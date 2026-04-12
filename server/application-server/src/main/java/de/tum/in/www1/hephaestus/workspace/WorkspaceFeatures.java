@@ -49,6 +49,11 @@ public class WorkspaceFeatures {
     @NotNull(message = "Progression enabled flag is required")
     private Boolean progressionEnabled = false;
 
+    /** Whether the league tiers and rankings are enabled */
+    @Column(name = "leagues_enabled", nullable = false)
+    @NotNull(message = "Leagues enabled flag is required")
+    private Boolean leaguesEnabled = false;
+
     /**
      * Applies a partial update from the request DTO (PATCH semantics).
      * Null fields in the request are ignored; non-null fields overwrite the current value.
@@ -65,6 +70,9 @@ public class WorkspaceFeatures {
         }
         if (request.progressionEnabled() != null) {
             this.progressionEnabled = request.progressionEnabled();
+        }
+        if (request.leaguesEnabled() != null) {
+            this.leaguesEnabled = request.leaguesEnabled();
         }
     }
 }

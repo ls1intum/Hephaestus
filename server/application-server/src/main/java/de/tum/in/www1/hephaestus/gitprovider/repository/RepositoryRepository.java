@@ -94,6 +94,21 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      */
     List<Repository> findAllByOrganization_LoginIgnoreCaseAndProviderId(String login, Long providerId);
 
+    /**
+     * Finds all repositories that match the workspace's monitored repo names.
+     * Uses nameWithOwner to join with RepositoryToMonitor entries,
+     * ensuring subgroup repos are included (not just top-level group repos).
+     */
+    @Query(
+        """
+        SELECT r FROM Repository r LEFT JOIN FETCH r.provider
+        WHERE r.nameWithOwner IN (
+            SELECT m.nameWithOwner FROM RepositoryToMonitor m WHERE m.workspace.id = :workspaceId
+        )
+        """
+    )
+    List<Repository> findAllByWorkspaceMonitors(@Param("workspaceId") Long workspaceId);
+
     @Transactional
     @Modifying
     @Query(

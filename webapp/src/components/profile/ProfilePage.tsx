@@ -19,6 +19,9 @@ interface ProfileProps {
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
 	/** Leaderboard schedule for proper week calculations */
 	schedule?: LeaderboardSchedule;
+	achievementsEnabled?: boolean;
+	progressionEnabled?: boolean;
+	leaguesEnabled?: boolean;
 }
 
 export function ProfilePage({
@@ -33,6 +36,9 @@ export function ProfilePage({
 	before,
 	onTimeframeChange,
 	schedule,
+	achievementsEnabled = true,
+	progressionEnabled = true,
+	leaguesEnabled = true,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -56,6 +62,9 @@ export function ProfilePage({
 				userXpRecord={profileData?.xpRecord}
 				isLoading={isLoading}
 				workspaceSlug={workspaceSlug}
+				achievementsEnabled={achievementsEnabled}
+				progressionEnabled={progressionEnabled}
+				leaguesEnabled={leaguesEnabled}
 			/>
 			<ProfileContent
 				providerType={providerType}

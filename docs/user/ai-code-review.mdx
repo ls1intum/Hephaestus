@@ -1,0 +1,89 @@
+---
+id: ai-code-review
+sidebar_position: 4
+title: Automated Code Review
+description: How Hephaestus reviews your merge requests and provides practice-based feedback.
+---
+
+Hephaestus automatically reviews your merge requests and gives you feedback on software engineering practices. When you open a non-draft merge request, the system analyzes your changes and posts comments highlighting what you did well and where you can improve.
+
+## How it works
+
+1. **You open an MR** -- Create a merge request (non-draft)
+2. **Hephaestus analyzes** -- An AI agent reads your diff and evaluates it against the practices configured for your workspace
+3. **You get feedback** -- Hephaestus posts a summary comment on your MR. If issues are found, you also get inline notes on specific lines
+
+To re-run the review after pushing new commits, use the [`/hephaestus review`](#retriggering-a-review) command.
+
+The review typically completes within 2--5 minutes, though large MRs may take longer.
+
+## Understanding the feedback
+
+### MR summary comment
+
+A summary comment appears at the top of your MR's discussion. When everything looks good, it posts a short approval. When issues are found, it contains:
+
+- A count of blocking issues and improvements found
+- Named positive practices you demonstrated well (up to 2)
+- Detailed explanations for any issues that could not be pinpointed to a specific line (e.g., MR description quality, commit messages)
+
+A compact list of line-specific issues is also included, showing the file location where each inline note was posted.
+
+### Inline diff notes
+
+For issues tied to specific code locations, Hephaestus posts inline notes directly on the relevant lines. Each note includes:
+
+- What the issue is
+- Why it matters
+- How to fix it (often with a code suggestion)
+
+### Severities
+
+| Severity     | Meaning                                                |
+| ------------ | ------------------------------------------------------ |
+| **CRITICAL** | Security vulnerability, data loss, or production crash |
+| **MAJOR**    | Functional bug or missing safety mechanism             |
+| **MINOR**    | Style, naming, or minor readability concern            |
+| **INFO**     | Observation with no direct quality impact              |
+
+## Retriggering a review
+
+If you want Hephaestus to re-analyze your MR (for example, after pushing new commits), post this as a comment on your MR:
+
+```
+/hephaestus review
+```
+
+Hephaestus will run a fresh analysis and post updated feedback.
+
+:::note
+The command is case-insensitive (`/Hephaestus Review` works too) but must be at the **start** of the comment body. Text before the command (e.g., "Please /hephaestus review") will not be detected.
+:::
+
+:::caution
+Reviews are not triggered for closed or merged MRs, and the `/hephaestus review` command is ignored for them.
+:::
+
+## What gets reviewed
+
+Hephaestus evaluates the **lines you added** in the MR diff. Pre-existing code is used as context for understanding your changes but is never flagged. Some practices (like MR description quality and commit discipline) evaluate MR metadata rather than code.
+
+The specific practices evaluated depend on your workspace configuration. Common practices include:
+
+- **Security** -- Hardcoded secrets
+- **Reliability** -- Crash risks (`fatal-error-crash`), silent failures, error handling
+- **Design** -- View decomposition, logic separation, state ownership, preview quality, accessibility
+- **Code quality** -- Meaningful naming, code hygiene
+- **Process** -- MR description quality, commit discipline
+
+## Opting out
+
+You can suppress review **comments** in your user settings. Navigate to **Settings** in the Hephaestus web app and disable the **Practice review comments** toggle under **AI Review**. Each review comment also has a link to this setting in its footer.
+
+:::info
+The preference suppresses comment delivery only. The review still runs and findings are stored in the database for instructor visibility.
+:::
+
+### Draft MRs
+
+By default, draft (WIP) merge requests are not reviewed. After marking a draft MR as ready, use `/hephaestus review` to trigger a review.

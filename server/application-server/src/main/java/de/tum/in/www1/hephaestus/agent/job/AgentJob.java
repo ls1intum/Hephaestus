@@ -154,6 +154,36 @@ public class AgentJob {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    // -- LLM usage aggregates (populated at job completion from agent-reported usage) --
+
+    @Column(name = "llm_model", length = 100)
+    private String llmModel;
+
+    /** Model version/snapshot date (e.g. "2026-03-17"), from agent config. */
+    @Column(name = "llm_model_version", length = 50)
+    private String llmModelVersion;
+
+    @Column(name = "llm_total_calls")
+    private Integer llmTotalCalls;
+
+    @Column(name = "llm_total_input_tokens")
+    private Integer llmTotalInputTokens;
+
+    @Column(name = "llm_total_output_tokens")
+    private Integer llmTotalOutputTokens;
+
+    @Column(name = "llm_total_reasoning_tokens")
+    private Integer llmTotalReasoningTokens;
+
+    @Column(name = "llm_cache_read_tokens")
+    private Integer llmCacheReadTokens;
+
+    @Column(name = "llm_cache_write_tokens")
+    private Integer llmCacheWriteTokens;
+
+    @Column(name = "llm_cost_usd")
+    private Double llmCostUsd;
+
     @PrePersist
     public void prePersist() {
         if (this.id == null) {

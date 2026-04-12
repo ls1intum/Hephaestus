@@ -12,7 +12,8 @@ public record UserTeamsDTO(
     String email,
     @NonNull String name,
     @NonNull String url,
-    @NonNull Set<TeamSummaryDTO> teams
+    @NonNull Set<TeamSummaryDTO> teams,
+    boolean hidden
 ) {
     /**
      * Creates a UserTeamsDTO from a User entity using scope-specific settings.
@@ -25,6 +26,18 @@ public record UserTeamsDTO(
      * @return the DTO with scope-specific settings applied
      */
     public static UserTeamsDTO fromUserWithScopeSettings(User user, Set<Long> hiddenTeamIds) {
+        return fromUserWithScopeSettings(user, hiddenTeamIds, false);
+    }
+
+    /**
+     * Creates a UserTeamsDTO from a User entity using scope-specific settings.
+     *
+     * @param user the user entity
+     * @param hiddenTeamIds set of team IDs that are hidden in this scope
+     * @param hidden whether this member is hidden from the leaderboard
+     * @return the DTO with scope-specific settings applied
+     */
+    public static UserTeamsDTO fromUserWithScopeSettings(User user, Set<Long> hiddenTeamIds, boolean hidden) {
         return new UserTeamsDTO(
             user.getId(),
             user.getLogin(),
@@ -37,7 +50,8 @@ public record UserTeamsDTO(
                 .map(m -> m.getTeam())
                 .filter(t -> t != null)
                 .map(team -> TeamSummaryDTO.fromTeamWithScopeSettings(team, hiddenTeamIds.contains(team.getId())))
-                .collect(Collectors.toCollection(LinkedHashSet::new))
+                .collect(Collectors.toCollection(LinkedHashSet::new)),
+            hidden
         );
     }
 }

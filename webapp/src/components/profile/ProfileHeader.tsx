@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getInitials } from "@/lib/avatar";
 import { cn } from "@/lib/utils.ts";
 import { XpProgress } from "./XpProgress";
 
@@ -20,6 +21,9 @@ export interface ProfileHeaderProps {
 	isLoading: boolean;
 	/** Workspace slug for routing to achievement page. */
 	workspaceSlug: string;
+	achievementsEnabled?: boolean;
+	progressionEnabled?: boolean;
+	leaguesEnabled?: boolean;
 }
 
 export function ProfileHeader({
@@ -29,6 +33,9 @@ export function ProfileHeader({
 	userXpRecord = { currentLevel: 1, currentLevelXP: 0, totalXP: 0, xpNeeded: 150 },
 	isLoading,
 	workspaceSlug,
+	achievementsEnabled = true,
+	progressionEnabled = true,
+	leaguesEnabled = true,
 }: ProfileHeaderProps) {
 	// Unpack XP data
 	const { currentLevel: level, currentLevelXP: currentXp, xpNeeded, totalXP } = userXpRecord;
@@ -56,7 +63,7 @@ export function ProfileHeader({
 						) : (
 							<Avatar className="size-16 border-2 border-background shadow-sm">
 								<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
-								<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
+								<AvatarFallback>{getInitials(user?.name, user?.login)}</AvatarFallback>
 							</Avatar>
 						)}
 
@@ -100,60 +107,65 @@ export function ProfileHeader({
 									target="_blank"
 									rel="noopener noreferrer"
 								>
-									github.com/{user.login}
+									{user.htmlUrl ? new URL(user.htmlUrl).host : ""}/{user.login}
 								</a>
-								<Button
-									variant="ghost"
-									size="sm"
-									className="h-7 gap-1.5 text-muted-foreground hover:text-foreground"
-									render={
-										<Link
-											to="/w/$workspaceSlug/user/$username/achievements"
-											params={{ workspaceSlug, username: user.login ?? "" }}
-										/>
-									}
-								>
-									<Sparkles className="w-3.5 h-3.5" />
-									<span className="text-xs">Achievements</span>
-								</Button>
+								{achievementsEnabled && (
+									<Button
+										variant="ghost"
+										size="sm"
+										className="h-7 gap-1.5 text-muted-foreground hover:text-foreground"
+										render={
+											<Link
+												to="/w/$workspaceSlug/user/$username/achievements"
+												params={{ workspaceSlug, username: user.login ?? "" }}
+											/>
+										}
+									>
+										<Sparkles className="w-3.5 h-3.5" />
+										<span className="text-xs">Achievements</span>
+									</Button>
+								)}
 							</div>
 						</div>
 					) : null}
 				</div>
 
 				{/* Row 2: XP Progress Bar with Contributing Since */}
-				{isLoading ? (
-					<div className="flex flex-col gap-2">
-						<Skeleton className="h-4 w-48" />
-						<Skeleton className="h-2.5 w-full max-w-sm" />
-						<Skeleton className="h-4 w-40" />
-					</div>
-				) : (
-					<XpProgress
-						className="max-w-sm"
-						currentXP={currentXp}
-						xpNeeded={xpNeeded}
-						nextLevel={level + 1}
-						totalXP={totalXP}
-						contributingSince={formattedFirstContribution}
-					/>
-				)}
+				{progressionEnabled &&
+					(isLoading ? (
+						<div className="flex flex-col gap-2">
+							<Skeleton className="h-4 w-48" />
+							<Skeleton className="h-2.5 w-full max-w-sm" />
+							<Skeleton className="h-4 w-40" />
+						</div>
+					) : (
+						<XpProgress
+							className="max-w-sm"
+							currentXP={currentXp}
+							xpNeeded={xpNeeded}
+							nextLevel={level + 1}
+							totalXP={totalXP}
+							contributingSince={formattedFirstContribution}
+						/>
+					))}
 			</div>
 
 			{/* Right section: League Icon + Points */}
-			<div className="flex flex-col items-center gap-1 shrink-0">
-				{isLoading ? (
-					<>
-						<Skeleton className="size-16 rounded-full" />
-						<Skeleton className="h-5 w-12" />
-					</>
-				) : (
-					<>
-						<LeagueIcon leaguePoints={leaguePoints} size="lg" />
-						<span className="text-muted-foreground text-base font-semibold">{leaguePoints}</span>
-					</>
-				)}
-			</div>
+			{leaguesEnabled && (
+				<div className="flex flex-col items-center gap-1 shrink-0">
+					{isLoading ? (
+						<>
+							<Skeleton className="size-16 rounded-full" />
+							<Skeleton className="h-5 w-12" />
+						</>
+					) : (
+						<>
+							<LeagueIcon leaguePoints={leaguePoints} size="lg" />
+							<span className="text-muted-foreground text-base font-semibold">{leaguePoints}</span>
+						</>
+					)}
+				</div>
+			)}
 		</div>
 	);
 }

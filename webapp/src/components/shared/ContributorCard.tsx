@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 
 export interface Contributor {
@@ -35,8 +36,11 @@ export function ContributorCard({ contributor, size = "md", className }: Contrib
 			title={`${contributor.name} (@${contributor.login})`}
 		>
 			<Avatar className={isSmall ? "size-12" : "size-16"}>
-				<AvatarImage src={contributor.avatarUrl} alt={`${contributor.login}'s avatar`} />
-				<AvatarFallback>{contributor.login.slice(0, 2).toUpperCase()}</AvatarFallback>
+				<AvatarImage
+					src={contributor.avatarUrl || undefined}
+					alt={`${contributor.login}'s avatar`}
+				/>
+				<AvatarFallback>{getInitials(contributor.name, contributor.login)}</AvatarFallback>
 			</Avatar>
 			<div className="flex flex-col items-center min-w-0 w-full space-y-0.5">
 				<div

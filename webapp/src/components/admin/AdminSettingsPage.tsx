@@ -25,6 +25,7 @@ export interface AdminSettingsPageProps {
 	achievementsEnabled: boolean;
 	leaderboardEnabled: boolean;
 	progressionEnabled: boolean;
+	leaguesEnabled: boolean;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
 }
@@ -48,6 +49,7 @@ export function AdminSettingsPage({
 	achievementsEnabled,
 	leaderboardEnabled,
 	progressionEnabled,
+	leaguesEnabled,
 	isSavingFeatures,
 	onToggleFeature,
 }: AdminSettingsPageProps) {
@@ -62,6 +64,7 @@ export function AdminSettingsPage({
 					achievementsEnabled={achievementsEnabled}
 					leaderboardEnabled={leaderboardEnabled}
 					progressionEnabled={progressionEnabled}
+					leaguesEnabled={leaguesEnabled}
 					isSaving={isSavingFeatures}
 					onToggle={onToggleFeature}
 				/>
@@ -79,8 +82,10 @@ export function AdminSettingsPage({
 					onRemoveRepository={onRemoveRepository}
 				/>
 
-				{/* Leagues Settings */}
-				<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
+				{/* Leagues Settings — only shown when leagues feature is enabled */}
+				{leaguesEnabled && (
+					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
+				)}
 			</div>
 		</div>
 	);

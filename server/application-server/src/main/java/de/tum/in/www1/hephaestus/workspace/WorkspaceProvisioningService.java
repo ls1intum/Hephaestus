@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
@@ -10,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
@@ -48,6 +50,7 @@ public class WorkspaceProvisioningService {
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitLabProperties gitLabProperties;
+    private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
     private final WebClient webClient;
 
     public WorkspaceProvisioningService(
@@ -63,7 +66,8 @@ public class WorkspaceProvisioningService {
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceScopeFilter workspaceScopeFilter,
-        GitLabProperties gitLabProperties
+        GitLabProperties gitLabProperties,
+        AuthenticatedGitProviderUserService authenticatedGitProviderUserService
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
@@ -78,6 +82,7 @@ public class WorkspaceProvisioningService {
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitLabProperties = gitLabProperties;
+        this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
         this.webClient = WebClient.builder()
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
@@ -211,6 +216,7 @@ public class WorkspaceProvisioningService {
 
         workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
         workspace.setPersonalAccessToken(config.token());
+        workspace.setRepositorySelection(RepositorySelection.ALL);
         if (!isBlank(config.serverUrl())) {
             workspace.setServerUrl(config.serverUrl().trim());
         }
@@ -223,6 +229,63 @@ public class WorkspaceProvisioningService {
         );
 
         ensureAdminMembership(savedWorkspace);
+    }
+
+    /**
+     * Resolves or creates a git provider User entity for a GitLab PAT workspace owner.
+     *
+     * <p>This is the public entry point for user-initiated GitLab workspace creation
+     * (via the REST API). When the authenticated user has no corresponding git provider
+     * {@link User} entity yet (common for first-time GitLab logins), this method
+     * validates the PAT against the GitLab API and upserts the user record so that
+     * workspace ownership can be assigned immediately.
+     *
+     * <p>If the user already exists, the upsert is a no-op merge thanks to the
+     * {@code ON CONFLICT (provider_id, native_id) DO UPDATE} clause in
+     * {@link UserRepository#upsertUser}.
+     *
+     * @param patToken    the GitLab Personal Access Token from the workspace creation request
+     * @param serverUrl   the GitLab server URL (may be null to use the default)
+     * @param accountLogin the GitLab group path used as the workspace account login
+     * @return the database ID of the resolved or created User
+     * @throws IllegalStateException if the token cannot be validated against GitLab
+     */
+    @Transactional
+    public Long resolveOrCreateGitLabUser(String patToken, String serverUrl, String accountLogin) {
+        String resolvedServerUrl = resolveGitLabServerUrl(serverUrl);
+        return syncGitLabUserForPAT(patToken, resolvedServerUrl, accountLogin);
+    }
+
+    /**
+     * Ensures the currently authenticated Keycloak user has a corresponding git provider
+     * {@link User} entity so they can be assigned as workspace owner.
+     *
+     * <p>Reads identity from JWT claims to determine the user's provider:
+     * <ul>
+     *   <li>{@code gitlab_id} → creates a GitLab user (uses the given serverUrl)</li>
+     *   <li>{@code github_id} → creates a GitHub user</li>
+     * </ul>
+     *
+     * <p>This is needed because first-time users may not have a {@code User} entity yet
+     * (it's normally created during sync). Without this, workspace creation would fail
+     * because there is no owner to assign.
+     *
+     * @param gitLabServerUrl the GitLab server URL for GitLab users (resolved to default if blank)
+     */
+    /**
+     * Ensures the currently authenticated Keycloak user has a corresponding git provider
+     * {@link User} entity so they can be assigned as workspace owner.
+     *
+     * <p>For GitLab workspaces, the user must have a linked GitLab identity ({@code gitlab_id}
+     * in their JWT). If they logged in via GitHub without linking GitLab, this method throws
+     * so the frontend can prompt them to link their account first.
+     *
+     * @param gitLabServerUrl the GitLab server URL (resolved to default if blank)
+     * @throws IllegalStateException if the user has no GitLab identity linked
+     */
+    @Transactional
+    public void ensureAuthenticatedUserExists(String gitLabServerUrl) {
+        authenticatedGitProviderUserService.ensureCurrentGitLabUserExists(gitLabServerUrl);
     }
 
     /**
@@ -326,8 +389,21 @@ public class WorkspaceProvisioningService {
         String webUrl,
         String serverUrl
     ) {
+        return upsertGitLabUser(nativeId, login, name, avatarUrl, webUrl, serverUrl, User.Type.BOT);
+    }
+
+    private Long upsertGitLabUser(
+        Long nativeId,
+        String login,
+        String name,
+        String avatarUrl,
+        String webUrl,
+        String serverUrl,
+        User.Type userType
+    ) {
         String safeName = name != null ? name : login;
-        String safeAvatar = avatarUrl != null ? avatarUrl : "";
+        // GitLab self-hosted instances return relative avatar paths (e.g. /uploads/-/system/user/avatar/123/avatar.png)
+        String safeAvatar = avatarUrl != null ? (avatarUrl.startsWith("/") ? serverUrl + avatarUrl : avatarUrl) : "";
         String safeWebUrl = webUrl != null ? webUrl : "";
 
         GitProvider provider = gitProviderRepository
@@ -347,15 +423,16 @@ public class WorkspaceProvisioningService {
             safeName,
             safeAvatar,
             safeWebUrl,
-            User.Type.BOT.name(),
+            userType.name(),
             null,
             null,
             null
         );
         log.info(
-            "Upserted user for GitLab PAT workspace bootstrap: userLogin={}, nativeId={}",
+            "Upserted user for GitLab workspace bootstrap: userLogin={}, nativeId={}, type={}",
             LoggingUtils.sanitizeForLog(login),
-            nativeId
+            nativeId,
+            userType
         );
         // Retrieve the JPA-managed entity to get the auto-generated PK (provider-scoped)
         return userRepository

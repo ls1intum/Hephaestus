@@ -3,14 +3,16 @@ package de.tum.in.www1.hephaestus.agent.handler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.in.www1.hephaestus.practices.model.CaMethod;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -34,15 +36,11 @@ import org.springframework.lang.Nullable;
  *       "evidence": { ... },
  *       "reasoning": "...",
  *       "guidance": "...",
- *       "guidanceMethod": "COACHING"
+ *       "suggestedDiffNotes": [
+ *         { "filePath": "src/Foo.swift", "startLine": 10, "body": "Suggestion..." }
+ *       ]
  *     }
- *   ],
- *   "delivery": {
- *     "mrNote": "Markdown summary for PR author...",
- *     "diffNotes": [
- *       { "filePath": "src/Foo.java", "startLine": 10, "body": "Suggestion..." }
- *     ]
- *   }
+ *   ]
  * }
  * }</pre>
  */
@@ -62,7 +60,7 @@ public class PracticeDetectionResultParser {
     static final int MAX_DIFF_NOTE_BODY_LENGTH = 2_000;
 
     /** Maximum number of diff notes per job. Bounds API calls for GitLab (one per note). */
-    static final int MAX_DIFF_NOTES = 10;
+    static final int MAX_DIFF_NOTES = 30;
 
     private final ObjectMapper objectMapper;
     private final int maxFindingsPerJob;
@@ -93,19 +91,26 @@ public class PracticeDetectionResultParser {
             return ParseResult.empty("rawOutput is blank");
         }
 
-        // Step 2: Double-parse the escaped JSON string
+        // Step 2: Sanitize invalid JSON escapes (e.g., Swift's \(variable) interpolation)
+        // then parse. The rawOutput may be pure JSON (from --json-schema) or may contain
+        // phase markers followed by JSON (from orchestrator protocol).
+        String sanitizedText = sanitizeJsonEscapes(rawOutputText);
         JsonNode root;
         try {
-            root = objectMapper.readTree(rawOutputText);
+            root = objectMapper.readTree(sanitizedText);
         } catch (JsonProcessingException e) {
-            return ParseResult.empty("invalid JSON in rawOutput: " + e.getMessage());
+            // Fallback: try to extract JSON from mixed text (e.g., "[PHASE0]...\n{...}")
+            root = extractJsonFromText(sanitizedText);
+            if (root == null) {
+                return ParseResult.empty("invalid JSON in rawOutput: " + e.getMessage());
+            }
         }
         if (root == null || root.isNull()) {
             return ParseResult.empty("rawOutput parsed to null");
         }
 
-        // Step 3: Extract findings array
-        JsonNode findingsNode = root.get("findings");
+        // Step 3: Extract findings array using the canonical top-level contract.
+        JsonNode findingsNode = extractFindingsNode(root);
         if (findingsNode == null || !findingsNode.isArray()) {
             return ParseResult.empty("missing or non-array 'findings' field");
         }
@@ -113,16 +118,18 @@ public class PracticeDetectionResultParser {
             return ParseResult.empty("findings array is empty");
         }
 
-        // Step 4: Max findings guard
-        if (findingsNode.size() > maxFindingsPerJob) {
-            return ParseResult.empty("findings count " + findingsNode.size() + " exceeds max " + maxFindingsPerJob);
+        // Step 4: Max findings guard — truncate rather than reject to preserve valid findings
+        int findingsLimit = findingsNode.size();
+        if (findingsLimit > maxFindingsPerJob) {
+            log.warn("Truncating findings from {} to {} (maxFindingsPerJob)", findingsNode.size(), maxFindingsPerJob);
+            findingsLimit = maxFindingsPerJob;
         }
 
-        // Step 5: Validate each entry
+        // Step 5: Validate each entry (respecting the truncation limit from Step 4)
         List<ValidatedFinding> valid = new ArrayList<>();
         List<DiscardedEntry> discarded = new ArrayList<>();
 
-        for (int i = 0; i < findingsNode.size(); i++) {
+        for (int i = 0; i < findingsLimit; i++) {
             JsonNode entry = findingsNode.get(i);
             if (!entry.isObject()) {
                 discarded.add(new DiscardedEntry(i, "entry is not a JSON object"));
@@ -135,10 +142,57 @@ public class PracticeDetectionResultParser {
             }
         }
 
-        // Step 6: Extract optional delivery content (never affects findings)
+        // Step 6: Deduplicate by practiceSlug — keep the finding with highest confidence
+        List<ValidatedFinding> deduped = deduplicateByPracticeSlug(valid);
+        if (deduped.size() < valid.size()) {
+            log.info("Deduplicated findings: {} → {} (by practiceSlug)", valid.size(), deduped.size());
+        }
+
+        // Step 7: Extract optional delivery content (never affects findings)
         DeliveryContent delivery = parseDeliveryContent(root);
 
-        return new ParseResult(Collections.unmodifiableList(valid), Collections.unmodifiableList(discarded), delivery);
+        // Step 8: Fallback — if delivery has no diffNotes, collect suggestedDiffNotes from
+        // NEGATIVE findings' raw JSON. OpenCode subagents produce per-finding suggestedDiffNotes
+        // that the orchestrator LLM often fails to aggregate into delivery.diffNotes.
+        if (delivery == null || delivery.diffNotes().isEmpty()) {
+            List<DiffNote> fallbackNotes = collectSuggestedDiffNotes(findingsNode, deduped);
+            if (!fallbackNotes.isEmpty()) {
+                String mrNote = delivery != null ? delivery.mrNote() : null;
+                delivery = new DeliveryContent(mrNote, fallbackNotes);
+                log.info(
+                    "Collected {} diff notes from per-finding suggestedDiffNotes (fallback)",
+                    fallbackNotes.size()
+                );
+            }
+        }
+
+        return new ParseResult(
+            Collections.unmodifiableList(deduped),
+            Collections.unmodifiableList(discarded),
+            delivery
+        );
+    }
+
+    private JsonNode extractFindingsNode(JsonNode root) {
+        return root.get("findings");
+    }
+
+    // =========================================================================
+    // Deduplication
+    // =========================================================================
+
+    /**
+     * Deduplicate findings by practiceSlug, keeping the one with the highest confidence.
+     * Agents sometimes produce multiple findings for the same practice; we keep only the best.
+     */
+    private static List<ValidatedFinding> deduplicateByPracticeSlug(List<ValidatedFinding> findings) {
+        Map<String, ValidatedFinding> best = new LinkedHashMap<>();
+        for (ValidatedFinding f : findings) {
+            best.merge(f.practiceSlug(), f, (existing, incoming) ->
+                incoming.confidence() > existing.confidence() ? incoming : existing
+            );
+        }
+        return new ArrayList<>(best.values());
     }
 
     // =========================================================================
@@ -193,68 +247,154 @@ public class PracticeDetectionResultParser {
         }
 
         for (int i = 0; i < limit; i++) {
-            JsonNode entry = diffNotesNode.get(i);
-            if (!entry.isObject()) {
-                log.debug("Skipping non-object diffNote at index {}", i);
-                continue;
+            DiffNote note = parseSingleDiffNote(diffNotesNode.get(i), -1, i);
+            if (note != null) {
+                notes.add(note);
             }
-
-            // Required: filePath
-            JsonNode filePathNode = entry.get("filePath");
-            if (
-                filePathNode == null ||
-                filePathNode.isNull() ||
-                !filePathNode.isTextual() ||
-                filePathNode.asText().isBlank()
-            ) {
-                log.debug("Skipping diffNote at index {}: missing filePath", i);
-                continue;
-            }
-            String filePath = filePathNode.asText();
-
-            // Required: startLine (positive integer)
-            JsonNode startLineNode = entry.get("startLine");
-            if (startLineNode == null || startLineNode.isNull() || !startLineNode.isNumber()) {
-                log.debug("Skipping diffNote at index {}: missing or non-numeric startLine", i);
-                continue;
-            }
-            int startLine = startLineNode.asInt();
-            if (startLine <= 0) {
-                log.debug("Skipping diffNote at index {}: startLine must be positive, got {}", i, startLine);
-                continue;
-            }
-
-            // Optional: endLine (positive integer, must be >= startLine)
-            Integer endLine = null;
-            JsonNode endLineNode = entry.get("endLine");
-            if (endLineNode != null && !endLineNode.isNull() && endLineNode.isNumber()) {
-                int endLineValue = endLineNode.asInt();
-                if (endLineValue >= startLine) {
-                    endLine = endLineValue;
-                }
-            }
-
-            // Required: body
-            JsonNode bodyNode = entry.get("body");
-            if (bodyNode == null || bodyNode.isNull() || !bodyNode.isTextual() || bodyNode.asText().isBlank()) {
-                log.debug("Skipping diffNote at index {}: missing body", i);
-                continue;
-            }
-            String body = bodyNode.asText();
-            if (body.length() > MAX_DIFF_NOTE_BODY_LENGTH) {
-                log.debug(
-                    "Truncating diffNote body from {} to {} chars at index {}",
-                    body.length(),
-                    MAX_DIFF_NOTE_BODY_LENGTH,
-                    i
-                );
-                body = body.substring(0, MAX_DIFF_NOTE_BODY_LENGTH);
-            }
-
-            notes.add(new DiffNote(filePath, startLine, endLine, body));
         }
 
         return Collections.unmodifiableList(notes);
+    }
+
+    /**
+     * Fallback: collect suggestedDiffNotes from individual NEGATIVE findings when delivery.diffNotes is empty.
+     *
+     * <p>OpenCode subagents produce per-finding {@code suggestedDiffNotes} arrays, but the orchestrator
+     * LLM often fails to aggregate them into {@code delivery.diffNotes}. This method scans raw finding
+     * JSON nodes, matches them against validated NEGATIVE findings (by practiceSlug), and collects
+     * their suggested diff notes — prioritizing higher severity findings, capped at {@link #MAX_DIFF_NOTES}.
+     */
+    private List<DiffNote> collectSuggestedDiffNotes(JsonNode findingsNode, List<ValidatedFinding> validatedFindings) {
+        // Build lookup of NEGATIVE validated findings by slug → severity for filtering and sorting
+        Map<String, Severity> negativeSlugs = new LinkedHashMap<>();
+        for (ValidatedFinding vf : validatedFindings) {
+            if (vf.verdict() == Verdict.NEGATIVE) {
+                negativeSlugs.put(vf.practiceSlug(), vf.severity());
+            }
+        }
+        if (negativeSlugs.isEmpty()) {
+            return List.of();
+        }
+
+        // Collect (severity, diffNote) pairs from raw findings that match NEGATIVE validated slugs
+        record ScoredNote(Severity severity, DiffNote note) {}
+        List<ScoredNote> scored = new ArrayList<>();
+
+        for (int i = 0; i < findingsNode.size(); i++) {
+            JsonNode entry = findingsNode.get(i);
+            if (!entry.isObject()) continue;
+
+            // Match by practiceSlug — normalize the same way validateEntry does
+            JsonNode slugNode = entry.get("practiceSlug");
+            if (slugNode == null || slugNode.isNull() || !slugNode.isTextual()) continue;
+            String slug = slugNode.asText().toLowerCase(Locale.ROOT).replace('_', '-');
+
+            Severity severity = negativeSlugs.get(slug);
+            if (severity == null) continue; // not a validated NEGATIVE finding
+
+            // Parse suggestedDiffNotes array
+            JsonNode suggestedNode = entry.get("suggestedDiffNotes");
+            if (suggestedNode == null || suggestedNode.isNull() || !suggestedNode.isArray()) continue;
+
+            for (int j = 0; j < suggestedNode.size(); j++) {
+                JsonNode noteEntry = suggestedNode.get(j);
+                DiffNote note = parseSingleDiffNote(noteEntry, i, j);
+                if (note != null) {
+                    scored.add(new ScoredNote(severity, note));
+                }
+            }
+        }
+
+        if (scored.isEmpty()) {
+            return List.of();
+        }
+
+        // Sort by severity: CRITICAL (ordinal 0) first, INFO (ordinal 3) last
+        scored.sort(Comparator.comparingInt(s -> s.severity().ordinal()));
+
+        // Cap at MAX_DIFF_NOTES
+        int limit = Math.min(scored.size(), MAX_DIFF_NOTES);
+        List<DiffNote> result = new ArrayList<>(limit);
+        for (int i = 0; i < limit; i++) {
+            result.add(scored.get(i).note());
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    /**
+     * Parse a single diff note JSON object. Returns null if the entry is invalid.
+     * Shared validation logic used by both delivery.diffNotes and suggestedDiffNotes parsing.
+     */
+    @Nullable
+    private DiffNote parseSingleDiffNote(JsonNode entry, int findingIndex, int noteIndex) {
+        if (!entry.isObject()) {
+            log.debug("Skipping non-object suggestedDiffNote at finding {}, index {}", findingIndex, noteIndex);
+            return null;
+        }
+
+        // Required: filePath
+        JsonNode filePathNode = entry.get("filePath");
+        if (
+            filePathNode == null ||
+            filePathNode.isNull() ||
+            !filePathNode.isTextual() ||
+            filePathNode.asText().isBlank()
+        ) {
+            log.debug("Skipping suggestedDiffNote at finding {}, index {}: missing filePath", findingIndex, noteIndex);
+            return null;
+        }
+        String filePath = filePathNode.asText();
+
+        // Required: startLine (positive integer)
+        JsonNode startLineNode = entry.get("startLine");
+        if (startLineNode == null || startLineNode.isNull() || !startLineNode.isNumber()) {
+            log.debug(
+                "Skipping suggestedDiffNote at finding {}, index {}: missing or non-numeric startLine",
+                findingIndex,
+                noteIndex
+            );
+            return null;
+        }
+        int startLine = startLineNode.asInt();
+        if (startLine <= 0) {
+            log.debug(
+                "Skipping suggestedDiffNote at finding {}, index {}: startLine must be positive, got {}",
+                findingIndex,
+                noteIndex,
+                startLine
+            );
+            return null;
+        }
+
+        // Optional: endLine (positive integer, must be >= startLine)
+        Integer endLine = null;
+        JsonNode endLineNode = entry.get("endLine");
+        if (endLineNode != null && !endLineNode.isNull() && endLineNode.isNumber()) {
+            int endLineValue = endLineNode.asInt();
+            if (endLineValue >= startLine) {
+                endLine = endLineValue;
+            }
+        }
+
+        // Required: body
+        JsonNode bodyNode = entry.get("body");
+        if (bodyNode == null || bodyNode.isNull() || !bodyNode.isTextual() || bodyNode.asText().isBlank()) {
+            log.debug("Skipping suggestedDiffNote at finding {}, index {}: missing body", findingIndex, noteIndex);
+            return null;
+        }
+        String body = bodyNode.asText();
+        if (body.length() > MAX_DIFF_NOTE_BODY_LENGTH) {
+            log.debug(
+                "Truncating suggestedDiffNote body from {} to {} chars at finding {}, index {}",
+                body.length(),
+                MAX_DIFF_NOTE_BODY_LENGTH,
+                findingIndex,
+                noteIndex
+            );
+            body = body.substring(0, MAX_DIFF_NOTE_BODY_LENGTH);
+        }
+
+        return new DiffNote(filePath, startLine, endLine, body);
     }
 
     // =========================================================================
@@ -299,7 +439,7 @@ public class PracticeDetectionResultParser {
                     log.debug("Evidence exceeds {} bytes, dropping: slug={}", MAX_EVIDENCE_BYTES, practiceSlug);
                 }
             } catch (JsonProcessingException e) {
-                // Silently drop unparseable evidence
+                log.debug("Failed to parse evidence JSON, dropping: slug={}, error={}", practiceSlug, e.getMessage());
             }
         }
 
@@ -327,28 +467,7 @@ public class PracticeDetectionResultParser {
             guidance = guidance.substring(0, MAX_GUIDANCE_LENGTH);
         }
 
-        // Optional: guidanceMethod
-        CaMethod guidanceMethod = null;
-        JsonNode gmNode = entry.get("guidanceMethod");
-        if (gmNode != null && !gmNode.isNull() && gmNode.isTextual() && !gmNode.asText().isBlank()) {
-            try {
-                guidanceMethod = CaMethod.valueOf(gmNode.asText().toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException e) {
-                // Invalid guidance method — leave null, don't discard the entire finding
-            }
-        }
-
-        return new ValidatedFinding(
-            practiceSlug,
-            title,
-            verdict,
-            severity,
-            confidence,
-            evidence,
-            reasoning,
-            guidance,
-            guidanceMethod
-        );
+        return new ValidatedFinding(practiceSlug, title, verdict, severity, confidence, evidence, reasoning, guidance);
     }
 
     private static String textField(JsonNode entry, String field) {
@@ -396,6 +515,80 @@ public class PracticeDetectionResultParser {
         return confidence;
     }
 
+    /**
+     * Sanitize invalid JSON escape sequences commonly produced by LLMs generating
+     * code snippets (e.g., Swift's {@code \(variable)} string interpolation).
+     *
+     * <p>In JSON, only {@code " \ / b f n r t u} are valid after a backslash.
+     * This method doubles any backslash that precedes an invalid escape character,
+     * turning {@code \(error)} into {@code \\(error)} which Jackson reads as a
+     * literal backslash followed by {@code (error)}.
+     */
+    static String sanitizeJsonEscapes(String text) {
+        // Quick check: if no backslash, nothing to fix
+        if (text.indexOf('\\') < 0) {
+            return text;
+        }
+        StringBuilder sb = new StringBuilder(text.length() + 64);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\\' && i + 1 < text.length()) {
+                char next = text.charAt(i + 1);
+                if (isValidJsonEscapeChar(next)) {
+                    // Valid JSON escape — pass through both chars
+                    sb.append(c);
+                    sb.append(next);
+                    i++; // skip next
+                } else {
+                    // Invalid JSON escape — double the backslash
+                    sb.append('\\');
+                    sb.append('\\');
+                    // Don't skip next — it will be processed in the next iteration
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static boolean isValidJsonEscapeChar(char c) {
+        return (
+            c == '"' || c == '\\' || c == '/' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'u'
+        );
+    }
+
+    /**
+     * Extract a JSON object containing "findings" from mixed text content.
+     *
+     * <p>The orchestrator protocol emits phase markers (e.g., {@code [PHASE0]...}) followed
+     * by a JSON object. This method finds the first '{' that starts a valid JSON object
+     * containing a "findings" array.
+     */
+    @Nullable
+    private JsonNode extractJsonFromText(String text) {
+        // Guard: skip absurdly large inputs (agent rawOutput shouldn't exceed 1MB)
+        if (text.length() > 1_000_000) {
+            log.warn("extractJsonFromText: input too large ({} chars), skipping", text.length());
+            return null;
+        }
+        int startIdx = 0;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            int braceIdx = text.indexOf('{', startIdx);
+            if (braceIdx < 0) break;
+            try {
+                JsonNode node = objectMapper.readTree(text.substring(braceIdx));
+                if (node != null && node.isObject() && node.has("findings")) {
+                    return node;
+                }
+            } catch (JsonProcessingException ignored) {
+                // Not valid JSON from this position, try next '{'
+            }
+            startIdx = braceIdx + 1;
+        }
+        return null;
+    }
+
     private static class EntryValidationException extends RuntimeException {
 
         EntryValidationException(String message) {
@@ -435,8 +628,7 @@ public class PracticeDetectionResultParser {
         float confidence,
         JsonNode evidence,
         String reasoning,
-        String guidance,
-        CaMethod guidanceMethod
+        String guidance
     ) {}
 
     public record DiscardedEntry(int index, String reason) {}

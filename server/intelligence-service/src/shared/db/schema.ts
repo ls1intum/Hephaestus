@@ -148,6 +148,7 @@ export const agentConfig = pgTable(
 		}).notNull(),
 		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
 		credentialMode: varchar("credential_mode", { length: 16 }).default("PROXY").notNull(),
+		modelVersion: varchar("model_version", { length: 50 }),
 	},
 	(table) => [
 		foreignKey({
@@ -191,18 +192,17 @@ export const agentJob = pgTable(
 		deliveryStatus: varchar("delivery_status", { length: 20 }),
 		deliveryCommentId: varchar("delivery_comment_id", { length: 255 }),
 		containerLogs: text("container_logs"),
+		llmModel: varchar("llm_model", { length: 100 }),
+		llmTotalCalls: integer("llm_total_calls"),
+		llmTotalInputTokens: integer("llm_total_input_tokens"),
+		llmTotalOutputTokens: integer("llm_total_output_tokens"),
+		llmTotalReasoningTokens: integer("llm_total_reasoning_tokens"),
+		llmCacheReadTokens: integer("llm_cache_read_tokens"),
+		llmCacheWriteTokens: integer("llm_cache_write_tokens"),
+		llmCostUsd: doublePrecision("llm_cost_usd"),
+		llmModelVersion: varchar("llm_model_version", { length: 50 }),
 	},
 	(table) => [
-		index("idx_agent_job_delivery_dedup")
-			.using(
-				"btree",
-				sql`workspace_id`,
-				sql`((metadata ->> 'pull_request_id'::text))`,
-				sql`completed_at`,
-			)
-			.where(
-				sql`(((delivery_status)::text = 'DELIVERED'::text) AND ((job_type)::text = 'PULL_REQUEST_REVIEW'::text) AND (delivery_comment_id IS NOT NULL))`,
-			),
 		index("idx_agent_job_status_started")
 			.using("btree", table.status.asc().nullsLast(), table.startedAt.asc().nullsLast())
 			.where(sql`((status)::text = 'RUNNING'::text)`),
@@ -1209,7 +1209,7 @@ export const practice = pgTable(
 		category: varchar({ length: 64 }),
 		description: text().notNull(),
 		triggerEvents: jsonb("trigger_events").default([]).notNull(),
-		detectionPrompt: text("detection_prompt"),
+		criteria: text(),
 		isActive: boolean("is_active").default(true).notNull(),
 		createdAt: timestamp("created_at", {
 			precision: 6,
@@ -1217,6 +1217,7 @@ export const practice = pgTable(
 			mode: "string",
 		}).notNull(),
 		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+		precomputeScript: text("precompute_script"),
 	},
 	(table) => [
 		index("idx_practice_workspace_active").using(
@@ -1253,7 +1254,6 @@ export const practiceFinding = pgTable(
 		evidence: jsonb(),
 		reasoning: text(),
 		guidance: text(),
-		guidanceMethod: varchar("guidance_method", { length: 16 }),
 		detectedAt: timestamp("detected_at", {
 			precision: 6,
 			withTimezone: true,
@@ -1289,10 +1289,6 @@ export const practiceFinding = pgTable(
 		}),
 		unique("uk_practice_finding_idempotency").on(table.idempotencyKey),
 		check(
-			"chk_practice_finding_verdict",
-			sql`(verdict)::text = ANY ((ARRAY['POSITIVE'::character varying, 'NEGATIVE'::character varying, 'NOT_APPLICABLE'::character varying, 'NEEDS_REVIEW'::character varying])::text[])`,
-		),
-		check(
 			"chk_practice_finding_severity",
 			sql`(severity)::text = ANY ((ARRAY['CRITICAL'::character varying, 'MAJOR'::character varying, 'MINOR'::character varying, 'INFO'::character varying])::text[])`,
 		),
@@ -1300,11 +1296,11 @@ export const practiceFinding = pgTable(
 			"chk_practice_finding_confidence",
 			sql`(confidence >= (0)::double precision) AND (confidence <= (1)::double precision)`,
 		),
-		check(
-			"chk_practice_finding_guidance_method",
-			sql`(guidance_method IS NULL) OR ((guidance_method)::text = ANY ((ARRAY['MODELING'::character varying, 'COACHING'::character varying, 'SCAFFOLDING'::character varying, 'ARTICULATION'::character varying, 'REFLECTION'::character varying, 'EXPLORATION'::character varying])::text[]))`,
-		),
 		check("chk_practice_finding_target_type", sql`(target_type)::text = 'PULL_REQUEST'::text`),
+		check(
+			"chk_practice_finding_verdict",
+			sql`(verdict)::text = ANY ((ARRAY['POSITIVE'::character varying, 'NEGATIVE'::character varying, 'NOT_APPLICABLE'::character varying])::text[])`,
+		),
 	],
 );
 
@@ -2144,6 +2140,7 @@ export const workspace = pgTable(
 		achievementsEnabled: boolean("achievements_enabled").default(false).notNull(),
 		leaderboardEnabled: boolean("leaderboard_enabled").default(false).notNull(),
 		progressionEnabled: boolean("progression_enabled").default(false).notNull(),
+		leaguesEnabled: boolean("leagues_enabled").default(false).notNull(),
 	},
 	(table) => [
 		foreignKey({
@@ -2170,6 +2167,7 @@ export const workspaceMembership = pgTable(
 		userId: bigint("user_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		hidden: boolean().default(false).notNull(),
 	},
 	(table) => [
 		index("idx_workspace_membership_user_id").using("btree", table.userId.asc().nullsLast()),

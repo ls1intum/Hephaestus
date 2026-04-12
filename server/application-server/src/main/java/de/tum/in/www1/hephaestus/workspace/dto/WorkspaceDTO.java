@@ -45,7 +45,8 @@ public record WorkspaceDTO(
     @NonNull @Schema(description = "Whether the practice review feature is enabled") Boolean practicesEnabled,
     @NonNull @Schema(description = "Whether the achievements system is enabled") Boolean achievementsEnabled,
     @NonNull @Schema(description = "Whether the leaderboard is enabled") Boolean leaderboardEnabled,
-    @NonNull @Schema(description = "Whether the league/progression system is enabled") Boolean progressionEnabled
+    @NonNull @Schema(description = "Whether the league/progression system is enabled") Boolean progressionEnabled,
+    @NonNull @Schema(description = "Whether league tiers and rankings are enabled") Boolean leaguesEnabled
 ) {
     public static WorkspaceDTO from(Workspace workspace) {
         return new WorkspaceDTO(
@@ -74,7 +75,8 @@ public record WorkspaceDTO(
             workspace.getFeatures().getPracticesEnabled(),
             workspace.getFeatures().getAchievementsEnabled(),
             workspace.getFeatures().getLeaderboardEnabled(),
-            workspace.getFeatures().getProgressionEnabled()
+            workspace.getFeatures().getProgressionEnabled(),
+            workspace.getFeatures().getLeaguesEnabled()
         );
     }
 }

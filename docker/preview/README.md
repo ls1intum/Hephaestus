@@ -71,4 +71,4 @@ docker rm -f "$TEMP_CTN"
 ## Files
 
 - `compose.app.yaml` - Main Docker Compose for preview deployments
-- `compose.proxy.yaml` - Traefik proxy configuration (shared)
+- `compose.shared-infra.yaml` - Shared Keycloak, webhook-ingest, and NATS stack for previews

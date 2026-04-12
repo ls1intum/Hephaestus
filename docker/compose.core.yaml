@@ -68,7 +68,7 @@ services:
         max-file: "3"
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.5
     restart: unless-stopped
     depends_on:
       keycloak-postgres:
@@ -99,6 +99,11 @@ services:
       - KEYCLOAK_GITHUB_CLIENT_ID=${KEYCLOAK_GITHUB_CLIENT_ID}
       - KEYCLOAK_GITHUB_CLIENT_SECRET=${KEYCLOAK_GITHUB_CLIENT_SECRET}
       - KEYCLOAK_GITHUB_ADMIN_USERNAME=${KEYCLOAK_GITHUB_ADMIN_USERNAME}
+      - KEYCLOAK_GITLAB_ENABLED=${KEYCLOAK_GITLAB_ENABLED:-false}
+      - KEYCLOAK_GITLAB_CLIENT_ID=${KEYCLOAK_GITLAB_CLIENT_ID}
+      - KEYCLOAK_GITLAB_CLIENT_SECRET=${KEYCLOAK_GITLAB_CLIENT_SECRET}
+      - KEYCLOAK_GITLAB_BASE_URL=${KEYCLOAK_GITLAB_BASE_URL:-https://gitlab.lrz.de}
+      - KEYCLOAK_GITLAB_ADMIN_USERNAME=${KEYCLOAK_GITLAB_ADMIN_USERNAME}
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.gzip.compress=true"
@@ -213,6 +218,44 @@ configs:
               "display.on.consent.screen": "false",
               "token.response.type.bearer.lower-case": "false"
             },
+            "protocolMappers": [
+              {
+                "name": "github_id",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-usermodel-attribute-mapper",
+                "config": {
+                  "user.attribute": "github_id",
+                  "claim.name": "github_id",
+                  "id.token.claim": "true",
+                  "access.token.claim": "true",
+                  "jsonType.label": "long"
+                }
+              },
+              {
+                "name": "gitlab_id",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-usermodel-attribute-mapper",
+                "config": {
+                  "user.attribute": "gitlab_id",
+                  "claim.name": "gitlab_id",
+                  "id.token.claim": "true",
+                  "access.token.claim": "true",
+                  "jsonType.label": "long"
+                }
+              },
+              {
+                "name": "identity_provider",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-usersessionmodel-note-mapper",
+                "config": {
+                  "user.session.note": "identity_provider",
+                  "claim.name": "identity_provider",
+                  "id.token.claim": "true",
+                  "access.token.claim": "true",
+                  "jsonType.label": "String"
+                }
+              }
+            ],
             "authenticationFlowBindingOverrides": {},
             "fullScopeAllowed": true,
             "nodeReRegistrationTimeout": -1,
@@ -339,7 +382,7 @@ configs:
             "displayName": "GitHub",
             "providerId": "github",
             "enabled": true,
-            "updateProfileFirstLoginMode": "on",
+            "updateProfileFirstLoginMode": "off",
             "trustEmail": true,
             "storeToken": false,
             "addReadTokenRoleOnCreate": false,
@@ -351,6 +394,81 @@ configs:
               "clientSecret": "${KEYCLOAK_GITHUB_CLIENT_SECRET}",
               "clientId": "${KEYCLOAK_GITHUB_CLIENT_ID}",
               "guiOrder": "1"
+            }
+          },
+          {
+            "alias": "gitlab-lrz",
+            "displayName": "GitLab LRZ",
+            "providerId": "oidc",
+            "enabled": ${KEYCLOAK_GITLAB_ENABLED:-false},
+            "updateProfileFirstLoginMode": "off",
+            "trustEmail": true,
+            "storeToken": false,
+            "addReadTokenRoleOnCreate": false,
+            "authenticateByDefault": false,
+            "linkOnly": false,
+            "hideOnLogin": false,
+            "firstBrokerLoginFlowAlias": "first broker login",
+            "config": {
+              "syncMode": "IMPORT",
+              "clientSecret": "${KEYCLOAK_GITLAB_CLIENT_SECRET}",
+              "clientId": "${KEYCLOAK_GITLAB_CLIENT_ID}",
+              "issuer": "${KEYCLOAK_GITLAB_BASE_URL}",
+              "authorizationUrl": "${KEYCLOAK_GITLAB_BASE_URL}/oauth/authorize",
+              "tokenUrl": "${KEYCLOAK_GITLAB_BASE_URL}/oauth/token",
+              "userInfoUrl": "${KEYCLOAK_GITLAB_BASE_URL}/oauth/userinfo",
+              "jwksUrl": "${KEYCLOAK_GITLAB_BASE_URL}/oauth/discovery/keys",
+              "logoutUrl": "",
+              "defaultScope": "openid profile email",
+              "validateSignature": "true",
+              "useJwksUrl": "true",
+              "guiOrder": "2",
+              "clientAuthMethod": "client_secret_post",
+              "allowedClockSkew": "300"
+            }
+          }
+        ],
+        "identityProviderMappers": [
+          {
+            "name": "github-id-attribute",
+            "identityProviderAlias": "github",
+            "identityProviderMapper": "github-user-attribute-mapper",
+            "config": {
+              "syncMode": "FORCE",
+              "jsonField": "id",
+              "userAttribute": "github_id"
+            }
+          },
+          {
+            "name": "gitlab-id-attribute",
+            "identityProviderAlias": "gitlab-lrz",
+            "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+            "config": {
+              "syncMode": "FORCE",
+              "claim": "sub",
+              "user.attribute": "gitlab_id"
+            }
+          },
+          {
+            "name": "github-admin-realm-role",
+            "identityProviderAlias": "github",
+            "identityProviderMapper": "oidc-advanced-role-idp-mapper",
+            "config": {
+              "syncMode": "FORCE",
+              "claims": "[{\"key\":\"login\",\"value\":\"(?i)^${KEYCLOAK_GITHUB_ADMIN_USERNAME}$\"}]",
+              "are.claim.values.regex": "true",
+              "role": "admin"
+            }
+          },
+          {
+            "name": "gitlab-admin-realm-role",
+            "identityProviderAlias": "gitlab-lrz",
+            "identityProviderMapper": "oidc-advanced-role-idp-mapper",
+            "config": {
+              "syncMode": "FORCE",
+              "claims": "[{\"key\":\"preferred_username\",\"value\":\"(?i)^${KEYCLOAK_GITLAB_ADMIN_USERNAME}$\"}]",
+              "are.claim.values.regex": "true",
+              "role": "admin"
             }
           }
         ],
@@ -434,10 +552,27 @@ configs:
                   "realm-management": [
                       "view-users",
                       "query-users",
-                      "manage-users"
+                      "manage-users",
+                      "view-identity-providers"
                   ]
               },
               "notBefore": 0,
               "groups": []
+          }],
+        "authenticatorConfig": [
+          {
+            "alias": "review profile config",
+            "config": {
+              "update.profile.on.first.login": "off"
+            }
+          }
+        ],
+        "components": {
+          "org.keycloak.userprofile.UserProfileProvider": [{
+            "providerId": "declarative-user-profile",
+            "config": {
+              "kc.user.profile.config": ["{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}}},{\"name\":\"email\",\"displayName\":\"${email}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"email\":{},\"length\":{\"max\":255}}},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255}}},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255}}}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"]
+            }
           }]
+        }
       }

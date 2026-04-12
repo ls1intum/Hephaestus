@@ -45,6 +45,40 @@ export type WorkspaceTeamRepositorySettings = {
 };
 
 /**
+ * Available workspace creation providers and their configuration
+ */
+export type WorkspaceProviders = {
+    /**
+     * GitHub workspace provider config, null if not available
+     */
+    github?: GitHubProvider;
+    /**
+     * GitLab workspace provider config, null if not available
+     */
+    gitlab?: GitLabProvider;
+};
+
+/**
+ * GitLab provider configuration
+ */
+export type GitLabProvider = {
+    /**
+     * Default GitLab server URL for this deployment
+     */
+    defaultServerUrl?: string;
+};
+
+/**
+ * GitHub provider configuration
+ */
+export type GitHubProvider = {
+    /**
+     * GitHub App installation URL
+     */
+    appInstallationUrl?: string;
+};
+
+/**
  * A user's membership in a workspace
  */
 export type WorkspaceMembership = {
@@ -52,6 +86,10 @@ export type WorkspaceMembership = {
      * Timestamp when the membership was created
      */
     createdAt?: Date;
+    /**
+     * Whether the member is hidden from the leaderboard
+     */
+    hidden?: boolean;
     /**
      * League points earned by the user in this workspace
      */
@@ -102,6 +140,10 @@ export type WorkspaceListItem = {
      * Whether the leaderboard is enabled
      */
     leaderboardEnabled: boolean;
+    /**
+     * Whether league tiers and rankings are enabled
+     */
+    leaguesEnabled: boolean;
     /**
      * Whether the practice review feature is enabled
      */
@@ -205,6 +247,10 @@ export type Workspace = {
      */
     leaderboardScheduleTime?: string;
     /**
+     * Whether league tiers and rankings are enabled
+     */
+    leaguesEnabled: boolean;
+    /**
      * Whether the practice review feature is enabled
      */
     practicesEnabled: boolean;
@@ -240,6 +286,7 @@ export type VoteMessageRequest = {
 
 export type UserTeams = {
     email?: string;
+    hidden?: boolean;
     id: number;
     login: string;
     name: string;
@@ -422,6 +469,10 @@ export type UpdateWorkspaceFeaturesRequest = {
      */
     leaderboardEnabled?: boolean;
     /**
+     * Enable league tiers and rankings
+     */
+    leaguesEnabled?: boolean;
+    /**
      * Enable the practice review feature
      */
     practicesEnabled?: boolean;
@@ -460,17 +511,21 @@ export type UpdatePracticeRequest = {
      */
     category?: string;
     /**
+     * Practice evaluation criteria
+     */
+    criteria?: string;
+    /**
      * Practice description
      */
     description?: string;
     /**
-     * AI detection prompt template
-     */
-    detectionPrompt?: string;
-    /**
      * Human-readable name
      */
     name?: string;
+    /**
+     * TypeScript/Bun precompute script for static analysis before AI review
+     */
+    precomputeScript?: string;
     /**
      * Domain events that trigger detection
      */
@@ -494,7 +549,7 @@ export type UpdateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType?: 'CLAUDE_CODE' | 'OPENCODE';
+    agentType?: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
     /**
      * Whether agent containers have internet access
      */
@@ -514,7 +569,7 @@ export type UpdateAgentConfigRequest = {
     /**
      * LLM provider
      */
-    llmProvider?: 'ANTHROPIC' | 'OPENAI';
+    llmProvider?: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
     /**
      * Maximum concurrent jobs
      */
@@ -948,10 +1003,6 @@ export type PracticeFindingList = {
      */
     detectedAt: Date;
     /**
-     * Cognitive apprenticeship guidance method
-     */
-    guidanceMethod?: 'MODELING' | 'COACHING' | 'SCAFFOLDING' | 'ARTICULATION' | 'REFLECTION' | 'EXPLORATION';
-    /**
      * Finding ID
      */
     id: string;
@@ -980,9 +1031,9 @@ export type PracticeFindingList = {
      */
     title: string;
     /**
-     * Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW
+     * Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE
      */
-    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
+    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
 };
 
 /**
@@ -1009,10 +1060,6 @@ export type PracticeFindingDetail = {
      * Actionable guidance for the contributor
      */
     guidance?: string;
-    /**
-     * Cognitive apprenticeship guidance method
-     */
-    guidanceMethod?: 'MODELING' | 'COACHING' | 'SCAFFOLDING' | 'ARTICULATION' | 'REFLECTION' | 'EXPLORATION';
     /**
      * Finding ID
      */
@@ -1046,9 +1093,9 @@ export type PracticeFindingDetail = {
      */
     title: string;
     /**
-     * Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW
+     * Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE
      */
-    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
+    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
 };
 
 /**
@@ -1068,13 +1115,13 @@ export type Practice = {
      */
     createdAt: Date;
     /**
+     * Practice evaluation criteria
+     */
+    criteria?: string;
+    /**
      * Practice description
      */
     description: string;
-    /**
-     * AI detection prompt template
-     */
-    detectionPrompt?: string;
     /**
      * Practice ID
      */
@@ -1083,6 +1130,10 @@ export type Practice = {
      * Human-readable name
      */
     name: string;
+    /**
+     * TypeScript/Bun precompute script for static analysis before AI review
+     */
+    precomputeScript?: string;
     /**
      * URL-safe identifier unique within workspace
      */
@@ -1179,6 +1230,42 @@ export type AgentJob = {
      */
     jobType: 'PULL_REQUEST_REVIEW';
     /**
+     * Tokens read from prompt cache
+     */
+    llmCacheReadTokens?: number;
+    /**
+     * Tokens written to prompt cache
+     */
+    llmCacheWriteTokens?: number;
+    /**
+     * Estimated cost in USD (agent-reported)
+     */
+    llmCostUsd?: number;
+    /**
+     * LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)
+     */
+    llmModel?: string;
+    /**
+     * Model version/snapshot date (e.g. 2026-03-17)
+     */
+    llmModelVersion?: string;
+    /**
+     * Total LLM API calls (steps) during execution
+     */
+    llmTotalCalls?: number;
+    /**
+     * Total input tokens consumed
+     */
+    llmTotalInputTokens?: number;
+    /**
+     * Total output tokens generated
+     */
+    llmTotalOutputTokens?: number;
+    /**
+     * Total reasoning/thinking tokens
+     */
+    llmTotalReasoningTokens?: number;
+    /**
      * Job metadata (routing/display info)
      */
     metadata?: unknown;
@@ -1198,6 +1285,28 @@ export type AgentJob = {
      * Current job status
      */
     status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+};
+
+/**
+ * An identity provider account that can be linked to the user
+ */
+export type LinkedAccount = {
+    /**
+     * Whether the user has linked this provider
+     */
+    connected: boolean;
+    /**
+     * Username on the external provider, if connected
+     */
+    linkedUsername?: string;
+    /**
+     * Identity provider alias (e.g. 'github', 'gitlab-lrz')
+     */
+    providerAlias: string;
+    /**
+     * Display name of the identity provider
+     */
+    providerName: string;
 };
 
 /**
@@ -1269,6 +1378,24 @@ export type LeaderboardEntry = {
      * User info (populated in INDIVIDUAL mode, null in TEAM mode)
      */
     user?: UserInfo;
+};
+
+/**
+ * An enabled identity provider available for login
+ */
+export type IdentityProvider = {
+    /**
+     * Identity provider alias used as idpHint (e.g. 'github', 'gitlab-lrz')
+     */
+    alias: string;
+    /**
+     * Display name of the identity provider
+     */
+    displayName: string;
+    /**
+     * Provider type (e.g. 'github', 'oidc')
+     */
+    type: string;
 };
 
 /**
@@ -1463,9 +1590,11 @@ export type CreateWorkspaceRequest = {
      */
     gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
     /**
-     * User ID of the workspace owner
+     * Deprecated: ignored by the server. The authenticated user always becomes the owner.
+     *
+     * @deprecated
      */
-    ownerUserId: number;
+    ownerUserId?: number;
     /**
      * Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
      */
@@ -1489,17 +1618,21 @@ export type CreatePracticeRequest = {
      */
     category?: string;
     /**
+     * Practice evaluation criteria
+     */
+    criteria?: string;
+    /**
      * Practice description
      */
     description: string;
     /**
-     * AI detection prompt template
-     */
-    detectionPrompt?: string;
-    /**
      * Human-readable name
      */
     name: string;
+    /**
+     * TypeScript/Bun precompute script for static analysis before AI review
+     */
+    precomputeScript?: string;
     /**
      * URL-safe identifier unique within the workspace
      */
@@ -1537,7 +1670,7 @@ export type CreateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'OPENCODE';
+    agentType: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
     /**
      * Whether agent containers have internet access
      */
@@ -1557,7 +1690,7 @@ export type CreateAgentConfigRequest = {
     /**
      * LLM provider
      */
-    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    llmProvider: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
     /**
      * Maximum concurrent jobs
      */
@@ -1687,7 +1820,7 @@ export type AgentConfig = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'OPENCODE';
+    agentType: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
     /**
      * Whether agent containers have internet access
      */
@@ -1715,7 +1848,7 @@ export type AgentConfig = {
     /**
      * LLM provider
      */
-    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    llmProvider: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
     /**
      * Maximum concurrent jobs
      */
@@ -1778,6 +1911,22 @@ export type Achievement = {
     unlockedAt: Date;
 };
 
+export type GetIdentityProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/identity-providers';
+};
+
+export type GetIdentityProvidersResponses = {
+    /**
+     * OK
+     */
+    200: Array<IdentityProvider>;
+};
+
+export type GetIdentityProvidersResponse = GetIdentityProvidersResponses[keyof GetIdentityProvidersResponses];
+
 export type ListGlobalContributorsData = {
     body?: never;
     path?: never;
@@ -1823,6 +1972,54 @@ export type GetUserFeaturesResponses = {
 };
 
 export type GetUserFeaturesResponse = GetUserFeaturesResponses[keyof GetUserFeaturesResponses];
+
+export type GetLinkedAccountsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/linked-accounts';
+};
+
+export type GetLinkedAccountsResponses = {
+    /**
+     * OK
+     */
+    200: Array<LinkedAccount>;
+};
+
+export type GetLinkedAccountsResponse = GetLinkedAccountsResponses[keyof GetLinkedAccountsResponses];
+
+export type UnlinkAccountData = {
+    body?: never;
+    path: {
+        providerAlias: string;
+    };
+    query?: never;
+    url: '/user/linked-accounts/{providerAlias}';
+};
+
+export type UnlinkAccountResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type ClaimIdentityData = {
+    body?: never;
+    path: {
+        providerAlias: string;
+    };
+    query?: never;
+    url: '/user/linked-accounts/{providerAlias}/claim';
+};
+
+export type ClaimIdentityResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type GetUserSettingsData = {
     body?: never;
@@ -1919,6 +2116,22 @@ export type GitLabPreflightResponses = {
 };
 
 export type GitLabPreflightResponse2 = GitLabPreflightResponses[keyof GitLabPreflightResponses];
+
+export type GetProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/workspaces/providers';
+};
+
+export type GetProvidersResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceProviders;
+};
+
+export type GetProvidersResponse = GetProvidersResponses[keyof GetProvidersResponses];
 
 export type PurgeWorkspaceData = {
     body?: never;
@@ -2468,6 +2681,36 @@ export type GetMemberResponses = {
 
 export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
 
+export type UpdateMemberVisibilityData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * User ID
+         */
+        userId: number;
+    };
+    query: {
+        /**
+         * whether the member should be hidden
+         */
+        hidden: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/members/{userId}/hidden';
+};
+
+export type UpdateMemberVisibilityResponses = {
+    /**
+     * Updated membership
+     */
+    200: WorkspaceMembership;
+};
+
+export type UpdateMemberVisibilityResponse = UpdateMemberVisibilityResponses[keyof UpdateMemberVisibilityResponses];
+
 export type ListDocumentsData = {
     body?: never;
     path: {
@@ -2999,7 +3242,7 @@ export type ListFindingsData = {
         /**
          * Filter by verdict
          */
-        verdict?: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
+        verdict?: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
         page?: number;
         size?: number;
     };
@@ -3343,6 +3586,27 @@ export type UpdatePublicVisibilityResponses = {
 
 export type UpdatePublicVisibilityResponse = UpdatePublicVisibilityResponses[keyof UpdatePublicVisibilityResponses];
 
+export type RemoveRepositoryToMonitorData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query: {
+        nameWithOwner: string;
+    };
+    url: '/workspaces/{workspaceSlug}/repositories';
+};
+
+export type RemoveRepositoryToMonitorResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type GetRepositoriesToMonitorData = {
     body?: never;
     path: {
@@ -3364,27 +3628,6 @@ export type GetRepositoriesToMonitorResponses = {
 
 export type GetRepositoriesToMonitorResponse = GetRepositoriesToMonitorResponses[keyof GetRepositoriesToMonitorResponses];
 
-export type RemoveRepositoryToMonitorData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        owner: string;
-        name: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
-};
-
-export type RemoveRepositoryToMonitorResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
 export type AddRepositoryToMonitorData = {
     body?: never;
     path: {
@@ -3392,11 +3635,11 @@ export type AddRepositoryToMonitorData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        owner: string;
-        name: string;
     };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
+    query: {
+        nameWithOwner: string;
+    };
+    url: '/workspaces/{workspaceSlug}/repositories';
 };
 
 export type AddRepositoryToMonitorResponses = {

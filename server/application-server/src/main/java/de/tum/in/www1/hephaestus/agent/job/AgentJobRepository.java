@@ -49,6 +49,24 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
+     * Cooldown check: find the most recently created job whose idempotency key starts with the
+     * given prefix (PR-scoped, config-scoped, but SHA-agnostic) and was created after the cutoff.
+     * Used to enforce a minimum interval between reviews for the same PR.
+     */
+    @Query(
+        "SELECT j FROM AgentJob j WHERE j.workspace.id = :workspaceId" +
+            " AND j.idempotencyKey LIKE :keyPrefix ESCAPE '\\'" +
+            " AND j.createdAt > :cutoff" +
+            " ORDER BY j.createdAt DESC" +
+            " LIMIT 1"
+    )
+    Optional<AgentJob> findRecentJobByKeyPrefix(
+        @Param("workspaceId") Long workspaceId,
+        @Param("keyPrefix") String keyPrefix,
+        @Param("cutoff") Instant cutoff
+    );
+
+    /**
      * Claim a QUEUED job for execution with {@code FOR UPDATE SKIP LOCKED}.
      * Returns empty if the row is already locked (duplicate NATS delivery) or not QUEUED.
      */
@@ -58,6 +76,11 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         nativeQuery = true
     )
     Optional<AgentJob> findByIdQueuedForUpdateSkipLocked(@Param("id") UUID id);
+
+    /** Reload a job with its workspace eagerly fetched (avoids LazyInitializationException on sandbox threads). */
+    @WorkspaceAgnostic("ID-based reload; job ID from workspace-scoped claim context")
+    @Query("SELECT j FROM AgentJob j LEFT JOIN FETCH j.workspace WHERE j.id = :id")
+    Optional<AgentJob> findByIdWithWorkspace(@Param("id") UUID id);
 
     /**
      * Conditional terminal status transition. Returns number of rows affected (0 or 1).
@@ -114,34 +137,5 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("id") UUID id,
         @Param("newStatus") DeliveryStatus newStatus,
         @Param("fromStatuses") Collection<DeliveryStatus> fromStatuses
-    );
-
-    /**
-     * Find the delivery comment ID from the most recent delivered job for the same PR.
-     * Used for re-analysis dedup: update the existing comment instead of creating a duplicate.
-     *
-     * <p>Note: {@code CAST(:pullRequestId AS text)} is required because the expression index
-     * {@code idx_agent_job_delivery_dedup} is defined on {@code (metadata->>'pull_request_id')}
-     * which returns text. Without the explicit cast, PostgreSQL may not match the index.
-     */
-    @WorkspaceAgnostic("Cross-job lookup for re-analysis dedup; workspace-scoped by parameter")
-    @Query(
-        value = """
-        SELECT delivery_comment_id FROM agent_job
-        WHERE workspace_id = :workspaceId
-        AND job_type = 'PULL_REQUEST_REVIEW'
-        AND delivery_comment_id IS NOT NULL
-        AND delivery_status = 'DELIVERED'
-        AND metadata->>'pull_request_id' = CAST(:pullRequestId AS text)
-        AND id != :currentJobId
-        ORDER BY completed_at DESC NULLS LAST
-        LIMIT 1
-        """,
-        nativeQuery = true
-    )
-    Optional<String> findPreviousDeliveryCommentId(
-        @Param("workspaceId") Long workspaceId,
-        @Param("pullRequestId") Long pullRequestId,
-        @Param("currentJobId") UUID currentJobId
     );
 }

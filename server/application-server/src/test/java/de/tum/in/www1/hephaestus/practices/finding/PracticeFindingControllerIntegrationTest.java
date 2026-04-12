@@ -109,7 +109,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
             null,
             "Test reasoning for " + title,
             "Test guidance for " + title,
-            "COACHING",
             detectedAt
         );
         return id;
@@ -378,8 +377,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isEqualTo("MAJOR")
                 .jsonPath("$.content[0].confidence")
                 .isEqualTo(0.85)
-                .jsonPath("$.content[0].guidanceMethod")
-                .isEqualTo("COACHING")
                 .jsonPath("$.content[0].detectedAt")
                 .isNotEmpty()
                 // Internal fields must not leak
@@ -496,7 +493,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 null,
                 "reasoning",
                 "guidance",
-                "COACHING",
                 now
             );
 
@@ -709,8 +705,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isEqualTo("Test reasoning for Detailed finding")
                 .jsonPath("$.guidance")
                 .isEqualTo("Test guidance for Detailed finding")
-                .jsonPath("$.guidanceMethod")
-                .isEqualTo("COACHING")
                 .jsonPath("$.detectedAt")
                 .isNotEmpty()
                 // Internal fields must not leak
@@ -791,7 +785,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 evidenceJson,
                 "reasoning",
                 "guidance",
-                "COACHING",
                 Instant.now()
             );
 
@@ -1048,7 +1041,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 null,
                 "reasoning",
                 "guidance",
-                "COACHING",
                 now
             );
 

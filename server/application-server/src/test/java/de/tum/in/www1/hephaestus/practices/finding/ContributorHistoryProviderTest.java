@@ -54,18 +54,6 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty when all findings are NOT_APPLICABLE")
-        void returnsEmptyForOnlyNotApplicable() {
-            when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
-                List.of(summary("pr-description", Verdict.NOT_APPLICABLE, 5, Instant.parse("2026-03-20T10:00:00Z")))
-            );
-
-            Optional<byte[]> result = provider.buildHistoryJson(CONTRIBUTOR_ID, WORKSPACE_ID);
-
-            assertThat(result).isEmpty();
-        }
-
-        @Test
         @DisplayName("builds correct JSON structure for single practice")
         void buildsSinglePracticeJson() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
@@ -85,7 +73,6 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
             assertThat(entry.get("practice").asText()).isEqualTo("pr-description-quality");
             assertThat(entry.get("positive").asLong()).isEqualTo(1);
             assertThat(entry.get("negative").asLong()).isEqualTo(3);
-            assertThat(entry.get("needsReview").asLong()).isZero();
             assertThat(entry.get("lastSeen").asText()).isEqualTo("2026-03-20T14:30:00Z");
         }
 
@@ -95,7 +82,7 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
                     summary("error-handling", Verdict.NEGATIVE, 2, Instant.parse("2026-03-18T10:15:00Z")),
-                    summary("error-handling", Verdict.NEEDS_REVIEW, 1, Instant.parse("2026-03-19T12:00:00Z")),
+                    summary("error-handling", Verdict.NEGATIVE, 1, Instant.parse("2026-03-19T12:00:00Z")),
                     summary("pr-description-quality", Verdict.POSITIVE, 5, Instant.parse("2026-03-20T14:30:00Z")),
                     summary("pr-description-quality", Verdict.NEGATIVE, 1, Instant.parse("2026-03-15T08:00:00Z"))
                 )
@@ -106,38 +93,16 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
 
             assertThat(root).hasSize(2);
 
-            // Sorted by NEGATIVE desc: error-handling (2) before pr-description-quality (1)
+            // Sorted by NEGATIVE desc: error-handling (3) before pr-description-quality (1)
             JsonNode first = root.get(0);
             assertThat(first.get("practice").asText()).isEqualTo("error-handling");
-            assertThat(first.get("negative").asLong()).isEqualTo(2);
-            assertThat(first.get("needsReview").asLong()).isEqualTo(1);
+            assertThat(first.get("negative").asLong()).isEqualTo(3);
             assertThat(first.get("lastSeen").asText()).isEqualTo("2026-03-19T12:00:00Z");
 
             JsonNode second = root.get(1);
             assertThat(second.get("practice").asText()).isEqualTo("pr-description-quality");
             assertThat(second.get("positive").asLong()).isEqualTo(5);
             assertThat(second.get("negative").asLong()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("omits NOT_APPLICABLE verdicts from counts")
-        void omitsNotApplicable() throws Exception {
-            when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
-                List.of(
-                    summary("test-coverage", Verdict.POSITIVE, 2, Instant.parse("2026-03-20T10:00:00Z")),
-                    summary("test-coverage", Verdict.NOT_APPLICABLE, 8, Instant.parse("2026-03-21T10:00:00Z"))
-                )
-            );
-
-            byte[] json = provider.buildHistoryJson(CONTRIBUTOR_ID, WORKSPACE_ID).orElseThrow();
-            JsonNode root = objectMapper.readTree(json);
-
-            assertThat(root).hasSize(1);
-            JsonNode entry = root.get(0);
-            assertThat(entry.get("positive").asLong()).isEqualTo(2);
-            assertThat(entry.get("negative").asLong()).isZero();
-            // lastSeen should only reflect non-NA verdicts
-            assertThat(entry.get("lastSeen").asText()).isEqualTo("2026-03-20T10:00:00Z");
         }
 
         @Test

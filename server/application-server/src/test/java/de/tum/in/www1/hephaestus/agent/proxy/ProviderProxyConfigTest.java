@@ -15,7 +15,10 @@ class ProviderProxyConfigTest extends BaseUnitTest {
         "https://api.anthropic.com",
         "https://api.openai.com",
         "Authorization",
-        true
+        true,
+        "",
+        "api-key",
+        false
     );
 
     @Nested
@@ -94,7 +97,10 @@ class ProviderProxyConfigTest extends BaseUnitTest {
                 "https://custom-anthropic.example.com",
                 "https://azure.openai.com",
                 "Authorization",
-                true
+                true,
+                "",
+                "api-key",
+                false
             );
             var anthropicConfig = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, props);
             var openaiConfig = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, props);
@@ -109,8 +115,16 @@ class ProviderProxyConfigTest extends BaseUnitTest {
     class AzureOpenAI {
 
         private final ProviderProxyConfig config = ProviderProxyConfig.forProvider(
-            LlmProvider.OPENAI,
-            new LlmProxyProperties("https://api.anthropic.com", "https://myresource.openai.azure.com", "api-key", false)
+            LlmProvider.AZURE_OPENAI,
+            new LlmProxyProperties(
+                "https://api.anthropic.com",
+                "https://api.openai.com",
+                "Authorization",
+                true,
+                "https://myresource.openai.azure.com",
+                "api-key",
+                false
+            )
         );
 
         @Test

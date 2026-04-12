@@ -596,6 +596,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "Project", // Through organization.workspaceId
                                 "ActivitySavedEvent", // Carries user context for achievement evaluation
                                 "AgentJob", // AgentJobCreatedEvent carries workspaceId directly
+                                "BotCommand", // BotCommandReceivedEvent carries repositoryId → workspace
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
                                 "WorkspacesInitializedEvent" // Startup lifecycle, signals all workspaces ready
@@ -896,7 +897,11 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
                     // Skip user account operations - these are USER-scoped, not WORKSPACE-scoped.
                     // Users can access their account settings regardless of workspace context.
-                    if (controllerName.contains("Account") || controllerName.contains("FeatureFlag")) {
+                    if (
+                        controllerName.contains("Account") ||
+                        controllerName.contains("FeatureFlag") ||
+                        controllerName.contains("IdentityProvider")
+                    ) {
                         return;
                     }
 

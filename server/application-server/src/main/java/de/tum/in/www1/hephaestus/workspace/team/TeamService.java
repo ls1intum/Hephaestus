@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
 import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermissionRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.List;
 import java.util.Map;
@@ -37,15 +38,18 @@ public class TeamService {
     private final TeamRepository teamRepository;
     private final TeamRepositoryPermissionRepository permissionRepository;
     private final WorkspaceTeamSettingsService workspaceTeamSettingsService;
+    private final WorkspaceMembershipService workspaceMembershipService;
 
     public TeamService(
         TeamRepository teamRepository,
         TeamRepositoryPermissionRepository permissionRepository,
-        WorkspaceTeamSettingsService workspaceTeamSettingsService
+        WorkspaceTeamSettingsService workspaceTeamSettingsService,
+        WorkspaceMembershipService workspaceMembershipService
     ) {
         this.teamRepository = teamRepository;
         this.permissionRepository = permissionRepository;
         this.workspaceTeamSettingsService = workspaceTeamSettingsService;
+        this.workspaceMembershipService = workspaceMembershipService;
     }
 
     /**
@@ -63,6 +67,7 @@ public class TeamService {
         Long workspaceId = workspace.getId();
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspaceId);
         Set<Long> hiddenRepoIds = workspaceTeamSettingsService.getHiddenRepositoryIds(workspaceId);
+        Set<Long> hiddenMemberIds = workspaceMembershipService.getHiddenMemberIds(workspaceId);
 
         List<Team> teams = teamRepository.findWithCollectionsByOrganizationIgnoreCase(workspace.getAccountLogin());
 
@@ -75,7 +80,7 @@ public class TeamService {
 
         return teams
             .stream()
-            .map(team -> convertToDTO(team, hiddenTeamIds, hiddenRepoIds, labelFiltersByTeam))
+            .map(team -> convertToDTO(team, hiddenTeamIds, hiddenRepoIds, labelFiltersByTeam, hiddenMemberIds))
             .toList();
     }
 
@@ -175,12 +180,13 @@ public class TeamService {
         Team team,
         Set<Long> hiddenTeamIds,
         Set<Long> hiddenRepoIds,
-        Map<Long, Set<Label>> labelFiltersByTeam
+        Map<Long, Set<Label>> labelFiltersByTeam,
+        Set<Long> hiddenMemberIds
     ) {
         boolean isHidden = hiddenTeamIds.contains(team.getId());
         Set<Label> workspaceLabels = labelFiltersByTeam.getOrDefault(team.getId(), Set.of());
 
-        return TeamInfoDTO.fromTeamWithScopeSettings(team, isHidden, workspaceLabels, hiddenRepoIds);
+        return TeamInfoDTO.fromTeamWithScopeSettings(team, isHidden, workspaceLabels, hiddenRepoIds, hiddenMemberIds);
     }
 
     /**

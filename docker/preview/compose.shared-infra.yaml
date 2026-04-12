@@ -19,6 +19,11 @@
 #      - keycloak: https://example.com:8080/keycloak
 #      - webhook-ingest: https://example.com:4200/webhooks
 #
+# IMPORTANT: This shared preview infrastructure does not, by itself, prove that
+# GitLab workspace creation or GitLab practice review will work in production.
+# If you want preview to validate that rollout, add the GitLab IdP and the same
+# application-server practice-review wiring used in the production stack.
+#
 # Domain format: https://domain.com:PORT/path
 # The :PORT tells Coolify which container port to proxy to.
 # Strip Prefix removes /keycloak and /webhooks before forwarding.
@@ -105,7 +110,7 @@ services:
   # Configure domain in Coolify UI: https://example.com/keycloak:8080
   # ---------------------------------------------------------------------------
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.5
     restart: unless-stopped
     depends_on:
       keycloak-db:
@@ -286,7 +291,7 @@ configs:
             "displayName": "GitHub",
             "providerId": "github",
             "enabled": true,
-            "updateProfileFirstLoginMode": "on",
+            "updateProfileFirstLoginMode": "off",
             "trustEmail": true,
             "storeToken": false,
             "addReadTokenRoleOnCreate": false,
@@ -318,7 +323,23 @@ configs:
             "enabled": true,
             "serviceAccountClientId": "hephaestus-confidential",
             "realmRoles": ["default-roles-hephaestus"],
-            "clientRoles": {"realm-management": ["view-users", "query-users", "manage-users"]}
+            "clientRoles": {"realm-management": ["view-users", "query-users", "manage-users", "view-identity-providers"]}
           }
-        ]
+        ],
+        "authenticatorConfig": [
+          {
+            "alias": "review profile config",
+            "config": {
+              "update.profile.on.first.login": "off"
+            }
+          }
+        ],
+        "components": {
+          "org.keycloak.userprofile.UserProfileProvider": [{
+            "providerId": "declarative-user-profile",
+            "config": {
+              "kc.user.profile.config": ["{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}}},{\"name\":\"email\",\"displayName\":\"${email}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"email\":{},\"length\":{\"max\":255}}},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255}}},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255}}}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"]
+            }
+          }]
+        }
       }

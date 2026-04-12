@@ -58,7 +58,11 @@ public record CreatePracticeRequestDTO(
     )
     List<String> triggerEvents,
 
-    @Size(max = 50000, message = "Detection prompt must be at most 50000 characters")
-    @Schema(description = "AI detection prompt template")
-    String detectionPrompt
+    @Size(max = 50000, message = "Criteria must be at most 50000 characters")
+    @Schema(description = "Practice evaluation criteria")
+    String criteria,
+
+    @Size(max = 100000, message = "Precompute script must be at most 100000 characters")
+    @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
+    String precomputeScript
 ) {}

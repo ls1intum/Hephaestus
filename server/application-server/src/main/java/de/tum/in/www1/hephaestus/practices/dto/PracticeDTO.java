@@ -18,7 +18,10 @@ public record PracticeDTO(
     @Nullable @Schema(description = "Practice category") String category,
     @NonNull @Schema(description = "Practice description") String description,
     @NonNull @Schema(description = "Domain events that trigger detection") List<String> triggerEvents,
-    @Nullable @Schema(description = "AI detection prompt template") String detectionPrompt,
+    @Nullable @Schema(description = "Practice evaluation criteria") String criteria,
+    @Nullable
+    @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
+    String precomputeScript,
     @NonNull @Schema(description = "Whether this practice is actively being detected") Boolean active,
     @NonNull @Schema(description = "Timestamp when the practice was created") Instant createdAt,
     @NonNull @Schema(description = "Timestamp when the practice was last updated") Instant updatedAt
@@ -31,7 +34,8 @@ public record PracticeDTO(
             practice.getCategory(),
             practice.getDescription(),
             TriggerEventsConverter.toList(practice.getTriggerEvents()),
-            practice.getDetectionPrompt(),
+            practice.getCriteria(),
+            practice.getPrecomputeScript(),
             practice.isActive(),
             practice.getCreatedAt(),
             practice.getUpdatedAt()

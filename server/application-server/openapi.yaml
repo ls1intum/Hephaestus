@@ -36,6 +36,8 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
+- description: Authentication discovery (public)
+  name: Auth
 - description: Manage practice definitions
   name: Practice Catalog
 - description: Workspace-scoped team settings management
@@ -49,6 +51,23 @@ tags:
 - description: Contributor rankings and league statistics
   name: Leaderboard
 paths:
+  /auth/identity-providers:
+    get:
+      description: Returns all enabled identity providers that can be used for login.
+        Public endpoint — no authentication required.
+      operationId: getIdentityProviders
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IdentityProvider"
+          description: OK
+      summary: List available identity providers
+      tags:
+      - Auth
   /contributors:
     get:
       description: Returns contributors to the Hephaestus project (for the About page)
@@ -90,6 +109,61 @@ paths:
                 $ref: "#/components/schemas/FeatureFlags"
           description: Feature flags evaluated successfully
       summary: Get feature flags for the current user
+      tags:
+      - Account
+  /user/linked-accounts:
+    get:
+      description: Returns all configured identity providers with their connection
+        status for the current user
+      operationId: getLinkedAccounts
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LinkedAccount"
+          description: OK
+      summary: List linked identity providers
+      tags:
+      - Account
+  /user/linked-accounts/{providerAlias}:
+    delete:
+      description: Remove the federated identity link for the given provider. Cannot
+        unlink the last remaining provider.
+      operationId: unlinkAccount
+      parameters:
+      - in: path
+        name: providerAlias
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9-]{1,64}$"
+      responses:
+        "200":
+          description: OK
+      summary: Unlink an identity provider
+      tags:
+      - Account
+  /user/linked-accounts/{providerAlias}/claim:
+    post:
+      description: Transfers a federated identity from another Keycloak user to the
+        current user. Used when a user has accidentally created two accounts by logging
+        in with different IdPs. Deletes the orphan account if it has no remaining
+        identities.
+      operationId: claimIdentity
+      parameters:
+      - in: path
+        name: providerAlias
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9-]{1,64}$"
+      responses:
+        "200":
+          description: OK
+      summary: Claim an identity provider from another user
       tags:
       - Account
   /user/settings:
@@ -198,6 +272,22 @@ paths:
                 $ref: "#/components/schemas/GitLabPreflightResponse"
           description: Validation result
       summary: Validate a GitLab PAT before workspace creation
+      tags:
+      - workspace-registry
+  /workspaces/providers:
+    get:
+      description: Returns available workspace providers with their configuration.
+        Public endpoint — no authentication required.
+      operationId: getProviders
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceProviders"
+          description: OK
+      security: []
+      summary: List available workspace creation providers
       tags:
       - workspace-registry
   /workspaces/{workspaceSlug}:
@@ -835,6 +925,43 @@ paths:
           description: Workspace membership details
       security: []
       summary: Get a specific member's details.
+      tags:
+      - workspace-membership
+  /workspaces/{workspaceSlug}/members/{userId}/hidden:
+    patch:
+      description: |-
+        Toggle the hidden flag for a workspace member.
+         Hidden members are excluded from the leaderboard.
+      operationId: updateMemberVisibility
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: whether the member should be hidden
+        in: query
+        name: hidden
+        required: true
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceMembership"
+          description: Updated membership
+      summary: Toggle the hidden flag for a workspace member.
       tags:
       - workspace-membership
   /workspaces/{workspaceSlug}/mentor/chat:
@@ -1650,7 +1777,6 @@ paths:
           - POSITIVE
           - NEGATIVE
           - NOT_APPLICABLE
-          - NEEDS_REVIEW
       - in: query
         name: page
         required: false
@@ -2049,6 +2175,27 @@ paths:
       tags:
       - workspace
   /workspaces/{workspaceSlug}/repositories:
+    delete:
+      operationId: removeRepositoryToMonitor
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: nameWithOwner
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      summary: Remove a repository from a workspace monitor list
+      tags:
+      - workspace
     get:
       operationId: getRepositoriesToMonitor
       parameters:
@@ -2072,33 +2219,6 @@ paths:
       summary: List repositories monitored by a workspace
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/repositories/{owner}/{name}:
-    delete:
-      operationId: removeRepositoryToMonitor
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: owner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: name
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      summary: Remove a repository from a workspace monitor list
-      tags:
-      - workspace
     post:
       operationId: addRepositoryToMonitor
       parameters:
@@ -2109,13 +2229,8 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: owner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: name
+      - in: query
+        name: nameWithOwner
         required: true
         schema:
           type: string
@@ -2960,6 +3075,7 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
+          - PI
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -2990,6 +3106,7 @@ components:
           enum:
           - ANTHROPIC
           - OPENAI
+          - AZURE_OPENAI
         maxConcurrentJobs:
           type: integer
           format: int32
@@ -3065,6 +3182,40 @@ components:
           description: Job type
           enum:
           - PULL_REQUEST_REVIEW
+        llmCacheReadTokens:
+          type: integer
+          format: int32
+          description: Tokens read from prompt cache
+        llmCacheWriteTokens:
+          type: integer
+          format: int32
+          description: Tokens written to prompt cache
+        llmCostUsd:
+          type: number
+          format: double
+          description: Estimated cost in USD (agent-reported)
+        llmModel:
+          type: string
+          description: "LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)"
+        llmModelVersion:
+          type: string
+          description: Model version/snapshot date (e.g. 2026-03-17)
+        llmTotalCalls:
+          type: integer
+          format: int32
+          description: Total LLM API calls (steps) during execution
+        llmTotalInputTokens:
+          type: integer
+          format: int32
+          description: Total input tokens consumed
+        llmTotalOutputTokens:
+          type: integer
+          format: int32
+          description: Total output tokens generated
+        llmTotalReasoningTokens:
+          type: integer
+          format: int32
+          description: Total reasoning/thinking tokens
         metadata:
           description: Job metadata (routing/display info)
         output:
@@ -3249,6 +3400,7 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
+          - PI
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -3273,6 +3425,7 @@ components:
           enum:
           - ANTHROPIC
           - OPENAI
+          - AZURE_OPENAI
         maxConcurrentJobs:
           type: integer
           format: int32
@@ -3349,16 +3502,16 @@ components:
           example: code-quality
           maxLength: 64
           minLength: 0
+        criteria:
+          type: string
+          description: Practice evaluation criteria
+          maxLength: 50000
+          minLength: 0
         description:
           type: string
           description: Practice description
           example: Ensures pull request descriptions are detailed and informative
           maxLength: 10000
-          minLength: 0
-        detectionPrompt:
-          type: string
-          description: AI detection prompt template
-          maxLength: 50000
           minLength: 0
         name:
           type: string
@@ -3366,6 +3519,12 @@ components:
           example: PR Description Quality
           maxLength: 128
           minLength: 3
+        precomputeScript:
+          type: string
+          description: TypeScript/Bun precompute script for static analysis before
+            AI review
+          maxLength: 100000
+          minLength: 0
         slug:
           type: string
           description: URL-safe identifier unique within the workspace
@@ -3397,6 +3556,8 @@ components:
           description: Git provider account login (GitHub org/user or GitLab group
             path)
           example: my-org
+          maxLength: 255
+          minLength: 0
         accountType:
           type: string
           description: Type of account (USER or ORG)
@@ -3407,6 +3568,8 @@ components:
           type: string
           description: Human-readable name of the workspace
           example: My Workspace
+          maxLength: 120
+          minLength: 0
         gitProviderMode:
           type: string
           description: Git provider authentication mode. Defaults to PAT_ORG (GitHub
@@ -3419,12 +3582,16 @@ components:
         ownerUserId:
           type: integer
           format: int64
-          description: User ID of the workspace owner
+          deprecated: true
+          description: "Deprecated: ignored by the server. The authenticated user\
+            \ always becomes the owner."
         personalAccessToken:
           type: string
           description: Personal Access Token for GitLab API access. Required when
             gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
           example: your-gitlab-token
+          maxLength: 512
+          minLength: 0
         serverUrl:
           type: string
           description: Custom server URL for self-hosted GitLab instances. Must use
@@ -3439,7 +3606,6 @@ components:
       - accountLogin
       - accountType
       - displayName
-      - ownerUserId
       - workspaceSlug
     Document:
       type: object
@@ -3582,6 +3748,14 @@ components:
       - applied
       - disputed
       - notApplicable
+    GitHubProvider:
+      type: object
+      description: GitHub provider configuration
+      properties:
+        appInstallationUrl:
+          type: string
+          description: GitHub App installation URL
+          example: https://github.com/apps/hephaestus/installations/new
     GitLabGroup:
       type: object
       description: GitLab group accessible to the provided PAT
@@ -3650,6 +3824,31 @@ components:
           description: Whether the token is valid
       required:
       - valid
+    GitLabProvider:
+      type: object
+      description: GitLab provider configuration
+      properties:
+        defaultServerUrl:
+          type: string
+          description: Default GitLab server URL for this deployment
+          example: https://gitlab.lrz.de
+    IdentityProvider:
+      type: object
+      description: An enabled identity provider available for login
+      properties:
+        alias:
+          type: string
+          description: "Identity provider alias used as idpHint (e.g. 'github', 'gitlab-lrz')"
+        displayName:
+          type: string
+          description: Display name of the identity provider
+        type:
+          type: string
+          description: "Provider type (e.g. 'github', 'oidc')"
+      required:
+      - alias
+      - displayName
+      - type
     LabelInfo:
       type: object
       description: Information about a label from a repository
@@ -3763,6 +3962,26 @@ components:
       required:
       - current
       - target
+    LinkedAccount:
+      type: object
+      description: An identity provider account that can be linked to the user
+      properties:
+        connected:
+          type: boolean
+          description: Whether the user has linked this provider
+        linkedUsername:
+          type: string
+          description: "Username on the external provider, if connected"
+        providerAlias:
+          type: string
+          description: "Identity provider alias (e.g. 'github', 'gitlab-lrz')"
+        providerName:
+          type: string
+          description: Display name of the identity provider
+      required:
+      - connected
+      - providerAlias
+      - providerName
     PageAgentJob:
       type: object
       properties:
@@ -3859,12 +4078,12 @@ components:
           type: string
           format: date-time
           description: Timestamp when the practice was created
+        criteria:
+          type: string
+          description: Practice evaluation criteria
         description:
           type: string
           description: Practice description
-        detectionPrompt:
-          type: string
-          description: AI detection prompt template
         id:
           type: integer
           format: int64
@@ -3872,6 +4091,10 @@ components:
         name:
           type: string
           description: Human-readable name
+        precomputeScript:
+          type: string
+          description: TypeScript/Bun precompute script for static analysis before
+            AI review
         slug:
           type: string
           description: URL-safe identifier unique within workspace
@@ -3913,16 +4136,6 @@ components:
         guidance:
           type: string
           description: Actionable guidance for the contributor
-        guidanceMethod:
-          type: string
-          description: Cognitive apprenticeship guidance method
-          enum:
-          - MODELING
-          - COACHING
-          - SCAFFOLDING
-          - ARTICULATION
-          - REFLECTION
-          - EXPLORATION
         id:
           type: string
           format: uuid
@@ -3958,12 +4171,11 @@ components:
           description: Finding title
         verdict:
           type: string
-          description: "Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW"
+          description: "Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE"
           enum:
           - POSITIVE
           - NEGATIVE
           - NOT_APPLICABLE
-          - NEEDS_REVIEW
       required:
       - confidence
       - detectedAt
@@ -3990,16 +4202,6 @@ components:
           type: string
           format: date-time
           description: When the finding was detected
-        guidanceMethod:
-          type: string
-          description: Cognitive apprenticeship guidance method
-          enum:
-          - MODELING
-          - COACHING
-          - SCAFFOLDING
-          - ARTICULATION
-          - REFLECTION
-          - EXPLORATION
         id:
           type: string
           format: uuid
@@ -4032,12 +4234,11 @@ components:
           description: Finding title
         verdict:
           type: string
-          description: "Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW"
+          description: "Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE"
           enum:
           - POSITIVE
           - NEGATIVE
           - NOT_APPLICABLE
-          - NEEDS_REVIEW
       required:
       - confidence
       - detectedAt
@@ -4582,6 +4783,7 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
+          - PI
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -4605,6 +4807,7 @@ components:
           enum:
           - ANTHROPIC
           - OPENAI
+          - AZURE_OPENAI
         maxConcurrentJobs:
           type: integer
           format: int32
@@ -4645,17 +4848,17 @@ components:
           example: code-quality
           maxLength: 64
           minLength: 0
+        criteria:
+          type: string
+          description: Practice evaluation criteria
+          maxLength: 50000
+          minLength: 0
         description:
           type: string
           description: Practice description
           maxLength: 10000
           minLength: 0
           pattern: .*\S.*
-        detectionPrompt:
-          type: string
-          description: AI detection prompt template
-          maxLength: 50000
-          minLength: 0
         name:
           type: string
           description: Human-readable name
@@ -4663,6 +4866,12 @@ components:
           maxLength: 128
           minLength: 3
           pattern: .*\S.*
+        precomputeScript:
+          type: string
+          description: TypeScript/Bun precompute script for static analysis before
+            AI review
+          maxLength: 100000
+          minLength: 0
         triggerEvents:
           type: array
           description: Domain events that trigger detection
@@ -4701,6 +4910,9 @@ components:
         leaderboardEnabled:
           type: boolean
           description: Enable the leaderboard ranking page
+        leaguesEnabled:
+          type: boolean
+          description: Enable league tiers and rankings
         practicesEnabled:
           type: boolean
           description: Enable the practice review feature
@@ -4838,6 +5050,8 @@ components:
       properties:
         email:
           type: string
+        hidden:
+          type: boolean
         id:
           type: integer
           format: int64
@@ -4936,6 +5150,9 @@ components:
           type: string
           description: Time for leaderboard notifications in HH:mm format
           example: 09:00
+        leaguesEnabled:
+          type: boolean
+          description: Whether league tiers and rankings are enabled
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
@@ -4977,6 +5194,7 @@ components:
       - id
       - isPubliclyViewable
       - leaderboardEnabled
+      - leaguesEnabled
       - practicesEnabled
       - progressionEnabled
       - providerType
@@ -5007,6 +5225,9 @@ components:
         leaderboardEnabled:
           type: boolean
           description: Whether the leaderboard is enabled
+        leaguesEnabled:
+          type: boolean
+          description: Whether league tiers and rankings are enabled
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
@@ -5034,6 +5255,7 @@ components:
       - displayName
       - id
       - leaderboardEnabled
+      - leaguesEnabled
       - practicesEnabled
       - progressionEnabled
       - providerType
@@ -5047,6 +5269,9 @@ components:
           type: string
           format: date-time
           description: Timestamp when the membership was created
+        hidden:
+          type: boolean
+          description: Whether the member is hidden from the leaderboard
         leaguePoints:
           type: integer
           format: int32
@@ -5069,6 +5294,16 @@ components:
         userName:
           type: string
           description: Display name of the user
+    WorkspaceProviders:
+      type: object
+      description: Available workspace creation providers and their configuration
+      properties:
+        github:
+          $ref: "#/components/schemas/GitHubProvider"
+          description: "GitHub workspace provider config, null if not available"
+        gitlab:
+          $ref: "#/components/schemas/GitLabProvider"
+          description: "GitLab workspace provider config, null if not available"
     WorkspaceTeamRepositorySettings:
       type: object
       description: Repository contribution visibility settings for a specific team

@@ -165,6 +165,10 @@ public class LeaderboardService {
             }
         }
 
+        // Remove hidden members from the leaderboard
+        Set<Long> hiddenMemberIds = workspaceMembershipService.getHiddenMemberIds(workspaceId);
+        activityData.keySet().removeAll(hiddenMemberIds);
+
         if (activityData.isEmpty()) {
             log.debug("Found no team members for leaderboard: workspaceId={}", workspaceId);
             return Collections.emptyList();
@@ -371,6 +375,7 @@ public class LeaderboardService {
             workspaceId,
             allTeamIds
         );
+        Set<Long> hiddenMemberIds = workspaceMembershipService.getHiddenMemberIds(workspaceId);
 
         for (int i = 0; i < sorted.size(); i++) {
             Team teamEntity = sorted.get(i).getKey();
@@ -386,7 +391,13 @@ public class LeaderboardService {
                 i + 1,
                 score,
                 null,
-                TeamInfoDTO.fromTeamWithScopeSettings(teamEntity, isHiddenInWorkspace, workspaceLabels, hiddenRepoIds),
+                TeamInfoDTO.fromTeamWithScopeSettings(
+                    teamEntity,
+                    isHiddenInWorkspace,
+                    workspaceLabels,
+                    hiddenRepoIds,
+                    hiddenMemberIds
+                ),
                 stats.reviewedPullRequests(),
                 stats.numberOfReviewedPRs(),
                 stats.numberOfApprovals(),

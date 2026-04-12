@@ -61,7 +61,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        PracticeReviewProperties properties = new PracticeReviewProperties(false, true, 5, "");
+        PracticeReviewProperties properties = new PracticeReviewProperties(false, true, false, "", 15);
         gate = new PracticeReviewDetectionGate(
             properties,
             userRoleChecker,
@@ -129,96 +129,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     // ── Gate Check Tests ────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("1. Label Gate")
-    class LabelGateTests {
-
-        @Test
-        @DisplayName("Should SKIP when PR has no-ai-review label")
-        void skipWhenNoAiReviewLabel() {
-            PullRequest pr = createPullRequest();
-            pr.getLabels().add(createLabel("no-ai-review"));
-
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("label:no-ai-review");
-        }
-
-        @Test
-        @DisplayName("Label skip should prevent any DB calls")
-        void labelSkipPreventsDbCalls() {
-            PullRequest pr = createPullRequest();
-            pr.getLabels().add(createLabel("no-ai-review"));
-
-            gate.evaluate(pr, TRIGGER_EVENT);
-
-            verifyNoInteractions(workspaceResolver, agentConfigChecker, practiceRepository, userRoleChecker);
-        }
-
-        @Test
-        @DisplayName("Label skip takes precedence over runForAllUsers=true")
-        void labelSkipOverridesRunForAll() {
-            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, 5, "");
-            PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
-                runForAllProps,
-                userRoleChecker,
-                agentConfigChecker,
-                practiceRepository,
-                workspaceResolver
-            );
-
-            PullRequest pr = createPullRequest();
-            pr.getLabels().add(createLabel("no-ai-review"));
-
-            GateDecision decision = runForAllGate.evaluate(pr, TRIGGER_EVENT);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-        }
-
-        @Test
-        @DisplayName("Should SKIP when label matches case-insensitively")
-        void skipWhenLabelMatchesCaseInsensitive() {
-            PullRequest pr = createPullRequest();
-            pr.getLabels().add(createLabel("No-AI-Review"));
-
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("label:no-ai-review");
-        }
-
-        @Test
-        @DisplayName("Should SKIP when no-ai-review is among multiple labels")
-        void skipWhenNoAiReviewAmongMultipleLabels() {
-            PullRequest pr = createPullRequest();
-            pr.getLabels().add(createLabel("enhancement"));
-            pr.getLabels().add(createLabel("no-ai-review"));
-            pr.getLabels().add(createLabel("bug"));
-
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("label:no-ai-review");
-        }
-
-        @Test
-        @DisplayName("Should handle null labels gracefully")
-        void handleNullLabels() {
-            PullRequest pr = createPullRequest();
-            pr.setLabels(null);
-            // Set up mocks so the gate progresses past label check to workspace resolution
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.empty());
-
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
-
-            // Should not throw, should progress past label check
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no workspace");
-        }
-    }
-
-    @Nested
-    @DisplayName("2. Draft Gate")
+    @DisplayName("1. Draft Gate")
     class DraftGateTests {
 
         @Test
@@ -236,7 +147,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         @Test
         @DisplayName("Should continue when PR is draft but skipDrafts=false")
         void continueWhenSkipDraftsDisabled() {
-            PracticeReviewProperties noSkipProps = new PracticeReviewProperties(false, false, 5, "");
+            PracticeReviewProperties noSkipProps = new PracticeReviewProperties(false, false, false, "", 15);
             PracticeReviewDetectionGate noSkipGate = new PracticeReviewDetectionGate(
                 noSkipProps,
                 userRoleChecker,
@@ -270,7 +181,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("3. Workspace Resolution Gate")
+    @DisplayName("2. Workspace Resolution Gate")
     class WorkspaceResolutionTests {
 
         @Test
@@ -300,7 +211,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("4. Agent Config Gate")
+    @DisplayName("3. Agent Config Gate")
     class AgentConfigGateTests {
 
         @Test
@@ -319,7 +230,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("5. Practice Matching Gate")
+    @DisplayName("4. Practice Matching Gate")
     class PracticeMatchingTests {
 
         @Test
@@ -382,13 +293,13 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("6. Run-for-All Bypass")
+    @DisplayName("5. Run-for-All Bypass")
     class RunForAllTests {
 
         @Test
         @DisplayName("Should DETECT without role check when runForAllUsers=true")
         void detectWhenRunForAllUsers() {
-            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, 5, "");
+            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, false, "", 15);
             PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
                 runForAllProps,
                 userRoleChecker,
@@ -414,7 +325,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("7. Assignee Gate")
+    @DisplayName("6. Assignee Gate")
     class AssigneeGateTests {
 
         @Test
@@ -447,7 +358,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("8. Circuit Breaker Gate")
+    @DisplayName("7. Circuit Breaker Gate")
     class CircuitBreakerTests {
 
         @Test
@@ -471,7 +382,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("9. Role Check Gate")
+    @DisplayName("8. Role Check Gate")
     class RoleCheckTests {
 
         @Test

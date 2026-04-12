@@ -3,9 +3,9 @@ package de.tum.in.www1.hephaestus.agent.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.account.UserPreferencesRepository;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
-import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
@@ -13,22 +13,16 @@ import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.in.www1.hephaestus.practices.review.PracticeReviewDeliveryGate;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.Nullable;
 
 /**
  * Registers all {@link JobTypeHandler} beans and the {@link JobTypeHandlerRegistry}.
- *
- * <p>Handlers are always available — they are pure domain logic with no infrastructure
- * dependencies beyond repository access. Unlike the sandbox subsystem (conditional on
- * {@code hephaestus.sandbox.enabled}), handler beans are unconditionally created. Follows the
- * same pattern as
- * {@link de.tum.in.www1.hephaestus.agent.adapter.AgentAdapterConfiguration}.
  */
 @Configuration
 public class JobTypeHandlerConfiguration {
@@ -36,21 +30,23 @@ public class JobTypeHandlerConfiguration {
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
     private final PracticeFindingRepository practiceFindingRepository;
-    private final PracticeReviewDeliveryGate deliveryGate;
     private final PracticeReviewProperties reviewProperties;
+
+    @Nullable
+    private final GitLabTokenService gitLabTokenService;
 
     JobTypeHandlerConfiguration(
         ObjectMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PracticeFindingRepository practiceFindingRepository,
-        PracticeReviewDeliveryGate deliveryGate,
-        PracticeReviewProperties reviewProperties
+        PracticeReviewProperties reviewProperties,
+        @Autowired(required = false) @Nullable GitLabTokenService gitLabTokenService
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
         this.practiceFindingRepository = practiceFindingRepository;
-        this.deliveryGate = deliveryGate;
         this.reviewProperties = reviewProperties;
+        this.gitLabTokenService = gitLabTokenService;
     }
 
     @Bean
@@ -87,16 +83,13 @@ public class JobTypeHandlerConfiguration {
         PullRequestCommentPoster commentPoster,
         DiffNotePoster diffNotePoster,
         UserPreferencesRepository userPreferencesRepository,
-        PullRequestRepository pullRequestRepository,
-        AgentJobRepository agentJobRepository
+        PullRequestRepository pullRequestRepository
     ) {
         return new FeedbackDeliveryService(
-            deliveryGate,
             commentPoster,
             diffNotePoster,
             userPreferencesRepository,
             pullRequestRepository,
-            agentJobRepository,
             reviewProperties
         );
     }
@@ -116,12 +109,11 @@ public class JobTypeHandlerConfiguration {
             pullRequestRepository,
             reviewCommentRepository,
             practiceRepository,
-            // CGLIB proxy call: returns the singleton bean. Not a @Bean parameter to stay
-            // within the architecture test limit of 6 parameters per @Bean method.
             contributorHistoryProvider(),
             resultParser,
             deliveryService,
-            feedbackService
+            feedbackService,
+            gitLabTokenService
         );
     }
 

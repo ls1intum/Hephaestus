@@ -143,7 +143,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         void methodsHaveLimitedParameters() {
             // Methods that have command-object overloads but need many params for internal processing
             Set<String> allowedOverloads = Set.of(
-                "ActivityEventService.record" // Has RecordActivityCommand overload for cleaner API
+                "ActivityEventService.record", // Has RecordActivityCommand overload for cleaner API
+                // @Bean factory wiring Spring dependencies — not business logic complexity
+                "DockerSandboxConfiguration.dockerSandboxAdapter"
             );
 
             // Repository native SQL methods require individual @Param annotations and cannot use
@@ -480,6 +482,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "WorkspaceActivationService",
                 "WorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GitHubDataSyncService
                 "WorkspaceRepositoryMonitorService",
+                "GitLabWorkspaceInitializationService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabWebhookService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabHistoricalBackfillService", // Optional GitLab beans gated by @ConditionalOnProperty

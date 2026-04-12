@@ -210,6 +210,95 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
     }
 
     @Nested
+    @DisplayName("Standalone Review Comment XP")
+    class StandaloneReviewCommentXp {
+
+        @Test
+        @DisplayName("substantive comment (>50 chars) returns full XP_REVIEW_COMMENT")
+        void calculateStandaloneReviewCommentXp_substantiveComment_returnsFullXp() {
+            User prAuthor = createUser(10L, "pr-author");
+            PullRequest pullRequest = createPullRequest(prAuthor);
+
+            double xp = calculator.calculateStandaloneReviewCommentXp(pullRequest, 99L, 100);
+
+            assertThat(xp).isEqualTo(0.5);
+        }
+
+        @Test
+        @DisplayName("trivial comment (<=50 chars) returns half XP_REVIEW_COMMENT")
+        void calculateStandaloneReviewCommentXp_trivialComment_returnsHalfXp() {
+            User prAuthor = createUser(10L, "pr-author");
+            PullRequest pullRequest = createPullRequest(prAuthor);
+
+            double xp = calculator.calculateStandaloneReviewCommentXp(pullRequest, 99L, 10);
+
+            assertThat(xp).isEqualTo(0.25);
+        }
+
+        @Test
+        @DisplayName("self-review (comment author == PR author) returns zero XP")
+        void calculateStandaloneReviewCommentXp_selfReview_returnsZero() {
+            User prAuthor = createUser(10L, "pr-author");
+            PullRequest pullRequest = createPullRequest(prAuthor);
+
+            // Comment author ID matches PR author ID
+            double xp = calculator.calculateStandaloneReviewCommentXp(pullRequest, 10L, 100);
+
+            assertThat(xp).isZero();
+        }
+
+        @Test
+        @DisplayName("null commentAuthorId does not match PR author — returns normal XP")
+        void calculateStandaloneReviewCommentXp_nullAuthorId_returnsXp() {
+            User prAuthor = createUser(10L, "pr-author");
+            PullRequest pullRequest = createPullRequest(prAuthor);
+
+            // null commentAuthorId should not match prAuthor.getId()
+            double xp = calculator.calculateStandaloneReviewCommentXp(pullRequest, null, 100);
+
+            assertThat(xp).isEqualTo(0.5);
+        }
+
+        @Test
+        @DisplayName("boundary: exactly 50 chars returns half XP (> 50 threshold)")
+        void calculateStandaloneReviewCommentXp_boundary50Chars_returnsHalfXp() {
+            User prAuthor = createUser(10L, "pr-author");
+            PullRequest pullRequest = createPullRequest(prAuthor);
+
+            // Exactly 50 chars: NOT > 50, so should get half XP
+            double xp50 = calculator.calculateStandaloneReviewCommentXp(pullRequest, 99L, 50);
+            assertThat(xp50).as("50 chars (boundary) should return half XP").isEqualTo(0.25);
+
+            // 51 chars: IS > 50, should get full XP
+            double xp51 = calculator.calculateStandaloneReviewCommentXp(pullRequest, 99L, 51);
+            assertThat(xp51).as("51 chars should return full XP").isEqualTo(0.5);
+        }
+
+        @Test
+        @DisplayName("bot-authored PR still awards XP to human commenter (no blanket bot exclusion)")
+        void calculateStandaloneReviewCommentXp_botAuthoredPr_humanGetsXp() {
+            // PR authored by a configured bot login — human commenter should STILL get XP
+            User botAuthor = createUser(50L, "copilot[bot]");
+            PullRequest pullRequest = createPullRequest(botAuthor);
+
+            // Human commenter (different ID from bot author) — should earn XP
+            double xp = calculator.calculateStandaloneReviewCommentXp(pullRequest, 99L, 100);
+
+            assertThat(xp).as("Human reviewing bot PR should still earn XP").isEqualTo(0.5);
+        }
+
+        @Test
+        @DisplayName("null PR author allows XP (defensive null safety)")
+        void calculateStandaloneReviewCommentXp_nullPrAuthor_returnsXp() {
+            PullRequest pullRequest = createPullRequest(null);
+
+            double xp = calculator.calculateStandaloneReviewCommentXp(pullRequest, 99L, 100);
+
+            assertThat(xp).as("Null PR author should not block XP").isEqualTo(0.5);
+        }
+    }
+
+    @Nested
     @DisplayName("XP Constants")
     class ExperiencePointConstants {
 

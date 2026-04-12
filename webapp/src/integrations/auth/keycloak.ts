@@ -31,6 +31,8 @@ export interface UserProfile {
 	sub: string;
 	token: string;
 	githubId?: string; // Optional GitHub ID from token
+	gitlabId?: string; // Optional GitLab ID from token
+	identityProvider?: string; // IdP alias used for this session (e.g. "github", "gitlab-lrz")
 }
 
 class KeycloakService {
@@ -172,10 +174,26 @@ class KeycloakService {
 	}
 
 	/**
+	 * Get the identity provider alias used for the current session (e.g. "github", "gitlab-lrz").
+	 */
+	public getIdentityProvider(): string | undefined {
+		return this.keycloak?.tokenParsed?.identity_provider;
+	}
+
+	/**
 	 * Get the user's git provider ID if available (e.g. GitHub user ID).
+	 * Returns whichever provider ID is available (GitHub or GitLab).
 	 */
 	public getGitProviderId(): string | undefined {
-		return this.keycloak?.tokenParsed?.github_id;
+		return this.keycloak?.tokenParsed?.github_id ?? this.keycloak?.tokenParsed?.gitlab_id;
+	}
+
+	/**
+	 * Whether the user has a linked GitLab identity.
+	 * True when gitlab_id is present in the token (set by the Keycloak protocol mapper).
+	 */
+	public hasGitLabIdentity(): boolean {
+		return this.keycloak?.tokenParsed?.gitlab_id != null;
 	}
 
 	/**
@@ -194,35 +212,54 @@ class KeycloakService {
 
 	/**
 	 * Get the user's profile picture URL from their identity provider.
-	 * Currently supports GitHub; GitLab IDP support will need an equivalent lookup.
+	 * Supports GitHub (via avatar API) and falls back to empty for other providers.
 	 */
 	public getUserProfilePictureUrl(): string {
-		const providerId = this.getGitProviderId();
-		if (providerId) {
-			return `https://avatars.githubusercontent.com/u/${providerId}`;
+		const githubId = this.keycloak?.tokenParsed?.github_id;
+		if (githubId) {
+			return `https://avatars.githubusercontent.com/u/${githubId}`;
 		}
 		return "";
 	}
 
 	/**
 	 * Get the user's profile URL on their identity provider.
-	 * Currently supports GitHub; GitLab IDP support will need an equivalent lookup.
+	 * Returns a GitHub profile URL for GitHub users, empty string for other providers
+	 * (GitLab profile URLs require the instance base URL which is not in the token).
 	 */
 	public getUserProfileUrl(): string {
 		const username = this.getUsername();
-		if (username) {
+		if (!username) return "";
+		const idp = this.getIdentityProvider();
+		if (!idp || idp === "github") {
 			return `https://github.com/${username}`;
 		}
 		return "";
 	}
 
 	/**
-	 * Redirect to the login page
+	 * Redirect to the Keycloak login page.
+	 * Users can choose between configured identity providers (GitHub, GitLab, etc.).
+	 * Pass an idpHint to skip the provider selection and go directly to a specific provider.
 	 */
-	public login(): Promise<void> {
+	public login(idpHint?: string): Promise<void> {
+		return this.keycloak?.login(idpHint ? { idpHint } : undefined) || Promise.resolve();
+	}
+
+	/**
+	 * Initiate account linking for the given identity provider.
+	 * Uses Keycloak's Application Initiated Action (kc_action=idp_link) to redirect
+	 * the user to the external provider's OAuth flow, then back to the given URL.
+	 *
+	 * Note: In Keycloak &lt;26.3, the redirect does not include kc_action_status,
+	 * so the frontend cannot detect success/cancel. The linked accounts query
+	 * refetches on return to show the updated state.
+	 */
+	public linkAccount(providerAlias: string, redirectUri?: string): Promise<void> {
 		return (
 			this.keycloak?.login({
-				idpHint: "github",
+				action: `idp_link:${providerAlias}`,
+				redirectUri: redirectUri ?? window.location.href,
 			}) || Promise.resolve()
 		);
 	}

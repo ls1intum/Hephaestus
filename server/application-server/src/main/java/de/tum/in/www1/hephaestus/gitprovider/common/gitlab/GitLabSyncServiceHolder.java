@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.gitlab.GitLabCommitBackfillService;
 import de.tum.in.www1.hephaestus.gitprovider.commit.gitlab.GitLabCommitSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.gitlab.GitLabIssueDependencySyncService;
@@ -36,6 +37,7 @@ public class GitLabSyncServiceHolder {
     private final GitLabCollaboratorSyncService collaboratorSyncService;
     private final GitLabIssueTypeSyncService issueTypeSyncService;
     private final GitLabCommitSyncService commitSyncService;
+    private final GitLabCommitBackfillService commitBackfillService;
     private final GitLabSubIssueSyncService subIssueSyncService;
     private final GitLabIssueDependencySyncService issueDependencySyncService;
 
@@ -50,6 +52,7 @@ public class GitLabSyncServiceHolder {
         @Nullable GitLabCollaboratorSyncService collaboratorSyncService,
         @Nullable GitLabIssueTypeSyncService issueTypeSyncService,
         @Nullable GitLabCommitSyncService commitSyncService,
+        @Nullable GitLabCommitBackfillService commitBackfillService,
         @Nullable GitLabSubIssueSyncService subIssueSyncService,
         @Nullable GitLabIssueDependencySyncService issueDependencySyncService
     ) {
@@ -63,6 +66,7 @@ public class GitLabSyncServiceHolder {
         this.collaboratorSyncService = collaboratorSyncService;
         this.issueTypeSyncService = issueTypeSyncService;
         this.commitSyncService = commitSyncService;
+        this.commitBackfillService = commitBackfillService;
         this.subIssueSyncService = subIssueSyncService;
         this.issueDependencySyncService = issueDependencySyncService;
     }
@@ -115,6 +119,11 @@ public class GitLabSyncServiceHolder {
     @Nullable
     public GitLabCommitSyncService getCommitSyncService() {
         return commitSyncService;
+    }
+
+    @Nullable
+    public GitLabCommitBackfillService getCommitBackfillService() {
+        return commitBackfillService;
     }
 
     @Nullable

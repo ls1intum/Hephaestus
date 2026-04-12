@@ -79,8 +79,16 @@ public class Practice {
     @Column(name = "trigger_events", columnDefinition = "jsonb", nullable = false)
     private JsonNode triggerEvents;
 
-    @Column(name = "detection_prompt", columnDefinition = "TEXT")
-    private String detectionPrompt;
+    @Column(name = "criteria", columnDefinition = "TEXT")
+    private String criteria;
+
+    /**
+     * Optional Bun/TypeScript static analysis script that runs before the AI agent.
+     * Produces structured hints (not verdicts) that the agent uses as starting points.
+     * When null, no precomputation runs for this practice.
+     */
+    @Column(name = "precompute_script", columnDefinition = "TEXT")
+    private String precomputeScript;
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;

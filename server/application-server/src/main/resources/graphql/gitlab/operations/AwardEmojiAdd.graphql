@@ -1,0 +1,11 @@
+# Adds an award emoji (reaction) to an awardable resource (Note, MergeRequest, Issue, etc.).
+# Used by BotCommandProcessor to react with an eyes emoji when a bot command is detected.
+
+mutation AwardEmojiAdd($awardableId: AwardableID!, $name: String!) {
+    awardEmojiAdd(input: {awardableId: $awardableId, name: $name}) {
+        awardEmoji {
+            name
+        }
+        errors
+    }
+}

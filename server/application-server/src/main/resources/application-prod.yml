@@ -83,6 +83,20 @@ hephaestus:
         jwk-set-uri: "${KEYCLOAK_JWK_SET_URI:${hephaestus.keycloak.internal-url}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs}"
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # GITLAB INTEGRATION (Production)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Enabled via GITLAB_ENABLED env var; defaults come from base application.yml.
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # AGENT SANDBOX & PRACTICE REVIEW (Production)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Sandbox, agent NATS, git checkout, and LLM proxy are configured via env
+    # vars in compose.app.yaml. Defaults come from base application.yml.
+    # The only prod-specific overrides go here (storage path for git repos).
+    git:
+        storage-path: ${GIT_STORAGE_PATH:/data/git-repos}
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # SLACK INTEGRATION (Production)
     # ═══════════════════════════════════════════════════════════════════════════
     slack:

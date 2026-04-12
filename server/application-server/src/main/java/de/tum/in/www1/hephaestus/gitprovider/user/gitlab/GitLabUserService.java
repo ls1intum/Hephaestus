@@ -35,6 +35,20 @@ public class GitLabUserService {
     }
 
     /**
+     * Resolves a GitLab avatar URL, prepending the server base URL for relative paths.
+     * GitLab self-hosted instances return relative paths like {@code /uploads/-/system/user/avatar/123/avatar.png}.
+     */
+    private String resolveAvatarUrl(@Nullable String avatarUrl) {
+        if (avatarUrl == null || avatarUrl.isEmpty()) {
+            return "";
+        }
+        if (avatarUrl.startsWith("/")) {
+            return gitLabProperties.defaultServerUrl() + avatarUrl;
+        }
+        return avatarUrl;
+    }
+
+    /**
      * Finds or creates a user from webhook data.
      * <p>
      * Stores the raw GitLab user ID as {@code nativeId} with the given {@code providerId}.
@@ -49,7 +63,7 @@ public class GitLabUserService {
         long nativeId = dto.id();
         String login = dto.username();
         String name = dto.name() != null ? dto.name() : login;
-        String avatarUrl = dto.avatarUrl() != null ? dto.avatarUrl() : "";
+        String avatarUrl = resolveAvatarUrl(dto.avatarUrl());
         String htmlUrl = gitLabProperties.defaultServerUrl() + "/" + login;
 
         userRepository.upsertUser(
@@ -97,7 +111,7 @@ public class GitLabUserService {
         }
 
         String resolvedName = name != null ? name : username;
-        String resolvedAvatarUrl = avatarUrl != null ? avatarUrl : "";
+        String resolvedAvatarUrl = resolveAvatarUrl(avatarUrl);
         String resolvedHtmlUrl = webUrl != null ? webUrl : (gitLabProperties.defaultServerUrl() + "/" + username);
 
         userRepository.upsertUser(

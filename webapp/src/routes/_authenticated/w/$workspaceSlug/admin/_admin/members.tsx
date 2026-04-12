@@ -1,7 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { getAllTeamsOptions, getUsersWithTeamsOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getAllTeamsOptions,
+	getUsersWithTeamsOptions,
+	getUsersWithTeamsQueryKey,
+	updateMemberVisibilityMutation,
+} from "@/api/@tanstack/react-query.gen";
 import { AdminMembersPage } from "@/components/admin/AdminMembersPage";
 import { adaptApiUserTeams } from "@/components/admin/types";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
@@ -44,6 +49,28 @@ function AdminMembersContainer() {
 		enabled: Boolean(workspaceSlug) && (teamsQueryOptions.enabled ?? true),
 	});
 
+	// Mutation for toggling member visibility
+	const queryClient = useQueryClient();
+	const toggleHidden = useMutation({
+		...updateMemberVisibilityMutation(),
+		onSuccess: () => {
+			queryClient.invalidateQueries({
+				queryKey: getUsersWithTeamsQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+			});
+		},
+		onError: (error) => {
+			toast.error(`Failed to update visibility: ${(error as Error).message}`);
+		},
+	});
+
+	const handleToggleHidden = (userId: number, hidden: boolean) => {
+		if (!workspaceSlug) return;
+		toggleHidden.mutate({
+			path: { workspaceSlug, userId },
+			query: { hidden },
+		});
+	};
+
 	// Transform API data for the component and sort alphabetically
 	const users = (usersData?.map(adaptApiUserTeams) || [])
 		.map((user) => ({
@@ -67,5 +94,12 @@ function AdminMembersContainer() {
 		toast.error(`Failed to load data: ${errorMessage}`);
 	}
 
-	return <AdminMembersPage users={users} teams={teams} isLoading={isLoading || !workspaceSlug} />;
+	return (
+		<AdminMembersPage
+			users={users}
+			teams={teams}
+			isLoading={isLoading || !workspaceSlug}
+			onToggleHidden={handleToggleHidden}
+		/>
+	);
 }

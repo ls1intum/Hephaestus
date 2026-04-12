@@ -14,7 +14,8 @@ export interface AuthContextType {
 	username: string | undefined;
 	userRoles: string[];
 	userProfile: UserProfile | undefined;
-	login: () => Promise<void>;
+	login: (idpHint?: string) => Promise<void>;
+	linkAccount: (providerAlias: string) => Promise<void>;
 	logout: () => Promise<void>;
 	hasRole: (role: string) => boolean;
 	isCurrentUser: (login?: string) => boolean;
@@ -22,6 +23,8 @@ export interface AuthContextType {
 	getGitProviderId: () => string | undefined;
 	getUserProfilePictureUrl: () => string;
 	getUserProfileUrl: () => string;
+	/** Whether the user has a linked GitLab identity (logged in via GitLab or account linked) */
+	hasGitLabIdentity: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -157,8 +160,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		globalState.initPromise = initKeycloak();
 	}, []);
 
-	const login = async () => {
-		await keycloakService.login();
+	const login = async (idpHint?: string) => {
+		await keycloakService.login(idpHint);
+	};
+
+	const linkAccount = async (providerAlias: string) => {
+		await keycloakService.linkAccount(providerAlias);
 	};
 
 	const logout = async () => {
@@ -193,6 +200,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		return keycloakService.getUserProfileUrl();
 	};
 
+	const hasGitLabIdentity = keycloakService.hasGitLabIdentity();
+
 	const value = {
 		isAuthenticated,
 		isLoading,
@@ -200,6 +209,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		userRoles,
 		userProfile,
 		login,
+		linkAccount,
 		logout,
 		hasRole,
 		isCurrentUser,
@@ -207,6 +217,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		getGitProviderId,
 		getUserProfilePictureUrl,
 		getUserProfileUrl,
+		hasGitLabIdentity,
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

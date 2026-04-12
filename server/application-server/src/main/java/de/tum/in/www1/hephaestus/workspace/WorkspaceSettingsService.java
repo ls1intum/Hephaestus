@@ -151,12 +151,13 @@ public class WorkspaceSettingsService {
         workspace.getFeatures().applyPatch(request);
 
         log.info(
-            "Updated workspace features: workspaceId={}, practices={}, achievements={}, leaderboard={}, progression={}",
+            "Updated workspace features: workspaceId={}, practices={}, achievements={}, leaderboard={}, progression={}, leagues={}",
             workspaceId,
             request.practicesEnabled(),
             request.achievementsEnabled(),
             request.leaderboardEnabled(),
-            request.progressionEnabled()
+            request.progressionEnabled(),
+            request.leaguesEnabled()
         );
         return workspaceRepository.save(workspace);
     }

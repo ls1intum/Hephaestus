@@ -51,6 +51,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		id: 1,
 		login: "alice",
 		name: "Alice Johnson",
+		hidden: false,
 		url: "https://github.com/alice",
 		teams: [mockTeams[0], mockTeams[2]],
 		user: {
@@ -64,6 +65,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		id: 2,
 		login: "bob",
 		name: "Bob Smith",
+		hidden: false,
 		url: "https://github.com/bob",
 		teams: [mockTeams[1]],
 		user: {
@@ -77,6 +79,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		id: 3,
 		login: "charlie",
 		name: "Charlie Brown",
+		hidden: false,
 		url: "https://github.com/charlie",
 		teams: [mockTeams[0], mockTeams[1], mockTeams[3]],
 		user: {
@@ -90,6 +93,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		id: 4,
 		login: "diana",
 		name: "Diana Prince",
+		hidden: false,
 		url: "https://github.com/diana",
 		teams: [],
 		user: {
@@ -103,6 +107,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		id: 5,
 		login: "ethan",
 		name: "Ethan Hunt",
+		hidden: false,
 		url: "https://github.com/ethan",
 		teams: [mockTeams[2], mockTeams[3]],
 		user: {
@@ -163,6 +168,7 @@ export const UsersWithoutTeams: Story = {
 				id: 6,
 				login: "john",
 				name: "John Doe",
+				hidden: false,
 				url: "https://github.com/john",
 				teams: [],
 				user: {
@@ -176,6 +182,7 @@ export const UsersWithoutTeams: Story = {
 				id: 7,
 				login: "jane",
 				name: "Jane Smith",
+				hidden: false,
 				url: "https://github.com/jane",
 				teams: [],
 				user: {
@@ -195,6 +202,7 @@ export const ManyUsers: Story = {
 			id: i + 10,
 			login: `user${i + 1}`,
 			name: `User ${i + 1}`,
+			hidden: false,
 			url: `https://github.com/user${i + 1}`,
 			teams: mockTeams.filter(() => Math.random() > 0.5),
 			user: {

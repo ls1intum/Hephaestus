@@ -5,6 +5,9 @@ spring:
             lifecycle-management: none
             skip:
                 in-tests: true
+    mail:
+        host: localhost
+        port: 25
     liquibase:
         enabled: false
     datasource:
@@ -32,7 +35,21 @@ github:
 hephaestus:
     workspace:
         init-default: false
+    keycloak:
+        url: http://localhost:8081
+        realm: hephaestus
+        client-id: hephaestus-confidential
+        client-secret: dummy
+    mail:
+        enabled: false
+        sender: noreply@example.com
+    intelligence-service:
+        url: http://localhost:8000
     sync:
+        nats:
+            enabled: false
+            server: "nats://localhost:4222"
+    agent:
         nats:
             enabled: false
             server: "nats://localhost:4222"

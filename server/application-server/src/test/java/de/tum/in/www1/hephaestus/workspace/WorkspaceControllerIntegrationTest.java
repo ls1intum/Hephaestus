@@ -72,7 +72,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-            .containsKeys("workspaceSlug", "displayName", "accountLogin", "accountType", "ownerUserId");
+            .containsKeys("workspaceSlug", "displayName", "accountLogin", "accountType");
     }
 
     @Test
@@ -250,10 +250,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         webTestClient
             .delete()
             .uri(
-                "/workspaces/{workspaceSlug}/repositories/{owner}/{name}",
+                "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
                 workspaceBeta.getWorkspaceSlug(),
-                "acme",
-                "demo-repo"
+                "acme/demo-repo"
             )
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
@@ -263,10 +262,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         webTestClient
             .delete()
             .uri(
-                "/workspaces/{workspaceSlug}/repositories/{owner}/{name}",
+                "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
                 workspaceAlpha.getWorkspaceSlug(),
-                "acme",
-                "demo-repo"
+                "acme/demo-repo"
             )
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
@@ -558,10 +556,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         ProblemDetail problem = webTestClient
             .post()
             .uri(
-                "/workspaces/{workspaceSlug}/repositories/{owner}/{name}",
+                "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
                 workspace.getWorkspaceSlug(),
-                "acme",
-                "test-repo"
+                "acme/test-repo"
             )
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
@@ -800,7 +797,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true, true))
             .exchange()
             .expectStatus()
             .isOk()
@@ -846,7 +843,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, true, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, true, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -866,7 +863,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, null, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -894,7 +891,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true, true))
             .exchange()
             .expectStatus()
             .isOk();
@@ -905,7 +902,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, false, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, false, null, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -935,7 +932,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true, true))
             .exchange()
             .expectStatus()
             .isForbidden();
@@ -954,7 +951,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, false, true, false))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, false, true, false, false))
             .exchange()
             .expectStatus()
             .isOk();

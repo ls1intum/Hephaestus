@@ -11,8 +11,7 @@
         "snippets": ["## Summary\nThis PR implements..."]
       },
       "reasoning": "The PR description clearly explains the motivation, changes made, and testing approach.",
-      "guidance": "Keep up the excellent documentation practices.",
-      "guidanceMethod": "COACHING"
+      "guidance": "Keep up the excellent documentation practices."
     },
     {
       "practiceSlug": "error-handling",
@@ -26,7 +25,9 @@
       },
       "reasoning": "Empty catch block swallows exceptions silently, making debugging difficult.",
       "guidance": "Log the exception or rethrow as a domain-specific exception.",
-      "guidanceMethod": "SCAFFOLDING"
+      "suggestedDiffNotes": [
+        {"filePath": "src/Main.java", "startLine": 42, "endLine": 50, "body": "Replace empty catch with logging or rethrow."}
+      ]
     },
     {
       "practiceSlug": "commit-message-quality",
@@ -39,15 +40,15 @@
     {
       "practiceSlug": "pr-scope",
       "title": "PR scope is appropriately sized",
-      "verdict": "NOT_APPLICABLE",
+      "verdict": "POSITIVE",
       "severity": "INFO",
       "confidence": 0.70,
-      "reasoning": "Single-file documentation change — scope assessment not meaningful."
+      "reasoning": "Single-file documentation change is well-scoped and focused."
     },
     {
       "practiceSlug": "review-thoroughness",
       "title": "Insufficient test coverage for new feature",
-      "verdict": "NEEDS_REVIEW",
+      "verdict": "NEGATIVE",
       "severity": "MINOR",
       "confidence": 0.55,
       "reasoning": "New utility class has no unit tests, but the change is small and well-understood.",

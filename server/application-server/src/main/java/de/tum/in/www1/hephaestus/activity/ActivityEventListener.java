@@ -8,6 +8,8 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
@@ -50,6 +52,7 @@ public class ActivityEventListener {
     private final ActivityEventService activityEventService;
     private final ExperiencePointCalculator xpCalc;
     private final PullRequestReviewRepository reviewRepository;
+    private final PullRequestRepository pullRequestRepository;
     private final IssueCommentRepository issueCommentRepository;
     private final PullRequestReviewThreadRepository reviewThreadRepository;
     private final UserRepository userRepository;
@@ -650,11 +653,13 @@ public class ActivityEventListener {
     /**
      * Handle review comment (inline code comment) created events.
      *
-     * <p>Records with 0 XP because the review's XP calculation already factors in
-     * the number of inline comments via {@code calculateCodeReviewBonus()}. Adding
-     * separate XP here would double-count the same comments.
+     * <p>For comments linked to a review (GitHub-style), records with 0 XP because
+     * the review's XP calculation already factors in inline comments via
+     * {@code calculateCodeReviewBonus()}.
      *
-     * <p>We still record the event for audit trail and activity tracking purposes.
+     * <p>For standalone comments without a parent review (GitLab diff notes),
+     * awards flat-rate XP directly since there is no parent review
+     * to carry the code review bonus.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -674,8 +679,16 @@ public class ActivityEventListener {
             return;
         }
         Instant occurredAt = commentData.createdAt() != null ? commentData.createdAt() : Instant.now();
-        // Record with 0 XP - the review's calculateCodeReviewBonus() already factors in comment count.
-        // Recording the event for audit purposes only.
+
+        // Standalone review comments (GitLab diff notes without a parent review) get
+        // flat-rate XP directly. Comments linked to a review get 0 XP since
+        // the review's calculateCodeReviewBonus() already factors in comment count.
+        double xp = 0.0;
+        if (commentData.reviewId() == null && commentData.pullRequestId() != null) {
+            xp = calculateStandaloneReviewCommentXp(commentData);
+        }
+
+        final double finalXp = xp;
         safeRecord("review comment", commentData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
@@ -685,8 +698,27 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.REVIEW_COMMENT,
                 commentData.id(),
-                0.0 // No XP - already counted in review's code review bonus
+                finalXp
             )
+        );
+    }
+
+    /**
+     * Calculates XP for a standalone review comment (not linked to a review).
+     * Self-review check and XP formula are handled inside the calculator
+     * to maintain the single-source-of-truth contract.
+     */
+    private double calculateStandaloneReviewCommentXp(EventPayload.ReviewCommentData commentData) {
+        PullRequest pr = pullRequestRepository.findById(commentData.pullRequestId()).orElse(null);
+        if (pr == null) {
+            log.warn("PR not found for standalone review comment XP: prId={}", commentData.pullRequestId());
+            return 0.0;
+        }
+
+        return xpCalc.calculateStandaloneReviewCommentXp(
+            pr,
+            commentData.authorId(),
+            commentData.body() != null ? commentData.body().length() : 0
         );
     }
 

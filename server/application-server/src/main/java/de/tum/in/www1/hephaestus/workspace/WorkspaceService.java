@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
@@ -58,25 +60,31 @@ public class WorkspaceService {
 
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
+    private final UserRepository userRepository;
 
     // Services
     private final WorkspaceSlugService workspaceSlugService;
     private final WorkspaceSettingsService workspaceSettingsService;
     private final LeaguePointsRecalculator leaguePointsRecalculator;
     private final WorkspaceMembershipService workspaceMembershipService;
+    private final GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService;
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
+        UserRepository userRepository,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceSettingsService workspaceSettingsService,
         LeaguePointsRecalculator leaguePointsRecalculator,
-        WorkspaceMembershipService workspaceMembershipService
+        WorkspaceMembershipService workspaceMembershipService,
+        GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService
     ) {
         this.workspaceRepository = workspaceRepository;
+        this.userRepository = userRepository;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceSettingsService = workspaceSettingsService;
         this.leaguePointsRecalculator = leaguePointsRecalculator;
         this.workspaceMembershipService = workspaceMembershipService;
+        this.gitLabWorkspaceInitializationService = gitLabWorkspaceInitializationService;
     }
 
     // ========================================================================
@@ -159,12 +167,16 @@ public class WorkspaceService {
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
+        // Always prefer the authenticated user to prevent privilege escalation.
+        // Fall back to the deprecated ownerUserId only when no auth context exists (e.g. tests).
+        Long ownerUserId = userRepository.getCurrentUser().map(User::getId).orElse(request.ownerUserId());
+
         Workspace workspace = createWorkspace(
             request.workspaceSlug(),
             request.displayName(),
             request.accountLogin(),
             request.accountType(),
-            request.ownerUserId()
+            ownerUserId
         );
 
         if (request.gitProviderMode() != null) {
@@ -177,12 +189,49 @@ public class WorkspaceService {
             workspace.setServerUrl(request.serverUrl().trim());
         }
 
+        // GitLab PAT workspaces monitor all repositories in the group by default
+        if (request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+            workspace.setRepositorySelection(RepositorySelection.ALL);
+        }
+
+        // Explicit save required: when called via createWorkspaceWithInitialization(),
+        // self-invocation bypasses @Transactional proxy, so dirty-checking flush won't
+        // happen automatically. The inner createWorkspace(5-args) saved the base entity,
+        // but these additional fields (gitProviderMode, PAT, serverUrl) need a second save.
+        return workspaceRepository.save(workspace);
+    }
+
+    /**
+     * Creates a workspace and triggers async GitLab initialization if applicable.
+     *
+     * <p>This method is intentionally NOT {@code @Transactional} so that the inner
+     * {@link #createWorkspace(CreateWorkspaceRequestDTO)} transaction commits before
+     * the async initialization reads the workspace from the database.
+     *
+     * @param request the workspace creation request
+     * @return the created workspace
+     */
+    public Workspace createWorkspaceWithInitialization(CreateWorkspaceRequestDTO request) {
+        Workspace workspace = createWorkspace(request);
+
+        // Trigger async repository discovery for GitLab PAT workspaces.
+        // The @Transactional createWorkspace() has already committed at this point,
+        // so the async thread will find the workspace in the database.
+        if (workspace.getGitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+            gitLabWorkspaceInitializationService.initializeAsync(workspace.getId());
+        }
+
         return workspace;
     }
 
     private void createOwnerRole(Workspace workspace, Long ownerUserId) {
         if (ownerUserId == null) {
-            throw new IllegalArgumentException("Owner user id must not be null when creating a workspace.");
+            throw new IllegalStateException(
+                "Cannot create workspace without an owner. " +
+                    "The authenticated user must have a corresponding git provider User entity. " +
+                    "workspaceSlug=" +
+                    workspace.getWorkspaceSlug()
+            );
         }
         workspaceMembershipService.createMembership(workspace, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);
     }

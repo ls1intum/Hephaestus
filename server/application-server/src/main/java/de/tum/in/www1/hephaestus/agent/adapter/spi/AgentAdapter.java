@@ -5,6 +5,8 @@ import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.adapter.AgentResult;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -69,11 +71,68 @@ public interface AgentAdapter {
      * @param request the agent execution parameters
      * @return the network policy for the container
      */
+    /**
+     * Build the shell command fragment that runs precomputation scripts before the agent.
+     *
+     * <p>Scripts are injected from DB into {@code .precompute/practices/} by the handler.
+     * The runner auto-discovers them, executes via Bun, and produces
+     * {@code .precompute/summary.md} + per-practice JSON. Failure is non-fatal —
+     * the agent works without hints if precompute fails.
+     *
+     * @return shell command fragment ending with {@code " && "}, ready to prepend to agent command
+     */
+    static String buildPrecomputeStep() {
+        // Handler injects practice scripts (root-owned) into .precompute/practices/.
+        // Agent (uid 1000) can't write to root-owned dirs, so:
+        // 1. Copy scripts + shared libs to writable /tmp/precompute/
+        // 2. Run from there, output to agent-writable .precompute-out/
+        // 3. The agent reads .precompute-out/summary.md
+        return (
+            "(mkdir -p /workspace/.precompute-out/practices" +
+            " && cp /workspace/.precompute/practices/*.ts /workspace/.precompute-out/practices/" +
+            " && ln -sf /opt/precompute/lib /workspace/.precompute-out/lib" +
+            " && bun run /opt/precompute/runner.ts" +
+            " --repo /workspace/repo" +
+            " --diff /workspace/.context/diff.patch" +
+            " --metadata /workspace/.context/metadata.json" +
+            " --output /workspace/.precompute-out" +
+            " > /tmp/precompute-runner.log 2>&1" +
+            " || { echo '[precompute] failed, continuing without hints'" +
+            " && cp /tmp/precompute-runner.log /workspace/.precompute-out/precompute-runner.log 2>/dev/null" +
+            " ; tail -200 /tmp/precompute-runner.log 2>/dev/null" +
+            " ; true; }) && "
+        );
+    }
+
     static NetworkPolicy buildNetworkPolicy(AgentAdapterRequest request) {
         if (request.credentialMode() == CredentialMode.PROXY) {
             String providerPath = request.llmProvider().name().toLowerCase(java.util.Locale.ROOT);
             return new NetworkPolicy(request.allowInternet(), null, request.jobToken(), providerPath);
         }
         return new NetworkPolicy(true, null, null, null);
+    }
+
+    /** Classpath prefix for agent resource files. */
+    String AGENT_RESOURCE_PREFIX = "agent/";
+
+    /**
+     * Load a classpath resource from the {@code agent/} directory.
+     *
+     * <p>Shared utility for all adapters — eliminates duplicate private methods.
+     *
+     * @param relativePath path relative to {@code agent/} (e.g. {@code "CLAUDE.md"})
+     * @return file content as bytes
+     * @throws IllegalStateException if the resource is missing or unreadable
+     */
+    static byte[] loadClasspathResource(String relativePath) {
+        String fullPath = AGENT_RESOURCE_PREFIX + relativePath;
+        try (InputStream is = AgentAdapter.class.getClassLoader().getResourceAsStream(fullPath)) {
+            if (is == null) {
+                throw new IllegalStateException("Missing classpath resource: " + fullPath);
+            }
+            return is.readAllBytes();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read classpath resource: " + fullPath, e);
+        }
     }
 }

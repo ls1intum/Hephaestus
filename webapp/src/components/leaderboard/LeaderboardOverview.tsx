@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { LeaderboardEntry } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getInitials } from "@/lib/avatar";
 import { LeagueInfoDialog } from "./LeagueInfoDialog";
 import { LeagueProgressCard } from "./LeagueProgressCard";
 
@@ -12,6 +13,7 @@ export interface LeaderboardOverviewProps {
 	leaguePoints: number;
 	leaderboardEnd?: string;
 	leaguePointsChange?: number;
+	leaguesEnabled?: boolean;
 }
 
 export function LeaderboardOverview({
@@ -19,6 +21,7 @@ export function LeaderboardOverview({
 	leaguePoints,
 	leaderboardEnd,
 	leaguePointsChange = 0,
+	leaguesEnabled = true,
 }: LeaderboardOverviewProps) {
 	const [leagueInfoOpen, setLeagueInfoOpen] = useState(false);
 	const [countdown, setCountdown] = useState<string>("Calculating...");
@@ -106,7 +109,7 @@ export function LeaderboardOverview({
 										/>
 									) : (
 										<span className="text-sm font-medium">
-											{user.name.slice(0, 2).toUpperCase()}
+											{getInitials(user.name, user.login)}
 										</span>
 									)}
 								</div>
@@ -121,31 +124,37 @@ export function LeaderboardOverview({
 							<span className="text-sm text-muted-foreground">Leaderboard ends in:</span>
 						</div>
 						<span className="text-xl font-medium">{countdown}</span>
-						<div className="flex flex-wrap items-center justify-center gap-1 mt-1 text-sm">
-							<span className="text-muted-foreground">League points change:</span>
-							<div className="flex items-center gap-1">
-								<span className="font-medium">{leaguePointsChange}</span>
-								{leaguePointsChange > 0 ? (
-									<TrendingUp className="h-4 w-4" />
-								) : leaguePointsChange < 0 ? (
-									<TrendingDown className="h-4 w-4" />
-								) : (
-									<MoveRight className="h-4 w-4" />
-								)}
+						{leaguesEnabled && (
+							<div className="flex flex-wrap items-center justify-center gap-1 mt-1 text-sm">
+								<span className="text-muted-foreground">League points change:</span>
+								<div className="flex items-center gap-1">
+									<span className="font-medium">{leaguePointsChange}</span>
+									{leaguePointsChange > 0 ? (
+										<TrendingUp className="h-4 w-4" />
+									) : leaguePointsChange < 0 ? (
+										<TrendingDown className="h-4 w-4" />
+									) : (
+										<MoveRight className="h-4 w-4" />
+									)}
+								</div>
 							</div>
-						</div>
+						)}
 					</div>
 
-					<div className="flex flex-col items-center gap-1 text-center">
-						<LeagueProgressCard
-							leaguePoints={leaguePoints}
-							onInfoClick={() => setLeagueInfoOpen(true)}
-						/>
-					</div>
+					{leaguesEnabled && (
+						<div className="flex flex-col items-center gap-1 text-center">
+							<LeagueProgressCard
+								leaguePoints={leaguePoints}
+								onInfoClick={() => setLeagueInfoOpen(true)}
+							/>
+						</div>
+					)}
 				</div>
 			</CardContent>
 
-			<LeagueInfoDialog open={leagueInfoOpen} onOpenChange={setLeagueInfoOpen} />
+			{leaguesEnabled && (
+				<LeagueInfoDialog open={leagueInfoOpen} onOpenChange={setLeagueInfoOpen} />
+			)}
 		</Card>
 	);
 }

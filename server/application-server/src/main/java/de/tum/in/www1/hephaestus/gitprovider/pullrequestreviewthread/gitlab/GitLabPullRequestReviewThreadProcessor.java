@@ -99,13 +99,13 @@ public class GitLabPullRequestReviewThreadProcessor {
     }
 
     /**
-     * Finds or creates a thread from a webhook diff note, where only the note ID is available.
+     * Finds or creates a thread from a webhook diff note.
      * <p>
-     * Webhooks don't carry the discussion ID, so we use the note's numeric ID as nativeId.
-     * The GraphQL discussion sync will reconcile this into the proper discussion later
-     * by matching on the note within the thread.
+     * Uses the discussion_id from the webhook payload (hashed via {@link #deterministicNativeId})
+     * as the thread nativeId. This matches the GraphQL sync's discussion-based threads,
+     * enabling correct thread grouping without reconciliation.
      *
-     * @param data the webhook-level data (note native ID, file position, timestamps)
+     * @param data the webhook-level data (thread native ID, file position, timestamps)
      * @param pr the parent pull request
      * @param provider the git provider
      * @return the thread entity (never null)
@@ -231,7 +231,7 @@ public class GitLabPullRequestReviewThreadProcessor {
      * to produce a stable Long. This is collision-resistant enough for our use case
      * since it's scoped per provider.
      */
-    static long deterministicNativeId(String discussionGlobalId) {
+    public static long deterministicNativeId(String discussionGlobalId) {
         // Use the same approach as java.lang.String.hashCode() but with long accumulator
         // for better distribution. FNV-1a inspired.
         long hash = 0xcbf29ce484222325L; // FNV offset basis

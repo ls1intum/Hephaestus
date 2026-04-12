@@ -1,11 +1,15 @@
 package de.tum.in.www1.hephaestus.account;
 
 import de.tum.in.www1.hephaestus.config.KeycloakProperties;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Optional;
 import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +24,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,17 +47,20 @@ public class AccountController {
     private final Keycloak keycloak;
     private final UserRepository userRepository;
     private final KeycloakProperties keycloakProperties;
+    private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
 
     public AccountController(
         AccountService accountService,
         Keycloak keycloak,
         UserRepository userRepository,
-        KeycloakProperties keycloakProperties
+        KeycloakProperties keycloakProperties,
+        AuthenticatedGitProviderUserService authenticatedGitProviderUserService
     ) {
         this.accountService = accountService;
         this.keycloak = keycloak;
         this.userRepository = userRepository;
         this.keycloakProperties = keycloakProperties;
+        this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
     }
 
     @DeleteMapping
@@ -94,8 +102,8 @@ public class AccountController {
         summary = "Get user settings",
         description = "Get the current user's notification, research participation, and AI review preferences"
     )
-    public ResponseEntity<UserSettingsDTO> getUserSettings() {
-        var user = userRepository.getCurrentUser();
+    public ResponseEntity<UserSettingsDTO> getUserSettings(@AuthenticationPrincipal JwtAuthenticationToken auth) {
+        var user = resolveOrProvisionCurrentUser(auth);
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -113,7 +121,7 @@ public class AccountController {
         @AuthenticationPrincipal JwtAuthenticationToken auth,
         @Valid @RequestBody UserSettingsDTO userSettings
     ) {
-        var user = userRepository.getCurrentUser();
+        var user = resolveOrProvisionCurrentUser(auth);
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -139,6 +147,60 @@ public class AccountController {
         return ResponseEntity.ok(updatedUserSettings);
     }
 
+    @GetMapping("/linked-accounts")
+    @Operation(
+        summary = "List linked identity providers",
+        description = "Returns all configured identity providers with their connection status for the current user"
+    )
+    public ResponseEntity<List<LinkedAccountDTO>> getLinkedAccounts(
+        @AuthenticationPrincipal JwtAuthenticationToken auth
+    ) {
+        JwtAuthenticationToken token = resolveAuthentication(auth);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
+        return ResponseEntity.ok(accountService.getLinkedAccounts(keycloakUserId));
+    }
+
+    @DeleteMapping("/linked-accounts/{providerAlias}")
+    @Operation(
+        summary = "Unlink an identity provider",
+        description = "Remove the federated identity link for the given provider. Cannot unlink the last remaining provider."
+    )
+    public ResponseEntity<Void> unlinkAccount(
+        @PathVariable @jakarta.validation.constraints.Pattern(regexp = "^[a-z0-9-]{1,64}$") String providerAlias,
+        @AuthenticationPrincipal JwtAuthenticationToken auth
+    ) {
+        JwtAuthenticationToken token = resolveAuthentication(auth);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
+        accountService.unlinkAccount(keycloakUserId, providerAlias);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/linked-accounts/{providerAlias}/claim")
+    @Operation(
+        summary = "Claim an identity provider from another user",
+        description = "Transfers a federated identity from another Keycloak user to the current user. " +
+            "Used when a user has accidentally created two accounts by logging in with different IdPs. " +
+            "Deletes the orphan account if it has no remaining identities."
+    )
+    public ResponseEntity<Void> claimIdentity(
+        @PathVariable @jakarta.validation.constraints.Pattern(regexp = "^[a-z0-9-]{1,64}$") String providerAlias,
+        @AuthenticationPrincipal JwtAuthenticationToken auth
+    ) {
+        JwtAuthenticationToken token = resolveAuthentication(auth);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
+        accountService.claimIdentity(keycloakUserId, providerAlias);
+        return ResponseEntity.noContent().build();
+    }
+
     private JwtAuthenticationToken resolveAuthentication(JwtAuthenticationToken injectedToken) {
         if (injectedToken != null) {
             return injectedToken;
@@ -148,5 +210,13 @@ public class AccountController {
             return jwtAuthenticationToken;
         }
         return null;
+    }
+
+    private Optional<User> resolveOrProvisionCurrentUser(JwtAuthenticationToken auth) {
+        if (resolveAuthentication(auth) == null) {
+            return Optional.empty();
+        }
+
+        return authenticatedGitProviderUserService.resolveOrProvisionCurrentUser(null);
     }
 }

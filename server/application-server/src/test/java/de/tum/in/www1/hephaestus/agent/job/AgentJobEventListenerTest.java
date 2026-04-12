@@ -68,7 +68,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        listener = new AgentJobEventListener(agentJobService, pullRequestRepository, practiceReviewDetectionGate);
+        listener = new AgentJobEventListener(agentJobService, pullRequestRepository, practiceReviewDetectionGate, true);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -694,7 +694,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                 var agentConfigChecker = mock(AgentConfigChecker.class);
                 var practiceRepository = mock(PracticeRepository.class);
                 var workspaceResolver = mock(WorkspaceResolver.class);
-                var properties = new PracticeReviewProperties(true, true, 5, ""); // runForAllUsers=true
+                var properties = new PracticeReviewProperties(true, true, false, "", 15); // runForAllUsers=true
                 var realGate = new PracticeReviewDetectionGate(
                     properties,
                     userRoleChecker,
@@ -702,7 +702,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                     practiceRepository,
                     workspaceResolver
                 );
-                var listener = new AgentJobEventListener(agentJobService, pullRequestRepository, realGate);
+                var listener = new AgentJobEventListener(agentJobService, pullRequestRepository, realGate, true);
                 return new CollaborationFixture(
                     listener,
                     userRoleChecker,

@@ -1,12 +1,19 @@
 package de.tum.in.www1.hephaestus.account;
 
+import de.tum.in.www1.hephaestus.config.KeycloakProperties;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.keycloak.admin.client.Keycloak;
+import org.keycloak.representations.idm.FederatedIdentityRepresentation;
+import org.keycloak.representations.idm.IdentityProviderRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -27,10 +34,19 @@ public class AccountService {
 
     private final UserPreferencesRepository userPreferencesRepository;
     private final PosthogClient posthogClient;
+    private final Keycloak keycloak;
+    private final KeycloakProperties keycloakProperties;
 
-    public AccountService(UserPreferencesRepository userPreferencesRepository, PosthogClient posthogClient) {
+    public AccountService(
+        UserPreferencesRepository userPreferencesRepository,
+        PosthogClient posthogClient,
+        Keycloak keycloak,
+        KeycloakProperties keycloakProperties
+    ) {
         this.userPreferencesRepository = userPreferencesRepository;
         this.posthogClient = posthogClient;
+        this.keycloak = keycloak;
+        this.keycloakProperties = keycloakProperties;
     }
 
     /**
@@ -128,6 +144,181 @@ public class AccountService {
         if (!anyDeleted) {
             String login = user != null ? user.getLogin() : "unknown";
             log.warn("No PostHog person matched provided identifiers during account deletion: userLogin={}", login);
+        }
+    }
+
+    /**
+     * Returns all enabled, non-link-only identity providers configured in the Keycloak realm.
+     * This is a public endpoint — no user context required.
+     */
+    public List<IdentityProviderDTO> getAvailableIdentityProviders() {
+        try {
+            return keycloak
+                .realm(keycloakProperties.realm())
+                .identityProviders()
+                .findAll()
+                .stream()
+                .filter(idp -> !Boolean.TRUE.equals(idp.isLinkOnly()) && Boolean.TRUE.equals(idp.isEnabled()))
+                .map(idp ->
+                    new IdentityProviderDTO(
+                        idp.getAlias(),
+                        idp.getDisplayName() != null ? idp.getDisplayName() : idp.getAlias(),
+                        idp.getProviderId()
+                    )
+                )
+                .toList();
+        } catch (Exception e) {
+            log.error("Failed to fetch identity providers", e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to communicate with identity provider");
+        }
+    }
+
+    /**
+     * Returns all identity providers configured in the Keycloak realm along with
+     * the current user's connection status for each.
+     *
+     * @param keycloakUserId the Keycloak subject identifier
+     * @return list of identity providers with connection status
+     */
+    public List<LinkedAccountDTO> getLinkedAccounts(String keycloakUserId) {
+        try {
+            List<IdentityProviderRepresentation> realmIdps = keycloak
+                .realm(keycloakProperties.realm())
+                .identityProviders()
+                .findAll();
+
+            List<FederatedIdentityRepresentation> linked = keycloak
+                .realm(keycloakProperties.realm())
+                .users()
+                .get(keycloakUserId)
+                .getFederatedIdentity();
+
+            Map<String, String> linkedUsernames = linked
+                .stream()
+                .collect(
+                    Collectors.toMap(
+                        FederatedIdentityRepresentation::getIdentityProvider,
+                        FederatedIdentityRepresentation::getUserName,
+                        (a, b) -> a
+                    )
+                );
+
+            return realmIdps
+                .stream()
+                .filter(idp -> !Boolean.TRUE.equals(idp.isLinkOnly()) && Boolean.TRUE.equals(idp.isEnabled()))
+                .map(idp -> {
+                    String alias = idp.getAlias();
+                    String username = linkedUsernames.get(alias);
+                    return new LinkedAccountDTO(
+                        alias,
+                        idp.getDisplayName() != null ? idp.getDisplayName() : alias,
+                        username != null,
+                        username
+                    );
+                })
+                .toList();
+        } catch (Exception e) {
+            log.error("Failed to fetch linked accounts for user {}", keycloakUserId, e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to communicate with identity provider");
+        }
+    }
+
+    /**
+     * Unlinks a federated identity provider from the user's Keycloak account.
+     * Prevents unlinking the last remaining provider.
+     *
+     * @param keycloakUserId the Keycloak subject identifier
+     * @param providerAlias  the identity provider alias to unlink
+     */
+    public void unlinkAccount(String keycloakUserId, String providerAlias) {
+        try {
+            var userResource = keycloak.realm(keycloakProperties.realm()).users().get(keycloakUserId);
+            List<FederatedIdentityRepresentation> linked = userResource.getFederatedIdentity();
+
+            if (linked.size() <= 1) {
+                log.warn("User {} attempted to unlink last identity provider {}", keycloakUserId, providerAlias);
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot unlink last identity provider");
+            }
+
+            boolean hasProvider = linked.stream().anyMatch(fi -> fi.getIdentityProvider().equals(providerAlias));
+            if (!hasProvider) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Identity provider not linked");
+            }
+
+            userResource.removeFederatedIdentity(providerAlias);
+            log.info("User {} unlinked identity provider {}", keycloakUserId, providerAlias);
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to unlink provider {} for user {}", providerAlias, keycloakUserId, e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to communicate with identity provider");
+        }
+    }
+
+    /**
+     * Claims a federated identity that is currently linked to a different Keycloak user.
+     * Removes the identity from the other user, adds it to the current user,
+     * and deletes the other user if they have no remaining federated identities.
+     *
+     * <p>This handles the common scenario where a user logs in via two different IdPs
+     * with different emails, creating two separate Keycloak accounts, and then wants
+     * to merge them.
+     *
+     * @param currentUserId the Keycloak ID of the currently authenticated user
+     * @param providerAlias the identity provider alias to claim (e.g. "gitlab-lrz")
+     */
+    public void claimIdentity(String currentUserId, String providerAlias) {
+        try {
+            var realmResource = keycloak.realm(keycloakProperties.realm());
+
+            // Find all users with this provider linked
+            var allUsers = realmResource.users().searchByAttributes("*");
+            String otherUserId = null;
+            FederatedIdentityRepresentation targetIdentity = null;
+
+            for (var user : allUsers) {
+                if (user.getId().equals(currentUserId)) {
+                    continue;
+                }
+                var feds = realmResource.users().get(user.getId()).getFederatedIdentity();
+                for (var fed : feds) {
+                    if (fed.getIdentityProvider().equals(providerAlias)) {
+                        otherUserId = user.getId();
+                        targetIdentity = fed;
+                        break;
+                    }
+                }
+                if (otherUserId != null) {
+                    break;
+                }
+            }
+
+            if (otherUserId == null || targetIdentity == null) {
+                throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "No other user found with identity provider " + providerAlias
+                );
+            }
+
+            // Remove the identity from the other user
+            realmResource.users().get(otherUserId).removeFederatedIdentity(providerAlias);
+            log.info("Removed {} identity from orphan user {}", providerAlias, otherUserId);
+
+            // Add it to the current user
+            realmResource.users().get(currentUserId).addFederatedIdentity(providerAlias, targetIdentity);
+            log.info("Added {} identity to current user {}", providerAlias, currentUserId);
+
+            // Delete the orphan user if they have no remaining federated identities
+            var remainingFeds = realmResource.users().get(otherUserId).getFederatedIdentity();
+            if (remainingFeds.isEmpty()) {
+                realmResource.users().delete(otherUserId);
+                log.info("Deleted orphan Keycloak user {} (no remaining identities)", otherUserId);
+            }
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to claim identity {} for user {}", providerAlias, currentUserId, e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to claim identity: " + e.getMessage());
         }
     }
 

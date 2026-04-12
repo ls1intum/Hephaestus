@@ -22,4 +22,17 @@ public interface RepositoryCollaboratorRepository
     );
 
     List<RepositoryCollaborator> findByRepository_Id(Long repositoryId);
+
+    @Query(
+        """
+            SELECT DISTINCT c FROM RepositoryCollaborator c
+            JOIN FETCH c.user
+            WHERE c.repository.organization.login = :orgLogin
+            AND c.permission IN :permissions
+        """
+    )
+    List<RepositoryCollaborator> findByOrgLoginAndPermissions(
+        @Param("orgLogin") String orgLogin,
+        @Param("permissions") List<RepositoryCollaborator.Permission> permissions
+    );
 }

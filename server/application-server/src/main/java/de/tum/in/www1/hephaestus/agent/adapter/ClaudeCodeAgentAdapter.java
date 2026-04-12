@@ -39,7 +39,11 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
     static final String OUTPUT_PATH = "/workspace/.output";
     private static final int MAX_BRACE_ATTEMPTS = 5;
     private static final String MAX_BUDGET_USD = "5.00";
-    private static final String EFFORT_LEVEL = "max";
+    private static final String EFFORT_LEVEL = "medium";
+    private static final int MAX_TURNS = 25;
+    private static final int MAX_STDOUT_BUFFER_BYTES = 10 * 1024 * 1024;
+    /** Buffer time (seconds) reserved for retries + cleanup before container timeout. */
+    static final int TIMEOUT_BUFFER_SECONDS = 60;
 
     private final ObjectMapper objectMapper;
 
@@ -65,30 +69,23 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
         inputFiles.put(".prompt", request.prompt().getBytes(StandardCharsets.UTF_8));
         inputFiles.put(".json-schema", buildJsonSchema());
 
-        // Full agentic mode with optimal flags:
-        // --json-schema: constrained decoding for reliable structured output (post-agentic-loop)
-        // --effort max: maximum extended thinking for thorough code review
-        // --no-session-persistence: skip disk I/O in ephemeral containers
-        // --max-budget-usd: cost ceiling to prevent runaway spending
-        // --verbose: debug info on stderr (does not affect stdout)
+        // Claude Code-specific orchestrator file (auto-discovered by Claude Code CLI)
+        inputFiles.put("CLAUDE.md", AgentAdapter.loadClasspathResource("CLAUDE.md"));
+
+        // Node.js runner script handles: run claude → validate output → retry via --continue
+        long agentTimeoutMs = Math.max(60_000L, (long) (request.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
+        inputFiles.put(".run-claude.mjs", buildRunnerScript(agentTimeoutMs));
+
         String command =
             authSetup +
             "mkdir -p " +
             OUTPUT_PATH +
-            " && PROMPT=$(cat /workspace/.prompt)" +
-            " && SCHEMA=$(cat /workspace/.json-schema)" +
-            " && claude -p \"$PROMPT\" --output-format json" +
-            " --json-schema \"$SCHEMA\"" +
-            " --effort " +
-            EFFORT_LEVEL +
-            " --dangerously-skip-permissions" +
-            " --no-session-persistence" +
-            " --max-budget-usd " +
-            MAX_BUDGET_USD +
-            " --verbose" +
-            " > " +
+            " && " +
+            AgentAdapter.buildPrecomputeStep() +
+            "node /workspace/.run-claude.mjs" +
+            "; cp -r /workspace/.analysis " +
             OUTPUT_PATH +
-            "/result.json";
+            "/analysis 2>/dev/null; true";
 
         return new AgentSandboxSpec(
             IMAGE,
@@ -114,19 +111,146 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
         String schema = """
             {"type":"object","properties":{"findings":{"type":"array","items":{"type":"object",\
             "properties":{"practiceSlug":{"type":"string"},"title":{"type":"string"},\
-            "verdict":{"type":"string","enum":["POSITIVE","NEGATIVE","NOT_APPLICABLE","NEEDS_REVIEW"]},\
+            "verdict":{"type":"string","enum":["POSITIVE","NEGATIVE","NOT_APPLICABLE"]},\
             "severity":{"type":"string","enum":["CRITICAL","MAJOR","MINOR","INFO"]},\
             "confidence":{"type":"number","minimum":0,"maximum":1},\
-            "evidence":{"type":"object"},"reasoning":{"type":"string"},\
-            "guidance":{"type":"string"},"guidanceMethod":{"type":"string",\
-            "enum":["MODELING","COACHING","SCAFFOLDING","ARTICULATION","REFLECTION","EXPLORATION"]}},\
-            "required":["practiceSlug","title","verdict","severity","confidence"]}},\
-            "delivery":{"type":"object","properties":{"mrNote":{"type":"string"},\
-            "diffNotes":{"type":"array","items":{"type":"object","properties":{\
+            "evidence":{"type":"object","properties":{\
+            "locations":{"type":"array","items":{"type":"object","properties":{\
+            "path":{"type":"string"},"startLine":{"type":"integer","minimum":1},\
+            "endLine":{"type":"integer","minimum":1}}}},\
+            "snippets":{"type":"array","items":{"type":"string"}}}},\
+            "reasoning":{"type":"string"},\
+            "guidance":{"type":"string"},\
+            "suggestedDiffNotes":{"type":"array","items":{"type":"object","properties":{\
             "filePath":{"type":"string"},"startLine":{"type":"integer","minimum":1},\
             "endLine":{"type":"integer","minimum":1},"body":{"type":"string"}},\
-            "required":["filePath","startLine","body"]}}}}},"required":["findings"]}""";
+            "required":["filePath","startLine","body"]}}},\
+            "required":["practiceSlug","title","verdict","severity","confidence"]}},\
+            "delivery":{"type":"object","properties":{\
+            "mrNote":{"type":"string"}}}},"required":["findings"]}""";
         return schema.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Build a Node.js runner script that invokes Claude Code with self-correction.
+     *
+     * <p>The script runs the initial analysis, validates the output for a {@code findings}
+     * array, and if invalid, sends up to 2 correction messages via {@code --continue}
+     * (which resumes the existing session with full context preserved).
+     *
+     * @param agentTimeoutMs total time budget for all runs (initial + retries)
+     */
+    private byte[] buildRunnerScript(long agentTimeoutMs) {
+        // Reserve 60s per retry attempt from total timeout
+        long retryTimeoutMs = 60_000;
+        long initialTimeoutMs = Math.max(60_000, agentTimeoutMs - 2 * retryTimeoutMs);
+        String script = """
+            import { spawnSync } from 'child_process';
+            import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+
+            const OUTPUT = '/workspace/.output';
+            mkdirSync(OUTPUT, { recursive: true });
+
+            const prompt = readFileSync('/workspace/.prompt', 'utf-8').trim();
+            const schema = readFileSync('/workspace/.json-schema', 'utf-8').trim();
+
+            function runClaude(args, label, timeoutMs) {
+              console.error(`[run-claude] ${label}`);
+              const start = Date.now();
+              const r = spawnSync('claude', args, {
+                encoding: 'utf-8',
+                maxBuffer: %d,
+                timeout: timeoutMs || 0,
+                cwd: '/workspace',
+                stdio: ['pipe', 'pipe', 'pipe']
+              });
+              const sec = ((Date.now() - start) / 1000).toFixed(1);
+              console.error(`[run-claude] ${label}: ${sec}s, exit=${r.status}, stdout=${(r.stdout||'').length}b`);
+              if (r.error) console.error(`[run-claude] ${label}: error=${r.error.message}`);
+              return r;
+            }
+
+            function hasFindings(out) {
+              if (!out?.trim()) return false;
+              try {
+                const p = JSON.parse(out);
+                if (p?.findings?.length > 0) return true;
+                if (Array.isArray(p)) {
+                  for (const ev of p) {
+                    if (ev.type === 'result') {
+                      if (ev.structured_output?.findings?.length > 0) return true;
+                      try { if (JSON.parse(ev.result)?.findings?.length > 0) return true; } catch {}
+                      if (typeof ev.result === 'string' && ev.result.includes('"findings"')) return true;
+                    }
+                  }
+                }
+                if (p?.type === 'result') {
+                  if (p.structured_output?.findings?.length > 0) return true;
+                  try { if (JSON.parse(p.result)?.findings?.length > 0) return true; } catch {}
+                }
+              } catch {
+                return out.includes('"findings"') && out.includes('"practiceSlug"');
+              }
+              return false;
+            }
+
+            // Initial run — session persists for --continue retries
+            let result = runClaude([
+              '-p', prompt,
+              '--output-format', 'json',
+              '--json-schema', schema,
+              '--effort', '%s',
+              '--max-turns', '%d',
+              '--dangerously-skip-permissions',
+              '--max-budget-usd', '%s',
+              '--verbose'
+            ], 'initial', %d);
+
+            let bestOutput = result.stdout || '';
+            writeFileSync(`${OUTPUT}/result.json`, bestOutput);
+            writeFileSync(`${OUTPUT}/initial.json`, bestOutput);
+            let valid = hasFindings(bestOutput);
+
+            // Self-correction: up to 2 retries via --continue (same session, full context)
+            for (let i = 1; i <= 2 && !valid; i++) {
+              console.error(`[run-claude] retry ${i}/2: output invalid, correcting via --continue`);
+              const msg = !bestOutput.trim()
+                ? 'Your previous response was empty. Output a JSON object: {"findings": [{practiceSlug, title, verdict, severity, confidence, ...}, ...]}. Review the practices and diff, then produce findings.'
+                : 'Your response could not be parsed as valid findings JSON. Output ONLY a JSON object: {"findings": [{practiceSlug, title, verdict (POSITIVE/NEGATIVE/NOT_APPLICABLE), severity (CRITICAL/MAJOR/MINOR/INFO), confidence (0-1), reasoning, guidance}, ...]}';
+
+              result = runClaude([
+                '--continue', '-p', msg,
+                '--output-format', 'json',
+                '--json-schema', schema,
+                '--max-turns', '5',
+                '--dangerously-skip-permissions',
+                '--max-budget-usd', '1.00',
+                '--verbose'
+              ], `retry-${i}`, %d);
+
+              const retryOutput = result.stdout || '';
+              writeFileSync(`${OUTPUT}/retry-${i}.json`, retryOutput);
+              if (hasFindings(retryOutput)) {
+                bestOutput = retryOutput;
+                valid = true;
+              } else if (retryOutput.trim() && retryOutput.length > bestOutput.length) {
+                bestOutput = retryOutput; // keep longer output for server-side parsing
+              }
+              // Always write best output to result.json (never overwrite with empty)
+              writeFileSync(`${OUTPUT}/result.json`, bestOutput);
+            }
+
+            console.error(`[run-claude] ${valid ? 'SUCCESS' : 'FAILED: no valid findings after retries'}`);
+            process.exit(valid ? 0 : (result.status || 1));
+            """.formatted(
+                MAX_STDOUT_BUFFER_BYTES,
+                EFFORT_LEVEL,
+                MAX_TURNS,
+                MAX_BUDGET_USD,
+                initialTimeoutMs,
+                retryTimeoutMs
+            );
+        return script.getBytes(StandardCharsets.UTF_8);
     }
 
     /**
@@ -136,6 +260,9 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
      * {type:"result",...}]}. With {@code --json-schema}, the result event may contain a
      * {@code structured_output} field with validated JSON. Falls back to extracting from
      * the {@code result} text field.
+     *
+     * <p>Also extracts LLM usage statistics ({@code total_cost_usd}, {@code total_input_tokens},
+     * {@code total_output_tokens}, {@code model}) from the {@code type: "result"} event.
      */
     @Override
     public AgentResult parseResult(SandboxResult sandboxResult) {
@@ -158,7 +285,18 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             output.put("rawOutput", cliOutput);
         }
 
-        return new AgentResult(success, output);
+        AgentResult.LlmUsage usage = extractUsage(cliOutput);
+        if (usage != null) {
+            log.info(
+                "Claude Code usage: model={}, input={}, output={}, cost={}",
+                usage.model(),
+                usage.inputTokens(),
+                usage.outputTokens(),
+                usage.costUsd()
+            );
+        }
+
+        return new AgentResult(success, output, usage);
     }
 
     /**
@@ -203,6 +341,93 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             log.warn("Failed to parse Claude Code CLI output: {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Extract LLM usage statistics from the Claude Code CLI output.
+     *
+     * <p>The {@code type: "result"} event contains top-level fields:
+     * {@code total_cost_usd}, {@code total_input_tokens}, {@code total_output_tokens},
+     * and {@code model}. These are extracted into an {@link AgentResult.LlmUsage} record.
+     *
+     * <p>Returns {@code null} when the output is a plain JSON object (e.g. direct
+     * {@code --json-schema} structured output without an event wrapper) or when no
+     * result event is found.
+     *
+     * @param cliOutput raw CLI stdout content
+     * @return usage statistics, or null if unavailable
+     */
+    AgentResult.LlmUsage extractUsage(String cliOutput) {
+        try {
+            JsonNode root = objectMapper.readTree(cliOutput);
+            JsonNode resultEvent = null;
+
+            // Single result object format
+            if (root.isObject() && "result".equals(root.path("type").asText())) {
+                resultEvent = root;
+            }
+
+            // JSON array of events format — find the result event
+            if (root.isArray()) {
+                for (JsonNode event : root) {
+                    if ("result".equals(event.path("type").asText())) {
+                        resultEvent = event;
+                        // Don't break — use the last result event if multiple exist
+                    }
+                }
+            }
+
+            if (resultEvent == null) {
+                return null;
+            }
+
+            String model = resultEvent.path("model").asText(null);
+            Integer inputTokens = intOrNull(resultEvent, "total_input_tokens");
+            Integer outputTokens = intOrNull(resultEvent, "total_output_tokens");
+            Double costUsd = doubleOrNull(resultEvent, "total_cost_usd");
+
+            // Count assistant events as LLM calls (each represents one model invocation)
+            int totalCalls = 0;
+            if (root.isArray()) {
+                for (JsonNode event : root) {
+                    if ("assistant".equals(event.path("type").asText())) {
+                        totalCalls++;
+                    }
+                }
+            } else {
+                // Single result object — at least one call was made
+                totalCalls = 1;
+            }
+
+            // Only return usage if at least some data is present
+            if (model == null && inputTokens == null && outputTokens == null && costUsd == null) {
+                return null;
+            }
+
+            return new AgentResult.LlmUsage(
+                model,
+                inputTokens,
+                outputTokens,
+                null, // reasoningTokens — not reported by Claude Code CLI
+                null, // cacheReadTokens — not reported by Claude Code CLI
+                null, // cacheWriteTokens — not reported by Claude Code CLI
+                costUsd,
+                Math.max(totalCalls, 1)
+            );
+        } catch (Exception e) {
+            log.warn("Failed to extract LLM usage from Claude Code output: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private static Integer intOrNull(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isNumber() ? value.asInt() : null;
+    }
+
+    private static Double doubleOrNull(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isNumber() ? value.asDouble() : null;
     }
 
     /**

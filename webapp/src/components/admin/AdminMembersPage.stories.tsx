@@ -70,6 +70,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		id: 1,
 		login: "alice.smith",
 		name: "Alice Smith",
+		hidden: false,
 		url: "https://github.com/alice.smith",
 		teams: [mockTeams[0]],
 		user: {
@@ -84,6 +85,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		id: 2,
 		login: "bob.johnson",
 		name: "Bob Johnson",
+		hidden: false,
 		url: "https://github.com/bob.johnson",
 		teams: [mockTeams[1], mockTeams[2]],
 		user: {
@@ -98,6 +100,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		id: 3,
 		login: "carol.williams",
 		name: "Carol Williams",
+		hidden: false,
 		url: "https://github.com/carol.williams",
 		teams: [mockTeams[0], mockTeams[1]],
 		user: {
@@ -112,6 +115,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		id: 4,
 		login: "david.brown",
 		name: "David Brown",
+		hidden: false,
 		url: "https://github.com/david.brown",
 		teams: [],
 		user: {

@@ -24,6 +24,7 @@ export interface LeaderboardFilterProps {
 	};
 	selectedMode: LeaderboardVariant;
 	onModeChange?: (mode: LeaderboardVariant) => void;
+	leaguesEnabled?: boolean;
 }
 
 export function LeaderboardFilter({
@@ -38,6 +39,7 @@ export function LeaderboardFilter({
 	leaderboardSchedule,
 	selectedMode,
 	onModeChange,
+	leaguesEnabled = true,
 }: LeaderboardFilterProps & {
 	initialAfterDate?: string;
 	initialBeforeDate?: string;
@@ -75,7 +77,11 @@ export function LeaderboardFilter({
 						/>
 					)}
 					{selectedMode === "INDIVIDUAL" && (
-						<SortFilter onSortChange={onSortChange} selectedSort={selectedSort} />
+						<SortFilter
+							onSortChange={onSortChange}
+							selectedSort={selectedSort}
+							leaguesEnabled={leaguesEnabled}
+						/>
 					)}
 					<TimeframeFilter
 						onTimeframeChange={onTimeframeChange}

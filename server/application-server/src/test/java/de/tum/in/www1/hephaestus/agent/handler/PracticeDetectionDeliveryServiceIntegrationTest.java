@@ -201,7 +201,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     private ValidatedFinding finding(String slug, Verdict verdict) {
-        return new ValidatedFinding(slug, "Test: " + slug, verdict, Severity.INFO, 0.9f, null, null, null, null);
+        return new ValidatedFinding(slug, "Test: " + slug, verdict, Severity.INFO, 0.9f, null, null, null);
     }
 
     @Nested
@@ -274,6 +274,11 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("caps negatives per practice at configured limit")
         void capsNegatives() {
+            // The idempotency key is practiceSlug:targetType:targetId:jobId, so all
+            // same-slug findings share the same key. The DB ON CONFLICT DO NOTHING
+            // deduplicates them, leaving only the first insert. The in-memory cap
+            // counter still advances, so findings 5 and 6 are discarded over cap,
+            // while findings 1-4 are discarded as duplicates.
             var findings = new ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
                 findings.add(
@@ -285,7 +290,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                         0.8f,
                         null,
                         null,
-                        null,
                         null
                     )
                 );
@@ -293,10 +297,11 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             var result = deliveryService.deliver(agentJob, findings);
 
-            // Default cap is 5
-            assertThat(result.inserted()).isEqualTo(5);
+            // Only 1 DB row inserted (same idempotency key), 4 duplicates, 2 over cap
+            assertThat(result.inserted()).isEqualTo(1);
+            assertThat(result.discardedDuplicate()).isEqualTo(4);
             assertThat(result.discardedOverCap()).isEqualTo(2);
-            assertThat(practiceFindingRepository.findAll()).hasSize(5);
+            assertThat(practiceFindingRepository.findAll()).hasSize(1);
         }
     }
 
@@ -349,11 +354,11 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     class NonNegativeVerdicts {
 
         @Test
-        @DisplayName("NOT_APPLICABLE and NEEDS_REVIEW verdicts persisted without triggering hasNegative")
-        void nonNegativeVerdictsDoNotTriggerHasNegative() {
+        @DisplayName("POSITIVE verdicts persisted without triggering hasNegative")
+        void positiveVerdictsDoNotTriggerHasNegative() {
             var findings = List.of(
-                finding("pr-description-quality", Verdict.NOT_APPLICABLE),
-                finding("error-handling", Verdict.NEEDS_REVIEW)
+                finding("pr-description-quality", Verdict.POSITIVE),
+                finding("error-handling", Verdict.POSITIVE)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -365,7 +370,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
                 .extracting(PracticeFinding::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.NOT_APPLICABLE, Verdict.NEEDS_REVIEW);
+                .containsExactlyInAnyOrder(Verdict.POSITIVE, Verdict.POSITIVE);
         }
     }
 

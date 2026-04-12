@@ -19,10 +19,6 @@
 #      - webapp: https://{{pr_id}}.hephaestus.example.com
 #      - application-server: https://{{pr_id}}.api.hephaestus.example.com
 #
-# GitHub Actions Variables (set in repo settings):
-#   - PREVIEW_HOSTNAME: e.g., hephaestus.example.com
-#   - PREVIEW_API_HOSTNAME: e.g., api.hephaestus.example.com
-#
 # Coolify Auto-Generated Variables:
 #   - SERVICE_FQDN_WEBAPP: Domain for webapp (host only, no scheme)
 #   - SERVICE_URL_WEBAPP: Full URL for webapp (with https://)
@@ -34,6 +30,10 @@
 # Connects to shared infrastructure services (from compose.shared-infra.yaml):
 #   - nats-server: Message queue
 #   - keycloak: Authentication
+#
+# IMPORTANT: This preview stack does not validate the full GitLab practice-review
+# rollout by default. GitLab IdP, sandbox execution, git checkout, and agent job
+# queue wiring must be added explicitly before using preview as rollout evidence.
 #
 # =============================================================================
 
@@ -251,6 +251,7 @@ services:
       # GitHub integration
       GH_APP_ID: ${GH_APP_ID:?Required}
       GH_APP_PRIVATE_KEY: ${GH_APP_PRIVATE_KEY:?Required}
+      GH_APP_INSTALLATION_URL: ${GH_APP_INSTALLATION_URL:-}
       GH_AUTH_TOKEN: ${GH_AUTH_TOKEN:?Required}
       # Monitoring (relaxed for previews)
       MONITORING_TIMEFRAME: ${MONITORING_TIMEFRAME:-14}

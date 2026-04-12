@@ -128,7 +128,7 @@ jobs:
     with:
       image-name: "ls1intum/hephaestus/agent-claude-code"
       docker-file: "./docker/agents/claude-code/Dockerfile"
-      docker-context: "./docker/agents/claude-code"
+      docker-context: "./docker/agents"
       registry: "ghcr.io"
       tags: |
         ${{ github.ref_name }}
@@ -149,7 +149,7 @@ jobs:
     with:
       image-name: "ls1intum/hephaestus/agent-opencode"
       docker-file: "./docker/agents/opencode/Dockerfile"
-      docker-context: "./docker/agents/opencode"
+      docker-context: "./docker/agents"
       registry: "ghcr.io"
       tags: |
         ${{ github.ref_name }}
@@ -162,3 +162,24 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=agent-opencode
+
+  agent-pi-build:
+    name: "Agent: Pi"
+    if: inputs.should_skip != 'true' && inputs.agent_images_changed == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image-name: "ls1intum/hephaestus/agent-pi"
+      docker-file: "./docker/agents/pi/Dockerfile"
+      docker-context: "./docker/agents"
+      registry: "ghcr.io"
+      tags: |
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+      labels: |
+        org.opencontainers.image.title=Hephaestus Agent - Pi
+        org.opencontainers.image.description=Sandboxed Pi coding agent for AI-powered code review
+        org.opencontainers.image.vendor=AET TUM
+        org.opencontainers.image.licenses=MIT
+        hephaestus.component=agent-pi

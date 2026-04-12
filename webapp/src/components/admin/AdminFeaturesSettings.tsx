@@ -10,6 +10,7 @@ export interface AdminFeaturesSettingsProps {
 	achievementsEnabled: boolean;
 	leaderboardEnabled: boolean;
 	progressionEnabled: boolean;
+	leaguesEnabled: boolean;
 	isSaving: boolean;
 	onToggle: (feature: FeatureKey, enabled: boolean) => void;
 }
@@ -32,8 +33,13 @@ const FEATURES: ReadonlyArray<{ key: FeatureKey; label: string; description: str
 	},
 	{
 		key: "progressionEnabled",
-		label: "Progression & Leagues",
-		description: "Enable league points, league tiers, and progression tracking.",
+		label: "XP & Level Progression",
+		description: "Show XP progress bar and level badges on profiles.",
+	},
+	{
+		key: "leaguesEnabled",
+		label: "Leagues",
+		description: "Show league tiers and rankings on leaderboard and profile.",
 	},
 ];
 
@@ -42,6 +48,7 @@ export function AdminFeaturesSettings({
 	achievementsEnabled,
 	leaderboardEnabled,
 	progressionEnabled,
+	leaguesEnabled,
 	isSaving,
 	onToggle,
 }: AdminFeaturesSettingsProps) {
@@ -50,6 +57,7 @@ export function AdminFeaturesSettings({
 		achievementsEnabled,
 		leaderboardEnabled,
 		progressionEnabled,
+		leaguesEnabled,
 	};
 
 	return (
