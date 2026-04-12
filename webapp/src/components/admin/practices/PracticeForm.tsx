@@ -1,44 +1,33 @@
-import { RotateCcw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, RotateCcw } from "lucide-react";
+import { useState } from "react";
 import type { CreatePracticeRequest, Practice, UpdatePracticeRequest } from "@/api/types.gen";
+import { CodeEditor } from "@/components/shared/CodeEditor";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import {
-	Sheet,
-	SheetContent,
-	SheetDescription,
-	SheetFooter,
-	SheetHeader,
-	SheetTitle,
-} from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { generateSlug, isValidSlug, TRIGGER_EVENT_OPTIONS } from "./constants";
 
-interface PracticeFormSheetBaseProps {
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
-	isPending: boolean;
-}
-
-interface PracticeFormSheetCreateProps extends PracticeFormSheetBaseProps {
+interface PracticeFormCreateProps {
 	mode: "create";
 	onSubmit: (data: CreatePracticeRequest) => void;
+	onCancel: () => void;
+	isPending: boolean;
 	initialData?: never;
 }
 
-interface PracticeFormSheetEditProps extends PracticeFormSheetBaseProps {
+interface PracticeFormEditProps {
 	mode: "edit";
-	onSubmit: (slug: string, data: UpdatePracticeRequest) => void;
 	initialData: Practice;
+	onSubmit: (slug: string, data: UpdatePracticeRequest) => void;
+	onCancel: () => void;
+	isPending: boolean;
 }
 
-export type PracticeFormSheetProps = PracticeFormSheetCreateProps | PracticeFormSheetEditProps;
+export type PracticeFormProps = PracticeFormCreateProps | PracticeFormEditProps;
 
 interface FormState {
 	name: string;
@@ -73,23 +62,15 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 	};
 }
 
-export function PracticeFormSheet({
+export function PracticeForm({
 	mode,
-	open,
-	onOpenChange,
 	onSubmit,
+	onCancel,
 	isPending,
 	initialData,
-}: PracticeFormSheetProps) {
+}: PracticeFormProps) {
 	const [form, setForm] = useState<FormState>(() => getInitialState(mode, initialData));
 	const [submitted, setSubmitted] = useState(false);
-
-	useEffect(() => {
-		if (open) {
-			setForm(getInitialState(mode, initialData));
-			setSubmitted(false);
-		}
-	}, [open, mode, initialData]);
 
 	const handleNameChange = (name: string) => {
 		setForm((prev) => {
@@ -113,7 +94,6 @@ export function PracticeFormSheet({
 		}));
 	};
 
-	// All validation errors gated behind `submitted` to avoid showing errors while typing
 	const nameError =
 		submitted && form.name.length < 3 ? "Name must be at least 3 characters" : undefined;
 	const slugError =
@@ -163,29 +143,40 @@ export function PracticeFormSheet({
 	};
 
 	return (
-		<Sheet open={open} onOpenChange={onOpenChange}>
-			<SheetContent side="right" className="sm:max-w-2xl w-full flex flex-col">
-				<SheetHeader>
-					<SheetTitle>{mode === "create" ? "Create Practice" : "Edit Practice"}</SheetTitle>
-					<SheetDescription>
-						{mode === "create"
-							? "Define a new practice for evaluating developer contributions."
-							: "Update this practice definition."}
-					</SheetDescription>
-				</SheetHeader>
+		<form onSubmit={handleSubmit} className="flex flex-col h-full">
+			<div className="flex-1 overflow-y-auto pb-24">
+				<div className="container mx-auto max-w-3xl py-6">
+					{/* Header */}
+					<div className="mb-8">
+						<button
+							type="button"
+							onClick={onCancel}
+							className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
+						>
+							<ArrowLeft className="h-4 w-4" />
+							Back to Practices
+						</button>
+						<h1 className="text-3xl font-bold tracking-tight">
+							{mode === "create" ? "Create Practice" : `Edit: ${initialData?.name}`}
+						</h1>
+						<p className="text-muted-foreground mt-1">
+							{mode === "create"
+								? "Define a new practice for evaluating developer contributions."
+								: "Update this practice definition."}
+						</p>
+					</div>
 
-				<form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-					<Tabs defaultValue="general" className="flex flex-col flex-1 min-h-0">
-						<div className="px-4">
-							<TabsList>
-								<TabsTrigger value="general">General</TabsTrigger>
-								<TabsTrigger value="precompute">Precompute Script</TabsTrigger>
-							</TabsList>
-						</div>
+					<div className="space-y-8">
+						{/* Section: General */}
+						<section className="space-y-4">
+							<div>
+								<h2 className="text-lg font-semibold">General</h2>
+								<p className="text-sm text-muted-foreground">
+									Basic practice information and identification.
+								</p>
+							</div>
 
-						<TabsContent value="general" className="flex-1 overflow-y-auto min-h-0">
-							<div className="grid gap-4 px-4 pb-4">
-								{/* Name */}
+							<div className="grid gap-4">
 								<div className="grid gap-2">
 									<Label htmlFor="practice-name">Name *</Label>
 									<Input
@@ -203,7 +194,6 @@ export function PracticeFormSheet({
 									)}
 								</div>
 
-								{/* Slug */}
 								<div className="grid gap-2">
 									<Label htmlFor="practice-slug">Slug {mode === "create" && "*"}</Label>
 									<div className="flex items-center gap-2">
@@ -211,9 +201,7 @@ export function PracticeFormSheet({
 											id="practice-slug"
 											placeholder="e.g. pr-description-quality"
 											value={form.slug}
-											onChange={(e) => {
-												setForm((prev) => ({ ...prev, slug: e.target.value }));
-											}}
+											onChange={(e) => setForm((prev) => ({ ...prev, slug: e.target.value }))}
 											disabled={mode === "edit"}
 											aria-invalid={!!slugError}
 											aria-describedby={slugError ? "slug-error" : undefined}
@@ -223,9 +211,9 @@ export function PracticeFormSheet({
 												type="button"
 												variant="ghost"
 												size="icon-sm"
-												onClick={() => {
-													setForm((prev) => ({ ...prev, slug: generateSlug(prev.name) }));
-												}}
+												onClick={() =>
+													setForm((prev) => ({ ...prev, slug: generateSlug(prev.name) }))
+												}
 												aria-label="Reset to auto-generated slug"
 											>
 												<RotateCcw className="h-3.5 w-3.5" />
@@ -244,7 +232,6 @@ export function PracticeFormSheet({
 									)}
 								</div>
 
-								{/* Category */}
 								<div className="grid gap-2">
 									<Label htmlFor="practice-category">Category</Label>
 									<Input
@@ -256,7 +243,6 @@ export function PracticeFormSheet({
 									/>
 								</div>
 
-								{/* Description */}
 								<div className="grid gap-2">
 									<Label htmlFor="practice-description">Description *</Label>
 									<Textarea
@@ -274,95 +260,111 @@ export function PracticeFormSheet({
 										</p>
 									)}
 								</div>
-
-								<Separator />
-
-								{/* Trigger Events */}
-								<fieldset
-									className="grid gap-2"
-									aria-invalid={!!triggerError}
-									aria-describedby={triggerError ? "trigger-error" : undefined}
-								>
-									<legend className="text-sm font-medium leading-none mb-1">
-										Trigger Events *
-									</legend>
-									<div className="grid grid-cols-2 gap-3">
-										{TRIGGER_EVENT_OPTIONS.map((option) => (
-											<Label
-												key={option.value}
-												htmlFor={`trigger-${option.value}`}
-												className="flex items-center gap-2 text-sm font-normal cursor-pointer"
-											>
-												<Checkbox
-													id={`trigger-${option.value}`}
-													checked={form.triggerEvents.includes(option.value)}
-													onCheckedChange={(checked) =>
-														handleToggleEvent(option.value, checked === true)
-													}
-												/>
-												{option.label}
-											</Label>
-										))}
-									</div>
-									{triggerError && (
-										<p id="trigger-error" className="text-sm text-destructive">
-											{triggerError}
-										</p>
-									)}
-								</fieldset>
-
-								{/* Criteria */}
-								<div className="grid gap-2">
-									<Label htmlFor="practice-criteria">Criteria</Label>
-									<Textarea
-										id="practice-criteria"
-										placeholder="Evaluation criteria in markdown that the AI agent uses to assess this practice..."
-										value={form.criteria}
-										onChange={(e) => setForm((prev) => ({ ...prev, criteria: e.target.value }))}
-										className="min-h-48 font-mono text-sm"
-									/>
-									<p className="text-xs text-muted-foreground">
-										Markdown-formatted evaluation criteria used by the AI agent during code review.
-									</p>
-								</div>
 							</div>
-						</TabsContent>
+						</section>
 
-						<TabsContent value="precompute" className="flex-1 flex flex-col min-h-0">
-							<div className="grid gap-3 px-4 pb-4 flex-1 min-h-0">
-								<div className="flex flex-col gap-2 min-h-0 flex-1">
-									<Label>Precompute Script</Label>
+						<Separator />
+
+						{/* Section: Trigger Events */}
+						<section className="space-y-4">
+							<fieldset
+								className="space-y-4"
+								aria-invalid={!!triggerError}
+								aria-describedby={triggerError ? "trigger-error" : undefined}
+							>
+								<div>
+									<legend className="text-lg font-semibold">Trigger Events *</legend>
 									<p className="text-sm text-muted-foreground">
-										TypeScript/Bun script that runs static analysis before the AI review. Produces
-										structured hints from diff and file inspection.
+										Domain events that trigger this practice's evaluation.
 									</p>
-									<CodeEditor
-										value={form.precomputeScript}
-										onChange={(val) => setForm((prev) => ({ ...prev, precomputeScript: val }))}
-										language="typescript"
-										className="flex-1 min-h-[300px]"
-									/>
 								</div>
-							</div>
-						</TabsContent>
-					</Tabs>
+								<div className="grid grid-cols-2 gap-3">
+									{TRIGGER_EVENT_OPTIONS.map((option) => (
+										<Label
+											key={option.value}
+											htmlFor={`trigger-${option.value}`}
+											className="flex items-center gap-2 text-sm font-normal cursor-pointer"
+										>
+											<Checkbox
+												id={`trigger-${option.value}`}
+												checked={form.triggerEvents.includes(option.value)}
+												onCheckedChange={(checked) =>
+													handleToggleEvent(option.value, checked === true)
+												}
+											/>
+											{option.label}
+										</Label>
+									))}
+								</div>
+								{triggerError && (
+									<p id="trigger-error" className="text-sm text-destructive">
+										{triggerError}
+									</p>
+								)}
+							</fieldset>
+						</section>
 
-					<SheetFooter className="border-t px-4 py-3">
-						<Button type="submit" disabled={isPending} className="w-full">
-							{isPending ? (
-								<>
-									<Spinner className="mr-2 h-4 w-4" />
-									{mode === "create" ? "Creating..." : "Saving..."}
-								</>
-							) : mode === "create" ? (
-								"Create Practice"
-							) : (
-								"Save Changes"
-							)}
-						</Button>
-					</SheetFooter>
-				</form>
-			</SheetContent>
-		</Sheet>
+						<Separator />
+
+						{/* Section: Evaluation Criteria */}
+						<section className="space-y-4">
+							<div>
+								<h2 className="text-lg font-semibold">Evaluation Criteria</h2>
+								<p className="text-sm text-muted-foreground">
+									Markdown-formatted criteria used by the AI agent during code review.
+								</p>
+							</div>
+							<Textarea
+								id="practice-criteria"
+								placeholder="Evaluation criteria in markdown..."
+								value={form.criteria}
+								onChange={(e) => setForm((prev) => ({ ...prev, criteria: e.target.value }))}
+								className="min-h-48 font-mono text-sm"
+							/>
+						</section>
+
+						<Separator />
+
+						{/* Section: Precompute Script */}
+						<section className="space-y-4">
+							<div>
+								<h2 className="text-lg font-semibold">Precompute Script</h2>
+								<p className="text-sm text-muted-foreground">
+									TypeScript/Bun script that runs static analysis before the AI review. Produces
+									structured hints from diff and file inspection.
+								</p>
+							</div>
+							<CodeEditor
+								value={form.precomputeScript}
+								onChange={(val) => setForm((prev) => ({ ...prev, precomputeScript: val }))}
+								language="typescript"
+								className="h-[400px]"
+							/>
+						</section>
+					</div>
+				</div>
+			</div>
+
+			{/* Sticky footer */}
+			<div className="sticky bottom-0 border-t bg-background px-6 py-4 z-10">
+				<div className="container mx-auto max-w-3xl flex justify-between">
+					<Button type="button" variant="outline" onClick={onCancel}>
+						Cancel
+					</Button>
+					<Button type="submit" disabled={isPending}>
+						{isPending ? (
+							<>
+								<Spinner className="mr-2 h-4 w-4" />
+								{mode === "create" ? "Creating..." : "Saving..."}
+							</>
+						) : mode === "create" ? (
+							"Create Practice"
+						) : (
+							"Save Changes"
+						)}
+					</Button>
+				</div>
+			</div>
+		</form>
 	);
 }

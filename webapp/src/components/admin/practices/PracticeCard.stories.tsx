@@ -13,9 +13,9 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
+		workspaceSlug: "demo",
 		practice: mockPractices[0],
 		isToggling: false,
-		onEdit: fn(),
 		onDelete: fn(),
 		onSetActive: fn(),
 	},

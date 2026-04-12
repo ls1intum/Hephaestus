@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { ClipboardList } from "lucide-react";
 import type { Practice } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
@@ -5,23 +6,21 @@ import { Spinner } from "@/components/ui/spinner";
 import { PracticeCard } from "./PracticeCard";
 
 interface PracticeCardListProps {
+	workspaceSlug: string;
 	practices: Practice[];
 	isLoading: boolean;
 	togglingPractices: Set<string>;
-	onEdit: (practice: Practice) => void;
 	onDelete: (practice: Practice) => void;
 	onSetActive: (slug: string, active: boolean) => void;
-	onCreateClick: () => void;
 }
 
 export function PracticeCardList({
+	workspaceSlug,
 	practices,
 	isLoading,
 	togglingPractices,
-	onEdit,
 	onDelete,
 	onSetActive,
-	onCreateClick,
 }: PracticeCardListProps) {
 	if (isLoading) {
 		return (
@@ -46,7 +45,12 @@ export function PracticeCardList({
 						Get started by creating your first practice definition
 					</p>
 				</div>
-				<Button variant="outline" size="sm" onClick={onCreateClick} className="mt-2">
+				<Button
+					variant="outline"
+					size="sm"
+					render={<Link to="/w/$workspaceSlug/admin/practices/new" params={{ workspaceSlug }} />}
+					className="mt-2"
+				>
 					Create Practice
 				</Button>
 			</div>
@@ -64,9 +68,9 @@ export function PracticeCardList({
 			{sorted.map((practice) => (
 				<PracticeCard
 					key={practice.slug}
+					workspaceSlug={workspaceSlug}
 					practice={practice}
 					isToggling={togglingPractices.has(practice.slug)}
-					onEdit={onEdit}
 					onDelete={onDelete}
 					onSetActive={onSetActive}
 				/>

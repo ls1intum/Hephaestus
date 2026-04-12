@@ -1,6 +1,7 @@
+import { Link } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import type { CreatePracticeRequest, Practice, UpdatePracticeRequest } from "@/api/types.gen";
+import type { Practice } from "@/api/types.gen";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -14,56 +15,32 @@ import {
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { PracticeCardList } from "./PracticeCardList";
-import { PracticeFormSheet } from "./PracticeFormSheet";
 
 interface AdminPracticesPageProps {
+	workspaceSlug: string;
 	practices: Practice[];
 	isLoading: boolean;
-	isCreating: boolean;
-	isUpdating: boolean;
 	isDeleting: boolean;
 	togglingPractices: Set<string>;
-	onCreatePractice: (data: CreatePracticeRequest) => Promise<void>;
-	onUpdatePractice: (slug: string, data: UpdatePracticeRequest) => Promise<void>;
 	onDeletePractice: (slug: string) => Promise<void>;
 	onSetActive: (slug: string, active: boolean) => void;
 }
 
 export function AdminPracticesPage({
+	workspaceSlug,
 	practices,
 	isLoading,
-	isCreating,
-	isUpdating,
 	isDeleting,
 	togglingPractices,
-	onCreatePractice,
-	onUpdatePractice,
 	onDeletePractice,
 	onSetActive,
 }: AdminPracticesPageProps) {
-	const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
-	const [editingPractice, setEditingPractice] = useState<Practice | null>(null);
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
-
-	const handleCreateSubmit = (data: CreatePracticeRequest) => {
-		onCreatePractice(data)
-			.then(() => setIsCreateSheetOpen(false))
-			// Error toasts handled by mutation onError in route container
-			.catch(() => {});
-	};
-
-	const handleEditSubmit = (slug: string, data: UpdatePracticeRequest) => {
-		onUpdatePractice(slug, data)
-			.then(() => setEditingPractice(null))
-			// Error toasts handled by mutation onError in route container
-			.catch(() => {});
-	};
 
 	const handleDeleteConfirm = () => {
 		if (deletingPractice) {
 			onDeletePractice(deletingPractice.slug)
 				.then(() => setDeletingPractice(null))
-				// Error toasts handled by mutation onError in route container
 				.catch(() => {});
 		}
 	};
@@ -77,46 +54,23 @@ export function AdminPracticesPage({
 						Configure practice definitions for evaluating developer contributions.
 					</p>
 				</div>
-				<Button onClick={() => setIsCreateSheetOpen(true)}>
+				<Button
+					render={<Link to="/w/$workspaceSlug/admin/practices/new" params={{ workspaceSlug }} />}
+				>
 					<Plus className="mr-2 h-4 w-4" />
 					Create Practice
 				</Button>
 			</div>
 
 			<PracticeCardList
+				workspaceSlug={workspaceSlug}
 				practices={practices}
 				isLoading={isLoading}
 				togglingPractices={togglingPractices}
-				onEdit={setEditingPractice}
 				onDelete={setDeletingPractice}
 				onSetActive={onSetActive}
-				onCreateClick={() => setIsCreateSheetOpen(true)}
 			/>
 
-			{/* Create Sheet */}
-			<PracticeFormSheet
-				mode="create"
-				open={isCreateSheetOpen}
-				onOpenChange={setIsCreateSheetOpen}
-				onSubmit={handleCreateSubmit}
-				isPending={isCreating}
-			/>
-
-			{/* Edit Sheet */}
-			{editingPractice && (
-				<PracticeFormSheet
-					mode="edit"
-					open
-					onOpenChange={(open) => {
-						if (!open) setEditingPractice(null);
-					}}
-					onSubmit={handleEditSubmit}
-					isPending={isUpdating}
-					initialData={editingPractice}
-				/>
-			)}
-
-			{/* Delete Confirmation */}
 			<AlertDialog
 				open={deletingPractice !== null}
 				onOpenChange={(open) => {

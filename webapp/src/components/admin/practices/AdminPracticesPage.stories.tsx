@@ -5,21 +5,18 @@ import { mockPractices } from "./storyMockData";
 
 /**
  * Full admin page for managing practice definitions.
- * Card-based layout with slide-over sheet for create/edit and AlertDialog for delete.
+ * Card-based layout with Link navigation to create/edit routes and AlertDialog for delete.
  */
 const meta = {
 	component: AdminPracticesPage,
 	parameters: { layout: "fullscreen" },
 	tags: ["autodocs"],
 	args: {
+		workspaceSlug: "demo",
 		practices: mockPractices,
 		isLoading: false,
-		isCreating: false,
-		isUpdating: false,
 		isDeleting: false,
 		togglingPractices: new Set<string>(),
-		onCreatePractice: fn().mockResolvedValue(undefined),
-		onUpdatePractice: fn().mockResolvedValue(undefined),
 		onDeletePractice: fn().mockResolvedValue(undefined),
 		onSetActive: fn(),
 	},

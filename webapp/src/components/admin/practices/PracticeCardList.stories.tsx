@@ -8,13 +8,12 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
+		workspaceSlug: "demo",
 		practices: mockPractices,
 		isLoading: false,
 		togglingPractices: new Set<string>(),
-		onEdit: fn(),
 		onDelete: fn(),
 		onSetActive: fn(),
-		onCreateClick: fn(),
 	},
 	decorators: [
 		(Story) => (

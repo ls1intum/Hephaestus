@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Code2, FileText, Pencil, Trash2 } from "lucide-react";
 import type { Practice } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
@@ -8,17 +9,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { TRIGGER_EVENT_SHORT_LABELS } from "./constants";
 
 interface PracticeCardProps {
+	workspaceSlug: string;
 	practice: Practice;
 	isToggling: boolean;
-	onEdit: (practice: Practice) => void;
 	onDelete: (practice: Practice) => void;
 	onSetActive: (slug: string, active: boolean) => void;
 }
 
 export function PracticeCard({
+	workspaceSlug,
 	practice,
 	isToggling,
-	onEdit,
 	onDelete,
 	onSetActive,
 }: PracticeCardProps) {
@@ -67,7 +68,12 @@ export function PracticeCard({
 						<Button
 							variant="ghost"
 							size="icon-sm"
-							onClick={() => onEdit(practice)}
+							render={
+								<Link
+									to="/w/$workspaceSlug/admin/practices/$practiceSlug"
+									params={{ workspaceSlug, practiceSlug: practice.slug }}
+								/>
+							}
 							aria-label={`Edit ${practice.name}`}
 						>
 							<Pencil className="h-4 w-4" />

@@ -1,24 +1,23 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
-import { PracticeFormSheet } from "./PracticeFormSheet";
+import { PracticeForm } from "./PracticeForm";
 import { mockPractices, mockPracticeWithAllTriggers } from "./storyMockData";
 
 /**
- * Sheet panel for creating or editing a practice definition.
- * Slides in from the right, keeping the card list visible behind.
+ * Full-page form for creating or editing a practice definition.
+ * Includes sections for general info, trigger events, criteria, and precompute script.
  */
 const meta = {
-	component: PracticeFormSheet,
+	component: PracticeForm,
 	parameters: { layout: "fullscreen" },
 	tags: ["autodocs"],
 	args: {
 		mode: "create",
-		open: true,
-		onOpenChange: fn(),
 		onSubmit: fn(),
+		onCancel: fn(),
 		isPending: false,
 	},
-} satisfies Meta<typeof PracticeFormSheet>;
+} satisfies Meta<typeof PracticeForm>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -34,34 +33,26 @@ export const EditMode: Story = {
 	},
 };
 
-/** Edit mode with all 4 trigger events and long criteria text. */
-export const EditWithAllTriggers: Story = {
+/** Edit mode with all triggers and a precompute script. */
+export const EditWithScript: Story = {
 	args: {
 		mode: "edit",
 		initialData: mockPracticeWithAllTriggers,
 	},
 };
 
-/** Create mode in submitting state with "Creating..." spinner. */
+/** Create mode in submitting state. */
 export const CreateSubmitting: Story = {
 	args: {
 		isPending: true,
 	},
 };
 
-/** Edit mode in submitting state with "Saving..." spinner. */
+/** Edit mode in submitting state. */
 export const EditSubmitting: Story = {
 	args: {
 		mode: "edit",
 		initialData: mockPractices[0],
 		isPending: true,
-	},
-};
-
-/** Edit mode with a practice that has no criteria — empty textarea. */
-export const EditNoCriteria: Story = {
-	args: {
-		mode: "edit",
-		initialData: mockPractices[1],
 	},
 };
