@@ -285,7 +285,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             assertThat(autoDecision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) autoDecision).reason()).isEqualTo("auto-trigger disabled for workspace");
             assertThat(manualDecision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) manualDecision).reason()).isEqualTo("manual trigger disabled for workspace");
+            assertThat(((GateDecision.Skip) manualDecision).reason()).isEqualTo(
+                "manual trigger disabled for workspace"
+            );
         }
 
         @Test

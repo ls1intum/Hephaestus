@@ -123,8 +123,10 @@ public class PracticeReviewDetectionGate {
         }
 
         // 2b. Trigger-mode-specific workspace setting
-        if (triggerMode == TriggerMode.AUTO
-            && !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewAutoTriggerEnabled())) {
+        if (
+            triggerMode == TriggerMode.AUTO &&
+            !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewAutoTriggerEnabled())
+        ) {
             log.debug(
                 "Practice review gate: SKIP, reason=autoTriggerDisabled, prId={}, workspaceId={}",
                 pullRequest.getId(),
@@ -132,8 +134,10 @@ public class PracticeReviewDetectionGate {
             );
             return new GateDecision.Skip("auto-trigger disabled for workspace");
         }
-        if (triggerMode == TriggerMode.MANUAL
-            && !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewManualTriggerEnabled())) {
+        if (
+            triggerMode == TriggerMode.MANUAL &&
+            !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewManualTriggerEnabled())
+        ) {
             log.debug(
                 "Practice review gate: SKIP, reason=manualTriggerDisabled, prId={}, workspaceId={}",
                 pullRequest.getId(),

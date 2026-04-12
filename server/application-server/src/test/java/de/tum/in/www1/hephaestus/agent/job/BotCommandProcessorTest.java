@@ -182,7 +182,9 @@ class BotCommandProcessorTest extends BaseUnitTest {
         void gateSkip_noJobSubmitted() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
-            when(practiceReviewDetectionGate.evaluate(eq(pr), any(), any())).thenReturn(new GateDecision.Skip("no practices"));
+            when(practiceReviewDetectionGate.evaluate(eq(pr), any(), any())).thenReturn(
+                new GateDecision.Skip("no practices")
+            );
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 

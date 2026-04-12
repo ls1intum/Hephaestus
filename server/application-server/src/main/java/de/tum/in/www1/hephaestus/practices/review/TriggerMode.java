@@ -8,5 +8,5 @@ public enum TriggerMode {
     /** Event-driven (PR created, synchronized, review submitted). */
     AUTO,
     /** Explicit user action (bot command {@code /hephaestus review}). */
-    MANUAL
+    MANUAL,
 }

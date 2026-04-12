@@ -282,9 +282,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)).thenReturn(
-                new GateDecision.Skip("no matching practices")
-            );
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)
+            ).thenReturn(new GateDecision.Skip("no matching practices"));
 
             listener.onPullRequestCreated(event);
 
@@ -321,7 +321,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             Workspace workspace = new Workspace();
             workspace.setId(42L);
             var detect = new GateDecision.Detect(workspace, List.of());
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)).thenReturn(detect);
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)
+            ).thenReturn(detect);
             when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onPullRequestCreated(event);
@@ -364,9 +366,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)).thenReturn(
-                new GateDecision.Skip("draft PR")
-            );
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)
+            ).thenReturn(new GateDecision.Skip("draft PR"));
 
             listener.onPullRequestCreated(event);
 
@@ -405,7 +407,11 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestSynchronized(new DomainEvent.PullRequestSynchronized(prData, webhookContext(1L)));
 
-            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_SYNCHRONIZED, TriggerMode.AUTO);
+            verify(practiceReviewDetectionGate).evaluate(
+                pr,
+                TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
+                TriggerMode.AUTO
+            );
         }
 
         @Test
@@ -419,9 +425,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)).thenReturn(
-                new GateDecision.Detect(workspace, List.of())
-            );
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)
+            ).thenReturn(new GateDecision.Detect(workspace, List.of()));
             when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("DB error"));
 
             // Should not throw
@@ -436,9 +442,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)).thenThrow(
-                new RuntimeException("DB connectivity error")
-            );
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)
+            ).thenThrow(new RuntimeException("DB connectivity error"));
 
             // Should not throw — outer catch handles gate exceptions
             listener.onPullRequestCreated(event);
@@ -506,7 +512,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
             var detect = new GateDecision.Detect(workspace, List.of());
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)).thenReturn(detect);
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)
+            ).thenReturn(detect);
             when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onReviewSubmitted(event);
@@ -616,9 +624,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)).thenReturn(
-                new GateDecision.Skip("no matching practices")
-            );
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)
+            ).thenReturn(new GateDecision.Skip("no matching practices"));
 
             listener.onReviewSubmitted(event);
 
@@ -644,9 +652,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)).thenReturn(
-                new GateDecision.Detect(workspace, List.of())
-            );
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)
+            ).thenReturn(new GateDecision.Detect(workspace, List.of()));
             when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("NATS error"));
 
             // Should not throw — inner submitJob catch handles it
@@ -661,9 +669,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)).thenThrow(
-                new RuntimeException("unexpected gate error")
-            );
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)
+            ).thenThrow(new RuntimeException("unexpected gate error"));
 
             // Should not throw — outer catch handles gate exceptions
             listener.onReviewSubmitted(event);

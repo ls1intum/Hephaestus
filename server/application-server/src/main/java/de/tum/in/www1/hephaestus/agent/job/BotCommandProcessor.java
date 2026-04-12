@@ -137,7 +137,9 @@ public class BotCommandProcessor {
 
             // 4. Evaluate practice detection gate (uses PullRequestCreated to match broadest set)
             GateDecision decision = practiceReviewDetectionGate.evaluate(
-                pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.MANUAL
+                pr,
+                TriggerEventNames.PULL_REQUEST_CREATED,
+                TriggerMode.MANUAL
             );
 
             switch (decision) {
