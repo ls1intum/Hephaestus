@@ -5,12 +5,17 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.LazyInitializationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
 /**
  * Immutable context for domain events - safe for async handling.
  */
+@Slf4j
 public record EventContext(
     @NonNull UUID eventId,
     @NonNull Instant occurredAt,
@@ -23,8 +28,25 @@ public record EventContext(
 ) {
     /**
      * Creates an EventContext from a ProcessingContext.
+     *
+     * <p>Note: The provider type is resolved eagerly here because the ProcessingContext
+     * may hold a detached JPA proxy that is inaccessible outside the original session.
      */
     public static EventContext from(ProcessingContext ctx) {
+        // TODO: Resolve providerType eagerly in ProcessingContext construction instead
+        //  of catching LazyInitializationException here. See ProcessingContext Javadoc.
+        GitProviderType resolvedType = null;
+        if (ctx.provider() != null) {
+            try {
+                resolvedType = ctx.provider().getType();
+            } catch (LazyInitializationException e) {
+                log.debug(
+                    "Could not resolve provider type from detached proxy, correlationId={}: {}",
+                    ctx.correlationId(),
+                    e.getMessage()
+                );
+            }
+        }
         return new EventContext(
             UUID.randomUUID(),
             Instant.now(),
@@ -33,7 +55,7 @@ public record EventContext(
             ctx.source(),
             ctx.webhookAction(),
             ctx.correlationId(),
-            ctx.provider() != null ? ctx.provider().getType() : null
+            resolvedType
         );
     }
 

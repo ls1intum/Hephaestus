@@ -2,10 +2,17 @@ package de.tum.in.www1.hephaestus.gitprovider.commit.gitlab;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitContributor;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitContributorRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -18,9 +25,11 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.Nullable;
@@ -53,6 +62,7 @@ public class GitLabCommitSyncService {
     private final CommitAuthorResolver authorResolver;
     private final GitLabTokenService tokenService;
     private final GitLabProperties gitLabProperties;
+    private final ApplicationEventPublisher eventPublisher;
     private final WebClient webClient;
 
     public GitLabCommitSyncService(
@@ -61,6 +71,7 @@ public class GitLabCommitSyncService {
         CommitAuthorResolver authorResolver,
         GitLabTokenService tokenService,
         GitLabProperties gitLabProperties,
+        ApplicationEventPublisher eventPublisher,
         WebClient.Builder webClientBuilder
     ) {
         this.commitRepository = commitRepository;
@@ -68,6 +79,7 @@ public class GitLabCommitSyncService {
         this.authorResolver = authorResolver;
         this.tokenService = tokenService;
         this.gitLabProperties = gitLabProperties;
+        this.eventPublisher = eventPublisher;
         this.webClient = webClientBuilder.build();
     }
 
@@ -106,7 +118,7 @@ public class GitLabCommitSyncService {
                 if (commits == null || commits.isEmpty()) break;
 
                 for (Map<String, Object> commitData : commits) {
-                    processCommit(commitData, repository, providerId);
+                    processCommit(commitData, repository, providerId, scopeId);
                     totalSynced++;
                 }
 
@@ -166,7 +178,12 @@ public class GitLabCommitSyncService {
             .block(REQUEST_TIMEOUT);
     }
 
-    private void processCommit(Map<String, Object> commitData, Repository repository, @Nullable Long providerId) {
+    private void processCommit(
+        Map<String, Object> commitData,
+        Repository repository,
+        @Nullable Long providerId,
+        Long scopeId
+    ) {
         String sha = (String) commitData.get("id");
         String message = (String) commitData.get("message");
         String webUrl = (String) commitData.get("web_url");
@@ -178,6 +195,8 @@ public class GitLabCommitSyncService {
         String committedDateStr = (String) commitData.get("committed_date");
 
         if (sha == null) return;
+
+        boolean isNew = !commitRepository.existsByShaAndRepositoryId(sha, repository.getId());
 
         String headline = extractHeadline(message);
         String body = extractBody(message);
@@ -235,6 +254,26 @@ public class GitLabCommitSyncService {
                 committerEmail,
                 0
             );
+        }
+
+        // Publish CommitCreated event for newly created commits
+        if (isNew) {
+            commitRepository
+                .findByShaAndRepositoryId(sha, repository.getId())
+                .ifPresent(commit -> {
+                    EventPayload.CommitData commitPayload = EventPayload.CommitData.from(commit);
+                    EventContext context = new EventContext(
+                        UUID.randomUUID(),
+                        Instant.now(),
+                        scopeId,
+                        RepositoryRef.from(repository),
+                        DataSource.REST_SYNC,
+                        null,
+                        UUID.randomUUID().toString(),
+                        GitProviderType.GITLAB
+                    );
+                    eventPublisher.publishEvent(new DomainEvent.CommitCreated(commitPayload, context));
+                });
         }
     }
 

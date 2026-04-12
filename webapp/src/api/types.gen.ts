@@ -251,6 +251,14 @@ export type Workspace = {
      */
     leaguesEnabled: boolean;
     /**
+     * Whether automatic practice reviews triggered by PR events are enabled
+     */
+    practiceReviewAutoTriggerEnabled: boolean;
+    /**
+     * Whether manual practice reviews triggered via bot command are enabled
+     */
+    practiceReviewManualTriggerEnabled: boolean;
+    /**
      * Whether the practice review feature is enabled
      */
     practicesEnabled: boolean;
@@ -472,6 +480,14 @@ export type UpdateWorkspaceFeaturesRequest = {
      * Enable league tiers and rankings
      */
     leaguesEnabled?: boolean;
+    /**
+     * Enable automatic practice reviews triggered by PR events
+     */
+    practiceReviewAutoTriggerEnabled?: boolean;
+    /**
+     * Enable manual practice reviews triggered via bot command
+     */
+    practiceReviewManualTriggerEnabled?: boolean;
     /**
      * Enable the practice review feature
      */

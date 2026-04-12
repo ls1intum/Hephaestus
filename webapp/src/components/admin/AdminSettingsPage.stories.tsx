@@ -97,6 +97,8 @@ const meta = {
 		leaderboardEnabled: false,
 		progressionEnabled: false,
 		leaguesEnabled: false,
+		practiceReviewAutoTriggerEnabled: true,
+		practiceReviewManualTriggerEnabled: true,
 		isSavingFeatures: false,
 		onToggleFeature: fn(),
 	},
@@ -155,5 +157,17 @@ export const ResettingLeagues: Story = {
 export const AppInstallationWorkspace: Story = {
 	args: {
 		isAppInstallationWorkspace: true,
+	},
+};
+
+/**
+ * Practice review enabled with sub-toggle visibility.
+ * Shows the full settings page with auto-trigger and manual trigger sub-toggles.
+ */
+export const PracticeReviewWithSubToggles: Story = {
+	args: {
+		practicesEnabled: true,
+		practiceReviewAutoTriggerEnabled: true,
+		practiceReviewManualTriggerEnabled: false,
 	},
 };

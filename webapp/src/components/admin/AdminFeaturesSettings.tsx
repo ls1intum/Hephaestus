@@ -11,15 +11,36 @@ export interface AdminFeaturesSettingsProps {
 	leaderboardEnabled: boolean;
 	progressionEnabled: boolean;
 	leaguesEnabled: boolean;
+	practiceReviewAutoTriggerEnabled: boolean;
+	practiceReviewManualTriggerEnabled: boolean;
 	isSaving: boolean;
 	onToggle: (feature: FeatureKey, enabled: boolean) => void;
 }
 
-const FEATURES: ReadonlyArray<{ key: FeatureKey; label: string; description: string }> = [
+interface FeatureDefinition {
+	key: FeatureKey;
+	label: string;
+	description: string;
+	children?: ReadonlyArray<{ key: FeatureKey; label: string; description: string }>;
+}
+
+const FEATURES: ReadonlyArray<FeatureDefinition> = [
 	{
 		key: "practicesEnabled",
 		label: "Practice Review",
 		description: "Enable agent-based practice review for contributors.",
+		children: [
+			{
+				key: "practiceReviewAutoTriggerEnabled",
+				label: "Auto-trigger",
+				description: "Automatically trigger reviews on pull request events.",
+			},
+			{
+				key: "practiceReviewManualTriggerEnabled",
+				label: "Manual trigger",
+				description: "Allow triggering reviews via the /hephaestus review bot command.",
+			},
+		],
 	},
 	{
 		key: "achievementsEnabled",
@@ -49,6 +70,8 @@ export function AdminFeaturesSettings({
 	leaderboardEnabled,
 	progressionEnabled,
 	leaguesEnabled,
+	practiceReviewAutoTriggerEnabled,
+	practiceReviewManualTriggerEnabled,
 	isSaving,
 	onToggle,
 }: AdminFeaturesSettingsProps) {
@@ -58,6 +81,8 @@ export function AdminFeaturesSettings({
 		leaderboardEnabled,
 		progressionEnabled,
 		leaguesEnabled,
+		practiceReviewAutoTriggerEnabled,
+		practiceReviewManualTriggerEnabled,
 	};
 
 	return (
@@ -71,18 +96,38 @@ export function AdminFeaturesSettings({
 								Enable or disable workspace features. Disabled features will be hidden from the
 								sidebar and inaccessible to members.
 							</p>
-							{FEATURES.map(({ key, label, description }) => (
-								<div key={key} className="flex items-center justify-between gap-4">
-									<div className="space-y-0.5">
-										<Label htmlFor={key}>{label}</Label>
-										<p className="text-sm text-muted-foreground">{description}</p>
+							{FEATURES.map(({ key, label, description, children }) => (
+								<div key={key}>
+									<div className="flex items-center justify-between gap-4">
+										<div className="space-y-0.5">
+											<Label htmlFor={key}>{label}</Label>
+											<p className="text-sm text-muted-foreground">{description}</p>
+										</div>
+										<Switch
+											id={key}
+											checked={values[key]}
+											onCheckedChange={(checked: boolean) => onToggle(key, checked)}
+											disabled={isSaving}
+										/>
 									</div>
-									<Switch
-										id={key}
-										checked={values[key]}
-										onCheckedChange={(checked: boolean) => onToggle(key, checked)}
-										disabled={isSaving}
-									/>
+									{children && values[key] && (
+										<div className="ml-6 mt-4 space-y-4 border-l-2 border-muted pl-4">
+											{children.map((child) => (
+												<div key={child.key} className="flex items-center justify-between gap-4">
+													<div className="space-y-0.5">
+														<Label htmlFor={child.key}>{child.label}</Label>
+														<p className="text-sm text-muted-foreground">{child.description}</p>
+													</div>
+													<Switch
+														id={child.key}
+														checked={values[child.key]}
+														onCheckedChange={(checked: boolean) => onToggle(child.key, checked)}
+														disabled={isSaving}
+													/>
+												</div>
+											))}
+										</div>
+									)}
 								</div>
 							))}
 						</div>

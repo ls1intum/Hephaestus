@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.practices.review.GateDecision;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewDetectionGate;
+import de.tum.in.www1.hephaestus.practices.review.TriggerMode;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,7 +136,11 @@ public class BotCommandProcessor {
             }
 
             // 4. Evaluate practice detection gate (uses PullRequestCreated to match broadest set)
-            GateDecision decision = practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED);
+            GateDecision decision = practiceReviewDetectionGate.evaluate(
+                pr,
+                TriggerEventNames.PULL_REQUEST_CREATED,
+                TriggerMode.MANUAL
+            );
 
             switch (decision) {
                 case GateDecision.Skip skip -> log.info(

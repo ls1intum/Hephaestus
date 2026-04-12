@@ -47,7 +47,6 @@
     <include file="./changelog/1772878549172_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1773005067843_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1773036684768_changelog.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1770916408627_create_user_achievement.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1770916408627_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1773354889621_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1773500736939_changelog.xml" relativeToChangelogFile="true"/>
@@ -67,4 +66,5 @@
     <include file="./changelog/1774785360089_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1774800000000_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1775507671119_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1776025148502_changelog.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

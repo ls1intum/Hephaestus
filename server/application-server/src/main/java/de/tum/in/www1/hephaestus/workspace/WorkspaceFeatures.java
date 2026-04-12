@@ -10,9 +10,10 @@ import lombok.Setter;
 /**
  * Embeddable value object grouping workspace-scoped feature flags.
  *
- * <p>All flags default to {@code false} for new workspaces — admins enable
- * features manually via the admin UI. This class centralizes feature flag
- * access and mutation, keeping the {@link Workspace} entity lean.
+ * <p>Top-level feature flags default to {@code false} for new workspaces —
+ * admins enable features manually via the admin UI. Sub-feature toggles
+ * (e.g., trigger modes) default to {@code true} so enabling the parent
+ * feature activates all sub-features immediately.
  *
  * <p>Adding a new feature flag requires only:
  * <ol>
@@ -54,6 +55,16 @@ public class WorkspaceFeatures {
     @NotNull(message = "Leagues enabled flag is required")
     private Boolean leaguesEnabled = false;
 
+    /** Whether practice reviews are automatically triggered by PR events */
+    @Column(name = "practice_review_auto_trigger_enabled", nullable = false)
+    @NotNull(message = "Practice review auto-trigger flag is required")
+    private Boolean practiceReviewAutoTriggerEnabled = true;
+
+    /** Whether practice reviews can be manually triggered via bot command */
+    @Column(name = "practice_review_manual_trigger_enabled", nullable = false)
+    @NotNull(message = "Practice review manual trigger flag is required")
+    private Boolean practiceReviewManualTriggerEnabled = true;
+
     /**
      * Applies a partial update from the request DTO (PATCH semantics).
      * Null fields in the request are ignored; non-null fields overwrite the current value.
@@ -73,6 +84,12 @@ public class WorkspaceFeatures {
         }
         if (request.leaguesEnabled() != null) {
             this.leaguesEnabled = request.leaguesEnabled();
+        }
+        if (request.practiceReviewAutoTriggerEnabled() != null) {
+            this.practiceReviewAutoTriggerEnabled = request.practiceReviewAutoTriggerEnabled();
+        }
+        if (request.practiceReviewManualTriggerEnabled() != null) {
+            this.practiceReviewManualTriggerEnabled = request.practiceReviewManualTriggerEnabled();
         }
     }
 }

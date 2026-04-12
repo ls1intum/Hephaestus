@@ -24,6 +24,10 @@ public class StandardCountEvaluator implements AchievementEvaluator {
 
     @Override
     public boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event) {
+        if (userAchievement.getUnlockedAt() != null) {
+            return false;
+        }
+
         if (!(userAchievement.getProgressData() instanceof LinearAchievementProgress(int current, int target))) {
             log.warn(
                 "Expected LinearAchievementProgress but received {} for achievement: {}",
