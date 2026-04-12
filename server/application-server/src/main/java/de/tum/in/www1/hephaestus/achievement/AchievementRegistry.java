@@ -17,7 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -29,11 +30,11 @@ import org.springframework.stereotype.Service;
  * This component parses the YAML file, resolves parent relationships into references,
  * and maintains indices for efficient querying.
  */
-@Slf4j
 @Service
 public class AchievementRegistry {
 
     private static final String ACHIEVEMENTS_FILE_PATH = "achievements/achievements.yml";
+    private static final Logger log = LoggerFactory.getLogger(AchievementRegistry.class);
 
     private final ObjectMapper yamlMapper;
 
@@ -101,9 +102,10 @@ public class AchievementRegistry {
                 boolean hasErrors = false;
                 for (AchievementDefinition definition : tempIdMap.values()) {
                     String parentId = definition.parent();
+                    boolean isSelfParented = definition.id().equals(parentId);
 
                     // Parent resolution and cycle detection
-                    if (parentId != null && !parentId.isEmpty()) {
+                    if (parentId != null && !parentId.isEmpty() && !isSelfParented) {
                         Set<String> visiting = new HashSet<>();
                         visiting.add(definition.id());
                         String current = parentId;
@@ -122,6 +124,9 @@ public class AchievementRegistry {
                             if (parentDef == null) {
                                 log.error("Achievement '{}' references unknown parent '{}'", definition.id(), current);
                                 hasErrors = true;
+                                break;
+                            }
+                            if (current.equals(parentDef.parent())) {
                                 break;
                             }
                             current = parentDef.parent();

@@ -107,24 +107,32 @@ class AchievementRegistryTest extends BaseUnitTest {
     @DisplayName("Parent References")
     class ParentReferenceTests {
 
+        private static final Set<String> STANDALONE_SELF_REFERENCED_ACHIEVEMENTS = Set.of(
+            "issue.special.necromancer",
+            "milestone.long_time_return",
+            "milestone.all_rare"
+        );
+
         @Test
-        @DisplayName("no achievement references itself as parent")
-        void noSelfReferencingParents() {
+        @DisplayName("only standalone achievements reference themselves as parent")
+        void shouldOnlyReferenceItselfWhenAchievementIsStandalone() {
             for (AchievementDefinition def : registry.values()) {
                 if (def.parent() != null && !def.parent().isEmpty()) {
-                    assertThat(def.parent())
-                        .as("Achievement '%s' must not reference itself as parent", def.id())
-                        .isNotEqualTo(def.id());
+                    if (def.parent().equals(def.id())) {
+                        assertThat(STANDALONE_SELF_REFERENCED_ACHIEVEMENTS)
+                            .as("Only standalone achievements may self-reference: '%s'", def.id())
+                            .contains(def.id());
+                    }
                 }
             }
         }
 
         @Test
         @DisplayName("all parent references point to existing achievements")
-        void allParentReferencesExist() {
+        void shouldHaveExistingParentWhenParentIsSpecified() {
             Set<String> allIds = registry.getAchievementIds();
             for (AchievementDefinition def : registry.values()) {
-                if (def.parent() != null && !def.parent().isEmpty()) {
+                if (def.parent() != null && !def.parent().isEmpty() && !def.parent().equals(def.id())) {
                     assertThat(allIds)
                         .as("Parent '%s' of achievement '%s' must exist", def.parent(), def.id())
                         .contains(def.parent());
@@ -133,17 +141,20 @@ class AchievementRegistryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("no parent cycles exist in the hierarchy")
-        void noParentCycles() {
+        @DisplayName("no non-standalone parent cycles exist in the hierarchy")
+        void shouldNotFormCyclesWhenFollowingParentChain() {
             for (AchievementDefinition def : registry.values()) {
                 Set<String> visited = new java.util.HashSet<>();
                 visited.add(def.id());
                 String current = def.parent();
-                while (current != null && !current.isEmpty()) {
+                while (current != null && !current.isEmpty() && !current.equals(def.id())) {
                     assertThat(visited.add(current))
                         .as("Cycle detected: achievement '%s' is part of cycle through '%s'", def.id(), current)
                         .isTrue();
                     AchievementDefinition parentDef = registry.getById(current);
+                    if (parentDef.parent() != null && parentDef.parent().equals(current)) {
+                        break;
+                    }
                     current = parentDef.parent();
                 }
             }

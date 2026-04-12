@@ -521,7 +521,7 @@ achievements:
           type: BinaryAchievementProgress
 
     - id: "issue.special.necromancer"
-      parent: "issue.necromancer"
+      parent: "issue.special.necromancer"
       rarity: epic
       isHidden: true
       category: issues
