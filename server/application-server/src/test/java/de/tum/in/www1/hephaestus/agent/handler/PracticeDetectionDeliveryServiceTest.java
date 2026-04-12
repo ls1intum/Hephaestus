@@ -155,7 +155,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             verify(practiceFindingRepository).insertIfAbsent(
                 any(UUID.class),
-                eq("pr-description-quality:PULL_REQUEST:456:" + testJob.getId()),
+                eq("pr-description-quality:0:PULL_REQUEST:456:" + testJob.getId()),
                 eq(testJob.getId()),
                 eq(10L),
                 eq("PULL_REQUEST"),
@@ -444,7 +444,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             );
 
             String key = keyCaptor.getValue();
-            assertThat(key).isEqualTo("pr-description-quality:PULL_REQUEST:456:" + testJob.getId());
+            assertThat(key).isEqualTo("pr-description-quality:0:PULL_REQUEST:456:" + testJob.getId());
         }
     }
 

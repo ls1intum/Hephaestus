@@ -843,17 +843,17 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     class Deduplication {
 
         @Test
-        @DisplayName("deduplicates by practiceSlug keeping highest confidence")
-        void deduplicatesByPracticeSlug() {
+        @DisplayName("keeps all findings including multiple per practice")
+        void keepsAllFindingsPerPractice() {
             ObjectNode f1 = validFindingNode();
             f1.put("practiceSlug", "error-handling");
             f1.put("confidence", 0.85);
-            f1.put("title", "Lower confidence");
+            f1.put("title", "First violation");
 
             ObjectNode f2 = validFindingNode();
             f2.put("practiceSlug", "error-handling");
             f2.put("confidence", 0.95);
-            f2.put("title", "Higher confidence");
+            f2.put("title", "Second violation");
 
             ObjectNode f3 = validFindingNode();
             f3.put("practiceSlug", "code-hygiene");
@@ -861,17 +861,15 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(f1, f2, f3)));
 
-            assertThat(result.validFindings()).hasSize(2);
-            // error-handling: should keep higher confidence (0.95)
-            ValidatedFinding errorHandling = result
-                .validFindings()
-                .stream()
-                .filter(f -> f.practiceSlug().equals("error-handling"))
-                .findFirst()
-                .orElseThrow();
-            assertThat(errorHandling.confidence()).isEqualTo(0.95f);
-            assertThat(errorHandling.title()).isEqualTo("Higher confidence");
-            // code-hygiene: should remain
+            // All three findings kept — no dedup
+            assertThat(result.validFindings()).hasSize(3);
+            assertThat(
+                result
+                    .validFindings()
+                    .stream()
+                    .filter(f -> f.practiceSlug().equals("error-handling"))
+                    .count()
+            ).isEqualTo(2);
             assertThat(
                 result
                     .validFindings()
