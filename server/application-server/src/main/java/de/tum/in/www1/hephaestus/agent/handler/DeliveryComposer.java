@@ -472,7 +472,7 @@ class DeliveryComposer {
             // Diff note body: emoji title + reasoning + guidance
             String body = composeDiffNoteBody(f);
             if (body != null && !body.isBlank()) {
-                notes.add(new DiffNote(pathNode.asText(), startLine, endLine, body));
+                notes.add(DiffNote.text(pathNode.asText(), startLine, endLine, body));
             }
         }
 

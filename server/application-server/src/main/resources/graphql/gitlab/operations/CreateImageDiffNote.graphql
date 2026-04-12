@@ -1,0 +1,20 @@
+# Posts an image diff note (pin annotation on an image) on a merge request.
+# Used by agent feedback delivery to annotate specific regions of PNG diagrams.
+# Each note targets an (x, y) pixel coordinate on an image file in the MR diff.
+
+mutation CreateImageDiffNote(
+    $noteableId: NoteableID!,
+    $body: String!,
+    $position: DiffImagePositionInput!
+) {
+    createImageDiffNote(input: {
+        noteableId: $noteableId,
+        body: $body,
+        position: $position
+    }) {
+        note {
+            id
+        }
+        errors
+    }
+}
