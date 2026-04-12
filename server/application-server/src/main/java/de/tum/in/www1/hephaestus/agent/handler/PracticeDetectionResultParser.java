@@ -142,20 +142,14 @@ public class PracticeDetectionResultParser {
             }
         }
 
-        // Step 6: Deduplicate by practiceSlug — keep the finding with highest confidence
-        List<ValidatedFinding> deduped = deduplicateByPracticeSlug(valid);
-        if (deduped.size() < valid.size()) {
-            log.info("Deduplicated findings: {} → {} (by practiceSlug)", valid.size(), deduped.size());
-        }
-
-        // Step 7: Extract optional delivery content (never affects findings)
+        // Step 6: Extract optional delivery content (never affects findings)
         DeliveryContent delivery = parseDeliveryContent(root);
 
-        // Step 8: Fallback — if delivery has no diffNotes, collect suggestedDiffNotes from
+        // Step 7: Fallback — if delivery has no diffNotes, collect suggestedDiffNotes from
         // NEGATIVE findings' raw JSON. OpenCode subagents produce per-finding suggestedDiffNotes
         // that the orchestrator LLM often fails to aggregate into delivery.diffNotes.
         if (delivery == null || delivery.diffNotes().isEmpty()) {
-            List<DiffNote> fallbackNotes = collectSuggestedDiffNotes(findingsNode, deduped);
+            List<DiffNote> fallbackNotes = collectSuggestedDiffNotes(findingsNode, valid);
             if (!fallbackNotes.isEmpty()) {
                 String mrNote = delivery != null ? delivery.mrNote() : null;
                 delivery = new DeliveryContent(mrNote, fallbackNotes);
@@ -166,33 +160,11 @@ public class PracticeDetectionResultParser {
             }
         }
 
-        return new ParseResult(
-            Collections.unmodifiableList(deduped),
-            Collections.unmodifiableList(discarded),
-            delivery
-        );
+        return new ParseResult(Collections.unmodifiableList(valid), Collections.unmodifiableList(discarded), delivery);
     }
 
     private JsonNode extractFindingsNode(JsonNode root) {
         return root.get("findings");
-    }
-
-    // =========================================================================
-    // Deduplication
-    // =========================================================================
-
-    /**
-     * Deduplicate findings by practiceSlug, keeping the one with the highest confidence.
-     * Agents sometimes produce multiple findings for the same practice; we keep only the best.
-     */
-    private static List<ValidatedFinding> deduplicateByPracticeSlug(List<ValidatedFinding> findings) {
-        Map<String, ValidatedFinding> best = new LinkedHashMap<>();
-        for (ValidatedFinding f : findings) {
-            best.merge(f.practiceSlug(), f, (existing, incoming) ->
-                incoming.confidence() > existing.confidence() ? incoming : existing
-            );
-        }
-        return new ArrayList<>(best.values());
     }
 
     // =========================================================================
@@ -344,6 +316,23 @@ public class PracticeDetectionResultParser {
             return null;
         }
         String filePath = filePathNode.asText();
+
+        // Reject internal workspace paths — agent sometimes hallucinates .context/ or .analysis/ paths
+        if (
+            filePath.startsWith(".context/") ||
+            filePath.startsWith(".practices/") ||
+            filePath.startsWith(".analysis/") ||
+            filePath.startsWith(".output/") ||
+            filePath.startsWith(".precompute")
+        ) {
+            log.debug(
+                "Skipping suggestedDiffNote with internal path at finding {}, index {}: {}",
+                findingIndex,
+                noteIndex,
+                filePath
+            );
+            return null;
+        }
 
         // Required: startLine (positive integer)
         JsonNode startLineNode = entry.get("startLine");

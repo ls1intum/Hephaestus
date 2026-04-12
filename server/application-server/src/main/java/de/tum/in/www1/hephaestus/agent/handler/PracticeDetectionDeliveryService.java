@@ -151,9 +151,9 @@ public class PracticeDetectionDeliveryService {
                 negativeCounts.put(finding.practiceSlug(), count + 1);
             }
 
-            // Build idempotency key — practiceSlug is unique per job (protocol mandates one finding per slug)
+            // Build idempotency key — includes index to allow multiple findings per practice
             String idempotencyKey =
-                finding.practiceSlug() + ":" + targetType.name() + ":" + targetId + ":" + job.getId();
+                finding.practiceSlug() + ":" + i + ":" + targetType.name() + ":" + targetId + ":" + job.getId();
 
             // Serialize evidence
             String evidenceJson = null;

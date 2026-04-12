@@ -230,6 +230,12 @@ class DiffNotePoster {
                 position.put("baseSha", mrInfo.baseSha);
                 Map<String, String> paths = new HashMap<>();
                 paths.put("newPath", note.filePath());
+                // oldPath required for GitLab to match the note position to the diff
+                // file in the Changes tab. Correct for new and modified files.
+                // For renamed files oldPath should be the pre-rename path, but the
+                // DiffNote record only carries the new path. Renames are rare in
+                // student assignments; if needed, resolve from MR diff metadata.
+                paths.put("oldPath", note.filePath());
                 position.put("paths", paths);
                 position.put("newLine", note.startLine());
 
