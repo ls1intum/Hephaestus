@@ -2141,6 +2141,12 @@ export const workspace = pgTable(
 		leaderboardEnabled: boolean("leaderboard_enabled").default(false).notNull(),
 		progressionEnabled: boolean("progression_enabled").default(false).notNull(),
 		leaguesEnabled: boolean("leagues_enabled").default(false).notNull(),
+		practiceReviewAutoTriggerEnabled: boolean("practice_review_auto_trigger_enabled")
+			.default(true)
+			.notNull(),
+		practiceReviewManualTriggerEnabled: boolean("practice_review_manual_trigger_enabled")
+			.default(true)
+			.notNull(),
 	},
 	(table) => [
 		foreignKey({

@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.review.GateDecision;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewDetectionGate;
+import de.tum.in.www1.hephaestus.practices.review.TriggerMode;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -142,7 +143,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
 
@@ -154,7 +155,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
 
@@ -167,7 +168,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
     }
@@ -181,7 +182,9 @@ class BotCommandProcessorTest extends BaseUnitTest {
         void gateSkip_noJobSubmitted() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
-            when(practiceReviewDetectionGate.evaluate(eq(pr), any())).thenReturn(new GateDecision.Skip("no practices"));
+            when(practiceReviewDetectionGate.evaluate(eq(pr), any(), any())).thenReturn(
+                new GateDecision.Skip("no practices")
+            );
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
@@ -199,6 +202,19 @@ class BotCommandProcessorTest extends BaseUnitTest {
             processor.onBotCommandReceived(event("/hephaestus review"));
 
             verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
+        }
+
+        @Test
+        @DisplayName("gate is invoked with TriggerMode.MANUAL")
+        void gateReceivesManualTriggerMode() {
+            PullRequest pr = createOpenPr();
+            mockPrLookup(pr);
+            mockGateDetect(pr);
+            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
+
+            processor.onBotCommandReceived(event("/hephaestus review"));
+
+            verify(practiceReviewDetectionGate).evaluate(eq(pr), any(), eq(TriggerMode.MANUAL));
         }
     }
 
@@ -257,7 +273,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
     private void mockGateDetect(PullRequest pr) {
         Workspace workspace = new Workspace();
         workspace.setId(1L);
-        when(practiceReviewDetectionGate.evaluate(eq(pr), any())).thenReturn(
+        when(practiceReviewDetectionGate.evaluate(eq(pr), any(), any())).thenReturn(
             new GateDecision.Detect(workspace, List.of(new Practice()))
         );
     }
