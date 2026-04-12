@@ -1,3 +1,4 @@
+import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { useReactFlow } from "@xyflow/react";
 import {
 	CircleDot,
@@ -26,7 +27,7 @@ import {
 import type { AchievementCategory, UIAchievement, ViewMode } from "@/components/achievements/types";
 import { calculateStats } from "@/components/achievements/utils";
 import { Button } from "@/components/ui/button";
-import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
+import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import {
 	Sheet,
 	SheetContent,
@@ -133,8 +134,10 @@ function SidebarBody({
 							<ToggleGroup
 								value={[viewMode]}
 								onValueChange={(value) => {
-									const newValue = value[value.length - 1] as ViewMode | undefined;
-									if (newValue) onViewModeChange(newValue);
+									// Ensure at least one value is selected (last one clicked wins)
+									const newValue =
+										value.length > 0 ? (value[value.length - 1] as ViewMode) : viewMode;
+									if (newValue !== viewMode) onViewModeChange(newValue);
 								}}
 								aria-label="View mode"
 								className="bg-secondary/50 rounded-lg p-1 flex-1"
@@ -209,14 +212,14 @@ function SidebarBody({
 									{stats.percentage}%
 								</span>
 							</div>
-							<Progress
+							<ProgressRoot.Root
 								value={stats.percentage}
 								aria-label={`Total achievement progress: ${stats.percentage}%`}
 							>
 								<ProgressTrack className="h-3 [&>div]:bg-foreground">
 									<ProgressIndicator />
 								</ProgressTrack>
-							</Progress>
+							</ProgressRoot.Root>{" "}
 							<div className="flex justify-between mt-2 text-xs text-muted-foreground">
 								<span>
 									{stats.unlocked} / {stats.total} Achievements
@@ -258,11 +261,14 @@ function SidebarBody({
 											</div>
 										</div>
 									</div>
-									<Progress value={percentage} aria-label={`${meta.name} progress: ${percentage}%`}>
+									<ProgressRoot.Root
+										value={percentage}
+										aria-label={`${meta.name} progress: ${percentage}%`}
+									>
 										<ProgressTrack className="h-1.5 [&>div]:bg-foreground/70">
 											<ProgressIndicator />
 										</ProgressTrack>
-									</Progress>
+									</ProgressRoot.Root>
 								</div>
 							);
 						})}
