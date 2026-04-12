@@ -564,24 +564,48 @@ public class AgentJobExecutor {
         JobTypeHandler handler,
         AgentJob job
     ) {
-        AgentJobStatus terminalStatus = determineTerminalStatus(sandboxResult);
+        AgentJobStatus terminalStatus = determineTerminalStatus(sandboxResult, agentResult);
         persistTerminalState(jobId, agentResult, sandboxResult, terminalStatus);
         deliverResults(jobId, terminalStatus, handler);
     }
 
     /**
-     * Determine the terminal status based on sandbox execution outcome.
+     * Determine the terminal status based on sandbox execution outcome and agent output.
+     *
+     * <p>If the sandbox exited with a non-zero code but the agent still produced valid output
+     * (e.g., the runner validation was stricter than the Java-side parser, or the agent wrote
+     * result.json but the process exited 1 due to an unrelated error), we treat it as COMPLETED
+     * so findings get delivered. The non-zero exit is logged for diagnostics.
      *
      * @return TIMED_OUT, FAILED, or COMPLETED
      */
-    private AgentJobStatus determineTerminalStatus(SandboxResult sandboxResult) {
+    private AgentJobStatus determineTerminalStatus(SandboxResult sandboxResult, AgentResult agentResult) {
         if (sandboxResult.timedOut()) {
             return AgentJobStatus.TIMED_OUT;
-        } else if (sandboxResult.exitCode() != 0) {
-            return AgentJobStatus.FAILED;
-        } else {
+        }
+        if (sandboxResult.exitCode() == 0) {
             return AgentJobStatus.COMPLETED;
         }
+        // Non-zero exit: check if valid output was still produced.
+        // The agent may write result.json but the runner exits 1 due to validation mismatch.
+        if (agentResult != null && agentResult.output() != null) {
+            Object rawOutput = agentResult.output().get("rawOutput");
+            if (rawOutput instanceof String raw && !raw.isBlank()) {
+                log.info(
+                    "Agent exited with code {} but produced output — treating as COMPLETED for delivery",
+                    sandboxResult.exitCode()
+                );
+                return AgentJobStatus.COMPLETED;
+            }
+            if (rawOutput != null) {
+                log.warn(
+                    "Agent exited with code {} and rawOutput is present but not a String (type={})",
+                    sandboxResult.exitCode(),
+                    rawOutput.getClass().getSimpleName()
+                );
+            }
+        }
+        return AgentJobStatus.FAILED;
     }
 
     /**

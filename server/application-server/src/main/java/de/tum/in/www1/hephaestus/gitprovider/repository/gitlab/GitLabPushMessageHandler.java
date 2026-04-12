@@ -157,7 +157,9 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
 
             // Decide between local git enrichment and webhook-only processing.
             // Local git provides line-level diff stats (additions/deletions per file).
-            // Only use for default branch pushes in active scopes (same as GitHub).
+            // Full enrichment (clone + commit walk) only for default branch pushes.
+            // But we ALWAYS fetch on any branch push if the repo is already cloned,
+            // so the practice review pipeline has fresh refs for diff computation.
             if (event.isDefaultBranch() && gitRepositoryManager.isEnabled()) {
                 Long scopeId = resolveScopeId(repository);
                 boolean scopeActive = scopeId != null && syncTargetProvider.isScopeActiveForSync(scopeId);
@@ -169,10 +171,44 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
                     processCommitsViaWebhook(event, repository, false);
                 }
             } else {
+                // Non-default branch push: still fetch if the repo is already cloned
+                // so practice reviews have fresh refs for diff computation.
+                if (gitRepositoryManager.isEnabled() && gitRepositoryManager.isRepositoryCloned(repository.getId())) {
+                    fetchForNonDefaultBranch(event, repository);
+                }
                 processCommitsViaWebhook(event, repository, false);
             }
         } else {
             log.warn("Failed to upsert project from push event: projectPath={}", safeProjectPath);
+        }
+    }
+
+    /**
+     * Fetch latest refs for non-default branch pushes. This keeps the local clone
+     * current for practice review diff computation. Does not walk commits or
+     * enrich file stats — that's only needed for default branch pushes.
+     */
+    private void fetchForNonDefaultBranch(GitLabPushEventDTO event, Repository repository) {
+        try {
+            Long scopeId = resolveScopeId(repository);
+            if (scopeId == null || !syncTargetProvider.isScopeActiveForSync(scopeId)) {
+                return;
+            }
+            String serverUrl = tokenService.resolveServerUrl(scopeId);
+            String token = tokenService.getAccessToken(scopeId);
+            String cloneUrl = serverUrl + "/" + repository.getNameWithOwner() + ".git";
+            gitRepositoryManager.ensureRepository(repository.getId(), cloneUrl, token);
+            log.debug(
+                "Fetched non-default branch push: ref={}, repo={}",
+                sanitizeForLog(event.ref()),
+                sanitizeForLog(repository.getNameWithOwner())
+            );
+        } catch (Exception e) {
+            log.warn(
+                "Non-default branch fetch failed: repo={}, error={}",
+                sanitizeForLog(repository.getNameWithOwner()),
+                e.getMessage()
+            );
         }
     }
 
