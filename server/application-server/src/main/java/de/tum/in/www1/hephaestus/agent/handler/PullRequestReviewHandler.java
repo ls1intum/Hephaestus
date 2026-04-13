@@ -549,20 +549,20 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     /**
-     * Fetch latest refs from the remote and verify the headSha exists locally.
+     * Fetch latest refs from the remote and verify the head commit exists locally.
      *
-     * <p>Returns {@code true} if the headSha was verified to exist in the local clone.
-     * Throws {@link JobPreparationException} if a fetch succeeded but the headSha
-     * is still not in the local clone (likely force-pushed away).
+     * <p>Uses JGit for both fetch ({@link GitRepositoryManager#ensureRepository}) and
+     * verification ({@link GitRepositoryManager#commitExists}) — no {@code git} CLI needed.
+     *
+     * @return true if the head commit was verified present in the local clone
      */
     private boolean fetchAndVerifyHead(long repositoryId, AgentJob job, String headSha) {
         if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
-            log.debug("Repository not cloned locally, skipping fetch/verify: repoId={}", repositoryId);
+            log.debug("Repository not cloned locally, skipping fetch: repoId={}", repositoryId);
             return false;
         }
-        Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
 
-        // Try fetching from remote to get latest refs
+        // Fetch latest refs via JGit
         boolean fetched = false;
         try {
             var workspace = job.getWorkspace();
@@ -586,34 +586,23 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             log.warn("Pre-diff fetch failed: repoId={}, error={}", repositoryId, e.getMessage());
         }
 
-        // Verify headSha exists locally — this is the critical check.
-        // If headSha doesn't exist, ALL diff strategies will fail and the agent gets an empty diff.
+        // Verify head commit exists via JGit (no git CLI needed)
         if (headSha != null && !headSha.isBlank()) {
-            String catFile = runGit(repoPath, "cat-file", "-t", headSha);
-            if (catFile != null && !catFile.trim().equals("commit")) {
-                // cat-file succeeded but returned non-commit type — SHA exists but is wrong type
-                log.warn("Head SHA {} is not a commit (type={}), repoId={}", headSha, catFile.trim(), repositoryId);
-            } else if (catFile == null && fetched) {
-                // Fetch succeeded but SHA still not found — this is a hard failure
-                throw new JobPreparationException(
-                    "Head commit " +
-                        headSha +
-                        " not found in local clone after successful fetch. " +
-                        "The commit may have been force-pushed away. repoId=" +
-                        repositoryId
-                );
-            } else if (catFile == null) {
-                // No fetch happened (token unavailable) and SHA not found
-                log.warn(
-                    "Head commit {} not found locally and fetch was not possible (token unavailable). " +
-                        "Diff computation will likely fail. repoId={}",
+            boolean exists = gitRepositoryManager.commitExists(repositoryId, headSha);
+            if (!exists && fetched) {
+                log.error(
+                    "Head commit {} not found in local clone after successful fetch. repoId={}",
                     headSha,
                     repositoryId
                 );
-                return false;
+            } else if (!exists) {
+                log.warn(
+                    "Head commit {} not found locally (no fetch possible). Diff may fail. repoId={}",
+                    headSha,
+                    repositoryId
+                );
             }
-            // catFile is "commit" — head SHA is verified present
-            return catFile != null && catFile.trim().equals("commit");
+            return exists;
         }
         return false;
     }
@@ -705,15 +694,14 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
 
-        // Fetch latest refs and verify headSha exists locally.
-        // Returns true if headSha was verified present in the local clone.
+        // Fetch latest refs and verify head commit exists via JGit.
         boolean headVerified = fetchAndVerifyHead(repositoryId, job, headSha);
 
         try {
             String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
             if (range == null) {
                 if (headVerified) {
-                    // Head commit exists but diff still couldn't be resolved — real bug.
+                    // Head commit is present but diff resolution still failed — a real bug.
                     throw new JobPreparationException(
                         "Cannot compute diff: all resolution strategies failed despite head commit " +
                             headSha +
@@ -725,9 +713,12 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                             repositoryId
                     );
                 }
-                log.warn(
-                    "Diff resolution failed (head commit not verified locally), skipping diff: headSha={}, repoId={}",
+                log.error(
+                    "Cannot compute diff: head commit not available locally. " +
+                        "headSha={}, targetBranch={}, sourceBranch={}, repoId={}",
                     headSha,
+                    targetBranch,
+                    sourceBranch,
                     repositoryId
                 );
                 return;
