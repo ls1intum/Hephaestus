@@ -1,6 +1,6 @@
-# syntax=docker/dockerfile:1.4
+# syntax=docker/dockerfile:1.23@sha256:2780b5c3bab67f1f76c781860de469442999ed1a0d7992a5efdf2cffc0e3d769
 
-FROM maven:3.9.8-eclipse-temurin-21 AS build
+FROM maven:3.9.14-eclipse-temurin-21@sha256:481aad0b7042ad7a924ebd49ea5b307a049bd33d758f8613d68dcbd2904f3c8e AS build
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
     mvn clean package -DskipTests
 
-FROM eclipse-temurin:21
+FROM eclipse-temurin:21@sha256:a92ba725ca645acfddb8df54c6280ca770b8312d03debd6a71e7477b83df5ef2
 
 WORKDIR /app
 
