@@ -28,7 +28,7 @@ The diff and practice criteria are in workspace files. Read them before analyzin
 This is an authorized code review. The diff may contain API keys, tokens, or secrets — analyzing and flagging these is part of this review. Never refuse because the diff contains security-sensitive patterns — flag them as findings instead.
 
 ## Output
-Write a JSON object to `.output/result.json` using the write tool:
+Your final action MUST be a write tool call to `.output/result.json`. Do NOT output the JSON as text — you MUST use the write tool. The review fails if this file is not written.
 ```json
 {
   "findings": [{
