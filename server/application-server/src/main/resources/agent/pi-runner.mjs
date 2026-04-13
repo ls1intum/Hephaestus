@@ -89,6 +89,83 @@ function checkResultFile() {
     }
 }
 
+// ── Text response rescue ─────────────────────────────────────────
+// Safety net: when the agent emits findings as a text response (stopReason="stop")
+// instead of using the write tool, extract the JSON from the message content
+// and write result.json ourselves.
+
+function extractLastAssistantText(sessionState) {
+    const messages = sessionState.messages || [];
+    // Scan all assistant messages from newest to oldest — the JSON might be
+    // in an earlier message if the last one was a continuation acknowledgment.
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.role !== "assistant") continue;
+        const textBlocks = (msg.content || []).filter(c => c.type === "text");
+        const text = textBlocks.map(c => c.text).join("").trim();
+        if (text && text.includes("findings")) return text;
+        if (text && text.length > 100) return text; // non-trivial text
+    }
+    return null;
+}
+
+function tryParseJsonFromText(text) {
+    if (!text) return null;
+    // Try direct parse first (agent may have emitted pure JSON)
+    try {
+        const parsed = JSON.parse(text);
+        if (isValidFindingsPayload(parsed)) return parsed;
+    } catch {}
+    // Try extracting JSON from markdown code fences or surrounding prose
+    const jsonBlockPattern = /```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/g;
+    let match;
+    while ((match = jsonBlockPattern.exec(text)) !== null) {
+        try {
+            const parsed = JSON.parse(match[1].trim());
+            if (isValidFindingsPayload(parsed)) return parsed;
+        } catch {}
+    }
+    // Try finding a top-level JSON object with "findings" key
+    const braceStart = text.indexOf('{"findings"');
+    if (braceStart === -1) return null;
+    // Walk forward to find the matching closing brace
+    let depth = 0;
+    for (let i = braceStart; i < text.length; i++) {
+        if (text[i] === '{') depth++;
+        else if (text[i] === '}') depth--;
+        if (depth === 0) {
+            try {
+                const parsed = JSON.parse(text.slice(braceStart, i + 1));
+                if (isValidFindingsPayload(parsed)) return parsed;
+            } catch {}
+            break;
+        }
+    }
+    return null;
+}
+
+/**
+ * Attempt to rescue findings from the agent's text response.
+ * Returns true if result.json was successfully written.
+ */
+function tryRescueFromTextResponse(sessionState) {
+    const text = extractLastAssistantText(sessionState);
+    if (!text) {
+        console.error(`[pi-runner] Text rescue: no assistant text found in session`);
+        return false;
+    }
+    // Always persist raw text for debugging failed rescues
+    try { writeFileSync(`${OUTPUT}/last-assistant-text.txt`, text); } catch {}
+    const payload = tryParseJsonFromText(text);
+    if (!payload) {
+        console.error(`[pi-runner] Text rescue: found assistant text (${text.length} chars) but no valid findings JSON. First 300 chars: ${text.slice(0, 300)}`);
+        return false;
+    }
+    console.error(`[pi-runner] Text rescue: extracted ${payload.findings.length} findings from assistant text response`);
+    writeFileSync(`${OUTPUT}/result.json`, JSON.stringify(payload, null, 2));
+    return checkResultFile();
+}
+
 // ── Session usage extraction ─────────────────────────────────────
 
 function extractUsageFromSession(session) {
@@ -233,62 +310,99 @@ async function main() {
         process.exit(0);
     }
 
-    // ── Attempt 2: Continuation (same session, directive prompt) ──
+    // ── Validate & retry: if result.json is missing, re-prompt the agent ──
 
-    console.error(`[pi-runner] Continuation: directing agent to write findings NOW`);
+    // Extract what the agent actually said (if anything)
+    const agentText = extractLastAssistantText(session.state);
+    if (agentText) {
+        console.error(`[pi-runner] Agent produced text (${agentText.length} chars) but no result.json`);
+        // Try to rescue valid JSON from the text first
+        if (tryRescueFromTextResponse(session.state)) {
+            console.error(`[pi-runner] SUCCESS: rescued valid JSON from agent text`);
+            unsubscribe();
+            process.exit(0);
+        }
+    }
 
-    let contAborted = false;
-    const contTimer = setTimeout(() => {
-        contAborted = true;
-        console.error(`[pi-runner] Continuation hard timeout — aborting`);
+    // Re-prompt: tell the agent exactly what went wrong and what to do
+    console.error(`[pi-runner] Re-prompting agent to write result.json`);
+
+    let retryAborted = false;
+    const retryTimer = setTimeout(() => {
+        retryAborted = true;
+        console.error(`[pi-runner] Retry hard timeout — aborting`);
         session.agent.abort();
     }, CONTINUATION_TIMEOUT_MS);
 
-    const contStartMs = Date.now();
+    const retryStartMs = Date.now();
 
-    try {
-        await session.prompt(
-            `You ran out of time. You have already read the diff and practice criteria in this session. ` +
-            `Do NOT read any more files. Do NOT grep anything. Do NOT explore the repo. ` +
-            `Based on what you have already analyzed, IMMEDIATELY write the result.json file using the write tool. ` +
-            `Include findings for ALL practices in the index. For practices you analyzed in detail, use your analysis. ` +
-            `For practices you did not fully analyze, emit POSITIVE with confidence 0.70 and a brief positive note. ` +
-            `Write the COMPLETE JSON to /workspace/.output/result.json NOW. This is your ONLY task.`
-        );
-    } catch (err) {
-        console.error(`[pi-runner] Continuation error: ${err.message}`);
+    // Build a specific re-prompt based on what happened
+    let retryPrompt;
+    if (agentText && agentText.includes("findings")) {
+        // Agent produced something that looks like findings but wasn't written to file
+        retryPrompt =
+            `You produced your analysis as a text response but did NOT write it to the output file. ` +
+            `You MUST use the write tool to save your findings. ` +
+            `Call the write tool NOW to write the JSON to /workspace/.output/result.json. ` +
+            `The JSON must have a top-level "findings" array and an optional "delivery" object.`;
+    } else if (softTimeoutFired || hardAborted) {
+        // Agent ran out of time
+        retryPrompt =
+            `You ran out of time before writing result.json. ` +
+            `Based on what you already analyzed, write the result.json file NOW using the write tool. ` +
+            `Include one finding per practice. For practices you did not analyze, use POSITIVE with confidence 0.70. ` +
+            `Write to /workspace/.output/result.json immediately.`;
+    } else {
+        // Agent completed but didn't write the file for unknown reason
+        retryPrompt =
+            `Your previous response did not write the required output file. ` +
+            `You MUST call the write tool to save a JSON object to /workspace/.output/result.json. ` +
+            `The JSON needs a "findings" array with one entry per practice and a "delivery.mrNote" string. ` +
+            `Do not explain anything — just call the write tool with the JSON.`;
     }
 
-    clearTimeout(contTimer);
+    try {
+        await session.prompt(retryPrompt);
+    } catch (err) {
+        console.error(`[pi-runner] Retry error: ${err.message}`);
+    }
 
-    const contDurationMs = Date.now() - contStartMs;
-    const contUsage = extractUsageFromSession(session.state);
-    accumulateUsage(prevUsage, contUsage);
+    clearTimeout(retryTimer);
+
+    const retryDurationMs = Date.now() - retryStartMs;
+    const retryUsage = extractUsageFromSession(session.state);
+    accumulateUsage(prevUsage, retryUsage);
 
     runnerDebug.attempts.push({
-        label: "continuation",
-        durationMs: contDurationMs,
-        hardAborted: contAborted,
-        assistantMessages: contUsage.assistantMessages,
-        stopReasons: contUsage.stopReasons,
-        usage: contUsage,
+        label: "retry",
+        durationMs: retryDurationMs,
+        hardAborted: retryAborted,
+        assistantMessages: retryUsage.assistantMessages,
+        stopReasons: retryUsage.stopReasons,
+        usage: retryUsage,
         resultFilePresent: existsSync(`${OUTPUT}/result.json`),
     });
     persistRunnerDebug();
     persistUsage();
 
-    console.error(`[pi-runner] Continuation: ${(contDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(`${OUTPUT}/result.json`)}`);
+    console.error(`[pi-runner] Retry: ${(retryDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(`${OUTPUT}/result.json`)}`);
 
     unsubscribe();
 
     if (checkResultFile()) {
-        console.error(`[pi-runner] SUCCESS: result.json valid after continuation`);
+        console.error(`[pi-runner] SUCCESS: result.json valid after retry`);
+        process.exit(0);
+    }
+
+    // Last resort: try to rescue from text one more time
+    if (tryRescueFromTextResponse(session.state)) {
+        console.error(`[pi-runner] SUCCESS: rescued valid JSON from retry text`);
         process.exit(0);
     }
 
     // ── Failed ───────────────────────────────────────────────────
 
-    console.error(`[pi-runner] FAILED: no valid result.json after initial + continuation`);
+    console.error(`[pi-runner] FAILED: no valid result.json after initial + retry`);
     process.exit(1);
 }
 
