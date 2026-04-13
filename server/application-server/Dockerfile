@@ -18,6 +18,9 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 FROM eclipse-temurin:21
 
+# git CLI needed by PullRequestReviewHandler.runGit() for diff computation
+RUN apt-get update -qq && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=build /app/target/*.jar /app/server.jar
