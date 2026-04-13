@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,10 +64,14 @@ public class PracticeDetectionResultParser {
     static final int MAX_DIFF_NOTES = 30;
 
     private final ObjectMapper objectMapper;
+    private final ObjectMapper lenientMapper;
     private final int maxFindingsPerJob;
 
     public PracticeDetectionResultParser(ObjectMapper objectMapper, int maxFindingsPerJob) {
         this.objectMapper = objectMapper;
+        // Lenient mapper for agent output: LLMs produce JSON with literal newlines,
+        // tabs, and other control chars inside string values that strict JSON rejects.
+        this.lenientMapper = objectMapper.copy().configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
         this.maxFindingsPerJob = maxFindingsPerJob;
     }
 
@@ -97,7 +102,8 @@ public class PracticeDetectionResultParser {
         String sanitizedText = sanitizeJsonEscapes(rawOutputText);
         JsonNode root;
         try {
-            root = objectMapper.readTree(sanitizedText);
+            // Use lenient mapper: LLMs produce JSON with literal newlines/tabs in strings
+            root = lenientMapper.readTree(sanitizedText);
         } catch (JsonProcessingException e) {
             // Fallback: try to extract JSON from mixed text (e.g., "[PHASE0]...\n{...}")
             root = extractJsonFromText(sanitizedText);
@@ -566,7 +572,7 @@ public class PracticeDetectionResultParser {
             int braceIdx = text.indexOf('{', startIdx);
             if (braceIdx < 0) break;
             try {
-                JsonNode node = objectMapper.readTree(text.substring(braceIdx));
+                JsonNode node = lenientMapper.readTree(text.substring(braceIdx));
                 if (node != null && node.isObject() && node.has("findings")) {
                     return node;
                 }
