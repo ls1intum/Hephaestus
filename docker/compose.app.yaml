@@ -142,6 +142,10 @@ services:
       - shared-network
     labels:
       - "traefik.enable=true"
+      # Pin Traefik to shared-network: the app-server temporarily joins agent sandbox
+      # networks (agent-net-*) during review jobs. Without this label, Traefik can pick
+      # the sandbox network IP and route requests to an unreachable internal network.
+      - "traefik.docker.network=shared-network"
       - "traefik.http.middlewares.https-application-server-stripprefix.stripprefix.prefixes=/api"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-application-server.entryPoints=http"
@@ -152,6 +156,8 @@ services:
       - "traefik.http.routers.https-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.https-application-server.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-application-server.tls=true"
+      - "traefik.http.services.http-application-server.loadbalancer.server.port=8080"
+      - "traefik.http.services.https-application-server.loadbalancer.server.port=8080"
       - "traefik.http.routers.http-application-server.priority=5"
       - "traefik.http.routers.https-application-server.priority=10"
     healthcheck:
