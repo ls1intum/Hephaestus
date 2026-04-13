@@ -261,6 +261,35 @@ public class GitRepositoryManager {
     }
 
     /**
+     * Check if a commit SHA exists in the local clone.
+     *
+     * @param repositoryId the repository database ID
+     * @param sha          the full commit SHA hex string
+     * @return true if the SHA resolves to a commit object in the local repo
+     */
+    public boolean commitExists(Long repositoryId, String sha) {
+        if (!properties.enabled() || sha == null || sha.isBlank()) {
+            return false;
+        }
+
+        return lockManager.withReadLock(repositoryId, () -> {
+            Path repoPath = getRepositoryPath(repositoryId);
+            try (Git git = Git.open(repoPath.toFile())) {
+                ObjectId objectId = git.getRepository().resolve(sha);
+                return objectId != null;
+            } catch (IOException e) {
+                log.debug(
+                    "Cannot check commit existence: repoId={}, sha={}, error={}",
+                    repositoryId,
+                    sha,
+                    e.getMessage()
+                );
+                return false;
+            }
+        });
+    }
+
+    /**
      * Lightweight SHA-to-email resolution from the local git clone.
      * <p>
      * For each SHA in the input set, reads the {@link RevCommit} to extract
