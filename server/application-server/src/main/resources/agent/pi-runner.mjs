@@ -266,8 +266,8 @@ async function main() {
     // Subscribe to events for diagnostics
     const events = [];
     const unsubscribe = session.subscribe((event) => {
-        if (event.type === "tool_start") {
-            console.error(`[pi-runner] tool: ${event.tool?.name || "?"}`);
+        if (event.type === "tool_start" || event.type === "toolStart") {
+            console.error(`[pi-runner] tool: ${event.tool?.name || event.name || "?"}`);
         }
         if (event.type === "message_end" && event.message?.role === "assistant") {
             const stopReason = event.message.stopReason;
@@ -364,15 +364,17 @@ async function main() {
             scaffold;
     } else if (agentText) {
         retryPrompt =
-            `You completed your analysis but output the result as text instead of writing it to a file. ` +
-            `Take your analysis and write it to /workspace/.output/result.json using the write tool. ` +
+            `You completed your analysis but did not write the output file. ` +
+            `Your analysis is done — do NOT read any more files. ` +
+            `Call the write tool NOW to save your findings to /workspace/.output/result.json. ` +
             `The JSON needs a "findings" array and a "delivery.mrNote" string.` +
             scaffold;
     } else {
         retryPrompt =
-            `You did not write .output/result.json. The review will fail unless you write this file. ` +
-            `Use your analysis from above. If you need to re-check a detail, you may read a file, ` +
-            `but prioritize writing /workspace/.output/result.json immediately using the write tool. ` +
+            `You did not write .output/result.json. The review will fail unless you write this file NOW. ` +
+            `Use your analysis from above. Do NOT read more files — write immediately. ` +
+            `Call the write tool to save a JSON with a "findings" array and "delivery.mrNote" string ` +
+            `to /workspace/.output/result.json. ` +
             `For any practice you did not fully analyze, use verdict POSITIVE with confidence 0.70.` +
             scaffold;
     }
