@@ -70,11 +70,24 @@ function isValidFindingsPayload(p) {
         p.findings.some(isValidFinding) && (p.delivery == null || (typeof p.delivery === "object" && !Array.isArray(p.delivery)));
 }
 
+function lenientJsonParse(text) {
+    // Strip control characters that LLMs embed in string values (tabs, newlines).
+    // Matches the Java server's ALLOW_UNQUOTED_CONTROL_CHARS behavior.
+    try { return JSON.parse(text); } catch {}
+    const cleaned = text.replace(/[\x00-\x1f\x7f]/g, (ch) => {
+        if (ch === "\n") return "\\n";
+        if (ch === "\r") return "\\r";
+        if (ch === "\t") return "\\t";
+        return "";
+    });
+    return JSON.parse(cleaned);
+}
+
 function checkResultFile() {
     const path = `${OUTPUT}/result.json`;
     if (!existsSync(path)) return false;
     try {
-        const data = JSON.parse(readFileSync(path, "utf-8"));
+        const data = lenientJsonParse(readFileSync(path, "utf-8"));
         const valid = isValidFindingsPayload(data);
         if (!valid) {
             const hasFindings = Array.isArray(data?.findings);
