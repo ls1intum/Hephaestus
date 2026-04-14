@@ -251,14 +251,16 @@ async function main() {
     let prevUsage = null;
 
     // Soft timeout: inject steering message telling agent to wrap up
+    // Mid-loop nudge: injects a user message reminding the agent to write.
+    // On production this has a 100% success rate when it fires (4/4 runs).
+    // It works because it's a "don't forget to write" reminder, not a time warning
+    // (LLMs have no sense of elapsed time).
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
-        const remaining = Math.floor((INITIAL_TIMEOUT_MS - SOFT_TIMEOUT_MS) / 1000);
-        console.error(`[pi-runner] Soft timeout fired — steering agent to wrap up (${remaining}s remaining)`);
+        console.error(`[pi-runner] Soft timeout fired — nudging agent to write`);
         session.agent.steer({
             role: "user",
             content: [{ type: "text", text:
-                `You have ${remaining} seconds left. ` +
                 `Finish your analysis and write /workspace/.output/result.json using the write tool. ` +
                 `For any practice you haven't fully analyzed, use POSITIVE with confidence 0.70.`
             }],
