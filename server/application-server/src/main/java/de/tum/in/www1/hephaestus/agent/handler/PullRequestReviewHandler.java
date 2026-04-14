@@ -237,14 +237,17 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         int pullRequestNumber = requireInt(metadata, "pr_number");
         String repoName = requireText(metadata, "repository_full_name");
 
-        // Slim task prompt — orchestrator instructions are in agent-specific files,
-        // which reference orchestrator-protocol.md.
+        // Keep the task prompt slim, but explicitly name the output deliverable so the
+        // agent does not stop after reading files. The agent-specific instructions and
+        // orchestrator protocol reinforce the same requirement.
         String prompt =
             "Review merge request #" +
             pullRequestNumber +
             " in " +
             repoName +
-            ". Follow the orchestrator protocol in /workspace/orchestrator-protocol.md.";
+            ". Read the context files, evaluate each practice, then write your findings " +
+            "to .output/result.json using the write tool. " +
+            "Follow /workspace/orchestrator-protocol.md for the schema and rules.";
         log.info("Built orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
         return prompt;
     }

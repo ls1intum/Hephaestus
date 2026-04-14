@@ -172,14 +172,8 @@ public class PiAgentAdapter implements AgentAdapter {
      * @param agentTimeoutMs total time budget for all runs (initial + retries)
      */
     private byte[] buildRunnerScript(long agentTimeoutMs) {
-        // Continuation gets 25% of budget — just needs to write the JSON from in-memory session.
-        // Initial gets the remaining 75%.
-        long continuationTimeoutMs = Math.max(60_000, agentTimeoutMs / 4);
-        long initialTimeoutMs = Math.max(60_000, agentTimeoutMs - continuationTimeoutMs);
         String scriptTemplate = new String(AgentAdapter.loadClasspathResource("pi-runner.mjs"), StandardCharsets.UTF_8);
-        String script = scriptTemplate
-            .replace("__INITIAL_TIMEOUT_MS__", Long.toString(initialTimeoutMs))
-            .replace("__CONTINUATION_TIMEOUT_MS__", Long.toString(continuationTimeoutMs));
+        String script = scriptTemplate.replace("__AGENT_BUDGET_MS__", Long.toString(agentTimeoutMs));
         return script.getBytes(StandardCharsets.UTF_8);
     }
 
