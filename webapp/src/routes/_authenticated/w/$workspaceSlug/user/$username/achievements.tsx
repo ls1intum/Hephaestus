@@ -9,6 +9,9 @@ export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/achievements",
 )({
 	component: UserAchievementsPage,
+	staticData: {
+		workspaceSwitch: { target: "workspace.home" },
+	},
 });
 
 /**

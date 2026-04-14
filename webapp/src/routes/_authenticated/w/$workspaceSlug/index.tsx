@@ -40,6 +40,9 @@ type LeaderboardSearchParams = z.infer<typeof leaderboardSearchSchema>;
 // Export route with search param validation
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 	component: LeaderboardContainer,
+	staticData: {
+		workspaceSwitch: { target: "workspace.home", preserveSearch: true },
+	},
 	validateSearch: leaderboardSearchSchema,
 	// Configure search middleware to retain params when navigating
 	search: {
@@ -51,14 +54,14 @@ function LeaderboardContainer() {
 	const { workspaceSlug: routeWorkspaceSlug } = Route.useParams();
 	// Get the current user from auth context
 	const { username } = useAuth();
-	const { workspaceSlug, providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
+	const { providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const {
 		leaderboardEnabled,
 		leaguesEnabled,
 		isLoading: featuresLoading,
 	} = useWorkspaceFeatures(routeWorkspaceSlug);
-	const slug = workspaceSlug ?? "";
-	const hasWorkspace = Boolean(workspaceSlug);
+	const slug = routeWorkspaceSlug;
+	const hasWorkspace = Boolean(routeWorkspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
 
 	// Access properly validated search params with correct types
@@ -140,7 +143,7 @@ function LeaderboardContainer() {
 
 	// Query for user profile data (mirror leaderboard filters if provided)
 	const userProfileOptions = getUserProfileOptions({
-		path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
+		path: { workspaceSlug: routeWorkspaceSlug, login: username || "" },
 		query: {
 			after: parsedAfter,
 			before: parsedBefore,
@@ -256,11 +259,11 @@ function LeaderboardContainer() {
 	});
 
 	// When leaderboard is disabled, show the profile page as the home view
-	if (!featuresLoading && !leaderboardEnabled && workspaceSlug && username) {
+	if (!featuresLoading && !leaderboardEnabled && routeWorkspaceSlug && username) {
 		return (
 			<Navigate
 				to="/w/$workspaceSlug/user/$username"
-				params={{ workspaceSlug, username }}
+				params={{ workspaceSlug: routeWorkspaceSlug, username }}
 				replace
 			/>
 		);

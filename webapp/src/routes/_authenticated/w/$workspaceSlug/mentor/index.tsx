@@ -7,16 +7,18 @@ import { getGroupedThreadsQueryKey, getThreadQueryKey } from "@/api/@tanstack/re
 import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
 import { Greeting } from "@/components/mentor/Greeting";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/")({
 	component: MentorContainer,
+	staticData: {
+		workspaceSwitch: { target: "workspace.mentor" },
+	},
 });
 
 function MentorContainer() {
 	const queryClient = useQueryClient();
 	const navigate = useNavigate({ from: Route.fullPath });
-	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const { workspaceSlug } = Route.useParams();
 	const slug = workspaceSlug ?? "";
 	const hasStartedRef = useRef(false);
 

@@ -13,15 +13,15 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices/")({
 	component: PracticesListContainer,
+	staticData: {
+		workspaceSwitch: { target: "admin.practices" },
+	},
 });
 
 function PracticesListContainer() {
 	const queryClient = useQueryClient();
-	const {
-		workspaceSlug,
-		isLoading: isWorkspaceLoading,
-		error: workspaceError,
-	} = useActiveWorkspaceSlug();
+	const { workspaceSlug } = Route.useParams();
+	const { isLoading: isWorkspaceLoading, error: workspaceError } = useActiveWorkspaceSlug();
 
 	const [togglingPractices, setTogglingPractices] = useState<Set<string>>(new Set());
 

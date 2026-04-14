@@ -6,12 +6,15 @@ import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices")({
 	component: PracticesLayout,
+	staticData: {
+		workspaceSwitch: { target: "admin.practices" },
+	},
 });
 
 function PracticesLayout() {
-	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const { workspaceSlug: routeWorkspaceSlug } = Route.useParams();
-	const { practicesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(routeWorkspaceSlug);
+	const { workspaceSlug } = Route.useParams();
+	const { isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
+	const { practicesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	if (!workspaceSlug && !isWorkspaceLoading) {
 		return <NoWorkspace />;

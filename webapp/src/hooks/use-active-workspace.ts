@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useMatches, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { getWorkspaceSwitchNavigation } from "@/lib/workspace-navigation";
+import { buildWorkspaceSwitchPlan, getWorkspaceRouteMatch } from "@/lib/workspace-switching";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 /**
@@ -25,22 +25,20 @@ export function useActiveWorkspaceSlug() {
 		refetchOnWindowFocus: true,
 	});
 	const workspaces = Array.isArray(query.data) ? query.data : [];
-	const location = useLocation();
+	const workspaceRoute = useMatches({
+		select: (matches) => getWorkspaceRouteMatch(matches),
+	});
 
 	// Track if we've already attempted a redirect to prevent infinite loops
 	const hasAttemptedRedirect = useRef(false);
-
-	// Extract slug from the current path if present (/w/<slug>/...)
-	// React Compiler handles memoization automatically
-	const pathMatch = location.pathname.match(/^\/w\/([^/]+)/);
-	const slugFromPath = pathMatch?.[1];
+	const slugFromRoute = workspaceRoute?.workspaceSlug;
 
 	const isValidSlug = (slug?: string) =>
 		slug != null && workspaces.some((ws) => ws.workspaceSlug === slug);
 
 	const activeSlug = (() => {
-		if (slugFromPath) {
-			return isValidSlug(slugFromPath) ? slugFromPath : undefined;
+		if (slugFromRoute) {
+			return isValidSlug(slugFromRoute) ? slugFromRoute : undefined;
 		}
 
 		if (isValidSlug(selectedSlug)) {
@@ -56,11 +54,10 @@ export function useActiveWorkspaceSlug() {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: deps trigger re-run to reset flag
 	useEffect(() => {
 		hasAttemptedRedirect.current = false;
-	}, [slugFromPath, workspaceSlugs]);
+	}, [slugFromRoute, workspaceSlugs]);
 
-	// Check if the slug from the URL path is valid (exists in available workspaces)
-	const slugFromPathIsValid =
-		slugFromPath != null && workspaces.some((ws) => ws.workspaceSlug === slugFromPath);
+	const slugFromRouteIsValid =
+		slugFromRoute != null && workspaces.some((ws) => ws.workspaceSlug === slugFromRoute);
 
 	// Redirect to another workspace when current workspace becomes inaccessible
 	// This handles the case where a workspace becomes SUSPENDED/PURGED while the user is viewing it
@@ -72,13 +69,18 @@ export function useActiveWorkspaceSlug() {
 		// 4. We haven't already attempted a redirect for this path
 		const workspacesLoaded = !query.isLoading && query.data !== undefined;
 
-		if (workspacesLoaded && slugFromPath && !slugFromPathIsValid && !hasAttemptedRedirect.current) {
+		if (
+			workspacesLoaded &&
+			slugFromRoute &&
+			!slugFromRouteIsValid &&
+			!hasAttemptedRedirect.current
+		) {
 			hasAttemptedRedirect.current = true;
 
 			const fallbackSlug = workspaces[0]?.workspaceSlug;
 			if (fallbackSlug) {
 				setSelectedSlug(fallbackSlug);
-				const target = getWorkspaceSwitchNavigation(location.pathname, fallbackSlug);
+				const target = buildWorkspaceSwitchPlan(workspaceRoute?.workspaceSwitch, fallbackSlug);
 				navigate({
 					to: target.to,
 					params: target.params,
@@ -94,12 +96,12 @@ export function useActiveWorkspaceSlug() {
 			}
 		}
 	}, [
-		slugFromPath,
-		slugFromPathIsValid,
+		slugFromRoute,
+		slugFromRouteIsValid,
+		workspaceRoute?.workspaceSwitch,
 		query.isLoading,
 		query.data,
 		workspaces,
-		location.pathname,
 		navigate,
 		setSelectedSlug,
 	]);
@@ -127,7 +129,6 @@ export function useActiveWorkspaceSlug() {
 		workspaceSlug: activeSlug,
 		workspaces,
 		providerType: activeWorkspace?.providerType ?? "GITHUB",
-		selectWorkspace: setSelectedSlug,
 		isLoading: query.isLoading,
 		error: query.error as Error | null,
 	};

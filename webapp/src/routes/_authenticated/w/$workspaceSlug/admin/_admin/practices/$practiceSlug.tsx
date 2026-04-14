@@ -9,19 +9,20 @@ import {
 import type { UpdatePracticeRequest } from "@/api/types.gen";
 import { PracticeForm } from "@/components/admin/practices/PracticeForm";
 import { Spinner } from "@/components/ui/spinner";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/_admin/practices/$practiceSlug",
 )({
 	component: EditPracticeContainer,
+	staticData: {
+		workspaceSwitch: { target: "admin.practices" },
+	},
 });
 
 function EditPracticeContainer() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const { practiceSlug } = Route.useParams();
-	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const { practiceSlug, workspaceSlug } = Route.useParams();
 
 	const practiceQueryOptions = getPracticeOptions({
 		path: { workspaceSlug: workspaceSlug ?? "", practiceSlug },

@@ -20,11 +20,15 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/teams")({
 	component: AdminTeamsContainer,
+	staticData: {
+		workspaceSwitch: { target: "admin.teams" },
+	},
 });
 
 function AdminTeamsContainer() {
 	const queryClient = useQueryClient();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
+	const { workspaceSlug } = Route.useParams();
+	const { isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 

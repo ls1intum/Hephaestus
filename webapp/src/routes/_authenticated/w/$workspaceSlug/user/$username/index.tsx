@@ -23,6 +23,9 @@ type ProfileSearchParams = z.infer<typeof profileSearchSchema>;
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$username/")({
 	component: UserProfile,
+	staticData: {
+		workspaceSwitch: { target: "workspace.home" },
+	},
 	validateSearch: profileSearchSchema,
 	search: {
 		middlewares: [retainSearchParams(["after", "before"])],

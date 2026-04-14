@@ -14,14 +14,14 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/members")({
 	component: AdminMembersContainer,
+	staticData: {
+		workspaceSwitch: { target: "admin.members" },
+	},
 });
 
 function AdminMembersContainer() {
-	const {
-		workspaceSlug,
-		isLoading: isWorkspaceLoading,
-		error: workspaceError,
-	} = useActiveWorkspaceSlug();
+	const { workspaceSlug } = Route.useParams();
+	const { isLoading: isWorkspaceLoading, error: workspaceError } = useActiveWorkspaceSlug();
 
 	// Fetch users with teams
 	const usersQueryOptions = getUsersWithTeamsOptions({

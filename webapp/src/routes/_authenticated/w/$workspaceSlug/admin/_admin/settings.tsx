@@ -17,6 +17,9 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/settings")({
 	component: AdminSettings,
+	staticData: {
+		workspaceSwitch: { target: "admin.settings" },
+	},
 });
 
 // Define the repository item type
@@ -29,11 +32,8 @@ type RepositoryItem = {
  */
 function AdminSettings() {
 	const queryClient = useQueryClient();
-	const {
-		workspaceSlug,
-		isLoading: isWorkspaceLoading,
-		error: workspaceError,
-	} = useActiveWorkspaceSlug();
+	const { workspaceSlug } = Route.useParams();
+	const { isLoading: isWorkspaceLoading, error: workspaceError } = useActiveWorkspaceSlug();
 
 	// Fetch full workspace data for gitProviderMode
 	const workspaceQueryOptions = getWorkspaceOptions({

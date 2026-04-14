@@ -12,17 +12,15 @@ import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/achievements")({
 	component: AdminAchievementsContainer,
+	staticData: {
+		workspaceSwitch: { target: "admin.achievements" },
+	},
 });
 
 function AdminAchievementsContainer() {
-	const {
-		workspaceSlug,
-		isLoading: isWorkspaceLoading,
-		error: workspaceError,
-	} = useActiveWorkspaceSlug();
-	const { workspaceSlug: routeWorkspaceSlug } = Route.useParams();
-	const { achievementsEnabled, isLoading: featuresLoading } =
-		useWorkspaceFeatures(routeWorkspaceSlug);
+	const { workspaceSlug } = Route.useParams();
+	const { isLoading: isWorkspaceLoading, error: workspaceError } = useActiveWorkspaceSlug();
+	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	const usersQueryOptions = getUsersWithTeamsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
