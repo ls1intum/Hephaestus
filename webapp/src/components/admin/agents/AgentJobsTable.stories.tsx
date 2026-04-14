@@ -13,6 +13,7 @@ const meta = {
 		configs: mockAgentConfigs,
 		jobsPage: mockAgentJobsPage,
 		selectedJobId: null,
+		selectedJob: undefined,
 		jobsFilter: { status: "ALL", configId: "", page: 0, size: 10 },
 		isLoading: false,
 		error: null,
@@ -35,6 +36,7 @@ export const Default: Story = {};
 export const SelectedRow: Story = {
 	args: {
 		selectedJobId: mockAgentJobs[1].id,
+		selectedJob: mockAgentJobs[1],
 	},
 };
 

@@ -6,22 +6,12 @@ import type {
 	PageAgentJob,
 	UpdateAgentConfigRequest,
 } from "@/api/types.gen";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
 import { AgentConfigForm } from "./AgentConfigForm";
 import { AgentConfigList } from "./AgentConfigList";
-import { AgentJobDetailsDialog } from "./AgentJobDetailsDialog";
+import { AgentJobDetailsPanel } from "./AgentJobDetailsPanel";
 import { AgentJobsTable } from "./AgentJobsTable";
 import {
 	type AgentConfigDraft,
@@ -98,6 +88,8 @@ export function AdminAgentsPage({
 	const [pendingEditorTarget, setPendingEditorTarget] = useState<
 		{ type: "create" } | { type: "edit"; config: AgentConfig } | null
 	>(null);
+	const [pendingDeleteCandidate, setPendingDeleteCandidate] = useState<AgentConfig | null>(null);
+	const [pendingCancelCandidate, setPendingCancelCandidate] = useState<AgentJob | null>(null);
 
 	const editingConfig = configs.find((config) => config.id === editingConfigId) ?? null;
 	const existingHasCredential = editingConfig?.hasLlmApiKey ?? false;
@@ -150,6 +142,51 @@ export function AdminAgentsPage({
 
 		setErrors({});
 		setPendingEditorTarget(null);
+	}
+
+	function dismissEditorChange() {
+		setPendingEditorTarget(null);
+	}
+
+	function requestDelete(config: AgentConfig) {
+		setPendingDeleteCandidate(config);
+	}
+
+	function requestCancelJob(job: AgentJob) {
+		setPendingCancelCandidate(job);
+	}
+
+	function dismissDeleteCandidate() {
+		setPendingDeleteCandidate(null);
+	}
+
+	function dismissCancelCandidate() {
+		setPendingCancelCandidate(null);
+	}
+
+	function confirmDeleteCandidate() {
+		if (!pendingDeleteCandidate) {
+			return;
+		}
+		void onDeleteConfig(pendingDeleteCandidate.id).then(() => {
+			if (editingConfigId === pendingDeleteCandidate.id) {
+				handleStartCreate();
+			}
+			setDeleteCandidate(null);
+		});
+		setDeleteCandidate(pendingDeleteCandidate);
+		setPendingDeleteCandidate(null);
+	}
+
+	function confirmCancelCandidate() {
+		if (!pendingCancelCandidate) {
+			return;
+		}
+		void onCancelJob(pendingCancelCandidate.id).then(() => {
+			setCancelCandidate(null);
+		});
+		setCancelCandidate(pendingCancelCandidate);
+		setPendingCancelCandidate(null);
 	}
 
 	function applyDraft(nextDraft: AgentConfigDraft) {
@@ -239,27 +276,6 @@ export function AdminAgentsPage({
 		}
 	}
 
-	async function handleDelete() {
-		if (!deleteCandidate) {
-			return;
-		}
-
-		await onDeleteConfig(deleteCandidate.id);
-		if (editingConfigId === deleteCandidate.id) {
-			handleStartCreate();
-		}
-		setDeleteCandidate(null);
-	}
-
-	async function handleCancelJob() {
-		if (!cancelCandidate) {
-			return;
-		}
-
-		await onCancelJob(cancelCandidate.id);
-		setCancelCandidate(null);
-	}
-
 	return (
 		<div className="container mx-auto max-w-7xl py-6">
 			<header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -292,24 +308,92 @@ export function AdminAgentsPage({
 						deletingConfigId={deletingConfigId}
 						onCreateNew={handleStartCreate}
 						onEdit={handleStartEdit}
-						onDelete={setDeleteCandidate}
+						onDelete={requestDelete}
 					/>
+
+					{pendingDeleteCandidate && (
+						<Alert variant="destructive">
+							<AlertTitle>Delete {pendingDeleteCandidate.name}?</AlertTitle>
+							<AlertDescription>
+								This removes the config from the workspace. Existing job history stays intact, but
+								active jobs must be cancelled before deletion succeeds.
+							</AlertDescription>
+							<div className="mt-4 flex flex-wrap gap-2">
+								<Button variant="outline" onClick={dismissDeleteCandidate}>
+									Keep config
+								</Button>
+								<Button variant="destructive" onClick={confirmDeleteCandidate}>
+									Continue to delete
+								</Button>
+							</div>
+						</Alert>
+					)}
 
 					<AgentJobsTable
 						configs={configs}
 						jobsPage={jobsPage}
 						selectedJobId={selectedJobId}
+						selectedJob={selectedJob}
 						jobsFilter={jobsFilter}
 						isLoading={isLoadingJobs}
 						error={jobsError}
 						cancellingJobId={cancellingJobId}
 						retryingJobId={retryingJobId}
 						onRefresh={onRefresh}
-						onRequestCancelJob={setCancelCandidate}
+						onRequestCancelJob={requestCancelJob}
 						onChangeJobsFilter={onChangeJobsFilter}
 						onSelectJob={(jobId) => onSelectJob(jobId)}
 						onRetryDelivery={onRetryDelivery}
 					/>
+
+					{pendingCancelCandidate && (
+						<Alert>
+							<AlertTitle>Cancel this job?</AlertTitle>
+							<AlertDescription>
+								This stops the selected practice-review run. Use this only when the current
+								execution is no longer valid.
+							</AlertDescription>
+							<div className="mt-4 flex flex-wrap gap-2">
+								<Button variant="outline" onClick={dismissCancelCandidate}>
+									Keep running
+								</Button>
+								<Button variant="outline" onClick={confirmCancelCandidate}>
+									Continue to cancel
+								</Button>
+							</div>
+						</Alert>
+					)}
+
+					{selectedJobId !== null && (
+						<AgentJobDetailsPanel
+							job={selectedJob}
+							isLoading={isLoadingJobDetails}
+							error={jobDetailsError}
+							cancellingJobId={cancellingJobId}
+							retryingJobId={retryingJobId}
+							onRequestCancelJob={requestCancelJob}
+							onClose={() => onSelectJob(null)}
+							onRetryDelivery={onRetryDelivery}
+						/>
+					)}
+
+					{pendingEditorTarget && (
+						<Alert>
+							<AlertTitle>Discard unsaved changes?</AlertTitle>
+							<AlertDescription>
+								Your current edits have not been saved. Continue only if you want to lose those
+								changes.
+							</AlertDescription>
+							<div className="mt-4 flex flex-wrap gap-2">
+								<Button variant="outline" onClick={dismissEditorChange}>
+									Keep editing
+								</Button>
+								<Button variant="outline" onClick={confirmEditorChange}>
+									Discard changes
+								</Button>
+							</div>
+						</Alert>
+					)}
 				</div>
 
 				<Card className="xl:sticky xl:top-6 xl:self-start">
@@ -336,115 +420,17 @@ export function AdminAgentsPage({
 				</Card>
 			</div>
 
-			<AgentJobDetailsDialog
-				open={selectedJobId !== null}
-				job={selectedJob}
-				isLoading={isLoadingJobDetails}
-				error={jobDetailsError}
-				cancellingJobId={cancellingJobId}
-				retryingJobId={retryingJobId}
-				onRequestCancelJob={setCancelCandidate}
-				onOpenChange={(open) => {
-					if (!open) {
-						onSelectJob(null);
-					}
-				}}
-				onRetryDelivery={onRetryDelivery}
-			/>
+			{deleteCandidate && (
+				<div className="sr-only" aria-live="polite">
+					Deleting {deleteCandidate.name}
+				</div>
+			)}
 
-			<AlertDialog
-				open={pendingEditorTarget !== null}
-				onOpenChange={(open) => {
-					if (!open) {
-						setPendingEditorTarget(null);
-					}
-				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-						<AlertDialogDescription>
-							Your current edits have not been saved. Continue only if you want to lose those
-							changes.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Keep editing</AlertDialogCancel>
-						<AlertDialogAction onClick={confirmEditorChange}>Discard changes</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-
-			<AlertDialog
-				open={cancelCandidate !== null}
-				onOpenChange={(open) => {
-					if (!open) {
-						setCancelCandidate(null);
-					}
-				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Cancel this job?</AlertDialogTitle>
-						<AlertDialogDescription>
-							This stops the selected practice-review run. Use this only when the current execution
-							is no longer valid.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Keep running</AlertDialogCancel>
-						<AlertDialogAction
-							onClick={handleCancelJob}
-							disabled={cancelCandidate == null || cancellingJobId === cancelCandidate.id}
-						>
-							{cancelCandidate != null && cancellingJobId === cancelCandidate.id ? (
-								<>
-									<Spinner className="mr-2 size-4" />
-									Cancelling...
-								</>
-							) : (
-								"Cancel job"
-							)}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-
-			<AlertDialog
-				open={deleteCandidate !== null}
-				onOpenChange={(open) => {
-					if (!open) {
-						setDeleteCandidate(null);
-					}
-				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Delete {deleteCandidate?.name}?</AlertDialogTitle>
-						<AlertDialogDescription>
-							This removes the config from the workspace. Existing job history stays intact, but
-							active jobs must be cancelled before deletion succeeds.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Keep config</AlertDialogCancel>
-						<AlertDialogAction
-							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-							onClick={handleDelete}
-							disabled={deleteCandidate == null || deletingConfigId === deleteCandidate.id}
-						>
-							{deleteCandidate != null && deletingConfigId === deleteCandidate.id ? (
-								<>
-									<Spinner className="mr-2 size-4" />
-									Deleting...
-								</>
-							) : (
-								"Delete config"
-							)}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+			{cancelCandidate && (
+				<div className="sr-only" aria-live="polite">
+					Cancelling {cancelCandidate.id}
+				</div>
+			)}
 		</div>
 	);
 }

@@ -47,6 +47,7 @@ export interface AgentJobsTableProps {
 	configs: AgentConfig[];
 	jobsPage?: PageAgentJob;
 	selectedJobId: string | null;
+	selectedJob?: AgentJob;
 	jobsFilter: {
 		status: JobStatusFilter;
 		configId: string;
@@ -68,6 +69,7 @@ export function AgentJobsTable({
 	configs,
 	jobsPage,
 	selectedJobId,
+	selectedJob,
 	jobsFilter,
 	isLoading,
 	error,
@@ -84,7 +86,7 @@ export function AgentJobsTable({
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Job History</CardTitle>
+				<CardTitle>Job history</CardTitle>
 				<CardDescription>
 					Filter workspace jobs, inspect frozen runtime snapshots, and retry failed delivery
 					attempts.
@@ -243,6 +245,13 @@ export function AgentJobsTable({
 						</Button>
 					</div>
 				</div>
+
+				{selectedJobId !== null && selectedJob && (
+					<div className="rounded-lg border bg-muted/20 px-4 py-3 text-sm">
+						Showing details for{" "}
+						<span className="font-medium">{selectedJob.configName ?? selectedJob.id}</span>
+					</div>
+				)}
 			</CardContent>
 		</Card>
 	);

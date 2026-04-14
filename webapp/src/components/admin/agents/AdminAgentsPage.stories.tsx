@@ -74,6 +74,14 @@ export const JobDetailsOpen: Story = {
 	},
 };
 
+export const InlineConfirmations: Story = {
+	args: {
+		selectedJobId: mockAgentJobs[0].id,
+		selectedJob: mockAgentJobs[0],
+	},
+	render: (args) => <AdminAgentsPage {...args} />,
+};
+
 export const ErrorState: Story = {
 	args: {
 		configsError: new Error("Server rejected the config request."),
