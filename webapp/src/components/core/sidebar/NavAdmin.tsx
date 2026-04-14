@@ -73,9 +73,7 @@ export function NavAdmin({
 					<SidebarMenuItem>
 						<SidebarMenuButton
 							tooltip="Manage review agents"
-							render={
-								<Link to="/w/$workspaceSlug/admin/agents" params={{ workspaceSlug }} search={{}} />
-							}
+							render={<Link to="/w/$workspaceSlug/admin/agents" params={{ workspaceSlug }} />}
 						>
 							<Bot />
 							<span>Manage review agents</span>

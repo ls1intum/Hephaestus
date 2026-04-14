@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -49,26 +49,64 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 });
 
 function AdminAgentsContainer() {
-	const queryClient = useQueryClient();
-	const navigate = useNavigate({ from: "/w/$workspaceSlug/admin/agents" });
 	const {
 		workspaceSlug,
 		isLoading: isWorkspaceLoading,
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
 	const { practicesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+
+	useEffect(() => {
+		if (workspaceError) {
+			toast.error(`Failed to resolve workspace: ${(workspaceError as Error).message}`);
+		}
+	}, [workspaceError]);
+
+	if (!workspaceSlug && !isWorkspaceLoading) {
+		return <NoWorkspace />;
+	}
+
+	if (!featuresLoading && !practicesEnabled && workspaceSlug) {
+		return <Navigate to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} replace />;
+	}
+
+	if (featuresLoading || !practicesEnabled) {
+		return (
+			<div className="flex h-64 items-center justify-center" role="status" aria-live="polite">
+				<div className="flex items-center gap-3 text-muted-foreground">
+					<Spinner className="size-8" />
+					<span>Loading review agent settings...</span>
+				</div>
+			</div>
+		);
+	}
+
+	if (!workspaceSlug) {
+		return null;
+	}
+
+	return (
+		<AdminAgentsContent workspaceSlug={workspaceSlug} isWorkspaceLoading={isWorkspaceLoading} />
+	);
+}
+
+interface AdminAgentsContentProps {
+	workspaceSlug: string;
+	isWorkspaceLoading: boolean;
+}
+
+function AdminAgentsContent({ workspaceSlug, isWorkspaceLoading }: AdminAgentsContentProps) {
+	const queryClient = useQueryClient();
+	const navigate = useNavigate({ from: Route.fullPath });
 	const { configId, jobId, page, status } = Route.useSearch();
 
 	const configsQueryOptions = getConfigsOptions({
-		path: { workspaceSlug: workspaceSlug ?? "" },
+		path: { workspaceSlug },
 	});
-	const configsQuery = useQuery({
-		...configsQueryOptions,
-		enabled: Boolean(workspaceSlug),
-	});
+	const configsQuery = useQuery(configsQueryOptions);
 
 	const jobsQueryOptions = listJobsOptions({
-		path: { workspaceSlug: workspaceSlug ?? "" },
+		path: { workspaceSlug },
 		query: {
 			status: status === "ALL" ? undefined : status,
 			configId: configId ? Number(configId) : undefined,
@@ -78,27 +116,24 @@ function AdminAgentsContainer() {
 	});
 	const jobsQuery = useQuery({
 		...jobsQueryOptions,
-		enabled: Boolean(workspaceSlug),
 		placeholderData: (previousData) => previousData,
 	});
 
 	const jobDetailsQueryOptions = getJobOptions({
-		path: { workspaceSlug: workspaceSlug ?? "", jobId: jobId ?? "pending" },
+		path: { workspaceSlug, jobId: jobId ?? "pending" },
 	});
 	const jobDetailsQuery = useQuery({
 		...jobDetailsQueryOptions,
-		enabled: Boolean(workspaceSlug && jobId),
+		enabled: jobId !== undefined,
 	});
 
 	const invalidateConfigs = () => {
-		if (!workspaceSlug) return;
 		queryClient.invalidateQueries({
 			queryKey: getConfigsQueryKey({ path: { workspaceSlug } }),
 		});
 	};
 
 	const invalidateJobs = () => {
-		if (!workspaceSlug) return;
 		queryClient.invalidateQueries({
 			queryKey: listJobsQueryKey({
 				path: { workspaceSlug },
@@ -172,31 +207,6 @@ function AdminAgentsContainer() {
 		},
 	});
 
-	useEffect(() => {
-		if (workspaceError) {
-			toast.error(`Failed to resolve workspace: ${(workspaceError as Error).message}`);
-		}
-	}, [workspaceError]);
-
-	if (!workspaceSlug && !isWorkspaceLoading) {
-		return <NoWorkspace />;
-	}
-
-	if (featuresLoading || !practicesEnabled) {
-		return (
-			<div className="flex h-64 items-center justify-center" role="status" aria-live="polite">
-				<div className="flex items-center gap-3 text-muted-foreground">
-					<Spinner className="size-8" />
-					<span>
-						{featuresLoading
-							? "Loading review agent settings..."
-							: "Practice review is not enabled for this workspace."}
-					</span>
-				</div>
-			</div>
-		);
-	}
-
 	type AgentsSearch = z.infer<typeof agentsSearchSchema>;
 
 	const updateSearch = (
@@ -218,9 +228,10 @@ function AdminAgentsContainer() {
 					page: number;
 					jobId: string | undefined;
 			  }>),
+		options?: { replace?: boolean },
 	) =>
 		void navigate({
-			replace: true,
+			replace: options?.replace ?? true,
 			search: (current: AgentsSearch) => {
 				const resolved = typeof next === "function" ? next(current) : next;
 				return {
@@ -232,7 +243,6 @@ function AdminAgentsContainer() {
 
 	return (
 		<AdminAgentsPage
-			workspaceSlug={workspaceSlug ?? ""}
 			configs={configsQuery.data ?? []}
 			jobsPage={jobsQuery.data}
 			selectedJob={jobDetailsQuery.data}
@@ -281,7 +291,7 @@ function AdminAgentsContainer() {
 				}));
 			}}
 			onSelectJob={(nextJobId) => {
-				updateSearch({ jobId: nextJobId ?? undefined });
+				updateSearch({ jobId: nextJobId ?? undefined }, { replace: nextJobId == null });
 			}}
 			onCancelJob={async (jobId: string) => {
 				if (!workspaceSlug) return;
