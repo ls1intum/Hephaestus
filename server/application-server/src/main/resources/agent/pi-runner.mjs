@@ -183,6 +183,29 @@ function tryRescueFromTextResponse(sessionState) {
     return checkResultFile();
 }
 
+// ── Practice slug loader (for retry scaffold) ───────────────────
+
+function loadPracticeSlugs() {
+    try {
+        const indexPath = `${CWD}/.practices/index.json`;
+        if (!existsSync(indexPath)) return [];
+        const index = JSON.parse(readFileSync(indexPath, "utf-8"));
+        if (!Array.isArray(index)) return [];
+        return index.map(p => p.slug).filter(Boolean);
+    } catch { return []; }
+}
+
+function buildRetryScaffold(slugs) {
+    if (!slugs.length) return "";
+    const entries = slugs.map(s =>
+        `{"practiceSlug":"${s}","title":"...","verdict":"POSITIVE","severity":"INFO","confidence":0.70,"evidence":{"locations":[],"snippets":[]},"reasoning":"...","guidance":"..."}`
+    );
+    return `\n\nHere is a template with ALL practice slugs pre-filled as POSITIVE. ` +
+        `Replace verdicts/details for practices you analyzed. ` +
+        `Write this to /workspace/.output/result.json using the write tool:\n` +
+        `{"findings":[${entries.join(",")}],"delivery":{"mrNote":"Summary of the review."}}`;
+}
+
 // ── Main ─────────────────────────────────────────────────────────
 
 const prompt = readFileSync("/workspace/.prompt", "utf-8").trim();
@@ -221,14 +244,16 @@ async function main() {
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
         const remaining = Math.floor((INITIAL_TIMEOUT_MS - SOFT_TIMEOUT_MS) / 1000);
+        const steerSlugs = loadPracticeSlugs();
+        const slugList = steerSlugs.length ? ` Practice slugs: ${steerSlugs.join(", ")}.` : "";
         console.error(`[pi-runner] Soft timeout fired — steering agent to wrap up (${remaining}s remaining)`);
         session.agent.steer({
             role: "user",
             content: [{ type: "text", text:
-                `⚠️ TIME WARNING: You have approximately ${remaining} seconds remaining before this session is terminated. ` +
-                `Stop exploring and write your findings NOW. Use the write tool to save /workspace/.output/result.json immediately. ` +
-                `Include findings for ALL practices — for any you haven't fully analyzed, emit POSITIVE with confidence 0.70. ` +
-                `Do NOT read any more files. Do NOT grep anything. Just write the result JSON NOW.`
+                `STOP reading files. You have ${remaining}s left. ` +
+                `Write /workspace/.output/result.json NOW using the write tool. ` +
+                `Include one finding per practice. For unanalyzed practices, use POSITIVE with confidence 0.70.` +
+                slugList
             }],
             timestamp: Date.now(),
         });
@@ -307,8 +332,12 @@ async function main() {
         }
     }
 
-    // Re-prompt: tell the agent exactly what went wrong
+    // Re-prompt: give the agent a concrete scaffold so it can ONLY write
     console.error(`[pi-runner] Re-prompting agent to write result.json`);
+
+    const slugs = loadPracticeSlugs();
+    const scaffold = buildRetryScaffold(slugs);
+    console.error(`[pi-runner] Loaded ${slugs.length} practice slugs for retry scaffold`);
 
     let retryAborted = false;
     const retryTimer = setTimeout(() => {
@@ -319,29 +348,14 @@ async function main() {
 
     const retryStartMs = Date.now();
 
-    // Build retry prompt based on what actually happened.
-    // Check timeout first — it's the most operationally relevant signal.
-    let retryPrompt;
-    if (softTimeoutFired || hardAborted) {
-        retryPrompt =
-            `You ran out of time before writing result.json. ` +
-            `Based on what you already analyzed, write the result.json file NOW using the write tool. ` +
-            `Include one finding per practice. For any you did not analyze, use POSITIVE with confidence 0.70. ` +
-            `The JSON needs a "findings" array and a "delivery.mrNote" string. ` +
-            `Write to /workspace/.output/result.json immediately. Do not explain — just call the write tool.`;
-    } else if (agentText) {
-        retryPrompt =
-            `You completed your analysis but output the result as text instead of writing it to a file. ` +
-            `You MUST use the write tool to save the JSON to /workspace/.output/result.json. ` +
-            `The JSON needs a "findings" array and a "delivery.mrNote" string. ` +
-            `Call the write tool NOW. Do not explain — just write the file.`;
-    } else {
-        retryPrompt =
-            `Your previous response did not write the required output file. ` +
-            `You MUST call the write tool to save a JSON object to /workspace/.output/result.json. ` +
-            `The JSON needs a "findings" array and a "delivery.mrNote" string. ` +
-            `Do not explain — just call the write tool with the JSON.`;
-    }
+    // The retry prompt must be IMPOSSIBLE to misinterpret.
+    // Do NOT read any more files. Do NOT analyze anything. Just write.
+    const retryPrompt =
+        `STOP. You did not write .output/result.json. The review FAILED. ` +
+        `Your ONLY action now: call the write tool to create /workspace/.output/result.json. ` +
+        `Do NOT read files. Do NOT grep. Do NOT explain. Just write the JSON. ` +
+        `Use your analysis from above. For any practice you did not fully analyze, use verdict POSITIVE with confidence 0.70.` +
+        scaffold;
 
     try {
         await session.prompt(retryPrompt);
