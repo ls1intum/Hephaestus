@@ -6,9 +6,6 @@ import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices")({
 	component: PracticesLayout,
-	staticData: {
-		workspaceSwitch: { target: "admin.practices" },
-	},
 });
 
 function PracticesLayout() {

@@ -20,9 +20,6 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/teams")({
 	component: AdminTeamsContainer,
-	staticData: {
-		workspaceSwitch: { target: "admin.teams" },
-	},
 });
 
 function AdminTeamsContainer() {

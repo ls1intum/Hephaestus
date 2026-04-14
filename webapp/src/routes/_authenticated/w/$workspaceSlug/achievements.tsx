@@ -7,9 +7,6 @@ import { useAuth } from "@/integrations/auth/AuthContext";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achievements")({
 	component: AchievementsPage,
-	staticData: {
-		workspaceSwitch: { target: "workspace.achievements" },
-	},
 });
 
 /**

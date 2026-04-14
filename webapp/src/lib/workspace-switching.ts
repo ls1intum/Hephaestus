@@ -10,15 +10,9 @@ export type WorkspaceSwitchTarget =
 	| "admin.practices"
 	| "admin.practice-create"
 	| "admin.achievement-designer";
-
-export interface WorkspaceSwitchBehavior {
-	target: WorkspaceSwitchTarget;
-	preserveSearch?: boolean;
-}
-
 export interface WorkspaceRouteMatch {
 	workspaceSlug: string;
-	workspaceSwitch?: WorkspaceSwitchBehavior;
+	routeId: string;
 }
 
 export interface WorkspaceSwitchPlan {
@@ -40,6 +34,50 @@ export interface WorkspaceSwitchPlan {
 	preserveSearch: boolean;
 }
 
+type WorkspaceRouteId =
+	| "/w/$workspaceSlug/"
+	| "/w/$workspaceSlug/achievements"
+	| "/w/$workspaceSlug/teams/"
+	| "/w/$workspaceSlug/mentor/"
+	| "/w/$workspaceSlug/mentor/$threadId"
+	| "/w/$workspaceSlug/admin/achievement-designer"
+	| "/settings"
+	| "/members"
+	| "/teams"
+	| "/achievements"
+	| "/practices"
+	| "/new"
+	| "/$practiceSlug"
+	| "/w/$workspaceSlug/user/$username/"
+	| "/w/$workspaceSlug/user/$username/achievements";
+
+const workspaceSwitchTargetsByRouteId: Record<
+	WorkspaceRouteId,
+	{ target: WorkspaceSwitchTarget; preserveSearch: boolean }
+> = {
+	"/w/$workspaceSlug/": { target: "workspace.home", preserveSearch: true },
+	"/w/$workspaceSlug/achievements": { target: "workspace.achievements", preserveSearch: false },
+	"/w/$workspaceSlug/teams/": { target: "workspace.teams", preserveSearch: false },
+	"/w/$workspaceSlug/mentor/": { target: "workspace.mentor", preserveSearch: false },
+	"/w/$workspaceSlug/mentor/$threadId": { target: "workspace.mentor", preserveSearch: false },
+	"/w/$workspaceSlug/admin/achievement-designer": {
+		target: "admin.achievement-designer",
+		preserveSearch: false,
+	},
+	"/settings": { target: "admin.settings", preserveSearch: false },
+	"/members": { target: "admin.members", preserveSearch: false },
+	"/teams": { target: "admin.teams", preserveSearch: false },
+	"/achievements": { target: "admin.achievements", preserveSearch: false },
+	"/practices": { target: "admin.practices", preserveSearch: false },
+	"/new": { target: "admin.practices", preserveSearch: false },
+	"/$practiceSlug": { target: "admin.practices", preserveSearch: false },
+	"/w/$workspaceSlug/user/$username/": { target: "workspace.home", preserveSearch: false },
+	"/w/$workspaceSlug/user/$username/achievements": {
+		target: "workspace.home",
+		preserveSearch: false,
+	},
+};
+
 const workspaceSwitchTargetToRoute = {
 	"workspace.home": "/w/$workspaceSlug",
 	"workspace.achievements": "/w/$workspaceSlug/achievements",
@@ -56,47 +94,37 @@ const workspaceSwitchTargetToRoute = {
 
 export function getWorkspaceRouteMatch(
 	matches: readonly {
+		routeId: string;
 		params: Record<string, unknown>;
-		staticData?: {
-			workspaceSwitch?: WorkspaceSwitchBehavior;
-		};
 	}[],
 ): WorkspaceRouteMatch | undefined {
-	let workspaceSlug: string | undefined;
-	let workspaceSwitch: WorkspaceSwitchBehavior | undefined;
-
 	for (let i = matches.length - 1; i >= 0; i -= 1) {
 		const match = matches[i];
 		const matchWorkspaceSlug = match.params.workspaceSlug;
 
-		if (!workspaceSwitch && match.staticData?.workspaceSwitch) {
-			workspaceSwitch = match.staticData.workspaceSwitch;
-		}
-
-		if (!workspaceSlug && typeof matchWorkspaceSlug === "string" && matchWorkspaceSlug.length > 0) {
-			workspaceSlug = matchWorkspaceSlug;
+		if (typeof matchWorkspaceSlug === "string" && matchWorkspaceSlug.length > 0) {
+			return {
+				workspaceSlug: matchWorkspaceSlug,
+				routeId: match.routeId,
+			};
 		}
 	}
 
-	if (!workspaceSlug) {
-		return undefined;
-	}
-
-	return {
-		workspaceSlug,
-		workspaceSwitch,
-	};
+	return undefined;
 }
 
 export function buildWorkspaceSwitchPlan(
-	workspaceSwitch: WorkspaceSwitchBehavior | undefined,
+	routeId: string | undefined,
 	workspaceSlug: string,
 ): WorkspaceSwitchPlan {
-	const target = workspaceSwitch?.target ?? "workspace.home";
+	const behavior =
+		(routeId && routeId in workspaceSwitchTargetsByRouteId
+			? workspaceSwitchTargetsByRouteId[routeId as WorkspaceRouteId]
+			: undefined) ?? workspaceSwitchTargetsByRouteId["/w/$workspaceSlug/user/$username/"];
 
 	return {
-		to: workspaceSwitchTargetToRoute[target],
+		to: workspaceSwitchTargetToRoute[behavior.target],
 		params: { workspaceSlug },
-		preserveSearch: workspaceSwitch?.preserveSearch ?? false,
+		preserveSearch: behavior.preserveSearch,
 	};
 }

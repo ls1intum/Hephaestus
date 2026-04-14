@@ -13,9 +13,6 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices/")({
 	component: PracticesListContainer,
-	staticData: {
-		workspaceSwitch: { target: "admin.practices" },
-	},
 });
 
 function PracticesListContainer() {

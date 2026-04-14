@@ -80,7 +80,7 @@ export function useActiveWorkspaceSlug() {
 			const fallbackSlug = workspaces[0]?.workspaceSlug;
 			if (fallbackSlug) {
 				setSelectedSlug(fallbackSlug);
-				const target = buildWorkspaceSwitchPlan(workspaceRoute?.workspaceSwitch, fallbackSlug);
+				const target = buildWorkspaceSwitchPlan(workspaceRoute?.routeId, fallbackSlug);
 				navigate({
 					to: target.to,
 					params: target.params,
@@ -98,7 +98,7 @@ export function useActiveWorkspaceSlug() {
 	}, [
 		slugFromRoute,
 		slugFromRouteIsValid,
-		workspaceRoute?.workspaceSwitch,
+		workspaceRoute,
 		query.isLoading,
 		query.data,
 		workspaces,

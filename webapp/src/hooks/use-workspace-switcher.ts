@@ -14,7 +14,7 @@ export function useWorkspaceSwitcher() {
 			setSelectedSlug(workspaceSlug);
 		}
 
-		const target = buildWorkspaceSwitchPlan(workspaceRoute?.workspaceSwitch, workspaceSlug);
+		const target = buildWorkspaceSwitchPlan(workspaceRoute?.routeId, workspaceSlug);
 
 		navigate({
 			to: target.to,

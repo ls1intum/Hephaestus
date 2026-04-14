@@ -14,9 +14,6 @@ export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/_admin/practices/$practiceSlug",
 )({
 	component: EditPracticeContainer,
-	staticData: {
-		workspaceSwitch: { target: "admin.practices" },
-	},
 });
 
 function EditPracticeContainer() {

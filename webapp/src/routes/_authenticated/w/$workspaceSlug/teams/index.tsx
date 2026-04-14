@@ -6,9 +6,6 @@ import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/teams/")({
 	component: TeamsContainer,
-	staticData: {
-		workspaceSwitch: { target: "workspace.teams" },
-	},
 });
 
 function TeamsContainer() {

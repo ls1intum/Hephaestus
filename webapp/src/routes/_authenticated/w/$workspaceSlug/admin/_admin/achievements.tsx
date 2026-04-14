@@ -12,9 +12,6 @@ import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/achievements")({
 	component: AdminAchievementsContainer,
-	staticData: {
-		workspaceSwitch: { target: "admin.achievements" },
-	},
 });
 
 function AdminAchievementsContainer() {

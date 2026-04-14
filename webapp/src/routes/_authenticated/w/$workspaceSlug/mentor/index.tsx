@@ -10,9 +10,6 @@ import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/")({
 	component: MentorContainer,
-	staticData: {
-		workspaceSwitch: { target: "workspace.mentor" },
-	},
 });
 
 function MentorContainer() {

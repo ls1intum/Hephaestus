@@ -40,9 +40,6 @@ type LeaderboardSearchParams = z.infer<typeof leaderboardSearchSchema>;
 // Export route with search param validation
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 	component: LeaderboardContainer,
-	staticData: {
-		workspaceSwitch: { target: "workspace.home", preserveSearch: true },
-	},
 	validateSearch: leaderboardSearchSchema,
 	// Configure search middleware to retain params when navigating
 	search: {

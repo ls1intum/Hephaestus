@@ -17,9 +17,6 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/settings")({
 	component: AdminSettings,
-	staticData: {
-		workspaceSwitch: { target: "admin.settings" },
-	},
 });
 
 // Define the repository item type

@@ -8,9 +8,6 @@ import { PracticeForm } from "@/components/admin/practices/PracticeForm";
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices/new")(
 	{
 		component: CreatePracticeContainer,
-		staticData: {
-			workspaceSwitch: { target: "admin.practice-create" },
-		},
 	},
 );
 
