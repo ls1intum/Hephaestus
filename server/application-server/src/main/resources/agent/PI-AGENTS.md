@@ -2,6 +2,14 @@
 
 **Your ONLY deliverable: call the write tool to save `.output/result.json`.** If you do not write this file, the review fails and nothing gets delivered. Do NOT output JSON as text — you MUST use the write tool.
 
+## How to work
+
+1. **Read** `.context/diff_summary.md`, `.practices/all-criteria.md`, `.practices/index.json`, and `.context/metadata.json`
+2. **Analyze** the diff against each practice — only flag changed lines (`+` and `-`). Verify NEGATIVE findings against actual diff lines. Re-examine POSITIVE verdicts for partial violations.
+3. **Write** `.output/result.json` using the write tool — one call, complete JSON
+
+You may also read `.context/diff.patch` for line-number verification, `repo/` for surrounding code context, `.precompute-out/summary.md` for static analysis hints, and `/workspace/orchestrator-protocol.md` for detailed rules.
+
 ## Workspace
 - `.context/diff_summary.md` — per-file diff chunks with index table **(primary — read this first)**
 - `.context/diff.patch` — full unified diff with `[L<n>]` line annotations (for line-number verification)
