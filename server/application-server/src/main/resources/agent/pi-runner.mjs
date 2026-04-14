@@ -26,13 +26,13 @@ import {
 
 const OUTPUT = "/workspace/.output";
 const CWD = "/workspace";
-const INITIAL_TIMEOUT_MS = __INITIAL_TIMEOUT_MS__;
-const SOFT_TIMEOUT_MS = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.50));
-const TOTAL_CONTINUATION_MS = __CONTINUATION_TIMEOUT_MS__;
-// Split continuation budget between retry 1 and retry 2.
-// Retry 1 gets 60% (more likely to need analysis time), retry 2 gets 40% (just write).
-const RETRY1_TIMEOUT_MS = Math.max(30_000, Math.floor(TOTAL_CONTINUATION_MS * 0.60));
-const RETRY2_TIMEOUT_MS = Math.max(30_000, TOTAL_CONTINUATION_MS - RETRY1_TIMEOUT_MS);
+// Single budget from the adapter. Runner owns all splitting.
+// Production: config=600s, buffer=60s → budget=540,000ms.
+const AGENT_BUDGET_MS = __AGENT_BUDGET_MS__;
+const INITIAL_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.75));   // 75% for analysis
+const RETRY1_TIMEOUT_MS  = Math.max(30_000, Math.floor(AGENT_BUDGET_MS * 0.15));   // 15% for retry 1
+const RETRY2_TIMEOUT_MS  = Math.max(30_000, AGENT_BUDGET_MS - INITIAL_TIMEOUT_MS - RETRY1_TIMEOUT_MS); // 10% for retry 2
+const SOFT_TIMEOUT_MS    = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.50)); // nudge at 50% of initial
 
 mkdirSync(OUTPUT, { recursive: true });
 
@@ -226,7 +226,7 @@ const prompt = readFileSync("/workspace/.prompt", "utf-8").trim();
 
 async function main() {
     console.error(`[pi-runner] Embedded SDK mode`);
-    console.error(`[pi-runner] Budget: initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry1=${RETRY1_TIMEOUT_MS}ms, retry2=${RETRY2_TIMEOUT_MS}ms`);
+    console.error(`[pi-runner] Budget: total=${AGENT_BUDGET_MS}ms, initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry1=${RETRY1_TIMEOUT_MS}ms, retry2=${RETRY2_TIMEOUT_MS}ms`);
 
     // Create tools scoped to /workspace
     const tools = [
