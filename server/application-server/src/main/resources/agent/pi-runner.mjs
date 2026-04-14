@@ -28,7 +28,11 @@ const OUTPUT = "/workspace/.output";
 const CWD = "/workspace";
 const INITIAL_TIMEOUT_MS = __INITIAL_TIMEOUT_MS__;
 const SOFT_TIMEOUT_MS = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.50));
-const CONTINUATION_TIMEOUT_MS = __CONTINUATION_TIMEOUT_MS__;
+const TOTAL_CONTINUATION_MS = __CONTINUATION_TIMEOUT_MS__;
+// Split continuation budget between retry 1 and retry 2.
+// Retry 1 gets 60% (more likely to need analysis time), retry 2 gets 40% (just write).
+const RETRY1_TIMEOUT_MS = Math.max(30_000, Math.floor(TOTAL_CONTINUATION_MS * 0.60));
+const RETRY2_TIMEOUT_MS = Math.max(30_000, TOTAL_CONTINUATION_MS - RETRY1_TIMEOUT_MS);
 
 mkdirSync(OUTPUT, { recursive: true });
 
@@ -222,7 +226,7 @@ const prompt = readFileSync("/workspace/.prompt", "utf-8").trim();
 
 async function main() {
     console.error(`[pi-runner] Embedded SDK mode`);
-    console.error(`[pi-runner] Budget: initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), continuation=${CONTINUATION_TIMEOUT_MS}ms`);
+    console.error(`[pi-runner] Budget: initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry1=${RETRY1_TIMEOUT_MS}ms, retry2=${RETRY2_TIMEOUT_MS}ms`);
 
     // Create tools scoped to /workspace
     const tools = [
@@ -359,9 +363,9 @@ async function main() {
     let retryAborted = false;
     const retryTimer = setTimeout(() => {
         retryAborted = true;
-        console.error(`[pi-runner] Retry hard timeout — aborting`);
+        console.error(`[pi-runner] Retry 1 hard timeout — aborting`);
         session.agent.abort();
-    }, CONTINUATION_TIMEOUT_MS);
+    }, RETRY1_TIMEOUT_MS);
 
     const retryStartMs = Date.now();
 
@@ -433,7 +437,7 @@ async function main() {
         retry2Aborted = true;
         console.error(`[pi-runner] Retry 2 hard timeout — aborting`);
         session.agent.abort();
-    }, CONTINUATION_TIMEOUT_MS);
+    }, RETRY2_TIMEOUT_MS);
 
     const retry2StartMs = Date.now();
 
