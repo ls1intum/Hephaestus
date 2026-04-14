@@ -15,6 +15,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Component
 public class WorkspaceProvisioningAdapter implements ProvisioningListener {
@@ -238,36 +240,24 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         // Update status first
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
 
-        // Trigger initial sync asynchronously before starting NATS consumer
-        // This ensures all entities exist before NATS starts processing webhook events
+        // Sync after the outer transaction commits so RepositoryToMonitor rows are visible.
         workspaceRepository
             .findByInstallationId(installationId)
             .ifPresent(workspace -> {
-                log.info(
-                    "Triggering initial sync for activated installation: installationId={}, workspaceId={}",
-                    installationId,
-                    workspace.getId()
-                );
-
-                // Run sync asynchronously to avoid blocking webhook processing
                 Long workspaceId = workspace.getId();
-                monitoringExecutor.execute(() -> {
-                    try {
-                        getGitHubDataSyncService().syncAllRepositories(workspaceId);
-                        log.info(
-                            "Completed initial sync for activated installation: installationId={}, workspaceId={}",
-                            installationId,
-                            workspaceId
-                        );
-                    } catch (Exception e) {
-                        log.error(
-                            "Failed initial sync for activated installation: installationId={}, workspaceId={}",
-                            installationId,
-                            workspaceId,
-                            e
-                        );
-                    }
-                });
+
+                if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                    TransactionSynchronizationManager.registerSynchronization(
+                        new TransactionSynchronization() {
+                            @Override
+                            public void afterCommit() {
+                                triggerInitialSync(installationId, workspaceId);
+                            }
+                        }
+                    );
+                } else {
+                    triggerInitialSync(installationId, workspaceId);
+                }
             });
 
         // Start NATS consumer to resume webhook processing
@@ -285,6 +275,32 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         RepositorySelection repoSelection = parseRepositorySelection(selection);
         workspaceInstallationService.updateRepositorySelection(installationId, repoSelection);
         log.debug("Updated repository selection: installationId={}, selection={}", installationId, repoSelection);
+    }
+
+    private void triggerInitialSync(Long installationId, Long workspaceId) {
+        log.info(
+            "Starting initial sync for activated installation: installationId={}, workspaceId={}",
+            installationId,
+            workspaceId
+        );
+
+        monitoringExecutor.execute(() -> {
+            try {
+                getGitHubDataSyncService().syncAllRepositories(workspaceId);
+                log.info(
+                    "Completed initial sync for activated installation: installationId={}, workspaceId={}",
+                    installationId,
+                    workspaceId
+                );
+            } catch (Exception e) {
+                log.error(
+                    "Failed initial sync for activated installation: installationId={}, workspaceId={}",
+                    installationId,
+                    workspaceId,
+                    e
+                );
+            }
+        });
     }
 
     private RepositorySelection parseRepositorySelection(String selection) {
