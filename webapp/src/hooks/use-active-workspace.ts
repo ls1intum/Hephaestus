@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { getWorkspaceSwitchNavigation } from "@/lib/workspace-navigation";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 /**
@@ -76,11 +77,12 @@ export function useActiveWorkspaceSlug() {
 
 			const fallbackSlug = workspaces[0]?.workspaceSlug;
 			if (fallbackSlug) {
-				// Redirect to the same relative path under a different workspace
-				const remainder = location.pathname.replace(/^\/w\/[^/]+/, "");
 				setSelectedSlug(fallbackSlug);
+				const target = getWorkspaceSwitchNavigation(location.pathname, fallbackSlug);
 				navigate({
-					to: `/w/${fallbackSlug}${remainder || "/"}` as never,
+					to: target.to,
+					params: target.params,
+					...(target.preserveSearch ? { search: (prev) => prev } : {}),
 					replace: true,
 				});
 			} else {

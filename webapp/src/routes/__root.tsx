@@ -29,6 +29,7 @@ import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
 import { getProviderSlug } from "@/lib/provider";
 import type { ChatMessage } from "@/lib/types";
+import { getWorkspaceSwitchNavigation } from "@/lib/workspace-navigation";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -277,9 +278,13 @@ function AppSidebarContainer() {
 	const handleWorkspaceChange = (ws: typeof activeWorkspace) => {
 		if (!ws) return;
 		selectWorkspace(ws.workspaceSlug);
-		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
-		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
-		navigate({ to: target as never, replace: true });
+		const target = getWorkspaceSwitchNavigation(pathname, ws.workspaceSlug);
+		navigate({
+			to: target.to,
+			params: target.params,
+			...(target.preserveSearch ? { search: (prev) => prev } : {}),
+			replace: true,
+		});
 	};
 
 	const handleAddWorkspace = () => {

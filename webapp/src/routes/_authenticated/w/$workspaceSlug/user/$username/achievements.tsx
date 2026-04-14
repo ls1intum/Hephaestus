@@ -19,7 +19,7 @@ function UserAchievementsPage() {
 	const { workspaceSlug, username } = Route.useParams();
 	const { isCurrentUser } = useAuth();
 	const navigate = useNavigate();
-	const { achievementsEnabled, isLoading } = useWorkspaceFeatures();
+	const { achievementsEnabled, isLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	useEffect(() => {
 		if (!isLoading && !achievementsEnabled && workspaceSlug && username) {

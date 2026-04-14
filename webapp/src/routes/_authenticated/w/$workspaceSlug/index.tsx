@@ -48,10 +48,15 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 });
 
 function LeaderboardContainer() {
+	const { workspaceSlug: routeWorkspaceSlug } = Route.useParams();
 	// Get the current user from auth context
 	const { username } = useAuth();
 	const { workspaceSlug, providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const { leaderboardEnabled, leaguesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const {
+		leaderboardEnabled,
+		leaguesEnabled,
+		isLoading: featuresLoading,
+	} = useWorkspaceFeatures(routeWorkspaceSlug);
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;

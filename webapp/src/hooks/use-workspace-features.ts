@@ -17,7 +17,10 @@ export interface WorkspaceFeatures {
  * Reads from the listWorkspaces query cache (same query as useActiveWorkspaceSlug).
  * Defaults all flags to true while loading to prevent sidebar flicker.
  */
-export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean } {
+
+export function useWorkspaceFeatures(
+	workspaceSlug?: string,
+): WorkspaceFeatures & { isLoading: boolean } {
 	const { selectedSlug } = useWorkspaceStore();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -28,7 +31,9 @@ export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean
 	});
 
 	const workspaces = Array.isArray(query.data) ? query.data : [];
-	const activeWorkspace = workspaces.find((ws) => ws.workspaceSlug === selectedSlug);
+	const activeWorkspace = workspaces.find(
+		(ws) => ws.workspaceSlug === (workspaceSlug ?? selectedSlug),
+	);
 
 	return {
 		...getWorkspaceFeatures(activeWorkspace),

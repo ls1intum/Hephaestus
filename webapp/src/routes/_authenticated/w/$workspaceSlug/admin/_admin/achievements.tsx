@@ -20,7 +20,9 @@ function AdminAchievementsContainer() {
 		isLoading: isWorkspaceLoading,
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
-	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const { workspaceSlug: routeWorkspaceSlug } = Route.useParams();
+	const { achievementsEnabled, isLoading: featuresLoading } =
+		useWorkspaceFeatures(routeWorkspaceSlug);
 
 	const usersQueryOptions = getUsersWithTeamsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },

@@ -10,7 +10,8 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 
 function PracticesLayout() {
 	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const { practicesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const { workspaceSlug: routeWorkspaceSlug } = Route.useParams();
+	const { practicesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(routeWorkspaceSlug);
 
 	if (!workspaceSlug && !isWorkspaceLoading) {
 		return <NoWorkspace />;

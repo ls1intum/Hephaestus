@@ -4,7 +4,6 @@ import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { Spinner } from "@/components/ui/spinner";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achievements")({
 	component: AchievementsPage,
@@ -16,10 +15,9 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achieveme
  */
 function AchievementsPage() {
 	const { userProfile, getUserProfilePictureUrl, username } = useAuth();
-	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
 	const { workspaceSlug } = Route.useParams();
 	const navigate = useNavigate();
-	const { achievementsEnabled, isLoading } = useWorkspaceFeatures();
+	const { achievementsEnabled, isLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	useEffect(() => {
 		if (!isLoading && !achievementsEnabled && workspaceSlug && username) {
@@ -42,7 +40,7 @@ function AchievementsPage() {
 
 	return (
 		<AchievementsView
-			workspaceSlug={selectedSlug || ""}
+			workspaceSlug={workspaceSlug}
 			targetUsername={username || ""}
 			isOwnProfile={true}
 			fallbackName={userProfile?.name || userProfile?.username}
