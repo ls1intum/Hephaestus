@@ -254,16 +254,13 @@ async function main() {
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
         const remaining = Math.floor((INITIAL_TIMEOUT_MS - SOFT_TIMEOUT_MS) / 1000);
-        const steerSlugs = loadPracticeSlugs();
-        const slugList = steerSlugs.length ? ` Practice slugs: ${steerSlugs.join(", ")}.` : "";
         console.error(`[pi-runner] Soft timeout fired — steering agent to wrap up (${remaining}s remaining)`);
         session.agent.steer({
             role: "user",
             content: [{ type: "text", text:
-                `STOP reading files. You have ${remaining}s left. ` +
-                `Write /workspace/.output/result.json NOW using the write tool. ` +
-                `Include one finding per practice. For unanalyzed practices, use POSITIVE with confidence 0.70.` +
-                slugList
+                `You have ${remaining} seconds left. ` +
+                `Finish your analysis and write /workspace/.output/result.json using the write tool. ` +
+                `For any practice you haven't fully analyzed, use POSITIVE with confidence 0.70.`
             }],
             timestamp: Date.now(),
         });
