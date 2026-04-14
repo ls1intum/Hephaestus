@@ -26,9 +26,13 @@ import {
 
 const OUTPUT = "/workspace/.output";
 const CWD = "/workspace";
-const INITIAL_TIMEOUT_MS = __INITIAL_TIMEOUT_MS__;
-const SOFT_TIMEOUT_MS = Math.max(60_000, Math.floor(INITIAL_TIMEOUT_MS * 0.75));
-const CONTINUATION_TIMEOUT_MS = __CONTINUATION_TIMEOUT_MS__;
+// Single budget from the adapter. Runner owns all splitting.
+// Production: config=600s, buffer=60s → budget=540,000ms.
+const AGENT_BUDGET_MS = __AGENT_BUDGET_MS__;
+const INITIAL_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.75));   // 75% for analysis
+const RETRY1_TIMEOUT_MS  = Math.max(30_000, Math.floor(AGENT_BUDGET_MS * 0.15));   // 15% for retry 1
+const RETRY2_TIMEOUT_MS  = Math.max(30_000, AGENT_BUDGET_MS - INITIAL_TIMEOUT_MS - RETRY1_TIMEOUT_MS); // 10% for retry 2
+const SOFT_TIMEOUT_MS    = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.50)); // nudge at 50% of initial
 
 mkdirSync(OUTPUT, { recursive: true });
 
@@ -70,11 +74,24 @@ function isValidFindingsPayload(p) {
         p.findings.some(isValidFinding) && (p.delivery == null || (typeof p.delivery === "object" && !Array.isArray(p.delivery)));
 }
 
+function lenientJsonParse(text) {
+    // Strip control characters that LLMs embed in string values (tabs, newlines).
+    // Matches the Java server's ALLOW_UNQUOTED_CONTROL_CHARS behavior.
+    try { return JSON.parse(text); } catch {}
+    const cleaned = text.replace(/[\x00-\x1f\x7f]/g, (ch) => {
+        if (ch === "\n") return "\\n";
+        if (ch === "\r") return "\\r";
+        if (ch === "\t") return "\\t";
+        return "";
+    });
+    return JSON.parse(cleaned);
+}
+
 function checkResultFile() {
     const path = `${OUTPUT}/result.json`;
     if (!existsSync(path)) return false;
     try {
-        const data = JSON.parse(readFileSync(path, "utf-8"));
+        const data = lenientJsonParse(readFileSync(path, "utf-8"));
         const valid = isValidFindingsPayload(data);
         if (!valid) {
             const hasFindings = Array.isArray(data?.findings);
@@ -130,9 +147,10 @@ function extractLastAssistantText(sessionState) {
     for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
         if (msg.role !== "assistant") continue;
-        const textBlocks = (msg.content || []).filter(c => c.type === "text");
-        const text = textBlocks.map(c => c.text).join("").trim();
-        if (!text || text.length < 50) continue;
+        // Pi SDK uses "text" and "thinking" content types — check both
+        const textBlocks = (msg.content || []).filter(c => c.type === "text" || c.type === "thinking");
+        const text = textBlocks.map(c => c.text || c.thinking || "").join("").trim();
+        if (!text || text.length < 20) continue;
         // Only return text that looks like it might contain JSON (has braces)
         if (text.includes("{") && text.includes("}")) return text;
     }
@@ -183,13 +201,32 @@ function tryRescueFromTextResponse(sessionState) {
     return checkResultFile();
 }
 
+// ── Practice slug loader (for retry scaffold) ───────────────────
+
+function loadPracticeSlugs() {
+    try {
+        const indexPath = `${CWD}/.practices/index.json`;
+        if (!existsSync(indexPath)) return [];
+        const index = JSON.parse(readFileSync(indexPath, "utf-8"));
+        if (!Array.isArray(index)) return [];
+        return index.map(p => p.slug).filter(Boolean);
+    } catch { return []; }
+}
+
+function buildRetryScaffold(slugs) {
+    if (!slugs.length) return "";
+    return `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
+        `Each needs a finding with practiceSlug, title, verdict (POSITIVE/NEGATIVE/NOT_APPLICABLE), severity, confidence, evidence, reasoning, and guidance. ` +
+        `Write the complete JSON to /workspace/.output/result.json using the write tool.`;
+}
+
 // ── Main ─────────────────────────────────────────────────────────
 
 const prompt = readFileSync("/workspace/.prompt", "utf-8").trim();
 
 async function main() {
     console.error(`[pi-runner] Embedded SDK mode`);
-    console.error(`[pi-runner] Budget: initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), continuation=${CONTINUATION_TIMEOUT_MS}ms`);
+    console.error(`[pi-runner] Budget: total=${AGENT_BUDGET_MS}ms, initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry1=${RETRY1_TIMEOUT_MS}ms, retry2=${RETRY2_TIMEOUT_MS}ms`);
 
     // Create tools scoped to /workspace
     const tools = [
@@ -217,18 +254,16 @@ async function main() {
     let hardAborted = false;
     let prevUsage = null;
 
-    // Soft timeout: inject steering message telling agent to wrap up
+    // Mid-loop nudge: remind the agent to write the output file.
+    // Production data: 4/4 success rate when this fires.
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
-        const remaining = Math.floor((INITIAL_TIMEOUT_MS - SOFT_TIMEOUT_MS) / 1000);
-        console.error(`[pi-runner] Soft timeout fired — steering agent to wrap up (${remaining}s remaining)`);
+        console.error(`[pi-runner] Soft timeout fired — nudging agent to write`);
         session.agent.steer({
             role: "user",
             content: [{ type: "text", text:
-                `⚠️ TIME WARNING: You have approximately ${remaining} seconds remaining before this session is terminated. ` +
-                `Stop exploring and write your findings NOW. Use the write tool to save /workspace/.output/result.json immediately. ` +
-                `Include findings for ALL practices — for any you haven't fully analyzed, emit POSITIVE with confidence 0.70. ` +
-                `Do NOT read any more files. Do NOT grep anything. Just write the result JSON NOW.`
+                `Finish your analysis and write /workspace/.output/result.json using the write tool. ` +
+                `For any practice you haven't fully analyzed, use POSITIVE with confidence 0.70.`
             }],
             timestamp: Date.now(),
         });
@@ -244,13 +279,14 @@ async function main() {
     // Subscribe to events for diagnostics
     const events = [];
     const unsubscribe = session.subscribe((event) => {
-        if (event.type === "tool_start") {
-            console.error(`[pi-runner] tool: ${event.tool?.name || "?"}`);
+        if (event.type === "tool_start" || event.type === "toolStart") {
+            console.error(`[pi-runner] tool: ${event.tool?.name || event.name || "?"}`);
         }
         if (event.type === "message_end" && event.message?.role === "assistant") {
             const stopReason = event.message.stopReason;
-            const toolCalls = (event.message.content || []).filter(c => c.type === "tool_use" || c.type === "tool_call").length;
-            console.error(`[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}`);
+            const types = (event.message.content || []).map(c => c.type);
+            const toolCalls = types.filter(t => t === "tool_use" || t === "tool_call" || t === "toolCall").length;
+            console.error(`[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, types=[${types}]`);
         }
         events.push({ type: event.type, timestamp: Date.now() });
     });
@@ -295,7 +331,14 @@ async function main() {
 
     // ── Validate & retry: if result.json is missing, re-prompt the agent ──
 
-    // Extract what the agent actually said
+    // Extract what the agent actually said — log message structure for diagnostics
+    const lastMsgs = (session.state.messages || []).filter(m => m.role === "assistant").slice(-2);
+    for (const m of lastMsgs) {
+        const types = (m.content || []).map(c => c.type);
+        const textLen = (m.content || []).filter(c => c.type === "text").reduce((s, c) => s + (c.text?.length || 0), 0);
+        console.error(`[pi-runner] assistant msg: stopReason=${m.stopReason}, contentTypes=[${types}], textLen=${textLen}`);
+    }
+
     const agentText = extractLastAssistantText(session.state);
     if (agentText) {
         console.error(`[pi-runner] Agent produced text (${agentText.length} chars) but no result.json`);
@@ -307,40 +350,46 @@ async function main() {
         }
     }
 
-    // Re-prompt: tell the agent exactly what went wrong
+    // Re-prompt: give the agent a concrete scaffold so it can ONLY write
     console.error(`[pi-runner] Re-prompting agent to write result.json`);
+
+    const slugs = loadPracticeSlugs();
+    const scaffold = buildRetryScaffold(slugs);
+    console.error(`[pi-runner] Loaded ${slugs.length} practice slugs for retry scaffold`);
 
     let retryAborted = false;
     const retryTimer = setTimeout(() => {
         retryAborted = true;
-        console.error(`[pi-runner] Retry hard timeout — aborting`);
+        console.error(`[pi-runner] Retry 1 hard timeout — aborting`);
         session.agent.abort();
-    }, CONTINUATION_TIMEOUT_MS);
+    }, RETRY1_TIMEOUT_MS);
 
     const retryStartMs = Date.now();
 
     // Build retry prompt based on what actually happened.
-    // Check timeout first — it's the most operationally relevant signal.
+    // Keep diagnostic branches — the recovery strategy differs by failure mode.
     let retryPrompt;
     if (softTimeoutFired || hardAborted) {
         retryPrompt =
             `You ran out of time before writing result.json. ` +
-            `Based on what you already analyzed, write the result.json file NOW using the write tool. ` +
-            `Include one finding per practice. For any you did not analyze, use POSITIVE with confidence 0.70. ` +
-            `The JSON needs a "findings" array and a "delivery.mrNote" string. ` +
-            `Write to /workspace/.output/result.json immediately. Do not explain — just call the write tool.`;
+            `Use your analysis from above and write /workspace/.output/result.json NOW using the write tool. ` +
+            `For any practice you did not fully analyze, use verdict POSITIVE with confidence 0.70.` +
+            scaffold;
     } else if (agentText) {
         retryPrompt =
-            `You completed your analysis but output the result as text instead of writing it to a file. ` +
-            `You MUST use the write tool to save the JSON to /workspace/.output/result.json. ` +
-            `The JSON needs a "findings" array and a "delivery.mrNote" string. ` +
-            `Call the write tool NOW. Do not explain — just write the file.`;
+            `You completed your analysis but did not write the output file. ` +
+            `Your analysis is done — do NOT read any more files. ` +
+            `Call the write tool NOW to save your findings to /workspace/.output/result.json. ` +
+            `The JSON needs a "findings" array and a "delivery.mrNote" string.` +
+            scaffold;
     } else {
         retryPrompt =
-            `Your previous response did not write the required output file. ` +
-            `You MUST call the write tool to save a JSON object to /workspace/.output/result.json. ` +
-            `The JSON needs a "findings" array and a "delivery.mrNote" string. ` +
-            `Do not explain — just call the write tool with the JSON.`;
+            `You did not write .output/result.json. The review will fail unless you write this file NOW. ` +
+            `Use your analysis from above. Do NOT read more files — write immediately. ` +
+            `Call the write tool to save a JSON with a "findings" array and "delivery.mrNote" string ` +
+            `to /workspace/.output/result.json. ` +
+            `For any practice you did not fully analyze, use verdict POSITIVE with confidence 0.70.` +
+            scaffold;
     }
 
     try {
@@ -368,24 +417,70 @@ async function main() {
     persistRunnerDebug();
     persistUsage();
 
-    console.error(`[pi-runner] Retry: ${(retryDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(`${OUTPUT}/result.json`)}`);
+    console.error(`[pi-runner] Retry 1: ${(retryDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(`${OUTPUT}/result.json`)}`);
+
+    if (checkResultFile()) {
+        console.error(`[pi-runner] SUCCESS: result.json valid after retry 1`);
+        unsubscribe();
+        process.exit(0);
+    }
+
+    // ── Retry 2: last chance — even more direct ─────────────────
+
+    console.error(`[pi-runner] Retry 2: final attempt`);
+
+    let retry2Aborted = false;
+    const retry2Timer = setTimeout(() => {
+        retry2Aborted = true;
+        console.error(`[pi-runner] Retry 2 hard timeout — aborting`);
+        session.agent.abort();
+    }, RETRY2_TIMEOUT_MS);
+
+    const retry2StartMs = Date.now();
+
+    try {
+        await session.prompt(
+            `The review will be discarded unless you write .output/result.json RIGHT NOW. ` +
+            `Call the write tool with the JSON. One finding per practice slug: ${slugs.join(", ")}. ` +
+            `Use your analysis. For unanalyzed practices, verdict POSITIVE, confidence 0.70. Write NOW.`
+        );
+    } catch (err) {
+        console.error(`[pi-runner] Retry 2 error: ${err.message}`);
+    }
+
+    clearTimeout(retry2Timer);
+
+    const retry2DurationMs = Date.now() - retry2StartMs;
+    const retry2Usage = extractUsageFromSession(session.state);
+    accumulateUsage(prevUsage, retry2Usage);
+
+    runnerDebug.attempts.push({
+        label: "retry2",
+        durationMs: retry2DurationMs,
+        hardAborted: retry2Aborted,
+        resultFilePresent: existsSync(`${OUTPUT}/result.json`),
+    });
+    persistRunnerDebug();
+    persistUsage();
+
+    console.error(`[pi-runner] Retry 2: ${(retry2DurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(`${OUTPUT}/result.json`)}`);
 
     unsubscribe();
 
     if (checkResultFile()) {
-        console.error(`[pi-runner] SUCCESS: result.json valid after retry`);
+        console.error(`[pi-runner] SUCCESS: result.json valid after retry 2`);
         process.exit(0);
     }
 
     // Last attempt: try to rescue from text
     if (tryRescueFromTextResponse(session.state)) {
-        console.error(`[pi-runner] SUCCESS: rescued valid JSON from retry text`);
+        console.error(`[pi-runner] SUCCESS: rescued valid JSON from text`);
         process.exit(0);
     }
 
     // ── Failed ───────────────────────────────────────────────────
 
-    console.error(`[pi-runner] FAILED: no valid result.json after initial + retry`);
+    console.error(`[pi-runner] FAILED: no valid result.json after initial + 2 retries`);
     process.exit(1);
 }
 
