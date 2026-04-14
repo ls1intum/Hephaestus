@@ -12,11 +12,6 @@
 - `.precompute-out/summary.md` — static analysis hints (optional, may not exist)
 - `repo/` — full repository checkout for exploring context around changed code
 
-## How to work
-1. Read `.context/diff_summary.md`, `.practices/all-criteria.md`, and `.practices/index.json`
-2. Analyze the diff against each practice
-3. **Write `.output/result.json` using the write tool** — one call, complete JSON
-
 ## Rules
 1. Only flag **changed** code — additions (`+` lines) and deletions (`-` lines). Context lines (no prefix) are pre-existing and not in scope. A deletion can be a finding (e.g., removing error handling). Before any NEGATIVE finding, confirm the evidence is from changed lines — if unsure, grep `diff.patch` to verify.
 2. Every practice in `.practices/index.json` must get at least one finding. Multiple NEGATIVE findings for the same practice are allowed when there are distinct violations — report each as a separate finding. Read the criteria for each practice (from `all-criteria.md`) to decide applicability — some define themselves as always applicable.

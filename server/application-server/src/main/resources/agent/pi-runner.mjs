@@ -130,9 +130,10 @@ function extractLastAssistantText(sessionState) {
     for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
         if (msg.role !== "assistant") continue;
-        const textBlocks = (msg.content || []).filter(c => c.type === "text");
-        const text = textBlocks.map(c => c.text).join("").trim();
-        if (!text || text.length < 50) continue;
+        // Pi SDK uses "text" and "thinking" content types — check both
+        const textBlocks = (msg.content || []).filter(c => c.type === "text" || c.type === "thinking");
+        const text = textBlocks.map(c => c.text || c.thinking || "").join("").trim();
+        if (!text || text.length < 20) continue;
         // Only return text that looks like it might contain JSON (has braces)
         if (text.includes("{") && text.includes("}")) return text;
     }
@@ -197,13 +198,9 @@ function loadPracticeSlugs() {
 
 function buildRetryScaffold(slugs) {
     if (!slugs.length) return "";
-    const entries = slugs.map(s =>
-        `{"practiceSlug":"${s}","title":"...","verdict":"POSITIVE","severity":"INFO","confidence":0.70,"evidence":{"locations":[],"snippets":[]},"reasoning":"...","guidance":"..."}`
-    );
-    return `\n\nHere is a template with ALL practice slugs pre-filled as POSITIVE. ` +
-        `Replace verdicts/details for practices you analyzed. ` +
-        `Write this to /workspace/.output/result.json using the write tool:\n` +
-        `{"findings":[${entries.join(",")}],"delivery":{"mrNote":"Summary of the review."}}`;
+    return `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
+        `Each needs a finding with practiceSlug, title, verdict (POSITIVE/NEGATIVE/NOT_APPLICABLE), severity, confidence, evidence, reasoning, and guidance. ` +
+        `Write the complete JSON to /workspace/.output/result.json using the write tool.`;
 }
 
 // ── Main ─────────────────────────────────────────────────────────
@@ -274,8 +271,9 @@ async function main() {
         }
         if (event.type === "message_end" && event.message?.role === "assistant") {
             const stopReason = event.message.stopReason;
-            const toolCalls = (event.message.content || []).filter(c => c.type === "tool_use" || c.type === "tool_call").length;
-            console.error(`[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}`);
+            const types = (event.message.content || []).map(c => c.type);
+            const toolCalls = types.filter(t => t === "tool_use" || t === "tool_call" || t === "toolCall").length;
+            console.error(`[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, types=[${types}]`);
         }
         events.push({ type: event.type, timestamp: Date.now() });
     });
@@ -320,7 +318,14 @@ async function main() {
 
     // ── Validate & retry: if result.json is missing, re-prompt the agent ──
 
-    // Extract what the agent actually said
+    // Extract what the agent actually said — log message structure for diagnostics
+    const lastMsgs = (session.state.messages || []).filter(m => m.role === "assistant").slice(-2);
+    for (const m of lastMsgs) {
+        const types = (m.content || []).map(c => c.type);
+        const textLen = (m.content || []).filter(c => c.type === "text").reduce((s, c) => s + (c.text?.length || 0), 0);
+        console.error(`[pi-runner] assistant msg: stopReason=${m.stopReason}, contentTypes=[${types}], textLen=${textLen}`);
+    }
+
     const agentText = extractLastAssistantText(session.state);
     if (agentText) {
         console.error(`[pi-runner] Agent produced text (${agentText.length} chars) but no result.json`);
@@ -348,14 +353,29 @@ async function main() {
 
     const retryStartMs = Date.now();
 
-    // The retry prompt must be IMPOSSIBLE to misinterpret.
-    // Do NOT read any more files. Do NOT analyze anything. Just write.
-    const retryPrompt =
-        `STOP. You did not write .output/result.json. The review FAILED. ` +
-        `Your ONLY action now: call the write tool to create /workspace/.output/result.json. ` +
-        `Do NOT read files. Do NOT grep. Do NOT explain. Just write the JSON. ` +
-        `Use your analysis from above. For any practice you did not fully analyze, use verdict POSITIVE with confidence 0.70.` +
-        scaffold;
+    // Build retry prompt based on what actually happened.
+    // Keep diagnostic branches — the recovery strategy differs by failure mode.
+    let retryPrompt;
+    if (softTimeoutFired || hardAborted) {
+        retryPrompt =
+            `You ran out of time before writing result.json. ` +
+            `Use your analysis from above and write /workspace/.output/result.json NOW using the write tool. ` +
+            `For any practice you did not fully analyze, use verdict POSITIVE with confidence 0.70.` +
+            scaffold;
+    } else if (agentText) {
+        retryPrompt =
+            `You completed your analysis but output the result as text instead of writing it to a file. ` +
+            `Take your analysis and write it to /workspace/.output/result.json using the write tool. ` +
+            `The JSON needs a "findings" array and a "delivery.mrNote" string.` +
+            scaffold;
+    } else {
+        retryPrompt =
+            `You did not write .output/result.json. The review will fail unless you write this file. ` +
+            `Use your analysis from above. If you need to re-check a detail, you may read a file, ` +
+            `but prioritize writing /workspace/.output/result.json immediately using the write tool. ` +
+            `For any practice you did not fully analyze, use verdict POSITIVE with confidence 0.70.` +
+            scaffold;
+    }
 
     try {
         await session.prompt(retryPrompt);

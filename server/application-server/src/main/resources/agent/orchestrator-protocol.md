@@ -2,7 +2,7 @@
 
 Canonical protocol for practice-aware code review. Both Claude Code and OpenCode follow this.
 
-**Your ONLY deliverable: use the write tool to save the result JSON to `.output/result.json`.** If this file is not written, the review fails. Do NOT output JSON as text.
+**Your ONLY deliverable: call the write tool to save `.output/result.json`.** If you do not write this file, the review fails and nothing gets delivered. Do NOT output JSON as text — you MUST use the write tool.
 
 ## Workspace Layout
 
