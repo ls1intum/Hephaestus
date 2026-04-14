@@ -21,7 +21,7 @@ public record AgentResult(boolean success, Map<String, Object> output, @Nullable
     }
 
     /**
-     * LLM usage as reported by the agent (OpenCode step-finish, Claude Code result).
+     * LLM usage as reported by the agent runtime.
      */
     public record LlmUsage(
         @Nullable String model,

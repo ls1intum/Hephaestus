@@ -289,7 +289,7 @@ class AgentAdapterRequestTest extends BaseUnitTest {
         @DisplayName("should accept valid API key request")
         void shouldAcceptValidApiKeyRequest() {
             var request = new AgentAdapterRequest(
-                AgentType.OPENCODE,
+                AgentType.PI,
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
                 "o3",

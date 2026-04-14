@@ -657,7 +657,7 @@ public class AgentJobExecutor {
                     // "delivery not attempted yet" from "no delivery needed"
                     freshJob.setDeliveryStatus(DeliveryStatus.PENDING);
                 }
-                // Primary: agent-reported usage (from OpenCode step-finish / Claude Code result)
+                // Primary: agent-reported usage from the runtime-specific result payload
                 var agentUsage = agentResult.usage();
                 if (agentUsage != null && agentUsage.totalCalls() > 0) {
                     freshJob.setLlmTotalCalls(agentUsage.totalCalls());

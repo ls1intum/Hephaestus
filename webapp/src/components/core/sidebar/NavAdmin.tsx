@@ -1,5 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { BookUser, ClipboardCheck, Map as MapIcon, Settings2, Trophy, Users } from "lucide-react";
+import {
+	BookUser,
+	Bot,
+	ClipboardCheck,
+	Map as MapIcon,
+	Settings2,
+	Trophy,
+	Users,
+} from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -58,6 +66,19 @@ export function NavAdmin({
 						>
 							<Trophy />
 							<span>Manage achievements</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
+				{practicesEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Manage review agents"
+							render={
+								<Link to="/w/$workspaceSlug/admin/agents" params={{ workspaceSlug }} search={{}} />
+							}
+						>
+							<Bot />
+							<span>Manage review agents</span>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}

@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.agent;
 
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigCredentialModeException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigHasActiveJobsException;
+import de.tum.in.www1.hephaestus.agent.config.AgentConfigMissingCredentialException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigNameConflictException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigProviderMismatchException;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobStateConflictException;
@@ -40,6 +41,11 @@ public class AgentControllerAdvice {
     @ExceptionHandler(AgentConfigCredentialModeException.class)
     ProblemDetail handleAgentConfigCredentialMode(AgentConfigCredentialModeException exception) {
         return problem(HttpStatus.BAD_REQUEST, "Invalid credential mode", exception.getMessage());
+    }
+
+    @ExceptionHandler(AgentConfigMissingCredentialException.class)
+    ProblemDetail handleAgentConfigMissingCredential(AgentConfigMissingCredentialException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "Missing agent credential", exception.getMessage());
     }
 
     @ExceptionHandler(AgentJobStateConflictException.class)

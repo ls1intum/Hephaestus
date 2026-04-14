@@ -17,7 +17,7 @@ import java.util.UUID;
  * underlying {@link SandboxManager}.
  *
  * @param jobId unique job identifier (used for labels, network naming, logging)
- * @param image Docker image to run (e.g. {@code ghcr.io/ls1intum/hephaestus/agent-opencode:latest})
+ * @param image Docker image to run (e.g. {@code ghcr.io/ls1intum/hephaestus/agent-pi:latest})
  * @param command container command + arguments
  * @param environment environment variables injected into the container
  * @param networkPolicy network access and LLM proxy configuration

@@ -37,12 +37,13 @@ public class AgentConfigService {
 
     @Transactional
     public AgentConfig createConfig(WorkspaceContext workspaceContext, CreateAgentConfigRequestDTO request) {
+        String normalizedName = normalizeRequiredName(request.name());
         validateProviderCompatibility(request.agentType(), request.llmProvider());
 
         Long workspaceId = workspaceContext.id();
-        if (agentConfigRepository.existsByWorkspaceIdAndName(workspaceId, request.name())) {
+        if (agentConfigRepository.existsByWorkspaceIdAndName(workspaceId, normalizedName)) {
             throw new AgentConfigNameConflictException(
-                "An agent config with name '" + request.name() + "' already exists in this workspace."
+                "An agent config with name '" + normalizedName + "' already exists in this workspace."
             );
         }
 
@@ -52,19 +53,16 @@ public class AgentConfigService {
 
         AgentConfig config = new AgentConfig();
         config.setWorkspace(workspace);
-        config.setName(request.name());
+        config.setName(normalizedName);
         config.setAgentType(request.agentType());
         config.setLlmProvider(request.llmProvider());
 
         if (request.enabled() != null) {
             config.setEnabled(request.enabled());
         }
-        if (request.modelName() != null) {
-            config.setModelName(request.modelName());
-        }
-        if (request.llmApiKey() != null) {
-            config.setLlmApiKey(request.llmApiKey());
-        }
+        config.setModelName(normalizeOptional(request.modelName()));
+        config.setModelVersion(normalizeOptional(request.modelVersion()));
+        config.setLlmApiKey(normalizeOptional(request.llmApiKey()));
         if (request.timeoutSeconds() != null) {
             config.setTimeoutSeconds(request.timeoutSeconds());
         }
@@ -98,6 +96,19 @@ public class AgentConfigService {
         LlmProvider effectiveProvider = request.llmProvider() != null ? request.llmProvider() : config.getLlmProvider();
         validateProviderCompatibility(effectiveType, effectiveProvider);
 
+        if (request.name() != null) {
+            String normalizedName = normalizeRequiredName(request.name());
+            if (
+                !normalizedName.equals(config.getName()) &&
+                agentConfigRepository.existsByWorkspaceIdAndName(workspaceContext.id(), normalizedName)
+            ) {
+                throw new AgentConfigNameConflictException(
+                    "An agent config with name '" + normalizedName + "' already exists in this workspace."
+                );
+            }
+            config.setName(normalizedName);
+        }
+
         if (request.agentType() != null) {
             config.setAgentType(request.agentType());
         }
@@ -107,11 +118,20 @@ public class AgentConfigService {
         if (request.enabled() != null) {
             config.setEnabled(request.enabled());
         }
-        if (request.modelName() != null) {
-            config.setModelName(request.modelName());
+        if (Boolean.TRUE.equals(request.clearModelName())) {
+            config.setModelName(null);
+        } else if (request.modelName() != null) {
+            config.setModelName(normalizeOptional(request.modelName()));
         }
-        if (request.llmApiKey() != null) {
-            config.setLlmApiKey(request.llmApiKey());
+        if (Boolean.TRUE.equals(request.clearModelVersion())) {
+            config.setModelVersion(null);
+        } else if (request.modelVersion() != null) {
+            config.setModelVersion(normalizeOptional(request.modelVersion()));
+        }
+        if (Boolean.TRUE.equals(request.clearLlmApiKey())) {
+            config.setLlmApiKey(null);
+        } else if (request.llmApiKey() != null) {
+            config.setLlmApiKey(normalizeOptional(request.llmApiKey()));
         }
         if (request.timeoutSeconds() != null) {
             config.setTimeoutSeconds(request.timeoutSeconds());
@@ -154,8 +174,16 @@ public class AgentConfigService {
      * Validates that direct credential modes (API_KEY, OAUTH) have internet access enabled.
      */
     private void validateCredentialMode(AgentConfig config) {
+        if (config.getAgentType() == AgentType.PI && config.getCredentialMode() == CredentialMode.OAUTH) {
+            throw new AgentConfigCredentialModeException(
+                "Pi does not support OAuth credentials. Use Proxy or API key instead."
+            );
+        }
         if (config.getCredentialMode() != CredentialMode.PROXY && !config.isAllowInternet()) {
             throw new AgentConfigCredentialModeException(config.getCredentialMode());
+        }
+        if (config.getCredentialMode() != CredentialMode.PROXY && normalizeOptional(config.getLlmApiKey()) == null) {
+            throw new AgentConfigMissingCredentialException(config.getCredentialMode());
         }
     }
 
@@ -166,9 +194,25 @@ public class AgentConfigService {
                     throw new AgentConfigProviderMismatchException(agentType, LlmProvider.ANTHROPIC, provider);
                 }
             }
-            case OPENCODE, PI -> {
+            case PI -> {
                 /* any provider is valid */
             }
         }
+    }
+
+    private String normalizeRequiredName(String value) {
+        String normalized = normalizeOptional(value);
+        if (normalized == null) {
+            throw new IllegalArgumentException("Agent config name is required");
+        }
+        return normalized;
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 }

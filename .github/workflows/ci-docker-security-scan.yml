@@ -38,10 +38,7 @@ jobs:
               name: "agent-claude-code",
               image: "ghcr.io/ls1intum/hephaestus/agent-claude-code",
             }
-          - {
-              name: "agent-opencode",
-              image: "ghcr.io/ls1intum/hephaestus/agent-opencode",
-            }
+          - { name: "agent-pi", image: "ghcr.io/ls1intum/hephaestus/agent-pi" }
 
     steps:
       - name: Checkout code

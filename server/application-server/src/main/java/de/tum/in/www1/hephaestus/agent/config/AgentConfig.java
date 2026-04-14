@@ -38,7 +38,7 @@ import lombok.ToString;
  * <h2>Provider Compatibility</h2>
  * <ul>
  *   <li>{@link AgentType#CLAUDE_CODE} requires {@link LlmProvider#ANTHROPIC}</li>
- *   <li>{@link AgentType#OPENCODE} accepts any provider</li>
+ *   <li>{@link AgentType#PI} accepts any provider</li>
  * </ul>
  *
  * @see AgentConfigService for CRUD operations and provider validation

@@ -565,11 +565,23 @@ export type UpdateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType?: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
+    agentType?: 'CLAUDE_CODE' | 'PI';
     /**
      * Whether agent containers have internet access
      */
     allowInternet?: boolean;
+    /**
+     * Clear the stored LLM API key
+     */
+    clearLlmApiKey?: boolean;
+    /**
+     * Clear the stored model name
+     */
+    clearModelName?: boolean;
+    /**
+     * Clear the stored model version
+     */
+    clearModelVersion?: boolean;
     /**
      * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
      */
@@ -594,6 +606,14 @@ export type UpdateAgentConfigRequest = {
      * LLM model name
      */
     modelName?: string;
+    /**
+     * Model version or snapshot date
+     */
+    modelVersion?: string;
+    /**
+     * Unique name within the workspace
+     */
+    name?: string;
     /**
      * Job timeout in seconds
      */
@@ -1210,6 +1230,26 @@ export type AgentJob = {
      */
     completedAt?: Date;
     /**
+     * Frozen agent type at submit time
+     */
+    configAgentType?: string;
+    /**
+     * Frozen provider at submit time
+     */
+    configLlmProvider?: string;
+    /**
+     * Frozen model name at submit time
+     */
+    configModelName?: string;
+    /**
+     * Frozen model version at submit time
+     */
+    configModelVersion?: string;
+    /**
+     * Frozen config name at submit time
+     */
+    configName?: string;
+    /**
      * Frozen agent config at submit time
      */
     configSnapshot: unknown;
@@ -1686,7 +1726,7 @@ export type CreateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
+    agentType: 'CLAUDE_CODE' | 'PI';
     /**
      * Whether agent containers have internet access
      */
@@ -1715,6 +1755,10 @@ export type CreateAgentConfigRequest = {
      * LLM model name
      */
     modelName?: string;
+    /**
+     * Model version or snapshot date
+     */
+    modelVersion?: string;
     /**
      * Unique name within the workspace
      */
@@ -1836,7 +1880,7 @@ export type AgentConfig = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
+    agentType: 'CLAUDE_CODE' | 'PI';
     /**
      * Whether agent containers have internet access
      */
@@ -1873,6 +1917,10 @@ export type AgentConfig = {
      * LLM model name
      */
     modelName?: string;
+    /**
+     * Model version or snapshot date
+     */
+    modelVersion?: string;
     /**
      * Unique name within the workspace
      */

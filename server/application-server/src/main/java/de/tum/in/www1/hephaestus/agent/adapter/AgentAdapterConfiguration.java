@@ -22,11 +22,6 @@ public class AgentAdapterConfiguration {
     }
 
     @Bean
-    public AgentAdapter openCodeAgentAdapter(ObjectMapper objectMapper) {
-        return new OpenCodeAgentAdapter(objectMapper);
-    }
-
-    @Bean
     public AgentAdapter piAgentAdapter(ObjectMapper objectMapper) {
         return new PiAgentAdapter(objectMapper);
     }

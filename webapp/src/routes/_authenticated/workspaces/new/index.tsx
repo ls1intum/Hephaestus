@@ -16,7 +16,7 @@ interface Provider {
 	name: string;
 	description: string;
 	icon: LucideIcon;
-	to: string;
+	to: "/workspaces/new/github" | "/workspaces/new/gitlab";
 }
 
 function ProviderSelectionPage() {

@@ -53,7 +53,7 @@ public class ContainerSecurityPolicy {
         "/run",
         "rw,noexec,nosuid,nodev,size=67108864",
         "/home/agent/.local",
-        "rw,exec,nosuid,nodev,size=1073741824" // exec allowed: OpenCode downloads rg/tools here at runtime
+        "rw,exec,nosuid,nodev,size=1073741824" // exec allowed: agent CLIs may load native helpers at runtime
     );
 
     private final SandboxProperties properties;

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="1776100000000-1" author="hephaestus">
+        <comment>Migrate legacy OpenCode agent configs and frozen snapshots to Pi.</comment>
+        <sql>
+            UPDATE agent_config
+            SET agent_type = 'PI'
+            WHERE agent_type = 'OPENCODE';
+
+            UPDATE agent_job
+            SET config_snapshot = jsonb_set(config_snapshot, '{agentType}', '"PI"'::jsonb, false)
+            WHERE config_snapshot IS NOT NULL
+              AND config_snapshot -&gt;&gt; 'agentType' = 'OPENCODE';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

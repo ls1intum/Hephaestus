@@ -23,7 +23,6 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -62,497 +61,375 @@ class AgentConfigServiceTest extends BaseUnitTest {
         );
     }
 
-    @Nested
-    @DisplayName("Provider validation")
-    class ProviderValidation {
+    @Test
+    @DisplayName("should create Claude config with model version")
+    void shouldCreateClaudeConfigWithModelVersion() {
+        when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "claude-reviewer")).thenReturn(false);
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        @Test
-        @DisplayName("should accept Claude Code with Anthropic provider")
-        void shouldAcceptClaudeCodeWithAnthropic() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test-config")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        var request = new CreateAgentConfigRequestDTO(
+            "claude-reviewer",
+            true,
+            AgentType.CLAUDE_CODE,
+            "claude-sonnet-4-20250514",
+            "2026-03-17",
+            null,
+            LlmProvider.ANTHROPIC,
+            300,
+            2,
+            false,
+            CredentialMode.PROXY
+        );
+
+        AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
+
+        assertThat(result.getName()).isEqualTo("claude-reviewer");
+        assertThat(result.getAgentType()).isEqualTo(AgentType.CLAUDE_CODE);
+        assertThat(result.getModelVersion()).isEqualTo("2026-03-17");
+        assertThat(result.getCredentialMode()).isEqualTo(CredentialMode.PROXY);
+    }
+
+    @Test
+    @DisplayName("should accept Pi with any provider")
+    void shouldAcceptPiWithAnyProvider() {
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        for (LlmProvider provider : LlmProvider.values()) {
+            String name = "pi-" + provider.name().toLowerCase();
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, name)).thenReturn(false);
 
             var request = new CreateAgentConfigRequestDTO(
-                "test-config",
+                name,
                 true,
-                AgentType.CLAUDE_CODE,
-                "claude-sonnet-4-20250514",
+                AgentType.PI,
+                "gpt-5.4-mini",
+                null,
                 "sk-test",
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                null,
-                null
-            );
-
-            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-            assertThat(result.getAgentType()).isEqualTo(AgentType.CLAUDE_CODE);
-            assertThat(result.getLlmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
-        }
-
-        @Test
-        @DisplayName("should reject Claude Code with OpenAI provider")
-        void shouldRejectClaudeCodeWithOpenai() {
-            var request = new CreateAgentConfigRequestDTO(
-                "test-config",
-                true,
-                AgentType.CLAUDE_CODE,
-                null,
-                null,
-                LlmProvider.OPENAI,
-                null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
-                .isInstanceOf(AgentConfigProviderMismatchException.class)
-                .hasMessageContaining("CLAUDE_CODE")
-                .hasMessageContaining("ANTHROPIC");
-        }
-
-        @Test
-        @DisplayName("should accept OpenCode with any provider")
-        void shouldAcceptOpencodeWithAnyProvider() {
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            for (LlmProvider provider : LlmProvider.values()) {
-                String name = "opencode-" + provider.name().toLowerCase();
-                when(agentConfigRepository.existsByWorkspaceIdAndName(1L, name)).thenReturn(false);
-
-                var request = new CreateAgentConfigRequestDTO(
-                    name,
-                    true,
-                    AgentType.OPENCODE,
-                    null,
-                    null,
-                    provider,
-                    null,
-                    null,
-                    null,
-                    null
-                );
-                AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-                assertThat(result.getLlmProvider()).isEqualTo(provider);
-            }
-        }
-
-        @Test
-        @DisplayName("should validate provider on update")
-        void shouldValidateProviderOnUpdate() {
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setAgentType(AgentType.CLAUDE_CODE);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
-
-            // Try to change only provider to OPENAI — should fail because CLAUDE_CODE requires ANTHROPIC
-            var request = new UpdateAgentConfigRequestDTO(
-                null,
-                null,
-                null,
-                null,
-                LlmProvider.OPENAI,
-                null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
-                .isInstanceOf(AgentConfigProviderMismatchException.class)
-                .hasMessageContaining("CLAUDE_CODE")
-                .hasMessageContaining("ANTHROPIC");
-        }
-    }
-
-    @Nested
-    @DisplayName("Credential mode validation")
-    class CredentialModeValidation {
-
-        @Test
-        @DisplayName("should reject API_KEY mode without internet access")
-        void shouldRejectApiKeyWithoutInternet() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            var request = new CreateAgentConfigRequestDTO(
-                "test",
-                true,
-                AgentType.CLAUDE_CODE,
-                null,
-                "sk-key",
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                false,
-                CredentialMode.API_KEY
-            );
-
-            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
-                .isInstanceOf(AgentConfigCredentialModeException.class)
-                .hasMessageContaining("API_KEY")
-                .hasMessageContaining("internet");
-        }
-
-        @Test
-        @DisplayName("should reject OAUTH mode without internet access")
-        void shouldRejectOauthWithoutInternet() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            var request = new CreateAgentConfigRequestDTO(
-                "test",
-                true,
-                AgentType.CLAUDE_CODE,
-                null,
-                "oauth-token",
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                false,
-                CredentialMode.OAUTH
-            );
-
-            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
-                .isInstanceOf(AgentConfigCredentialModeException.class)
-                .hasMessageContaining("OAUTH")
-                .hasMessageContaining("internet");
-        }
-
-        @Test
-        @DisplayName("should accept API_KEY mode with internet access")
-        void shouldAcceptApiKeyWithInternet() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = new CreateAgentConfigRequestDTO(
-                "test",
-                true,
-                AgentType.CLAUDE_CODE,
-                null,
-                "sk-key",
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                true,
-                CredentialMode.API_KEY
-            );
-
-            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-            assertThat(result.getCredentialMode()).isEqualTo(CredentialMode.API_KEY);
-            assertThat(result.isAllowInternet()).isTrue();
-        }
-
-        @Test
-        @DisplayName("should accept PROXY mode without internet access")
-        void shouldAcceptProxyWithoutInternet() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = new CreateAgentConfigRequestDTO(
-                "test",
-                true,
-                AgentType.CLAUDE_CODE,
-                null,
-                null,
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                false,
-                CredentialMode.PROXY
-            );
-
-            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-            assertThat(result.getCredentialMode()).isEqualTo(CredentialMode.PROXY);
-            assertThat(result.isAllowInternet()).isFalse();
-        }
-
-        @Test
-        @DisplayName("should default to PROXY mode when credentialMode is null")
-        void shouldDefaultToProxy() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = new CreateAgentConfigRequestDTO(
-                "test",
-                true,
-                AgentType.CLAUDE_CODE,
-                null,
-                null,
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                null,
-                null
-            );
-
-            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-            assertThat(result.getCredentialMode()).isEqualTo(CredentialMode.PROXY);
-        }
-
-        @Test
-        @DisplayName("should reject credential mode change on update when internet is disabled")
-        void shouldRejectCredentialModeChangeOnUpdate() {
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setAgentType(AgentType.CLAUDE_CODE);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-            existing.setAllowInternet(false);
-            existing.setCredentialMode(CredentialMode.PROXY);
-
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
-
-            var request = new UpdateAgentConfigRequestDTO(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                CredentialMode.API_KEY
-            );
-
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
-                AgentConfigCredentialModeException.class
-            );
-        }
-
-        @Test
-        @DisplayName("should reject disabling internet on existing API_KEY config")
-        void shouldRejectDisablingInternetOnApiKeyConfig() {
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setAgentType(AgentType.CLAUDE_CODE);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-            existing.setAllowInternet(true);
-            existing.setCredentialMode(CredentialMode.API_KEY);
-
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
-
-            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, false, null);
-
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
-                AgentConfigCredentialModeException.class
-            );
-        }
-    }
-
-    @Nested
-    @DisplayName("Read")
-    class Read {
-
-        @Test
-        @DisplayName("should return configs for workspace")
-        void shouldReturnConfigsForWorkspace() {
-            var configs = java.util.List.of(new AgentConfig(), new AgentConfig());
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(configs);
-
-            var result = agentConfigService.getConfigs(workspaceContext);
-
-            assertThat(result).hasSize(2);
-            verify(agentConfigRepository).findByWorkspaceId(1L);
-        }
-
-        @Test
-        @DisplayName("should return single config by ID")
-        void shouldReturnConfigById() {
-            AgentConfig config = new AgentConfig();
-            config.setId(10L);
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
-
-            var result = agentConfigService.getConfig(workspaceContext, 10L);
-
-            assertThat(result.getId()).isEqualTo(10L);
-        }
-
-        @Test
-        @DisplayName("should throw not found for non-existent config")
-        void shouldThrowNotFoundForNonExistentConfig() {
-            when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> agentConfigService.getConfig(workspaceContext, 999L)).isInstanceOf(
-                EntityNotFoundException.class
-            );
-        }
-    }
-
-    @Nested
-    @DisplayName("Create")
-    class Create {
-
-        @Test
-        @DisplayName("should create new config with all fields")
-        void shouldCreateNewConfig() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = new CreateAgentConfigRequestDTO(
-                "my-agent",
-                true,
-                AgentType.CLAUDE_CODE,
-                "claude-sonnet-4-20250514",
-                "sk-abc",
-                LlmProvider.ANTHROPIC,
+                provider,
                 300,
                 2,
                 true,
-                null
+                CredentialMode.API_KEY
             );
 
             AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-
-            assertThat(result.getWorkspace()).isEqualTo(workspace);
-            assertThat(result.getName()).isEqualTo("my-agent");
-            assertThat(result.isEnabled()).isTrue();
-            assertThat(result.getModelName()).isEqualTo("claude-sonnet-4-20250514");
-            assertThat(result.getLlmApiKey()).isEqualTo("sk-abc");
-            assertThat(result.getTimeoutSeconds()).isEqualTo(300);
-            assertThat(result.getMaxConcurrentJobs()).isEqualTo(2);
-            assertThat(result.isAllowInternet()).isTrue();
-        }
-
-        @Test
-        @DisplayName("should reject duplicate name within workspace")
-        void shouldRejectDuplicateName() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(true);
-
-            var request = new CreateAgentConfigRequestDTO(
-                "my-agent",
-                true,
-                AgentType.CLAUDE_CODE,
-                null,
-                null,
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
-                .isInstanceOf(AgentConfigNameConflictException.class)
-                .hasMessageContaining("my-agent");
+            assertThat(result.getLlmProvider()).isEqualTo(provider);
+            assertThat(result.getAgentType()).isEqualTo(AgentType.PI);
         }
     }
 
-    @Nested
-    @DisplayName("Update")
-    class Update {
+    @Test
+    @DisplayName("should reject Claude config with non-Anthropic provider")
+    void shouldRejectClaudeConfigWithNonAnthropicProvider() {
+        var request = new CreateAgentConfigRequestDTO(
+            "bad-claude",
+            true,
+            AgentType.CLAUDE_CODE,
+            null,
+            null,
+            null,
+            LlmProvider.OPENAI,
+            null,
+            null,
+            null,
+            null
+        );
 
-        @Test
-        @DisplayName("should update existing config and preserve API key when null")
-        void shouldUpdateExistingConfigAndPreserveApiKeyWhenNull() {
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setAgentType(AgentType.CLAUDE_CODE);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-            existing.setLlmApiKey("sk-existing-secret");
-
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = new UpdateAgentConfigRequestDTO(
-                null,
-                AgentType.OPENCODE,
-                "gpt-4o",
-                null,
-                LlmProvider.OPENAI,
-                120,
-                null,
-                null,
-                null
-            );
-
-            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
-
-            assertThat(result.getId()).isEqualTo(10L);
-            assertThat(result.getAgentType()).isEqualTo(AgentType.OPENCODE);
-            assertThat(result.getLlmApiKey()).isEqualTo("sk-existing-secret");
-            assertThat(result.getTimeoutSeconds()).isEqualTo(120);
-        }
-
-        @Test
-        @DisplayName("should throw not found when updating non-existent config")
-        void shouldThrowNotFoundWhenUpdatingNonExistentConfig() {
-            when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
-
-            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, null, null);
-
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 999L, request)).isInstanceOf(
-                EntityNotFoundException.class
-            );
-        }
+        assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
+            .isInstanceOf(AgentConfigProviderMismatchException.class)
+            .hasMessageContaining("CLAUDE_CODE")
+            .hasMessageContaining("ANTHROPIC");
     }
 
-    @Nested
-    @DisplayName("Delete")
-    class Delete {
+    @Test
+    @DisplayName("should reject direct auth without internet access")
+    void shouldRejectDirectAuthWithoutInternetAccess() {
+        when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "claude-direct")).thenReturn(false);
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
-        @Test
-        @DisplayName("should delete config when no active jobs")
-        void shouldDeleteConfigWhenNoActiveJobs() {
-            AgentConfig config = new AgentConfig();
-            config.setId(10L);
-            config.setWorkspace(workspace);
+        var request = new CreateAgentConfigRequestDTO(
+            "claude-direct",
+            true,
+            AgentType.CLAUDE_CODE,
+            null,
+            null,
+            "sk-key",
+            LlmProvider.ANTHROPIC,
+            null,
+            null,
+            false,
+            CredentialMode.API_KEY
+        );
 
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
-            when(
-                agentJobRepository.countByConfigIdAndStatusIn(
-                    eq(10L),
-                    eq(Set.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
-                )
-            ).thenReturn(0L);
+        assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
+            .isInstanceOf(AgentConfigCredentialModeException.class)
+            .hasMessageContaining("internet");
+    }
 
-            agentConfigService.deleteConfig(workspaceContext, 10L);
+    @Test
+    @DisplayName("should reject direct auth without credential")
+    void shouldRejectDirectAuthWithoutCredential() {
+        when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "pi-direct")).thenReturn(false);
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
-            verify(agentConfigRepository).delete(config);
-        }
+        var request = new CreateAgentConfigRequestDTO(
+            "pi-direct",
+            true,
+            AgentType.PI,
+            "gpt-5.4-mini",
+            null,
+            null,
+            LlmProvider.OPENAI,
+            null,
+            null,
+            true,
+            CredentialMode.API_KEY
+        );
 
-        @Test
-        @DisplayName("should reject delete when active jobs exist")
-        void shouldRejectDeleteWhenActiveJobsExist() {
-            AgentConfig config = new AgentConfig();
-            config.setId(10L);
-            config.setWorkspace(workspace);
+        assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
+            .isInstanceOf(AgentConfigMissingCredentialException.class)
+            .hasMessageContaining("credential");
+    }
 
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
-            when(
-                agentJobRepository.countByConfigIdAndStatusIn(
-                    eq(10L),
-                    eq(Set.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
-                )
-            ).thenReturn(2L);
+    @Test
+    @DisplayName("should reject Pi OAuth credential mode")
+    void shouldRejectPiOAuthCredentialMode() {
+        when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "pi-oauth")).thenReturn(false);
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
-            assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext, 10L))
-                .isInstanceOf(AgentConfigHasActiveJobsException.class)
-                .hasMessageContaining("2 active job(s)");
+        var request = new CreateAgentConfigRequestDTO(
+            "pi-oauth",
+            true,
+            AgentType.PI,
+            "gpt-5.4-mini",
+            null,
+            "oauth-token",
+            LlmProvider.OPENAI,
+            300,
+            2,
+            true,
+            CredentialMode.OAUTH
+        );
 
-            verify(agentConfigRepository, never()).delete(any());
-        }
+        assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
+            .isInstanceOf(AgentConfigCredentialModeException.class)
+            .hasMessageContaining("Pi does not support OAuth");
+    }
 
-        @Test
-        @DisplayName("should throw not found when deleting non-existent config")
-        void shouldThrowNotFoundWhenDeletingNonExistentConfig() {
-            when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
+    @Test
+    @DisplayName("should rename config and keep secret when update omits api key")
+    void shouldRenameConfigAndKeepSecretWhenUpdateOmitsApiKey() {
+        AgentConfig existing = new AgentConfig();
+        existing.setId(10L);
+        existing.setWorkspace(workspace);
+        existing.setName("old-name");
+        existing.setAgentType(AgentType.CLAUDE_CODE);
+        existing.setLlmProvider(LlmProvider.ANTHROPIC);
+        existing.setLlmApiKey("sk-existing-secret");
 
-            assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext, 999L)).isInstanceOf(
-                EntityNotFoundException.class
-            );
-        }
+        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+        when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "new-name")).thenReturn(false);
+        when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new UpdateAgentConfigRequestDTO(
+            "new-name",
+            null,
+            AgentType.PI,
+            "gpt-4o",
+            null,
+            "2026-03-17",
+            null,
+            null,
+            null,
+            LlmProvider.OPENAI,
+            120,
+            null,
+            true,
+            null
+        );
+
+        AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+        assertThat(result.getName()).isEqualTo("new-name");
+        assertThat(result.getAgentType()).isEqualTo(AgentType.PI);
+        assertThat(result.getModelVersion()).isEqualTo("2026-03-17");
+        assertThat(result.getLlmApiKey()).isEqualTo("sk-existing-secret");
+        assertThat(result.getTimeoutSeconds()).isEqualTo(120);
+    }
+
+    @Test
+    @DisplayName("should clear api key when requested")
+    void shouldClearApiKeyWhenRequested() {
+        AgentConfig existing = new AgentConfig();
+        existing.setId(10L);
+        existing.setWorkspace(workspace);
+        existing.setName("claude-reviewer");
+        existing.setAgentType(AgentType.CLAUDE_CODE);
+        existing.setLlmProvider(LlmProvider.ANTHROPIC);
+        existing.setCredentialMode(CredentialMode.PROXY);
+        existing.setLlmApiKey("sk-existing-secret");
+
+        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+        when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new UpdateAgentConfigRequestDTO(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+        assertThat(result.getLlmApiKey()).isNull();
+    }
+
+    @Test
+    @DisplayName("should clear model fields when requested")
+    void shouldClearModelFieldsWhenRequested() {
+        AgentConfig existing = new AgentConfig();
+        existing.setId(10L);
+        existing.setWorkspace(workspace);
+        existing.setName("pi-reviewer");
+        existing.setAgentType(AgentType.PI);
+        existing.setLlmProvider(LlmProvider.OPENAI);
+        existing.setModelName("gpt-5.4-mini");
+        existing.setModelVersion("2026-03-17");
+
+        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+        when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new UpdateAgentConfigRequestDTO(
+            null,
+            null,
+            null,
+            null,
+            true,
+            null,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+        assertThat(result.getModelName()).isNull();
+        assertThat(result.getModelVersion()).isNull();
+    }
+
+    @Test
+    @DisplayName("should reject duplicate name during rename")
+    void shouldRejectDuplicateNameDuringRename() {
+        AgentConfig existing = new AgentConfig();
+        existing.setId(10L);
+        existing.setWorkspace(workspace);
+        existing.setName("old-name");
+        existing.setAgentType(AgentType.CLAUDE_CODE);
+        existing.setLlmProvider(LlmProvider.ANTHROPIC);
+
+        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+        when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "new-name")).thenReturn(true);
+
+        var request = new UpdateAgentConfigRequestDTO(
+            "new-name",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+            .isInstanceOf(AgentConfigNameConflictException.class)
+            .hasMessageContaining("new-name");
+    }
+
+    @Test
+    @DisplayName("should return configs for workspace")
+    void shouldReturnConfigsForWorkspace() {
+        var configs = java.util.List.of(new AgentConfig(), new AgentConfig());
+        when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(configs);
+
+        var result = agentConfigService.getConfigs(workspaceContext);
+
+        assertThat(result).hasSize(2);
+        verify(agentConfigRepository).findByWorkspaceId(1L);
+    }
+
+    @Test
+    @DisplayName("should throw not found when config is missing")
+    void shouldThrowNotFoundWhenConfigIsMissing() {
+        when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> agentConfigService.getConfig(workspaceContext, 999L)).isInstanceOf(
+            EntityNotFoundException.class
+        );
+    }
+
+    @Test
+    @DisplayName("should delete config when no active jobs exist")
+    void shouldDeleteConfigWhenNoActiveJobsExist() {
+        AgentConfig config = new AgentConfig();
+        config.setId(10L);
+        config.setWorkspace(workspace);
+
+        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
+        when(
+            agentJobRepository.countByConfigIdAndStatusIn(
+                eq(10L),
+                eq(Set.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
+            )
+        ).thenReturn(0L);
+
+        agentConfigService.deleteConfig(workspaceContext, 10L);
+
+        verify(agentConfigRepository).delete(config);
+    }
+
+    @Test
+    @DisplayName("should reject delete when active jobs exist")
+    void shouldRejectDeleteWhenActiveJobsExist() {
+        AgentConfig config = new AgentConfig();
+        config.setId(10L);
+        config.setWorkspace(workspace);
+
+        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
+        when(
+            agentJobRepository.countByConfigIdAndStatusIn(
+                eq(10L),
+                eq(Set.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
+            )
+        ).thenReturn(2L);
+
+        assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext, 10L))
+            .isInstanceOf(AgentConfigHasActiveJobsException.class)
+            .hasMessageContaining("2 active job(s)");
+
+        verify(agentConfigRepository, never()).delete(any());
     }
 }

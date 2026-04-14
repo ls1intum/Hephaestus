@@ -3074,7 +3074,6 @@ components:
           description: Type of coding agent
           enum:
           - CLAUDE_CODE
-          - OPENCODE
           - PI
         allowInternet:
           type: boolean
@@ -3115,6 +3114,10 @@ components:
           type: string
           description: LLM model name
           example: claude-sonnet-4-20250514
+        modelVersion:
+          type: string
+          description: Model version or snapshot date
+          example: 2026-03-17
         name:
           type: string
           description: Unique name within the workspace
@@ -3146,6 +3149,21 @@ components:
           type: string
           format: date-time
           description: Timestamp when the job completed
+        configAgentType:
+          type: string
+          description: Frozen agent type at submit time
+        configLlmProvider:
+          type: string
+          description: Frozen provider at submit time
+        configModelName:
+          type: string
+          description: Frozen model name at submit time
+        configModelVersion:
+          type: string
+          description: Frozen model version at submit time
+        configName:
+          type: string
+          description: Frozen config name at submit time
         configSnapshot:
           description: Frozen agent config at submit time
         containerId:
@@ -3399,7 +3417,6 @@ components:
           description: Type of coding agent
           enum:
           - CLAUDE_CODE
-          - OPENCODE
           - PI
         allowInternet:
           type: boolean
@@ -3438,6 +3455,12 @@ components:
           description: LLM model name
           example: claude-sonnet-4-20250514
           maxLength: 128
+          minLength: 0
+        modelVersion:
+          type: string
+          description: Model version or snapshot date
+          example: 2026-03-17
+          maxLength: 50
           minLength: 0
         name:
           type: string
@@ -4782,11 +4805,19 @@ components:
           description: Type of coding agent
           enum:
           - CLAUDE_CODE
-          - OPENCODE
           - PI
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
+        clearLlmApiKey:
+          type: boolean
+          description: Clear the stored LLM API key
+        clearModelName:
+          type: boolean
+          description: Clear the stored model name
+        clearModelVersion:
+          type: boolean
+          description: Clear the stored model version
         credentialMode:
           type: string
           description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
@@ -4820,6 +4851,17 @@ components:
           description: LLM model name
           example: claude-sonnet-4-20250514
           maxLength: 128
+          minLength: 0
+        modelVersion:
+          type: string
+          description: Model version or snapshot date
+          example: 2026-03-17
+          maxLength: 50
+          minLength: 0
+        name:
+          type: string
+          description: Unique name within the workspace
+          maxLength: 100
           minLength: 0
         timeoutSeconds:
           type: integer

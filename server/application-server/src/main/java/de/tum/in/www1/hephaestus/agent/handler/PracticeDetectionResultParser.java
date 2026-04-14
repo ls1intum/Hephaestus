@@ -152,8 +152,7 @@ public class PracticeDetectionResultParser {
         DeliveryContent delivery = parseDeliveryContent(root);
 
         // Step 7: Fallback — if delivery has no diffNotes, collect suggestedDiffNotes from
-        // NEGATIVE findings' raw JSON. OpenCode subagents produce per-finding suggestedDiffNotes
-        // that the orchestrator LLM often fails to aggregate into delivery.diffNotes.
+        // NEGATIVE findings' raw JSON when present on individual findings.
         if (delivery == null || delivery.diffNotes().isEmpty()) {
             List<DiffNote> fallbackNotes = collectSuggestedDiffNotes(findingsNode, valid);
             if (!fallbackNotes.isEmpty()) {
@@ -237,8 +236,8 @@ public class PracticeDetectionResultParser {
     /**
      * Fallback: collect suggestedDiffNotes from individual NEGATIVE findings when delivery.diffNotes is empty.
      *
-     * <p>OpenCode subagents produce per-finding {@code suggestedDiffNotes} arrays, but the orchestrator
-     * LLM often fails to aggregate them into {@code delivery.diffNotes}. This method scans raw finding
+     * <p>Some agent runtimes produce per-finding {@code suggestedDiffNotes} arrays, but the orchestrator
+     * may fail to aggregate them into {@code delivery.diffNotes}. This method scans raw finding
      * JSON nodes, matches them against validated NEGATIVE findings (by practiceSlug), and collects
      * their suggested diff notes — prioritizing higher severity findings, capped at {@link #MAX_DIFF_NOTES}.
      */

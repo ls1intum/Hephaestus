@@ -27,6 +27,9 @@ public record CreateAgentConfigRequestDTO(
     @Size(max = 128, message = "Model name must not exceed 128 characters")
     @Schema(description = "LLM model name", example = "claude-sonnet-4-20250514")
     String modelName,
+    @Size(max = 50, message = "Model version must not exceed 50 characters")
+    @Schema(description = "Model version or snapshot date", example = "2026-03-17")
+    String modelVersion,
     @Schema(description = "LLM API key") String llmApiKey,
     @NotNull(message = "LLM provider is required")
     @Schema(description = "LLM provider", requiredMode = Schema.RequiredMode.REQUIRED)

@@ -142,27 +142,6 @@ jobs:
         org.opencontainers.image.licenses=MIT
         hephaestus.component=agent-claude-code
 
-  agent-opencode-build:
-    name: "Agent: OpenCode"
-    if: inputs.should_skip != 'true' && inputs.agent_images_changed == 'true'
-    uses: ./.github/workflows/reusable-docker-build.yml
-    with:
-      image-name: "ls1intum/hephaestus/agent-opencode"
-      docker-file: "./docker/agents/opencode/Dockerfile"
-      docker-context: "./docker/agents"
-      registry: "ghcr.io"
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Agent - OpenCode
-        org.opencontainers.image.description=Sandboxed OpenCode CLI agent for AI-powered code review
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=agent-opencode
-
   agent-pi-build:
     name: "Agent: Pi"
     if: inputs.should_skip != 'true' && inputs.agent_images_changed == 'true'

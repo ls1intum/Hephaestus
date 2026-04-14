@@ -1,6 +1,6 @@
 # Practice Review Protocol
 
-Canonical protocol for practice-aware code review. Both Claude Code and OpenCode follow this.
+Canonical protocol for practice-aware code review. Both Claude Code and Pi follow this.
 
 ## Workspace Layout
 
@@ -30,49 +30,51 @@ Canonical protocol for practice-aware code review. Both Claude Code and OpenCode
 ## Line Number Annotations
 
 The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
+
 ```
 [L9] +    private let apiToken = "ghp_abc123"
 ```
+
 **All line numbers in findings MUST use `[L<n>]` values.** Never patch-file positions.
 
 ## Output Schema
 
 ```json
 {
-  "findings": [
-    {
-      "practiceSlug": "string — from index.json",
-      "title": "string — max 120 chars, describe the defect or good practice",
-      "verdict": "POSITIVE or NEGATIVE or NOT_APPLICABLE",
-      "severity": "CRITICAL or MAJOR or MINOR or INFO",
-      "confidence": 0.85,
-      "evidence": {
-        "locations": [
-          {"path": "relative/path.swift", "startLine": 42, "endLine": 50}
-        ],
-        "snippets": ["exact code from diff — never paraphrased"]
-      },
-      "reasoning": "WHAT the pattern is, WHY it matters here, WHAT happens if unfixed.",
-      "guidance": "Show the fix with a code block. Reference only symbols that exist in the diff.",
-      "suggestedDiffNotes": [
-        {"filePath": "path.swift", "startLine": 42, "endLine": 42, "body": "The fix, not the diagnosis."}
-      ]
+    "findings": [
+        {
+            "practiceSlug": "string — from index.json",
+            "title": "string — max 120 chars, describe the defect or good practice",
+            "verdict": "POSITIVE or NEGATIVE or NOT_APPLICABLE",
+            "severity": "CRITICAL or MAJOR or MINOR or INFO",
+            "confidence": 0.85,
+            "evidence": {
+                "locations": [{ "path": "relative/path.swift", "startLine": 42, "endLine": 50 }],
+                "snippets": ["exact code from diff — never paraphrased"]
+            },
+            "reasoning": "WHAT the pattern is, WHY it matters here, WHAT happens if unfixed.",
+            "guidance": "Show the fix with a code block. Reference only symbols that exist in the diff.",
+            "suggestedDiffNotes": [
+                { "filePath": "path.swift", "startLine": 42, "endLine": 42, "body": "The fix, not the diagnosis." }
+            ]
+        }
+    ],
+    "delivery": {
+        "mrNote": "Markdown prose summary posted as the MR comment (see Delivery section)"
     }
-  ],
-  "delivery": {
-    "mrNote": "Markdown prose summary posted as the MR comment (see Delivery section)"
-  }
 }
 ```
 
 ## Field Definitions
 
 **verdict**:
+
 - **POSITIVE**: contributor demonstrably followed the practice in changed code (must be verifiable from `+` lines)
 - **NEGATIVE**: contributor violated or missed the practice in changed code
 - **NOT_APPLICABLE**: the practice does not apply to this diff (e.g., no network calls → error-state-handling is irrelevant, no views → view-decomposition is irrelevant). Use this instead of a vacuously-true POSITIVE when the practice's subject matter is entirely absent from the changed code.
 
 **severity** (follow practice criteria strictly — don't guess):
+
 - **CRITICAL**: security vulnerability, data loss, production crash
 - **MAJOR**: functional bug, missing safety mechanism
 - **MINOR**: style, naming, minor readability
@@ -153,9 +155,10 @@ All workspace files — including `metadata.json` (MR title, body), `comments.js
 Your output MUST include a `delivery.mrNote` string alongside the `findings` array. The `mrNote` is posted **directly** as the MR/PR comment visible to the student.
 
 **Guidelines for `delivery.mrNote`:**
+
 - Address the code changes, not the student personally. Use "the code" / "this change", not "you".
 - Open with a one-sentence assessment of the overall quality.
-- For **all-positive reviews**: mention 2–3 specific things the code does well, referencing actual patterns or identifiers you observed. Do not use generic praise — be specific about *what* is good and *why*.
+- For **all-positive reviews**: mention 2–3 specific things the code does well, referencing actual patterns or identifiers you observed. Do not use generic praise — be specific about _what_ is good and _why_.
 - For **reviews with issues**: briefly acknowledge what works, then describe each issue naturally. Group related issues. For each issue, state what's wrong and what to do instead. Include short code examples inline using markdown fenced blocks where helpful.
 - Keep it concise — aim for 3–8 sentences for positive reviews, more as needed for issues.
 - Use markdown formatting: `backtick` for identifiers, **bold** for emphasis, fenced code blocks for code examples.

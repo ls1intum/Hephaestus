@@ -21,4 +21,8 @@ public class AgentConfigCredentialModeException extends RuntimeException {
     public AgentConfigCredentialModeException(CredentialMode mode) {
         super(mode + " credential mode requires internet access to be enabled");
     }
+
+    public AgentConfigCredentialModeException(String message) {
+        super(message);
+    }
 }
