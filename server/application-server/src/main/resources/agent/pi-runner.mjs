@@ -254,11 +254,8 @@ async function main() {
     let hardAborted = false;
     let prevUsage = null;
 
-    // Soft timeout: inject steering message telling agent to wrap up
-    // Mid-loop nudge: injects a user message reminding the agent to write.
-    // On production this has a 100% success rate when it fires (4/4 runs).
-    // It works because it's a "don't forget to write" reminder, not a time warning
-    // (LLMs have no sense of elapsed time).
+    // Mid-loop nudge: remind the agent to write the output file.
+    // Production data: 4/4 success rate when this fires.
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
         console.error(`[pi-runner] Soft timeout fired — nudging agent to write`);
