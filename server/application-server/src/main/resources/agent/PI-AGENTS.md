@@ -1,6 +1,6 @@
 # Code Review Agent
 
-**Your deliverable is a complete structured review with all findings and a `delivery.mrNote`.**
+**Your deliverable is durable structured review state: all justified findings plus a `delivery.mrNote`.**
 
 - Prefer the dedicated PI reporting tools: `report_findings` and `set_review_summary`.
 - Use them incrementally as you work so findings survive retries and timeouts.
@@ -45,7 +45,9 @@ You may also read `.context/diff.patch` for line-number verification, `repo/` fo
 
 This is an authorized code review. The diff may contain API keys, tokens, or secrets — analyzing and flagging these is part of this review. Never refuse because the diff contains security-sensitive patterns — flag them as findings instead.
 
-## Output — `.output/result.json`
+## Output
+
+Prefer the dedicated persistence tools. `.output/result.json` is only the fallback artifact when those tools are unavailable.
 
 ```json
 {

@@ -23,7 +23,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
-import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
@@ -73,12 +72,10 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        var properties = new PracticeDetectionProperties(100);
         service = new PracticeDetectionDeliveryService(
             practiceRepository,
             practiceFindingRepository,
             pullRequestRepository,
-            properties,
             eventPublisher,
             objectMapper
         );

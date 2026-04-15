@@ -213,6 +213,10 @@ function maybeWriteResultFile() {
     return true;
 }
 
+function hasPersistedReviewState() {
+    return reviewState.findings.length > 0 || Boolean(reviewState.delivery.mrNote?.trim());
+}
+
 function normalizeDiffNote(note) {
     if (!note || typeof note !== "object") throw new Error("diff note must be an object");
     const filePath = String(note.filePath ?? "").trim();
@@ -475,7 +479,7 @@ function tryRescueFromTextResponse(sessionState) {
         return false;
     }
     console.error(`[pi-runner] Text rescue: extracted ${payload.findings.length} findings`);
-    writeFileSync(`${OUTPUT}/result.json`, JSON.stringify(payload, null, 2));
+    writeFileSync(RESULT_PATH, JSON.stringify(payload, null, 2));
     return checkResultFile();
 }
 
@@ -497,8 +501,8 @@ function buildRetryScaffold(slugs) {
     if (!slugs.length) return "";
     return (
         `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
-        `Each needs a finding with practiceSlug, title, verdict (POSITIVE/NEGATIVE/NOT_APPLICABLE), severity, confidence, evidence, reasoning, and guidance. ` +
-        `Write the complete JSON to /workspace/.output/result.json using the write tool.`
+        `Persist every justified finding with report_findings. ` +
+        `Then persist the final MR summary with set_review_summary.`
     );
 }
 
@@ -534,7 +538,7 @@ async function main() {
     let hardAborted = false;
     let prevUsage = null;
 
-    // Mid-loop nudge: remind the agent to write the output file.
+    // Mid-loop nudge: stop analysis early enough to persist durable review state.
     // Production data: 4/4 success rate when this fires.
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
@@ -605,13 +609,13 @@ async function main() {
         assistantMessages: initialUsage.assistantMessages,
         stopReasons: initialUsage.stopReasons,
         usage: initialUsage,
-        resultFilePresent: existsSync(`${OUTPUT}/result.json`),
+        resultFilePresent: existsSync(RESULT_PATH),
     });
     persistRunnerDebug();
     persistUsage();
 
     console.error(
-        `[pi-runner] Initial: ${(initialDurationMs / 1000).toFixed(1)}s, calls=${initialUsage.totalCalls}, softTimeout=${softTimeoutFired}, hardAbort=${hardAborted}, resultFile=${existsSync(`${OUTPUT}/result.json`)}`,
+        `[pi-runner] Initial: ${(initialDurationMs / 1000).toFixed(1)}s, calls=${initialUsage.totalCalls}, softTimeout=${softTimeoutFired}, hardAbort=${hardAborted}, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
     );
 
     if (checkResultFile()) {
@@ -627,7 +631,7 @@ async function main() {
         process.exit(0);
     }
 
-    // ── Validate & retry: if result.json is missing, re-prompt the agent ──
+    // ── Validate & retry: if durable state is incomplete, re-prompt the agent ──
 
     // Extract what the agent actually said — log message structure for diagnostics
     const lastMsgs = (session.state.messages || []).filter((m) => m.role === "assistant").slice(-2);
@@ -643,7 +647,9 @@ async function main() {
 
     const agentText = extractLastAssistantText(session.state);
     if (agentText) {
-        console.error(`[pi-runner] Agent produced text (${agentText.length} chars) but no result.json`);
+        console.error(
+            `[pi-runner] Agent produced text (${agentText.length} chars) but did not persist complete review output`,
+        );
         // Try to rescue valid JSON from the text
         if (tryRescueFromTextResponse(session.state)) {
             console.error(`[pi-runner] SUCCESS: rescued valid JSON from agent text`);
@@ -653,7 +659,7 @@ async function main() {
     }
 
     // Re-prompt: give the agent a concrete scaffold so it can ONLY write
-    console.error(`[pi-runner] Re-prompting agent to write result.json`);
+    console.error(`[pi-runner] Re-prompting agent to persist remaining review output`);
 
     const slugs = loadPracticeSlugs();
     const scaffold = buildRetryScaffold(slugs);
@@ -719,13 +725,13 @@ async function main() {
         assistantMessages: retryUsage.assistantMessages,
         stopReasons: retryUsage.stopReasons,
         usage: retryUsage,
-        resultFilePresent: existsSync(`${OUTPUT}/result.json`),
+        resultFilePresent: existsSync(RESULT_PATH),
     });
     persistRunnerDebug();
     persistUsage();
 
     console.error(
-        `[pi-runner] Retry 1: ${(retryDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(`${OUTPUT}/result.json`)}`,
+        `[pi-runner] Retry 1: ${(retryDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
     );
 
     if (checkResultFile()) {
@@ -776,13 +782,13 @@ async function main() {
         label: "retry2",
         durationMs: retry2DurationMs,
         hardAborted: retry2Aborted,
-        resultFilePresent: existsSync(`${OUTPUT}/result.json`),
+        resultFilePresent: existsSync(RESULT_PATH),
     });
     persistRunnerDebug();
     persistUsage();
 
     console.error(
-        `[pi-runner] Retry 2: ${(retry2DurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(`${OUTPUT}/result.json`)}`,
+        `[pi-runner] Retry 2: ${(retry2DurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
     );
 
     unsubscribe();
@@ -806,7 +812,7 @@ async function main() {
 
     // ── Failed ───────────────────────────────────────────────────
 
-    console.error(`[pi-runner] FAILED: no valid result.json after initial + 2 retries`);
+    console.error(`[pi-runner] FAILED: no complete persisted review output after initial + 2 retries`);
     process.exit(1);
 }
 

@@ -47,7 +47,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private JobTypeHandler prReviewHandler() {
-        var parser = new PracticeDetectionResultParser(objectMapper, 100);
+        var parser = new PracticeDetectionResultParser(objectMapper);
         return new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,

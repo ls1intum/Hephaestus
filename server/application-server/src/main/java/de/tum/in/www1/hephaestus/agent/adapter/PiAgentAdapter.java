@@ -180,9 +180,9 @@ public class PiAgentAdapter implements AgentAdapter {
     /**
      * Parse the Pi agent output from the sandbox result.
      *
-     * <p>The Pi agent writes findings to {@code .output/result.json} via its {@code write} tool.
-     * The runner script may also capture stdout as a fallback. This method tries the file first,
-     * then falls back to extracting JSON from mixed text content.
+     * <p>The Pi runner persists structured review state incrementally and composes
+     * {@code .output/result.json} from that state. This method prefers the composed result file,
+     * then falls back to rebuilding it from {@code review-state.json} if needed.
      *
      * <p>Additionally sanitizes invalid JSON escapes from Swift string interpolation
      * ({@code \(variable)}) which produces invalid {@code \(} sequences in JSON strings.

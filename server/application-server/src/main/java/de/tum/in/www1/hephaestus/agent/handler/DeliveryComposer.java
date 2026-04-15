@@ -447,7 +447,7 @@ class DeliveryComposer {
         List<DiffNote> notes = new ArrayList<>();
 
         for (ValidatedFinding f : negatives) {
-            if (notes.size() >= PracticeDetectionResultParser.MAX_DIFF_NOTES) break;
+            if (notes.size() >= PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES) break;
 
             JsonNode evidence = f.evidence();
             if (evidence == null || evidence.isNull()) continue;

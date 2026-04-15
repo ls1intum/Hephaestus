@@ -10,7 +10,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
-import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
@@ -40,7 +39,6 @@ public class PracticeDetectionDeliveryService {
     private final PracticeRepository practiceRepository;
     private final PracticeFindingRepository practiceFindingRepository;
     private final PullRequestRepository pullRequestRepository;
-    private final PracticeDetectionProperties properties;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
@@ -48,14 +46,12 @@ public class PracticeDetectionDeliveryService {
         PracticeRepository practiceRepository,
         PracticeFindingRepository practiceFindingRepository,
         PullRequestRepository pullRequestRepository,
-        PracticeDetectionProperties properties,
         ApplicationEventPublisher eventPublisher,
         ObjectMapper objectMapper
     ) {
         this.practiceRepository = practiceRepository;
         this.practiceFindingRepository = practiceFindingRepository;
         this.pullRequestRepository = pullRequestRepository;
-        this.properties = properties;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
     }
@@ -204,10 +200,5 @@ public class PracticeDetectionDeliveryService {
         return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative);
     }
 
-    public record DeliveryResult(
-        int inserted,
-        int discardedUnknownSlug,
-        int discardedDuplicate,
-        boolean hasNegative
-    ) {}
+    public record DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {}
 }

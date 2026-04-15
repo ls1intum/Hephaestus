@@ -81,7 +81,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        resultParser = new PracticeDetectionResultParser(objectMapper, 100);
+        resultParser = new PracticeDetectionResultParser(objectMapper);
         handler = new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,

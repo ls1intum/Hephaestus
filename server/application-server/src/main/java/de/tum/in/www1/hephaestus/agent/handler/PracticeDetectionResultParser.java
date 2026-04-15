@@ -60,19 +60,16 @@ public class PracticeDetectionResultParser {
     /** Maximum length for a single diff note body. */
     static final int MAX_DIFF_NOTE_BODY_LENGTH = 2_000;
 
-    /** Maximum number of diff notes per job. Bounds API calls for GitLab (one per note). */
-    static final int MAX_DIFF_NOTES = 30;
+    /** Maximum number of inline delivery notes per job. This bounds comment API fan-out, not finding detection. */
+    static final int MAX_DELIVERY_DIFF_NOTES = 30;
 
     private final ObjectMapper objectMapper;
     private final ObjectMapper lenientMapper;
-    private final int maxFindingsPerJob;
-
-    public PracticeDetectionResultParser(ObjectMapper objectMapper, int maxFindingsPerJob) {
+    public PracticeDetectionResultParser(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         // Lenient mapper for agent output: LLMs produce JSON with literal newlines,
         // tabs, and other control chars inside string values that strict JSON rejects.
         this.lenientMapper = objectMapper.copy().configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
-        this.maxFindingsPerJob = maxFindingsPerJob;
     }
 
     /**
@@ -124,18 +121,11 @@ public class PracticeDetectionResultParser {
             return ParseResult.empty("findings array is empty");
         }
 
-        // Step 4: Max findings guard — truncate rather than reject to preserve valid findings
-        int findingsLimit = findingsNode.size();
-        if (findingsLimit > maxFindingsPerJob) {
-            log.warn("Truncating findings from {} to {} (maxFindingsPerJob)", findingsNode.size(), maxFindingsPerJob);
-            findingsLimit = maxFindingsPerJob;
-        }
-
-        // Step 5: Validate each entry (respecting the truncation limit from Step 4)
+        // Step 4: Validate each entry. Do not silently truncate findings.
         List<ValidatedFinding> valid = new ArrayList<>();
         List<DiscardedEntry> discarded = new ArrayList<>();
 
-        for (int i = 0; i < findingsLimit; i++) {
+        for (int i = 0; i < findingsNode.size(); i++) {
             JsonNode entry = findingsNode.get(i);
             if (!entry.isObject()) {
                 discarded.add(new DiscardedEntry(i, "entry is not a JSON object"));
@@ -148,10 +138,10 @@ public class PracticeDetectionResultParser {
             }
         }
 
-        // Step 6: Extract optional delivery content (never affects findings)
+        // Step 5: Extract optional delivery content (never affects findings)
         DeliveryContent delivery = parseDeliveryContent(root);
 
-        // Step 7: Fallback — if delivery has no diffNotes, collect suggestedDiffNotes from
+        // Step 6: Fallback — if delivery has no diffNotes, collect suggestedDiffNotes from
         // NEGATIVE findings' raw JSON. OpenCode subagents produce per-finding suggestedDiffNotes
         // that the orchestrator LLM often fails to aggregate into delivery.diffNotes.
         if (delivery == null || delivery.diffNotes().isEmpty()) {
@@ -218,10 +208,14 @@ public class PracticeDetectionResultParser {
         }
 
         List<DiffNote> notes = new ArrayList<>();
-        int limit = Math.min(diffNotesNode.size(), MAX_DIFF_NOTES);
+        int limit = Math.min(diffNotesNode.size(), MAX_DELIVERY_DIFF_NOTES);
 
-        if (diffNotesNode.size() > MAX_DIFF_NOTES) {
-            log.debug("Capping diffNotes from {} to {}", diffNotesNode.size(), MAX_DIFF_NOTES);
+        if (diffNotesNode.size() > MAX_DELIVERY_DIFF_NOTES) {
+            log.debug(
+                "Limiting delivery.diffNotes from {} to {} to bound inline comment fan-out",
+                diffNotesNode.size(),
+                MAX_DELIVERY_DIFF_NOTES
+            );
         }
 
         for (int i = 0; i < limit; i++) {
@@ -240,7 +234,7 @@ public class PracticeDetectionResultParser {
      * <p>OpenCode subagents produce per-finding {@code suggestedDiffNotes} arrays, but the orchestrator
      * LLM often fails to aggregate them into {@code delivery.diffNotes}. This method scans raw finding
      * JSON nodes, matches them against validated NEGATIVE findings (by practiceSlug), and collects
-     * their suggested diff notes — prioritizing higher severity findings, capped at {@link #MAX_DIFF_NOTES}.
+     * their suggested diff notes — prioritizing higher severity findings, capped at {@link #MAX_DELIVERY_DIFF_NOTES}.
      */
     private List<DiffNote> collectSuggestedDiffNotes(JsonNode findingsNode, List<ValidatedFinding> validatedFindings) {
         // Build lookup of NEGATIVE validated findings by slug → severity for filtering and sorting
@@ -290,8 +284,8 @@ public class PracticeDetectionResultParser {
         // Sort by severity: CRITICAL (ordinal 0) first, INFO (ordinal 3) last
         scored.sort(Comparator.comparingInt(s -> s.severity().ordinal()));
 
-        // Cap at MAX_DIFF_NOTES
-        int limit = Math.min(scored.size(), MAX_DIFF_NOTES);
+        // Limit inline delivery fan-out without dropping the underlying findings.
+        int limit = Math.min(scored.size(), MAX_DELIVERY_DIFF_NOTES);
         List<DiffNote> result = new ArrayList<>(limit);
         for (int i = 0; i < limit; i++) {
             result.add(scored.get(i).note());
