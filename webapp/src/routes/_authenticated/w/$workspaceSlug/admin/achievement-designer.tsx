@@ -9,7 +9,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-definitions";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/achievement-designer")(
 	{
@@ -20,8 +19,8 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/ach
 function AchievementDesignerPage() {
 	const queryClient = useQueryClient();
 	const { userProfile, getUserProfilePictureUrl, username } = useAuth();
-	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
-	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const { workspaceSlug } = Route.useParams();
+	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	const reloadMutation = useMutation({
 		...reloadAchievementsMutation(),
@@ -46,7 +45,7 @@ function AchievementDesignerPage() {
 	const handleReload = () => {
 		reloadMutation.mutate({
 			path: {
-				workspaceSlug: selectedSlug || "",
+				workspaceSlug,
 				login: username || "",
 			},
 		});
@@ -55,23 +54,17 @@ function AchievementDesignerPage() {
 	// Fetch real profile data if we have a workspace context
 	const profileQuery = useQuery({
 		...getUserProfileOptions({
-			path: { workspaceSlug: selectedSlug || "", login: username || "" },
+			path: { workspaceSlug, login: username || "" },
 		}),
-		enabled: Boolean(selectedSlug) && Boolean(username),
+		enabled: Boolean(workspaceSlug) && Boolean(username),
 	});
 
 	// Fetch all achievement definitions (Design Mode Data)
-	const allDefinitionsQuery = useAllAchievementDefinitions(selectedSlug || "", username || "");
+	const allDefinitionsQuery = useAllAchievementDefinitions(workspaceSlug, username || "");
 
 	// Feature guard — declarative redirect when achievements are disabled
-	if (!featuresLoading && !achievementsEnabled && selectedSlug) {
-		return (
-			<Navigate
-				to="/w/$workspaceSlug/admin/settings"
-				params={{ workspaceSlug: selectedSlug }}
-				replace
-			/>
-		);
+	if (!featuresLoading && !achievementsEnabled && workspaceSlug) {
+		return <Navigate to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} replace />;
 	}
 
 	if (featuresLoading || !achievementsEnabled) {

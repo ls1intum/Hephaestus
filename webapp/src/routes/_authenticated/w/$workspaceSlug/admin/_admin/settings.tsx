@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import {
 	addRepositoryToMonitorMutation,
@@ -12,8 +13,6 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { FeatureKey } from "@/components/admin/AdminFeaturesSettings";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
-import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/settings")({
 	component: AdminSettings,
@@ -29,19 +28,14 @@ type RepositoryItem = {
  */
 function AdminSettings() {
 	const queryClient = useQueryClient();
-	const {
-		workspaceSlug,
-		isLoading: isWorkspaceLoading,
-		error: workspaceError,
-	} = useActiveWorkspaceSlug();
+	const { workspaceSlug } = Route.useParams();
 
 	// Fetch full workspace data for gitProviderMode
 	const workspaceQueryOptions = getWorkspaceOptions({
-		path: { workspaceSlug: workspaceSlug ?? "" },
+		path: { workspaceSlug },
 	});
 	const { data: workspaceData } = useQuery({
 		...workspaceQueryOptions,
-		enabled: Boolean(workspaceSlug),
 	});
 
 	// Check if repository management is allowed
@@ -50,7 +44,7 @@ function AdminSettings() {
 
 	// Repositories query
 	const repositoriesQueryOptions = getRepositoriesToMonitorOptions({
-		path: { workspaceSlug: workspaceSlug ?? "" },
+		path: { workspaceSlug },
 	});
 	const {
 		data: repositories,
@@ -58,7 +52,7 @@ function AdminSettings() {
 		error: repositoriesError,
 	} = useQuery({
 		...repositoriesQueryOptions,
-		enabled: Boolean(workspaceSlug) && (repositoriesQueryOptions.enabled ?? true),
+		enabled: repositoriesQueryOptions.enabled ?? true,
 	});
 
 	// Add repository mutation
@@ -116,9 +110,11 @@ function AdminSettings() {
 		},
 	});
 
-	if (!workspaceSlug && !isWorkspaceLoading) {
-		return <NoWorkspace />;
-	}
+	useEffect(() => {
+		if (repositoriesError) {
+			toast.error(`Failed to load data: ${(repositoriesError as Error).message}`);
+		}
+	}, [repositoriesError]);
 
 	// Handle add repository
 	const handleAddRepository = (nameWithOwner: string) => {
@@ -161,8 +157,8 @@ function AdminSettings() {
 	return (
 		<AdminSettingsPage
 			repositories={formattedRepositories}
-			isLoadingRepositories={isWorkspaceLoading || isLoadingRepositories || !workspaceSlug}
-			repositoriesError={(workspaceError as Error | null) ?? (repositoriesError as Error | null)}
+			isLoadingRepositories={isLoadingRepositories}
+			repositoriesError={repositoriesError as Error | null}
 			addRepositoryError={addRepository.error as Error | null}
 			isAddingRepository={addRepository.isPending}
 			isRemovingRepository={removeRepository.isPending}

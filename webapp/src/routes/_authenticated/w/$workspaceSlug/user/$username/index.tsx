@@ -23,6 +23,11 @@ type ProfileSearchParams = z.infer<typeof profileSearchSchema>;
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$username/")({
 	component: UserProfile,
+	staticData: {
+		workspaceSwitch: {
+			fallbackTo: "/w/$workspaceSlug",
+		},
+	},
 	validateSearch: profileSearchSchema,
 	search: {
 		middlewares: [retainSearchParams(["after", "before"])],
@@ -32,7 +37,8 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$use
 function UserProfile() {
 	const { username, workspaceSlug } = Route.useParams();
 	const { isCurrentUser } = useAuth();
-	const { achievementsEnabled, progressionEnabled, leaguesEnabled } = useWorkspaceFeatures();
+	const { achievementsEnabled, progressionEnabled, leaguesEnabled } =
+		useWorkspaceFeatures(workspaceSlug);
 	const { after, before } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 

@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { createPracticeMutation, listPracticesQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { CreatePracticeRequest } from "@/api/types.gen";
 import { PracticeForm } from "@/components/admin/practices/PracticeForm";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices/new")(
 	{
@@ -15,7 +14,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 function CreatePracticeContainer() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const { workspaceSlug } = Route.useParams();
 
 	const createPractice = useMutation({
 		...createPracticeMutation(),

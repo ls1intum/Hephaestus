@@ -26,7 +26,6 @@ import {
 	wizardReducer,
 } from "@/components/workspace/create-workspace/wizard-context";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/gitlab")({
 	component: GitLabWizardPage,
@@ -158,7 +157,6 @@ function GitLabWizardPage() {
 	);
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
-	const { setSelectedSlug } = useWorkspaceStore();
 	const headingRef = useRef<HTMLHeadingElement>(null);
 
 	const stepAnnouncement = `Step ${state.step} of 3: ${STEP_META[state.step - 1].title}`;
@@ -176,7 +174,6 @@ function GitLabWizardPage() {
 	const createWorkspace = useMutation({
 		...createWorkspaceMutation(),
 		onSuccess: (data) => {
-			setSelectedSlug(data.workspaceSlug);
 			toast.success(`Workspace "${data.displayName}" created`);
 			navigate({
 				to: "/w/$workspaceSlug",

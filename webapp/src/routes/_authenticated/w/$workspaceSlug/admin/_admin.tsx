@@ -1,5 +1,4 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, Navigate, Outlet } from "@tanstack/react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 
@@ -9,24 +8,17 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 
 function AdminLayout() {
 	const { workspaceSlug, isAdmin, isLoading } = useWorkspaceAccess();
-	const navigate = useNavigate();
 
-	useEffect(() => {
-		if (!isLoading && !isAdmin && workspaceSlug) {
-			navigate({
-				to: "/w/$workspaceSlug",
-				params: { workspaceSlug },
-				replace: true,
-			});
-		}
-	}, [isLoading, isAdmin, workspaceSlug, navigate]);
-
-	if (isLoading || (!isAdmin && workspaceSlug)) {
+	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-96">
 				<Spinner className="size-8" />
 			</div>
 		);
+	}
+
+	if (!isAdmin && workspaceSlug) {
+		return <Navigate to="/w/$workspaceSlug" params={{ workspaceSlug }} replace />;
 	}
 
 	return <Outlet />;

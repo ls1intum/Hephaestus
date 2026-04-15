@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import type { WorkspaceListItem } from "@/api/types.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export interface WorkspaceFeatures {
 	practicesEnabled: boolean;
@@ -13,12 +12,12 @@ export interface WorkspaceFeatures {
 }
 
 /**
- * Returns the feature flags for the active workspace.
- * Reads from the listWorkspaces query cache (same query as useActiveWorkspaceSlug).
- * Defaults all flags to true while loading to prevent sidebar flicker.
+ * Returns feature flags for the requested workspace from the shared workspace list.
  */
-export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean } {
-	const { selectedSlug } = useWorkspaceStore();
+
+export function useWorkspaceFeatures(
+	workspaceSlug?: string,
+): WorkspaceFeatures & { isLoading: boolean } {
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 
 	const query = useQuery({
@@ -28,24 +27,24 @@ export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean
 	});
 
 	const workspaces = Array.isArray(query.data) ? query.data : [];
-	const activeWorkspace = workspaces.find((ws) => ws.workspaceSlug === selectedSlug);
+	const activeWorkspace = workspaces.find((workspace) => workspace.workspaceSlug === workspaceSlug);
 
 	return {
 		...getWorkspaceFeatures(activeWorkspace),
-		isLoading: query.isLoading,
+		isLoading: authLoading || query.isLoading,
 	};
 }
 
 /**
  * Extracts feature flags from a WorkspaceListItem.
- * Defaults all to true when workspace is undefined (loading state).
+ * Missing workspace data resolves to a safe disabled state.
  */
 export function getWorkspaceFeatures(workspace?: WorkspaceListItem): WorkspaceFeatures {
 	return {
-		practicesEnabled: workspace?.practicesEnabled ?? true,
-		achievementsEnabled: workspace?.achievementsEnabled ?? true,
-		leaderboardEnabled: workspace?.leaderboardEnabled ?? true,
-		progressionEnabled: workspace?.progressionEnabled ?? true,
+		practicesEnabled: workspace?.practicesEnabled ?? false,
+		achievementsEnabled: workspace?.achievementsEnabled ?? false,
+		leaderboardEnabled: workspace?.leaderboardEnabled ?? false,
+		progressionEnabled: workspace?.progressionEnabled ?? false,
 		leaguesEnabled: workspace?.leaguesEnabled ?? false,
 	};
 }
