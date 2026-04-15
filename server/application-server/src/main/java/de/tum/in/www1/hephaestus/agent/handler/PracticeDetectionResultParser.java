@@ -65,6 +65,7 @@ public class PracticeDetectionResultParser {
 
     private final ObjectMapper objectMapper;
     private final ObjectMapper lenientMapper;
+
     public PracticeDetectionResultParser(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         // Lenient mapper for agent output: LLMs produce JSON with literal newlines,
