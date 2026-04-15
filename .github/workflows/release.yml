@@ -72,7 +72,7 @@ jobs:
         run: |
           VERSION="${{ needs.release.outputs.new_version }}"
           SHA="${{ github.event.workflow_run.head_sha }}"
-          IMAGES=("webapp" "application-server" "intelligence-service" "webhook-ingest" "agent-claude-code" "agent-opencode")
+          IMAGES=("webapp" "application-server" "intelligence-service" "webhook-ingest" "agent-claude-code" "agent-pi")
 
           for img in "${IMAGES[@]}"; do
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet author="opencode" id="1776200000000-1">
+        <createTable tableName="agent_runner">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="agent_runner_pkey"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="agent_type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="model_name" type="VARCHAR(128)"/>
+            <column name="model_version" type="VARCHAR(50)"/>
+            <column name="llm_api_key" type="TEXT"/>
+            <column name="llm_provider" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="credential_mode" type="VARCHAR(16)" defaultValue="PROXY">
+                <constraints nullable="false"/>
+            </column>
+            <column name="timeout_seconds" type="INTEGER" defaultValueNumeric="600">
+                <constraints nullable="false"/>
+            </column>
+            <column name="max_concurrent_jobs" type="INTEGER" defaultValueNumeric="3">
+                <constraints nullable="false"/>
+            </column>
+            <column name="allow_internet" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet author="opencode" id="1776200000000-2">
+        <addUniqueConstraint columnNames="workspace_id, name"
+                             constraintName="uk_agent_runner_workspace_name"
+                             tableName="agent_runner"/>
+    </changeSet>
+
+    <changeSet author="opencode" id="1776200000000-3">
+        <addForeignKeyConstraint baseColumnNames="workspace_id"
+                                 baseTableName="agent_runner"
+                                 constraintName="fk_agent_runner_workspace"
+                                 referencedColumnNames="id"
+                                 referencedTableName="workspace"
+                                 validate="true"/>
+    </changeSet>
+
+    <changeSet author="opencode" id="1776200000000-4">
+        <addColumn tableName="agent_config">
+            <column name="runner_id" type="BIGINT"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="opencode" id="1776200000000-5">
+        <sql>
+            INSERT INTO agent_runner (
+                workspace_id,
+                name,
+                agent_type,
+                model_name,
+                model_version,
+                llm_api_key,
+                llm_provider,
+                credential_mode,
+                timeout_seconds,
+                max_concurrent_jobs,
+                allow_internet,
+                created_at,
+                updated_at
+            )
+            SELECT
+                ac.workspace_id,
+                ac.name,
+                ac.agent_type,
+                ac.model_name,
+                ac.model_version,
+                ac.llm_api_key,
+                ac.llm_provider,
+                ac.credential_mode,
+                ac.timeout_seconds,
+                ac.max_concurrent_jobs,
+                ac.allow_internet,
+                ac.created_at,
+                ac.updated_at
+            FROM agent_config ac;
+        </sql>
+    </changeSet>
+
+    <changeSet author="opencode" id="1776200000000-6">
+        <sql>
+            UPDATE agent_config ac
+            SET runner_id = ar.id
+            FROM agent_runner ar
+            WHERE ar.workspace_id = ac.workspace_id
+              AND ar.name = ac.name;
+        </sql>
+    </changeSet>
+
+    <changeSet author="opencode" id="1776200000000-7">
+        <addNotNullConstraint tableName="agent_config" columnName="runner_id" columnDataType="BIGINT"/>
+    </changeSet>
+
+    <changeSet author="opencode" id="1776200000000-8">
+        <addForeignKeyConstraint baseColumnNames="runner_id"
+                                 baseTableName="agent_config"
+                                 constraintName="fk_agent_config_runner"
+                                 referencedColumnNames="id"
+                                 referencedTableName="agent_runner"
+                                 validate="true"/>
+    </changeSet>
+
+    <changeSet author="opencode" id="1776200000000-9">
+        <dropColumn tableName="agent_config" columnName="agent_type"/>
+        <dropColumn tableName="agent_config" columnName="model_name"/>
+        <dropColumn tableName="agent_config" columnName="model_version"/>
+        <dropColumn tableName="agent_config" columnName="llm_api_key"/>
+        <dropColumn tableName="agent_config" columnName="llm_provider"/>
+        <dropColumn tableName="agent_config" columnName="credential_mode"/>
+        <dropColumn tableName="agent_config" columnName="timeout_seconds"/>
+        <dropColumn tableName="agent_config" columnName="max_concurrent_jobs"/>
+        <dropColumn tableName="agent_config" columnName="allow_internet"/>
+    </changeSet>
+
+</databaseChangeLog>

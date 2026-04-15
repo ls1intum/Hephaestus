@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.agent.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
@@ -142,6 +143,14 @@ class PiAgentAdapterTest extends BaseUnitTest {
             var spec = adapter.buildSandboxSpec(apiKeyRequest(LlmProvider.AZURE_OPENAI));
             assertThat(spec.networkPolicy().internetAccess()).isTrue();
             assertThat(spec.networkPolicy().llmProxyToken()).isNull();
+        }
+
+        @Test
+        @DisplayName("should reject OAuth mode")
+        void shouldRejectOAuthMode() {
+            assertThatThrownBy(() -> adapter.buildSandboxSpec(oauthRequest(LlmProvider.OPENAI)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not support OAuth");
         }
     }
 
@@ -502,6 +511,20 @@ class PiAgentAdapterTest extends BaseUnitTest {
             null,
             "Review this PR",
             "sk-test-key",
+            null,
+            true,
+            600
+        );
+    }
+
+    private AgentAdapterRequest oauthRequest(LlmProvider provider) {
+        return new AgentAdapterRequest(
+            AgentType.PI,
+            provider,
+            CredentialMode.OAUTH,
+            "gpt-5.4-mini",
+            "Review this PR",
+            "oauth-token",
             null,
             true,
             600

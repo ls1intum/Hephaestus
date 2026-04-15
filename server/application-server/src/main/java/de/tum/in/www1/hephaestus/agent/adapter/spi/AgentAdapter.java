@@ -61,7 +61,7 @@ public interface AgentAdapter {
      * Build a {@link NetworkPolicy} from the request's credential mode and internet settings.
      *
      * <p>In {@link CredentialMode#PROXY} mode, internet access is determined by
-     * {@link AgentAdapterRequest#allowInternet()}. In direct modes ({@code API_KEY}, {@code OAUTH}),
+     * {@link AgentAdapterRequest#allowInternet()}. In direct modes ({@code API_KEY}, Claude Code {@code OAUTH}),
      * internet is always enabled (enforced by validation).
      *
      * <p>Note: {@code llmProxyUrl} is always {@code null} in the returned policy. The sandbox

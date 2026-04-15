@@ -45,7 +45,6 @@ class DeliveryComposer {
         ".context/",
         ".practices/",
         ".analysis/",
-        ".opencode/",
         ".claude/"
     );
 

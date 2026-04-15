@@ -379,10 +379,7 @@ public class PiAgentAdapter implements AgentAdapter {
         return switch (request.credentialMode()) {
             case PROXY -> buildProxyAuthSetup(request.llmProvider());
             case API_KEY -> buildApiKeyAuthSetup(request.llmProvider(), request.credential(), env);
-            case OAUTH -> {
-                // Pi does not have a dedicated OAuth mode; treat as API key
-                yield buildApiKeyAuthSetup(request.llmProvider(), request.credential(), env);
-            }
+            case OAUTH -> throw new IllegalArgumentException("Pi does not support OAuth credentials");
         };
     }
 

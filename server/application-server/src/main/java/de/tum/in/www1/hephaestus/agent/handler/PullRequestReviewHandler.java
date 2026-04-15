@@ -45,7 +45,7 @@ import org.springframework.lang.Nullable;
 /**
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
  *
- * <p>Uses a single-pass architecture: one AI agent (Claude Code or OpenCode) reads all
+ * <p>Uses a single-pass architecture: one AI agent (Claude Code or Pi) reads all
  * context files, evaluates every relevant practice against the diff, and returns structured
  * JSON findings. The server then renders delivery (MR summary + diff notes) via
  * {@link DeliveryComposer} and posts via {@link FeedbackDeliveryService}.
@@ -237,9 +237,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         int pullRequestNumber = requireInt(metadata, "pr_number");
         String repoName = requireText(metadata, "repository_full_name");
 
-        // Task prompt — must explicitly name the output deliverable so the agent
-        // doesn't stop after reading files.  The orchestrator protocol and AGENTS.md
-        // reinforce this, but the initial prompt is what the agent sees first.
+        // Keep the task prompt slim, but explicitly name the output deliverable so the
+        // agent does not stop after reading files. The agent-specific instructions and
+        // orchestrator protocol reinforce the same requirement.
         String prompt =
             "Review merge request #" +
             pullRequestNumber +
@@ -267,7 +267,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      * </ul>
      */
     private void injectOrchestratorFiles(Map<String, byte[]> files, AgentJob job) {
-        // 1. Shared orchestrator protocol (referenced by both Claude Code and OpenCode orchestrators)
+        // 1. Shared orchestrator protocol (referenced by all supported agent orchestrators)
         files.put("orchestrator-protocol.md", loadClasspathResource("orchestrator-protocol.md"));
 
         // Agent-specific orchestrator files (CLAUDE.md, subagent defs) are injected by each adapter.

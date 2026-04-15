@@ -2,9 +2,12 @@ package de.tum.in.www1.hephaestus.agent;
 
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigCredentialModeException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigHasActiveJobsException;
+import de.tum.in.www1.hephaestus.agent.config.AgentConfigMissingCredentialException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigNameConflictException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigProviderMismatchException;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobStateConflictException;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunnerHasLinkedConfigsException;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunnerNameConflictException;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import java.util.Optional;
 import org.springframework.core.Ordered;
@@ -32,6 +35,16 @@ public class AgentControllerAdvice {
         return problem(HttpStatus.CONFLICT, "Agent config name conflict", exception.getMessage());
     }
 
+    @ExceptionHandler(AgentRunnerNameConflictException.class)
+    ProblemDetail handleAgentRunnerNameConflict(AgentRunnerNameConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "Agent runner name conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(AgentRunnerHasLinkedConfigsException.class)
+    ProblemDetail handleAgentRunnerHasLinkedConfigs(AgentRunnerHasLinkedConfigsException exception) {
+        return problem(HttpStatus.CONFLICT, "Agent runner has linked configs", exception.getMessage());
+    }
+
     @ExceptionHandler(AgentConfigProviderMismatchException.class)
     ProblemDetail handleAgentConfigProviderMismatch(AgentConfigProviderMismatchException exception) {
         return problem(HttpStatus.BAD_REQUEST, "Invalid agent configuration", exception.getMessage());
@@ -40,6 +53,11 @@ public class AgentControllerAdvice {
     @ExceptionHandler(AgentConfigCredentialModeException.class)
     ProblemDetail handleAgentConfigCredentialMode(AgentConfigCredentialModeException exception) {
         return problem(HttpStatus.BAD_REQUEST, "Invalid credential mode", exception.getMessage());
+    }
+
+    @ExceptionHandler(AgentConfigMissingCredentialException.class)
+    ProblemDetail handleAgentConfigMissingCredential(AgentConfigMissingCredentialException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "Missing agent credential", exception.getMessage());
     }
 
     @ExceptionHandler(AgentJobStateConflictException.class)

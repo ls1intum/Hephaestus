@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class AgentJobController {
 
     private final AgentJobService agentJobService;
+    private final ObjectMapper objectMapper;
 
     @GetMapping
     @Operation(summary = "List agent jobs for a workspace")
@@ -48,7 +50,7 @@ public class AgentJobController {
         Pageable pageable = PageRequest.of(safePage, pageSize, Sort.by("createdAt").descending());
         Page<AgentJobDTO> jobs = agentJobService
             .getJobs(workspaceContext.id(), status, configId, pageable)
-            .map(AgentJobDTO::from);
+            .map(job -> AgentJobDTO.from(job, objectMapper));
         return ResponseEntity.ok(jobs);
     }
 
@@ -67,7 +69,7 @@ public class AgentJobController {
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<AgentJobDTO> getJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
         AgentJob job = agentJobService.getJob(workspaceContext.id(), jobId);
-        return ResponseEntity.ok(AgentJobDTO.from(job));
+        return ResponseEntity.ok(AgentJobDTO.from(job, objectMapper));
     }
 
     @PostMapping("/{jobId}/cancel")
@@ -86,7 +88,7 @@ public class AgentJobController {
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<AgentJobDTO> cancelJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
         AgentJob job = agentJobService.cancel(workspaceContext.id(), jobId);
-        return ResponseEntity.ok(AgentJobDTO.from(job));
+        return ResponseEntity.ok(AgentJobDTO.from(job, objectMapper));
     }
 
     @PostMapping("/{jobId}/delivery/retry")
@@ -105,6 +107,6 @@ public class AgentJobController {
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<AgentJobDTO> retryDelivery(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
         AgentJob job = agentJobService.retryDelivery(workspaceContext.id(), jobId);
-        return ResponseEntity.ok(AgentJobDTO.from(job));
+        return ResponseEntity.ok(AgentJobDTO.from(job, objectMapper));
     }
 }

@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunner;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import org.junit.jupiter.api.DisplayName;
@@ -27,14 +28,20 @@ class ConfigSnapshotTest extends BaseUnitTest {
         config.setId(42L);
         config.setWorkspace(ws);
         config.setName("my-agent");
-        config.setAgentType(AgentType.CLAUDE_CODE);
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setCredentialMode(CredentialMode.PROXY);
-        config.setModelName("claude-sonnet-4-20250514");
-        config.setTimeoutSeconds(600);
-        config.setAllowInternet(false);
-        config.setLlmApiKey("sk-secret-key");
-        config.setMaxConcurrentJobs(5);
+
+        AgentRunner runner = new AgentRunner();
+        runner.setId(7L);
+        runner.setWorkspace(ws);
+        runner.setName("my-runner");
+        runner.setAgentType(AgentType.CLAUDE_CODE);
+        runner.setLlmProvider(LlmProvider.ANTHROPIC);
+        runner.setCredentialMode(CredentialMode.PROXY);
+        runner.setModelName("claude-sonnet-4-20250514");
+        runner.setTimeoutSeconds(600);
+        runner.setAllowInternet(false);
+        runner.setLlmApiKey("sk-secret-key");
+        runner.setMaxConcurrentJobs(5);
+        config.setRunner(runner);
         return config;
     }
 
@@ -51,6 +58,8 @@ class ConfigSnapshotTest extends BaseUnitTest {
             assertThat(snapshot.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
             assertThat(snapshot.configId()).isEqualTo(42L);
             assertThat(snapshot.configName()).isEqualTo("my-agent");
+            assertThat(snapshot.runnerId()).isEqualTo(7L);
+            assertThat(snapshot.runnerName()).isEqualTo("my-runner");
             assertThat(snapshot.agentType()).isEqualTo(AgentType.CLAUDE_CODE);
             assertThat(snapshot.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
             assertThat(snapshot.credentialMode()).isEqualTo(CredentialMode.PROXY);
@@ -93,6 +102,8 @@ class ConfigSnapshotTest extends BaseUnitTest {
             assertThat(deserialized.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
             assertThat(deserialized.configId()).isEqualTo(42L);
             assertThat(deserialized.configName()).isEqualTo("my-agent");
+            assertThat(deserialized.runnerId()).isEqualTo(7L);
+            assertThat(deserialized.runnerName()).isEqualTo("my-runner");
             assertThat(deserialized.agentType()).isEqualTo(AgentType.CLAUDE_CODE);
             assertThat(deserialized.timeoutSeconds()).isEqualTo(600);
         }

@@ -50,12 +50,12 @@ sequenceDiagram
 
 ## Agent architecture
 
-The system supports two LLM backends. Claude Code uses a single-pass architecture (one agent evaluates all practices); OpenCode uses a multi-agent orchestrator that dispatches specialist subagents:
+The system supports two LLM backends. Both are selected per workspace via the `agent_config` table and both return the same normalized findings schema:
 
 - **Claude Code** (`ClaudeCodeAgentAdapter`) -- Uses `--json-schema` for constrained decoding. Runner script (`.run-claude.mjs`) performs 2-phase self-correction: initial run + up to 2 format retries via `--continue` (same session, full context preserved).
-- **OpenCode** (`OpenCodeAgentAdapter`) -- Uses a self-enforced JSON schema. Runner script (`.run-opencode.mjs`) performs 3-phase self-correction: initial run, format retry, position retry (validates `suggestedDiffNotes` against diff hunks).
+- **Pi** (`PiAgentAdapter`) -- Uses a staged `settings.json` file plus a Node runner (`.run-pi.mjs`) that validates the output, retries once with session continuation, and persists usage diagnostics for post-mortem analysis.
 
-Both adapters produce the same output schema. The server is backend-agnostic after the agent returns. The active backend is selected per workspace via the `agent_config` table.
+The server is backend-agnostic after the agent returns.
 
 ### Workspace layout
 
@@ -81,10 +81,10 @@ Every agent container gets this file structure (agent-specific files noted):
   .prompt                            # Task prompt for the agent
   .json-schema                       # Output schema (Claude Code only)
   .run-claude.mjs                    # Runner script (Claude Code only)
-  .run-opencode.mjs                  # Runner script (OpenCode only)
+  .run-pi.mjs                        # Runner script (Pi only)
   CLAUDE.md                          # Orchestrator instructions (Claude Code only)
-  .opencode/agents/*.md              # Agent definitions (OpenCode only)
-  opencode.json                      # Configuration (OpenCode only)
+  .pi/AGENTS.md                      # Pi runtime instructions (Pi only)
+  .pi-runtime/settings.json          # Pi runtime settings (Pi only)
   .analysis/practices/.gitkeep       # Directory for intermediate findings
   .output/                           # Agent writes final results here
 ```
@@ -167,11 +167,11 @@ This uses Spring's event system to avoid a module dependency cycle between `gitp
 
 Key tables for code review:
 
-| Table              | Key Columns                                                                                                               | Purpose                                                                                      |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `agent_config`     | `name`, `agent_type`, `model_name`, `model_version`, `enabled`, `llm_api_key` (encrypted), `llm_provider`, `credential_mode`, `timeout_seconds`, `max_concurrent_jobs`, `allow_internet` | LLM backend configuration per workspace                                                      |
-| `agent_job`        | `status`, `idempotency_key`, `job_token` (encrypted), `config_snapshot` (JSONB), `delivery_status`, `llm_*` usage columns | Job lifecycle: QUEUED → RUNNING → COMPLETED/FAILED. Tracks container ID, exit code, LLM cost |
-| `practice`         | `slug`, `name`, `description` (TEXT, NOT NULL), `category`, `criteria` (TEXT), `trigger_events` (JSONB), `precompute_script` (TEXT), `is_active`, `workspace_id` | Practice definitions. Unique constraint on `(workspace_id, slug)`                            |
+| Table              | Key Columns                                                                                                                                                                                              | Purpose                                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `agent_config`     | `name`, `agent_type`, `model_name`, `model_version`, `enabled`, `llm_api_key` (encrypted), `llm_provider`, `credential_mode`, `timeout_seconds`, `max_concurrent_jobs`, `allow_internet`                 | LLM backend configuration per workspace                                                      |
+| `agent_job`        | `status`, `idempotency_key`, `job_token` (encrypted), `config_snapshot` (JSONB), `delivery_status`, `llm_*` usage columns                                                                                | Job lifecycle: QUEUED → RUNNING → COMPLETED/FAILED. Tracks container ID, exit code, LLM cost |
+| `practice`         | `slug`, `name`, `description` (TEXT, NOT NULL), `category`, `criteria` (TEXT), `trigger_events` (JSONB), `precompute_script` (TEXT), `is_active`, `workspace_id`                                         | Practice definitions. Unique constraint on `(workspace_id, slug)`                            |
 | `practice_finding` | `idempotency_key`, `title`, `verdict`, `severity`, `confidence`, `evidence` (JSONB), `reasoning`, `guidance`, `agent_job_id`, `practice_id`, `target_type`, `target_id`, `contributor_id`, `detected_at` | Individual findings per target (PR) per practice                                             |
 
 ## Configuration
@@ -223,4 +223,4 @@ The orchestrator protocol (`orchestrator-protocol.md`) contains language-agnosti
 
 1. Write new practice criteria targeting the language's patterns and insert them in the `practice` table
 2. The orchestrator protocol is language-agnostic -- no changes needed unless the language requires special analysis strategies
-3. The agent prompt files (`CLAUDE.md`, `opencode-orchestrator.md`) may need minor adjustments for language-specific tooling (e.g., build commands, linter integration)
+3. The agent prompt files (`CLAUDE.md`, `PI-AGENTS.md`) may need minor adjustments for language-specific tooling (e.g., build commands, linter integration)

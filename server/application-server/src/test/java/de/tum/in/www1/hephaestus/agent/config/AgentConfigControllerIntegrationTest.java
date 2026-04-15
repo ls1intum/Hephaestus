@@ -53,6 +53,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             true,
             AgentType.CLAUDE_CODE,
             "claude-sonnet-4-20250514",
+            "2026-03-17",
             "sk-test-secret-key-123",
             LlmProvider.ANTHROPIC,
             300,
@@ -104,6 +105,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(created.agentType()).isEqualTo(AgentType.CLAUDE_CODE);
         assertThat(created.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
         assertThat(created.modelName()).isEqualTo("claude-sonnet-4-20250514");
+        assertThat(created.modelVersion()).isEqualTo("2026-03-17");
         assertThat(created.hasLlmApiKey()).isTrue();
         assertThat(created.timeoutSeconds()).isEqualTo(300);
         assertThat(created.maxConcurrentJobs()).isEqualTo(2);
@@ -161,7 +163,8 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         var duplicateRequest = new CreateAgentConfigRequestDTO(
             "duplicate-name",
             true,
-            AgentType.OPENCODE,
+            AgentType.PI,
+            null,
             null,
             null,
             LlmProvider.OPENAI,
@@ -197,8 +200,13 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         // Update — omit llmApiKey (null = keep existing)
         var updateRequest = new UpdateAgentConfigRequestDTO(
             null,
-            AgentType.OPENCODE,
+            null,
+            AgentType.PI,
             "gpt-4o",
+            null,
+            "2026-03-17",
+            null,
+            null,
             null,
             LlmProvider.OPENAI,
             120,
@@ -222,13 +230,55 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         assertThat(updated).isNotNull();
         assertThat(updated.name()).isEqualTo("update-test"); // name unchanged
-        assertThat(updated.agentType()).isEqualTo(AgentType.OPENCODE);
+        assertThat(updated.agentType()).isEqualTo(AgentType.PI);
         assertThat(updated.llmProvider()).isEqualTo(LlmProvider.OPENAI);
         assertThat(updated.modelName()).isEqualTo("gpt-4o");
+        assertThat(updated.modelVersion()).isEqualTo("2026-03-17");
         assertThat(updated.hasLlmApiKey()).isTrue(); // preserved from create
         assertThat(updated.timeoutSeconds()).isEqualTo(120);
         assertThat(updated.maxConcurrentJobs()).isEqualTo(1);
         assertThat(updated.allowInternet()).isTrue();
+    }
+
+    @Test
+    @WithAdminUser
+    void patchCanRenameConfigAndClearApiKey() {
+        Workspace workspace = setupWorkspace();
+        AgentConfigDTO created = createConfig(workspace, "rename-test");
+
+        var updateRequest = new UpdateAgentConfigRequestDTO(
+            "pi-primary",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        AgentConfigDTO updated = webTestClient
+            .patch()
+            .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(updateRequest)
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(AgentConfigDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(updated).isNotNull();
+        assertThat(updated.name()).isEqualTo("pi-primary");
+        assertThat(updated.hasLlmApiKey()).isFalse();
     }
 
     @Test
@@ -240,6 +290,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             "bad-provider",
             true,
             AgentType.CLAUDE_CODE,
+            null,
             null,
             null,
             LlmProvider.OPENAI,
@@ -265,6 +316,83 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(problem).isNotNull();
         assertThat(problem.getDetail()).contains("CLAUDE_CODE");
         assertThat(problem.getDetail()).contains("ANTHROPIC");
+    }
+
+    @Test
+    @WithAdminUser
+    void postWithPiOAuthReturns400() {
+        Workspace workspace = setupWorkspace();
+
+        var request = new CreateAgentConfigRequestDTO(
+            "pi-oauth",
+            true,
+            AgentType.PI,
+            "gpt-5.4-mini",
+            null,
+            "oauth-token",
+            LlmProvider.OPENAI,
+            300,
+            2,
+            true,
+            de.tum.in.www1.hephaestus.agent.CredentialMode.OAUTH
+        );
+
+        ProblemDetail problem = webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+            .expectBody(ProblemDetail.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(problem).isNotNull();
+        assertThat(problem.getDetail()).contains("Pi does not support OAuth");
+    }
+
+    @Test
+    @WithAdminUser
+    void patchCanClearModelFields() {
+        Workspace workspace = setupWorkspace();
+        AgentConfigDTO created = createConfig(workspace, "clear-model-fields");
+
+        var updateRequest = new UpdateAgentConfigRequestDTO(
+            null,
+            null,
+            null,
+            null,
+            true,
+            null,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        AgentConfigDTO updated = webTestClient
+            .patch()
+            .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(updateRequest)
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(AgentConfigDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(updated).isNotNull();
+        assertThat(updated.modelName()).isNull();
+        assertThat(updated.modelVersion()).isNull();
     }
 
     @Test
@@ -376,6 +504,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             AgentType.CLAUDE_CODE,
             null,
             null,
+            null,
             LlmProvider.ANTHROPIC,
             null,
             null,
@@ -405,6 +534,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             AgentType.CLAUDE_CODE,
             null,
             null,
+            null,
             LlmProvider.ANTHROPIC,
             5, // below minimum of 30
             null,
@@ -432,6 +562,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             "location-test",
             true,
             AgentType.CLAUDE_CODE,
+            null,
             null,
             null,
             LlmProvider.ANTHROPIC,
@@ -476,6 +607,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             "secret-test",
             true,
             AgentType.CLAUDE_CODE,
+            null,
             null,
             "sk-super-secret-key",
             LlmProvider.ANTHROPIC,

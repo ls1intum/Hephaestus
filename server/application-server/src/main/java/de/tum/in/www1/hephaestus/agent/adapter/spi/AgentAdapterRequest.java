@@ -16,7 +16,7 @@ import org.springframework.lang.Nullable;
  * <ul>
  *   <li>{@link CredentialMode#PROXY} — {@code jobToken} required; container uses internal proxy</li>
  *   <li>{@link CredentialMode#API_KEY} — {@code credential} required; direct API key auth</li>
- *   <li>{@link CredentialMode#OAUTH} — {@code credential} required; direct OAuth token auth</li>
+ *   <li>{@link CredentialMode#OAUTH} — {@code credential} required; direct OAuth token auth for Claude Code</li>
  * </ul>
  *
  * @param agentType      the agent runtime

@@ -6,11 +6,11 @@ import de.tum.in.www1.hephaestus.agent.adapter.AgentResult;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapter;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapterRequest;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentSandboxSpec;
-import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
-import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.in.www1.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunner;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunnerRepository;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
@@ -86,7 +86,7 @@ public class AgentJobExecutor {
     private final Connection natsConnection;
     private final AgentNatsProperties natsProperties;
     private final AgentJobRepository jobRepository;
-    private final AgentConfigRepository configRepository;
+    private final AgentRunnerRepository runnerRepository;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final AgentAdapterRegistry adapterRegistry;
     private final SandboxManager sandboxManager;
@@ -105,7 +105,7 @@ public class AgentJobExecutor {
         @Qualifier("agentNatsConnection") Connection natsConnection,
         AgentNatsProperties natsProperties,
         AgentJobRepository jobRepository,
-        AgentConfigRepository configRepository,
+        AgentRunnerRepository runnerRepository,
         JobTypeHandlerRegistry handlerRegistry,
         AgentAdapterRegistry adapterRegistry,
         SandboxManager sandboxManager,
@@ -117,7 +117,7 @@ public class AgentJobExecutor {
         this.natsConnection = natsConnection;
         this.natsProperties = natsProperties;
         this.jobRepository = jobRepository;
-        this.configRepository = configRepository;
+        this.runnerRepository = runnerRepository;
         this.handlerRegistry = handlerRegistry;
         this.adapterRegistry = adapterRegistry;
         this.sandboxManager = sandboxManager;
@@ -522,22 +522,24 @@ public class AgentJobExecutor {
             AgentJob job = locked.get();
 
             // Concurrency gate: lock config row, check running count
-            if (job.getConfig() != null) {
-                Optional<AgentConfig> configOpt = configRepository.findByIdForUpdate(job.getConfig().getId());
-                if (configOpt.isPresent()) {
-                    AgentConfig config = configOpt.get();
-                    long runningCount = jobRepository.countByConfigIdAndStatusIn(
-                        config.getId(),
+            if (job.getConfig() != null && job.getConfig().getRunner() != null) {
+                Optional<AgentRunner> runnerOpt = runnerRepository.findByIdForUpdate(
+                    job.getConfig().getRunner().getId()
+                );
+                if (runnerOpt.isPresent()) {
+                    AgentRunner runner = runnerOpt.get();
+                    long runningCount = jobRepository.countByConfigRunnerIdAndStatusIn(
+                        runner.getId(),
                         Set.of(AgentJobStatus.RUNNING)
                     );
-                    if (runningCount >= config.getMaxConcurrentJobs()) {
+                    if (runningCount >= runner.getMaxConcurrentJobs()) {
                         concurrencyRejected.increment();
                         log.info(
-                            "Concurrency limit reached: jobId={}, configId={}, running={}, max={}",
+                            "Concurrency limit reached: jobId={}, runnerId={}, running={}, max={}",
                             jobId,
-                            config.getId(),
+                            runner.getId(),
                             runningCount,
-                            config.getMaxConcurrentJobs()
+                            runner.getMaxConcurrentJobs()
                         );
                         return ClaimOutcome.CONCURRENCY_FULL;
                     }
@@ -657,7 +659,7 @@ public class AgentJobExecutor {
                     // "delivery not attempted yet" from "no delivery needed"
                     freshJob.setDeliveryStatus(DeliveryStatus.PENDING);
                 }
-                // Primary: agent-reported usage (from OpenCode step-finish / Claude Code result)
+                // Primary: agent-reported usage from the runtime-specific result payload
                 var agentUsage = agentResult.usage();
                 if (agentUsage != null && agentUsage.totalCalls() > 0) {
                     freshJob.setLlmTotalCalls(agentUsage.totalCalls());

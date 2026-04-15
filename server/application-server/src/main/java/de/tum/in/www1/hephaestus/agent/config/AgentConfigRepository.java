@@ -14,11 +14,15 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> {
+    @Query("SELECT c FROM AgentConfig c JOIN FETCH c.runner WHERE c.workspace.id = :workspaceId")
     List<AgentConfig> findByWorkspaceId(Long workspaceId);
 
+    @Query("SELECT c FROM AgentConfig c JOIN FETCH c.runner WHERE c.id = :id AND c.workspace.id = :workspaceId")
     Optional<AgentConfig> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
     boolean existsByWorkspaceIdAndName(Long workspaceId, String name);
+
+    long countByRunnerId(Long runnerId);
 
     /**
      * Pessimistic lock on a config row for the executor's concurrency gate.

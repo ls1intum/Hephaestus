@@ -93,6 +93,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         agentConfig.setLlmProvider(LlmProvider.ANTHROPIC);
         agentConfig.setCredentialMode(CredentialMode.PROXY);
         agentConfig.setTimeoutSeconds(300);
+        agentConfig.setModelVersion("2026-03-17");
         agentConfig = agentConfigRepository.save(agentConfig);
 
         // Seed git entities needed for the submission request
@@ -361,11 +362,12 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(result).isPresent();
             var snapshot = result.get().getConfigSnapshot();
             assertThat(snapshot.get("agentType").asText()).isEqualTo("CLAUDE_CODE");
+            assertThat(snapshot.get("modelVersion").asText()).isEqualTo("2026-03-17");
             assertThat(snapshot.get("timeoutSeconds").asInt()).isEqualTo(300);
 
             // Change the config after submission
             agentConfig.setTimeoutSeconds(900);
-            agentConfig.setAgentType(AgentType.OPENCODE);
+            agentConfig.setAgentType(AgentType.PI);
             agentConfigRepository.save(agentConfig);
 
             // Re-load the job from DB — snapshot should still reflect the original

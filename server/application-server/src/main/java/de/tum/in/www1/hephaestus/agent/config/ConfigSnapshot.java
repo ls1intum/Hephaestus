@@ -28,6 +28,8 @@ public record ConfigSnapshot(
     int schemaVersion,
     Long configId,
     String configName,
+    Long runnerId,
+    String runnerName,
     AgentType agentType,
     LlmProvider llmProvider,
     CredentialMode credentialMode,
@@ -37,7 +39,7 @@ public record ConfigSnapshot(
     boolean allowInternet
 ) {
     /** Current schema version. Bump when adding/removing fields. */
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
 
     public ConfigSnapshot {
         Objects.requireNonNull(agentType, "agentType must not be null");
@@ -48,15 +50,46 @@ public record ConfigSnapshot(
         }
     }
 
+    public ConfigSnapshot(
+        int schemaVersion,
+        Long configId,
+        String configName,
+        AgentType agentType,
+        LlmProvider llmProvider,
+        CredentialMode credentialMode,
+        @Nullable String modelName,
+        @Nullable String modelVersion,
+        int timeoutSeconds,
+        boolean allowInternet
+    ) {
+        this(
+            schemaVersion,
+            configId,
+            configName,
+            configId,
+            configName,
+            agentType,
+            llmProvider,
+            credentialMode,
+            modelName,
+            modelVersion,
+            timeoutSeconds,
+            allowInternet
+        );
+    }
+
     /**
      * Create a snapshot from a live {@link AgentConfig}.
      */
     public static ConfigSnapshot from(AgentConfig config) {
         Objects.requireNonNull(config, "config must not be null");
+        var runner = config.getRunner();
         return new ConfigSnapshot(
             SCHEMA_VERSION,
             config.getId(),
             config.getName(),
+            runner != null && runner.getId() != null ? runner.getId() : config.getId(),
+            runner != null && runner.getName() != null ? runner.getName() : config.getName(),
             config.getAgentType(),
             config.getLlmProvider(),
             config.getCredentialMode(),
@@ -89,6 +122,23 @@ public record ConfigSnapshot(
                 )
             );
         }
-        return objectMapper.convertValue(node, ConfigSnapshot.class);
+        ConfigSnapshot snapshot = objectMapper.convertValue(node, ConfigSnapshot.class);
+        if (snapshot.runnerId() != null || snapshot.runnerName() != null) {
+            return snapshot;
+        }
+        return new ConfigSnapshot(
+            snapshot.schemaVersion(),
+            snapshot.configId(),
+            snapshot.configName(),
+            snapshot.configId(),
+            snapshot.configName(),
+            snapshot.agentType(),
+            snapshot.llmProvider(),
+            snapshot.credentialMode(),
+            snapshot.modelName(),
+            snapshot.modelVersion(),
+            snapshot.timeoutSeconds(),
+            snapshot.allowInternet()
+        );
     }
 }

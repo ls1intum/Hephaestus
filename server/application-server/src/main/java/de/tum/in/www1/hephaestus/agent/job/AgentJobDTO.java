@@ -1,9 +1,13 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
+import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 
 @Schema(description = "Agent job execution record (job_token intentionally omitted)")
@@ -14,6 +18,12 @@ public record AgentJobDTO(
     @Schema(description = "Job metadata (routing/display info)") Object metadata,
     @Schema(description = "Job output (agent results)") Object output,
     @NonNull @Schema(description = "Frozen agent config at submit time") Object configSnapshot,
+    @Schema(description = "Frozen config name at submit time") String configName,
+    @Schema(description = "Frozen runner name at submit time") String runnerName,
+    @Schema(description = "Frozen agent type at submit time") String configAgentType,
+    @Schema(description = "Frozen provider at submit time") String configLlmProvider,
+    @Schema(description = "Frozen model name at submit time") String configModelName,
+    @Schema(description = "Frozen model version at submit time") String configModelVersion,
     @Schema(description = "Docker container ID") String containerId,
     @Schema(description = "Container exit code") Integer exitCode,
     @Schema(description = "Human-readable error message") String errorMessage,
@@ -36,7 +46,19 @@ public record AgentJobDTO(
     @Schema(description = "Tokens written to prompt cache") Integer llmCacheWriteTokens,
     @Schema(description = "Estimated cost in USD (agent-reported)") Double llmCostUsd
 ) {
-    public static AgentJobDTO from(AgentJob job) {
+    private static final Logger log = LoggerFactory.getLogger(AgentJobDTO.class);
+
+    public static AgentJobDTO from(AgentJob job, ObjectMapper objectMapper) {
+        ConfigSnapshot snapshot = null;
+        try {
+            if (job.getConfigSnapshot() != null) {
+                snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
+            }
+        } catch (Exception exception) {
+            log.warn("Failed to parse config snapshot for agent job {}", job.getId(), exception);
+            snapshot = null;
+        }
+
         return new AgentJobDTO(
             job.getId(),
             job.getJobType(),
@@ -44,6 +66,12 @@ public record AgentJobDTO(
             job.getMetadata(),
             job.getOutput(),
             job.getConfigSnapshot(),
+            snapshot != null ? snapshot.configName() : null,
+            snapshot != null ? snapshot.runnerName() : null,
+            snapshot != null ? snapshot.agentType().name() : null,
+            snapshot != null ? snapshot.llmProvider().name() : null,
+            snapshot != null ? snapshot.modelName() : null,
+            snapshot != null ? snapshot.modelVersion() : null,
             job.getContainerId(),
             job.getExitCode(),
             job.getErrorMessage(),
