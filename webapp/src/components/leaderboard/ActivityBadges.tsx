@@ -18,6 +18,7 @@ export interface ActivityBadgesProps {
 	approvals: number;
 	comments: number;
 	codeComments: number;
+	reviewedPullRequestsTitle?: string;
 	highlightReviews?: boolean;
 	className?: string;
 	isLoading?: boolean;
@@ -30,6 +31,7 @@ export function ActivityBadges({
 	approvals,
 	comments,
 	codeComments,
+	reviewedPullRequestsTitle,
 	highlightReviews = false,
 	className,
 	isLoading = false,
@@ -62,6 +64,7 @@ export function ActivityBadges({
 						reviewedPullRequests={reviewedPullRequests}
 						highlight={highlightReviews}
 						providerType={providerType}
+						title={reviewedPullRequestsTitle}
 					/>
 					<div className="flex items-center text-provider-muted-foreground">
 						<ChevronLeftIcon className="h-4 w-4" />

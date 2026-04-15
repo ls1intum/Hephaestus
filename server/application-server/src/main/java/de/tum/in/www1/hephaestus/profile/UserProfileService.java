@@ -194,7 +194,8 @@ public class UserProfileService {
             )
             .orElse(ProfileActivityStatsDTO.empty());
 
-        // Distinct PRs reviewed (hydrated from activity events)
+        // Keep the backend list aligned with leaderboard semantics; the profile UI can merge
+        // in visible own-PR activity when presenting this list.
         List<PullRequestInfoDTO> reviewedPullRequests = buildReviewedPullRequestsList(
             workspaceId,
             userEntity.getId(),

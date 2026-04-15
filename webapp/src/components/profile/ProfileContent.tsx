@@ -108,13 +108,18 @@ export function ProfileContent({
 	const terms = getProviderTerms(providerType);
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
-	// Use server-provided reviewed PRs if available, otherwise extract from review activity
-	const reviewedPullRequestsForPopover: ReviewedPullRequest[] =
-		reviewedPullRequests && reviewedPullRequests.length > 0
-			? reviewedPullRequests
-			: (reviewActivity ?? [])
-					.map((activity) => activity.pullRequest)
-					.filter((pr): pr is PullRequestBaseInfo => Boolean(pr));
+	const activityPullRequests = (reviewActivity ?? [])
+		.map((activity) => activity.pullRequest)
+		.filter((pr): pr is PullRequestBaseInfo => Boolean(pr));
+
+	const reviewedPullRequestsForPopover: ReviewedPullRequest[] = Array.from(
+		new Map(
+			[...(reviewedPullRequests ?? []), ...activityPullRequests].map((pullRequest) => [
+				pullRequest.id,
+				pullRequest,
+			]),
+		).values(),
+	);
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -133,6 +138,7 @@ export function ProfileContent({
 							<h3 className="text-lg font-semibold">Review activity</h3>
 							<ActivityBadges
 								reviewedPullRequests={reviewedPullRequestsForPopover}
+								reviewedPullRequestsTitle={`Active ${terms.pullRequestsShort}`}
 								approvals={reviewStats.approvals}
 								changeRequests={reviewStats.changeRequests}
 								comments={reviewStats.comments}

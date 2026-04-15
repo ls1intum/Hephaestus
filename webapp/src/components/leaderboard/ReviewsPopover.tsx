@@ -14,18 +14,21 @@ export interface ReviewsPopoverProps {
 	reviewedPullRequests: readonly ReviewedPullRequest[];
 	highlight?: boolean;
 	providerType?: ProviderType;
+	title?: string;
 }
 
 export function ReviewsPopover({
 	reviewedPullRequests,
 	highlight = false,
 	providerType = "GITHUB",
+	title,
 }: ReviewsPopoverProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [showCopySuccess, setShowCopySuccess] = useState(false);
 	const hasReviews = reviewedPullRequests.length > 0;
 	const terms = getProviderTerms(providerType);
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
+	const popoverTitle = title ?? `Reviewed ${terms.pullRequestsShort}`;
 
 	// Sort reviewed PRs by repository name and PR number
 	const sortedReviewedPullRequests = reviewedPullRequests
@@ -122,7 +125,7 @@ export function ReviewsPopover({
 				<div className="flex flex-wrap justify-between items-center gap-4">
 					<CardTitle className="flex items-center gap-2">
 						<PrIcon size={20} />
-						<h4 className="font-medium leading-none">Reviewed {terms.pullRequestsShort}</h4>
+						<h4 className="font-medium leading-none">{popoverTitle}</h4>
 					</CardTitle>
 					<Button variant="outline" size="icon" onClick={copyPullRequests}>
 						{showCopySuccess ? (
