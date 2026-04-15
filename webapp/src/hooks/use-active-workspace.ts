@@ -1,27 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMatches, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useMatches } from "@tanstack/react-router";
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { buildWorkspaceSwitchPlan, getWorkspaceRouteMatch } from "@/lib/workspace-switching";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { getWorkspaceRouteMatch } from "@/lib/workspace-switching";
 
 /**
- * Returns the active workspace slug, the available workspaces and a setter to switch between them.
- * Selection is persisted locally so page reloads keep the same workspace.
- *
- * When the current workspace becomes inaccessible (e.g., SUSPENDED or PURGED),
- * this hook automatically redirects to another available workspace.
+ * Returns the active workspace derived from the current route when present,
+ * otherwise falls back to the first accessible workspace from the workspace list.
  */
 export function useActiveWorkspaceSlug() {
-	const { selectedSlug, setSelectedSlug } = useWorkspaceStore();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
-	const navigate = useNavigate();
 	const query = useQuery({
 		...listWorkspacesOptions(),
 		enabled: isAuthenticated && !authLoading,
-		// Short stale time to ensure we detect workspace status changes quickly
-		staleTime: 30_000, // 30 seconds
+		staleTime: 30_000,
 		refetchOnWindowFocus: true,
 	});
 	const workspaces = Array.isArray(query.data) ? query.data : [];
@@ -29,127 +21,16 @@ export function useActiveWorkspaceSlug() {
 		select: (matches) => getWorkspaceRouteMatch(matches),
 	});
 
-	// Track if we've already attempted a redirect to prevent infinite loops
-	const hasAttemptedRedirect = useRef(false);
 	const slugFromRoute = workspaceRoute?.workspaceSlug;
-
-	const isValidSlug = (slug?: string) =>
-		slug != null && workspaces.some((ws) => ws.workspaceSlug === slug);
-
-	const activeSlug = (() => {
-		if (slugFromRoute) {
-			return isValidSlug(slugFromRoute) ? slugFromRoute : undefined;
-		}
-
-		if (isValidSlug(selectedSlug)) {
-			return selectedSlug;
-		}
-
-		return workspaces[0]?.workspaceSlug ?? undefined;
-	})();
-
-	// Reset redirect tracking when location or workspaces change meaningfully
-	// Also reset when workspaces list changes (e.g., after server restart or query refetch)
-	const workspaceSlugs = workspaces.map((ws) => ws.workspaceSlug).join(",");
-	// biome-ignore lint/correctness/useExhaustiveDependencies: deps trigger re-run to reset flag
-	useEffect(() => {
-		hasAttemptedRedirect.current = false;
-	}, [slugFromRoute, workspaceSlugs]);
-
-	const slugFromRouteIsValid =
-		slugFromRoute != null && workspaces.some((ws) => ws.workspaceSlug === slugFromRoute);
-
-	// Redirect to another workspace when current workspace becomes inaccessible
-	// This handles the case where a workspace becomes SUSPENDED/PURGED while the user is viewing it
-	useEffect(() => {
-		// Only attempt redirect if:
-		// 1. We have a slug in the URL path
-		// 2. Workspaces have loaded (not loading and we have data or confirmed empty)
-		// 3. The slug is not valid (workspace became inaccessible)
-		// 4. We haven't already attempted a redirect for this path
-		const workspacesLoaded = !query.isLoading && query.data !== undefined;
-
-		if (
-			workspacesLoaded &&
-			slugFromRoute &&
-			!slugFromRouteIsValid &&
-			!hasAttemptedRedirect.current
-		) {
-			hasAttemptedRedirect.current = true;
-
-			const fallbackSlug = workspaces[0]?.workspaceSlug;
-			if (fallbackSlug) {
-				setSelectedSlug(fallbackSlug);
-				const target = buildWorkspaceSwitchPlan(workspaceRoute, fallbackSlug);
-
-				if (target.kind === "relative") {
-					if (target.preserveSearch) {
-						navigate({
-							from: target.from as never,
-							to: target.to as never,
-							params: { workspaceSlug: fallbackSlug } as never,
-							search: true,
-							replace: true,
-						});
-					} else {
-						navigate({
-							from: target.from as never,
-							to: target.to as never,
-							params: { workspaceSlug: fallbackSlug } as never,
-							replace: true,
-						});
-					}
-				} else {
-					navigate({
-						to: target.to,
-						params: target.params,
-						...(target.preserveSearch ? { search: (prev) => prev } : {}),
-						replace: true,
-					});
-				}
-			} else {
-				// No workspaces available, redirect to home
-				navigate({
-					to: "/",
-					replace: true,
-				});
-			}
-		}
-	}, [
-		slugFromRoute,
-		slugFromRouteIsValid,
-		workspaceRoute,
-		query.isLoading,
-		query.data,
-		workspaces,
-		navigate,
-		setSelectedSlug,
-	]);
-
-	// Keep store in sync with activeSlug, but only after workspaces have loaded.
-	// During loading, activeSlug may be undefined even if the URL slug is valid,
-	// so we must wait until we have workspace data before syncing.
-	useEffect(() => {
-		const workspacesLoaded = !query.isLoading && query.data !== undefined;
-		if (workspacesLoaded && activeSlug !== selectedSlug) {
-			setSelectedSlug(activeSlug);
-		}
-	}, [activeSlug, selectedSlug, setSelectedSlug, query.isLoading, query.data]);
-
-	// Clear persisted selection when the user logs out to avoid cross-user leakage
-	useEffect(() => {
-		if (!isAuthenticated && selectedSlug) {
-			setSelectedSlug(undefined);
-		}
-	}, [isAuthenticated, selectedSlug, setSelectedSlug]);
-
-	const activeWorkspace = workspaces.find((ws) => ws.workspaceSlug === activeSlug);
+	const activeWorkspace = slugFromRoute
+		? workspaces.find((workspace) => workspace.workspaceSlug === slugFromRoute)
+		: workspaces[0];
 
 	return {
-		workspaceSlug: activeSlug,
+		workspaceSlug: activeWorkspace?.workspaceSlug,
 		workspaces,
 		providerType: activeWorkspace?.providerType ?? "GITHUB",
-		isLoading: query.isLoading,
+		isLoading: authLoading || query.isLoading,
 		error: query.error as Error | null,
 	};
 }

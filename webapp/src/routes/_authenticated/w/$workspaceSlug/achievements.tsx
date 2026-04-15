@@ -1,5 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { Spinner } from "@/components/ui/spinner";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
@@ -16,19 +15,17 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achieveme
 function AchievementsPage() {
 	const { userProfile, getUserProfilePictureUrl, username } = useAuth();
 	const { workspaceSlug } = Route.useParams();
-	const navigate = useNavigate();
 	const { achievementsEnabled, isLoading } = useWorkspaceFeatures(workspaceSlug);
 
-	useEffect(() => {
-		if (!isLoading && !achievementsEnabled && workspaceSlug && username) {
-			// Silent redirect — UI elements are already hidden when disabled
-			navigate({
-				to: "/w/$workspaceSlug/user/$username",
-				params: { workspaceSlug, username },
-				replace: true,
-			});
-		}
-	}, [isLoading, achievementsEnabled, workspaceSlug, username, navigate]);
+	if (!isLoading && !achievementsEnabled && workspaceSlug && username) {
+		return (
+			<Navigate
+				to="/w/$workspaceSlug/user/$username"
+				params={{ workspaceSlug, username }}
+				replace
+			/>
+		);
+	}
 
 	if (isLoading || !achievementsEnabled) {
 		return (

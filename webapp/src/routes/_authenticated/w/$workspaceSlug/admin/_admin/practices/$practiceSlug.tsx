@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	getPracticeOptions,
@@ -60,12 +60,16 @@ function EditPracticeContainer() {
 		navigate({ to: ".." });
 	};
 
-	if (isLoading || !practice) {
+	if (isLoading) {
 		return (
 			<div className="flex justify-center items-center h-64">
 				<Spinner className="h-8 w-8" />
 			</div>
 		);
+	}
+
+	if (!practice) {
+		return <Navigate to="/w/$workspaceSlug/admin/practices" params={{ workspaceSlug }} replace />;
 	}
 
 	return (
