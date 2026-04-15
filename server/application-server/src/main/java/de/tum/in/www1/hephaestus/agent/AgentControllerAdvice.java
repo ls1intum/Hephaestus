@@ -6,6 +6,8 @@ import de.tum.in.www1.hephaestus.agent.config.AgentConfigMissingCredentialExcept
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigNameConflictException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigProviderMismatchException;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobStateConflictException;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunnerHasLinkedConfigsException;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunnerNameConflictException;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import java.util.Optional;
 import org.springframework.core.Ordered;
@@ -31,6 +33,16 @@ public class AgentControllerAdvice {
     @ExceptionHandler(AgentConfigNameConflictException.class)
     ProblemDetail handleAgentConfigNameConflict(AgentConfigNameConflictException exception) {
         return problem(HttpStatus.CONFLICT, "Agent config name conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(AgentRunnerNameConflictException.class)
+    ProblemDetail handleAgentRunnerNameConflict(AgentRunnerNameConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "Agent runner name conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(AgentRunnerHasLinkedConfigsException.class)
+    ProblemDetail handleAgentRunnerHasLinkedConfigs(AgentRunnerHasLinkedConfigsException exception) {
+        return problem(HttpStatus.CONFLICT, "Agent runner has linked configs", exception.getMessage());
     }
 
     @ExceptionHandler(AgentConfigProviderMismatchException.class)

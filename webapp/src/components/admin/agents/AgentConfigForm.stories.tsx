@@ -2,8 +2,13 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 import { fn } from "storybook/test";
 import { AgentConfigForm } from "./AgentConfigForm";
-import { mockAgentConfigs } from "./storyMockData";
-import { createDraftFromConfig, createEmptyDraft } from "./utils";
+import { mockAgentConfigs, mockAgentRunners } from "./storyMockData";
+import {
+	createConfigDraftFromConfig,
+	createEmptyConfigDraft,
+	createEmptyRunnerDraft,
+	createRunnerDraftFromRunner,
+} from "./utils";
 
 /**
  * Form for creating and editing review-agent runtime configurations.
@@ -13,17 +18,31 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		mode: "create",
-		draft: createEmptyDraft(),
+		title: "Runner",
+		submitLabel: "Save runner",
+		draft: createEmptyRunnerDraft(),
+		configDraft: null,
 		errors: {},
 		existingHasCredential: false,
 		isSaving: false,
-		onSubmit: fn(),
+		runners: mockAgentRunners,
 		onReset: fn(),
-		onDraftChange: fn(),
+		onSubmit: fn().mockResolvedValue(undefined),
+		onRunnerDraftChange: fn(),
+		onConfigDraftChange: fn(),
 	},
 	render: (args) => {
-		const [draft, setDraft] = useState(args.draft);
-		return <AgentConfigForm {...args} draft={draft} onDraftChange={setDraft} />;
+		const [runnerDraft, setRunnerDraft] = useState(args.draft);
+		const [configDraft, setConfigDraft] = useState(args.configDraft);
+		return (
+			<AgentConfigForm
+				{...args}
+				draft={runnerDraft}
+				configDraft={configDraft}
+				onRunnerDraftChange={setRunnerDraft}
+				onConfigDraftChange={setConfigDraft}
+			/>
+		);
 	},
 } satisfies Meta<typeof AgentConfigForm>;
 
@@ -36,8 +55,9 @@ export const Create: Story = {};
 export const Edit: Story = {
 	args: {
 		mode: "edit",
-		draft: createDraftFromConfig(mockAgentConfigs[1]),
+		draft: createRunnerDraftFromRunner(mockAgentRunners[1]),
 		existingHasCredential: true,
+		submitLabel: "Update runner",
 	},
 };
 
@@ -49,11 +69,35 @@ export const ValidationErrors: Story = {
 			allowInternet: "Direct credential modes require internet access.",
 		},
 		draft: {
-			...createEmptyDraft(),
+			...createEmptyRunnerDraft(),
 			agentType: "PI",
 			credentialMode: "API_KEY",
 			llmProvider: "OPENAI",
 			allowInternet: false,
 		},
+	},
+};
+
+export const ConfigBinding: Story = {
+	args: {
+		title: "Agent config",
+		submitLabel: "Save config",
+		draft: null,
+		configDraft: createConfigDraftFromConfig(mockAgentConfigs[0]),
+		existingHasCredential: false,
+	},
+};
+
+export const ConfigValidationErrors: Story = {
+	args: {
+		title: "Agent config",
+		submitLabel: "Save config",
+		draft: null,
+		configDraft: createEmptyConfigDraft(),
+		errors: {
+			name: "Config name is required",
+			runnerId: "Select a runner",
+		},
+		existingHasCredential: false,
 	},
 };

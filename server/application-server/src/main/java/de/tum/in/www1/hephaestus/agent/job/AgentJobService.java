@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.agent.handler.PullRequestReviewSubmissionReques
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunner;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
@@ -244,8 +245,8 @@ public class AgentJobService {
             // Copy LLM API key — needed for all credential modes:
             // PROXY mode: proxy controller reads it to forward to upstream provider
             // API_KEY or Claude Code OAuth mode: adapter injects it as env var into the container
-            if (config.getLlmApiKey() != null) {
-                job.setLlmApiKey(config.getLlmApiKey());
+            if (config.getRunner().getLlmApiKey() != null) {
+                job.setLlmApiKey(config.getRunner().getLlmApiKey());
             }
 
             try {

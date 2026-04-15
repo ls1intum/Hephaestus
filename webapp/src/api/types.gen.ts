@@ -559,15 +559,15 @@ export type UpdatePracticeActiveRequest = {
 };
 
 /**
- * Request to update an existing agent configuration (all fields optional — null fields are not changed)
+ * Request to update an existing runner (all fields optional - null fields are not changed)
  */
-export type UpdateAgentConfigRequest = {
+export type UpdateAgentRunnerRequest = {
     /**
      * Type of coding agent
      */
     agentType?: 'CLAUDE_CODE' | 'PI';
     /**
-     * Whether agent containers have internet access
+     * Whether runner containers have internet access
      */
     allowInternet?: boolean;
     /**
@@ -587,7 +587,65 @@ export type UpdateAgentConfigRequest = {
      */
     credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
     /**
-     * Whether the agent is enabled
+     * LLM API key (omit or null to keep existing key)
+     */
+    llmApiKey?: string;
+    /**
+     * LLM provider
+     */
+    llmProvider?: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs?: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Model version or snapshot date
+     */
+    modelVersion?: string;
+    /**
+     * Unique name within the workspace
+     */
+    name?: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds?: number;
+};
+
+/**
+ * Request to update an existing agent configuration (all fields optional — null fields are not changed)
+ */
+export type UpdateAgentConfigRequest = {
+    /**
+     * Type of coding agent
+     */
+    agentType?: 'CLAUDE_CODE' | 'PI';
+    /**
+     * Whether runner containers have internet access
+     */
+    allowInternet?: boolean;
+    /**
+     * Clear the stored LLM API key
+     */
+    clearLlmApiKey?: boolean;
+    /**
+     * Clear the stored model name
+     */
+    clearModelName?: boolean;
+    /**
+     * Clear the stored model version
+     */
+    clearModelVersion?: boolean;
+    /**
+     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     */
+    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    /**
+     * Whether the review agent is enabled
      */
     enabled?: boolean;
     /**
@@ -614,6 +672,10 @@ export type UpdateAgentConfigRequest = {
      * Unique name within the workspace
      */
     name?: string;
+    /**
+     * Runner that executes this agent
+     */
+    runnerId?: number;
     /**
      * Job timeout in seconds
      */
@@ -1334,6 +1396,10 @@ export type AgentJob = {
      */
     retryCount: number;
     /**
+     * Frozen runner name at submit time
+     */
+    runnerName?: string;
+    /**
      * Timestamp when the job started running
      */
     startedAt?: Date;
@@ -1720,25 +1786,21 @@ export type CreateDocumentRequest = {
 };
 
 /**
- * Request to create a new agent configuration for a workspace
+ * Request to create a new runner for a workspace
  */
-export type CreateAgentConfigRequest = {
+export type CreateAgentRunnerRequest = {
     /**
      * Type of coding agent
      */
     agentType: 'CLAUDE_CODE' | 'PI';
     /**
-     * Whether agent containers have internet access
+     * Whether runner containers have internet access
      */
     allowInternet?: boolean;
     /**
      * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
      */
     credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
-    /**
-     * Whether the agent is enabled
-     */
-    enabled?: boolean;
     /**
      * LLM API key
      */
@@ -1763,6 +1825,60 @@ export type CreateAgentConfigRequest = {
      * Unique name within the workspace
      */
     name: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds?: number;
+};
+
+/**
+ * Request to create a new review-agent configuration for a workspace
+ */
+export type CreateAgentConfigRequest = {
+    /**
+     * Type of coding agent
+     */
+    agentType?: 'CLAUDE_CODE' | 'PI';
+    /**
+     * Whether runner containers have internet access
+     */
+    allowInternet?: boolean;
+    /**
+     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     */
+    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    /**
+     * Whether the review agent is enabled
+     */
+    enabled?: boolean;
+    /**
+     * LLM API key
+     */
+    llmApiKey?: string;
+    /**
+     * LLM provider
+     */
+    llmProvider?: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs?: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Model version or snapshot date
+     */
+    modelVersion?: string;
+    /**
+     * Unique name within the workspace
+     */
+    name: string;
+    /**
+     * Existing runner that executes this agent
+     */
+    runnerId?: number;
     /**
      * Job timeout in seconds
      */
@@ -1874,7 +1990,65 @@ export type AssignRoleRequest = {
 };
 
 /**
- * Agent configuration for a workspace (API key redacted)
+ * Reusable runner for executing workspace review agents (API key redacted)
+ */
+export type AgentRunner = {
+    /**
+     * Type of coding agent
+     */
+    agentType: 'CLAUDE_CODE' | 'PI';
+    /**
+     * Whether runner containers have internet access
+     */
+    allowInternet: boolean;
+    /**
+     * Timestamp when the runner was created
+     */
+    createdAt: Date;
+    /**
+     * Authentication mode
+     */
+    credentialMode: 'PROXY' | 'API_KEY' | 'OAUTH';
+    /**
+     * Whether an LLM API key is configured
+     */
+    hasLlmApiKey: boolean;
+    /**
+     * Runner ID
+     */
+    id: number;
+    /**
+     * LLM provider
+     */
+    llmProvider: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Model version or snapshot date
+     */
+    modelVersion?: string;
+    /**
+     * Unique name within the workspace
+     */
+    name: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds: number;
+    /**
+     * Timestamp when the runner was last updated
+     */
+    updatedAt?: Date;
+};
+
+/**
+ * Review-agent configuration for a workspace
  */
 export type AgentConfig = {
     /**
@@ -1882,7 +2056,7 @@ export type AgentConfig = {
      */
     agentType: 'CLAUDE_CODE' | 'PI';
     /**
-     * Whether agent containers have internet access
+     * Whether runner containers have internet access
      */
     allowInternet: boolean;
     /**
@@ -1894,7 +2068,7 @@ export type AgentConfig = {
      */
     credentialMode: 'PROXY' | 'API_KEY' | 'OAUTH';
     /**
-     * Whether the agent is enabled
+     * Whether the review agent is enabled
      */
     enabled: boolean;
     /**
@@ -1925,6 +2099,14 @@ export type AgentConfig = {
      * Unique name within the workspace
      */
     name: string;
+    /**
+     * Runner ID used to execute this agent
+     */
+    runnerId: number;
+    /**
+     * Runner name used to execute this agent
+     */
+    runnerName: string;
     /**
      * Job timeout in seconds
      */
@@ -2505,6 +2687,146 @@ export type RetryDeliveryResponses = {
 };
 
 export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
+
+export type GetRunnersData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-runners';
+};
+
+export type GetRunnersResponses = {
+    /**
+     * Runners returned
+     */
+    200: Array<AgentRunner>;
+};
+
+export type GetRunnersResponse = GetRunnersResponses[keyof GetRunnersResponses];
+
+export type CreateRunnerData = {
+    body: CreateAgentRunnerRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-runners';
+};
+
+export type CreateRunnerErrors = {
+    /**
+     * Runner name already exists in this workspace
+     */
+    409: unknown;
+};
+
+export type CreateRunnerResponses = {
+    /**
+     * Runner created
+     */
+    201: AgentRunner;
+};
+
+export type CreateRunnerResponse = CreateRunnerResponses[keyof CreateRunnerResponses];
+
+export type DeleteRunnerData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        runnerId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-runners/{runnerId}';
+};
+
+export type DeleteRunnerErrors = {
+    /**
+     * Runner not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete runner with linked configs
+     */
+    409: unknown;
+};
+
+export type DeleteRunnerResponses = {
+    /**
+     * Runner deleted
+     */
+    204: void;
+};
+
+export type DeleteRunnerResponse = DeleteRunnerResponses[keyof DeleteRunnerResponses];
+
+export type GetRunnerData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        runnerId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-runners/{runnerId}';
+};
+
+export type GetRunnerErrors = {
+    /**
+     * Runner not found
+     */
+    404: unknown;
+};
+
+export type GetRunnerResponses = {
+    /**
+     * Runner returned
+     */
+    200: AgentRunner;
+};
+
+export type GetRunnerResponse = GetRunnerResponses[keyof GetRunnerResponses];
+
+export type UpdateRunnerData = {
+    body: UpdateAgentRunnerRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        runnerId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-runners/{runnerId}';
+};
+
+export type UpdateRunnerErrors = {
+    /**
+     * Runner not found
+     */
+    404: unknown;
+};
+
+export type UpdateRunnerResponses = {
+    /**
+     * Runner updated
+     */
+    200: AgentRunner;
+};
+
+export type UpdateRunnerResponse = UpdateRunnerResponses[keyof UpdateRunnerResponses];
 
 export type UpdateFeaturesData = {
     body: UpdateWorkspaceFeaturesRequest;

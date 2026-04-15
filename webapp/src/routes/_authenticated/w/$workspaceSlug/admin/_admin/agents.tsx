@@ -6,16 +6,28 @@ import { z } from "zod";
 import {
 	cancelJobMutation,
 	createConfigMutation,
+	createRunnerMutation,
 	deleteConfigMutation,
+	deleteRunnerMutation,
 	getConfigsOptions,
 	getConfigsQueryKey,
 	getJobOptions,
+	getRunnersOptions,
+	getRunnersQueryKey,
 	listJobsOptions,
 	listJobsQueryKey,
 	retryDeliveryMutation,
 	updateConfigMutation,
+	updateRunnerMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { CreateAgentConfigRequest, UpdateAgentConfigRequest } from "@/api/types.gen";
+import type {
+	AgentConfig,
+	AgentRunner,
+	CreateAgentConfigRequest,
+	CreateAgentRunnerRequest,
+	UpdateAgentConfigRequest,
+	UpdateAgentRunnerRequest,
+} from "@/api/types.gen";
 import { AdminAgentsPage } from "@/components/admin/agents/AdminAgentsPage";
 import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
@@ -105,6 +117,11 @@ function AdminAgentsContent({ workspaceSlug, isWorkspaceLoading }: AdminAgentsCo
 	});
 	const configsQuery = useQuery(configsQueryOptions);
 
+	const runnersQueryOptions = getRunnersOptions({
+		path: { workspaceSlug },
+	});
+	const runnersQuery = useQuery(runnersQueryOptions);
+
 	const jobsQueryOptions = listJobsOptions({
 		path: { workspaceSlug },
 		query: {
@@ -133,6 +150,31 @@ function AdminAgentsContent({ workspaceSlug, isWorkspaceLoading }: AdminAgentsCo
 		});
 	};
 
+	const configsQueryKey = getConfigsQueryKey({ path: { workspaceSlug } });
+	const runnersQueryKey = getRunnersQueryKey({ path: { workspaceSlug } });
+
+	const upsertById = <T extends { id: number; name: string }>(
+		items: T[] | undefined,
+		item: T,
+	): T[] => {
+		const currentItems = items ?? [];
+		const existingIndex = currentItems.findIndex((currentItem) => currentItem.id === item.id);
+		if (existingIndex === -1) {
+			return [...currentItems, item].sort((left, right) => left.name.localeCompare(right.name));
+		}
+
+		return currentItems.map((currentItem) => (currentItem.id === item.id ? item : currentItem));
+	};
+
+	const removeById = <T extends { id: number }>(items: T[] | undefined, itemId: number): T[] =>
+		(items ?? []).filter((item) => item.id !== itemId);
+
+	const invalidateRunners = () => {
+		queryClient.invalidateQueries({
+			queryKey: runnersQueryKey,
+		});
+	};
+
 	const invalidateJobs = () => {
 		queryClient.invalidateQueries({
 			queryKey: listJobsQueryKey({
@@ -146,17 +188,18 @@ function AdminAgentsContent({ workspaceSlug, isWorkspaceLoading }: AdminAgentsCo
 			}),
 		});
 		if (jobId) {
-			queryClient.invalidateQueries({
-				queryKey: jobDetailsQueryOptions.queryKey,
-			});
+			queryClient.invalidateQueries({ queryKey: jobDetailsQueryOptions.queryKey });
 		}
 	};
 
 	const createConfig = useMutation({
 		...createConfigMutation(),
-		onSuccess: () => {
+		onSuccess: (config) => {
+			queryClient.setQueryData<AgentConfig[]>(configsQueryKey, (current) =>
+				upsertById(current, config),
+			);
 			invalidateConfigs();
-			toast.success("Agent config created");
+			toast.success("Agent config saved");
 		},
 		onError: (error) => {
 			toast.error((error as Error).message || "Failed to create agent config");
@@ -165,7 +208,10 @@ function AdminAgentsContent({ workspaceSlug, isWorkspaceLoading }: AdminAgentsCo
 
 	const updateConfig = useMutation({
 		...updateConfigMutation(),
-		onSuccess: () => {
+		onSuccess: (config) => {
+			queryClient.setQueryData<AgentConfig[]>(configsQueryKey, (current) =>
+				upsertById(current, config),
+			);
 			invalidateConfigs();
 			toast.success("Agent config updated");
 		},
@@ -176,12 +222,60 @@ function AdminAgentsContent({ workspaceSlug, isWorkspaceLoading }: AdminAgentsCo
 
 	const deleteConfig = useMutation({
 		...deleteConfigMutation(),
-		onSuccess: () => {
+		onSuccess: (_, variables) => {
+			queryClient.setQueryData<AgentConfig[]>(configsQueryKey, (current) =>
+				removeById(current, variables.path.configId),
+			);
 			invalidateConfigs();
 			toast.success("Agent config deleted");
 		},
 		onError: (error) => {
 			toast.error((error as Error).message || "Failed to delete agent config");
+		},
+	});
+
+	const createRunner = useMutation({
+		...createRunnerMutation(),
+		onSuccess: (runner) => {
+			queryClient.setQueryData<AgentRunner[]>(runnersQueryKey, (current) =>
+				upsertById(current, runner),
+			);
+			invalidateRunners();
+			toast.success("Runner saved");
+		},
+		onError: (error) => {
+			toast.error((error as Error).message || "Failed to create runner");
+		},
+	});
+
+	const updateRunner = useMutation({
+		...updateRunnerMutation(),
+		onSuccess: (runner) => {
+			queryClient.setQueryData<AgentRunner[]>(runnersQueryKey, (current) =>
+				upsertById(current, runner),
+			);
+			invalidateRunners();
+			invalidateConfigs();
+			invalidateJobs();
+			toast.success("Runner updated");
+		},
+		onError: (error) => {
+			toast.error((error as Error).message || "Failed to update runner");
+		},
+	});
+
+	const deleteRunner = useMutation({
+		...deleteRunnerMutation(),
+		onSuccess: (_, variables) => {
+			queryClient.setQueryData<AgentRunner[]>(runnersQueryKey, (current) =>
+				removeById(current, variables.path.runnerId),
+			);
+			invalidateRunners();
+			invalidateConfigs();
+			toast.success("Runner deleted");
+		},
+		onError: (error) => {
+			toast.error((error as Error).message || "Failed to delete runner");
 		},
 	});
 
@@ -217,12 +311,7 @@ function AdminAgentsContent({ workspaceSlug, isWorkspaceLoading }: AdminAgentsCo
 					page: number;
 					jobId: string | undefined;
 			  }>
-			| ((current: {
-					status: (typeof jobStatusOptions)[number];
-					configId: string;
-					page: number;
-					jobId?: string;
-			  }) => Partial<{
+			| ((current: AgentsSearch) => Partial<{
 					status: (typeof jobStatusOptions)[number];
 					configId: string;
 					page: number;
@@ -243,41 +332,59 @@ function AdminAgentsContent({ workspaceSlug, isWorkspaceLoading }: AdminAgentsCo
 
 	return (
 		<AdminAgentsPage
+			runners={runnersQuery.data ?? []}
 			configs={configsQuery.data ?? []}
 			jobsPage={jobsQuery.data}
 			selectedJob={jobDetailsQuery.data}
 			selectedJobId={jobId ?? null}
 			jobsFilter={{ status, configId, page, size: pageSize }}
-			isLoadingConfigs={configsQuery.isLoading || isWorkspaceLoading || !workspaceSlug}
-			isLoadingJobs={jobsQuery.isLoading || isWorkspaceLoading || !workspaceSlug}
+			isLoadingRunners={runnersQuery.isLoading || isWorkspaceLoading}
+			isLoadingConfigs={configsQuery.isLoading || isWorkspaceLoading}
+			isLoadingJobs={jobsQuery.isLoading || isWorkspaceLoading}
 			isLoadingJobDetails={jobDetailsQuery.isLoading}
-			configsError={(configsQuery.error as Error | null) ?? null}
 			jobsError={(jobsQuery.error as Error | null) ?? null}
 			jobDetailsError={(jobDetailsQuery.error as Error | null) ?? null}
+			isSavingRunner={createRunner.isPending || updateRunner.isPending}
 			isSavingConfig={createConfig.isPending || updateConfig.isPending}
+			deletingRunnerId={deleteRunner.variables?.path.runnerId ?? null}
 			deletingConfigId={deleteConfig.variables?.path.configId ?? null}
 			cancellingJobId={cancelJob.variables?.path.jobId ?? null}
 			retryingJobId={retryDelivery.variables?.path.jobId ?? null}
 			onRefresh={() => {
+				invalidateRunners();
 				invalidateConfigs();
 				invalidateJobs();
 			}}
+			onCreateRunner={async (payload: CreateAgentRunnerRequest) => {
+				return await createRunner.mutateAsync({
+					path: { workspaceSlug },
+					body: payload,
+				});
+			}}
+			onUpdateRunner={async (targetRunnerId: number, payload: UpdateAgentRunnerRequest) => {
+				return await updateRunner.mutateAsync({
+					path: { workspaceSlug, runnerId: targetRunnerId },
+					body: payload,
+				});
+			}}
+			onDeleteRunner={async (targetRunnerId: number) => {
+				await deleteRunner.mutateAsync({
+					path: { workspaceSlug, runnerId: targetRunnerId },
+				});
+			}}
 			onCreateConfig={async (payload: CreateAgentConfigRequest) => {
-				if (!workspaceSlug) return;
-				await createConfig.mutateAsync({
+				return await createConfig.mutateAsync({
 					path: { workspaceSlug },
 					body: payload,
 				});
 			}}
 			onUpdateConfig={async (targetConfigId: number, payload: UpdateAgentConfigRequest) => {
-				if (!workspaceSlug) return;
-				await updateConfig.mutateAsync({
+				return await updateConfig.mutateAsync({
 					path: { workspaceSlug, configId: targetConfigId },
 					body: payload,
 				});
 			}}
 			onDeleteConfig={async (targetConfigId: number) => {
-				if (!workspaceSlug) return;
 				await deleteConfig.mutateAsync({
 					path: { workspaceSlug, configId: targetConfigId },
 				});
@@ -293,17 +400,11 @@ function AdminAgentsContent({ workspaceSlug, isWorkspaceLoading }: AdminAgentsCo
 			onSelectJob={(nextJobId) => {
 				updateSearch({ jobId: nextJobId ?? undefined }, { replace: nextJobId == null });
 			}}
-			onCancelJob={async (jobId: string) => {
-				if (!workspaceSlug) return;
-				await cancelJob.mutateAsync({
-					path: { workspaceSlug, jobId },
-				});
+			onCancelJob={async (targetJobId: string) => {
+				await cancelJob.mutateAsync({ path: { workspaceSlug, jobId: targetJobId } });
 			}}
-			onRetryDelivery={async (jobId: string) => {
-				if (!workspaceSlug) return;
-				await retryDelivery.mutateAsync({
-					path: { workspaceSlug, jobId },
-				});
+			onRetryDelivery={async (targetJobId: string) => {
+				await retryDelivery.mutateAsync({ path: { workspaceSlug, jobId: targetJobId } });
 			}}
 		/>
 	);

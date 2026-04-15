@@ -13,6 +13,8 @@ import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobStatus;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunner;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunnerRepository;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
@@ -37,6 +39,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
     private AgentJobRepository agentJobRepository;
 
     @Mock
+    private AgentRunnerRepository agentRunnerRepository;
+
+    @Mock
     private WorkspaceRepository workspaceRepository;
 
     @InjectMocks
@@ -44,6 +49,19 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
     private Workspace workspace;
     private WorkspaceContext workspaceContext;
+
+    private AgentRunner createRunner(Long id, String name) {
+        AgentRunner runner = new AgentRunner();
+        runner.setId(id);
+        runner.setWorkspace(workspace);
+        runner.setName(name);
+        runner.setAgentType(AgentType.CLAUDE_CODE);
+        runner.setLlmProvider(LlmProvider.ANTHROPIC);
+        runner.setCredentialMode(CredentialMode.PROXY);
+        runner.setTimeoutSeconds(600);
+        runner.setMaxConcurrentJobs(3);
+        return runner;
+    }
 
     @BeforeEach
     void setUp() {
@@ -66,6 +84,8 @@ class AgentConfigServiceTest extends BaseUnitTest {
     void shouldCreateClaudeConfigWithModelVersion() {
         when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "claude-reviewer")).thenReturn(false);
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        when(agentRunnerRepository.existsByWorkspaceIdAndName(1L, "claude-reviewer")).thenReturn(false);
+        when(agentRunnerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new CreateAgentConfigRequestDTO(
@@ -94,11 +114,13 @@ class AgentConfigServiceTest extends BaseUnitTest {
     @DisplayName("should accept Pi with any provider")
     void shouldAcceptPiWithAnyProvider() {
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        when(agentRunnerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         for (LlmProvider provider : LlmProvider.values()) {
             String name = "pi-" + provider.name().toLowerCase();
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, name)).thenReturn(false);
+            when(agentRunnerRepository.existsByWorkspaceIdAndName(1L, name)).thenReturn(false);
 
             var request = new CreateAgentConfigRequestDTO(
                 name,
@@ -123,6 +145,10 @@ class AgentConfigServiceTest extends BaseUnitTest {
     @Test
     @DisplayName("should reject Claude config with non-Anthropic provider")
     void shouldRejectClaudeConfigWithNonAnthropicProvider() {
+        when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "bad-claude")).thenReturn(false);
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        when(agentRunnerRepository.existsByWorkspaceIdAndName(1L, "bad-claude")).thenReturn(false);
+
         var request = new CreateAgentConfigRequestDTO(
             "bad-claude",
             true,
@@ -148,6 +174,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
     void shouldRejectDirectAuthWithoutInternetAccess() {
         when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "claude-direct")).thenReturn(false);
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        when(agentRunnerRepository.existsByWorkspaceIdAndName(1L, "claude-direct")).thenReturn(false);
 
         var request = new CreateAgentConfigRequestDTO(
             "claude-direct",
@@ -173,6 +200,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
     void shouldRejectDirectAuthWithoutCredential() {
         when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "pi-direct")).thenReturn(false);
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        when(agentRunnerRepository.existsByWorkspaceIdAndName(1L, "pi-direct")).thenReturn(false);
 
         var request = new CreateAgentConfigRequestDTO(
             "pi-direct",
@@ -198,6 +226,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
     void shouldRejectPiOAuthCredentialMode() {
         when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "pi-oauth")).thenReturn(false);
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        when(agentRunnerRepository.existsByWorkspaceIdAndName(1L, "pi-oauth")).thenReturn(false);
 
         var request = new CreateAgentConfigRequestDTO(
             "pi-oauth",
@@ -225,12 +254,13 @@ class AgentConfigServiceTest extends BaseUnitTest {
         existing.setId(10L);
         existing.setWorkspace(workspace);
         existing.setName("old-name");
-        existing.setAgentType(AgentType.CLAUDE_CODE);
-        existing.setLlmProvider(LlmProvider.ANTHROPIC);
-        existing.setLlmApiKey("sk-existing-secret");
+        AgentRunner runner = createRunner(110L, "old-name");
+        runner.setLlmApiKey("sk-existing-secret");
+        existing.setRunner(runner);
 
         when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
         when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "new-name")).thenReturn(false);
+        when(agentRunnerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new UpdateAgentConfigRequestDTO(
@@ -266,12 +296,12 @@ class AgentConfigServiceTest extends BaseUnitTest {
         existing.setId(10L);
         existing.setWorkspace(workspace);
         existing.setName("claude-reviewer");
-        existing.setAgentType(AgentType.CLAUDE_CODE);
-        existing.setLlmProvider(LlmProvider.ANTHROPIC);
-        existing.setCredentialMode(CredentialMode.PROXY);
-        existing.setLlmApiKey("sk-existing-secret");
+        AgentRunner runner = createRunner(110L, "claude-reviewer");
+        runner.setLlmApiKey("sk-existing-secret");
+        existing.setRunner(runner);
 
         when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+        when(agentRunnerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new UpdateAgentConfigRequestDTO(
@@ -303,12 +333,15 @@ class AgentConfigServiceTest extends BaseUnitTest {
         existing.setId(10L);
         existing.setWorkspace(workspace);
         existing.setName("pi-reviewer");
-        existing.setAgentType(AgentType.PI);
-        existing.setLlmProvider(LlmProvider.OPENAI);
-        existing.setModelName("gpt-5.4-mini");
-        existing.setModelVersion("2026-03-17");
+        AgentRunner runner = createRunner(110L, "pi-reviewer");
+        runner.setAgentType(AgentType.PI);
+        runner.setLlmProvider(LlmProvider.OPENAI);
+        runner.setModelName("gpt-5.4-mini");
+        runner.setModelVersion("2026-03-17");
+        existing.setRunner(runner);
 
         when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+        when(agentRunnerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new UpdateAgentConfigRequestDTO(
@@ -341,8 +374,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
         existing.setId(10L);
         existing.setWorkspace(workspace);
         existing.setName("old-name");
-        existing.setAgentType(AgentType.CLAUDE_CODE);
-        existing.setLlmProvider(LlmProvider.ANTHROPIC);
+        existing.setRunner(createRunner(110L, "old-name"));
 
         when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
         when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "new-name")).thenReturn(true);

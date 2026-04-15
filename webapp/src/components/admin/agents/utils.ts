@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AgentConfig, AgentJob, PageAgentJob } from "@/api/types.gen";
+import type { AgentConfig, AgentJob, AgentRunner, PageAgentJob } from "@/api/types.gen";
 
 export const agentTypeOptions = ["CLAUDE_CODE", "PI"] as const;
 export const providerOptions = ["ANTHROPIC", "OPENAI", "AZURE_OPENAI"] as const;
@@ -19,10 +19,9 @@ export type ProviderValue = (typeof providerOptions)[number];
 export type CredentialModeValue = (typeof credentialModeOptions)[number];
 export type JobStatusFilter = (typeof statusFilterOptions)[number];
 
-export type AgentConfigDraft = {
+export type RunnerDraft = {
 	name: string;
 	agentType: AgentTypeValue;
-	enabled: boolean;
 	modelName: string;
 	modelVersion: string;
 	llmProvider: ProviderValue;
@@ -34,29 +33,40 @@ export type AgentConfigDraft = {
 	clearLlmApiKey: boolean;
 };
 
-export type DraftErrors = Partial<Record<keyof AgentConfigDraft, string>>;
-
-export const agentConfigFieldIds: Partial<Record<keyof AgentConfigDraft, string>> = {
-	allowInternet: "agent-allow-internet",
-	credentialMode: "agent-credential-mode",
-	enabled: "agent-enabled",
-	llmApiKey: "agent-secret",
-	llmProvider: "agent-provider",
-	maxConcurrentJobs: "agent-concurrency",
-	modelName: "agent-model-name",
-	modelVersion: "agent-model-version",
-	name: "agent-config-name",
-	timeoutSeconds: "agent-timeout",
+export type ConfigDraft = {
+	name: string;
+	enabled: boolean;
+	runnerId: string;
 };
 
-const draftSchema = z.object({
+export type DraftErrors = {
+	runner: Partial<Record<keyof RunnerDraft, string>>;
+	config: Partial<Record<keyof ConfigDraft, string>>;
+};
+
+export const agentConfigFieldIds: Record<string, string> = {
+	allowInternet: "agent-runner-allow-internet",
+	configName: "agent-config-name",
+	credentialMode: "agent-runner-credential-mode",
+	enabled: "agent-config-enabled",
+	llmApiKey: "agent-runner-secret",
+	llmProvider: "agent-runner-provider",
+	maxConcurrentJobs: "agent-runner-concurrency",
+	modelName: "agent-runner-model-name",
+	modelVersion: "agent-runner-model-version",
+	runnerId: "agent-config-runner-id",
+	runnerName: "agent-runner-name",
+	timeoutSeconds: "agent-runner-timeout",
+	agentType: "agent-runner-type",
+};
+
+const runnerDraftSchema = z.object({
 	name: z
 		.string()
 		.trim()
-		.min(1, "Name is required")
-		.max(100, "Name must not exceed 100 characters"),
+		.min(1, "Runner name is required")
+		.max(100, "Runner name must not exceed 100 characters"),
 	agentType: z.enum(agentTypeOptions),
-	enabled: z.boolean(),
 	modelName: z.string().max(128, "Model name must not exceed 128 characters"),
 	modelVersion: z.string().max(50, "Model version must not exceed 50 characters"),
 	llmProvider: z.enum(providerOptions),
@@ -80,6 +90,16 @@ const draftSchema = z.object({
 	clearLlmApiKey: z.boolean(),
 });
 
+const configDraftSchema = z.object({
+	name: z
+		.string()
+		.trim()
+		.min(1, "Config name is required")
+		.max(100, "Config name must not exceed 100 characters"),
+	enabled: z.boolean(),
+	runnerId: z.string().trim().min(1, "Select a runner"),
+});
+
 const numberFormatter = new Intl.NumberFormat();
 const costFormatter = new Intl.NumberFormat(undefined, {
 	style: "currency",
@@ -88,11 +108,10 @@ const costFormatter = new Intl.NumberFormat(undefined, {
 	maximumFractionDigits: 4,
 });
 
-export function createEmptyDraft(): AgentConfigDraft {
+export function createEmptyRunnerDraft(): RunnerDraft {
 	return {
 		name: "",
 		agentType: "CLAUDE_CODE",
-		enabled: true,
 		modelName: "",
 		modelVersion: "",
 		llmProvider: "ANTHROPIC",
@@ -105,20 +124,35 @@ export function createEmptyDraft(): AgentConfigDraft {
 	};
 }
 
-export function createDraftFromConfig(config: AgentConfig): AgentConfigDraft {
+export function createEmptyConfigDraft(defaultRunnerId?: number): ConfigDraft {
 	return {
-		name: config.name,
-		agentType: config.agentType,
-		enabled: config.enabled,
-		modelName: config.modelName ?? "",
-		modelVersion: config.modelVersion ?? "",
-		llmProvider: config.llmProvider,
-		timeoutSeconds: String(config.timeoutSeconds),
-		maxConcurrentJobs: String(config.maxConcurrentJobs),
-		allowInternet: config.allowInternet,
-		credentialMode: config.credentialMode,
+		name: "",
+		enabled: true,
+		runnerId: defaultRunnerId != null ? String(defaultRunnerId) : "",
+	};
+}
+
+export function createRunnerDraftFromRunner(runner: AgentRunner): RunnerDraft {
+	return {
+		name: runner.name,
+		agentType: runner.agentType,
+		modelName: runner.modelName ?? "",
+		modelVersion: runner.modelVersion ?? "",
+		llmProvider: runner.llmProvider,
+		timeoutSeconds: String(runner.timeoutSeconds),
+		maxConcurrentJobs: String(runner.maxConcurrentJobs),
+		allowInternet: runner.allowInternet,
+		credentialMode: runner.credentialMode,
 		llmApiKey: "",
 		clearLlmApiKey: false,
+	};
+}
+
+export function createConfigDraftFromConfig(config: AgentConfig): ConfigDraft {
+	return {
+		name: config.name,
+		enabled: config.enabled,
+		runnerId: String(config.runnerId),
 	};
 }
 
@@ -127,12 +161,14 @@ export function normalizeOptional(value: string): string | undefined {
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
-export function validateDraft(
-	draft: AgentConfigDraft,
+export function validateRunnerDraft(
+	draft: RunnerDraft,
 	options: { existingHasCredential: boolean },
-): { success: true; data: z.infer<typeof draftSchema> } | { success: false; errors: DraftErrors } {
-	const result = draftSchema.safeParse(draft);
-	const extraErrors: DraftErrors = {};
+):
+	| { success: true; data: z.infer<typeof runnerDraftSchema> }
+	| { success: false; errors: DraftErrors["runner"] } {
+	const result = runnerDraftSchema.safeParse(draft);
+	const extraErrors: DraftErrors["runner"] = {};
 
 	if (draft.agentType === "CLAUDE_CODE" && draft.llmProvider !== "ANTHROPIC") {
 		extraErrors.llmProvider = "Claude Code requires Anthropic.";
@@ -154,10 +190,10 @@ export function validateDraft(
 		return { success: true, data: result.data };
 	}
 
-	const zodErrors: DraftErrors = {};
+	const zodErrors: DraftErrors["runner"] = {};
 	if (!result.success) {
 		for (const issue of result.error.issues) {
-			const field = issue.path[0] as keyof AgentConfigDraft;
+			const field = issue.path[0] as keyof RunnerDraft;
 			if (!zodErrors[field]) {
 				zodErrors[field] = issue.message;
 			}
@@ -171,6 +207,27 @@ export function validateDraft(
 			...extraErrors,
 		},
 	};
+}
+
+export function validateConfigDraft(
+	draft: ConfigDraft,
+):
+	| { success: true; data: z.infer<typeof configDraftSchema> }
+	| { success: false; errors: DraftErrors["config"] } {
+	const result = configDraftSchema.safeParse(draft);
+	if (result.success) {
+		return { success: true, data: result.data };
+	}
+
+	const errors: DraftErrors["config"] = {};
+	for (const issue of result.error.issues) {
+		const field = issue.path[0] as keyof ConfigDraft;
+		if (!errors[field]) {
+			errors[field] = issue.message;
+		}
+	}
+
+	return { success: false, errors };
 }
 
 export function formatAgentType(agentType: AgentTypeValue | string | undefined): string {
@@ -276,4 +333,21 @@ export function pageSummary(page: PageAgentJob | undefined): string {
 	const currentPage = (page.number ?? 0) + 1;
 	const totalPages = page.totalPages ?? 1;
 	return `Page ${currentPage} of ${totalPages}`;
+}
+
+export function focusFirstInvalidField(errors: DraftErrors) {
+	const firstRunnerField = Object.keys(errors.runner)[0];
+	const firstConfigField = Object.keys(errors.config)[0];
+	const firstField = firstRunnerField ?? firstConfigField;
+	const fieldId = firstField ? agentConfigFieldIds[firstField] : undefined;
+	if (!fieldId) {
+		return;
+	}
+
+	queueMicrotask(() => {
+		const element = document.getElementById(fieldId);
+		if (element instanceof HTMLElement) {
+			element.focus();
+		}
+	});
 }

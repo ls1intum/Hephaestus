@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import type { AgentRunner } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,63 +23,119 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import type {
-	AgentConfigDraft,
 	AgentTypeValue,
+	ConfigDraft,
 	CredentialModeValue,
-	DraftErrors,
 	ProviderValue,
+	RunnerDraft,
 } from "./utils";
 import { agentConfigFieldIds } from "./utils";
 
 export interface AgentConfigFormProps {
 	mode: "create" | "edit";
-	draft: AgentConfigDraft;
-	errors: DraftErrors;
+	title: "Runner" | "Agent config";
+	submitLabel: string;
+	draft: RunnerDraft | null;
+	configDraft: ConfigDraft | null;
+	errors: Record<string, string | undefined>;
 	existingHasCredential: boolean;
 	isSaving: boolean;
-	onDraftChange: (nextDraft: AgentConfigDraft) => void;
-	onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+	runners?: AgentRunner[];
+	onRunnerDraftChange: (nextDraft: RunnerDraft) => void;
+	onConfigDraftChange: (nextDraft: ConfigDraft) => void;
+	onSubmit: () => Promise<void>;
 	onReset: () => void;
 }
 
 export function AgentConfigForm({
 	mode,
+	title,
+	submitLabel,
 	draft,
+	configDraft,
 	errors,
 	existingHasCredential,
 	isSaving,
-	onDraftChange,
+	runners = [],
+	onRunnerDraftChange,
+	onConfigDraftChange,
 	onSubmit,
 	onReset,
 }: AgentConfigFormProps) {
+	const isRunnerForm = title === "Runner";
+
 	return (
-		<form className="space-y-6" onSubmit={onSubmit}>
+		<form
+			className="space-y-6"
+			onSubmit={(event) => {
+				event.preventDefault();
+				void onSubmit();
+			}}
+		>
 			{Object.keys(errors).length > 0 && (
 				<Alert variant="destructive" role="alert" aria-live="assertive">
 					<AlertTitle>Review the highlighted fields</AlertTitle>
 					<AlertDescription>
-						Update the invalid settings before saving this runtime.
+						Update the invalid settings before saving this {title.toLowerCase()}.
 					</AlertDescription>
 				</Alert>
 			)}
 
+			{isRunnerForm && draft ? (
+				<RunnerFormContent
+					draft={draft}
+					errors={errors}
+					existingHasCredential={existingHasCredential}
+					onDraftChange={onRunnerDraftChange}
+				/>
+			) : configDraft ? (
+				<ConfigFormContent
+					draft={configDraft}
+					errors={errors}
+					runners={runners}
+					onDraftChange={onConfigDraftChange}
+				/>
+			) : null}
+
+			<div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:justify-between">
+				<Button type="button" variant="outline" onClick={onReset}>
+					{mode === "create" ? "Reset form" : `Create another ${title.toLowerCase()}`}
+				</Button>
+				<Button type="submit" disabled={isSaving}>
+					{isSaving ? <Spinner className="mr-2 size-4" /> : null}
+					{submitLabel}
+				</Button>
+			</div>
+		</form>
+	);
+}
+
+function RunnerFormContent({
+	draft,
+	errors,
+	existingHasCredential,
+	onDraftChange,
+}: {
+	draft: RunnerDraft;
+	errors: Record<string, string | undefined>;
+	existingHasCredential: boolean;
+	onDraftChange: (nextDraft: RunnerDraft) => void;
+}) {
+	return (
+		<>
 			<FieldSet>
 				<FieldLegend>Identity</FieldLegend>
 				<FieldGroup>
 					<Field data-invalid={errors.name ? "true" : undefined}>
-						<FieldLabel htmlFor={agentConfigFieldIds.name}>Config name</FieldLabel>
+						<FieldLabel htmlFor={agentConfigFieldIds.runnerName}>Runner name</FieldLabel>
 						<Input
-							id={agentConfigFieldIds.name}
-							name="name"
-							autoComplete="off"
+							id={agentConfigFieldIds.runnerName}
 							value={draft.name}
 							onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
-							placeholder="e.g. claude-default-reviewer"
-							aria-describedby={errors.name ? "agent-config-name-error" : undefined}
-							aria-invalid={Boolean(errors.name)}
+							placeholder="e.g. claude-default-runner"
 						/>
 						<FieldDescription>Unique within this workspace.</FieldDescription>
-						<FieldError id="agent-config-name-error">{errors.name}</FieldError>
+						<FieldError>{errors.name}</FieldError>
 					</Field>
 
 					<Field>
@@ -108,9 +164,6 @@ export function AgentConfigForm({
 								<SelectItem value="PI">Pi</SelectItem>
 							</SelectContent>
 						</Select>
-						<FieldDescription>
-							Claude Code is Anthropic-only. Pi supports Anthropic, OpenAI, and Azure OpenAI.
-						</FieldDescription>
 					</Field>
 				</FieldGroup>
 			</FieldSet>
@@ -133,8 +186,6 @@ export function AgentConfigForm({
 								id={agentConfigFieldIds.llmProvider}
 								className="w-full"
 								disabled={draft.agentType === "CLAUDE_CODE"}
-								aria-describedby={errors.llmProvider ? "agent-provider-error" : undefined}
-								aria-invalid={Boolean(errors.llmProvider)}
 							>
 								<SelectValue />
 							</SelectTrigger>
@@ -144,7 +195,7 @@ export function AgentConfigForm({
 								<SelectItem value="AZURE_OPENAI">Azure OpenAI</SelectItem>
 							</SelectContent>
 						</Select>
-						<FieldError id="agent-provider-error">{errors.llmProvider}</FieldError>
+						<FieldError>{errors.llmProvider}</FieldError>
 					</Field>
 
 					<FieldGroup className="grid gap-4 sm:grid-cols-2">
@@ -152,32 +203,24 @@ export function AgentConfigForm({
 							<FieldLabel htmlFor={agentConfigFieldIds.modelName}>Model name</FieldLabel>
 							<Input
 								id={agentConfigFieldIds.modelName}
-								name="modelName"
-								autoComplete="off"
 								value={draft.modelName}
 								onChange={(event) => onDraftChange({ ...draft, modelName: event.target.value })}
 								placeholder={
 									draft.agentType === "CLAUDE_CODE" ? "claude-sonnet-4-20250514" : "gpt-5.4-mini"
 								}
-								aria-describedby={errors.modelName ? "agent-model-name-error" : undefined}
-								aria-invalid={Boolean(errors.modelName)}
 							/>
-							<FieldError id="agent-model-name-error">{errors.modelName}</FieldError>
+							<FieldError>{errors.modelName}</FieldError>
 						</Field>
 
 						<Field data-invalid={errors.modelVersion ? "true" : undefined}>
 							<FieldLabel htmlFor={agentConfigFieldIds.modelVersion}>Model version</FieldLabel>
 							<Input
 								id={agentConfigFieldIds.modelVersion}
-								name="modelVersion"
-								autoComplete="off"
 								value={draft.modelVersion}
 								onChange={(event) => onDraftChange({ ...draft, modelVersion: event.target.value })}
 								placeholder="2026-03-17"
-								aria-describedby={errors.modelVersion ? "agent-model-version-error" : undefined}
-								aria-invalid={Boolean(errors.modelVersion)}
 							/>
-							<FieldError id="agent-model-version-error">{errors.modelVersion}</FieldError>
+							<FieldError>{errors.modelVersion}</FieldError>
 						</Field>
 					</FieldGroup>
 				</FieldGroup>
@@ -212,16 +255,12 @@ export function AgentConfigForm({
 								{draft.agentType === "CLAUDE_CODE" && <SelectItem value="OAUTH">OAuth</SelectItem>}
 							</SelectContent>
 						</Select>
-						<FieldDescription>
-							Proxy keeps outbound access optional. OAuth is available for Claude Code only.
-						</FieldDescription>
 					</Field>
 
 					<Field data-invalid={errors.llmApiKey ? "true" : undefined}>
 						<FieldLabel htmlFor={agentConfigFieldIds.llmApiKey}>Credential / API key</FieldLabel>
 						<Input
 							id={agentConfigFieldIds.llmApiKey}
-							name="llmApiKey"
 							type="password"
 							value={draft.llmApiKey}
 							disabled={draft.clearLlmApiKey}
@@ -234,17 +273,11 @@ export function AgentConfigForm({
 							}
 							placeholder={
 								existingHasCredential
-									? "Stored securely. Leave blank to keep the current secret."
+									? "Stored securely. Leave blank to keep it."
 									: "Paste the credential used for direct access"
 							}
-							autoCapitalize="none"
-							autoCorrect="off"
-							autoComplete="off"
-							spellCheck={false}
-							aria-describedby={errors.llmApiKey ? "agent-secret-error" : undefined}
-							aria-invalid={Boolean(errors.llmApiKey)}
 						/>
-						{existingHasCredential && mode === "edit" && (
+						{existingHasCredential && (
 							<label
 								htmlFor="agent-clear-credential"
 								className="mt-3 flex items-start gap-3 text-sm"
@@ -263,7 +296,7 @@ export function AgentConfigForm({
 								<span>Clear the stored credential on the next save.</span>
 							</label>
 						)}
-						<FieldError id="agent-secret-error">{errors.llmApiKey}</FieldError>
+						<FieldError>{errors.llmApiKey}</FieldError>
 					</Field>
 
 					<Field data-invalid={errors.allowInternet ? "true" : undefined}>
@@ -280,11 +313,11 @@ export function AgentConfigForm({
 									onDraftChange({ ...draft, allowInternet: checked === true })
 								}
 							/>
-							<span>Allow the runtime to access the public internet during execution.</span>
+							<span>Allow the runner to access the public internet during execution.</span>
 						</label>
 						<FieldDescription>
 							{draft.credentialMode === "PROXY"
-								? "Useful for external APIs, package registries, or direct provider access."
+								? "Useful for external APIs, package registries, or provider access."
 								: "Direct credential modes automatically keep internet access enabled."}
 						</FieldDescription>
 						<FieldError>{errors.allowInternet}</FieldError>
@@ -301,17 +334,13 @@ export function AgentConfigForm({
 						<FieldLabel htmlFor={agentConfigFieldIds.timeoutSeconds}>Timeout (seconds)</FieldLabel>
 						<Input
 							id={agentConfigFieldIds.timeoutSeconds}
-							name="timeoutSeconds"
 							type="number"
 							value={draft.timeoutSeconds}
 							onChange={(event) => onDraftChange({ ...draft, timeoutSeconds: event.target.value })}
 							min={30}
 							max={3600}
-							inputMode="numeric"
-							aria-describedby={errors.timeoutSeconds ? "agent-timeout-error" : undefined}
-							aria-invalid={Boolean(errors.timeoutSeconds)}
 						/>
-						<FieldError id="agent-timeout-error">{errors.timeoutSeconds}</FieldError>
+						<FieldError>{errors.timeoutSeconds}</FieldError>
 					</Field>
 
 					<Field data-invalid={errors.maxConcurrentJobs ? "true" : undefined}>
@@ -320,7 +349,6 @@ export function AgentConfigForm({
 						</FieldLabel>
 						<Input
 							id={agentConfigFieldIds.maxConcurrentJobs}
-							name="maxConcurrentJobs"
 							type="number"
 							value={draft.maxConcurrentJobs}
 							onChange={(event) =>
@@ -328,14 +356,75 @@ export function AgentConfigForm({
 							}
 							min={1}
 							max={10}
-							inputMode="numeric"
-							aria-describedby={errors.maxConcurrentJobs ? "agent-concurrency-error" : undefined}
-							aria-invalid={Boolean(errors.maxConcurrentJobs)}
 						/>
-						<FieldError id="agent-concurrency-error">{errors.maxConcurrentJobs}</FieldError>
+						<FieldError>{errors.maxConcurrentJobs}</FieldError>
 					</Field>
 				</FieldGroup>
+			</FieldSet>
+		</>
+	);
+}
 
+function ConfigFormContent({
+	draft,
+	errors,
+	runners,
+	onDraftChange,
+}: {
+	draft: ConfigDraft;
+	errors: Record<string, string | undefined>;
+	runners: AgentRunner[];
+	onDraftChange: (nextDraft: ConfigDraft) => void;
+}) {
+	return (
+		<>
+			<FieldSet>
+				<FieldLegend>Identity</FieldLegend>
+				<FieldGroup>
+					<Field data-invalid={errors.name ? "true" : undefined}>
+						<FieldLabel htmlFor={agentConfigFieldIds.configName}>Config name</FieldLabel>
+						<Input
+							id={agentConfigFieldIds.configName}
+							value={draft.name}
+							onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
+							placeholder="e.g. claude-default-reviewer"
+						/>
+						<FieldDescription>Unique within this workspace.</FieldDescription>
+						<FieldError>{errors.name}</FieldError>
+					</Field>
+
+					<Field data-invalid={errors.runnerId ? "true" : undefined}>
+						<FieldLabel htmlFor={agentConfigFieldIds.runnerId}>Runner</FieldLabel>
+						<Select
+							value={draft.runnerId || undefined}
+							onValueChange={(value) => {
+								if (!value) return;
+								onDraftChange({ ...draft, runnerId: value });
+							}}
+						>
+							<SelectTrigger id={agentConfigFieldIds.runnerId} className="w-full">
+								<SelectValue placeholder="Select a runner" />
+							</SelectTrigger>
+							<SelectContent>
+								{runners.map((runner) => (
+									<SelectItem key={runner.id} value={String(runner.id)}>
+										{runner.name}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<FieldDescription>
+							Each config delegates execution to exactly one runner.
+						</FieldDescription>
+						<FieldError>{errors.runnerId}</FieldError>
+					</Field>
+				</FieldGroup>
+			</FieldSet>
+
+			<Separator />
+
+			<FieldSet>
+				<FieldLegend>Behavior</FieldLegend>
 				<Field>
 					<FieldTitle>Enabled</FieldTitle>
 					<label
@@ -347,22 +436,10 @@ export function AgentConfigForm({
 							checked={draft.enabled}
 							onCheckedChange={(checked) => onDraftChange({ ...draft, enabled: checked === true })}
 						/>
-						<span>
-							Include this configuration when the workspace submits new practice-review jobs.
-						</span>
+						<span>Include this config when the workspace submits new review jobs.</span>
 					</label>
 				</Field>
 			</FieldSet>
-
-			<div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:justify-between">
-				<Button type="button" variant="outline" onClick={onReset}>
-					{mode === "create" ? "Reset form" : "Create another"}
-				</Button>
-				<Button type="submit" disabled={isSaving}>
-					{isSaving ? <Spinner className="mr-2 size-4" /> : null}
-					{mode === "create" ? "Save config" : "Save changes"}
-				</Button>
-			</div>
-		</form>
+		</>
 	);
 }

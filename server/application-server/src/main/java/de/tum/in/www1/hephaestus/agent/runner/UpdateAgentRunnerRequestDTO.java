@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.agent.config;
+package de.tum.in.www1.hephaestus.agent.runner;
 
 import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
@@ -8,15 +8,11 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 
-@Schema(
-    description = "Request to update an existing agent configuration (all fields optional — null fields are not changed)"
-)
-public record UpdateAgentConfigRequestDTO(
+@Schema(description = "Request to update an existing runner (all fields optional - null fields are not changed)")
+public record UpdateAgentRunnerRequestDTO(
     @Size(max = 100, message = "Name must not exceed 100 characters")
     @Schema(description = "Unique name within the workspace")
     String name,
-    @Schema(description = "Whether the review agent is enabled") Boolean enabled,
-    @Schema(description = "Runner that executes this agent") Long runnerId,
     @Schema(description = "Type of coding agent") AgentType agentType,
     @Size(max = 128, message = "Model name must not exceed 128 characters")
     @Schema(description = "LLM model name", example = "claude-sonnet-4-20250514")
@@ -40,39 +36,4 @@ public record UpdateAgentConfigRequestDTO(
     @Schema(description = "Whether runner containers have internet access") Boolean allowInternet,
     @Schema(description = "Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)")
     CredentialMode credentialMode
-) {
-    public UpdateAgentConfigRequestDTO(
-        String name,
-        Boolean enabled,
-        AgentType agentType,
-        String modelName,
-        Boolean clearModelName,
-        String modelVersion,
-        Boolean clearModelVersion,
-        String llmApiKey,
-        Boolean clearLlmApiKey,
-        LlmProvider llmProvider,
-        Integer timeoutSeconds,
-        Integer maxConcurrentJobs,
-        Boolean allowInternet,
-        CredentialMode credentialMode
-    ) {
-        this(
-            name,
-            enabled,
-            null,
-            agentType,
-            modelName,
-            clearModelName,
-            modelVersion,
-            clearModelVersion,
-            llmApiKey,
-            clearLlmApiKey,
-            llmProvider,
-            timeoutSeconds,
-            maxConcurrentJobs,
-            allowInternet,
-            credentialMode
-        );
-    }
-}
+) {}

@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,11 +25,14 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @WorkspaceScopedController
 @RequestMapping("/agent-configs")
 @Tag(name = "Agent Config", description = "Workspace-scoped agent configuration management")
-@RequiredArgsConstructor
 @Validated
 public class AgentConfigController {
 
     private final AgentConfigService agentConfigService;
+
+    public AgentConfigController(AgentConfigService agentConfigService) {
+        this.agentConfigService = agentConfigService;
+    }
 
     @GetMapping
     @Operation(summary = "List agent configurations for a workspace")

@@ -18,10 +18,11 @@ import de.tum.in.www1.hephaestus.agent.adapter.AgentResult;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapter;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
-import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.in.www1.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunner;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunnerRepository;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
@@ -59,7 +60,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     private AgentJobRepository jobRepository;
 
     @Mock
-    private AgentConfigRepository configRepository;
+    private AgentRunnerRepository runnerRepository;
 
     @Mock
     private JobTypeHandlerRegistry handlerRegistry;
@@ -98,6 +99,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     private UUID jobId;
     private AgentJob job;
     private AgentConfig config;
+    private AgentRunner runner;
     private ConfigSnapshot snapshot;
 
     @BeforeEach
@@ -108,7 +110,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             natsConnection,
             NATS_PROPS,
             jobRepository,
-            configRepository,
+            runnerRepository,
             handlerRegistry,
             adapterRegistry,
             sandboxManager,
@@ -122,12 +124,24 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         config = new AgentConfig();
         config.setId(10L);
-        config.setMaxConcurrentJobs(3);
+        config.setName("test-config");
+
+        runner = new AgentRunner();
+        runner.setId(20L);
+        runner.setName("test-runner");
+        runner.setAgentType(AgentType.CLAUDE_CODE);
+        runner.setLlmProvider(LlmProvider.ANTHROPIC);
+        runner.setCredentialMode(CredentialMode.PROXY);
+        runner.setTimeoutSeconds(600);
+        runner.setMaxConcurrentJobs(3);
+        config.setRunner(runner);
 
         snapshot = new ConfigSnapshot(
-            1,
+            ConfigSnapshot.SCHEMA_VERSION,
             10L,
             "test-config",
+            20L,
+            "test-runner",
             AgentType.CLAUDE_CODE,
             LlmProvider.ANTHROPIC,
             CredentialMode.PROXY,
@@ -201,8 +215,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void shouldNakWithDelayWhenConcurrencyLimitReached() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
-            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
-            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(3L); // equals max
+            when(runnerRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(runner));
+            when(jobRepository.countByConfigRunnerIdAndStatusIn(eq(20L), any())).thenReturn(3L); // equals max
 
             executor.executeJob(msg);
 
@@ -216,8 +230,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void shouldTransitionToRunningOnSuccessfulClaim() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
-            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
-            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(runnerRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(runner));
+            when(jobRepository.countByConfigRunnerIdAndStatusIn(eq(20L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             setupFullExecution();
@@ -238,8 +252,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void shouldCompleteJobSuccessfully() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
-            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
-            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(runnerRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(runner));
+            when(jobRepository.countByConfigRunnerIdAndStatusIn(eq(20L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             setupFullExecution();
@@ -271,8 +285,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void shouldMarkFailedOnNonZeroExitCode() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
-            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
-            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(runnerRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(runner));
+            when(jobRepository.countByConfigRunnerIdAndStatusIn(eq(20L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             SandboxResult failResult = new SandboxResult(1, Map.of(), "error output", false, Duration.ofMinutes(2));
@@ -301,8 +315,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void shouldMarkTimedOutOnTimeout() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
-            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
-            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(runnerRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(runner));
+            when(jobRepository.countByConfigRunnerIdAndStatusIn(eq(20L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             SandboxResult timeoutResult = new SandboxResult(137, Map.of(), "timed out", true, Duration.ofMinutes(10));
@@ -336,8 +350,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void shouldTransitionToCancelledOnCancellation() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
-            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
-            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(runnerRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(runner));
+            when(jobRepository.countByConfigRunnerIdAndStatusIn(eq(20L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             setupFullExecutionWithException(new SandboxCancelledException("cancelled"));
@@ -359,8 +373,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void shouldMarkFailedOnGenericException() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
-            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
-            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(runnerRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(runner));
+            when(jobRepository.countByConfigRunnerIdAndStatusIn(eq(20L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             setupFullExecutionWithException(new RuntimeException("Docker daemon unreachable"));

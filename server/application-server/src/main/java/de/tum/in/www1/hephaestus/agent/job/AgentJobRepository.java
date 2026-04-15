@@ -33,6 +33,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     long countByConfigIdAndStatusIn(Long configId, Collection<AgentJobStatus> statuses);
 
+    long countByConfigRunnerIdAndStatusIn(Long runnerId, Collection<AgentJobStatus> statuses);
+
     List<AgentJob> findByStatus(AgentJobStatus status);
 
     List<AgentJob> findByStatusIn(Collection<AgentJobStatus> statuses);

@@ -2,29 +2,31 @@ import { useEffect, useState } from "react";
 import type {
 	AgentConfig,
 	AgentJob,
+	AgentRunner,
 	CreateAgentConfigRequest,
+	CreateAgentRunnerRequest,
 	PageAgentJob,
 	UpdateAgentConfigRequest,
+	UpdateAgentRunnerRequest,
 } from "@/api/types.gen";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AgentConfigForm } from "./AgentConfigForm";
-import { AgentConfigList } from "./AgentConfigList";
-import { AgentJobDetailsPanel } from "./AgentJobDetailsPanel";
-import { AgentJobsTable } from "./AgentJobsTable";
+import { AgentSettingsPage } from "./AgentSettingsPage";
 import {
-	type AgentConfigDraft,
-	agentConfigFieldIds,
-	createDraftFromConfig,
-	createEmptyDraft,
+	type ConfigDraft,
+	createConfigDraftFromConfig,
+	createEmptyConfigDraft,
+	createEmptyRunnerDraft,
+	createRunnerDraftFromRunner,
 	type DraftErrors,
+	focusFirstInvalidField,
 	type JobStatusFilter,
 	normalizeOptional,
-	validateDraft,
+	type RunnerDraft,
+	validateConfigDraft,
+	validateRunnerDraft,
 } from "./utils";
 
 export interface AdminAgentsPageProps {
+	runners: AgentRunner[];
 	configs: AgentConfig[];
 	jobsPage?: PageAgentJob;
 	selectedJob?: AgentJob;
@@ -35,19 +37,24 @@ export interface AdminAgentsPageProps {
 		page: number;
 		size: number;
 	};
+	isLoadingRunners: boolean;
 	isLoadingConfigs: boolean;
 	isLoadingJobs: boolean;
 	isLoadingJobDetails: boolean;
-	configsError: Error | null;
 	jobsError: Error | null;
 	jobDetailsError: Error | null;
+	isSavingRunner: boolean;
 	isSavingConfig: boolean;
+	deletingRunnerId: number | null;
 	deletingConfigId: number | null;
 	cancellingJobId: string | null;
 	retryingJobId: string | null;
 	onRefresh: () => void;
-	onCreateConfig: (payload: CreateAgentConfigRequest) => Promise<void>;
-	onUpdateConfig: (configId: number, payload: UpdateAgentConfigRequest) => Promise<void>;
+	onCreateRunner: (payload: CreateAgentRunnerRequest) => Promise<AgentRunner>;
+	onUpdateRunner: (runnerId: number, payload: UpdateAgentRunnerRequest) => Promise<AgentRunner>;
+	onDeleteRunner: (runnerId: number) => Promise<void>;
+	onCreateConfig: (payload: CreateAgentConfigRequest) => Promise<AgentConfig>;
+	onUpdateConfig: (configId: number, payload: UpdateAgentConfigRequest) => Promise<AgentConfig>;
 	onDeleteConfig: (configId: number) => Promise<void>;
 	onChangeJobsFilter: (next: Partial<AdminAgentsPageProps["jobsFilter"]>) => void;
 	onSelectJob: (jobId: string | null) => void;
@@ -55,23 +62,32 @@ export interface AdminAgentsPageProps {
 	onRetryDelivery: (jobId: string) => Promise<void>;
 }
 
+type RunnerSelection = number | "new" | null;
+type ConfigSelection = number | "new" | null;
+
 export function AdminAgentsPage({
+	runners,
 	configs,
 	jobsPage,
 	selectedJob,
 	selectedJobId,
 	jobsFilter,
+	isLoadingRunners,
 	isLoadingConfigs,
 	isLoadingJobs,
 	isLoadingJobDetails,
-	configsError,
 	jobsError,
 	jobDetailsError,
+	isSavingRunner,
 	isSavingConfig,
+	deletingRunnerId,
 	deletingConfigId,
 	cancellingJobId,
 	retryingJobId,
 	onRefresh,
+	onCreateRunner,
+	onUpdateRunner,
+	onDeleteRunner,
 	onCreateConfig,
 	onUpdateConfig,
 	onDeleteConfig,
@@ -80,155 +96,158 @@ export function AdminAgentsPage({
 	onCancelJob,
 	onRetryDelivery,
 }: AdminAgentsPageProps) {
-	const [editingConfigId, setEditingConfigId] = useState<number | "new">("new");
-	const [draft, setDraft] = useState<AgentConfigDraft>(() => createEmptyDraft());
-	const [errors, setErrors] = useState<DraftErrors>({});
-	const [deleteCandidate, setDeleteCandidate] = useState<AgentConfig | null>(null);
+	const [selectedRunnerId, setSelectedRunnerId] = useState<RunnerSelection>(null);
+	const [selectedConfigId, setSelectedConfigId] = useState<ConfigSelection>(null);
+	const [runnerDraft, setRunnerDraft] = useState<RunnerDraft>(createEmptyRunnerDraft);
+	const [configDraft, setConfigDraft] = useState<ConfigDraft>(() => createEmptyConfigDraft());
+	const [errors, setErrors] = useState<DraftErrors>({ runner: {}, config: {} });
+	const [pendingDeleteRunner, setPendingDeleteRunner] = useState<AgentRunner | null>(null);
+	const [pendingDeleteConfig, setPendingDeleteConfig] = useState<AgentConfig | null>(null);
+	const [deleteRunnerCandidate, setDeleteRunnerCandidate] = useState<AgentRunner | null>(null);
+	const [deleteConfigCandidate, setDeleteConfigCandidate] = useState<AgentConfig | null>(null);
+	const [pendingCancelJob, setPendingCancelJob] = useState<AgentJob | null>(null);
 	const [cancelCandidate, setCancelCandidate] = useState<AgentJob | null>(null);
-	const [pendingEditorTarget, setPendingEditorTarget] = useState<
-		{ type: "create" } | { type: "edit"; config: AgentConfig } | null
-	>(null);
-	const [pendingDeleteCandidate, setPendingDeleteCandidate] = useState<AgentConfig | null>(null);
-	const [pendingCancelCandidate, setPendingCancelCandidate] = useState<AgentJob | null>(null);
 
-	const editingConfig = configs.find((config) => config.id === editingConfigId) ?? null;
-	const existingHasCredential = editingConfig?.hasLlmApiKey ?? false;
-
-	function hasUnsavedChanges() {
-		const baseline = editingConfig ? createDraftFromConfig(editingConfig) : createEmptyDraft();
-		return JSON.stringify(draft) !== JSON.stringify(baseline);
-	}
+	const activeRunner =
+		selectedRunnerId == null || selectedRunnerId === "new"
+			? null
+			: (runners.find((runner) => runner.id === selectedRunnerId) ?? null);
+	const activeConfig =
+		selectedConfigId == null || selectedConfigId === "new"
+			? null
+			: (configs.find((config) => config.id === selectedConfigId) ?? null);
+	const runnerHasCredential = activeRunner?.hasLlmApiKey ?? false;
 
 	useEffect(() => {
-		if (editingConfigId !== "new" && !editingConfig) {
-			setEditingConfigId("new");
-			setDraft(createEmptyDraft());
-			setErrors({});
-		}
-	}, [editingConfig, editingConfigId]);
-
-	function handleStartCreate() {
-		if (hasUnsavedChanges()) {
-			setPendingEditorTarget({ type: "create" });
-			return;
-		}
-		setEditingConfigId("new");
-		setDraft(createEmptyDraft());
-		setErrors({});
-	}
-
-	function handleStartEdit(config: AgentConfig) {
-		if (hasUnsavedChanges()) {
-			setPendingEditorTarget({ type: "edit", config });
-			return;
-		}
-		setEditingConfigId(config.id);
-		setDraft(createDraftFromConfig(config));
-		setErrors({});
-	}
-
-	function confirmEditorChange() {
-		if (!pendingEditorTarget) {
+		if (selectedRunnerId !== null || isLoadingRunners) {
 			return;
 		}
 
-		if (pendingEditorTarget.type === "create") {
-			setEditingConfigId("new");
-			setDraft(createEmptyDraft());
-		} else {
-			setEditingConfigId(pendingEditorTarget.config.id);
-			setDraft(createDraftFromConfig(pendingEditorTarget.config));
-		}
-
-		setErrors({});
-		setPendingEditorTarget(null);
-	}
-
-	function dismissEditorChange() {
-		setPendingEditorTarget(null);
-	}
-
-	function requestDelete(config: AgentConfig) {
-		setPendingDeleteCandidate(config);
-	}
-
-	function requestCancelJob(job: AgentJob) {
-		setPendingCancelCandidate(job);
-	}
-
-	function dismissDeleteCandidate() {
-		setPendingDeleteCandidate(null);
-	}
-
-	function dismissCancelCandidate() {
-		setPendingCancelCandidate(null);
-	}
-
-	function confirmDeleteCandidate() {
-		if (!pendingDeleteCandidate) {
+		if (runners.length === 0) {
+			setSelectedRunnerId("new");
+			setRunnerDraft(createEmptyRunnerDraft());
 			return;
 		}
-		void onDeleteConfig(pendingDeleteCandidate.id).then(() => {
-			if (editingConfigId === pendingDeleteCandidate.id) {
-				handleStartCreate();
-			}
-			setDeleteCandidate(null);
-		});
-		setDeleteCandidate(pendingDeleteCandidate);
-		setPendingDeleteCandidate(null);
-	}
 
-	function confirmCancelCandidate() {
-		if (!pendingCancelCandidate) {
+		const [firstRunner] = runners;
+		setSelectedRunnerId(firstRunner.id);
+		setRunnerDraft(createRunnerDraftFromRunner(firstRunner));
+	}, [isLoadingRunners, runners, selectedRunnerId]);
+
+	useEffect(() => {
+		if (selectedConfigId !== null || isLoadingConfigs) {
 			return;
 		}
-		void onCancelJob(pendingCancelCandidate.id).then(() => {
-			setCancelCandidate(null);
-		});
-		setCancelCandidate(pendingCancelCandidate);
-		setPendingCancelCandidate(null);
-	}
 
-	function applyDraft(nextDraft: AgentConfigDraft) {
-		setDraft(nextDraft);
-		setErrors((previousErrors) => {
-			if (Object.keys(previousErrors).length === 0) {
-				return previousErrors;
+		if (configs.length === 0) {
+			setSelectedConfigId("new");
+			setConfigDraft(createEmptyConfigDraft(runners[0]?.id));
+			return;
+		}
+
+		const [firstConfig] = configs;
+		setSelectedConfigId(firstConfig.id);
+		setConfigDraft(createConfigDraftFromConfig(firstConfig));
+	}, [configs, isLoadingConfigs, runners, selectedConfigId]);
+
+	useEffect(() => {
+		if (selectedRunnerId !== null && selectedRunnerId !== "new" && !activeRunner) {
+			if (runners.length === 0) {
+				setSelectedRunnerId("new");
+				setRunnerDraft(createEmptyRunnerDraft());
+				return;
 			}
 
-			const validation = validateDraft(nextDraft, { existingHasCredential });
-			return validation.success ? {} : validation.errors;
-		});
-	}
-
-	function focusFirstInvalidField(nextErrors: DraftErrors) {
-		const firstInvalidField = Object.keys(nextErrors)[0] as keyof AgentConfigDraft | undefined;
-		const fieldId = firstInvalidField ? agentConfigFieldIds[firstInvalidField] : undefined;
-		if (!fieldId) {
-			return;
+			const [firstRunner] = runners;
+			setSelectedRunnerId(firstRunner.id);
+			setRunnerDraft(createRunnerDraftFromRunner(firstRunner));
 		}
+	}, [activeRunner, runners, selectedRunnerId]);
 
-		queueMicrotask(() => {
-			const element = document.getElementById(fieldId);
-			if (element instanceof HTMLElement) {
-				element.focus();
+	useEffect(() => {
+		if (selectedConfigId !== null && selectedConfigId !== "new" && !activeConfig) {
+			if (configs.length === 0) {
+				setSelectedConfigId("new");
+				setConfigDraft(createEmptyConfigDraft(runners[0]?.id));
+				return;
 			}
-		});
+
+			const [firstConfig] = configs;
+			setSelectedConfigId(firstConfig.id);
+			setConfigDraft(createConfigDraftFromConfig(firstConfig));
+		}
+	}, [activeConfig, configs, runners, selectedConfigId]);
+
+	useEffect(() => {
+		if (!configDraft.runnerId && runners.length > 0) {
+			setConfigDraft((current) => ({
+				...current,
+				runnerId: String(runners[0].id),
+			}));
+		}
+	}, [configDraft.runnerId, runners]);
+
+	function updateErrors(nextErrors: Partial<DraftErrors>) {
+		setErrors((current) => ({
+			runner: nextErrors.runner ?? current.runner,
+			config: nextErrors.config ?? current.config,
+		}));
 	}
 
-	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-		event.preventDefault();
+	function handleRunnerDraftChange(nextDraft: RunnerDraft) {
+		setRunnerDraft(nextDraft);
+		if (Object.keys(errors.runner).length > 0) {
+			const validation = validateRunnerDraft(nextDraft, {
+				existingHasCredential: runnerHasCredential,
+			});
+			updateErrors({ runner: validation.success ? {} : validation.errors });
+		}
+	}
 
-		const validation = validateDraft(draft, { existingHasCredential });
+	function handleConfigDraftChange(nextDraft: ConfigDraft) {
+		setConfigDraft(nextDraft);
+		if (Object.keys(errors.config).length > 0) {
+			const validation = validateConfigDraft(nextDraft);
+			updateErrors({ config: validation.success ? {} : validation.errors });
+		}
+	}
+
+	function activateNewRunner() {
+		setSelectedRunnerId("new");
+		setRunnerDraft(createEmptyRunnerDraft());
+		updateErrors({ runner: {} });
+	}
+
+	function activateRunner(runner: AgentRunner) {
+		setSelectedRunnerId(runner.id);
+		setRunnerDraft(createRunnerDraftFromRunner(runner));
+		updateErrors({ runner: {} });
+	}
+
+	function activateNewConfig() {
+		setSelectedConfigId("new");
+		setConfigDraft(createEmptyConfigDraft(activeRunner?.id ?? runners[0]?.id));
+		updateErrors({ config: {} });
+	}
+
+	function activateConfig(config: AgentConfig) {
+		setSelectedConfigId(config.id);
+		setConfigDraft(createConfigDraftFromConfig(config));
+		updateErrors({ config: {} });
+	}
+
+	async function handleRunnerSubmit() {
+		const validation = validateRunnerDraft(runnerDraft, {
+			existingHasCredential: runnerHasCredential,
+		});
 		if (!validation.success) {
-			setErrors(validation.errors);
-			focusFirstInvalidField(validation.errors);
+			updateErrors({ runner: validation.errors });
+			focusFirstInvalidField({ runner: validation.errors, config: errors.config });
 			return;
 		}
 
 		const payloadBase = {
 			name: validation.data.name.trim(),
-			enabled: validation.data.enabled,
 			agentType: validation.data.agentType,
 			modelName: normalizeOptional(validation.data.modelName),
 			modelVersion: normalizeOptional(validation.data.modelVersion),
@@ -239,24 +258,24 @@ export function AdminAgentsPage({
 			credentialMode: validation.data.credentialMode,
 		};
 
-		if (editingConfigId === "new") {
-			await onCreateConfig({
+		if (selectedRunnerId === "new" || selectedRunnerId === null) {
+			const createdRunner = await onCreateRunner({
 				...payloadBase,
 				llmApiKey: normalizeOptional(validation.data.llmApiKey),
 			});
-			handleStartCreate();
+			activateRunner(createdRunner);
 			return;
 		}
 
-		await onUpdateConfig(editingConfigId, {
+		const updatedRunner = await onUpdateRunner(selectedRunnerId, {
 			...payloadBase,
 			clearModelName:
-				editingConfig?.modelName != null &&
+				activeRunner?.modelName != null &&
 				normalizeOptional(validation.data.modelName) === undefined
 					? true
 					: undefined,
 			clearModelVersion:
-				editingConfig?.modelVersion != null &&
+				activeRunner?.modelVersion != null &&
 				normalizeOptional(validation.data.modelVersion) === undefined
 					? true
 					: undefined,
@@ -264,173 +283,172 @@ export function AdminAgentsPage({
 			clearLlmApiKey: validation.data.clearLlmApiKey || undefined,
 		});
 
-		if (editingConfig) {
-			handleStartEdit({
-				...editingConfig,
-				...payloadBase,
-				hasLlmApiKey:
-					validation.data.clearLlmApiKey === true
-						? false
-						: normalizeOptional(validation.data.llmApiKey) !== undefined || existingHasCredential,
-			});
+		activateRunner(updatedRunner);
+	}
+
+	async function handleConfigSubmit() {
+		const validation = validateConfigDraft(configDraft);
+		if (!validation.success) {
+			updateErrors({ config: validation.errors });
+			focusFirstInvalidField({ runner: errors.runner, config: validation.errors });
+			return;
 		}
+
+		const payloadBase = {
+			name: validation.data.name.trim(),
+			enabled: validation.data.enabled,
+			runnerId: Number(validation.data.runnerId),
+		};
+
+		if (selectedConfigId === "new" || selectedConfigId === null) {
+			const createdConfig = await onCreateConfig(payloadBase);
+			activateConfig(createdConfig);
+			return;
+		}
+
+		const updatedConfig = await onUpdateConfig(selectedConfigId, payloadBase);
+		activateConfig(updatedConfig);
+	}
+
+	function requestDeleteRunner(runner: AgentRunner) {
+		setPendingDeleteRunner(runner);
+	}
+
+	function confirmDeleteRunner() {
+		if (!pendingDeleteRunner) {
+			return;
+		}
+
+		const runnerToDelete = pendingDeleteRunner;
+		setDeleteRunnerCandidate(runnerToDelete);
+		setPendingDeleteRunner(null);
+		void (async () => {
+			try {
+				await onDeleteRunner(runnerToDelete.id);
+				if (selectedRunnerId === runnerToDelete.id) {
+					activateNewRunner();
+				}
+			} finally {
+				setDeleteRunnerCandidate(null);
+			}
+		})();
+	}
+
+	function requestDeleteConfig(config: AgentConfig) {
+		setPendingDeleteConfig(config);
+	}
+
+	function confirmDeleteConfig() {
+		if (!pendingDeleteConfig) {
+			return;
+		}
+
+		const configToDelete = pendingDeleteConfig;
+		setDeleteConfigCandidate(configToDelete);
+		setPendingDeleteConfig(null);
+		void (async () => {
+			try {
+				await onDeleteConfig(configToDelete.id);
+				if (selectedConfigId === configToDelete.id) {
+					activateNewConfig();
+				}
+			} finally {
+				setDeleteConfigCandidate(null);
+			}
+		})();
+	}
+
+	function requestCancelJob(job: AgentJob) {
+		setPendingCancelJob(job);
+	}
+
+	function confirmCancelJob() {
+		if (!pendingCancelJob) {
+			return;
+		}
+
+		const jobToCancel = pendingCancelJob;
+		setCancelCandidate(jobToCancel);
+		setPendingCancelJob(null);
+		void (async () => {
+			try {
+				await onCancelJob(jobToCancel.id);
+			} finally {
+				setCancelCandidate(null);
+			}
+		})();
 	}
 
 	return (
-		<div className="container mx-auto max-w-7xl py-6">
-			<header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-				<div className="max-w-3xl space-y-2">
-					<h1 className="text-3xl font-semibold tracking-tight">Review Agents</h1>
-					<p className="text-sm text-muted-foreground sm:text-base">
-						Configure the Claude Code and Pi runtimes that run practice reviews for this workspace.
-					</p>
-				</div>
-				<Button variant="outline" onClick={onRefresh}>
-					Refresh data
-				</Button>
-			</header>
+		<AgentSettingsPage
+			runners={runners}
+			configs={configs}
+			selectedRunnerId={selectedRunnerId}
+			selectedConfigId={selectedConfigId}
+			runnerDraft={runnerDraft}
+			configDraft={configDraft}
+			errors={errors}
+			existingHasCredential={runnerHasCredential}
+			isLoadingRunners={isLoadingRunners}
+			isLoadingConfigs={isLoadingConfigs}
+			isSavingRunner={isSavingRunner}
+			isSavingConfig={isSavingConfig}
+			deletingRunnerId={deletingRunnerId ?? deleteRunnerCandidate?.id ?? null}
+			deletingConfigId={deletingConfigId ?? deleteConfigCandidate?.id ?? null}
+			pendingDeleteRunner={pendingDeleteRunner}
+			pendingDeleteConfig={pendingDeleteConfig}
+			jobsPage={jobsPage}
+			selectedJob={selectedJob}
+			selectedJobId={selectedJobId}
+			jobsFilter={jobsFilter}
+			isLoadingJobs={isLoadingJobs}
+			isLoadingJobDetails={isLoadingJobDetails}
+			jobsError={jobsError}
+			jobDetailsError={jobDetailsError}
+			pendingCancelJob={pendingCancelJob}
+			cancellingJobId={cancellingJobId ?? cancelCandidate?.id ?? null}
+			retryingJobId={retryingJobId}
+			onSelectRunner={(runnerId: number | "new") => {
+				if (runnerId === "new") {
+					activateNewRunner();
+					return;
+				}
 
-			<div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_24rem]">
-				<div className="space-y-6">
-					{configsError && (
-						<Card>
-							<CardHeader>
-								<CardTitle>Could not load agent configs</CardTitle>
-								<CardDescription>{configsError.message}</CardDescription>
-							</CardHeader>
-						</Card>
-					)}
+				const nextRunner = runners.find((runner) => runner.id === runnerId);
+				if (nextRunner) {
+					activateRunner(nextRunner);
+				}
+			}}
+			onSelectConfig={(configId) => {
+				if (configId === "new") {
+					activateNewConfig();
+					return;
+				}
 
-					<AgentConfigList
-						configs={configs}
-						isLoading={isLoadingConfigs}
-						editingConfigId={editingConfigId}
-						deletingConfigId={deletingConfigId}
-						onCreateNew={handleStartCreate}
-						onEdit={handleStartEdit}
-						onDelete={requestDelete}
-					/>
-
-					{pendingDeleteCandidate && (
-						<Alert variant="destructive">
-							<AlertTitle>Delete {pendingDeleteCandidate.name}?</AlertTitle>
-							<AlertDescription>
-								This removes the config from the workspace. Existing job history stays intact, but
-								active jobs must be cancelled before deletion succeeds.
-							</AlertDescription>
-							<div className="mt-4 flex flex-wrap gap-2">
-								<Button variant="outline" onClick={dismissDeleteCandidate}>
-									Keep config
-								</Button>
-								<Button variant="destructive" onClick={confirmDeleteCandidate}>
-									Continue to delete
-								</Button>
-							</div>
-						</Alert>
-					)}
-
-					<AgentJobsTable
-						configs={configs}
-						jobsPage={jobsPage}
-						selectedJobId={selectedJobId}
-						selectedJob={selectedJob}
-						jobsFilter={jobsFilter}
-						isLoading={isLoadingJobs}
-						error={jobsError}
-						cancellingJobId={cancellingJobId}
-						retryingJobId={retryingJobId}
-						onRefresh={onRefresh}
-						onRequestCancelJob={requestCancelJob}
-						onChangeJobsFilter={onChangeJobsFilter}
-						onSelectJob={(jobId) => onSelectJob(jobId)}
-						onRetryDelivery={onRetryDelivery}
-					/>
-
-					{pendingCancelCandidate && (
-						<Alert>
-							<AlertTitle>Cancel this job?</AlertTitle>
-							<AlertDescription>
-								This stops the selected practice-review run. Use this only when the current
-								execution is no longer valid.
-							</AlertDescription>
-							<div className="mt-4 flex flex-wrap gap-2">
-								<Button variant="outline" onClick={dismissCancelCandidate}>
-									Keep running
-								</Button>
-								<Button variant="outline" onClick={confirmCancelCandidate}>
-									Continue to cancel
-								</Button>
-							</div>
-						</Alert>
-					)}
-
-					{selectedJobId !== null && (
-						<AgentJobDetailsPanel
-							job={selectedJob}
-							isLoading={isLoadingJobDetails}
-							error={jobDetailsError}
-							cancellingJobId={cancellingJobId}
-							retryingJobId={retryingJobId}
-							onRequestCancelJob={requestCancelJob}
-							onClose={() => onSelectJob(null)}
-							onRetryDelivery={onRetryDelivery}
-						/>
-					)}
-
-					{pendingEditorTarget && (
-						<Alert>
-							<AlertTitle>Discard unsaved changes?</AlertTitle>
-							<AlertDescription>
-								Your current edits have not been saved. Continue only if you want to lose those
-								changes.
-							</AlertDescription>
-							<div className="mt-4 flex flex-wrap gap-2">
-								<Button variant="outline" onClick={dismissEditorChange}>
-									Keep editing
-								</Button>
-								<Button variant="outline" onClick={confirmEditorChange}>
-									Discard changes
-								</Button>
-							</div>
-						</Alert>
-					)}
-				</div>
-
-				<Card className="xl:sticky xl:top-6 xl:self-start">
-					<CardHeader>
-						<CardTitle>
-							{editingConfigId === "new" ? "New agent config" : "Edit agent config"}
-						</CardTitle>
-						<CardDescription>
-							Configure naming, runtime, credentials, and execution limits for one review runtime.
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<AgentConfigForm
-							mode={editingConfigId === "new" ? "create" : "edit"}
-							draft={draft}
-							errors={errors}
-							existingHasCredential={existingHasCredential}
-							isSaving={isSavingConfig}
-							onDraftChange={applyDraft}
-							onSubmit={handleSubmit}
-							onReset={handleStartCreate}
-						/>
-					</CardContent>
-				</Card>
-			</div>
-
-			{deleteCandidate && (
-				<div className="sr-only" aria-live="polite">
-					Deleting {deleteCandidate.name}
-				</div>
-			)}
-
-			{cancelCandidate && (
-				<div className="sr-only" aria-live="polite">
-					Cancelling {cancelCandidate.id}
-				</div>
-			)}
-		</div>
+				const nextConfig = configs.find((config) => config.id === configId);
+				if (nextConfig) {
+					activateConfig(nextConfig);
+				}
+			}}
+			onRunnerDraftChange={handleRunnerDraftChange}
+			onConfigDraftChange={handleConfigDraftChange}
+			onRunnerSubmit={handleRunnerSubmit}
+			onConfigSubmit={handleConfigSubmit}
+			onRunnerReset={activateNewRunner}
+			onConfigReset={activateNewConfig}
+			onRequestDeleteRunner={requestDeleteRunner}
+			onCancelDeleteRunner={() => setPendingDeleteRunner(null)}
+			onConfirmDeleteRunner={confirmDeleteRunner}
+			onRequestDeleteConfig={requestDeleteConfig}
+			onCancelDeleteConfig={() => setPendingDeleteConfig(null)}
+			onConfirmDeleteConfig={confirmDeleteConfig}
+			onRefresh={onRefresh}
+			onChangeJobsFilter={onChangeJobsFilter}
+			onSelectJob={onSelectJob}
+			onRequestCancelJob={requestCancelJob}
+			onCancelPendingJob={() => setPendingCancelJob(null)}
+			onConfirmCancelJob={confirmCancelJob}
+			onRetryDelivery={onRetryDelivery}
+		/>
 	);
 }

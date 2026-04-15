@@ -25,6 +25,7 @@ import de.tum.in.www1.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.in.www1.hephaestus.agent.runner.AgentRunner;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
@@ -84,6 +85,19 @@ class AgentJobServiceTest extends BaseUnitTest {
     private Workspace workspace;
     private AgentConfig enabledConfig;
 
+    private AgentRunner createRunner(Long id, String name) {
+        AgentRunner runner = new AgentRunner();
+        runner.setId(id);
+        runner.setWorkspace(workspace);
+        runner.setName(name);
+        runner.setAgentType(AgentType.CLAUDE_CODE);
+        runner.setLlmProvider(LlmProvider.ANTHROPIC);
+        runner.setCredentialMode(CredentialMode.PROXY);
+        runner.setTimeoutSeconds(600);
+        runner.setMaxConcurrentJobs(3);
+        return runner;
+    }
+
     @BeforeEach
     void setUp() {
         service = new AgentJobService(
@@ -108,10 +122,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         enabledConfig.setWorkspace(workspace);
         enabledConfig.setName("test-config");
         enabledConfig.setEnabled(true);
-        enabledConfig.setAgentType(AgentType.CLAUDE_CODE);
-        enabledConfig.setLlmProvider(LlmProvider.ANTHROPIC);
-        enabledConfig.setCredentialMode(CredentialMode.PROXY);
-        enabledConfig.setTimeoutSeconds(600);
+        enabledConfig.setRunner(createRunner(101L, "runner-test-config"));
     }
 
     private JobSubmission createSubmission() {
