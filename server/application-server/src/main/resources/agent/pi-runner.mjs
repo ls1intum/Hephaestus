@@ -299,31 +299,27 @@ function appendFindings(findings) {
     return { inserted, duplicates };
 }
 
-const reportFindingsTool = defineTool({
-    name: "report_findings",
-    label: "Report Findings",
+const reportFindingTool = defineTool({
+    name: "report_finding",
+    label: "Report Finding",
     description:
-        "Persist one or more structured findings immediately so they survive retries and timeouts. Call this as soon as a finding is ready. Do not wait to batch everything at the end.",
+        "Persist exactly one structured finding immediately so it survives retries and timeouts. Call this as soon as one finding is ready. Do not wait to batch findings.",
     parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["findings"],
+        required: ["finding"],
         properties: {
-            findings: {
-                type: "array",
-                minItems: 1,
-                items: findingSchema,
-            },
+            finding: findingSchema,
         },
     },
     execute: async (_toolCallId, params) => {
-        const { inserted, duplicates } = appendFindings(params.findings);
-        const negativeCount = params.findings.filter((finding) => finding.verdict === "NEGATIVE").length;
+        const { inserted, duplicates } = appendFindings([params.finding]);
+        const negativeCount = params.finding.verdict === "NEGATIVE" ? 1 : 0;
         return {
             content: [
                 {
                     type: "text",
-                    text: `Stored ${inserted} finding(s)${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative findings in this call: ${negativeCount}.`,
+                    text: `Stored ${inserted} finding${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative findings in this call: ${negativeCount}.`,
                 },
             ],
             details: { inserted, duplicates, totalFindings: reviewState.findings.length },
@@ -500,7 +496,10 @@ function buildRetryScaffold(slugs) {
     if (!slugs.length) return "";
     return (
         `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
-        `Persist every justified finding with report_findings. ` +
+        `Persist every justified finding with report_finding, one finding per call. ` +
+        `There is no target count and no quota. ` +
+        `Only report POSITIVE findings that add real review value. ` +
+        `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem. ` +
         `Then persist the final MR summary with set_review_summary.`
     );
 }
@@ -526,7 +525,7 @@ async function main() {
         cwd: CWD,
         agentDir: process.env.PI_CODING_AGENT_DIR || "/home/agent/.pi",
         tools,
-        customTools: [reportFindingsTool, setReviewSummaryTool],
+        customTools: [reportFindingTool, setReviewSummaryTool],
         sessionManager,
         settingsManager,
     });
@@ -549,10 +548,14 @@ async function main() {
                     type: "text",
                     text:
                         `Stop analyzing and persist output now. ` +
-                        `Use report_findings immediately for any finding you already have. ` +
+                        `Use report_finding immediately for any finding you already have, one finding per call. ` +
+                        `There is no target count and no quota. ` +
                         `When reading files for initial context, batch independent reads and greps in parallel when the runtime supports it. ` +
                         `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
-                        `Then call set_review_summary exactly once. Do not write planning prose.`,
+                        `Only keep POSITIVE findings that add real review value. ` +
+                        `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
+                        `Then call set_review_summary exactly once. ` +
+                        `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`,
                 },
             ],
             timestamp: Date.now(),
@@ -680,25 +683,35 @@ async function main() {
         retryPrompt =
             `You ran out of time before finalizing the review. ` +
             `Do NOT restart analysis from scratch. Do NOT read more files. ` +
-            `Persist every remaining justified finding with report_findings immediately. ` +
+            `Persist every remaining justified finding with report_finding immediately, one finding per call. ` +
+            `There is no target count and no quota. ` +
             `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
+            `Only keep POSITIVE findings that add real review value. ` +
+            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
             `Then call set_review_summary exactly once with the MR note. ` +
-            `Do not write planning prose. ` +
+            `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
             scaffold;
     } else if (agentText) {
         retryPrompt =
             `You completed analysis but did not persist the final review output. ` +
-            `Do NOT read any more files. Persist the remaining findings with report_findings NOW. ` +
+            `Do NOT read any more files. Persist the remaining findings with report_finding NOW, one finding per call. ` +
+            `There is no target count and no quota. ` +
             `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
-            `Then call set_review_summary exactly once with delivery.mrNote. Do not write planning prose. ` +
+            `Only keep POSITIVE findings that add real review value. ` +
+            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
+            `Then call set_review_summary exactly once with delivery.mrNote. ` +
+            `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
             scaffold;
     } else {
         retryPrompt =
             `You did not persist the review output. The review will fail unless you persist it NOW. ` +
-            `Use your analysis from above. Do NOT read more files. Persist findings with report_findings immediately, ` +
+            `Use your analysis from above. Do NOT read more files. Persist findings with report_finding immediately, one finding per call, ` +
+            `with no target count or quota, ` +
             `using \"No change needed.\" as guidance for POSITIVE or NOT_APPLICABLE findings when needed. ` +
+            `Only keep POSITIVE findings that add real review value. ` +
+            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
             `Then call set_review_summary exactly once with the MR note. ` +
-            `Do not write planning prose. ` +
+            `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
             scaffold;
     }
 
@@ -760,8 +773,12 @@ async function main() {
     try {
         await session.prompt(
             `The review will be discarded unless you persist the remaining output RIGHT NOW. ` +
-                `Use report_findings for any findings not yet persisted and set_review_summary for delivery.mrNote. ` +
-                `Do NOT read more files. Do NOT write planning prose. Guidance for POSITIVE or NOT_APPLICABLE findings can simply be \"No change needed.\" ` +
+                `Use report_finding for any findings not yet persisted, one finding per call, and set_review_summary for delivery.mrNote. ` +
+                `There is no target count and no quota. ` +
+                `Do NOT read more files. Use tools only. Do NOT write planning prose or plain-text commentary. ` +
+                `Only keep POSITIVE findings that add real review value. ` +
+                `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
+                `Guidance for POSITIVE or NOT_APPLICABLE findings can simply be \"No change needed.\" ` +
                 `${slugs.length ? `Relevant practice slugs: ${slugs.join(", ")}.` : ""}`,
         );
     } catch (err) {

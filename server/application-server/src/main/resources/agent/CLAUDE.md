@@ -59,6 +59,8 @@ If `contributor_history.json` has ≥2 prior NEGATIVE findings for the same prac
 - Report all justified findings. Multiple NEGATIVE findings for the same practice are allowed and should stay separate when they represent different issues.
 - **Red-team your POSITIVE verdicts**: for each, state one concrete reason the practice COULD be NEGATIVE, then verify that reason does not hold by citing evidence from the diff. This is a verification step, not a reason to second-guess well-supported conclusions.
 - **Check proportionality**: would the author reading only the MR summary understand the most important problems?
+- **Suppress review noise**: if a POSITIVE finding would only say "this exists" or "this is acceptable," omit it unless it adds meaningful review value.
+- **Avoid derivative stacking**: if one stronger finding already explains the user-visible or architectural problem, do not add a second weaker finding that only complains about logging, naming, or style around that same root issue unless it would still deserve separate action.
 
 ### Phase 5: Final Output
 

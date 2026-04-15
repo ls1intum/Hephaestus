@@ -173,9 +173,9 @@ class DeliveryComposerTest extends BaseUnitTest {
         String mrNote = result.mrNote();
         assertThat(mrNote).isNotNull();
 
-        // Opening: names up to 2 positive practices (using positive labels, not raw slugs)
-        assertThat(mrNote).contains("error state handling");
-        assertThat(mrNote).contains("view decomposition");
+        // Mixed reviews with multiple blocking issues should not front-load praise.
+        assertThat(mrNote).doesNotContain("error state handling");
+        assertThat(mrNote).doesNotContain("view decomposition");
 
         // Issue count: split blocking vs improvement (2 CRITICAL/MAJOR + 2 MINOR)
         assertThat(mrNote).contains("2 issues to fix before merging");

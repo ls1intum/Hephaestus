@@ -108,6 +108,8 @@ For POSITIVE or NOT_APPLICABLE findings, `guidance` may be short, for example `N
 6. **Check false-positive exclusions** in practice criteria before flagging NEGATIVE.
 7. **NOT_APPLICABLE for irrelevant practices** — if a practice doesn't apply to this diff, emit a finding with verdict NOT_APPLICABLE. Do not silently skip it.
 8. **Coverage matters, but completeness beats forced symmetry** — evaluate every relevant practice, but do not collapse multiple defects into a single finding just to keep one-per-practice symmetry. Report all justified findings. Use POSITIVE or NOT_APPLICABLE only when they add meaningful review value.
+   8a. **High-signal reviews beat noisy reviews** — do not emit courtesy positives just to increase coverage. A POSITIVE finding must teach or reinforce something genuinely useful.
+   8b. **Avoid derivative findings** — if a stronger finding already captures the root problem, do not add a weaker adjacent finding unless it would independently matter to the author.
 9. **If ALL findings are POSITIVE**: output only POSITIVE findings. The server posts an approval comment (e.g., "Nice work on X and Y. No issues found — looking good!").
 10. **Fix must be non-empty** — guidance code blocks must show the actual corrected code. Never show an empty function body or a no-op as a "fix".
 11. **Secrets: show deletion, not commenting-out** — for hardcoded secrets, the fix is DELETE the line + rotate the credential. Never show a commented-out version of the secret.
@@ -132,12 +134,14 @@ For POSITIVE or NOT_APPLICABLE findings, `guidance` may be short, for example `N
 30. **Guidance code must be defect-free** — your suggested fix MUST NOT introduce new problems. Never use patterns in guidance code that trigger NEGATIVE findings under other practices. Every code block in guidance must pass the same practices you are evaluating.
 31. **Guidance must show real error handling** — when replacing a silent failure pattern in guidance, show the complete error path: (a) an error state variable, (b) the error-catching code that sets it, and (c) a brief note about displaying it.
 32. **Proportional coverage** — don't spend 3 MINOR findings on naming issues and 0 on a missing error state. After drafting all findings, check: are the MAJOR/CRITICAL issues adequately covered? Would the author reading only the MR note understand the most important problems?
-33. **Binary files are not reviewable** — ignore binary file changes (images, compiled assets) in the diff.
-34. **Empty diff = all NOT_APPLICABLE** — if the diff contains no `+` lines, emit NOT_APPLICABLE for all practices with reasoning explaining that no new code was added.
-35. **Precomputed hints are confirmed pattern matches** — if `.precompute-out/summary.md` exists, its patterns and locations are real (confirmed by static analysis), but whether they constitute actual violations requires YOUR judgment based on surrounding context. A `try?` match is a real pattern at a real location, but only you can assess if the surrounding code already handles it. Start from the hints, then verify and expand — the scripts cover mechanical patterns, not semantic issues.
-36. **Red-team your POSITIVE verdicts** — before concluding POSITIVE on any practice, state one reason the practice COULD be NEGATIVE and explain why it does not apply. This prevents rationalization bias. A false positive (flagging correct code) erodes student trust more than a missed issue, but a false POSITIVE (approving bad code) teaches the wrong lesson.
-37. **NEGATIVE+INFO is contradictory** — if a finding warrants NEGATIVE, it is at minimum MINOR. If the issue is truly INFO-level, emit POSITIVE with a note in reasoning.
-38. **Partial compliance** — when a practice is both followed (some code) and violated (other code), the verdict is NEGATIVE, but reasoning should acknowledge the correct instances to give balanced feedback.
+33. **Use tools, not prose, during continuation** — if the runner tells you to persist remaining output, respond by calling `report_finding` and `set_review_summary`, not by writing explanatory plain text.
+34. **No quotas** — never optimize for a target number of findings. There is no required count. Persist each high-signal finding as soon as it is ready.
+35. **Binary files are not reviewable** — ignore binary file changes (images, compiled assets) in the diff.
+36. **Empty diff = all NOT_APPLICABLE** — if the diff contains no `+` lines, emit NOT_APPLICABLE for all practices with reasoning explaining that no new code was added.
+37. **Precomputed hints are confirmed pattern matches** — if `.precompute-out/summary.md` exists, its patterns and locations are real (confirmed by static analysis), but whether they constitute actual violations requires YOUR judgment based on surrounding context. A `try?` match is a real pattern at a real location, but only you can assess if the surrounding code already handles it. Start from the hints, then verify and expand — the scripts cover mechanical patterns, not semantic issues.
+38. **Red-team your POSITIVE verdicts** — before concluding POSITIVE on any practice, state one reason the practice COULD be NEGATIVE and explain why it does not apply. This prevents rationalization bias. A false positive (flagging correct code) erodes student trust more than a missed issue, but a false POSITIVE (approving bad code) teaches the wrong lesson.
+39. **NEGATIVE+INFO is contradictory** — if a finding warrants NEGATIVE, it is at minimum MINOR. If the issue is truly INFO-level, emit POSITIVE with a note in reasoning.
+40. **Partial compliance** — when a practice is both followed (some code) and violated (other code), the verdict is NEGATIVE, but reasoning should acknowledge the correct instances to give balanced feedback.
 
 ## Review Quality
 

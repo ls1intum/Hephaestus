@@ -37,6 +37,9 @@ class DeliveryComposer {
     /** Max positives to name in the opening (more than 2 creates a run-on). */
     static final int MAX_NAMED_POSITIVES = 2;
 
+    /** When there are many blocking issues, avoid leading with praise. */
+    static final int BLOCKING_ISSUES_SUPPRESS_PRAISE_THRESHOLD = 2;
+
     /** Practices that are inherently non-inlinable (no file-level location). */
     static final Set<String> NON_INLINABLE_PRACTICES = Set.of("mr-description-quality", "commit-discipline");
 
@@ -240,8 +243,15 @@ class DeliveryComposer {
         List<ValidatedFinding> positives,
         List<ValidatedFinding> negatives
     ) {
-        // Name up to MAX_NAMED_POSITIVES specific positive practices
-        if (!positives.isEmpty()) {
+        long blockingCount = negatives
+            .stream()
+            .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
+            .count();
+        long improvementCount = negatives.size() - blockingCount;
+
+        // Name up to MAX_NAMED_POSITIVES specific positive practices, but do not front-load praise
+        // when there are multiple blocking issues.
+        if (!positives.isEmpty() && blockingCount < BLOCKING_ISSUES_SUPPRESS_PRAISE_THRESHOLD) {
             List<String> namedPositives = positives
                 .stream()
                 .limit(MAX_NAMED_POSITIVES)
@@ -249,13 +259,6 @@ class DeliveryComposer {
                 .toList();
             sb.append("Nice work on the ").append(joinNatural(namedPositives)).append(". ");
         }
-
-        // Split blocking vs improvement counts
-        long blockingCount = negatives
-            .stream()
-            .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
-            .count();
-        long improvementCount = negatives.size() - blockingCount;
 
         if (blockingCount > 0 && improvementCount > 0) {
             sb
