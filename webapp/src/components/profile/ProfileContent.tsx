@@ -38,7 +38,6 @@ export function ProfileContent({
 	providerType = "GITHUB",
 	reviewActivity = [],
 	openPullRequests = [],
-	activityStats,
 	reviewedPullRequests,
 	isLoading,
 	username,
@@ -91,20 +90,7 @@ export function ProfileContent({
 			},
 		);
 
-	// Convert server stats to normalized format, or fall back to client computation
-	const normalizeStats = (serverStats?: ProfileActivityStats): NormalizedStats => {
-		if (serverStats) {
-			return {
-				approvals: serverStats.numberOfApprovals ?? 0,
-				changeRequests: serverStats.numberOfChangeRequests ?? 0,
-				comments: (serverStats.numberOfComments ?? 0) + (serverStats.numberOfIssueComments ?? 0),
-				codeComments: serverStats.numberOfCodeComments ?? 0,
-			};
-		}
-		return computeStatsFromActivity(reviewActivity ?? []);
-	};
-
-	const reviewStats = normalizeStats(activityStats);
+	const activityStatsForFeed = computeStatsFromActivity(reviewActivity ?? []);
 	const terms = getProviderTerms(providerType);
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
@@ -126,17 +112,17 @@ export function ProfileContent({
 				enableAllActivity
 			/>
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-				{/* Latest Review Activity */}
+				{/* Latest Pull Request Activity */}
 				<div className="flex flex-col gap-4">
 					<div className="flex flex-col gap-1">
 						<div className="flex flex-wrap items-center gap-3">
-							<h3 className="text-lg font-semibold">Review activity</h3>
+							<h3 className="text-lg font-semibold">{terms.pullRequests} activity</h3>
 							<ActivityBadges
 								reviewedPullRequests={reviewedPullRequestsForPopover}
-								approvals={reviewStats.approvals}
-								changeRequests={reviewStats.changeRequests}
-								comments={reviewStats.comments}
-								codeComments={reviewStats.codeComments}
+								approvals={activityStatsForFeed.approvals}
+								changeRequests={activityStatsForFeed.changeRequests}
+								comments={activityStatsForFeed.comments}
+								codeComments={activityStatsForFeed.codeComments}
 								isLoading={isLoading}
 								providerType={providerType}
 							/>
@@ -160,11 +146,11 @@ export function ProfileContent({
 						) : (
 							<EmptyState
 								icon={CodeReviewIcon}
-								title="No review activity"
+								title={`No ${terms.pullRequests.toLowerCase()} activity`}
 								description={
 									currUserIsDashboardUser
-										? "No reviews in this timeframe. Try expanding the filter."
-										: `${displayName || username} has no reviews in this timeframe.`
+										? `No ${terms.pullRequests.toLowerCase()} activity in this timeframe. Try expanding the filter.`
+										: `${displayName || username} has no ${terms.pullRequests.toLowerCase()} activity in this timeframe.`
 								}
 							/>
 						)}
