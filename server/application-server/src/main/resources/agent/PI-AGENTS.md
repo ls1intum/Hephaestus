@@ -2,7 +2,7 @@
 
 **Your deliverable is a complete structured review with all findings and a `delivery.mrNote`.**
 
-- Prefer the dedicated PI reporting tools: `report_findings`, `mark_practice_reviewed`, and `set_review_summary`.
+- Prefer the dedicated PI reporting tools: `report_findings` and `set_review_summary`.
 - Use them incrementally as you work so findings survive retries and timeouts.
 - Call `report_findings` as soon as a finding is ready. Do not wait until the end to batch everything.
 - If those tools are unavailable, fall back to writing `.output/result.json` with the write tool.
@@ -11,12 +11,11 @@
 
 ## How to work
 
-1. **Read** `.context/diff_summary.md`, `.practices/all-criteria.md`, `.practices/index.json`, and `.context/metadata.json`
+1. **Read** `.context/diff_summary.md`, `.practices/all-criteria.md`, `.practices/index.json`, and `.context/metadata.json`. Batch independent reads/greps in parallel when your runtime supports it.
 2. **Analyze** the diff against each practice — only flag changed lines (`+` and `-`). Verify NEGATIVE findings against actual diff lines. Re-examine POSITIVE verdicts for partial violations.
 3. **Persist findings as you go** with `report_findings` whenever you confirm them.
-4. **Mark coverage** with `mark_practice_reviewed` when a practice is fully evaluated.
-5. **Persist the final MR summary** with `set_review_summary` once you know what should be posted.
-6. If the dedicated tools are unavailable, **write** `.output/result.json` using the write tool.
+4. **Persist the final MR summary** with `set_review_summary` once you know what should be posted.
+5. If the dedicated tools are unavailable, **write** `.output/result.json` using the write tool.
 
 For POSITIVE or NOT_APPLICABLE findings, `guidance` can be brief, e.g. `No change needed.` Do not overthink positive guidance.
 

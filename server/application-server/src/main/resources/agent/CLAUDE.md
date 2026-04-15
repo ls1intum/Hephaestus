@@ -45,6 +45,7 @@ For EACH relevant practice:
 1. **Verify before flagging**: Before any NEGATIVE finding, confirm the evidence is from changed lines (`+` or `-`). If unsure, grep `diff.patch` to verify. Evidence snippets must be copied character-for-character from the diff.
 2. **Use `repo/` for context** — read files there to understand surrounding code, but never flag pre-existing code that was not changed in the diff.
 3. **Verify precompute hints** — precompute scripts match patterns mechanically. Verify each hint by reading surrounding code to assess whether it is a real violation.
+   Parallelize independent reads and greps whenever the runtime supports it so you spend time on analysis, not serial file loading.
 4. **Severity** — follow the criteria file for each practice.
 5. **Guidance** — include a code block showing the corrected code. If the fix requires context not visible in the diff, describe the approach in prose. Only reference symbols that exist in the diff or standard library. Never introduce patterns that violate other practices.
 6. **suggestedDiffNotes** — one per defect location. `filePath` must be a real diff file. `startLine` must be the `[L<n>]` number of the defect line. Body = the fix action, not the diagnosis.

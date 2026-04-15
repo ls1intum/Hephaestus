@@ -187,6 +187,7 @@ class PiAgentAdapterTest extends BaseUnitTest {
             assertThat(script).contains("report_findings");
             assertThat(script).contains("set_review_summary");
             assertThat(script).contains("review-state.json");
+            assertThat(script).doesNotContain("mark_practice_reviewed");
         }
 
         @Test

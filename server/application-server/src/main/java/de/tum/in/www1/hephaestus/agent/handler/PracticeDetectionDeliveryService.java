@@ -16,7 +16,6 @@ import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -91,7 +90,7 @@ public class PracticeDetectionDeliveryService {
                 workspaceId,
                 job.getId()
             );
-            return new DeliveryResult(0, validFindings.size(), 0, 0, false);
+            return new DeliveryResult(0, validFindings.size(), 0, false);
         }
 
         // Resolve target PR and author
@@ -112,10 +111,8 @@ public class PracticeDetectionDeliveryService {
         Long targetId = pullRequestId;
 
         // Persist findings
-        Map<String, Integer> negativeCounts = new HashMap<>();
         int inserted = 0;
         int discardedUnknownSlug = 0;
-        int discardedOverCap = 0;
         int discardedDuplicate = 0;
         boolean hasNegative = false;
         Instant detectedAt = Instant.now();
@@ -133,22 +130,6 @@ public class PracticeDetectionDeliveryService {
                     job.getId()
                 );
                 continue;
-            }
-
-            // Cap negatives per practice
-            if (finding.verdict() == Verdict.NEGATIVE) {
-                int count = negativeCounts.getOrDefault(finding.practiceSlug(), 0);
-                if (count >= properties.maxNegativeFindingsPerPractice()) {
-                    discardedOverCap++;
-                    log.info(
-                        "Discarded finding over negative cap: slug={}, cap={}, jobId={}",
-                        finding.practiceSlug(),
-                        properties.maxNegativeFindingsPerPractice(),
-                        job.getId()
-                    );
-                    continue;
-                }
-                negativeCounts.put(finding.practiceSlug(), count + 1);
             }
 
             // Build idempotency key — includes index to allow multiple findings per practice
@@ -197,12 +178,11 @@ public class PracticeDetectionDeliveryService {
             }
         }
 
-        int totalDiscarded = discardedUnknownSlug + discardedOverCap + discardedDuplicate;
+        int totalDiscarded = discardedUnknownSlug + discardedDuplicate;
         log.info(
-            "Practice detection delivery: inserted={}, unknownSlug={}, overCap={}, duplicate={}, jobId={}",
+            "Practice detection delivery: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
             inserted,
             discardedUnknownSlug,
-            discardedOverCap,
             discardedDuplicate,
             job.getId()
         );
@@ -221,13 +201,12 @@ public class PracticeDetectionDeliveryService {
             )
         );
 
-        return new DeliveryResult(inserted, discardedUnknownSlug, discardedOverCap, discardedDuplicate, hasNegative);
+        return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative);
     }
 
     public record DeliveryResult(
         int inserted,
         int discardedUnknownSlug,
-        int discardedOverCap,
         int discardedDuplicate,
         boolean hasNegative
     ) {}

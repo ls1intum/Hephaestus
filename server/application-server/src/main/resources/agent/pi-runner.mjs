@@ -55,7 +55,6 @@ const reviewState = {
     findings: [],
     findingKeys: [],
     delivery: { mrNote: null },
-    coverage: {},
 };
 const verdictSchema = { type: "string", enum: ["POSITIVE", "NEGATIVE", "NOT_APPLICABLE"] };
 const severitySchema = { type: "string", enum: ["CRITICAL", "MAJOR", "MINOR", "INFO"] };
@@ -121,7 +120,6 @@ function persistReviewState() {
             {
                 findings: reviewState.findings,
                 delivery: reviewState.delivery,
-                coverage: reviewState.coverage,
             },
             null,
             2,
@@ -298,11 +296,6 @@ function appendFindings(findings) {
     return { inserted, duplicates };
 }
 
-function updateCoverage(practiceSlug, status) {
-    reviewState.coverage[practiceSlug] = { status, updatedAt: new Date().toISOString() };
-    persistReviewState();
-}
-
 const reportFindingsTool = defineTool({
     name: "report_findings",
     label: "Report Findings",
@@ -331,31 +324,6 @@ const reportFindingsTool = defineTool({
                 },
             ],
             details: { inserted, duplicates, totalFindings: reviewState.findings.length },
-        };
-    },
-});
-
-const markPracticeReviewedTool = defineTool({
-    name: "mark_practice_reviewed",
-    label: "Mark Practice Reviewed",
-    description:
-        "Record that a practice has been fully reviewed so retries can focus only on the remaining practices. Call this after persisting the findings for that practice.",
-    parameters: {
-        type: "object",
-        additionalProperties: false,
-        required: ["practiceSlug", "status"],
-        properties: {
-            practiceSlug: { type: "string", minLength: 1 },
-            status: verdictSchema,
-        },
-    },
-    execute: async (_toolCallId, params) => {
-        updateCoverage(String(params.practiceSlug).trim(), params.status);
-        return {
-            content: [
-                { type: "text", text: `Recorded review coverage for ${params.practiceSlug} (${params.status}).` },
-            ],
-            details: { reviewedPractices: Object.keys(reviewState.coverage).length },
         };
     },
 });
@@ -555,7 +523,7 @@ async function main() {
         cwd: CWD,
         agentDir: process.env.PI_CODING_AGENT_DIR || "/home/agent/.pi",
         tools,
-        customTools: [reportFindingsTool, markPracticeReviewedTool, setReviewSummaryTool],
+        customTools: [reportFindingsTool, setReviewSummaryTool],
         sessionManager,
         settingsManager,
     });
@@ -579,8 +547,9 @@ async function main() {
                     text:
                         `Stop analyzing and persist output now. ` +
                         `Use report_findings immediately for any finding you already have. ` +
+                        `When reading files for initial context, batch independent reads and greps in parallel when the runtime supports it. ` +
                         `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
-                        `Then call mark_practice_reviewed and finally set_review_summary. Do not write planning prose.`,
+                        `Then call set_review_summary. Do not write planning prose.`,
                 },
             ],
             timestamp: Date.now(),
@@ -707,7 +676,7 @@ async function main() {
             `You ran out of time before finalizing the review. ` +
             `Do NOT restart analysis from scratch. Persist any remaining findings with report_findings immediately, ` +
             `using \"No change needed.\" as guidance for POSITIVE or NOT_APPLICABLE findings if needed. ` +
-            `Then persist the MR note with set_review_summary and mark completed practices with mark_practice_reviewed. ` +
+            `Then persist the MR note with set_review_summary. ` +
             `Do not write planning prose. ` +
             `Only if the tools are unavailable should you write /workspace/.output/result.json directly. ` +
             scaffold;
@@ -724,7 +693,7 @@ async function main() {
             `You did not persist the review output. The review will fail unless you persist it NOW. ` +
             `Use your analysis from above. Do NOT read more files. Persist findings with report_findings immediately, ` +
             `using \"No change needed.\" as guidance for POSITIVE or NOT_APPLICABLE findings when needed. ` +
-            `Then persist the MR note with set_review_summary and mark completed practices with mark_practice_reviewed immediately. ` +
+            `Then persist the MR note with set_review_summary immediately. ` +
             `Do not write planning prose. ` +
             `Only if those tools are unavailable should you write /workspace/.output/result.json directly. ` +
             scaffold;
@@ -788,7 +757,7 @@ async function main() {
     try {
         await session.prompt(
             `The review will be discarded unless you persist the remaining output RIGHT NOW. ` +
-                `Use report_findings for any findings not yet persisted, set_review_summary for delivery.mrNote, and mark_practice_reviewed for any remaining practices. ` +
+                `Use report_findings for any findings not yet persisted and set_review_summary for delivery.mrNote. ` +
                 `Do NOT read more files or write planning prose. Guidance for POSITIVE or NOT_APPLICABLE findings can simply be \"No change needed.\" ` +
                 `Only if those tools are unavailable should you write /workspace/.output/result.json directly. ` +
                 `${slugs.length ? `Relevant practice slugs: ${slugs.join(", ")}.` : ""}`,
