@@ -11,6 +11,7 @@ Read `/workspace/orchestrator-protocol.md` for the output schema, field definiti
 ### Phase 0: Context Assembly
 
 Read all of the following files before beginning analysis. Issue multiple Read calls in parallel if your runtime supports it:
+
 - `/workspace/orchestrator-protocol.md` — output schema and rules
 - `/workspace/.context/diff_stat.txt` — scope
 - `/workspace/.context/diff_summary.md` — per-file diff chunks with index table (primary input)
@@ -26,6 +27,7 @@ If `.precompute-out/summary.md` exists, its pattern matches are real (from stati
 ### Phase 1: Understand the Diff
 
 Before evaluating any practice, read the full diff and build a mental model of:
+
 - Which files changed (from diff_stat.txt)
 - What the `+` lines add and the `-` lines remove
 - What patterns are present on changed lines
@@ -43,6 +45,7 @@ For EACH relevant practice:
 1. **Verify before flagging**: Before any NEGATIVE finding, confirm the evidence is from changed lines (`+` or `-`). If unsure, grep `diff.patch` to verify. Evidence snippets must be copied character-for-character from the diff.
 2. **Use `repo/` for context** — read files there to understand surrounding code, but never flag pre-existing code that was not changed in the diff.
 3. **Verify precompute hints** — precompute scripts match patterns mechanically. Verify each hint by reading surrounding code to assess whether it is a real violation.
+   Parallelize independent reads and greps whenever the runtime supports it so you spend time on analysis, not serial file loading.
 4. **Severity** — follow the criteria file for each practice.
 5. **Guidance** — include a code block showing the corrected code. If the fix requires context not visible in the diff, describe the approach in prose. Only reference symbols that exist in the diff or standard library. Never introduce patterns that violate other practices.
 6. **suggestedDiffNotes** — one per defect location. `filePath` must be a real diff file. `startLine` must be the `[L<n>]` number of the defect line. Body = the fix action, not the diagnosis.
@@ -53,9 +56,11 @@ If `contributor_history.json` has ≥2 prior NEGATIVE findings for the same prac
 ### Phase 4: Verify & Prioritize
 
 - Report ALL valid NEGATIVE findings — do not cap or suppress.
-- Every practice must get at least one finding. Multiple NEGATIVE findings for the same practice are allowed — report distinct violations as separate findings.
+- Report all justified findings. Multiple NEGATIVE findings for the same practice are allowed and should stay separate when they represent different issues.
 - **Red-team your POSITIVE verdicts**: for each, state one concrete reason the practice COULD be NEGATIVE, then verify that reason does not hold by citing evidence from the diff. This is a verification step, not a reason to second-guess well-supported conclusions.
 - **Check proportionality**: would the author reading only the MR summary understand the most important problems?
+- **Suppress review noise**: if a POSITIVE finding would only say "this exists" or "this is acceptable," omit it unless it adds meaningful review value.
+- **Avoid derivative stacking**: if one stronger finding already explains the user-visible or architectural problem, do not add a second weaker finding that only complains about logging, naming, or style around that same root issue unless it would still deserve separate action.
 
 ### Phase 5: Final Output
 

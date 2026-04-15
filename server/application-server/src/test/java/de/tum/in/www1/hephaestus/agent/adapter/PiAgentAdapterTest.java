@@ -176,13 +176,19 @@ class PiAgentAdapterTest extends BaseUnitTest {
             assertThat(spec.inputFiles()).containsKey(".run-pi.mjs");
             String script = new String(spec.inputFiles().get(".run-pi.mjs"), StandardCharsets.UTF_8);
             assertThat(script).contains("createAgentSession"); // embedded SDK, not CLI subprocess
-            assertThat(script).contains("createWriteTool"); // write tool for file output
+            assertThat(script).contains("createReadTool");
+            assertThat(script).doesNotContain("createWriteTool");
             assertThat(script).contains("readFileSync(\"/workspace/.prompt\"");
             assertThat(script).contains("runner-debug.json");
             assertThat(script).contains("session.agent.steer"); // soft timeout steering
             assertThat(script).contains("session.prompt"); // continuation via in-memory session
             assertThat(script).contains("checkResultFile");
             assertThat(script).contains("isValidFindingsPayload");
+            assertThat(script).contains("defineTool");
+            assertThat(script).contains("report_finding");
+            assertThat(script).contains("set_review_summary");
+            assertThat(script).contains("review-state.json");
+            assertThat(script).doesNotContain("mark_practice_reviewed");
         }
 
         @Test
@@ -330,6 +336,43 @@ class PiAgentAdapterTest extends BaseUnitTest {
             AgentResult result = adapter.parseResult(sandboxResult);
             assertThat(result.success()).isTrue();
             assertThat(result.output()).doesNotContainKey("rawOutput");
+        }
+
+        @Test
+        @DisplayName("should rebuild raw output from durable review state when result file is missing")
+        void shouldRebuildRawOutputFromReviewState() {
+            String reviewState = """
+                {
+                  "findings": [
+                    {
+                      "practiceSlug": "error-state-handling",
+                      "title": "Missing user-visible error state",
+                      "verdict": "NEGATIVE",
+                      "severity": "MAJOR",
+                      "confidence": 0.91,
+                      "evidence": {"locations": [], "snippets": []},
+                      "reasoning": "Errors are swallowed.",
+                      "guidance": "Show an alert.",
+                      "suggestedDiffNotes": []
+                    }
+                  ],
+                  "delivery": {
+                    "mrNote": "Please surface the failure to users."
+                  }
+                }
+                """;
+            var sandboxResult = new SandboxResult(
+                1,
+                Map.of("review-state.json", reviewState.getBytes(StandardCharsets.UTF_8)),
+                "runner failed",
+                false,
+                Duration.ofSeconds(10)
+            );
+            AgentResult result = adapter.parseResult(sandboxResult);
+            assertThat(result.success()).isFalse();
+            assertThat(result.output()).containsKey("rawOutput");
+            assertThat(result.output().get("rawOutput").toString()).contains("error-state-handling");
+            assertThat(result.output().get("rawOutput").toString()).contains("Please surface the failure to users");
         }
 
         @Test

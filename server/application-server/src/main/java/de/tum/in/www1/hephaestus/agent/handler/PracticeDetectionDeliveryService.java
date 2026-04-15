@@ -10,13 +10,11 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
-import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,7 +39,6 @@ public class PracticeDetectionDeliveryService {
     private final PracticeRepository practiceRepository;
     private final PracticeFindingRepository practiceFindingRepository;
     private final PullRequestRepository pullRequestRepository;
-    private final PracticeDetectionProperties properties;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
@@ -49,14 +46,12 @@ public class PracticeDetectionDeliveryService {
         PracticeRepository practiceRepository,
         PracticeFindingRepository practiceFindingRepository,
         PullRequestRepository pullRequestRepository,
-        PracticeDetectionProperties properties,
         ApplicationEventPublisher eventPublisher,
         ObjectMapper objectMapper
     ) {
         this.practiceRepository = practiceRepository;
         this.practiceFindingRepository = practiceFindingRepository;
         this.pullRequestRepository = pullRequestRepository;
-        this.properties = properties;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
     }
@@ -91,7 +86,7 @@ public class PracticeDetectionDeliveryService {
                 workspaceId,
                 job.getId()
             );
-            return new DeliveryResult(0, validFindings.size(), 0, 0, false);
+            return new DeliveryResult(0, validFindings.size(), 0, false);
         }
 
         // Resolve target PR and author
@@ -112,10 +107,8 @@ public class PracticeDetectionDeliveryService {
         Long targetId = pullRequestId;
 
         // Persist findings
-        Map<String, Integer> negativeCounts = new HashMap<>();
         int inserted = 0;
         int discardedUnknownSlug = 0;
-        int discardedOverCap = 0;
         int discardedDuplicate = 0;
         boolean hasNegative = false;
         Instant detectedAt = Instant.now();
@@ -133,22 +126,6 @@ public class PracticeDetectionDeliveryService {
                     job.getId()
                 );
                 continue;
-            }
-
-            // Cap negatives per practice
-            if (finding.verdict() == Verdict.NEGATIVE) {
-                int count = negativeCounts.getOrDefault(finding.practiceSlug(), 0);
-                if (count >= properties.maxNegativeFindingsPerPractice()) {
-                    discardedOverCap++;
-                    log.info(
-                        "Discarded finding over negative cap: slug={}, cap={}, jobId={}",
-                        finding.practiceSlug(),
-                        properties.maxNegativeFindingsPerPractice(),
-                        job.getId()
-                    );
-                    continue;
-                }
-                negativeCounts.put(finding.practiceSlug(), count + 1);
             }
 
             // Build idempotency key — includes index to allow multiple findings per practice
@@ -197,12 +174,11 @@ public class PracticeDetectionDeliveryService {
             }
         }
 
-        int totalDiscarded = discardedUnknownSlug + discardedOverCap + discardedDuplicate;
+        int totalDiscarded = discardedUnknownSlug + discardedDuplicate;
         log.info(
-            "Practice detection delivery: inserted={}, unknownSlug={}, overCap={}, duplicate={}, jobId={}",
+            "Practice detection delivery: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
             inserted,
             discardedUnknownSlug,
-            discardedOverCap,
             discardedDuplicate,
             job.getId()
         );
@@ -221,14 +197,8 @@ public class PracticeDetectionDeliveryService {
             )
         );
 
-        return new DeliveryResult(inserted, discardedUnknownSlug, discardedOverCap, discardedDuplicate, hasNegative);
+        return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative);
     }
 
-    public record DeliveryResult(
-        int inserted,
-        int discardedUnknownSlug,
-        int discardedOverCap,
-        int discardedDuplicate,
-        boolean hasNegative
-    ) {}
+    public record DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {}
 }

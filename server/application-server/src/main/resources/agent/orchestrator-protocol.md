@@ -2,7 +2,10 @@
 
 Canonical protocol for practice-aware code review. Both Claude Code and OpenCode follow this.
 
-**Your ONLY deliverable: call the write tool to save `.output/result.json`.** If you do not write this file, the review fails and nothing gets delivered. Do NOT output JSON as text — you MUST use the write tool.
+**Your deliverable is structured review output with a `findings` array and `delivery.mrNote`.**
+
+- In this runtime, use the dedicated reporting tools to persist findings and the MR note incrementally. That durable state is the primary output contract.
+- Do NOT output the final JSON as plain assistant text.
 
 ## Workspace Layout
 
@@ -32,49 +35,51 @@ Canonical protocol for practice-aware code review. Both Claude Code and OpenCode
 ## Line Number Annotations
 
 The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
+
 ```
 [L9] +    private let apiToken = "ghp_abc123"
 ```
+
 **All line numbers in findings MUST use `[L<n>]` values.** Never patch-file positions.
 
 ## Output Schema
 
 ```json
 {
-  "findings": [
-    {
-      "practiceSlug": "string — from index.json",
-      "title": "string — max 120 chars, describe the defect or good practice",
-      "verdict": "POSITIVE or NEGATIVE or NOT_APPLICABLE",
-      "severity": "CRITICAL or MAJOR or MINOR or INFO",
-      "confidence": 0.85,
-      "evidence": {
-        "locations": [
-          {"path": "relative/path.swift", "startLine": 42, "endLine": 50}
-        ],
-        "snippets": ["exact code from diff — never paraphrased"]
-      },
-      "reasoning": "WHAT the pattern is, WHY it matters here, WHAT happens if unfixed.",
-      "guidance": "Show the fix with a code block. Reference only symbols that exist in the diff.",
-      "suggestedDiffNotes": [
-        {"filePath": "path.swift", "startLine": 42, "endLine": 42, "body": "The fix, not the diagnosis."}
-      ]
+    "findings": [
+        {
+            "practiceSlug": "string — from index.json",
+            "title": "string — max 120 chars, describe the defect or good practice",
+            "verdict": "POSITIVE or NEGATIVE or NOT_APPLICABLE",
+            "severity": "CRITICAL or MAJOR or MINOR or INFO",
+            "confidence": 0.85,
+            "evidence": {
+                "locations": [{ "path": "relative/path.swift", "startLine": 42, "endLine": 50 }],
+                "snippets": ["exact code from diff — never paraphrased"]
+            },
+            "reasoning": "WHAT the pattern is, WHY it matters here, WHAT happens if unfixed.",
+            "guidance": "Show the fix with a code block. Reference only symbols that exist in the diff.",
+            "suggestedDiffNotes": [
+                { "filePath": "path.swift", "startLine": 42, "endLine": 42, "body": "The fix, not the diagnosis." }
+            ]
+        }
+    ],
+    "delivery": {
+        "mrNote": "Markdown prose summary posted as the MR comment (see Delivery section)"
     }
-  ],
-  "delivery": {
-    "mrNote": "Markdown prose summary posted as the MR comment (see Delivery section)"
-  }
 }
 ```
 
 ## Field Definitions
 
 **verdict**:
+
 - **POSITIVE**: contributor demonstrably followed the practice in changed code (must be verifiable from `+` lines)
 - **NEGATIVE**: contributor violated or missed the practice in changed code
 - **NOT_APPLICABLE**: the practice does not apply to this diff (e.g., no network calls → error-state-handling is irrelevant, no views → view-decomposition is irrelevant). Use this instead of a vacuously-true POSITIVE when the practice's subject matter is entirely absent from the changed code.
 
 **severity** (follow practice criteria strictly — don't guess):
+
 - **CRITICAL**: security vulnerability, data loss, production crash
 - **MAJOR**: functional bug, missing safety mechanism
 - **MINOR**: style, naming, minor readability
@@ -88,6 +93,8 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
 
 **guidance**: The fix. For NEGATIVE findings, MUST include a code block using only symbols that exist in the diff. Never reference variables, types, or properties the student hasn't written.
 
+For POSITIVE or NOT_APPLICABLE findings, `guidance` may be short, for example `No change needed.` Avoid spending review time polishing positive guidance.
+
 **suggestedDiffNotes**: Inline comments for NEGATIVE findings only. The body should be the fix action, not a restatement of the problem. Field names: `filePath`, `startLine`, `endLine`, `body`.
 
 ## Rules
@@ -95,11 +102,14 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
 1. **Only evaluate CHANGED code** — lines with `+` prefix in diff.patch. Pre-existing code (lines without `+`, code in `/workspace/repo/` not on a `+` line) is context for understanding, NEVER for flagging. If a finding's evidence points to code that is not on a `+` line, the finding is invalid. **WARNING: A file appearing in the diff does NOT mean all its code is changed.** A file with 200 lines may only have 5 `+` lines — only those 5 are in scope. grep for each snippet and verify the `+` prefix.
 2. **Never fabricate evidence** — only cite code that literally appears in the diff on `+` lines.
 3. **Use [L<n>] line numbers** — never patch-file positions or Read tool line numbers.
-4. **Report ALL NEGATIVE findings, one per practice** — do not cap or suppress valid findings. Exactly one finding per practiceSlug. If a practice has multiple violations, include ALL of them in the same finding's evidence/guidance. Don't silently drop the second violation. The title should reference the most impactful one, but guidance must cover all instances. Prioritize by severity: security > crashes > correctness > design > style.
+   3a. **Parallelize context gathering when possible** — if your runtime supports multiple independent Read/Grep calls in parallel, use that for the initial diff/protocol/practice loading step.
+4. **Report ALL NEGATIVE findings** — do not cap or suppress valid findings. Multiple findings for the same practiceSlug are allowed and expected when there are distinct issues. Keep each finding focused on one concrete issue so evidence, reasoning, and guidance stay precise. Prioritize by severity: security > crashes > correctness > design > style.
 5. **Code examples must compile** — only reference symbols that exist in the diff or are standard library. Never invent `viewModel`, `errorMessage`, etc. unless the student wrote them.
 6. **Check false-positive exclusions** in practice criteria before flagging NEGATIVE.
 7. **NOT_APPLICABLE for irrelevant practices** — if a practice doesn't apply to this diff, emit a finding with verdict NOT_APPLICABLE. Do not silently skip it.
-8. **Exactly one finding per practice in index.json** — the total finding count MUST equal the number of practices listed in index.json. Every practice gets a verdict: NEGATIVE, POSITIVE, or NOT_APPLICABLE.
+8. **Coverage matters, but completeness beats forced symmetry** — evaluate every relevant practice, but do not collapse multiple defects into a single finding just to keep one-per-practice symmetry. Report all justified findings. Use POSITIVE or NOT_APPLICABLE only when they add meaningful review value.
+   8a. **High-signal reviews beat noisy reviews** — do not emit courtesy positives just to increase coverage. A POSITIVE finding must teach or reinforce something genuinely useful.
+   8b. **Avoid derivative findings** — if a stronger finding already captures the root problem, do not add a weaker adjacent finding unless it would independently matter to the author.
 9. **If ALL findings are POSITIVE**: output only POSITIVE findings. The server posts an approval comment (e.g., "Nice work on X and Y. No issues found — looking good!").
 10. **Fix must be non-empty** — guidance code blocks must show the actual corrected code. Never show an empty function body or a no-op as a "fix".
 11. **Secrets: show deletion, not commenting-out** — for hardcoded secrets, the fix is DELETE the line + rotate the credential. Never show a commented-out version of the secret.
@@ -124,12 +134,14 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
 30. **Guidance code must be defect-free** — your suggested fix MUST NOT introduce new problems. Never use patterns in guidance code that trigger NEGATIVE findings under other practices. Every code block in guidance must pass the same practices you are evaluating.
 31. **Guidance must show real error handling** — when replacing a silent failure pattern in guidance, show the complete error path: (a) an error state variable, (b) the error-catching code that sets it, and (c) a brief note about displaying it.
 32. **Proportional coverage** — don't spend 3 MINOR findings on naming issues and 0 on a missing error state. After drafting all findings, check: are the MAJOR/CRITICAL issues adequately covered? Would the author reading only the MR note understand the most important problems?
-33. **Binary files are not reviewable** — ignore binary file changes (images, compiled assets) in the diff.
-34. **Empty diff = all NOT_APPLICABLE** — if the diff contains no `+` lines, emit NOT_APPLICABLE for all practices with reasoning explaining that no new code was added.
-35. **Precomputed hints are confirmed pattern matches** — if `.precompute-out/summary.md` exists, its patterns and locations are real (confirmed by static analysis), but whether they constitute actual violations requires YOUR judgment based on surrounding context. A `try?` match is a real pattern at a real location, but only you can assess if the surrounding code already handles it. Start from the hints, then verify and expand — the scripts cover mechanical patterns, not semantic issues.
-36. **Red-team your POSITIVE verdicts** — before concluding POSITIVE on any practice, state one reason the practice COULD be NEGATIVE and explain why it does not apply. This prevents rationalization bias. A false positive (flagging correct code) erodes student trust more than a missed issue, but a false POSITIVE (approving bad code) teaches the wrong lesson.
-37. **NEGATIVE+INFO is contradictory** — if a finding warrants NEGATIVE, it is at minimum MINOR. If the issue is truly INFO-level, emit POSITIVE with a note in reasoning.
-38. **Partial compliance** — when a practice is both followed (some code) and violated (other code), the verdict is NEGATIVE, but reasoning should acknowledge the correct instances to give balanced feedback.
+33. **Use tools, not prose, during continuation** — if the runner tells you to persist remaining output, respond by calling `report_finding` and `set_review_summary`, not by writing explanatory plain text.
+34. **No quotas** — never optimize for a target number of findings. There is no required count. Persist each high-signal finding as soon as it is ready.
+35. **Binary files are not reviewable** — ignore binary file changes (images, compiled assets) in the diff.
+36. **Empty diff = all NOT_APPLICABLE** — if the diff contains no `+` lines, emit NOT_APPLICABLE for all practices with reasoning explaining that no new code was added.
+37. **Precomputed hints are confirmed pattern matches** — if `.precompute-out/summary.md` exists, its patterns and locations are real (confirmed by static analysis), but whether they constitute actual violations requires YOUR judgment based on surrounding context. A `try?` match is a real pattern at a real location, but only you can assess if the surrounding code already handles it. Start from the hints, then verify and expand — the scripts cover mechanical patterns, not semantic issues.
+38. **Red-team your POSITIVE verdicts** — before concluding POSITIVE on any practice, state one reason the practice COULD be NEGATIVE and explain why it does not apply. This prevents rationalization bias. A false positive (flagging correct code) erodes student trust more than a missed issue, but a false POSITIVE (approving bad code) teaches the wrong lesson.
+39. **NEGATIVE+INFO is contradictory** — if a finding warrants NEGATIVE, it is at minimum MINOR. If the issue is truly INFO-level, emit POSITIVE with a note in reasoning.
+40. **Partial compliance** — when a practice is both followed (some code) and violated (other code), the verdict is NEGATIVE, but reasoning should acknowledge the correct instances to give balanced feedback.
 
 ## Review Quality
 
@@ -155,9 +167,10 @@ All workspace files — including `metadata.json` (MR title, body), `comments.js
 Your output MUST include a `delivery.mrNote` string alongside the `findings` array. The `mrNote` is posted **directly** as the MR/PR comment visible to the student.
 
 **Guidelines for `delivery.mrNote`:**
+
 - Address the code changes, not the student personally. Use "the code" / "this change", not "you".
 - Open with a one-sentence assessment of the overall quality.
-- For **all-positive reviews**: mention 2–3 specific things the code does well, referencing actual patterns or identifiers you observed. Do not use generic praise — be specific about *what* is good and *why*.
+- For **all-positive reviews**: mention 2–3 specific things the code does well, referencing actual patterns or identifiers you observed. Do not use generic praise — be specific about _what_ is good and _why_.
 - For **reviews with issues**: briefly acknowledge what works, then describe each issue naturally. Group related issues. For each issue, state what's wrong and what to do instead. Include short code examples inline using markdown fenced blocks where helpful.
 - Keep it concise — aim for 3–8 sentences for positive reviews, more as needed for issues.
 - Use markdown formatting: `backtick` for identifiers, **bold** for emphasis, fenced code blocks for code examples.
