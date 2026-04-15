@@ -14,7 +14,6 @@ import { LeaderboardPage } from "@/components/leaderboard/LeaderboardPage";
 import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
 import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import {
@@ -51,7 +50,6 @@ function LeaderboardContainer() {
 	const { workspaceSlug: routeWorkspaceSlug } = Route.useParams();
 	// Get the current user from auth context
 	const { username } = useAuth();
-	const { providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const {
 		leaderboardEnabled,
 		leaguesEnabled,
@@ -59,7 +57,7 @@ function LeaderboardContainer() {
 	} = useWorkspaceFeatures(routeWorkspaceSlug);
 	const slug = routeWorkspaceSlug;
 	const hasWorkspace = Boolean(routeWorkspaceSlug);
-	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
+	const showNoWorkspace = !hasWorkspace;
 
 	// Access properly validated search params with correct types
 	const { team, sort, after, before, mode } = Route.useSearch();
@@ -72,6 +70,7 @@ function LeaderboardContainer() {
 		}),
 		enabled: hasWorkspace,
 	});
+	const providerType = workspaceQuery.data?.providerType ?? "GITHUB";
 
 	// Extract leaderboard schedule from workspace config
 	const getSchedule = (): LeaderboardSchedule => {
@@ -347,11 +346,7 @@ function LeaderboardContainer() {
 		<LeaderboardPage
 			providerType={providerType}
 			leaderboard={leaderboardQuery.data || []}
-			isLoading={
-				isWorkspaceLoading ||
-				teamsQuery.isPending ||
-				(leaderboardQuery.isPending && !leaderboardQuery.data)
-			}
+			isLoading={teamsQuery.isPending || (leaderboardQuery.isPending && !leaderboardQuery.data)}
 			currentUser={userProfileQuery.data?.userInfo}
 			currentUserEntry={currentUserEntry}
 			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}

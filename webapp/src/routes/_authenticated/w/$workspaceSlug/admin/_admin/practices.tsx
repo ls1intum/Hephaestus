@@ -1,7 +1,5 @@
 import { createFileRoute, Navigate, Outlet } from "@tanstack/react-router";
 import { Spinner } from "@/components/ui/spinner";
-import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices")({
@@ -10,12 +8,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 
 function PracticesLayout() {
 	const { workspaceSlug } = Route.useParams();
-	const { isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const { practicesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
-
-	if (!workspaceSlug && !isWorkspaceLoading) {
-		return <NoWorkspace />;
-	}
 
 	if (!featuresLoading && !practicesEnabled && workspaceSlug) {
 		return <Navigate to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} replace />;

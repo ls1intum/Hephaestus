@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import {
 	getAllTeamsOptions,
@@ -9,8 +10,6 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import { AdminMembersPage } from "@/components/admin/AdminMembersPage";
 import { adaptApiUserTeams } from "@/components/admin/types";
-import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/members")({
 	component: AdminMembersContainer,
@@ -18,11 +17,10 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 
 function AdminMembersContainer() {
 	const { workspaceSlug } = Route.useParams();
-	const { isLoading: isWorkspaceLoading, error: workspaceError } = useActiveWorkspaceSlug();
 
 	// Fetch users with teams
 	const usersQueryOptions = getUsersWithTeamsOptions({
-		path: { workspaceSlug: workspaceSlug ?? "" },
+		path: { workspaceSlug },
 	});
 	const {
 		data: usersData,
@@ -30,12 +28,12 @@ function AdminMembersContainer() {
 		error: usersError,
 	} = useQuery({
 		...usersQueryOptions,
-		enabled: Boolean(workspaceSlug) && (usersQueryOptions.enabled ?? true),
+		enabled: usersQueryOptions.enabled ?? true,
 	});
 
 	// Fetch teams
 	const teamsQueryOptions = getAllTeamsOptions({
-		path: { workspaceSlug: workspaceSlug ?? "" },
+		path: { workspaceSlug },
 	});
 	const {
 		data: teamsData,
@@ -43,7 +41,7 @@ function AdminMembersContainer() {
 		error: teamsError,
 	} = useQuery({
 		...teamsQueryOptions,
-		enabled: Boolean(workspaceSlug) && (teamsQueryOptions.enabled ?? true),
+		enabled: teamsQueryOptions.enabled ?? true,
 	});
 
 	// Mutation for toggling member visibility
@@ -52,7 +50,7 @@ function AdminMembersContainer() {
 		...updateMemberVisibilityMutation(),
 		onSuccess: () => {
 			queryClient.invalidateQueries({
-				queryKey: getUsersWithTeamsQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+				queryKey: getUsersWithTeamsQueryKey({ path: { workspaceSlug } }),
 			});
 		},
 		onError: (error) => {
@@ -68,6 +66,13 @@ function AdminMembersContainer() {
 		});
 	};
 
+	useEffect(() => {
+		if (usersError || teamsError) {
+			const errorMessage = (usersError as Error)?.message || (teamsError as Error)?.message;
+			toast.error(`Failed to load data: ${errorMessage}`);
+		}
+	}, [usersError, teamsError]);
+
 	// Transform API data for the component and sort alphabetically
 	const users = (usersData?.map(adaptApiUserTeams) || [])
 		.map((user) => ({
@@ -76,26 +81,13 @@ function AdminMembersContainer() {
 		}))
 		.sort((a, b) => a.user.name.localeCompare(b.user.name));
 	const teams = [...(teamsData || [])].sort((a, b) => a.name.localeCompare(b.name));
-	const isLoading = isWorkspaceLoading || usersLoading || teamsLoading;
-
-	if (!workspaceSlug && !isWorkspaceLoading) {
-		return <NoWorkspace />;
-	}
-
-	// Show error state if needed
-	if (workspaceError || usersError || teamsError) {
-		const errorMessage =
-			(workspaceError as Error)?.message ||
-			(usersError as Error)?.message ||
-			(teamsError as Error)?.message;
-		toast.error(`Failed to load data: ${errorMessage}`);
-	}
+	const isLoading = usersLoading || teamsLoading;
 
 	return (
 		<AdminMembersPage
 			users={users}
 			teams={teams}
-			isLoading={isLoading || !workspaceSlug}
+			isLoading={isLoading}
 			onToggleHidden={handleToggleHidden}
 		/>
 	);
