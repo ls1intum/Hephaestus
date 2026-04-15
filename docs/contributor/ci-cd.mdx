@@ -54,12 +54,12 @@ graph TD
 
 Every merge to `main` with releasable changes (`feat:`, `fix:`, `perf:`, `revert:`, breaking):
 
-1. **CI runs** — tests, quality gates, Docker builds
-2. **semantic-release** — analyzes commits, creates version tag
-3. **Staging deploys** — automatic, no approval needed
-4. **You verify** — check staging.hephaestus.cit.tum.de
-5. **Approve production** — click in GitHub Actions
-6. **Production deploys** — live!
+1. **CI runs** – tests, quality gates, Docker builds
+2. **semantic-release** – analyzes commits, creates version tag
+3. **Staging deploys** – automatic, no approval needed
+4. **You verify** – check staging.hephaestus.cit.tum.de
+5. **Approve production** – click in GitHub Actions
+6. **Production deploys** – live!
 
 ## 🛡️ Quality Gates
 
@@ -74,11 +74,11 @@ Before any release, code must pass:
 
 ## 🔒 Security
 
-- **CodeQL** — SAST scanning via GitHub's Default Setup (automatic, zero maintenance)
-- **Trivy** — Scans dependencies for CVEs
-- **TruffleHog** — Secret detection in code and history
-- **Renovate** — Monitors dependencies for vulnerabilities
-- **Environment protection** — Production requires approval
+- **CodeQL** – SAST scanning via GitHub's Default Setup (automatic, zero maintenance)
+- **Trivy** – Scans dependencies for CVEs
+- **TruffleHog** – Secret detection in code and history
+- **Renovate** – Monitors dependencies for vulnerabilities
+- **Environment protection** – Production requires approval
 
 ### CodeQL Default Setup
 
@@ -88,7 +88,7 @@ CodeQL runs automatically via GitHub's Default Setup (enabled in repository sett
 - Scans on pull request creation and updates
 - Weekly scheduled scans for the full codebase
 - Incremental analysis (20% faster on PRs)
-- Zero maintenance — GitHub manages query updates
+- Zero maintenance – GitHub manages query updates
 
 This is more efficient than a custom workflow and doesn't consume CI minutes.
 

@@ -36,13 +36,13 @@ Use `*Test.java` for unit tests and `*IntegrationTest.java` for integration test
 
 ## Why testing?
 
-Tests catch regressions before they hit production, document expected behaviour, and unlock safe refactors. Our setup keeps the feedback loop fast—unit tests finish in under a second, while the shared Testcontainers environment limits the cost of integration suites.
+Tests catch regressions before they hit production, document expected behaviour, and unlock safe refactors. Our setup keeps the feedback loop fast – unit tests finish in under a second, while the shared Testcontainers environment limits the cost of integration suites.
 
 ## Unit tests
 
 - Extend `BaseUnitTest` for isolated component tests.
 - Use Mockito (`@Mock`, `@InjectMocks`) for dependencies.
-- Expect sub-second runtime—no Spring context is loaded.
+- Expect sub-second runtime – no Spring context is loaded.
 
 ```java
 class UserServiceTest extends BaseUnitTest {
@@ -126,7 +126,7 @@ Reusable webhook JSON lives in `src/test/resources/github`. Use `@GitHubPayload(
 npm run nats:extract-examples
 ```
 
-Available examples include `label.created`, `repository.created`, `create`, `push`, and more—consult the folder before recording new payloads.
+Available examples include `label.created`, `repository.created`, `create`, `push`, and more – consult the folder before recording new payloads.
 
 ## Maven recipes
 
@@ -155,7 +155,7 @@ Some regression scenarios can only be validated against GitHub itself. We ship a
     cp application-live-local.example.yml application-live-local.yml
     ```
 
-    Fill in the placeholders with the sandbox organisation slug, the installation id, and either an inline PEM key (`github.app.privateKey`) or a readable `privateKeyLocation`. Keep this file out of version control—it is already listed in `.gitignore`.
+    Fill in the placeholders with the sandbox organisation slug, the installation id, and either an inline PEM key (`github.app.privateKey`) or a readable `privateKeyLocation`. Keep this file out of version control – it is already listed in `.gitignore`.
 
     Alternatively, export the matching environment variables:
 
@@ -177,7 +177,7 @@ From `server/application-server/` run:
 ./mvnw test -Plive-tests
 ```
 
-The `-Plive-tests` profile tells Maven to run only tests tagged with `@Tag("live")`. This is the **single guard** for live tests—if you don't pass the profile, the tests simply won't run.
+The `-Plive-tests` profile tells Maven to run only tests tagged with `@Tag("live")`. This is the **single guard** for live tests – if you don't pass the profile, the tests simply won't run.
 
 **Live tests never run during normal CI.** They are explicitly excluded from `mvn test` and `mvn verify` via tag filtering in the Surefire and Failsafe plugins.
 
