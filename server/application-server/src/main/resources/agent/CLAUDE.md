@@ -11,6 +11,7 @@ Read `/workspace/orchestrator-protocol.md` for the output schema, field definiti
 ### Phase 0: Context Assembly
 
 Read all of the following files before beginning analysis. Issue multiple Read calls in parallel if your runtime supports it:
+
 - `/workspace/orchestrator-protocol.md` — output schema and rules
 - `/workspace/.context/diff_stat.txt` — scope
 - `/workspace/.context/diff_summary.md` — per-file diff chunks with index table (primary input)
@@ -26,6 +27,7 @@ If `.precompute-out/summary.md` exists, its pattern matches are real (from stati
 ### Phase 1: Understand the Diff
 
 Before evaluating any practice, read the full diff and build a mental model of:
+
 - Which files changed (from diff_stat.txt)
 - What the `+` lines add and the `-` lines remove
 - What patterns are present on changed lines
@@ -53,7 +55,7 @@ If `contributor_history.json` has ≥2 prior NEGATIVE findings for the same prac
 ### Phase 4: Verify & Prioritize
 
 - Report ALL valid NEGATIVE findings — do not cap or suppress.
-- Every practice must get at least one finding. Multiple NEGATIVE findings for the same practice are allowed — report distinct violations as separate findings.
+- Report all justified findings. Multiple NEGATIVE findings for the same practice are allowed and should stay separate when they represent different issues.
 - **Red-team your POSITIVE verdicts**: for each, state one concrete reason the practice COULD be NEGATIVE, then verify that reason does not hold by citing evidence from the diff. This is a verification step, not a reason to second-guess well-supported conclusions.
 - **Check proportionality**: would the author reading only the MR summary understand the most important problems?
 

@@ -198,6 +198,9 @@ public class PiAgentAdapter implements AgentAdapter {
 
         byte[] resultFile = sandboxResult.outputFiles().get("result.json");
         if (resultFile == null) {
+            resultFile = buildResultFromReviewState(sandboxResult.outputFiles().get("review-state.json"));
+        }
+        if (resultFile == null) {
             return new AgentResult(success, output, usage);
         }
 
@@ -271,6 +274,36 @@ public class PiAgentAdapter implements AgentAdapter {
             output.put("runnerDebug", objectMapper.readValue(runnerDebugFile, Object.class));
         } catch (Exception e) {
             log.warn("Failed to parse Pi runner debug output", e);
+        }
+    }
+
+    private byte[] buildResultFromReviewState(byte[] reviewStateFile) {
+        if (reviewStateFile == null || reviewStateFile.length == 0) {
+            return null;
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(reviewStateFile);
+            JsonNode findings = root.get("findings");
+            if (findings == null || !findings.isArray() || findings.isEmpty()) {
+                return null;
+            }
+
+            Map<String, Object> assembled = new LinkedHashMap<>();
+            assembled.put("findings", objectMapper.treeToValue(findings, Object.class));
+
+            JsonNode delivery = root.get("delivery");
+            if (delivery != null && delivery.isObject()) {
+                JsonNode mrNote = delivery.get("mrNote");
+                if (mrNote != null && mrNote.isTextual() && !mrNote.asText().isBlank()) {
+                    assembled.put("delivery", Map.of("mrNote", mrNote.asText()));
+                }
+            }
+
+            return objectMapper.writeValueAsBytes(assembled);
+        } catch (Exception e) {
+            log.warn("Failed to rebuild Pi result from durable review state", e);
+            return null;
         }
     }
 
