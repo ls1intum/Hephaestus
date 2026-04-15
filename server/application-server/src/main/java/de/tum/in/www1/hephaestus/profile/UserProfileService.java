@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.profile;
 
 import de.tum.in.www1.hephaestus.activity.ActivityEvent;
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
+import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -11,6 +12,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
@@ -68,6 +71,7 @@ public class UserProfileService {
     private final ProfileRepositoryQueryRepository profileRepositoryQueryRepository;
     private final ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
     private final PullRequestReviewRepository pullRequestReviewRepository;
+    private final PullRequestReviewCommentRepository pullRequestReviewCommentRepository;
     private final IssueCommentRepository issueCommentRepository;
     private final ProfileReviewActivityAssembler reviewActivityAssembler;
     private final WorkspaceMembershipService workspaceMembershipService;
@@ -81,6 +85,7 @@ public class UserProfileService {
         ProfileRepositoryQueryRepository profileRepositoryQueryRepository,
         ProfilePullRequestQueryRepository profilePullRequestQueryRepository,
         PullRequestReviewRepository pullRequestReviewRepository,
+        PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
         IssueCommentRepository issueCommentRepository,
         ProfileReviewActivityAssembler reviewActivityAssembler,
         WorkspaceMembershipService workspaceMembershipService,
@@ -93,6 +98,7 @@ public class UserProfileService {
         this.profileRepositoryQueryRepository = profileRepositoryQueryRepository;
         this.profilePullRequestQueryRepository = profilePullRequestQueryRepository;
         this.pullRequestReviewRepository = pullRequestReviewRepository;
+        this.pullRequestReviewCommentRepository = pullRequestReviewCommentRepository;
         this.issueCommentRepository = issueCommentRepository;
         this.reviewActivityAssembler = reviewActivityAssembler;
         this.workspaceMembershipService = workspaceMembershipService;
@@ -163,8 +169,7 @@ public class UserProfileService {
                       .sorted(Comparator.comparing(RepositoryInfoDTO::name))
                       .toList();
 
-        // Review activity: query PullRequestReview and IssueComment directly
-        // This ensures all reviews are shown, regardless of ActivityEvent records
+        // Review activity uses ActivityEvent as the source of truth, then hydrates git entities.
         List<ProfileReviewActivityDTO> reviewActivity = buildReviewActivity(
             userEntity.getLogin(),
             workspaceId,
@@ -271,13 +276,19 @@ public class UserProfileService {
         // Separate review events from comment events
         Set<Long> reviewIds = activityEvents
             .stream()
-            .filter(e -> "review".equals(e.getTargetType()))
+            .filter(e -> ActivityTargetType.REVIEW.getValue().equals(e.getTargetType()))
             .map(ActivityEvent::getTargetId)
             .collect(Collectors.toSet());
 
         Set<Long> commentIds = activityEvents
             .stream()
-            .filter(e -> "issue_comment".equals(e.getTargetType()))
+            .filter(e -> ActivityTargetType.ISSUE_COMMENT.getValue().equals(e.getTargetType()))
+            .map(ActivityEvent::getTargetId)
+            .collect(Collectors.toSet());
+
+        Set<Long> reviewCommentIds = activityEvents
+            .stream()
+            .filter(e -> ActivityTargetType.REVIEW_COMMENT.getValue().equals(e.getTargetType()))
             .map(ActivityEvent::getTargetId)
             .collect(Collectors.toSet());
 
@@ -296,30 +307,47 @@ public class UserProfileService {
                   .stream()
                   .collect(Collectors.toMap(IssueComment::getId, Function.identity()));
 
-        // Build XP lookup map from activity events
-        Map<Long, Double> xpByTargetId = activityEvents
+        Map<Long, PullRequestReviewComment> reviewCommentsById = reviewCommentIds.isEmpty()
+            ? Map.of()
+            : pullRequestReviewCommentRepository
+                  .findAllByIdWithRelations(reviewCommentIds)
+                  .stream()
+                  .collect(Collectors.toMap(PullRequestReviewComment::getId, Function.identity()));
+
+        Map<ActivityTargetKey, Double> xpByTarget = activityEvents
             .stream()
-            .collect(
-                Collectors.toMap(
-                    ActivityEvent::getTargetId,
-                    ActivityEvent::getXp,
-                    Double::sum // Sum if same targetId appears multiple times
+            .collect(Collectors.toMap(ActivityTargetKey::from, ActivityEvent::getXp, Double::sum));
+
+        List<ActivityEvent> distinctActivityEvents = new ArrayList<>(
+            activityEvents
+                .stream()
+                .collect(
+                    Collectors.toMap(
+                        ActivityTargetKey::from,
+                        Function.identity(),
+                        (existing, replacement) -> existing,
+                        LinkedHashMap::new
+                    )
                 )
-            );
+                .values()
+        );
 
-        // Assemble DTOs from activity events
-
-        return activityEvents
+        return distinctActivityEvents
             .stream()
             .map(event -> {
-                int xp = XpPrecision.roundToInt(xpByTargetId.getOrDefault(event.getTargetId(), 0.0));
-                if ("review".equals(event.getTargetType())) {
+                int xp = XpPrecision.roundToInt(xpByTarget.getOrDefault(ActivityTargetKey.from(event), 0.0));
+                if (ActivityTargetType.REVIEW.getValue().equals(event.getTargetType())) {
                     PullRequestReview review = reviewsById.get(event.getTargetId());
                     if (review != null) {
                         return reviewActivityAssembler.assemble(review, xp);
                     }
-                } else if ("issue_comment".equals(event.getTargetType())) {
+                } else if (ActivityTargetType.ISSUE_COMMENT.getValue().equals(event.getTargetType())) {
                     IssueComment comment = commentsById.get(event.getTargetId());
+                    if (comment != null) {
+                        return reviewActivityAssembler.assemble(comment, xp);
+                    }
+                } else if (ActivityTargetType.REVIEW_COMMENT.getValue().equals(event.getTargetType())) {
+                    PullRequestReviewComment comment = reviewCommentsById.get(event.getTargetId());
                     if (comment != null) {
                         return reviewActivityAssembler.assemble(comment, xp);
                     }
@@ -327,16 +355,6 @@ public class UserProfileService {
                 return null;
             })
             .filter(Objects::nonNull)
-            // Deduplicate by ID (same review can have multiple events like EDITED)
-            .collect(
-                Collectors.toMap(
-                    ProfileReviewActivityDTO::id,
-                    Function.identity(),
-                    (existing, replacement) -> existing // Keep first occurrence
-                )
-            )
-            .values()
-            .stream()
             .sorted(Comparator.comparing(ProfileReviewActivityDTO::submittedAt).reversed())
             .toList();
     }
@@ -378,6 +396,12 @@ public class UserProfileService {
         }
 
         return XpSystem.getLevelProgress(activityEventRepository.findTotalXpByWorkspaceAndActor(workspaceId, userId));
+    }
+
+    private record ActivityTargetKey(String targetType, Long targetId) {
+        private static ActivityTargetKey from(ActivityEvent event) {
+            return new ActivityTargetKey(event.getTargetType(), event.getTargetId());
+        }
     }
 
     private record TimeRange(Instant after, Instant before) {}

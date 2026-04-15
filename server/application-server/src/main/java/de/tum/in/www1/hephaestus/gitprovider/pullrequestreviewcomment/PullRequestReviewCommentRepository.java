@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -54,4 +55,16 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
     List<PullRequestReviewComment> findByPullRequestIdWithAuthorOrderByCreatedAt(
         @Param("pullRequestId") Long pullRequestId
     );
+
+    @Query(
+        """
+        SELECT prrc
+        FROM PullRequestReviewComment prrc
+        LEFT JOIN FETCH prrc.author
+        LEFT JOIN FETCH prrc.pullRequest pr
+        LEFT JOIN FETCH pr.repository
+        WHERE prrc.id IN :ids
+        """
+    )
+    List<PullRequestReviewComment> findAllByIdWithRelations(@Param("ids") Collection<Long> ids);
 }

@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.activity.scoring;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Unit tests for ExperiencePointCalculator.
@@ -50,7 +52,7 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
             User reviewer = createUser(2L, "reviewer");
 
             PullRequest pullRequest = createPullRequest(copilot);
-            pullRequest.getAssignees().add(reviewer);
+            pullRequest.addAssignee(reviewer);
 
             PullRequestReview review = createApprovedReview(reviewer, pullRequest);
 
@@ -66,7 +68,7 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
             User reviewer = createUser(2L, "reviewer");
 
             PullRequest pullRequest = createPullRequest(copilot);
-            pullRequest.getAssignees().add(reviewer);
+            pullRequest.addAssignee(reviewer);
 
             PullRequestReview review = createApprovedReview(reviewer, pullRequest);
 
@@ -98,7 +100,7 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
             User differentAssignee = createUser(3L, "someone-else");
 
             PullRequest pullRequest = createPullRequest(copilot);
-            pullRequest.getAssignees().add(differentAssignee); // Reviewer is NOT assignee
+            pullRequest.addAssignee(differentAssignee); // Reviewer is NOT assignee
 
             PullRequestReview review = createApprovedReview(reviewer, pullRequest);
 
@@ -121,7 +123,7 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
             PullRequest pullRequest = createPullRequest(author);
 
             PullRequestReview dismissedReview = createApprovedReview(reviewer, pullRequest);
-            dismissedReview.setDismissed(true);
+            ReflectionTestUtils.setField(dismissedReview, "isDismissed", true);
 
             double experiencePoints = calculator.calculateReviewExperiencePoints(List.of(dismissedReview));
 
@@ -139,10 +141,10 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
             PullRequest pullRequest = createPullRequest(author);
 
             PullRequestReview activeReview = createApprovedReview(reviewer, pullRequest);
-            activeReview.setDismissed(false);
+            ReflectionTestUtils.setField(activeReview, "isDismissed", false);
 
             PullRequestReview dismissedReview = createApprovedReview(reviewer, pullRequest);
-            dismissedReview.setDismissed(true);
+            ReflectionTestUtils.setField(dismissedReview, "isDismissed", true);
 
             double activeXp = calculator.calculateReviewExperiencePoints(List.of(activeReview));
             double dismissedXp = calculator.calculateReviewExperiencePoints(List.of(dismissedReview));
@@ -163,10 +165,10 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
             PullRequest pullRequest = createPullRequest(author);
 
             PullRequestReview dismissedReview = createApprovedReview(reviewer1, pullRequest);
-            dismissedReview.setDismissed(true);
+            ReflectionTestUtils.setField(dismissedReview, "isDismissed", true);
 
             PullRequestReview activeReview = createApprovedReview(reviewer2, pullRequest);
-            activeReview.setDismissed(false);
+            ReflectionTestUtils.setField(activeReview, "isDismissed", false);
 
             double mixedXp = calculator.calculateReviewExperiencePoints(List.of(dismissedReview, activeReview));
             double activeOnlyXp = calculator.calculateReviewExperiencePoints(List.of(activeReview));
@@ -183,11 +185,11 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         @Test
         @DisplayName("returns complexity score 1 for simple pull requests")
         void simpleComplexity() {
-            PullRequest pullRequest = new PullRequest();
-            pullRequest.setChangedFiles(1);
-            pullRequest.setCommits(1);
-            pullRequest.setAdditions(10);
-            pullRequest.setDeletions(5);
+            PullRequest pullRequest = createPullRequest(null);
+            ReflectionTestUtils.setField(pullRequest, "changedFiles", 1);
+            ReflectionTestUtils.setField(pullRequest, "commits", 1);
+            ReflectionTestUtils.setField(pullRequest, "additions", 10);
+            ReflectionTestUtils.setField(pullRequest, "deletions", 5);
 
             int score = calculator.calculateComplexityScore(pullRequest);
 
@@ -197,11 +199,11 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         @Test
         @DisplayName("returns complexity score 33 for overly complex pull requests")
         void overlyComplexComplexity() {
-            PullRequest pullRequest = new PullRequest();
-            pullRequest.setChangedFiles(100);
-            pullRequest.setCommits(50);
-            pullRequest.setAdditions(3000);
-            pullRequest.setDeletions(2000);
+            PullRequest pullRequest = createPullRequest(null);
+            ReflectionTestUtils.setField(pullRequest, "changedFiles", 100);
+            ReflectionTestUtils.setField(pullRequest, "commits", 50);
+            ReflectionTestUtils.setField(pullRequest, "additions", 3000);
+            ReflectionTestUtils.setField(pullRequest, "deletions", 2000);
 
             int score = calculator.calculateComplexityScore(pullRequest);
 
@@ -296,6 +298,28 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
 
             assertThat(xp).as("Null PR author should not block XP").isEqualTo(0.5);
         }
+
+        @Test
+        @DisplayName("issue comments on own pull request return zero XP")
+        void calculateIssueCommentExperiencePoints_ownPullRequestComment_returnsZero() {
+            User prAuthor = createUser(10L, "pr-author");
+            PullRequest pullRequest = createPullRequest(prAuthor);
+
+            IssueComment issueComment = new IssueComment();
+            ReflectionTestUtils.setField(issueComment, "id", 123L);
+            ReflectionTestUtils.setField(issueComment, "issue", pullRequest);
+            ReflectionTestUtils.setField(issueComment, "author", prAuthor);
+            ReflectionTestUtils.setField(issueComment, "body", "Author reply to tutor feedback");
+            ReflectionTestUtils.setField(
+                issueComment,
+                "htmlUrl",
+                "https://github.com/test/test-repo/pull/1#issuecomment-123"
+            );
+
+            double xp = calculator.calculateIssueCommentExperiencePoints(issueComment);
+
+            assertThat(xp).isZero();
+        }
     }
 
     @Nested
@@ -329,28 +353,28 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
 
     private User createUser(Long id, String login) {
         User user = new User();
-        user.setId(id);
-        user.setLogin(login);
+        ReflectionTestUtils.setField(user, "id", id);
+        ReflectionTestUtils.setField(user, "login", login);
         return user;
     }
 
     private PullRequest createPullRequest(User author) {
         PullRequest pullRequest = new PullRequest();
-        pullRequest.setAuthor(author);
-        pullRequest.setCommits(1);
-        pullRequest.setAdditions(1);
-        pullRequest.setDeletions(1);
-        pullRequest.setChangedFiles(1);
+        ReflectionTestUtils.setField(pullRequest, "author", author);
+        ReflectionTestUtils.setField(pullRequest, "commits", 1);
+        ReflectionTestUtils.setField(pullRequest, "additions", 1);
+        ReflectionTestUtils.setField(pullRequest, "deletions", 1);
+        ReflectionTestUtils.setField(pullRequest, "changedFiles", 1);
         return pullRequest;
     }
 
     private PullRequestReview createApprovedReview(User reviewer, PullRequest pullRequest) {
         PullRequestReview review = new PullRequestReview();
-        review.setAuthor(reviewer);
-        review.setPullRequest(pullRequest);
-        review.setState(PullRequestReview.State.APPROVED);
-        review.setHtmlUrl("https://github.com/test/review");
-        review.setSubmittedAt(Instant.now());
+        ReflectionTestUtils.setField(review, "author", reviewer);
+        ReflectionTestUtils.setField(review, "pullRequest", pullRequest);
+        ReflectionTestUtils.setField(review, "state", PullRequestReview.State.APPROVED);
+        ReflectionTestUtils.setField(review, "htmlUrl", "https://github.com/test/review");
+        ReflectionTestUtils.setField(review, "submittedAt", Instant.now());
         return review;
     }
 }

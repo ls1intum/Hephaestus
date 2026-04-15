@@ -465,6 +465,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
             de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_COMMENTED,
             de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_UNKNOWN,
             de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_DISMISSED,
+            de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_COMMENT_CREATED,
             de.tum.in.www1.hephaestus.activity.ActivityEventType.COMMENT_CREATED
         )
         ORDER BY e.occurredAt DESC

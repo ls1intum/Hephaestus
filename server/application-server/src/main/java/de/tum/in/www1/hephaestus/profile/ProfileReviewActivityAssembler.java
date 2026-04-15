@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.profile;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestBaseInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.profile.dto.ProfileReviewActivityDTO;
 import org.springframework.lang.NonNull;
@@ -67,6 +68,20 @@ public class ProfileReviewActivityAssembler {
             0,
             UserInfoDTO.fromUser(comment.getAuthor()),
             PullRequestBaseInfoDTO.fromIssue(comment.getIssue()),
+            comment.getHtmlUrl(),
+            xp,
+            comment.getCreatedAt()
+        );
+    }
+
+    public ProfileReviewActivityDTO assemble(@NonNull PullRequestReviewComment comment, int xp) {
+        return new ProfileReviewActivityDTO(
+            comment.getId(),
+            false,
+            PullRequestReview.State.COMMENTED,
+            1,
+            UserInfoDTO.fromUser(comment.getAuthor()),
+            PullRequestBaseInfoDTO.fromPullRequest(comment.getPullRequest()),
             comment.getHtmlUrl(),
             xp,
             comment.getCreatedAt()
