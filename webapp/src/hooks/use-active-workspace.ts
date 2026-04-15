@@ -80,13 +80,33 @@ export function useActiveWorkspaceSlug() {
 			const fallbackSlug = workspaces[0]?.workspaceSlug;
 			if (fallbackSlug) {
 				setSelectedSlug(fallbackSlug);
-				const target = buildWorkspaceSwitchPlan(workspaceRoute?.routeId, fallbackSlug);
-				navigate({
-					to: target.to,
-					params: target.params,
-					...(target.preserveSearch ? { search: (prev) => prev } : {}),
-					replace: true,
-				});
+				const target = buildWorkspaceSwitchPlan(workspaceRoute, fallbackSlug);
+
+				if (target.kind === "relative") {
+					if (target.preserveSearch) {
+						navigate({
+							from: target.from as never,
+							to: target.to as never,
+							params: { workspaceSlug: fallbackSlug } as never,
+							search: true,
+							replace: true,
+						});
+					} else {
+						navigate({
+							from: target.from as never,
+							to: target.to as never,
+							params: { workspaceSlug: fallbackSlug } as never,
+							replace: true,
+						});
+					}
+				} else {
+					navigate({
+						to: target.to,
+						params: target.params,
+						...(target.preserveSearch ? { search: (prev) => prev } : {}),
+						replace: true,
+					});
+				}
 			} else {
 				// No workspaces available, redirect to home
 				navigate({

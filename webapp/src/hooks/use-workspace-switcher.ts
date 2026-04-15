@@ -14,7 +14,27 @@ export function useWorkspaceSwitcher() {
 			setSelectedSlug(workspaceSlug);
 		}
 
-		const target = buildWorkspaceSwitchPlan(workspaceRoute?.routeId, workspaceSlug);
+		const target = buildWorkspaceSwitchPlan(workspaceRoute, workspaceSlug);
+
+		if (target.kind === "relative") {
+			if (target.preserveSearch) {
+				navigate({
+					from: target.from as never,
+					to: target.to as never,
+					params: { workspaceSlug } as never,
+					search: true,
+					replace: true,
+				});
+			} else {
+				navigate({
+					from: target.from as never,
+					to: target.to as never,
+					params: { workspaceSlug } as never,
+					replace: true,
+				});
+			}
+			return;
+		}
 
 		navigate({
 			to: target.to,
