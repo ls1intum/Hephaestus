@@ -36,7 +36,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Unit tests for UserProfileService.
@@ -303,8 +302,8 @@ class UserProfileServiceTest {
         }
 
         @Test
-        @DisplayName("hydrates standalone review comments from activity events")
-        void hydratesStandaloneReviewCommentsFromActivityEvents() {
+        @DisplayName("hydrates own pull request review comments from activity events")
+        void hydratesOwnPullRequestReviewCommentsFromActivityEvents() {
             User user = createUser(USER_ID, USER_LOGIN);
             Repository repo = createRepository(200L);
             PullRequest pr = createPullRequest(300L, user, repo);
@@ -345,6 +344,89 @@ class UserProfileServiceTest {
             assertThat(result.get().reviewActivity()).hasSize(1);
             verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(600L));
             verify(reviewActivityAssembler).assemble(eq(reviewComment), eq(0));
+        }
+
+        @Test
+        @DisplayName("skips review comments on other users pull requests")
+        void skipsReviewCommentsOnOtherUsersPullRequests() {
+            User actor = createUser(USER_ID, USER_LOGIN);
+            User prAuthor = createUser(99L, "pr-author");
+            Repository repo = createRepository(200L);
+            PullRequest pr = createPullRequest(300L, prAuthor, repo);
+            PullRequestReviewComment reviewComment = createReviewComment(600L, actor, pr);
+
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(actor));
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
+            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+
+            ActivityEvent event = createActivityEvent(
+                WORKSPACE_ID,
+                USER_ID,
+                600L,
+                ActivityTargetType.REVIEW_COMMENT,
+                0.0
+            );
+            when(
+                activityEventRepository.findProfileActivityByActorInTimeframe(
+                    eq(WORKSPACE_ID),
+                    eq(USER_ID),
+                    any(),
+                    any()
+                )
+            ).thenReturn(List.of(event));
+
+            when(pullRequestReviewCommentRepository.findAllByIdWithRelations(Set.of(600L))).thenReturn(
+                List.of(reviewComment)
+            );
+
+            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().reviewActivity()).isEmpty();
+            verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(600L));
+            verify(reviewActivityAssembler, never()).assemble(eq(reviewComment), anyInt());
+        }
+
+        @Test
+        @DisplayName("skips issue comments on regular issues")
+        void skipsIssueCommentsOnRegularIssues() {
+            User user = createUser(USER_ID, USER_LOGIN);
+            Repository repo = createRepository(200L);
+            Issue issue = createIssue(300L, user, repo);
+            IssueComment comment = createIssueComment(500L, user, issue);
+
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
+            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+
+            ActivityEvent event = createActivityEvent(
+                WORKSPACE_ID,
+                USER_ID,
+                500L,
+                ActivityTargetType.ISSUE_COMMENT,
+                0.0
+            );
+            when(
+                activityEventRepository.findProfileActivityByActorInTimeframe(
+                    eq(WORKSPACE_ID),
+                    eq(USER_ID),
+                    any(),
+                    any()
+                )
+            ).thenReturn(List.of(event));
+
+            when(issueCommentRepository.findAllByIdWithRelations(Set.of(500L))).thenReturn(List.of(comment));
+
+            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().reviewActivity()).isEmpty();
+            verify(issueCommentRepository).findAllByIdWithRelations(Set.of(500L));
+            verify(reviewActivityAssembler, never()).assemble(eq(comment), anyInt());
         }
 
         @Test
@@ -412,58 +494,70 @@ class UserProfileServiceTest {
 
     private User createUser(Long id, String login) {
         User user = new User();
-        ReflectionTestUtils.setField(user, "id", id);
-        ReflectionTestUtils.setField(user, "login", login);
+        user.setId(id);
+        user.setLogin(login);
         return user;
     }
 
     private Repository createRepository(Long id) {
         Repository repo = new Repository();
-        ReflectionTestUtils.setField(repo, "id", id);
-        ReflectionTestUtils.setField(repo, "name", "test-repo");
+        repo.setId(id);
+        repo.setName("test-repo");
         return repo;
     }
 
     private PullRequest createPullRequest(Long id, User author, Repository repo) {
         PullRequest pr = new PullRequest();
-        ReflectionTestUtils.setField(pr, "id", id);
-        ReflectionTestUtils.setField(pr, "author", author);
-        ReflectionTestUtils.setField(pr, "repository", repo);
-        ReflectionTestUtils.setField(pr, "number", 1);
-        ReflectionTestUtils.setField(pr, "title", "Test PR");
-        ReflectionTestUtils.setField(pr, "htmlUrl", "https://github.com/test/pr/1");
+        pr.setId(id);
+        pr.setAuthor(author);
+        pr.setRepository(repo);
+        pr.setNumber(1);
+        pr.setTitle("Test PR");
+        pr.setHtmlUrl("https://github.com/test/pr/1");
         return pr;
+    }
+
+    private Issue createIssue(Long id, User author, Repository repo) {
+        Issue issue = new Issue();
+        issue.setId(id);
+        issue.setAuthor(author);
+        issue.setRepository(repo);
+        issue.setNumber(2);
+        issue.setTitle("Test Issue");
+        issue.setHtmlUrl("https://github.com/test/issues/2");
+        issue.setState(Issue.State.OPEN);
+        return issue;
     }
 
     private PullRequestReview createReview(Long id, User author, PullRequest pr) {
         PullRequestReview review = new PullRequestReview();
-        ReflectionTestUtils.setField(review, "id", id);
-        ReflectionTestUtils.setField(review, "author", author);
-        ReflectionTestUtils.setField(review, "pullRequest", pr);
-        ReflectionTestUtils.setField(review, "state", PullRequestReview.State.APPROVED);
-        ReflectionTestUtils.setField(review, "submittedAt", Instant.now());
-        ReflectionTestUtils.setField(review, "htmlUrl", "https://github.com/test/review/1");
+        review.setId(id);
+        review.setAuthor(author);
+        review.setPullRequest(pr);
+        review.setState(PullRequestReview.State.APPROVED);
+        review.setSubmittedAt(Instant.now());
+        review.setHtmlUrl("https://github.com/test/review/1");
         return review;
     }
 
     private IssueComment createIssueComment(Long id, User author, Issue issue) {
         IssueComment comment = new IssueComment();
-        ReflectionTestUtils.setField(comment, "id", id);
-        ReflectionTestUtils.setField(comment, "author", author);
-        ReflectionTestUtils.setField(comment, "issue", issue);
-        ReflectionTestUtils.setField(comment, "createdAt", Instant.now());
-        ReflectionTestUtils.setField(comment, "htmlUrl", "https://github.com/test/comment/1");
+        comment.setId(id);
+        comment.setAuthor(author);
+        comment.setIssue(issue);
+        comment.setCreatedAt(Instant.now());
+        comment.setHtmlUrl("https://github.com/test/comment/1");
         return comment;
     }
 
     private PullRequestReviewComment createReviewComment(Long id, User author, PullRequest pullRequest) {
         PullRequestReviewComment comment = new PullRequestReviewComment();
-        ReflectionTestUtils.setField(comment, "id", id);
-        ReflectionTestUtils.setField(comment, "author", author);
-        ReflectionTestUtils.setField(comment, "pullRequest", pullRequest);
-        ReflectionTestUtils.setField(comment, "createdAt", Instant.now());
-        ReflectionTestUtils.setField(comment, "htmlUrl", "https://github.com/test/review-comment/1");
-        ReflectionTestUtils.setField(comment, "body", "Reply to tutor note");
+        comment.setId(id);
+        comment.setAuthor(author);
+        comment.setPullRequest(pullRequest);
+        comment.setCreatedAt(Instant.now());
+        comment.setHtmlUrl("https://github.com/test/review-comment/1");
+        comment.setBody("Reply to tutor note");
         return comment;
     }
 

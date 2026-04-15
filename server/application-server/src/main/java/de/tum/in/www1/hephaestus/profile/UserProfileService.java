@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
@@ -343,12 +344,12 @@ public class UserProfileService {
                     }
                 } else if (ActivityTargetType.ISSUE_COMMENT.getValue().equals(event.getTargetType())) {
                     IssueComment comment = commentsById.get(event.getTargetId());
-                    if (comment != null) {
+                    if (comment != null && isPullRequestComment(comment)) {
                         return reviewActivityAssembler.assemble(comment, xp);
                     }
                 } else if (ActivityTargetType.REVIEW_COMMENT.getValue().equals(event.getTargetType())) {
                     PullRequestReviewComment comment = reviewCommentsById.get(event.getTargetId());
-                    if (comment != null) {
+                    if (comment != null && isOwnPullRequestComment(comment)) {
                         return reviewActivityAssembler.assemble(comment, xp);
                     }
                 }
@@ -396,6 +397,19 @@ public class UserProfileService {
         }
 
         return XpSystem.getLevelProgress(activityEventRepository.findTotalXpByWorkspaceAndActor(workspaceId, userId));
+    }
+
+    private boolean isPullRequestComment(IssueComment comment) {
+        return comment.getIssue() instanceof PullRequest;
+    }
+
+    private boolean isOwnPullRequestComment(PullRequestReviewComment comment) {
+        return (
+            comment.getAuthor() != null &&
+            comment.getPullRequest() != null &&
+            comment.getPullRequest().getAuthor() != null &&
+            Objects.equals(comment.getAuthor().getId(), comment.getPullRequest().getAuthor().getId())
+        );
     }
 
     private record ActivityTargetKey(String targetType, Long targetId) {

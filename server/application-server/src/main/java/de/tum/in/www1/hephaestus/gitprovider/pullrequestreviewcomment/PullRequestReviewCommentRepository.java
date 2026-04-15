@@ -62,6 +62,7 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
         FROM PullRequestReviewComment prrc
         LEFT JOIN FETCH prrc.author
         LEFT JOIN FETCH prrc.pullRequest pr
+        LEFT JOIN FETCH pr.author
         LEFT JOIN FETCH pr.repository
         WHERE prrc.id IN :ids
         """
