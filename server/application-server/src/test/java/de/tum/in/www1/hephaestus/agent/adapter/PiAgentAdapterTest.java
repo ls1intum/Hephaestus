@@ -176,7 +176,8 @@ class PiAgentAdapterTest extends BaseUnitTest {
             assertThat(spec.inputFiles()).containsKey(".run-pi.mjs");
             String script = new String(spec.inputFiles().get(".run-pi.mjs"), StandardCharsets.UTF_8);
             assertThat(script).contains("createAgentSession"); // embedded SDK, not CLI subprocess
-            assertThat(script).contains("createWriteTool"); // write tool for file output
+            assertThat(script).contains("createReadTool");
+            assertThat(script).doesNotContain("createWriteTool");
             assertThat(script).contains("readFileSync(\"/workspace/.prompt\"");
             assertThat(script).contains("runner-debug.json");
             assertThat(script).contains("session.agent.steer"); // soft timeout steering

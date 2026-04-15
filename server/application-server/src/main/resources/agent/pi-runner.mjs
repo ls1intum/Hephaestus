@@ -22,7 +22,6 @@ import {
     createReadTool,
     createBashTool,
     createGrepTool,
-    createWriteTool,
 } from "@mariozechner/pi-coding-agent";
 
 const OUTPUT = "/workspace/.output";
@@ -517,7 +516,7 @@ async function main() {
     );
 
     // Create tools scoped to /workspace
-    const tools = [createReadTool(CWD), createBashTool(CWD), createGrepTool(CWD), createWriteTool(CWD)];
+    const tools = [createReadTool(CWD), createBashTool(CWD), createGrepTool(CWD)];
 
     // Create session using Pi SDK — embedded, not CLI subprocess
     const settingsManager = SettingsManager.create(CWD, process.env.PI_CODING_AGENT_DIR || "/home/agent/.pi");
@@ -542,7 +541,7 @@ async function main() {
     // Production data: 4/4 success rate when this fires.
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
-        console.error(`[pi-runner] Soft timeout fired — nudging agent to write`);
+        console.error(`[pi-runner] Soft timeout fired — nudging agent to persist review state`);
         session.agent.steer({
             role: "user",
             content: [
@@ -553,7 +552,7 @@ async function main() {
                         `Use report_findings immediately for any finding you already have. ` +
                         `When reading files for initial context, batch independent reads and greps in parallel when the runtime supports it. ` +
                         `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
-                        `Then call set_review_summary. Do not write planning prose.`,
+                        `Then call set_review_summary exactly once. Do not write planning prose.`,
                 },
             ],
             timestamp: Date.now(),
@@ -658,7 +657,7 @@ async function main() {
         }
     }
 
-    // Re-prompt: give the agent a concrete scaffold so it can ONLY write
+    // Re-prompt: give the agent a concrete scaffold so it only persists remaining review state.
     console.error(`[pi-runner] Re-prompting agent to persist remaining review output`);
 
     const slugs = loadPracticeSlugs();
@@ -680,28 +679,26 @@ async function main() {
     if (softTimeoutFired || hardAborted) {
         retryPrompt =
             `You ran out of time before finalizing the review. ` +
-            `Do NOT restart analysis from scratch. Persist any remaining findings with report_findings immediately, ` +
-            `using \"No change needed.\" as guidance for POSITIVE or NOT_APPLICABLE findings if needed. ` +
-            `Then persist the MR note with set_review_summary. ` +
+            `Do NOT restart analysis from scratch. Do NOT read more files. ` +
+            `Persist every remaining justified finding with report_findings immediately. ` +
+            `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
+            `Then call set_review_summary exactly once with the MR note. ` +
             `Do not write planning prose. ` +
-            `Only if the tools are unavailable should you write /workspace/.output/result.json directly. ` +
             scaffold;
     } else if (agentText) {
         retryPrompt =
             `You completed analysis but did not persist the final review output. ` +
             `Do NOT read any more files. Persist the remaining findings with report_findings NOW. ` +
             `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
-            `Then persist delivery.mrNote with set_review_summary. Do not write planning prose. ` +
-            `Only if those tools are unavailable should you write /workspace/.output/result.json directly. ` +
+            `Then call set_review_summary exactly once with delivery.mrNote. Do not write planning prose. ` +
             scaffold;
     } else {
         retryPrompt =
             `You did not persist the review output. The review will fail unless you persist it NOW. ` +
             `Use your analysis from above. Do NOT read more files. Persist findings with report_findings immediately, ` +
             `using \"No change needed.\" as guidance for POSITIVE or NOT_APPLICABLE findings when needed. ` +
-            `Then persist the MR note with set_review_summary immediately. ` +
+            `Then call set_review_summary exactly once with the MR note. ` +
             `Do not write planning prose. ` +
-            `Only if those tools are unavailable should you write /workspace/.output/result.json directly. ` +
             scaffold;
     }
 
@@ -764,8 +761,7 @@ async function main() {
         await session.prompt(
             `The review will be discarded unless you persist the remaining output RIGHT NOW. ` +
                 `Use report_findings for any findings not yet persisted and set_review_summary for delivery.mrNote. ` +
-                `Do NOT read more files or write planning prose. Guidance for POSITIVE or NOT_APPLICABLE findings can simply be \"No change needed.\" ` +
-                `Only if those tools are unavailable should you write /workspace/.output/result.json directly. ` +
+                `Do NOT read more files. Do NOT write planning prose. Guidance for POSITIVE or NOT_APPLICABLE findings can simply be \"No change needed.\" ` +
                 `${slugs.length ? `Relevant practice slugs: ${slugs.join(", ")}.` : ""}`,
         );
     } catch (err) {

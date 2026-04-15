@@ -4,8 +4,7 @@ Canonical protocol for practice-aware code review. Both Claude Code and OpenCode
 
 **Your deliverable is structured review output with a `findings` array and `delivery.mrNote`.**
 
-- In file-oriented runtimes, write `.output/result.json`.
-- In runtimes with dedicated reporting tools, persist findings and the MR note incrementally through those tools. Treat that durable state as primary; any final file is just a derived artifact.
+- In this runtime, use the dedicated reporting tools to persist findings and the MR note incrementally. That durable state is the primary output contract.
 - Do NOT output the final JSON as plain assistant text.
 
 ## Workspace Layout
