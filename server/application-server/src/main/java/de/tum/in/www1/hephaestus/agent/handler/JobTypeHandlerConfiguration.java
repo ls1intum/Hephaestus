@@ -11,7 +11,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
-import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
@@ -50,8 +49,8 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    public PracticeDetectionResultParser practiceDetectionResultParser(PracticeDetectionProperties properties) {
-        return new PracticeDetectionResultParser(objectMapper, properties.maxFindingsPerJob());
+    public PracticeDetectionResultParser practiceDetectionResultParser() {
+        return new PracticeDetectionResultParser(objectMapper);
     }
 
     @Bean
