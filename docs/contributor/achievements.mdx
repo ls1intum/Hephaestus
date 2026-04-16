@@ -31,7 +31,7 @@ The Achievement Module listens for `ActivitySavedEvent` messages published by th
 
 ### 3. Leaderboard Module (Read Path)
 
-The Leaderboard acts as the read model in the CQRS architecture. Since XP is pre-computed exactly once upon activity creation, determining leaderboards does not require iterating over or replaying events. Instead, the module directly utilizes native database aggregation functions (like `SUM` and `GROUP BY`). This strategy keeps leaderboard queries incredibly fast and ensures page load times remain efficiently regardless of how many events are generated over time.
+The Leaderboard acts as the read model in the CQRS architecture. Since XP is pre-computed exactly once upon activity creation, determining leaderboards does not require iterating over or replaying events. Instead, the module directly utilizes native database aggregation functions (like `SUM` and `GROUP BY`). This strategy keeps leaderboard queries incredibly fast and ensures page load times remain efficient regardless of how many events are generated over time.
 
 ## Achievements Configuration
 
