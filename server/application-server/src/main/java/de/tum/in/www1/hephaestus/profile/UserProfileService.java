@@ -180,23 +180,6 @@ public class UserProfileService {
         // Activity stats from activity events (matches leaderboard semantics)
         ProfileActivityStatsDTO activityStats = profileActivityQueryService
             .getActivityStats(workspaceId, userEntity.getId(), timeRange.after(), timeRange.before())
-            .map(stats ->
-                new ProfileActivityStatsDTO.Builder()
-                    .withScore(stats.totalScore())
-                    .withNumberOfReviewedPRs(stats.reviewedPrCount())
-                    .withNumberOfApprovals(stats.approvals())
-                    .withNumberOfChangeRequests(stats.changeRequests())
-                    .withNumberOfComments(stats.comments())
-                    .withNumberOfCodeComments(stats.codeComments())
-                    .withNumberOfUnknowns(stats.unknowns())
-                    .withNumberOfOwnReplies(stats.ownReplies())
-                    .withNumberOfOpenPullRequests(stats.openPullRequests())
-                    .withNumberOfMergedPullRequests(stats.mergedPullRequests())
-                    .withNumberOfClosedPullRequests(stats.closedPullRequests())
-                    .withNumberOfOpenedIssues(stats.openedIssues())
-                    .withNumberOfClosedIssues(stats.closedIssues())
-                    .build()
-            )
             .orElse(ProfileActivityStatsDTO.empty());
 
         // Keep the backend list aligned with leaderboard semantics; the profile UI can merge
