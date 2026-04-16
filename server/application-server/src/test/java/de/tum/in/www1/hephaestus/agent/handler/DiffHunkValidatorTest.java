@@ -212,7 +212,7 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         @Test
         @DisplayName("returns notes unchanged when validLines is empty")
         void emptyValidLines() {
-            List<DiffNote> notes = List.of(new DiffNote("File.swift", 10, null, "comment"));
+            List<DiffNote> notes = List.of(DiffNote.text("File.swift", 10, null, "comment"));
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(notes, Map.of(), "job-1");
             assertThat(result).isEqualTo(notes);
         }
@@ -233,7 +233,7 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         @DisplayName("keeps valid notes as-is")
         void validNotesUnchanged() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 15, 20));
-            DiffNote note = new DiffNote("File.swift", 10, null, "good line");
+            DiffNote note = DiffNote.text("File.swift", 10, null, "good line");
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
                 List.of(note),
                 Map.of("File.swift", lines),
@@ -247,7 +247,7 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         @DisplayName("snaps invalid line to nearest valid line (floor)")
         void snapsToFloor() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 20));
-            DiffNote note = new DiffNote("File.swift", 12, null, "off by 2");
+            DiffNote note = DiffNote.text("File.swift", 12, null, "off by 2");
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
                 List.of(note),
                 Map.of("File.swift", lines),
@@ -261,7 +261,7 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         @DisplayName("snaps invalid line to nearest valid line (ceiling)")
         void snapsToCeiling() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 20));
-            DiffNote note = new DiffNote("File.swift", 17, null, "closer to 20");
+            DiffNote note = DiffNote.text("File.swift", 17, null, "closer to 20");
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
                 List.of(note),
                 Map.of("File.swift", lines),
@@ -275,7 +275,7 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         @DisplayName("keeps note unchanged when file is not in validLines map")
         void unknownFileKeptAsIs() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
-            DiffNote note = new DiffNote("Other.swift", 50, null, "unknown file");
+            DiffNote note = DiffNote.text("Other.swift", 50, null, "unknown file");
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
                 List.of(note),
                 Map.of("File.swift", lines),
@@ -292,7 +292,7 @@ class DiffHunkValidatorTest extends BaseUnitTest {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 11, 12, 15, 20, 25));
             // Note with range 12-14 (span=2), closest valid start is 12 (exact match)
             // But let's use 13-16 (span=3) which snaps to 12, endLine should be ≤15
-            DiffNote note = new DiffNote("File.swift", 13, 16, "range note");
+            DiffNote note = DiffNote.text("File.swift", 13, 16, "range note");
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
                 List.of(note),
                 Map.of("File.swift", lines),
@@ -311,7 +311,7 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void endLineDoesNotBalloon() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 100));
             // Note at 12-14 (span=2), snaps to 10, endLine should NOT jump to 100
-            DiffNote note = new DiffNote("File.swift", 12, 14, "should not balloon");
+            DiffNote note = DiffNote.text("File.swift", 12, 14, "should not balloon");
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
                 List.of(note),
                 Map.of("File.swift", lines),
@@ -328,9 +328,9 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void mixedNotes() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 5, 10, 15));
             List<DiffNote> notes = List.of(
-                new DiffNote("File.swift", 5, null, "valid"),
-                new DiffNote("File.swift", 7, null, "invalid - snap to 5"),
-                new DiffNote("File.swift", 15, null, "valid")
+                DiffNote.text("File.swift", 5, null, "valid"),
+                DiffNote.text("File.swift", 7, null, "invalid - snap to 5"),
+                DiffNote.text("File.swift", 15, null, "valid")
             );
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(notes, Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(3);
@@ -343,7 +343,7 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         @DisplayName("prefers floor on equal distance tie")
         void tieBreaksToFloor() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 15));
-            DiffNote note = new DiffNote("File.swift", 10, null, "equidistant");
+            DiffNote note = DiffNote.text("File.swift", 10, null, "equidistant");
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
                 List.of(note),
                 Map.of("File.swift", lines),
@@ -357,7 +357,7 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         @DisplayName("snaps note far beyond all valid lines to last valid line")
         void snapsBeyondAllLines() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
-            DiffNote note = new DiffNote("File.swift", 1000, null, "way beyond");
+            DiffNote note = DiffNote.text("File.swift", 1000, null, "way beyond");
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
                 List.of(note),
                 Map.of("File.swift", lines),
@@ -365,6 +365,26 @@ class DiffHunkValidatorTest extends BaseUnitTest {
             );
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("passes image notes through without modification")
+        void passesImageNotesThrough() {
+            TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 15));
+            DiffNote imageNote = DiffNote.image("diagram.png", 200, 150, 800, 600, "Fix this class");
+            DiffNote textNote = DiffNote.text("File.swift", 7, null, "text comment");
+            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
+                List.of(imageNote, textNote),
+                Map.of("File.swift", lines),
+                "job-1"
+            );
+            assertThat(result).hasSize(2);
+            // Image note unchanged
+            assertThat(result.get(0).isImageNote()).isTrue();
+            assertThat(result.get(0).imagePosition().x()).isEqualTo(200);
+            // Text note snapped
+            assertThat(result.get(1).isImageNote()).isFalse();
+            assertThat(result.get(1).startLine()).isEqualTo(5);
         }
     }
 }
