@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
 import de.tum.in.www1.hephaestus.activity.ActivityXpProjection;
 import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.profile.ProfilePullRequestQueryRepository.AuthorCountProjection;
+import de.tum.in.www1.hephaestus.profile.dto.ProfileActivityStatsDTO;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +64,7 @@ public class ProfileActivityQueryService {
      * @param actorId the actor (user) to get stats for
      * @param since start of timeframe (inclusive)
      * @param until end of timeframe (exclusive)
-     * @return activity stats for the actor, or empty if no activity found
+     * @return activity stats for the actor
      */
     @Transactional(readOnly = true)
     public Optional<ProfileActivityStatsDTO> getActivityStats(
@@ -80,6 +81,8 @@ public class ProfileActivityQueryService {
             until
         );
 
+        Set<Long> actorIds = Set.of(actorId);
+
         // 1. Get XP totals from activity_event table
         List<ActivityXpProjection> xpData = activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(
             workspaceId,
@@ -93,17 +96,12 @@ public class ProfileActivityQueryService {
             .filter(xp -> actorId.equals(xp.getActorId()))
             .findFirst();
 
-        if (actorXp.isEmpty()) {
-            log.debug("No activity events found for actor: actorId={}, workspaceId={}", actorId, workspaceId);
-            return Optional.empty();
-        }
-
-        ActivityXpProjection xp = actorXp.get();
-        int totalScore = XpPrecision.roundToInt(xp.getTotalExperiencePoints());
-        int eventCount = xp.getEventCount() != null ? xp.getEventCount().intValue() : 0;
+        int totalScore = actorXp
+            .map(ActivityXpProjection::getTotalExperiencePoints)
+            .map(XpPrecision::roundToInt)
+            .orElse(0);
 
         // 2. Get activity breakdown by type
-        Set<Long> actorIds = Set.of(actorId);
         List<ActivityBreakdownProjection> breakdown = activityEventRepository.findActivityBreakdown(
             workspaceId,
             actorIds,
@@ -172,18 +170,16 @@ public class ProfileActivityQueryService {
         int reviewedPrCount = distinctPrCounts.getOrDefault(actorId, 0L).intValue();
 
         log.debug(
-            "Built profile activity stats: actorId={}, totalScore={}, eventCount={}, reviewedPrCount={}",
+            "Built profile activity stats: actorId={}, totalScore={}, reviewedPrCount={}",
             actorId,
             totalScore,
-            eventCount,
             reviewedPrCount
         );
 
         return Optional.of(
             new ProfileActivityStatsDTO(
-                actorId,
                 totalScore,
-                eventCount,
+                reviewedPrCount,
                 approvals,
                 changeRequests,
                 comments,
@@ -194,63 +190,8 @@ public class ProfileActivityQueryService {
                 mergedPullRequests.getOrDefault(actorId, 0L).intValue(),
                 closedPullRequests.getOrDefault(actorId, 0L).intValue(),
                 openedIssues,
-                closedIssues,
-                reviewedPrCount
+                closedIssues
             )
         );
-    }
-
-    /**
-     * Immutable profile activity statistics for a single user.
-     *
-     * <p>Contains aggregated XP totals and activity breakdown statistics
-     * computed from the activity event ledger, matching the semantics of
-     * {@link de.tum.in.www1.hephaestus.leaderboard.LeaderboardUserXp}.
-     *
-     * @param actorId the user's ID
-     * @param totalScore total XP score for the timeframe (rounded from BigDecimal)
-     * @param eventCount number of activity events recorded
-     * @param approvals number of REVIEW_APPROVED events
-     * @param changeRequests number of REVIEW_CHANGES_REQUESTED events
-     * @param comments number of REVIEW_COMMENTED events
-     * @param codeComments number of REVIEW_COMMENT_CREATED events
-     * @param unknowns number of REVIEW_UNKNOWN events
-     * @param ownReplies number of comments/replies on the actor's own pull requests
-     * @param openPullRequests number of authored pull requests opened in timeframe that are still open
-     * @param mergedPullRequests number of authored pull requests merged in timeframe
-     * @param closedPullRequests number of authored pull requests closed without merge in timeframe
-     * @param openedIssues number of issues opened in timeframe
-     * @param closedIssues number of issues closed in timeframe
-     * @param reviewedPrCount number of DISTINCT pull requests reviewed (excludes self-reviews)
-     */
-    public record ProfileActivityStatsDTO(
-        Long actorId,
-        int totalScore,
-        int eventCount,
-        int approvals,
-        int changeRequests,
-        int comments,
-        int codeComments,
-        int unknowns,
-        int ownReplies,
-        int openPullRequests,
-        int mergedPullRequests,
-        int closedPullRequests,
-        int openedIssues,
-        int closedIssues,
-        int reviewedPrCount
-    ) {
-        /**
-         * Returns the count of unique pull requests reviewed.
-         *
-         * <p>This value comes from a distinct PR count query, not derived from
-         * summing event counts (since one PR can have multiple review events).
-         * Self-reviews (where the reviewer is also the PR author) are excluded.
-         *
-         * @return number of distinct PRs reviewed in the timeframe
-         */
-        public int reviewedPullRequestCount() {
-            return reviewedPrCount;
-        }
     }
 }

@@ -4406,6 +4406,20 @@ components:
           format: int32
           description: Total XP score
           example: 1250
+      required:
+      - numberOfApprovals
+      - numberOfChangeRequests
+      - numberOfClosedIssues
+      - numberOfClosedPullRequests
+      - numberOfCodeComments
+      - numberOfComments
+      - numberOfMergedPullRequests
+      - numberOfOpenPullRequests
+      - numberOfOpenedIssues
+      - numberOfOwnReplies
+      - numberOfReviewedPRs
+      - numberOfUnknowns
+      - score
     ProfileReviewActivity:
       type: object
       description: A scored review activity entry with XP score for profile display

@@ -933,55 +933,55 @@ export type ProfileActivityStats = {
     /**
      * Number of approvals given
      */
-    numberOfApprovals?: number;
+    numberOfApprovals: number;
     /**
      * Number of change requests submitted
      */
-    numberOfChangeRequests?: number;
+    numberOfChangeRequests: number;
     /**
      * Number of issues closed in the timeframe
      */
-    numberOfClosedIssues?: number;
+    numberOfClosedIssues: number;
     /**
      * Number of authored pull requests closed without merge in the timeframe
      */
-    numberOfClosedPullRequests?: number;
+    numberOfClosedPullRequests: number;
     /**
      * Number of scored inline feedback comments on pull requests authored by someone else
      */
-    numberOfCodeComments?: number;
+    numberOfCodeComments: number;
     /**
      * Number of comment-only review submissions
      */
-    numberOfComments?: number;
+    numberOfComments: number;
     /**
      * Number of authored pull requests merged in the timeframe
      */
-    numberOfMergedPullRequests?: number;
+    numberOfMergedPullRequests: number;
     /**
      * Number of authored pull requests opened in the timeframe that are still open
      */
-    numberOfOpenPullRequests?: number;
+    numberOfOpenPullRequests: number;
     /**
      * Number of issues opened in the timeframe
      */
-    numberOfOpenedIssues?: number;
+    numberOfOpenedIssues: number;
     /**
      * Number of visible-only discussion replies and inline thread replies on the user's own pull requests
      */
-    numberOfOwnReplies?: number;
+    numberOfOwnReplies: number;
     /**
      * Number of distinct pull requests reviewed
      */
-    numberOfReviewedPRs?: number;
+    numberOfReviewedPRs: number;
     /**
      * Number of reviews with unknown state
      */
-    numberOfUnknowns?: number;
+    numberOfUnknowns: number;
     /**
      * Total XP score
      */
-    score?: number;
+    score: number;
 };
 
 /**

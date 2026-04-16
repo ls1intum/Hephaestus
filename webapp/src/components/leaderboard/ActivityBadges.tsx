@@ -70,14 +70,14 @@ export function ActivityBadges({
 		closedPullRequests > 0 ||
 		openedIssues > 0 ||
 		closedIssues > 0;
-
-	const hasActivity =
+	const hasScoredActivity =
 		reviewedPullRequests.length > 0 ||
 		changeRequests > 0 ||
 		approvals > 0 ||
 		comments > 0 ||
-		codeComments > 0 ||
-		hasVisibleOnlyActivity;
+		codeComments > 0;
+
+	const hasActivity = hasScoredActivity || hasVisibleOnlyActivity;
 
 	if (!hasActivity && !isLoading) return null;
 
@@ -162,7 +162,7 @@ export function ActivityBadges({
 					</TooltipContent>
 				</Tooltip>
 			)}
-			{hasVisibleOnlyActivity && (
+			{hasScoredActivity && hasVisibleOnlyActivity && (
 				<>
 					<div className="mx-1 h-4 border-l border-border" aria-hidden="true" />
 					<span className="text-xs text-muted-foreground">Visible only</span>

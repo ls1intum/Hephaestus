@@ -203,7 +203,7 @@ export const Default: Story = {
 			],
 			activityStats: {
 				score: 9,
-				numberOfReviewedPRs: 3,
+				numberOfReviewedPRs: 1,
 				numberOfApprovals: 1,
 				numberOfChangeRequests: 1,
 				numberOfComments: 1,

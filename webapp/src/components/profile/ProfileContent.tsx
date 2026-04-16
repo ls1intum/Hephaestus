@@ -18,7 +18,7 @@ export interface ProfileContentProps {
 	providerType?: ProviderType;
 	reviewActivity?: ProfileReviewActivity[];
 	openPullRequests?: PullRequestInfo[];
-	/** Server-computed activity stats; falls back to client computation if not provided */
+	/** Server-computed activity stats */
 	activityStats?: ProfileActivityStats;
 	/** Server-provided list of reviewed pull requests */
 	reviewedPullRequests?: PullRequestInfo[];
@@ -54,7 +54,9 @@ export function ProfileContent({
 
 	const skeletonPullRequests = isLoading ? Array.from({ length: 2 }, (_, i) => ({ id: i })) : [];
 
-	const filteredReviewActivity = isLoading ? skeletonReviews : (reviewActivity ?? []);
+	const filteredReviewActivity = isLoading
+		? skeletonReviews
+		: (reviewActivity ?? []).filter((activity) => (activity.score ?? 0) > 0);
 
 	const displayPullRequests = isLoading ? skeletonPullRequests : openPullRequests;
 
