@@ -116,6 +116,9 @@ public class LeaderboardXpQueryService {
             until
         );
 
+        Map<Long, Long> pullRequestDiscussionComments =
+            activityEventRepository.countPullRequestDiscussionCommentsByActors(workspaceId, actorIds, since, until);
+
         // 4. Hydrate user data
         Map<Long, User> usersById = userRepository
             .findAllById(actorIds)
@@ -155,11 +158,17 @@ public class LeaderboardXpQueryService {
                 case REVIEW_CHANGES_REQUESTED -> builder.addChangeRequests(count);
                 case REVIEW_COMMENTED -> builder.addComments(count);
                 case REVIEW_UNKNOWN -> builder.addUnknowns(count);
-                case COMMENT_CREATED -> builder.addIssueComments(count);
                 case REVIEW_COMMENT_CREATED -> builder.addCodeComments(count);
                 default -> {
                     // PR events and REVIEW_DISMISSED don't contribute to review stats
                 }
+            }
+        }
+
+        for (Map.Entry<Long, Long> entry : pullRequestDiscussionComments.entrySet()) {
+            LeaderboardUserXp.Builder builder = builders.get(entry.getKey());
+            if (builder != null) {
+                builder.addIssueComments(entry.getValue().intValue());
             }
         }
 

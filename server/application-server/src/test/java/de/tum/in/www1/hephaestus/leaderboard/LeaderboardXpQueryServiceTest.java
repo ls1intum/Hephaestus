@@ -57,6 +57,9 @@ class LeaderboardXpQueryServiceTest {
         when(
             activityEventRepository.findDistinctReviewedPullRequestCountsByActors(any(), anySet(), any(), any())
         ).thenReturn(List.of());
+        when(
+            activityEventRepository.countPullRequestDiscussionCommentsByActors(any(), anySet(), any(), any())
+        ).thenReturn(Map.of());
     }
 
     @Nested
@@ -132,6 +135,14 @@ class LeaderboardXpQueryServiceTest {
             when(
                 activityEventRepository.findActivityBreakdown(eq(WORKSPACE_ID), anySet(), eq(SINCE), eq(UNTIL))
             ).thenReturn(breakdown);
+            when(
+                activityEventRepository.countPullRequestDiscussionCommentsByActors(
+                    eq(WORKSPACE_ID),
+                    anySet(),
+                    eq(SINCE),
+                    eq(UNTIL)
+                )
+            ).thenReturn(Map.of(100L, 1L));
             when(userRepository.findAllById(Set.of(100L))).thenReturn(List.of(user));
 
             // Act

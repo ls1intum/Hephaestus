@@ -105,6 +105,9 @@ public class ProfileActivityQueryService {
             until
         );
 
+        Map<Long, Long> pullRequestDiscussionComments =
+            activityEventRepository.countPullRequestDiscussionCommentsByActors(workspaceId, actorIds, since, until);
+
         // 3. Aggregate breakdown stats
         int approvals = 0;
         int changeRequests = 0;
@@ -121,13 +124,14 @@ public class ProfileActivityQueryService {
                 case REVIEW_CHANGES_REQUESTED -> changeRequests += count;
                 case REVIEW_COMMENTED -> comments += count;
                 case REVIEW_UNKNOWN -> unknowns += count;
-                case COMMENT_CREATED -> issueComments += count;
                 case REVIEW_COMMENT_CREATED -> codeComments += count;
                 default -> {
                     // PR events and REVIEW_DISMISSED don't contribute to review stats
                 }
             }
         }
+
+        issueComments = pullRequestDiscussionComments.getOrDefault(actorId, 0L).intValue();
 
         // 4. Query distinct PR count (with self-review exclusion)
         Map<Long, Long> distinctPrCounts = activityEventRepository.countDistinctReviewedPullRequestsByActors(

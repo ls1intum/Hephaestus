@@ -11,7 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * <ul>
  *   <li>Total XP score</li>
  *   <li>Review activity breakdown (approvals, change requests, comments)</li>
- *   <li>Comment statistics (issue comments, inline code comments)</li>
+ *   <li>Pull request discussion statistics (conversation comments, inline code comments)</li>
  *   <li>Distinct PR review count</li>
  * </ul>
  *
@@ -23,7 +23,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @param numberOfApprovals count of APPROVED review states
  * @param numberOfChangeRequests count of CHANGES_REQUESTED review states
  * @param numberOfComments count of COMMENTED review states
- * @param numberOfIssueComments count of issue comments on pull requests
+ * @param numberOfIssueComments count of pull request conversation comments
  * @param numberOfCodeComments count of inline code review comments
  * @param numberOfUnknowns count of unknown/other review states
  */
@@ -35,7 +35,7 @@ public record ProfileActivityStatsDTO(
     @Schema(description = "Number of approvals given", example = "15") Integer numberOfApprovals,
     @Schema(description = "Number of change requests submitted", example = "8") Integer numberOfChangeRequests,
     @Schema(description = "Number of review comments (COMMENTED state)", example = "12") Integer numberOfComments,
-    @Schema(description = "Number of issue comments on pull requests", example = "25") Integer numberOfIssueComments,
+    @Schema(description = "Number of pull request conversation comments", example = "25") Integer numberOfIssueComments,
     @Schema(description = "Number of inline code review comments", example = "30") Integer numberOfCodeComments,
     @Schema(description = "Number of reviews with unknown state", example = "0") Integer numberOfUnknowns
 ) {

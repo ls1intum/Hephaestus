@@ -98,7 +98,7 @@ export function ActivityBadges({
 						<CommentIcon className="h-4 w-4" />
 						<span>{comments}</span>
 					</TooltipTrigger>
-					<TooltipContent>Comments</TooltipContent>
+					<TooltipContent>PR discussion</TooltipContent>
 				</Tooltip>
 			)}
 			{codeComments > 0 && (
@@ -109,7 +109,7 @@ export function ActivityBadges({
 						<CommentDiscussionIcon className="h-4 w-4" />
 						<span>{codeComments}</span>
 					</TooltipTrigger>
-					<TooltipContent>Code comments</TooltipContent>
+					<TooltipContent>Inline code comments</TooltipContent>
 				</Tooltip>
 			)}
 		</div>

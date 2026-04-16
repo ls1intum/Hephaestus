@@ -30,7 +30,9 @@ public record LeaderboardEntryDTO(
     @NonNull @Schema(description = "Count of distinct PRs reviewed", example = "5") Integer numberOfReviewedPRs,
     @NonNull @Schema(description = "Count of review approvals", example = "3") Integer numberOfApprovals,
     @NonNull @Schema(description = "Count of change requests submitted", example = "1") Integer numberOfChangeRequests,
-    @NonNull @Schema(description = "Count of review and issue comments", example = "10") Integer numberOfComments,
+    @NonNull
+    @Schema(description = "Count of pull request discussion comments", example = "10")
+    Integer numberOfComments,
     @NonNull
     @Schema(description = "Count of reviews with unknown/unrecognized state", example = "0")
     Integer numberOfUnknowns,

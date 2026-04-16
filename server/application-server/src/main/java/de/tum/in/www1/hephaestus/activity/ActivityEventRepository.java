@@ -214,6 +214,42 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("until") Instant until
     );
 
+    @Query(
+        """
+        SELECT e.actor.id as actorId, COUNT(e) as count
+        FROM ActivityEvent e
+        JOIN IssueComment c ON c.id = e.targetId
+        JOIN PullRequest pr ON pr.id = c.issue.id
+        WHERE e.workspace.id = :workspaceId
+        AND e.actor.id IN :actorIds
+        AND e.actor.type = de.tum.in.www1.hephaestus.gitprovider.user.User$Type.USER
+        AND e.targetType = 'issue_comment'
+        AND e.eventType = de.tum.in.www1.hephaestus.activity.ActivityEventType.COMMENT_CREATED
+        AND e.occurredAt >= :since
+        AND e.occurredAt < :until
+        GROUP BY e.actor.id
+        """
+    )
+    List<ActorCountProjection> findPullRequestDiscussionCommentCounts(
+        @Param("workspaceId") Long workspaceId,
+        @Param("actorIds") Set<Long> actorIds,
+        @Param("since") Instant since,
+        @Param("until") Instant until
+    );
+
+    default Map<Long, Long> countPullRequestDiscussionCommentsByActors(
+        Long workspaceId,
+        Set<Long> actorIds,
+        Instant since,
+        Instant until
+    ) {
+        return findPullRequestDiscussionCommentCounts(workspaceId, actorIds, since, until)
+            .stream()
+            .collect(
+                java.util.stream.Collectors.toMap(ActorCountProjection::getActorId, ActorCountProjection::getCount)
+            );
+    }
+
     /**
      * Count DISTINCT pull requests reviewed by each actor for workspace-level leaderboard.
      *
@@ -327,6 +363,11 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     interface DistinctPrCountProjection {
         Long getActorId();
         Long getPrCount();
+    }
+
+    interface ActorCountProjection {
+        Long getActorId();
+        Long getCount();
     }
 
     // ========================================================================
