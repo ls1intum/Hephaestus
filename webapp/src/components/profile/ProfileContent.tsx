@@ -104,8 +104,7 @@ export function ProfileContent({
 							/>
 						</div>
 						<p className="text-sm text-provider-muted-foreground">
-							This feed lists scored review activity. Additional badges summarize authored work and
-							collaboration that stay visible without affecting score.
+							This list shows review work that affects score. The badges also show other activity.
 						</p>
 					</div>
 					<div className="flex flex-col gap-2 m-1">
@@ -129,8 +128,8 @@ export function ProfileContent({
 								title="No review activity"
 								description={
 									currUserIsDashboardUser
-										? `No scored review activity in this timeframe. Try expanding the filter.`
-										: `${displayName || username} has no scored review activity in this timeframe.`
+										? `No review activity that counts yet. Try a wider timeframe.`
+										: `${displayName || username} has no review activity that counts in this timeframe.`
 								}
 							/>
 						)}

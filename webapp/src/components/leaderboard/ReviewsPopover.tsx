@@ -101,6 +101,12 @@ export function ReviewsPopover({
 						variant="outline"
 						size="sm"
 						disabled={!hasReviews}
+						title={hasReviews ? `See reviewed ${terms.pullRequests.toLowerCase()}` : undefined}
+						aria-label={
+							hasReviews
+								? `${reviewedPullRequests.length} reviewed ${terms.pullRequests.toLowerCase()}. Click to open the list.`
+								: `No reviewed ${terms.pullRequests.toLowerCase()}`
+						}
 						className={cn(
 							"flex items-center gap-1",
 							!highlight
@@ -110,7 +116,7 @@ export function ReviewsPopover({
 						onClick={(e) => e.stopPropagation()}
 					>
 						<PrIcon size={16} />
-						{reviewedPullRequests.length}
+						<span>{reviewedPullRequests.length} reviewed</span>
 					</Button>
 				}
 			/>

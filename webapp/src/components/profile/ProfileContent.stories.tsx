@@ -154,6 +154,19 @@ const mockActivityStats = {
 	numberOfClosedIssues: 1,
 };
 
+const mockReviewedPullRequests = mockReviewActivity
+	.map((activity) => activity.pullRequest)
+	.filter(
+		(pullRequest): pullRequest is NonNullable<(typeof mockReviewActivity)[number]["pullRequest"]> =>
+			Boolean(pullRequest),
+	)
+	.map((pullRequest) => ({
+		...pullRequest,
+		commentsCount: 0,
+		additions: 0,
+		deletions: 0,
+	}));
+
 const emptyActivityStats = {
 	score: 0,
 	numberOfReviewedPRs: 0,
@@ -233,6 +246,7 @@ export const Default: Story = {
 		reviewActivity: mockReviewActivity,
 		openPullRequests: mockOpenPullRequests,
 		activityStats: mockActivityStats,
+		reviewedPullRequests: mockReviewedPullRequests,
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
@@ -292,6 +306,7 @@ export const EmptyPullRequests: Story = {
 			...mockActivityStats,
 			numberOfOpenPullRequests: 0,
 		},
+		reviewedPullRequests: mockReviewedPullRequests,
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,

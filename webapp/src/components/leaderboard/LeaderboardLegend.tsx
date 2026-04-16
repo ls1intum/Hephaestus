@@ -28,9 +28,7 @@ export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: 
 					<CardTitle>
 						<InfoIcon className="inline mr-2 h-4 w-4" /> Activity Legend
 					</CardTitle>
-					<CardDescription>
-						Understanding which activity affects score and which badges provide extra visibility.
-					</CardDescription>
+					<CardDescription>What counts toward score, and what is just shown.</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<div className="space-y-3">
@@ -51,21 +49,21 @@ export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: 
 								</div>
 								<div className="flex items-center gap-2 text-provider-muted-foreground">
 									<CommentIcon className="h-4 w-4" />
-									<span>Comment reviews</span>
+									<span>Review comments</span>
 								</div>
 								<div className="flex items-center gap-2 text-provider-muted-foreground">
 									<CommentDiscussionIcon className="h-4 w-4" />
-									<span>Scored inline feedback</span>
+									<span>Inline comments</span>
 								</div>
 							</div>
 						</div>
 
 						<div className="space-y-2 pt-2 border-t">
-							<p className="text-sm font-medium">Visible only</p>
+							<p className="text-sm font-medium">Also shown</p>
 							<div className="grid grid-cols-1 gap-2">
 								<div className="flex items-center gap-2 text-provider-muted-foreground">
 									<MessageSquareReply className="h-4 w-4" />
-									<span>Own {terms.pullRequests.toLowerCase()} replies and inline replies</span>
+									<span>Replies on your own {terms.pullRequests.toLowerCase()}</span>
 								</div>
 								<div className="flex items-center gap-2 text-provider-open-foreground">
 									<PrIcon className="h-4 w-4" size={16} />
@@ -92,8 +90,7 @@ export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: 
 
 						<div className="pt-2 border-t">
 							<p className="text-sm text-provider-muted-foreground mb-2">
-								Only review activity contributes to score. The visible-only badges provide
-								additional context about authored work and collaboration.
+								Only reviews affect score. Everything else is shown for context.
 							</p>
 							<Button
 								variant="outline"
@@ -101,7 +98,7 @@ export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: 
 								className="text-provider-link-foreground"
 								onClick={() => setShowScoringModal(true)}
 							>
-								View scoring formula
+								How scoring works
 							</Button>
 						</div>
 					</div>

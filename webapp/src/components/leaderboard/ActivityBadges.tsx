@@ -1,6 +1,5 @@
 import {
 	CheckIcon,
-	ChevronLeftIcon,
 	CommentDiscussionIcon,
 	CommentIcon,
 	FileDiffIcon,
@@ -94,19 +93,14 @@ export function ActivityBadges({
 	return (
 		<div className={cn("flex items-center gap-2", className)}>
 			<span className="sr-only">
-				Activity badges. Review badges affect score. Badges after the divider are visible only.
+				Activity badges. Reviews affect score. The rest is shown for context.
 			</span>
 			{reviewedPullRequests.length > 0 && (
-				<>
-					<ReviewsPopover
-						reviewedPullRequests={reviewedPullRequests}
-						highlight={highlightReviews}
-						providerType={providerType}
-					/>
-					<div className="flex items-center text-provider-muted-foreground">
-						<ChevronLeftIcon className="h-4 w-4" />
-					</div>
-				</>
+				<ReviewsPopover
+					reviewedPullRequests={reviewedPullRequests}
+					highlight={highlightReviews}
+					providerType={providerType}
+				/>
 			)}
 			{changeRequests > 0 && (
 				<Tooltip>
@@ -144,7 +138,7 @@ export function ActivityBadges({
 						<CommentIcon className="h-4 w-4" />
 						<span>{comments}</span>
 					</TooltipTrigger>
-					<TooltipContent>Scored. Comment-only review submissions.</TooltipContent>
+					<TooltipContent>Review comments</TooltipContent>
 				</Tooltip>
 			)}
 			{codeComments > 0 && (
@@ -158,14 +152,15 @@ export function ActivityBadges({
 						<span>{codeComments}</span>
 					</TooltipTrigger>
 					<TooltipContent>
-						Scored. Inline feedback on {terms.pullRequests.toLowerCase()} authored by someone else.
+						Inline comments on someone else&apos;s {terms.pullRequests.toLowerCase()}. Counts toward
+						score.
 					</TooltipContent>
 				</Tooltip>
 			)}
 			{hasScoredActivity && hasVisibleOnlyActivity && (
 				<>
 					<div className="mx-1 h-4 border-l border-border" aria-hidden="true" />
-					<span className="text-xs text-muted-foreground">Visible only</span>
+					<span className="text-xs text-muted-foreground">Also shown</span>
 				</>
 			)}
 			{ownReplies > 0 && (
@@ -179,8 +174,7 @@ export function ActivityBadges({
 						<span>{ownReplies}</span>
 					</TooltipTrigger>
 					<TooltipContent>
-						Visible only. Replies in {terms.pullRequestShort} discussion or inline threads on{" "}
-						{terms.pullRequests.toLowerCase()} you authored. Does not affect score.
+						Replies on your own {terms.pullRequests.toLowerCase()}. Doesn&apos;t affect score.
 					</TooltipContent>
 				</Tooltip>
 			)}
@@ -195,8 +189,7 @@ export function ActivityBadges({
 						<span>{openPullRequests}</span>
 					</TooltipTrigger>
 					<TooltipContent>
-						Visible only. {terms.pullRequests} you authored in this timeframe that are still open.
-						Does not affect score.
+						Your open {terms.pullRequests.toLowerCase()}. Doesn&apos;t affect score.
 					</TooltipContent>
 				</Tooltip>
 			)}
@@ -211,8 +204,7 @@ export function ActivityBadges({
 						<span>{mergedPullRequests}</span>
 					</TooltipTrigger>
 					<TooltipContent>
-						Visible only. {terms.pullRequests} you authored that were merged in this timeframe. Does
-						not affect score.
+						Your merged {terms.pullRequests.toLowerCase()}. Doesn&apos;t affect score.
 					</TooltipContent>
 				</Tooltip>
 			)}
@@ -227,8 +219,7 @@ export function ActivityBadges({
 						<span>{closedPullRequests}</span>
 					</TooltipTrigger>
 					<TooltipContent>
-						Visible only. {terms.pullRequests} you authored that were closed without merge in this
-						timeframe. Does not affect score.
+						Your closed {terms.pullRequests.toLowerCase()}. Doesn&apos;t affect score.
 					</TooltipContent>
 				</Tooltip>
 			)}
@@ -242,9 +233,7 @@ export function ActivityBadges({
 						<IssueOpenedIcon className="h-4 w-4" />
 						<span>{openedIssues}</span>
 					</TooltipTrigger>
-					<TooltipContent>
-						Visible only. Issues you opened in this timeframe. Does not affect score.
-					</TooltipContent>
+					<TooltipContent>Issues you opened. Doesn&apos;t affect score.</TooltipContent>
 				</Tooltip>
 			)}
 			{closedIssues > 0 && (
@@ -257,9 +246,7 @@ export function ActivityBadges({
 						<IssueClosedIcon className="h-4 w-4" />
 						<span>{closedIssues}</span>
 					</TooltipTrigger>
-					<TooltipContent>
-						Visible only. Issues you closed in this timeframe. Does not affect score.
-					</TooltipContent>
+					<TooltipContent>Issues you closed. Doesn&apos;t affect score.</TooltipContent>
 				</Tooltip>
 			)}
 		</div>

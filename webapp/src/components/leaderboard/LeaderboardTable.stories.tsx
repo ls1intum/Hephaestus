@@ -3,6 +3,47 @@ import { fn } from "storybook/test";
 import type { LeaderboardEntry } from "@/api/types.gen";
 import { LeaderboardTable } from "./LeaderboardTable";
 
+const reviewedPullRequests = [
+	{
+		id: 201,
+		number: 42,
+		title: "Improve leaderboard semantics",
+		state: "OPEN" as const,
+		isDraft: false,
+		isMerged: false,
+		commentsCount: 2,
+		additions: 35,
+		deletions: 5,
+		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
+		repository: {
+			id: 1,
+			name: "Hephaestus",
+			nameWithOwner: "ls1intum/Hephaestus",
+			htmlUrl: "https://github.com/ls1intum/Hephaestus",
+			hiddenFromContributions: false,
+		},
+	},
+	{
+		id: 202,
+		number: 314,
+		title: "Refine profile activity feed",
+		state: "OPEN" as const,
+		isDraft: false,
+		isMerged: false,
+		commentsCount: 4,
+		additions: 120,
+		deletions: 15,
+		htmlUrl: "https://github.com/ls1intum/Artemis/pull/314",
+		repository: {
+			id: 2,
+			name: "Artemis",
+			nameWithOwner: "ls1intum/Artemis",
+			htmlUrl: "https://github.com/ls1intum/Artemis",
+			hiddenFromContributions: false,
+		},
+	},
+];
+
 /**
  * A table component that displays leaderboard data with user rankings, scores, and activity metrics.
  */
@@ -19,7 +60,7 @@ const mockLeaderboardEntries: LeaderboardEntry[] = [
 			htmlUrl: "https://github.com/GODrums",
 			leaguePoints: 1250,
 		},
-		reviewedPullRequests: [],
+		reviewedPullRequests,
 		numberOfReviewedPRs: 18,
 		numberOfApprovals: 8,
 		numberOfChangeRequests: 7,
@@ -44,7 +85,7 @@ const mockLeaderboardEntries: LeaderboardEntry[] = [
 			htmlUrl: "https://github.com/FelixTJDietrich",
 			leaguePoints: 750,
 		},
-		reviewedPullRequests: [],
+		reviewedPullRequests: reviewedPullRequests.slice(0, 1),
 		numberOfReviewedPRs: 8,
 		numberOfApprovals: 1,
 		numberOfChangeRequests: 5,
@@ -69,7 +110,7 @@ const mockLeaderboardEntries: LeaderboardEntry[] = [
 			htmlUrl: "https://github.com/krusche",
 			leaguePoints: 2500,
 		},
-		reviewedPullRequests: [],
+		reviewedPullRequests: reviewedPullRequests.slice(0, 1),
 		numberOfReviewedPRs: 5,
 		numberOfApprovals: 3,
 		numberOfChangeRequests: 1,
@@ -94,7 +135,7 @@ const mockLeaderboardEntries: LeaderboardEntry[] = [
 			htmlUrl: "https://github.com/shadcn",
 			leaguePoints: 350,
 		},
-		reviewedPullRequests: [],
+		reviewedPullRequests: reviewedPullRequests.slice(0, 1),
 		numberOfReviewedPRs: 3,
 		numberOfApprovals: 0,
 		numberOfChangeRequests: 1,
@@ -159,6 +200,7 @@ const meta = {
 	},
 	args: {
 		onUserClick: fn(),
+		variant: "INDIVIDUAL",
 	},
 } satisfies Meta<typeof LeaderboardTable>;
 

@@ -126,9 +126,9 @@ export const MergeRequestProvider: Story = {
 };
 
 /**
- * Visible-only authored and collaboration activity without scored review activity.
+ * Other activity without score-earning reviews.
  */
-export const VisibleOnly: Story = {
+export const OtherActivity: Story = {
 	args: {
 		reviewedPullRequests: [],
 		approvals: 0,
@@ -140,6 +140,25 @@ export const VisibleOnly: Story = {
 		mergedPullRequests: 3,
 		closedPullRequests: 1,
 		openedIssues: 2,
+		closedIssues: 1,
+	},
+};
+
+/**
+ * Realistic mixed state with reviewed PRs first and authored activity after it.
+ */
+export const MixedActivity: Story = {
+	args: {
+		reviewedPullRequests: basePullRequests,
+		approvals: 2,
+		changeRequests: 1,
+		comments: 3,
+		codeComments: 4,
+		ownReplies: 2,
+		openPullRequests: 1,
+		mergedPullRequests: 2,
+		closedPullRequests: 1,
+		openedIssues: 1,
 		closedIssues: 1,
 	},
 };
