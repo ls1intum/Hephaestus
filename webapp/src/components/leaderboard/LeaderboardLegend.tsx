@@ -4,7 +4,10 @@ import {
 	CommentIcon,
 	FileDiffIcon,
 	InfoIcon,
+	IssueClosedIcon,
+	IssueOpenedIcon,
 } from "@primer/octicons-react";
+import { MessageSquareReply } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +18,8 @@ export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: 
 	const [showScoringModal, setShowScoringModal] = useState(false);
 	const terms = getProviderTerms(providerType);
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
+	const { icon: MergedPrIcon } = getPullRequestStateIcon(providerType, "MERGED");
+	const { icon: ClosedPrIcon } = getPullRequestStateIcon(providerType, "CLOSED");
 
 	return (
 		<>
@@ -23,38 +28,72 @@ export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: 
 					<CardTitle>
 						<InfoIcon className="inline mr-2 h-4 w-4" /> Activity Legend
 					</CardTitle>
-					<CardDescription>Understanding the leaderboard activity indicators</CardDescription>
+					<CardDescription>
+						Understanding which activity affects score and which badges provide extra visibility.
+					</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<div className="space-y-3">
-						<div className="grid grid-cols-1 gap-2">
-							<div className="flex items-center gap-2 text-provider-muted-foreground">
-								<PrIcon className="h-4 w-4" size={16} />
-								<span>Reviewed {terms.pullRequests.toLowerCase()}</span>
+						<div className="space-y-2">
+							<p className="text-sm font-medium">Counts toward score</p>
+							<div className="grid grid-cols-1 gap-2">
+								<div className="flex items-center gap-2 text-provider-muted-foreground">
+									<PrIcon className="h-4 w-4" size={16} />
+									<span>Reviewed {terms.pullRequests.toLowerCase()}</span>
+								</div>
+								<div className="flex items-center gap-2 text-provider-danger-foreground">
+									<FileDiffIcon className="h-4 w-4" />
+									<span>Changes requested</span>
+								</div>
+								<div className="flex items-center gap-2 text-provider-success-foreground">
+									<CheckIcon className="h-4 w-4" />
+									<span>Approvals</span>
+								</div>
+								<div className="flex items-center gap-2 text-provider-muted-foreground">
+									<CommentIcon className="h-4 w-4" />
+									<span>Comment reviews</span>
+								</div>
+								<div className="flex items-center gap-2 text-provider-muted-foreground">
+									<CommentDiscussionIcon className="h-4 w-4" />
+									<span>Scored inline feedback</span>
+								</div>
 							</div>
-							<div className="flex items-center gap-2 text-provider-danger-foreground">
-								<FileDiffIcon className="h-4 w-4" />
-								<span>Changes requested</span>
-							</div>
-							<div className="flex items-center gap-2 text-provider-success-foreground">
-								<CheckIcon className="h-4 w-4" />
-								<span>Approvals</span>
-							</div>
-							<div className="flex items-center gap-2 text-provider-muted-foreground">
-								<CommentIcon className="h-4 w-4" />
-								<span>Comments</span>
-							</div>
-							<div className="flex items-center gap-2 text-provider-muted-foreground">
-								<CommentDiscussionIcon className="h-4 w-4" />
-								<span>Code comments</span>
+						</div>
+
+						<div className="space-y-2 pt-2 border-t">
+							<p className="text-sm font-medium">Visible only</p>
+							<div className="grid grid-cols-1 gap-2">
+								<div className="flex items-center gap-2 text-provider-muted-foreground">
+									<MessageSquareReply className="h-4 w-4" />
+									<span>Own {terms.pullRequests.toLowerCase()} replies and inline replies</span>
+								</div>
+								<div className="flex items-center gap-2 text-provider-open-foreground">
+									<PrIcon className="h-4 w-4" size={16} />
+									<span>Open {terms.pullRequests.toLowerCase()}</span>
+								</div>
+								<div className="flex items-center gap-2 text-provider-done-foreground">
+									<MergedPrIcon className="h-4 w-4" size={16} />
+									<span>Merged {terms.pullRequests.toLowerCase()}</span>
+								</div>
+								<div className="flex items-center gap-2 text-provider-closed-foreground">
+									<ClosedPrIcon className="h-4 w-4" size={16} />
+									<span>Closed {terms.pullRequests.toLowerCase()}</span>
+								</div>
+								<div className="flex items-center gap-2 text-provider-open-foreground">
+									<IssueOpenedIcon className="h-4 w-4" />
+									<span>Opened issues</span>
+								</div>
+								<div className="flex items-center gap-2 text-provider-closed-foreground">
+									<IssueClosedIcon className="h-4 w-4" />
+									<span>Closed issues</span>
+								</div>
 							</div>
 						</div>
 
 						<div className="pt-2 border-t">
 							<p className="text-sm text-provider-muted-foreground mb-2">
-								Your score combines your review activity with the complexity of the{" "}
-								{terms.pullRequests.toLowerCase()} you've reviewed. Score calculation weighs change
-								requests highest, followed by approvals and comments.
+								Only review activity contributes to score. The visible-only badges provide
+								additional context about authored work and collaboration.
 							</p>
 							<Button
 								variant="outline"

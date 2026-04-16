@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.activity.ActivityBreakdownProjection;
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
 import de.tum.in.www1.hephaestus.activity.ActivityXpProjection;
 import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
+import de.tum.in.www1.hephaestus.profile.ProfilePullRequestQueryRepository.AuthorCountProjection;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +39,14 @@ public class ProfileActivityQueryService {
     private static final Logger log = LoggerFactory.getLogger(ProfileActivityQueryService.class);
 
     private final ActivityEventRepository activityEventRepository;
+    private final ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
 
-    public ProfileActivityQueryService(ActivityEventRepository activityEventRepository) {
+    public ProfileActivityQueryService(
+        ActivityEventRepository activityEventRepository,
+        ProfilePullRequestQueryRepository profilePullRequestQueryRepository
+    ) {
         this.activityEventRepository = activityEventRepository;
+        this.profilePullRequestQueryRepository = profilePullRequestQueryRepository;
     }
 
     /**
@@ -105,16 +111,39 @@ public class ProfileActivityQueryService {
             until
         );
 
-        Map<Long, Long> pullRequestDiscussionComments =
-            activityEventRepository.countPullRequestDiscussionCommentsByActors(workspaceId, actorIds, since, until);
+        Map<Long, Long> ownReplies = activityEventRepository.countOwnPullRequestRepliesByActors(
+            workspaceId,
+            actorIds,
+            since,
+            until
+        );
+        Map<Long, Long> openPullRequests = profilePullRequestQueryRepository
+            .countOpenPullRequestsByAuthors(workspaceId, actorIds, since, until)
+            .stream()
+            .collect(
+                java.util.stream.Collectors.toMap(AuthorCountProjection::getAuthorId, AuthorCountProjection::getCount)
+            );
+        Map<Long, Long> mergedPullRequests = profilePullRequestQueryRepository
+            .countMergedPullRequestsByAuthors(workspaceId, actorIds, since, until)
+            .stream()
+            .collect(
+                java.util.stream.Collectors.toMap(AuthorCountProjection::getAuthorId, AuthorCountProjection::getCount)
+            );
+        Map<Long, Long> closedPullRequests = profilePullRequestQueryRepository
+            .countClosedPullRequestsByAuthors(workspaceId, actorIds, since, until)
+            .stream()
+            .collect(
+                java.util.stream.Collectors.toMap(AuthorCountProjection::getAuthorId, AuthorCountProjection::getCount)
+            );
 
         // 3. Aggregate breakdown stats
         int approvals = 0;
         int changeRequests = 0;
         int comments = 0;
         int unknowns = 0;
-        int issueComments = 0;
         int codeComments = 0;
+        int openedIssues = 0;
+        int closedIssues = 0;
 
         for (ActivityBreakdownProjection stat : breakdown) {
             int count = stat.getCount() != null ? stat.getCount().intValue() : 0;
@@ -125,13 +154,13 @@ public class ProfileActivityQueryService {
                 case REVIEW_COMMENTED -> comments += count;
                 case REVIEW_UNKNOWN -> unknowns += count;
                 case REVIEW_COMMENT_CREATED -> codeComments += count;
+                case ISSUE_CREATED -> openedIssues += count;
+                case ISSUE_CLOSED -> closedIssues += count;
                 default -> {
                     // PR events and REVIEW_DISMISSED don't contribute to review stats
                 }
             }
         }
-
-        issueComments = pullRequestDiscussionComments.getOrDefault(actorId, 0L).intValue();
 
         // 4. Query distinct PR count (with self-review exclusion)
         Map<Long, Long> distinctPrCounts = activityEventRepository.countDistinctReviewedPullRequestsByActors(
@@ -158,9 +187,14 @@ public class ProfileActivityQueryService {
                 approvals,
                 changeRequests,
                 comments,
-                unknowns,
-                issueComments,
                 codeComments,
+                unknowns,
+                ownReplies.getOrDefault(actorId, 0L).intValue(),
+                openPullRequests.getOrDefault(actorId, 0L).intValue(),
+                mergedPullRequests.getOrDefault(actorId, 0L).intValue(),
+                closedPullRequests.getOrDefault(actorId, 0L).intValue(),
+                openedIssues,
+                closedIssues,
                 reviewedPrCount
             )
         );
@@ -179,9 +213,14 @@ public class ProfileActivityQueryService {
      * @param approvals number of REVIEW_APPROVED events
      * @param changeRequests number of REVIEW_CHANGES_REQUESTED events
      * @param comments number of REVIEW_COMMENTED events
-     * @param unknowns number of REVIEW_UNKNOWN events
-     * @param issueComments number of COMMENT_CREATED events
      * @param codeComments number of REVIEW_COMMENT_CREATED events
+     * @param unknowns number of REVIEW_UNKNOWN events
+     * @param ownReplies number of comments/replies on the actor's own pull requests
+     * @param openPullRequests number of authored pull requests opened in timeframe that are still open
+     * @param mergedPullRequests number of authored pull requests merged in timeframe
+     * @param closedPullRequests number of authored pull requests closed without merge in timeframe
+     * @param openedIssues number of issues opened in timeframe
+     * @param closedIssues number of issues closed in timeframe
      * @param reviewedPrCount number of DISTINCT pull requests reviewed (excludes self-reviews)
      */
     public record ProfileActivityStatsDTO(
@@ -191,9 +230,14 @@ public class ProfileActivityQueryService {
         int approvals,
         int changeRequests,
         int comments,
-        int unknowns,
-        int issueComments,
         int codeComments,
+        int unknowns,
+        int ownReplies,
+        int openPullRequests,
+        int mergedPullRequests,
+        int closedPullRequests,
+        int openedIssues,
+        int closedIssues,
         int reviewedPrCount
     ) {
         /**

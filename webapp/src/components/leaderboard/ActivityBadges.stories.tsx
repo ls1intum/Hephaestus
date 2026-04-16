@@ -124,3 +124,22 @@ export const MergeRequestProvider: Story = {
 		providerType: "GITLAB",
 	},
 };
+
+/**
+ * Visible-only authored and collaboration activity without scored review activity.
+ */
+export const VisibleOnly: Story = {
+	args: {
+		reviewedPullRequests: [],
+		approvals: 0,
+		changeRequests: 0,
+		comments: 0,
+		codeComments: 0,
+		ownReplies: 2,
+		openPullRequests: 1,
+		mergedPullRequests: 3,
+		closedPullRequests: 1,
+		openedIssues: 2,
+		closedIssues: 1,
+	},
+};

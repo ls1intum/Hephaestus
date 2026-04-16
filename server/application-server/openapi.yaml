@@ -3885,16 +3885,50 @@ components:
           format: int32
           description: Count of change requests submitted
           example: 1
+        numberOfClosedIssues:
+          type: integer
+          format: int32
+          description: Count of issues closed in the timeframe
+          example: 2
+        numberOfClosedPullRequests:
+          type: integer
+          format: int32
+          description: Count of authored pull requests closed without merge in the
+            timeframe
+          example: 1
         numberOfCodeComments:
           type: integer
           format: int32
-          description: Count of inline code review comments
+          description: Count of scored inline feedback comments on pull requests authored
+            by someone else
           example: 7
         numberOfComments:
           type: integer
           format: int32
-          description: Count of review and issue comments
+          description: Count of comment-only review submissions
           example: 10
+        numberOfMergedPullRequests:
+          type: integer
+          format: int32
+          description: Count of authored pull requests merged in the timeframe
+          example: 6
+        numberOfOpenPullRequests:
+          type: integer
+          format: int32
+          description: Count of authored pull requests opened in the timeframe that
+            are still open
+          example: 2
+        numberOfOpenedIssues:
+          type: integer
+          format: int32
+          description: Count of issues opened in the timeframe
+          example: 3
+        numberOfOwnReplies:
+          type: integer
+          format: int32
+          description: Count of visible-only discussion replies and inline thread
+            replies on the contributor's own pull requests
+          example: 4
         numberOfReviewedPRs:
           type: integer
           format: int32
@@ -3929,8 +3963,14 @@ components:
       required:
       - numberOfApprovals
       - numberOfChangeRequests
+      - numberOfClosedIssues
+      - numberOfClosedPullRequests
       - numberOfCodeComments
       - numberOfComments
+      - numberOfMergedPullRequests
+      - numberOfOpenPullRequests
+      - numberOfOpenedIssues
+      - numberOfOwnReplies
       - numberOfReviewedPRs
       - numberOfUnknowns
       - rank
@@ -4273,7 +4313,7 @@ components:
             $ref: "#/components/schemas/PullRequestInfo"
         reviewActivity:
           type: array
-          description: Recent review activity with XP scores
+          description: Recent scored review activity with XP scores
           items:
             $ref: "#/components/schemas/ProfileReviewActivity"
         reviewedPullRequests:
@@ -4288,7 +4328,9 @@ components:
           $ref: "#/components/schemas/ProfileXpRecord"
           description: XP progress information for the users' profile
       required:
+      - activityStats
       - contributedRepositories
+      - reviewedPullRequests
       - userInfo
       - xpRecord
     ProfileActivityStats:
@@ -4305,21 +4347,50 @@ components:
           format: int32
           description: Number of change requests submitted
           example: 8
+        numberOfClosedIssues:
+          type: integer
+          format: int32
+          description: Number of issues closed in the timeframe
+          example: 2
+        numberOfClosedPullRequests:
+          type: integer
+          format: int32
+          description: Number of authored pull requests closed without merge in the
+            timeframe
+          example: 1
         numberOfCodeComments:
           type: integer
           format: int32
-          description: Number of inline code review comments
+          description: Number of scored inline feedback comments on pull requests
+            authored by someone else
           example: 30
         numberOfComments:
           type: integer
           format: int32
-          description: Number of review comments (COMMENTED state)
+          description: Number of comment-only review submissions
           example: 12
-        numberOfIssueComments:
+        numberOfMergedPullRequests:
           type: integer
           format: int32
-          description: Number of issue comments on pull requests
-          example: 25
+          description: Number of authored pull requests merged in the timeframe
+          example: 6
+        numberOfOpenPullRequests:
+          type: integer
+          format: int32
+          description: Number of authored pull requests opened in the timeframe that
+            are still open
+          example: 2
+        numberOfOpenedIssues:
+          type: integer
+          format: int32
+          description: Number of issues opened in the timeframe
+          example: 3
+        numberOfOwnReplies:
+          type: integer
+          format: int32
+          description: Number of visible-only discussion replies and inline thread
+            replies on the user's own pull requests
+          example: 4
         numberOfReviewedPRs:
           type: integer
           format: int32
@@ -4337,7 +4408,7 @@ components:
           example: 1250
     ProfileReviewActivity:
       type: object
-      description: A review activity entry with XP score for profile display
+      description: A scored review activity entry with XP score for profile display
       properties:
         author:
           $ref: "#/components/schemas/UserInfo"

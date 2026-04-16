@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.activity.ActivityXpProjection;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.profile.ProfilePullRequestQueryRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -47,19 +48,74 @@ class LeaderboardXpQueryServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
+
     private LeaderboardXpQueryService service;
 
     @BeforeEach
     void setUp() {
-        service = new LeaderboardXpQueryService(activityEventRepository, userRepository);
+        service = new LeaderboardXpQueryService(
+            activityEventRepository,
+            userRepository,
+            profilePullRequestQueryRepository
+        );
 
         // Default mock for distinct PR count query - returns empty list (0 PRs) by default
         when(
             activityEventRepository.findDistinctReviewedPullRequestCountsByActors(any(), anySet(), any(), any())
         ).thenReturn(List.of());
+        when(activityEventRepository.countOwnPullRequestRepliesByActors(any(), anySet(), any(), any())).thenReturn(
+            Map.of()
+        );
         when(
-            activityEventRepository.countPullRequestDiscussionCommentsByActors(any(), anySet(), any(), any())
+            profilePullRequestQueryRepository.countOpenPullRequestsByAuthors(any(), anySet(), any(), any())
+        ).thenReturn(List.of());
+        when(
+            profilePullRequestQueryRepository.countMergedPullRequestsByAuthors(any(), anySet(), any(), any())
+        ).thenReturn(List.of());
+        when(
+            profilePullRequestQueryRepository.countClosedPullRequestsByAuthors(any(), anySet(), any(), any())
+        ).thenReturn(List.of());
+        when(
+            activityEventRepository.countDistinctReviewedPullRequestsByActorsAndTeams(
+                any(),
+                anySet(),
+                anySet(),
+                any(),
+                any()
+            )
         ).thenReturn(Map.of());
+        when(
+            activityEventRepository.countOwnPullRequestRepliesByActorsAndTeams(any(), anySet(), anySet(), any(), any())
+        ).thenReturn(Map.of());
+        when(
+            profilePullRequestQueryRepository.countOpenPullRequestsByAuthorsAndTeams(
+                any(),
+                anySet(),
+                anySet(),
+                any(),
+                any()
+            )
+        ).thenReturn(List.of());
+        when(
+            profilePullRequestQueryRepository.countMergedPullRequestsByAuthorsAndTeams(
+                any(),
+                anySet(),
+                anySet(),
+                any(),
+                any()
+            )
+        ).thenReturn(List.of());
+        when(
+            profilePullRequestQueryRepository.countClosedPullRequestsByAuthorsAndTeams(
+                any(),
+                anySet(),
+                anySet(),
+                any(),
+                any()
+            )
+        ).thenReturn(List.of());
     }
 
     @Nested
@@ -125,7 +181,6 @@ class LeaderboardXpQueryServiceTest {
                 createBreakdownProjection(100L, ActivityEventType.REVIEW_APPROVED, 3L),
                 createBreakdownProjection(100L, ActivityEventType.REVIEW_CHANGES_REQUESTED, 2L),
                 createBreakdownProjection(100L, ActivityEventType.REVIEW_COMMENTED, 1L),
-                createBreakdownProjection(100L, ActivityEventType.COMMENT_CREATED, 1L),
                 createBreakdownProjection(100L, ActivityEventType.REVIEW_COMMENT_CREATED, 1L)
             );
 
@@ -136,7 +191,7 @@ class LeaderboardXpQueryServiceTest {
                 activityEventRepository.findActivityBreakdown(eq(WORKSPACE_ID), anySet(), eq(SINCE), eq(UNTIL))
             ).thenReturn(breakdown);
             when(
-                activityEventRepository.countPullRequestDiscussionCommentsByActors(
+                activityEventRepository.countOwnPullRequestRepliesByActors(
                     eq(WORKSPACE_ID),
                     anySet(),
                     eq(SINCE),
@@ -154,8 +209,8 @@ class LeaderboardXpQueryServiceTest {
             assertThat(data.approvals()).isEqualTo(3);
             assertThat(data.changeRequests()).isEqualTo(2);
             assertThat(data.comments()).isEqualTo(1);
-            assertThat(data.issueComments()).isEqualTo(1);
             assertThat(data.codeComments()).isEqualTo(1);
+            assertThat(data.ownReplies()).isEqualTo(1);
         }
 
         @Test
@@ -204,8 +259,41 @@ class LeaderboardXpQueryServiceTest {
                 )
             ).thenReturn(xpData);
             when(
-                activityEventRepository.findActivityBreakdown(eq(WORKSPACE_ID), anySet(), eq(SINCE), eq(UNTIL))
+                activityEventRepository.findActivityBreakdownByWorkspaceAndTeams(
+                    eq(WORKSPACE_ID),
+                    eq(teamIds),
+                    anySet(),
+                    eq(SINCE),
+                    eq(UNTIL)
+                )
             ).thenReturn(List.of());
+            when(
+                activityEventRepository.countOwnPullRequestRepliesByActorsAndTeams(
+                    eq(WORKSPACE_ID),
+                    eq(teamIds),
+                    anySet(),
+                    eq(SINCE),
+                    eq(UNTIL)
+                )
+            ).thenReturn(Map.of(100L, 2L));
+            when(
+                profilePullRequestQueryRepository.countOpenPullRequestsByAuthorsAndTeams(
+                    eq(WORKSPACE_ID),
+                    eq(teamIds),
+                    anySet(),
+                    eq(SINCE),
+                    eq(UNTIL)
+                )
+            ).thenReturn(List.of(authorCountProjection(100L, 1L)));
+            when(
+                activityEventRepository.countDistinctReviewedPullRequestsByActorsAndTeams(
+                    eq(WORKSPACE_ID),
+                    eq(teamIds),
+                    anySet(),
+                    eq(SINCE),
+                    eq(UNTIL)
+                )
+            ).thenReturn(Map.of(100L, 3L));
             when(userRepository.findAllById(Set.of(100L))).thenReturn(List.of(user));
 
             // Act
@@ -219,6 +307,9 @@ class LeaderboardXpQueryServiceTest {
                 SINCE,
                 UNTIL
             );
+            assertThat(result.get(100L).ownReplies()).isEqualTo(2);
+            assertThat(result.get(100L).openPullRequests()).isEqualTo(1);
+            assertThat(result.get(100L).reviewedPullRequestCount()).isEqualTo(3);
             verify(activityEventRepository, never()).findExperiencePointsByWorkspaceAndTimeframe(any(), any(), any());
         }
 
@@ -301,6 +392,20 @@ class LeaderboardXpQueryServiceTest {
             @Override
             public Double getExperiencePoints() {
                 return 0.0;
+            }
+        };
+    }
+
+    private ProfilePullRequestQueryRepository.AuthorCountProjection authorCountProjection(Long authorId, Long count) {
+        return new ProfilePullRequestQueryRepository.AuthorCountProjection() {
+            @Override
+            public Long getAuthorId() {
+                return authorId;
+            }
+
+            @Override
+            public Long getCount() {
+                return count;
             }
         };
     }

@@ -395,9 +395,7 @@ const profileSchemaResponseTransformer = (data: any) => {
     if (data.reviewActivity) {
         data.reviewActivity = data.reviewActivity.map((item: any) => profileReviewActivitySchemaResponseTransformer(item));
     }
-    if (data.reviewedPullRequests) {
-        data.reviewedPullRequests = data.reviewedPullRequests.map((item: any) => pullRequestInfoSchemaResponseTransformer(item));
-    }
+    data.reviewedPullRequests = data.reviewedPullRequests.map((item: any) => pullRequestInfoSchemaResponseTransformer(item));
     return data;
 };
 

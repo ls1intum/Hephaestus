@@ -21,7 +21,7 @@ import org.springframework.lang.NonNull;
  * <p>The score is read from the activity_event ledger (CQRS pattern).
  */
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
-@Schema(description = "A review activity entry with XP score for profile display")
+@Schema(description = "A scored review activity entry with XP score for profile display")
 public record ProfileReviewActivityDTO(
     @NonNull @Schema(description = "Unique identifier of the review") Long id,
     @NonNull @Schema(description = "Whether the review was dismissed") Boolean isDismissed,

@@ -19,9 +19,14 @@ import org.springframework.lang.NonNull;
  * @param changeRequests number of REVIEW_CHANGES_REQUESTED events
  * @param comments number of REVIEW_COMMENTED events
  * @param unknowns number of REVIEW_UNKNOWN events
- * @param issueComments number of COMMENT_CREATED events
- * @param codeComments number of REVIEW_COMMENT_CREATED events
+ * @param codeComments number of scored REVIEW_COMMENT_CREATED events on pull requests authored by someone else
  * @param reviewedPrCount number of DISTINCT pull requests reviewed (from separate query)
+ * @param ownReplies number of visible-only discussion replies and inline thread replies on the actor's own pull requests
+ * @param openPullRequests number of authored pull requests opened in timeframe that are still open
+ * @param mergedPullRequests number of authored pull requests merged in timeframe
+ * @param closedPullRequests number of authored pull requests closed without merge in timeframe
+ * @param openedIssues number of issues opened in timeframe
+ * @param closedIssues number of issues closed in timeframe
  */
 public record LeaderboardUserXp(
     @NonNull User user,
@@ -31,9 +36,14 @@ public record LeaderboardUserXp(
     int changeRequests,
     int comments,
     int unknowns,
-    int issueComments,
     int codeComments,
-    int reviewedPrCount
+    int reviewedPrCount,
+    int ownReplies,
+    int openPullRequests,
+    int mergedPullRequests,
+    int closedPullRequests,
+    int openedIssues,
+    int closedIssues
 ) {
     /**
      * Returns the count of unique pull requests reviewed.
@@ -62,9 +72,14 @@ public record LeaderboardUserXp(
         private int changeRequests = 0;
         private int comments = 0;
         private int unknowns = 0;
-        private int issueComments = 0;
         private int codeComments = 0;
         private int reviewedPrCount = 0;
+        private int ownReplies = 0;
+        private int openPullRequests = 0;
+        private int mergedPullRequests = 0;
+        private int closedPullRequests = 0;
+        private int openedIssues = 0;
+        private int closedIssues = 0;
 
         public Builder(User user, int totalScore, int eventCount) {
             this.user = user;
@@ -92,13 +107,38 @@ public record LeaderboardUserXp(
             return this;
         }
 
-        public Builder addIssueComments(int count) {
-            this.issueComments += count;
+        public Builder addCodeComments(int count) {
+            this.codeComments += count;
             return this;
         }
 
-        public Builder addCodeComments(int count) {
-            this.codeComments += count;
+        public Builder addOwnReplies(int count) {
+            this.ownReplies += count;
+            return this;
+        }
+
+        public Builder addOpenPullRequests(int count) {
+            this.openPullRequests += count;
+            return this;
+        }
+
+        public Builder addMergedPullRequests(int count) {
+            this.mergedPullRequests += count;
+            return this;
+        }
+
+        public Builder addClosedPullRequests(int count) {
+            this.closedPullRequests += count;
+            return this;
+        }
+
+        public Builder addOpenedIssues(int count) {
+            this.openedIssues += count;
+            return this;
+        }
+
+        public Builder addClosedIssues(int count) {
+            this.closedIssues += count;
             return this;
         }
 
@@ -116,9 +156,14 @@ public record LeaderboardUserXp(
                 changeRequests,
                 comments,
                 unknowns,
-                issueComments,
                 codeComments,
-                reviewedPrCount
+                reviewedPrCount,
+                ownReplies,
+                openPullRequests,
+                mergedPullRequests,
+                closedPullRequests,
+                openedIssues,
+                closedIssues
             );
         }
     }

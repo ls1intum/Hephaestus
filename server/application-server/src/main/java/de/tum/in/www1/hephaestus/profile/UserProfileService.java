@@ -155,7 +155,7 @@ public class UserProfileService {
             workspaceId == null
                 ? List.of()
                 : profilePullRequestQueryRepository
-                      .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
+                      .findAuthoredByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
                       .stream()
                       .map(PullRequestInfoDTO::fromPullRequest)
                       .toList();
@@ -187,9 +187,14 @@ public class UserProfileService {
                     .withNumberOfApprovals(stats.approvals())
                     .withNumberOfChangeRequests(stats.changeRequests())
                     .withNumberOfComments(stats.comments())
-                    .withNumberOfIssueComments(stats.issueComments())
                     .withNumberOfCodeComments(stats.codeComments())
                     .withNumberOfUnknowns(stats.unknowns())
+                    .withNumberOfOwnReplies(stats.ownReplies())
+                    .withNumberOfOpenPullRequests(stats.openPullRequests())
+                    .withNumberOfMergedPullRequests(stats.mergedPullRequests())
+                    .withNumberOfClosedPullRequests(stats.closedPullRequests())
+                    .withNumberOfOpenedIssues(stats.openedIssues())
+                    .withNumberOfClosedIssues(stats.closedIssues())
                     .build()
             )
             .orElse(ProfileActivityStatsDTO.empty());
@@ -350,7 +355,7 @@ public class UserProfileService {
                     }
                 } else if (ActivityTargetType.REVIEW_COMMENT.getValue().equals(event.getTargetType())) {
                     PullRequestReviewComment comment = reviewCommentsById.get(event.getTargetId());
-                    if (comment != null && isOwnPullRequestComment(comment)) {
+                    if (comment != null && !isOwnPullRequestComment(comment)) {
                         return reviewActivityAssembler.assemble(comment, xp);
                     }
                 }

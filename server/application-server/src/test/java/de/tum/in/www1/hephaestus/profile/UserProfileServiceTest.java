@@ -125,7 +125,7 @@ class UserProfileServiceTest {
             PullRequestReview review = createReview(400L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -175,7 +175,7 @@ class UserProfileServiceTest {
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -215,7 +215,7 @@ class UserProfileServiceTest {
             IssueComment comment = createIssueComment(500L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -271,7 +271,7 @@ class UserProfileServiceTest {
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -302,15 +302,16 @@ class UserProfileServiceTest {
         }
 
         @Test
-        @DisplayName("hydrates own pull request review comments from activity events")
-        void hydratesOwnPullRequestReviewCommentsFromActivityEvents() {
-            User user = createUser(USER_ID, USER_LOGIN);
+        @DisplayName("hydrates review comments on other users pull requests from activity events")
+        void hydratesReviewCommentsOnOtherUsersPullRequestsFromActivityEvents() {
+            User actor = createUser(USER_ID, USER_LOGIN);
+            User prAuthor = createUser(99L, "pr-author");
             Repository repo = createRepository(200L);
-            PullRequest pr = createPullRequest(300L, user, repo);
-            PullRequestReviewComment reviewComment = createReviewComment(600L, user, pr);
+            PullRequest pr = createPullRequest(300L, prAuthor, repo);
+            PullRequestReviewComment reviewComment = createReviewComment(600L, actor, pr);
 
-            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(actor));
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -337,7 +338,6 @@ class UserProfileServiceTest {
             when(reviewActivityAssembler.assemble(eq(reviewComment), eq(0))).thenReturn(
                 createProfileReviewDTO(600L, 0)
             );
-
             Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
 
             assertThat(result).isPresent();
@@ -347,16 +347,15 @@ class UserProfileServiceTest {
         }
 
         @Test
-        @DisplayName("skips review comments on other users pull requests")
-        void skipsReviewCommentsOnOtherUsersPullRequests() {
-            User actor = createUser(USER_ID, USER_LOGIN);
-            User prAuthor = createUser(99L, "pr-author");
+        @DisplayName("skips own pull request review comments from scored activity feed")
+        void skipsOwnPullRequestReviewCommentsFromScoredActivityFeed() {
+            User user = createUser(USER_ID, USER_LOGIN);
             Repository repo = createRepository(200L);
-            PullRequest pr = createPullRequest(300L, prAuthor, repo);
-            PullRequestReviewComment reviewComment = createReviewComment(600L, actor, pr);
+            PullRequest pr = createPullRequest(300L, user, repo);
+            PullRequestReviewComment reviewComment = createReviewComment(600L, user, pr);
 
-            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(actor));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -386,7 +385,7 @@ class UserProfileServiceTest {
             assertThat(result).isPresent();
             assertThat(result.get().reviewActivity()).isEmpty();
             verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(600L));
-            verify(reviewActivityAssembler, never()).assemble(eq(reviewComment), anyInt());
+            verify(reviewActivityAssembler, never()).assemble(eq(reviewComment), eq(0));
         }
 
         @Test
@@ -398,7 +397,7 @@ class UserProfileServiceTest {
             IssueComment comment = createIssueComment(500L, user, issue);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -439,7 +438,7 @@ class UserProfileServiceTest {
             PullRequestReviewComment reviewComment = createReviewComment(700L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -473,18 +472,16 @@ class UserProfileServiceTest {
             );
 
             ProfileReviewActivityDTO issueCommentDto = createProfileReviewDTO(700L, 0);
-            ProfileReviewActivityDTO reviewCommentDto = createProfileReviewDTO(700L, 0);
             when(reviewActivityAssembler.assemble(eq(issueComment), eq(0))).thenReturn(issueCommentDto);
-            when(reviewActivityAssembler.assemble(eq(reviewComment), eq(0))).thenReturn(reviewCommentDto);
 
             Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
 
             assertThat(result).isPresent();
-            assertThat(result.get().reviewActivity()).hasSize(2);
+            assertThat(result.get().reviewActivity()).hasSize(1);
             verify(issueCommentRepository).findAllByIdWithRelations(Set.of(700L));
             verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(700L));
             verify(reviewActivityAssembler).assemble(eq(issueComment), eq(0));
-            verify(reviewActivityAssembler).assemble(eq(reviewComment), eq(0));
+            verify(reviewActivityAssembler, never()).assemble(eq(reviewComment), eq(0));
         }
     }
 

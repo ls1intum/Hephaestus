@@ -109,8 +109,14 @@ export function LeaderboardTable({
 										reviewedPullRequests={entry.reviewedPullRequests}
 										changeRequests={entry.numberOfChangeRequests}
 										approvals={entry.numberOfApprovals}
-										comments={entry.numberOfComments + entry.numberOfUnknowns}
+										comments={entry.numberOfComments}
 										codeComments={entry.numberOfCodeComments}
+										ownReplies={entry.numberOfOwnReplies}
+										openPullRequests={entry.numberOfOpenPullRequests}
+										mergedPullRequests={entry.numberOfMergedPullRequests}
+										closedPullRequests={entry.numberOfClosedPullRequests}
+										openedIssues={entry.numberOfOpenedIssues}
+										closedIssues={entry.numberOfClosedIssues}
 										providerType={providerType}
 									/>
 								</TableCell>
@@ -161,8 +167,14 @@ export function LeaderboardTable({
 									reviewedPullRequests={entry.reviewedPullRequests}
 									changeRequests={entry.numberOfChangeRequests}
 									approvals={entry.numberOfApprovals}
-									comments={entry.numberOfComments + entry.numberOfUnknowns}
+									comments={entry.numberOfComments}
 									codeComments={entry.numberOfCodeComments}
+									ownReplies={entry.numberOfOwnReplies}
+									openPullRequests={entry.numberOfOpenPullRequests}
+									mergedPullRequests={entry.numberOfMergedPullRequests}
+									closedPullRequests={entry.numberOfClosedPullRequests}
+									openedIssues={entry.numberOfOpenedIssues}
+									closedIssues={entry.numberOfClosedIssues}
 									providerType={providerType}
 									highlightReviews={isCurrentUser}
 								/>

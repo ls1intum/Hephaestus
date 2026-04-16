@@ -885,7 +885,7 @@ export type ProfileXpRecord = {
 };
 
 /**
- * A review activity entry with XP score for profile display
+ * A scored review activity entry with XP score for profile display
  */
 export type ProfileReviewActivity = {
     /**
@@ -939,17 +939,37 @@ export type ProfileActivityStats = {
      */
     numberOfChangeRequests?: number;
     /**
-     * Number of inline code review comments
+     * Number of issues closed in the timeframe
+     */
+    numberOfClosedIssues?: number;
+    /**
+     * Number of authored pull requests closed without merge in the timeframe
+     */
+    numberOfClosedPullRequests?: number;
+    /**
+     * Number of scored inline feedback comments on pull requests authored by someone else
      */
     numberOfCodeComments?: number;
     /**
-     * Number of review comments (COMMENTED state)
+     * Number of comment-only review submissions
      */
     numberOfComments?: number;
     /**
-     * Number of issue comments on pull requests
+     * Number of authored pull requests merged in the timeframe
      */
-    numberOfIssueComments?: number;
+    numberOfMergedPullRequests?: number;
+    /**
+     * Number of authored pull requests opened in the timeframe that are still open
+     */
+    numberOfOpenPullRequests?: number;
+    /**
+     * Number of issues opened in the timeframe
+     */
+    numberOfOpenedIssues?: number;
+    /**
+     * Number of visible-only discussion replies and inline thread replies on the user's own pull requests
+     */
+    numberOfOwnReplies?: number;
     /**
      * Number of distinct pull requests reviewed
      */
@@ -971,7 +991,7 @@ export type Profile = {
     /**
      * Aggregated activity stats consistent with leaderboard calculations
      */
-    activityStats?: ProfileActivityStats;
+    activityStats: ProfileActivityStats;
     /**
      * Repositories the user has contributed to
      */
@@ -985,13 +1005,13 @@ export type Profile = {
      */
     openPullRequests?: Array<PullRequestInfo>;
     /**
-     * Recent review activity with XP scores
+     * Recent scored review activity with XP scores
      */
     reviewActivity?: Array<ProfileReviewActivity>;
     /**
      * Distinct pull requests reviewed by this user
      */
-    reviewedPullRequests?: Array<PullRequestInfo>;
+    reviewedPullRequests: Array<PullRequestInfo>;
     /**
      * Basic information about the user
      */
@@ -1359,13 +1379,37 @@ export type LeaderboardEntry = {
      */
     numberOfChangeRequests: number;
     /**
-     * Count of inline code review comments
+     * Count of issues closed in the timeframe
+     */
+    numberOfClosedIssues: number;
+    /**
+     * Count of authored pull requests closed without merge in the timeframe
+     */
+    numberOfClosedPullRequests: number;
+    /**
+     * Count of scored inline feedback comments on pull requests authored by someone else
      */
     numberOfCodeComments: number;
     /**
-     * Count of review and issue comments
+     * Count of comment-only review submissions
      */
     numberOfComments: number;
+    /**
+     * Count of authored pull requests merged in the timeframe
+     */
+    numberOfMergedPullRequests: number;
+    /**
+     * Count of authored pull requests opened in the timeframe that are still open
+     */
+    numberOfOpenPullRequests: number;
+    /**
+     * Count of issues opened in the timeframe
+     */
+    numberOfOpenedIssues: number;
+    /**
+     * Count of visible-only discussion replies and inline thread replies on the contributor's own pull requests
+     */
+    numberOfOwnReplies: number;
     /**
      * Count of distinct PRs reviewed
      */

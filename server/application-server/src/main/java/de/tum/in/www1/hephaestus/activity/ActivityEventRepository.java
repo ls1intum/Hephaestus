@@ -128,11 +128,14 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
                SUM(e.xp) as totalExperiencePoints,
                COUNT(e) as eventCount
         FROM ActivityEvent e
-        JOIN e.actor.teamMemberships tm
         WHERE e.workspace.id = :workspaceId
         AND e.actor IS NOT NULL
         AND e.actor.type = de.tum.in.www1.hephaestus.gitprovider.user.User$Type.USER
-        AND tm.team.id IN :teamIds
+        AND EXISTS (
+            SELECT 1 FROM TeamMembership tm
+            WHERE tm.user = e.actor
+            AND tm.team.id IN :teamIds
+        )
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
         AND (e.repository IS NULL OR EXISTS (
@@ -204,6 +207,12 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.actor.type = de.tum.in.www1.hephaestus.gitprovider.user.User$Type.USER
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
+        AND NOT EXISTS (
+            SELECT 1 FROM PullRequestReviewComment prrc
+            WHERE prrc.id = e.targetId
+            AND e.targetType = 'review_comment'
+            AND prrc.author.id = prrc.pullRequest.author.id
+        )
         GROUP BY e.actor.id, e.eventType
         """
     )
@@ -227,27 +236,247 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.eventType = de.tum.in.www1.hephaestus.activity.ActivityEventType.COMMENT_CREATED
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
+        AND c.author.id = pr.author.id
         GROUP BY e.actor.id
         """
     )
-    List<ActorCountProjection> findPullRequestDiscussionCommentCounts(
+    List<ActorCountProjection> findOwnPullRequestConversationReplyCounts(
         @Param("workspaceId") Long workspaceId,
         @Param("actorIds") Set<Long> actorIds,
         @Param("since") Instant since,
         @Param("until") Instant until
     );
 
-    default Map<Long, Long> countPullRequestDiscussionCommentsByActors(
+    @Query(
+        """
+        SELECT e.actor.id as actorId, COUNT(e) as count
+        FROM ActivityEvent e
+        JOIN PullRequestReviewComment c ON c.id = e.targetId
+        JOIN PullRequest pr ON pr.id = c.pullRequest.id
+        WHERE e.workspace.id = :workspaceId
+        AND e.actor.id IN :actorIds
+        AND e.actor.type = de.tum.in.www1.hephaestus.gitprovider.user.User$Type.USER
+        AND e.targetType = 'review_comment'
+        AND e.eventType = de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_COMMENT_CREATED
+        AND e.occurredAt >= :since
+        AND e.occurredAt < :until
+        AND c.author.id = pr.author.id
+        GROUP BY e.actor.id
+        """
+    )
+    List<ActorCountProjection> findOwnPullRequestInlineReplyCounts(
+        @Param("workspaceId") Long workspaceId,
+        @Param("actorIds") Set<Long> actorIds,
+        @Param("since") Instant since,
+        @Param("until") Instant until
+    );
+
+    default Map<Long, Long> countOwnPullRequestRepliesByActors(
         Long workspaceId,
         Set<Long> actorIds,
         Instant since,
         Instant until
     ) {
-        return findPullRequestDiscussionCommentCounts(workspaceId, actorIds, since, until)
-            .stream()
-            .collect(
-                java.util.stream.Collectors.toMap(ActorCountProjection::getActorId, ActorCountProjection::getCount)
-            );
+        Map<Long, Long> counts = new java.util.HashMap<>();
+        for (ActorCountProjection projection : findOwnPullRequestConversationReplyCounts(
+            workspaceId,
+            actorIds,
+            since,
+            until
+        )) {
+            counts.merge(projection.getActorId(), projection.getCount(), Long::sum);
+        }
+        for (ActorCountProjection projection : findOwnPullRequestInlineReplyCounts(
+            workspaceId,
+            actorIds,
+            since,
+            until
+        )) {
+            counts.merge(projection.getActorId(), projection.getCount(), Long::sum);
+        }
+        return counts;
+    }
+
+    @Query(
+        """
+        SELECT e.actor.id as actorId,
+               e.eventType as eventType,
+               COUNT(e) as count,
+               SUM(e.xp) as experiencePoints
+        FROM ActivityEvent e
+        WHERE e.workspace.id = :workspaceId
+        AND e.actor.id IN :actorIds
+        AND e.actor.type = de.tum.in.www1.hephaestus.gitprovider.user.User$Type.USER
+        AND EXISTS (
+            SELECT 1 FROM TeamMembership tm
+            WHERE tm.user = e.actor
+            AND tm.team.id IN :teamIds
+        )
+        AND e.occurredAt >= :since
+        AND e.occurredAt < :until
+        AND (e.repository IS NULL OR EXISTS (
+            SELECT 1 FROM TeamRepositoryPermission trp
+            WHERE trp.repository = e.repository
+            AND trp.team.id IN :teamIds
+        ))
+        AND (e.repository IS NULL OR NOT EXISTS (
+            SELECT 1 FROM WorkspaceTeamRepositorySettings wtrs
+            WHERE wtrs.repository = e.repository
+            AND wtrs.workspace.id = :workspaceId
+            AND wtrs.team.id IN :teamIds
+            AND wtrs.hiddenFromContributions = true
+        ))
+        AND (
+            e.targetType <> 'review'
+            OR EXISTS (
+                SELECT 1 FROM PullRequestReview prr
+                WHERE prr.id = e.targetId
+                AND (
+                    NOT EXISTS (
+                        SELECT 1 FROM WorkspaceTeamLabelFilter wtlf
+                        WHERE wtlf.workspace.id = :workspaceId
+                        AND wtlf.team.id IN :teamIds
+                        AND wtlf.label.repository = prr.pullRequest.repository
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM WorkspaceTeamLabelFilter wtlf
+                        JOIN wtlf.label lbl
+                        WHERE wtlf.workspace.id = :workspaceId
+                        AND wtlf.team.id IN :teamIds
+                        AND wtlf.label.repository = prr.pullRequest.repository
+                        AND lbl MEMBER OF prr.pullRequest.labels
+                    )
+                )
+            )
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM PullRequestReviewComment prrc
+            WHERE prrc.id = e.targetId
+            AND e.targetType = 'review_comment'
+            AND prrc.author.id = prrc.pullRequest.author.id
+        )
+        GROUP BY e.actor.id, e.eventType
+        """
+    )
+    List<ActivityBreakdownProjection> findActivityBreakdownByWorkspaceAndTeams(
+        @Param("workspaceId") Long workspaceId,
+        @Param("teamIds") Set<Long> teamIds,
+        @Param("actorIds") Set<Long> actorIds,
+        @Param("since") Instant since,
+        @Param("until") Instant until
+    );
+
+    @Query(
+        """
+        SELECT e.actor.id as actorId, COUNT(e) as count
+        FROM ActivityEvent e
+        JOIN IssueComment c ON c.id = e.targetId
+        JOIN PullRequest pr ON pr.id = c.issue.id
+        WHERE e.workspace.id = :workspaceId
+        AND e.actor.id IN :actorIds
+        AND e.actor.type = de.tum.in.www1.hephaestus.gitprovider.user.User$Type.USER
+        AND EXISTS (
+            SELECT 1 FROM TeamMembership tm
+            WHERE tm.user = e.actor
+            AND tm.team.id IN :teamIds
+        )
+        AND e.targetType = 'issue_comment'
+        AND e.eventType = de.tum.in.www1.hephaestus.activity.ActivityEventType.COMMENT_CREATED
+        AND e.occurredAt >= :since
+        AND e.occurredAt < :until
+        AND c.author.id = pr.author.id
+        AND EXISTS (
+            SELECT 1 FROM TeamRepositoryPermission trp
+            WHERE trp.repository = pr.repository
+            AND trp.team.id IN :teamIds
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM WorkspaceTeamRepositorySettings wtrs
+            WHERE wtrs.repository = pr.repository
+            AND wtrs.workspace.id = :workspaceId
+            AND wtrs.team.id IN :teamIds
+            AND wtrs.hiddenFromContributions = true
+        )
+        GROUP BY e.actor.id
+        """
+    )
+    List<ActorCountProjection> findOwnPullRequestConversationReplyCountsByTeams(
+        @Param("workspaceId") Long workspaceId,
+        @Param("teamIds") Set<Long> teamIds,
+        @Param("actorIds") Set<Long> actorIds,
+        @Param("since") Instant since,
+        @Param("until") Instant until
+    );
+
+    @Query(
+        """
+        SELECT e.actor.id as actorId, COUNT(e) as count
+        FROM ActivityEvent e
+        JOIN PullRequestReviewComment c ON c.id = e.targetId
+        JOIN PullRequest pr ON pr.id = c.pullRequest.id
+        WHERE e.workspace.id = :workspaceId
+        AND e.actor.id IN :actorIds
+        AND e.actor.type = de.tum.in.www1.hephaestus.gitprovider.user.User$Type.USER
+        AND EXISTS (
+            SELECT 1 FROM TeamMembership tm
+            WHERE tm.user = e.actor
+            AND tm.team.id IN :teamIds
+        )
+        AND e.targetType = 'review_comment'
+        AND e.eventType = de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_COMMENT_CREATED
+        AND e.occurredAt >= :since
+        AND e.occurredAt < :until
+        AND c.author.id = pr.author.id
+        AND EXISTS (
+            SELECT 1 FROM TeamRepositoryPermission trp
+            WHERE trp.repository = pr.repository
+            AND trp.team.id IN :teamIds
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM WorkspaceTeamRepositorySettings wtrs
+            WHERE wtrs.repository = pr.repository
+            AND wtrs.workspace.id = :workspaceId
+            AND wtrs.team.id IN :teamIds
+            AND wtrs.hiddenFromContributions = true
+        )
+        GROUP BY e.actor.id
+        """
+    )
+    List<ActorCountProjection> findOwnPullRequestInlineReplyCountsByTeams(
+        @Param("workspaceId") Long workspaceId,
+        @Param("teamIds") Set<Long> teamIds,
+        @Param("actorIds") Set<Long> actorIds,
+        @Param("since") Instant since,
+        @Param("until") Instant until
+    );
+
+    default Map<Long, Long> countOwnPullRequestRepliesByActorsAndTeams(
+        Long workspaceId,
+        Set<Long> teamIds,
+        Set<Long> actorIds,
+        Instant since,
+        Instant until
+    ) {
+        Map<Long, Long> counts = new java.util.HashMap<>();
+        for (ActorCountProjection projection : findOwnPullRequestConversationReplyCountsByTeams(
+            workspaceId,
+            teamIds,
+            actorIds,
+            since,
+            until
+        )) {
+            counts.merge(projection.getActorId(), projection.getCount(), Long::sum);
+        }
+        for (ActorCountProjection projection : findOwnPullRequestInlineReplyCountsByTeams(
+            workspaceId,
+            teamIds,
+            actorIds,
+            since,
+            until
+        )) {
+            counts.merge(projection.getActorId(), projection.getCount(), Long::sum);
+        }
+        return counts;
     }
 
     /**
@@ -306,6 +535,86 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         Instant until
     ) {
         return findDistinctReviewedPullRequestCountsByActors(workspaceId, actorIds, since, until)
+            .stream()
+            .collect(
+                java.util.stream.Collectors.toMap(
+                    DistinctPrCountProjection::getActorId,
+                    DistinctPrCountProjection::getPrCount
+                )
+            );
+    }
+
+    @Query(
+        """
+        SELECT e.actor.id as actorId, COUNT(DISTINCT r.pullRequest.id) as prCount
+        FROM ActivityEvent e
+        JOIN PullRequestReview r ON r.id = e.targetId
+        WHERE e.workspace.id = :workspaceId
+        AND e.actor.id IN :actorIds
+        AND e.actor.type = de.tum.in.www1.hephaestus.gitprovider.user.User$Type.USER
+        AND EXISTS (
+            SELECT 1 FROM TeamMembership tm
+            WHERE tm.user = e.actor
+            AND tm.team.id IN :teamIds
+        )
+        AND e.targetType = 'review'
+        AND e.eventType IN (
+            de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_APPROVED,
+            de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_COMMENTED,
+            de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_UNKNOWN
+        )
+        AND e.occurredAt >= :since
+        AND e.occurredAt < :until
+        AND (r.pullRequest.author IS NULL OR r.pullRequest.author.id <> e.actor.id)
+        AND EXISTS (
+            SELECT 1 FROM TeamRepositoryPermission trp
+            WHERE trp.repository = r.pullRequest.repository
+            AND trp.team.id IN :teamIds
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM WorkspaceTeamRepositorySettings wtrs
+            WHERE wtrs.repository = r.pullRequest.repository
+            AND wtrs.workspace.id = :workspaceId
+            AND wtrs.team.id IN :teamIds
+            AND wtrs.hiddenFromContributions = true
+        )
+        AND (
+            NOT EXISTS (
+                SELECT 1 FROM WorkspaceTeamLabelFilter wtlf
+                JOIN wtlf.label l
+                WHERE wtlf.workspace.id = :workspaceId
+                AND wtlf.team.id IN :teamIds
+                AND l.repository = r.pullRequest.repository
+            )
+            OR EXISTS (
+                SELECT 1 FROM WorkspaceTeamLabelFilter wtlf
+                JOIN wtlf.label l
+                WHERE wtlf.workspace.id = :workspaceId
+                AND wtlf.team.id IN :teamIds
+                AND l.repository = r.pullRequest.repository
+                AND l MEMBER OF r.pullRequest.labels
+            )
+        )
+        GROUP BY e.actor.id
+        """
+    )
+    List<DistinctPrCountProjection> findDistinctReviewedPullRequestCountsByActorsAndTeams(
+        @Param("workspaceId") Long workspaceId,
+        @Param("teamIds") Set<Long> teamIds,
+        @Param("actorIds") Set<Long> actorIds,
+        @Param("since") Instant since,
+        @Param("until") Instant until
+    );
+
+    default Map<Long, Long> countDistinctReviewedPullRequestsByActorsAndTeams(
+        Long workspaceId,
+        Set<Long> teamIds,
+        Set<Long> actorIds,
+        Instant since,
+        Instant until
+    ) {
+        return findDistinctReviewedPullRequestCountsByActorsAndTeams(workspaceId, teamIds, actorIds, since, until)
             .stream()
             .collect(
                 java.util.stream.Collectors.toMap(

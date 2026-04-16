@@ -38,6 +38,7 @@ export function ProfileContent({
 	providerType = "GITHUB",
 	reviewActivity = [],
 	openPullRequests = [],
+	activityStats,
 	reviewedPullRequests,
 	isLoading,
 	username,
@@ -57,40 +58,7 @@ export function ProfileContent({
 
 	const displayPullRequests = isLoading ? skeletonPullRequests : openPullRequests;
 
-	// Normalized stats interface for ActivityBadges
-	interface NormalizedStats {
-		approvals: number;
-		changeRequests: number;
-		comments: number;
-		codeComments: number;
-	}
-
-	// Compute stats from activity data as fallback when server stats not available
-	const computeStatsFromActivity = (activities: ProfileReviewActivity[]): NormalizedStats =>
-		activities.reduce(
-			(acc, activity) => {
-				acc.codeComments += activity.codeComments ?? 0;
-				switch (activity.state) {
-					case "APPROVED":
-						acc.approvals += 1;
-						break;
-					case "CHANGES_REQUESTED":
-						acc.changeRequests += 1;
-						break;
-					default:
-						acc.comments += 1;
-				}
-				return acc;
-			},
-			{
-				approvals: 0,
-				changeRequests: 0,
-				comments: 0,
-				codeComments: 0,
-			},
-		);
-
-	const activityStatsForFeed = computeStatsFromActivity(reviewActivity ?? []);
+	const activityStatsForFeed = activityStats;
 	const terms = getProviderTerms(providerType);
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
@@ -116,17 +84,27 @@ export function ProfileContent({
 				<div className="flex flex-col gap-4">
 					<div className="flex flex-col gap-1">
 						<div className="flex flex-wrap items-center gap-3">
-							<h3 className="text-lg font-semibold">{terms.pullRequests} activity</h3>
+							<h3 className="text-lg font-semibold">Review activity</h3>
 							<ActivityBadges
 								reviewedPullRequests={reviewedPullRequestsForPopover}
-								approvals={activityStatsForFeed.approvals}
-								changeRequests={activityStatsForFeed.changeRequests}
-								comments={activityStatsForFeed.comments}
-								codeComments={activityStatsForFeed.codeComments}
+								approvals={activityStatsForFeed?.numberOfApprovals ?? 0}
+								changeRequests={activityStatsForFeed?.numberOfChangeRequests ?? 0}
+								comments={activityStatsForFeed?.numberOfComments ?? 0}
+								codeComments={activityStatsForFeed?.numberOfCodeComments ?? 0}
+								ownReplies={activityStatsForFeed?.numberOfOwnReplies ?? 0}
+								openPullRequests={activityStatsForFeed?.numberOfOpenPullRequests ?? 0}
+								mergedPullRequests={activityStatsForFeed?.numberOfMergedPullRequests ?? 0}
+								closedPullRequests={activityStatsForFeed?.numberOfClosedPullRequests ?? 0}
+								openedIssues={activityStatsForFeed?.numberOfOpenedIssues ?? 0}
+								closedIssues={activityStatsForFeed?.numberOfClosedIssues ?? 0}
 								isLoading={isLoading}
 								providerType={providerType}
 							/>
 						</div>
+						<p className="text-sm text-provider-muted-foreground">
+							This feed lists scored review activity. Additional badges summarize authored work and
+							collaboration that stay visible without affecting score.
+						</p>
 					</div>
 					<div className="flex flex-col gap-2 m-1">
 						{filteredReviewActivity.length > 0 ? (
@@ -146,11 +124,11 @@ export function ProfileContent({
 						) : (
 							<EmptyState
 								icon={CodeReviewIcon}
-								title={`No ${terms.pullRequests.toLowerCase()} activity`}
+								title="No review activity"
 								description={
 									currUserIsDashboardUser
-										? `No ${terms.pullRequests.toLowerCase()} activity in this timeframe. Try expanding the filter.`
-										: `${displayName || username} has no ${terms.pullRequests.toLowerCase()} activity in this timeframe.`
+										? `No scored review activity in this timeframe. Try expanding the filter.`
+										: `${displayName || username} has no scored review activity in this timeframe.`
 								}
 							/>
 						)}

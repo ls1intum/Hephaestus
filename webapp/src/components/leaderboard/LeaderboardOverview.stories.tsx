@@ -54,6 +54,12 @@ const mockLeaderboardEntry = {
 	numberOfComments: 2,
 	numberOfUnknowns: 0,
 	numberOfCodeComments: 3,
+	numberOfOwnReplies: 2,
+	numberOfOpenPullRequests: 1,
+	numberOfMergedPullRequests: 4,
+	numberOfClosedPullRequests: 1,
+	numberOfOpenedIssues: 3,
+	numberOfClosedIssues: 2,
 };
 
 /**
