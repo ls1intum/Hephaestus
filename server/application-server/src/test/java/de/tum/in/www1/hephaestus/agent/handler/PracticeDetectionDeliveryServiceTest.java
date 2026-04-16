@@ -23,7 +23,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
-import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
@@ -73,12 +72,10 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        var properties = new PracticeDetectionProperties(5, 100);
         service = new PracticeDetectionDeliveryService(
             practiceRepository,
             practiceFindingRepository,
             pullRequestRepository,
-            properties,
             eventPublisher,
             objectMapper
         );
@@ -150,7 +147,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             assertThat(result.inserted()).isEqualTo(1);
             assertThat(result.discardedUnknownSlug()).isZero();
-            assertThat(result.discardedOverCap()).isZero();
             assertThat(result.discardedDuplicate()).isZero();
 
             verify(practiceFindingRepository).insertIfAbsent(
@@ -281,26 +277,12 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Negative cap")
-    class NegativeCap {
+    @DisplayName("Multiple negatives")
+    class MultipleNegatives {
 
         @Test
-        @DisplayName("allows up to cap negatives per practice")
-        void upToCapAllowed() {
-            var findings = new java.util.ArrayList<ValidatedFinding>();
-            for (int i = 0; i < 5; i++) {
-                findings.add(validFinding("pr-description-quality", Verdict.NEGATIVE));
-            }
-
-            var result = service.deliver(testJob, findings);
-
-            assertThat(result.inserted()).isEqualTo(5);
-            assertThat(result.discardedOverCap()).isZero();
-        }
-
-        @Test
-        @DisplayName("discards negatives beyond cap")
-        void beyondCapDiscarded() {
+        @DisplayName("persists all negative findings for a practice")
+        void persistsAllNegativesForPractice() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
                 findings.add(validFinding("pr-description-quality", Verdict.NEGATIVE));
@@ -308,13 +290,13 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             var result = service.deliver(testJob, findings);
 
-            assertThat(result.inserted()).isEqualTo(5);
-            assertThat(result.discardedOverCap()).isEqualTo(2);
+            assertThat(result.inserted()).isEqualTo(7);
+            assertThat(result.discardedDuplicate()).isZero();
         }
 
         @Test
-        @DisplayName("does not cap POSITIVE findings")
-        void positiveNotCapped() {
+        @DisplayName("persists many POSITIVE findings")
+        void persistsManyPositiveFindings() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 10; i++) {
                 findings.add(validFinding("pr-description-quality", Verdict.POSITIVE));
@@ -323,12 +305,12 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             var result = service.deliver(testJob, findings);
 
             assertThat(result.inserted()).isEqualTo(10);
-            assertThat(result.discardedOverCap()).isZero();
+            assertThat(result.discardedDuplicate()).isZero();
         }
 
         @Test
-        @DisplayName("caps negatives independently per practice")
-        void independentCapsPerPractice() {
+        @DisplayName("persists negatives independently per practice")
+        void persistsNegativesIndependentlyPerPractice() {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
@@ -337,7 +319,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             );
 
             var findings = new java.util.ArrayList<ValidatedFinding>();
-            // 5 negatives for each practice — both should be fully allowed
             for (int i = 0; i < 5; i++) {
                 findings.add(validFinding("pr-description-quality", Verdict.NEGATIVE));
                 findings.add(validFinding("error-handling", Verdict.NEGATIVE));
@@ -346,7 +327,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             var result = service.deliver(testJob, findings);
 
             assertThat(result.inserted()).isEqualTo(10);
-            assertThat(result.discardedOverCap()).isZero();
         }
     }
 
@@ -366,10 +346,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("NOT_APPLICABLE is not subject to negative cap")
-        void notApplicableNotCapped() {
+        @DisplayName("persists many NOT_APPLICABLE findings")
+        void persistsManyNotApplicableFindings() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
-            // 10 NOT_APPLICABLE — none should be capped (cap only applies to NEGATIVE)
             for (int i = 0; i < 10; i++) {
                 findings.add(validFinding("pr-description-quality", Verdict.NOT_APPLICABLE));
             }
@@ -377,7 +356,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             var result = service.deliver(testJob, findings);
 
             assertThat(result.inserted()).isEqualTo(10);
-            assertThat(result.discardedOverCap()).isZero();
         }
     }
 

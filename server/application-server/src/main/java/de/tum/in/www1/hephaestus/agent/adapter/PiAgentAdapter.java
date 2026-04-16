@@ -180,9 +180,9 @@ public class PiAgentAdapter implements AgentAdapter {
     /**
      * Parse the Pi agent output from the sandbox result.
      *
-     * <p>The Pi agent writes findings to {@code .output/result.json} via its {@code write} tool.
-     * The runner script may also capture stdout as a fallback. This method tries the file first,
-     * then falls back to extracting JSON from mixed text content.
+     * <p>The Pi runner persists structured review state incrementally and composes
+     * {@code .output/result.json} from that state. This method prefers the composed result file,
+     * then falls back to rebuilding it from {@code review-state.json} if needed.
      *
      * <p>Additionally sanitizes invalid JSON escapes from Swift string interpolation
      * ({@code \(variable)}) which produces invalid {@code \(} sequences in JSON strings.
@@ -197,6 +197,9 @@ public class PiAgentAdapter implements AgentAdapter {
         addRunnerDebug(output, sandboxResult.outputFiles().get("runner-debug.json"));
 
         byte[] resultFile = sandboxResult.outputFiles().get("result.json");
+        if (resultFile == null) {
+            resultFile = buildResultFromReviewState(sandboxResult.outputFiles().get("review-state.json"));
+        }
         if (resultFile == null) {
             return new AgentResult(success, output, usage);
         }
@@ -271,6 +274,36 @@ public class PiAgentAdapter implements AgentAdapter {
             output.put("runnerDebug", objectMapper.readValue(runnerDebugFile, Object.class));
         } catch (Exception e) {
             log.warn("Failed to parse Pi runner debug output", e);
+        }
+    }
+
+    private byte[] buildResultFromReviewState(byte[] reviewStateFile) {
+        if (reviewStateFile == null || reviewStateFile.length == 0) {
+            return null;
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(reviewStateFile);
+            JsonNode findings = root.get("findings");
+            if (findings == null || !findings.isArray() || findings.isEmpty()) {
+                return null;
+            }
+
+            Map<String, Object> assembled = new LinkedHashMap<>();
+            assembled.put("findings", objectMapper.treeToValue(findings, Object.class));
+
+            JsonNode delivery = root.get("delivery");
+            if (delivery != null && delivery.isObject()) {
+                JsonNode mrNote = delivery.get("mrNote");
+                if (mrNote != null && mrNote.isTextual() && !mrNote.asText().isBlank()) {
+                    assembled.put("delivery", Map.of("mrNote", mrNote.asText()));
+                }
+            }
+
+            return objectMapper.writeValueAsBytes(assembled);
+        } catch (Exception e) {
+            log.warn("Failed to rebuild Pi result from durable review state", e);
+            return null;
         }
     }
 

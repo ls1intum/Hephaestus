@@ -81,7 +81,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        resultParser = new PracticeDetectionResultParser(objectMapper, 100);
+        resultParser = new PracticeDetectionResultParser(objectMapper);
         handler = new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,
@@ -831,7 +831,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0, false));
+            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, false));
 
             handler.deliver(job);
 
@@ -958,7 +958,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0, false));
+            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, false));
 
             handler.deliver(job);
 
@@ -988,7 +988,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0, true));
+            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, true));
 
             handler.deliver(job);
 
@@ -1015,7 +1015,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0, false));
+            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, false));
 
             handler.deliver(job);
 
