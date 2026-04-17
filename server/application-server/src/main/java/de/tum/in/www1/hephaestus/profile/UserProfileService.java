@@ -171,11 +171,7 @@ public class UserProfileService {
                       .toList();
 
         // Review activity uses ActivityEvent as the source of truth, then hydrates git entities.
-        List<ProfileReviewActivityDTO> reviewActivity = buildReviewActivity(
-            userEntity.getId(),
-            workspaceId,
-            timeRange
-        );
+        List<ProfileReviewActivityDTO> reviewActivity = buildReviewActivity(userEntity.getId(), workspaceId, timeRange);
 
         // Activity stats from activity events (matches leaderboard semantics)
         ProfileActivityStatsDTO activityStats = profileActivityQueryService.getActivityStats(

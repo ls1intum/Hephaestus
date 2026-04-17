@@ -538,12 +538,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     ) {
         return findDistinctReviewedPullRequestCountsByActors(workspaceId, actorIds, since, until)
             .stream()
-            .collect(
-                Collectors.toMap(
-                    DistinctPrCountProjection::getActorId,
-                    DistinctPrCountProjection::getPrCount
-                )
-            );
+            .collect(Collectors.toMap(DistinctPrCountProjection::getActorId, DistinctPrCountProjection::getPrCount));
     }
 
     @Query(
@@ -618,12 +613,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     ) {
         return findDistinctReviewedPullRequestCountsByActorsAndTeams(workspaceId, teamIds, actorIds, since, until)
             .stream()
-            .collect(
-                Collectors.toMap(
-                    DistinctPrCountProjection::getActorId,
-                    DistinctPrCountProjection::getPrCount
-                )
-            );
+            .collect(Collectors.toMap(DistinctPrCountProjection::getActorId, DistinctPrCountProjection::getPrCount));
     }
 
     /**
@@ -748,10 +738,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         Set<Long> targetIds,
         Set<ActivityTargetType> targetTypes
     ) {
-        Set<String> typeValues = targetTypes
-            .stream()
-            .map(ActivityTargetType::getValue)
-            .collect(Collectors.toSet());
+        Set<String> typeValues = targetTypes.stream().map(ActivityTargetType::getValue).collect(Collectors.toSet());
         return findXpByTargetIdsAndTypesInternal(workspaceId, targetIds, typeValues);
     }
 
