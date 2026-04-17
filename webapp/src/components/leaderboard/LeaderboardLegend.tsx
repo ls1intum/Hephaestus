@@ -81,7 +81,7 @@ export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: 
 									<IssueOpenedIcon className="h-4 w-4" />
 									<span>Opened issues</span>
 								</div>
-								<div className="flex items-center gap-2 text-provider-closed-foreground">
+								<div className="flex items-center gap-2 text-provider-done-foreground">
 									<IssueClosedIcon className="h-4 w-4" />
 									<span>Closed issues</span>
 								</div>
