@@ -2,11 +2,13 @@ package de.tum.in.www1.hephaestus.activity;
 
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -277,7 +279,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         Instant since,
         Instant until
     ) {
-        Map<Long, Long> counts = new java.util.HashMap<>();
+        Map<Long, Long> counts = new HashMap<>();
         for (ActorCountProjection projection : findOwnPullRequestConversationReplyCounts(
             workspaceId,
             actorIds,
@@ -457,7 +459,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         Instant since,
         Instant until
     ) {
-        Map<Long, Long> counts = new java.util.HashMap<>();
+        Map<Long, Long> counts = new HashMap<>();
         for (ActorCountProjection projection : findOwnPullRequestConversationReplyCountsByTeams(
             workspaceId,
             teamIds,
@@ -537,7 +539,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         return findDistinctReviewedPullRequestCountsByActors(workspaceId, actorIds, since, until)
             .stream()
             .collect(
-                java.util.stream.Collectors.toMap(
+                Collectors.toMap(
                     DistinctPrCountProjection::getActorId,
                     DistinctPrCountProjection::getPrCount
                 )
@@ -617,7 +619,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         return findDistinctReviewedPullRequestCountsByActorsAndTeams(workspaceId, teamIds, actorIds, since, until)
             .stream()
             .collect(
-                java.util.stream.Collectors.toMap(
+                Collectors.toMap(
                     DistinctPrCountProjection::getActorId,
                     DistinctPrCountProjection::getPrCount
                 )
@@ -749,7 +751,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         Set<String> typeValues = targetTypes
             .stream()
             .map(ActivityTargetType::getValue)
-            .collect(java.util.stream.Collectors.toSet());
+            .collect(Collectors.toSet());
         return findXpByTargetIdsAndTypesInternal(workspaceId, targetIds, typeValues);
     }
 
