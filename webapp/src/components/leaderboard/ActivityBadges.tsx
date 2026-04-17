@@ -145,7 +145,7 @@ export function ActivityBadges({
 				<Tooltip>
 					<TooltipTrigger
 						className="cursor-help"
-						aria-label={`${codeComments} scored inline feedback comments on pull requests authored by someone else. Counts toward score.`}
+						aria-label={`${codeComments} scored inline feedback comments on ${terms.pullRequests.toLowerCase()} authored by someone else. Counts toward score.`}
 						render={<div className="flex items-center gap-1 text-provider-muted-foreground" />}
 					>
 						<CommentDiscussionIcon className="h-4 w-4" />
@@ -167,7 +167,7 @@ export function ActivityBadges({
 				<Tooltip>
 					<TooltipTrigger
 						className="cursor-help"
-						aria-label={`${ownReplies} own pull request discussion or inline replies. Visible only and does not affect score.`}
+						aria-label={`${ownReplies} replies on your own ${terms.pullRequests.toLowerCase()} and inline threads. Visible only and does not affect score.`}
 						render={<div className="flex items-center gap-1 text-provider-muted-foreground" />}
 					>
 						<MessageSquareReply className="h-4 w-4" />

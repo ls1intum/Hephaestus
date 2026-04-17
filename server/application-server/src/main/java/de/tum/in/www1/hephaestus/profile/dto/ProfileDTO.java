@@ -22,7 +22,7 @@ import org.springframework.lang.NonNull;
  *
  * <p>The gitprovider module has NO knowledge of XP or scoring.
  */
-@JsonInclude(JsonInclude.Include.NON_EMPTY)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Complete user profile including contribution history and activity")
 public record ProfileDTO(
     @NonNull @Schema(description = "Basic information about the user") UserInfoDTO userInfo,

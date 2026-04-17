@@ -60,7 +60,6 @@ export function ProfileContent({
 
 	const displayPullRequests = isLoading ? skeletonPullRequests : openPullRequests;
 
-	const activityStatsForFeed = activityStats;
 	const terms = getProviderTerms(providerType);
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
@@ -89,16 +88,16 @@ export function ProfileContent({
 							<h3 className="text-lg font-semibold">Review activity</h3>
 							<ActivityBadges
 								reviewedPullRequests={reviewedPullRequestsForPopover}
-								approvals={activityStatsForFeed?.numberOfApprovals ?? 0}
-								changeRequests={activityStatsForFeed?.numberOfChangeRequests ?? 0}
-								comments={activityStatsForFeed?.numberOfComments ?? 0}
-								codeComments={activityStatsForFeed?.numberOfCodeComments ?? 0}
-								ownReplies={activityStatsForFeed?.numberOfOwnReplies ?? 0}
-								openPullRequests={activityStatsForFeed?.numberOfOpenPullRequests ?? 0}
-								mergedPullRequests={activityStatsForFeed?.numberOfMergedPullRequests ?? 0}
-								closedPullRequests={activityStatsForFeed?.numberOfClosedPullRequests ?? 0}
-								openedIssues={activityStatsForFeed?.numberOfOpenedIssues ?? 0}
-								closedIssues={activityStatsForFeed?.numberOfClosedIssues ?? 0}
+								approvals={activityStats?.numberOfApprovals ?? 0}
+								changeRequests={activityStats?.numberOfChangeRequests ?? 0}
+								comments={activityStats?.numberOfComments ?? 0}
+								codeComments={activityStats?.numberOfCodeComments ?? 0}
+								ownReplies={activityStats?.numberOfOwnReplies ?? 0}
+								openPullRequests={activityStats?.numberOfOpenPullRequests ?? 0}
+								mergedPullRequests={activityStats?.numberOfMergedPullRequests ?? 0}
+								closedPullRequests={activityStats?.numberOfClosedPullRequests ?? 0}
+								openedIssues={activityStats?.numberOfOpenedIssues ?? 0}
+								closedIssues={activityStats?.numberOfClosedIssues ?? 0}
 								isLoading={isLoading}
 								providerType={providerType}
 							/>

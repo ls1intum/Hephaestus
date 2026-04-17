@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.profile;
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,38 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>These queries are used for user profile display where workspace context is required.
  */
 @Repository
+@Transactional(readOnly = true)
 public interface ProfilePullRequestQueryRepository extends JpaRepository<PullRequest, Long> {
-    /**
-     * Finds pull requests assigned to a user by login and states, scoped to a workspace.
-     *
-     * @param assigneeLogin the assignee's login (case-insensitive)
-     * @param states the states to filter by
-     * @param workspaceId the workspace to scope to
-     * @return pull requests assigned to the user in the given states
-     */
-    @Transactional
-    @Query(
-        """
-        SELECT p
-        FROM PullRequest p
-        LEFT JOIN FETCH p.labels
-        JOIN FETCH p.author
-        LEFT JOIN FETCH p.assignees
-        LEFT JOIN FETCH p.repository r
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
-        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
-            AND p.state IN :states
-            AND rtm.workspace.id = :workspaceId
-        ORDER BY p.createdAt DESC
-        """
-    )
-    List<PullRequest> findAssignedByLoginAndStates(
-        @Param("assigneeLogin") String assigneeLogin,
-        @Param("states") Set<PullRequest.State> states,
-        @Param("workspaceId") Long workspaceId
-    );
-
-    @Transactional
     @Query(
         """
         SELECT p
@@ -72,7 +43,6 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
         @Param("workspaceId") Long workspaceId
     );
 
-    @Transactional
     @Query(
         """
         SELECT p.author.id as authorId, COUNT(p) as count
@@ -86,14 +56,13 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
         GROUP BY p.author.id
         """
     )
-    java.util.List<AuthorCountProjection> countOpenPullRequestsByAuthors(
+    List<AuthorCountProjection> countOpenPullRequestsByAuthors(
         @Param("workspaceId") Long workspaceId,
         @Param("authorIds") Set<Long> authorIds,
-        @Param("since") java.time.Instant since,
-        @Param("until") java.time.Instant until
+        @Param("since") Instant since,
+        @Param("until") Instant until
     );
 
-    @Transactional
     @Query(
         """
         SELECT p.author.id as authorId, COUNT(p) as count
@@ -124,15 +93,14 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
         GROUP BY p.author.id
         """
     )
-    java.util.List<AuthorCountProjection> countOpenPullRequestsByAuthorsAndTeams(
+    List<AuthorCountProjection> countOpenPullRequestsByAuthorsAndTeams(
         @Param("workspaceId") Long workspaceId,
         @Param("teamIds") Set<Long> teamIds,
         @Param("authorIds") Set<Long> authorIds,
-        @Param("since") java.time.Instant since,
-        @Param("until") java.time.Instant until
+        @Param("since") Instant since,
+        @Param("until") Instant until
     );
 
-    @Transactional
     @Query(
         """
         SELECT p.author.id as authorId, COUNT(p) as count
@@ -146,14 +114,13 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
         GROUP BY p.author.id
         """
     )
-    java.util.List<AuthorCountProjection> countMergedPullRequestsByAuthors(
+    List<AuthorCountProjection> countMergedPullRequestsByAuthors(
         @Param("workspaceId") Long workspaceId,
         @Param("authorIds") Set<Long> authorIds,
-        @Param("since") java.time.Instant since,
-        @Param("until") java.time.Instant until
+        @Param("since") Instant since,
+        @Param("until") Instant until
     );
 
-    @Transactional
     @Query(
         """
         SELECT p.author.id as authorId, COUNT(p) as count
@@ -184,15 +151,14 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
         GROUP BY p.author.id
         """
     )
-    java.util.List<AuthorCountProjection> countMergedPullRequestsByAuthorsAndTeams(
+    List<AuthorCountProjection> countMergedPullRequestsByAuthorsAndTeams(
         @Param("workspaceId") Long workspaceId,
         @Param("teamIds") Set<Long> teamIds,
         @Param("authorIds") Set<Long> authorIds,
-        @Param("since") java.time.Instant since,
-        @Param("until") java.time.Instant until
+        @Param("since") Instant since,
+        @Param("until") Instant until
     );
 
-    @Transactional
     @Query(
         """
         SELECT p.author.id as authorId, COUNT(p) as count
@@ -202,19 +168,18 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
             AND p.closedAt IS NOT NULL
             AND p.closedAt >= :since
             AND p.closedAt < :until
-            AND p.isMerged = false
+            AND p.mergedAt IS NULL
             AND rtm.workspace.id = :workspaceId
         GROUP BY p.author.id
         """
     )
-    java.util.List<AuthorCountProjection> countClosedPullRequestsByAuthors(
+    List<AuthorCountProjection> countClosedPullRequestsByAuthors(
         @Param("workspaceId") Long workspaceId,
         @Param("authorIds") Set<Long> authorIds,
-        @Param("since") java.time.Instant since,
-        @Param("until") java.time.Instant until
+        @Param("since") Instant since,
+        @Param("until") Instant until
     );
 
-    @Transactional
     @Query(
         """
         SELECT p.author.id as authorId, COUNT(p) as count
@@ -229,7 +194,7 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
             AND p.closedAt IS NOT NULL
             AND p.closedAt >= :since
             AND p.closedAt < :until
-            AND p.isMerged = false
+            AND p.mergedAt IS NULL
             AND rtm.workspace.id = :workspaceId
             AND EXISTS (
                 SELECT 1 FROM TeamRepositoryPermission trp
@@ -246,12 +211,12 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
         GROUP BY p.author.id
         """
     )
-    java.util.List<AuthorCountProjection> countClosedPullRequestsByAuthorsAndTeams(
+    List<AuthorCountProjection> countClosedPullRequestsByAuthorsAndTeams(
         @Param("workspaceId") Long workspaceId,
         @Param("teamIds") Set<Long> teamIds,
         @Param("authorIds") Set<Long> authorIds,
-        @Param("since") java.time.Instant since,
-        @Param("until") java.time.Instant until
+        @Param("since") Instant since,
+        @Param("until") Instant until
     );
 
     interface AuthorCountProjection {
