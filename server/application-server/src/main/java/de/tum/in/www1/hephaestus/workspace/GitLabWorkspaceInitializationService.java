@@ -486,6 +486,7 @@ public class GitLabWorkspaceInitializationService {
         var collaboratorSyncService = gitLabServices.getCollaboratorSyncService();
         var commitSyncService = gitLabServices.getCommitSyncService();
         var commitBackfillService = gitLabServices.getCommitBackfillService();
+        var commitMrLinker = gitLabServices.getCommitMergeRequestLinker();
 
         GitLabRateLimitTracker rateLimitTracker = rateLimitTrackerProvider.getIfAvailable();
         Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
@@ -613,6 +614,20 @@ public class GitLabWorkspaceInitializationService {
                 } catch (Exception e) {
                     log.warn(
                         "Failed commit sync: workspaceId={}, repo={}",
+                        workspace.getId(),
+                        repo.getNameWithOwner(),
+                        e
+                    );
+                }
+            }
+
+            // Link commits to their merge requests (must run after both commits and MRs have synced)
+            if (commitMrLinker != null) {
+                try {
+                    commitMrLinker.linkCommitsForRepository(workspace.getId(), repo);
+                } catch (Exception e) {
+                    log.warn(
+                        "Failed commit→MR linking: workspaceId={}, repo={}",
                         workspace.getId(),
                         repo.getNameWithOwner(),
                         e

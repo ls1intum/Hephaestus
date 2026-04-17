@@ -273,6 +273,34 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     List<String> findShasWithoutContributorsByRepositoryId(@Param("repositoryId") Long repositoryId);
 
     /**
+     * Commit id/SHA pairs for commits in a repository with no pull-request linkage yet.
+     * Used by GitLab to backfill {@code commit_pull_request} from the REST API —
+     * GitHub enrichment wires this up via GraphQL {@code associatedPullRequests}.
+     */
+    @Query(
+        value = """
+        SELECT gc.id AS id, gc.sha AS sha FROM git_commit gc
+        WHERE gc.repository_id = :repositoryId
+          AND NOT EXISTS (
+              SELECT 1 FROM commit_pull_request cpr WHERE cpr.commit_id = gc.id
+          )
+        ORDER BY gc.committed_at DESC NULLS LAST
+        """,
+        nativeQuery = true
+    )
+    List<CommitIdShaProjection> findIdsAndShasWithoutPullRequestLinksByRepositoryId(
+        @Param("repositoryId") Long repositoryId
+    );
+
+    /**
+     * Projection returning commit id + SHA pairs.
+     */
+    interface CommitIdShaProjection {
+        Long getId();
+        String getSha();
+    }
+
+    /**
      * Link a commit to pull requests by PR numbers within the same repository.
      * Uses INSERT ... ON CONFLICT DO NOTHING to be idempotent.
      */

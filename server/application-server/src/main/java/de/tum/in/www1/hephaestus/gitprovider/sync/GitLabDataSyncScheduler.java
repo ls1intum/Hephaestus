@@ -306,6 +306,7 @@ public class GitLabDataSyncScheduler {
         GitLabCollaboratorSyncService collaboratorSync = services.getCollaboratorSyncService();
         GitLabCommitSyncService commitSync = services.getCommitSyncService();
         var commitBackfill = services.getCommitBackfillService();
+        var commitMrLinker = services.getCommitMergeRequestLinker();
 
         // Find all repositories monitored by this workspace (via RepositoryToMonitor join,
         // which correctly includes subgroup repos — not just top-level group repos)
@@ -433,6 +434,20 @@ public class GitLabDataSyncScheduler {
                     totalCommits += r.count();
                 } catch (Exception e) {
                     log.warn("Failed commit sync: scopeId={}, repo={}", session.scopeId(), repo.getNameWithOwner(), e);
+                }
+            }
+
+            // Link commits to their merge requests (must run after both commits and MRs have synced)
+            if (commitMrLinker != null) {
+                try {
+                    commitMrLinker.linkCommitsForRepository(session.scopeId(), repo);
+                } catch (Exception e) {
+                    log.warn(
+                        "Failed commit→MR linking: scopeId={}, repo={}",
+                        session.scopeId(),
+                        repo.getNameWithOwner(),
+                        e
+                    );
                 }
             }
 

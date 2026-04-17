@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitFileChange;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.commit.gitlab.GitLabCommitMergeRequestLinker;
 import de.tum.in.www1.hephaestus.gitprovider.commit.util.CommitUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
@@ -77,6 +78,7 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
     private final ScopeIdResolver scopeIdResolver;
     private final SyncTargetProvider syncTargetProvider;
     private final ApplicationEventPublisher eventPublisher;
+    private final GitLabCommitMergeRequestLinker commitMergeRequestLinker;
 
     GitLabPushMessageHandler(
         GitLabProjectProcessor projectProcessor,
@@ -91,6 +93,7 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         ScopeIdResolver scopeIdResolver,
         SyncTargetProvider syncTargetProvider,
         ApplicationEventPublisher eventPublisher,
+        GitLabCommitMergeRequestLinker commitMergeRequestLinker,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -107,6 +110,7 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         this.scopeIdResolver = scopeIdResolver;
         this.syncTargetProvider = syncTargetProvider;
         this.eventPublisher = eventPublisher;
+        this.commitMergeRequestLinker = commitMergeRequestLinker;
     }
 
     @Override
@@ -439,11 +443,28 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
             return;
         }
 
+        Long scopeId = resolveScopeId(repository);
+
+        // Link this commit to its merge requests via GitLab REST (best-effort — scheduled
+        // sync re-runs the same backfill, so a transient failure here is self-healing).
+        if (scopeId != null) {
+            try {
+                commitMergeRequestLinker.linkCommitToMergeRequests(scopeId, repository, commit.getId(), sha);
+            } catch (Exception e) {
+                log.debug(
+                    "Push-time commit→MR link failed: repoId={}, sha={}, error={}",
+                    repository.getId(),
+                    sha,
+                    e.getMessage()
+                );
+            }
+        }
+
         EventPayload.CommitData commitData = EventPayload.CommitData.from(commit);
         EventContext context = new EventContext(
             UUID.randomUUID(),
             Instant.now(),
-            resolveScopeId(repository),
+            scopeId,
             RepositoryRef.from(repository),
             DataSource.WEBHOOK,
             null,

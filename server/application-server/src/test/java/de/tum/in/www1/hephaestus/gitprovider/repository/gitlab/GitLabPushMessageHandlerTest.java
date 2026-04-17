@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.commit.gitlab.GitLabCommitMergeRequestLinker;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
@@ -83,6 +84,9 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
+    private GitLabCommitMergeRequestLinker commitMergeRequestLinker;
+
+    @Mock
     private NatsMessageDeserializer deserializer;
 
     private TransactionTemplate transactionTemplate;
@@ -134,6 +138,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             scopeIdResolver,
             syncTargetProvider,
             eventPublisher,
+            commitMergeRequestLinker,
             deserializer,
             transactionTemplate
         );
