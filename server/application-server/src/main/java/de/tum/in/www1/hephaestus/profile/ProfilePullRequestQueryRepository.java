@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Workspace-scoped queries for pull requests in the profile context.
@@ -18,9 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
  * depend on workspace entities to maintain clean architecture.
  *
  * <p>These queries are used for user profile display where workspace context is required.
+ * Callers wrap invocations in their own {@code @Transactional(readOnly = true)}.
  */
 @Repository
-@Transactional(readOnly = true)
 public interface ProfilePullRequestQueryRepository extends JpaRepository<PullRequest, Long> {
     @Query(
         """
