@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookLabel;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
@@ -421,6 +422,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
                 null
             );
             GitLabIssueEventDTO event = new GitLabIssueEventDTO(
@@ -499,16 +501,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(
-                gitLabUserService.findOrCreateUser(
-                    anyString(),
-                    anyString(),
-                    anyString(),
-                    anyString(),
-                    anyString(),
-                    eq(PROVIDER_ID)
-                )
-            ).thenReturn(author);
+            when(gitLabUserService.findOrCreateUser(any(GitLabUserLookup.class), eq(PROVIDER_ID))).thenReturn(author);
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
@@ -886,6 +879,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             action,
             confidential,
             RAW_USER_ID,
+            null,
             null,
             "2026-01-31 19:03:35 +0100",
             "2026-01-31 19:03:35 +0100",

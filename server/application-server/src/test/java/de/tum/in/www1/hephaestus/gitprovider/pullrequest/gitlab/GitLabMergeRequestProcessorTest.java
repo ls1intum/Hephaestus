@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
@@ -18,6 +19,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookLabel;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
@@ -843,6 +845,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 false,
                 RAW_USER_ID,
                 RAW_USER_ID, // mergeUserId = event.user().id()
+                null,
                 "2024-01-15T10:00:00Z",
                 "2024-01-15T14:00:00Z",
                 null,
@@ -928,6 +931,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 "main",
                 false,
                 RAW_USER_ID,
+                null,
                 null,
                 "2024-01-15T10:00:00Z",
                 "2024-01-15T14:00:00Z",
@@ -1147,6 +1151,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 false,
                 12345L,
                 null,
+                null,
                 "2024-01-15T10:00:00Z",
                 "2024-01-15T10:00:00Z",
                 null,
@@ -1246,9 +1251,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(
-                gitLabUserService.findOrCreateUser(anyString(), anyString(), any(), any(), any(), eq(PROVIDER_ID))
-            ).thenReturn(author);
+            when(gitLabUserService.findOrCreateUser(any(GitLabUserLookup.class), eq(PROVIDER_ID))).thenReturn(author);
 
             var syncData = createSyncData();
             PullRequest result = processor.processFromSync(syncData, testRepo, 1L);
@@ -1346,9 +1349,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(
-                gitLabUserService.findOrCreateUser(anyString(), anyString(), any(), any(), any(), eq(PROVIDER_ID))
-            ).thenReturn(author);
+            when(gitLabUserService.findOrCreateUser(any(GitLabUserLookup.class), eq(PROVIDER_ID))).thenReturn(author);
 
             Milestone milestone = new Milestone();
             milestone.setId(42L);
@@ -1385,6 +1386,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 "Test User",
                 "https://gitlab.com/uploads/avatar.png",
                 "https://gitlab.com/testuser",
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -1443,9 +1446,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(
-                gitLabUserService.findOrCreateUser(anyString(), anyString(), any(), any(), any(), eq(PROVIDER_ID))
-            ).thenReturn(author);
+            when(gitLabUserService.findOrCreateUser(any(GitLabUserLookup.class), eq(PROVIDER_ID))).thenReturn(author);
 
             when(milestoneRepository.findByNumberAndRepositoryId(99, REPO_ID)).thenReturn(Optional.empty());
 
@@ -1479,6 +1480,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 "Test User",
                 "https://gitlab.com/uploads/avatar.png",
                 "https://gitlab.com/testuser",
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -1584,6 +1587,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
+                null,
                 null
             );
             PullRequest result = processor.processFromSync(syncData, testRepo, 1L);
@@ -1619,6 +1624,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 false,
                 0,
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -1672,11 +1679,10 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             lenient()
                 .when(
                     gitLabUserService.findOrCreateUser(
-                        eq("gid://gitlab/User/12345"),
-                        anyString(),
-                        any(),
-                        any(),
-                        any(),
+                        argThat(
+                            (GitLabUserLookup lookup) ->
+                                lookup != null && "gid://gitlab/User/12345".equals(lookup.globalId())
+                        ),
                         eq(PROVIDER_ID)
                     )
                 )
@@ -1688,11 +1694,10 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             lenient()
                 .when(
                     gitLabUserService.findOrCreateUser(
-                        eq("gid://gitlab/User/11111"),
-                        anyString(),
-                        any(),
-                        any(),
-                        any(),
+                        argThat(
+                            (GitLabUserLookup lookup) ->
+                                lookup != null && "gid://gitlab/User/11111".equals(lookup.globalId())
+                        ),
                         eq(PROVIDER_ID)
                     )
                 )
@@ -1736,13 +1741,16 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
+                null,
                 List.of(
                     new GitLabMergeRequestProcessor.SyncUserData(
                         "gid://gitlab/User/11111",
                         "reviewer1",
                         "Reviewer One",
                         "https://gitlab.com/uploads/avatar.png",
-                        "https://gitlab.com/reviewer1"
+                        "https://gitlab.com/reviewer1",
+                        null
                     )
                 ),
                 null
@@ -1916,6 +1924,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
+                null,
                 null
             );
             processor.processFromSync(syncData, testRepo, 1L);
@@ -2061,6 +2071,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             false,
             RAW_USER_ID,
             null,
+            null,
             "2024-01-15T10:00:00Z",
             "2024-01-15T10:00:00Z",
             null,
@@ -2093,6 +2104,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             "main",
             false,
             RAW_USER_ID,
+            null,
             null,
             "2024-01-15T10:00:00Z",
             "2024-01-15T10:00:00Z",
@@ -2127,6 +2139,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             false,
             RAW_USER_ID,
             null,
+            null,
             "2024-01-15T10:00:00Z",
             "2024-01-15T10:00:00Z",
             null,
@@ -2159,6 +2172,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             "main",
             false,
             RAW_USER_ID,
+            null,
             null,
             "2024-01-15T10:00:00Z",
             "2024-01-15T14:00:00Z",
@@ -2240,6 +2254,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             "Test User",
             "https://gitlab.com/uploads/avatar.png",
             "https://gitlab.com/testuser",
+            null,
+            null,
             null,
             null,
             null,

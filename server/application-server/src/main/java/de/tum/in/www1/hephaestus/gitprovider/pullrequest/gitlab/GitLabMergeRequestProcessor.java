@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.BaseGitLabProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
@@ -101,7 +102,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         String username,
         @Nullable String name,
         @Nullable String avatarUrl,
-        @Nullable String webUrl
+        @Nullable String webUrl,
+        @Nullable String publicEmail
     ) {}
 
     public record SyncMergeRequestData(
@@ -134,11 +136,13 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         @Nullable String authorName,
         @Nullable String authorAvatarUrl,
         @Nullable String authorWebUrl,
+        @Nullable String authorPublicEmail,
         @Nullable String mergeUserGlobalId,
         @Nullable String mergeUserUsername,
         @Nullable String mergeUserName,
         @Nullable String mergeUserAvatarUrl,
         @Nullable String mergeUserWebUrl,
+        @Nullable String mergeUserPublicEmail,
         @Nullable List<SyncLabelData> syncLabels,
         @Nullable List<SyncUserData> syncAssignees,
         @Nullable List<SyncUserData> syncReviewers,
@@ -207,6 +211,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         User author = resolveWebhookAuthor(event, context.providerId());
         User mergedBy = resolveWebhookMergeUser(event, context.providerId());
+        Long milestoneId = resolveWebhookMilestoneId(attrs.milestoneId(), context.repository().getProvider().getId());
 
         String headRefOid = attrs.lastCommit() != null ? attrs.lastCommit().id() : null;
 
@@ -227,6 +232,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             attrs.mergedAt(),
             author,
             mergedBy,
+            milestoneId,
             context.repository(),
             context,
             isNew
@@ -528,26 +534,32 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         boolean isNew = existingOpt.isEmpty();
 
         User author = findOrCreateUser(
-            data.authorGlobalId(),
-            data.authorUsername(),
-            data.authorName(),
-            data.authorAvatarUrl(),
-            data.authorWebUrl(),
+            new GitLabUserLookup(
+                data.authorGlobalId(),
+                data.authorUsername(),
+                data.authorName(),
+                data.authorAvatarUrl(),
+                data.authorWebUrl(),
+                data.authorPublicEmail()
+            ),
             providerId
         );
 
         User mergeUser = findOrCreateUser(
-            data.mergeUserGlobalId(),
-            data.mergeUserUsername(),
-            data.mergeUserName(),
-            data.mergeUserAvatarUrl(),
-            data.mergeUserWebUrl(),
+            new GitLabUserLookup(
+                data.mergeUserGlobalId(),
+                data.mergeUserUsername(),
+                data.mergeUserName(),
+                data.mergeUserAvatarUrl(),
+                data.mergeUserWebUrl(),
+                data.mergeUserPublicEmail()
+            ),
             providerId
         );
 
         Issue.State mrState = convertState(data.state());
         boolean isMerged = "merged".equalsIgnoreCase(data.state());
-        String reviewDecision = data.approved() ? "APPROVED" : "REVIEW_REQUIRED";
+        String reviewDecision = deriveReviewDecision(data.approved(), data.detailedMergeStatus());
         String mergeStateStatus = mapDetailedMergeStatus(data.detailedMergeStatus());
 
         // Resolve milestone by iid + repository (milestones are synced before MRs)
@@ -675,6 +687,17 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     @Nullable
+    private Long resolveWebhookMilestoneId(@Nullable Long gitlabMilestoneId, Long providerId) {
+        if (gitlabMilestoneId == null) {
+            return null;
+        }
+        return milestoneRepository
+            .findByNativeIdAndProviderId(gitlabMilestoneId, providerId)
+            .map(Milestone::getId)
+            .orElse(null);
+    }
+
+    @Nullable
     private PullRequest upsertMergeRequest(
         Long rawId,
         Integer iid,
@@ -692,6 +715,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         @Nullable String mergedAt,
         @Nullable User author,
         @Nullable User mergedBy,
+        @Nullable Long milestoneId,
         Repository repository,
         ProcessingContext context,
         boolean isNew
@@ -726,7 +750,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             parseGitLabTimestamp(updatedAt),
             author != null ? author.getId() : null,
             repository.getId(),
-            null,
+            milestoneId,
             parseGitLabTimestamp(mergedAt),
             draft,
             isMerged,
@@ -785,6 +809,24 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 yield Issue.State.OPEN;
             }
         };
+    }
+
+    /**
+     * Derives the PR review decision from GitLab's binary approval flag plus detailed merge status.
+     *
+     * <p>GitLab's {@code approved} field is binary and cannot express CHANGES_REQUESTED. The
+     * {@code detailed_merge_status == "requested_changes"} signal (Premium, GA 17.3) surfaces
+     * active change requests on the MR, so we lift it into the three-state model that the
+     * leaderboard/profile UI expects.
+     */
+    private static String deriveReviewDecision(boolean approved, @Nullable String detailedStatus) {
+        if (approved) {
+            return "APPROVED";
+        }
+        if (detailedStatus != null && "requested_changes".equalsIgnoreCase(detailedStatus)) {
+            return "CHANGES_REQUESTED";
+        }
+        return "REVIEW_REQUIRED";
     }
 
     @Nullable
@@ -856,11 +898,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         for (SyncUserData approver : syncApprovers) {
             User user = findOrCreateUser(
-                approver.globalId(),
-                approver.username(),
-                approver.name(),
-                approver.avatarUrl(),
-                approver.webUrl(),
+                new GitLabUserLookup(
+                    approver.globalId(),
+                    approver.username(),
+                    approver.name(),
+                    approver.avatarUrl(),
+                    approver.webUrl(),
+                    approver.publicEmail()
+                ),
                 providerId
             );
             if (user == null) continue;
@@ -982,11 +1027,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Set<User> newAssignees = new HashSet<>();
         for (SyncUserData data : syncAssignees) {
             User user = findOrCreateUser(
-                data.globalId(),
-                data.username(),
-                data.name(),
-                data.avatarUrl(),
-                data.webUrl(),
+                new GitLabUserLookup(
+                    data.globalId(),
+                    data.username(),
+                    data.name(),
+                    data.avatarUrl(),
+                    data.webUrl(),
+                    data.publicEmail()
+                ),
                 providerId
             );
             if (user != null) newAssignees.add(user);
@@ -1010,11 +1058,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Set<User> newReviewers = new HashSet<>();
         for (SyncUserData data : syncReviewers) {
             User user = findOrCreateUser(
-                data.globalId(),
-                data.username(),
-                data.name(),
-                data.avatarUrl(),
-                data.webUrl(),
+                new GitLabUserLookup(
+                    data.globalId(),
+                    data.username(),
+                    data.name(),
+                    data.avatarUrl(),
+                    data.webUrl(),
+                    data.publicEmail()
+                ),
                 providerId
             );
             if (user != null) newReviewers.add(user);

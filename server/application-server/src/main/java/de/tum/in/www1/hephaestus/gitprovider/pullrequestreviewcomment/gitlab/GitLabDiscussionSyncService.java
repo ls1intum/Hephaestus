@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponse
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.GitLabIssueCommentProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
@@ -303,11 +304,13 @@ public class GitLabDiscussionSyncService {
             Map<String, Object> resolvedByMap = (Map<String, Object>) discussionNode.get("resolvedBy");
             if (resolvedByMap != null) {
                 resolvedBy = issueCommentProcessor.findOrCreateUser(
-                    (String) resolvedByMap.get("id"),
-                    (String) resolvedByMap.get("username"),
-                    (String) resolvedByMap.get("name"),
-                    (String) resolvedByMap.get("avatarUrl"),
-                    (String) resolvedByMap.get("webUrl"),
+                    GitLabUserLookup.of(
+                        (String) resolvedByMap.get("id"),
+                        (String) resolvedByMap.get("username"),
+                        (String) resolvedByMap.get("name"),
+                        (String) resolvedByMap.get("avatarUrl"),
+                        (String) resolvedByMap.get("webUrl")
+                    ),
                     providerId
                 );
             }
@@ -465,11 +468,13 @@ public class GitLabDiscussionSyncService {
             return null;
         }
         return issueCommentProcessor.findOrCreateUser(
-            (String) authorMap.get("id"),
-            (String) authorMap.get("username"),
-            (String) authorMap.get("name"),
-            (String) authorMap.get("avatarUrl"),
-            (String) authorMap.get("webUrl"),
+            GitLabUserLookup.of(
+                (String) authorMap.get("id"),
+                (String) authorMap.get("username"),
+                (String) authorMap.get("name"),
+                (String) authorMap.get("avatarUrl"),
+                (String) authorMap.get("webUrl")
+            ),
             providerId
         );
     }

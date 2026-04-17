@@ -68,4 +68,6 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
         """
     )
     List<PullRequestReviewComment> findAllByIdWithRelations(@Param("ids") Collection<Long> ids);
+
+    Optional<PullRequestReviewComment> findFirstByThreadIdOrderByCreatedAtAsc(Long threadId);
 }

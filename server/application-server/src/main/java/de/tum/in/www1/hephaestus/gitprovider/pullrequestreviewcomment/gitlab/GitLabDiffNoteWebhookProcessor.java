@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.gitlab.GitLabPullRequestReviewThreadProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -51,6 +52,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
     private final PullRequestRepository pullRequestRepository;
     private final GitLabPullRequestReviewThreadProcessor threadProcessor;
     private final GitLabPullRequestReviewCommentProcessor reviewCommentProcessor;
+    private final PullRequestReviewCommentRepository reviewCommentRepository;
 
     public GitLabDiffNoteWebhookProcessor(
         GitLabUserService gitLabUserService,
@@ -62,7 +64,8 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         GitLabProperties gitLabProperties,
         PullRequestRepository pullRequestRepository,
         GitLabPullRequestReviewThreadProcessor threadProcessor,
-        GitLabPullRequestReviewCommentProcessor reviewCommentProcessor
+        GitLabPullRequestReviewCommentProcessor reviewCommentProcessor,
+        PullRequestReviewCommentRepository reviewCommentRepository
     ) {
         super(
             gitLabUserService,
@@ -76,6 +79,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         this.pullRequestRepository = pullRequestRepository;
         this.threadProcessor = threadProcessor;
         this.reviewCommentProcessor = reviewCommentProcessor;
+        this.reviewCommentRepository = reviewCommentRepository;
     }
 
     /**
@@ -184,12 +188,20 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             updatedAt
         );
 
+        // Resolve parent: if the thread already has a starter comment, this note is a reply.
+        // This mirrors GitLab's semantics where all notes in a discussion share the same
+        // discussion_id; the earliest note is the thread starter and subsequent notes reply to it.
+        PullRequestReviewComment inReplyTo =
+            thread.getId() != null
+                ? reviewCommentRepository.findFirstByThreadIdOrderByCreatedAtAsc(thread.getId()).orElse(null)
+                : null;
+
         var commentContext = new GitLabPullRequestReviewCommentProcessor.CommentContext(
             thread,
             pr,
             author,
             provider,
-            null, // no parent for webhook diff notes
+            inReplyTo,
             context.scopeId()
         );
         PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(noteData, commentContext);

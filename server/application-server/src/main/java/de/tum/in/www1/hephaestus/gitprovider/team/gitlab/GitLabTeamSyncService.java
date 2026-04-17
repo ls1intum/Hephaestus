@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabDescendantGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupMemberResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
@@ -54,7 +55,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <ol>
  *   <li>A — Fetch descendant groups and create Team entities</li>
  *   <li>B — Resolve parent references (two-pass)</li>
- *   <li>C — Sync direct members per team</li>
+ *   <li>C — Sync direct + inherited members per team (inherited members cover TUM/LRZ course groups where students are enrolled at the parent group level)</li>
  *   <li>D — Sync team-repo permissions (repos whose org = subgroup fullPath)</li>
  *   <li>E — Cleanup stale teams (only if sync completed fully)</li>
  *   <li>F — Add project collaborators as team members (students in repos under subgroup)</li>
@@ -553,11 +554,13 @@ public class GitLabTeamSyncService {
 
         var userRef = member.user();
         User user = gitLabUserService.findOrCreateUser(
-            userRef.id(),
-            userRef.username(),
-            userRef.name(),
-            userRef.avatarUrl(),
-            userRef.webUrl(),
+            GitLabUserLookup.of(
+                userRef.id(),
+                userRef.username(),
+                userRef.name(),
+                userRef.avatarUrl(),
+                userRef.webUrl()
+            ),
             providerId
         );
 

@@ -40,6 +40,7 @@ public record GitLabMergeRequestEventDTO(
         boolean draft,
         @JsonProperty("author_id") @NonNull Long authorId,
         @JsonProperty("merge_user_id") @Nullable Long mergeUserId,
+        @JsonProperty("milestone_id") @Nullable Long milestoneId,
         @JsonProperty("created_at") @NonNull String createdAt,
         @JsonProperty("updated_at") @NonNull String updatedAt,
         @JsonProperty("closed_at") @Nullable String closedAt,

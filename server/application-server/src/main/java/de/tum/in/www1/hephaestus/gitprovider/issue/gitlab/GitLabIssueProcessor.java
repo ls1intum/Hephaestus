@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.BaseGitLabProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -92,6 +93,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         var attrs = event.objectAttributes();
         User author = resolveWebhookAuthor(event, context.providerId());
+        Long providerId = context.repository().getProvider().getId();
+        Long milestoneId = resolveWebhookMilestoneId(attrs.milestoneId(), providerId);
         Issue issue = upsertIssue(
             attrs.id(),
             attrs.iid(),
@@ -103,6 +106,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             attrs.updatedAt(),
             attrs.closedAt(),
             author,
+            milestoneId,
             context.repository(),
             context
         );
@@ -198,11 +202,13 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         // Resolve author
         User author = findOrCreateUser(
-            data.authorGlobalId(),
-            data.authorUsername(),
-            data.authorName(),
-            data.authorAvatarUrl(),
-            data.authorWebUrl(),
+            GitLabUserLookup.of(
+                data.authorGlobalId(),
+                data.authorUsername(),
+                data.authorName(),
+                data.authorAvatarUrl(),
+                data.authorWebUrl()
+            ),
             providerId
         );
 
@@ -340,6 +346,17 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     }
 
     @Nullable
+    private Long resolveWebhookMilestoneId(@Nullable Long gitlabMilestoneId, Long providerId) {
+        if (gitlabMilestoneId == null) {
+            return null;
+        }
+        return milestoneRepository
+            .findByNativeIdAndProviderId(gitlabMilestoneId, providerId)
+            .map(Milestone::getId)
+            .orElse(null);
+    }
+
+    @Nullable
     private Issue upsertIssue(
         Long rawId,
         Integer iid,
@@ -351,6 +368,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         @Nullable String updatedAt,
         @Nullable String closedAt,
         @Nullable User author,
+        @Nullable Long milestoneId,
         Repository repository,
         ProcessingContext context
     ) {
@@ -386,7 +404,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             parseGitLabTimestamp(updatedAt),
             author != null ? author.getId() : null,
             repository.getId(),
-            null,
+            milestoneId,
             null,
             null,
             null,
@@ -470,11 +488,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Set<User> newAssignees = new HashSet<>();
         for (SyncAssigneeData data : syncAssignees) {
             User user = findOrCreateUser(
-                data.globalId(),
-                data.username(),
-                data.name(),
-                data.avatarUrl(),
-                data.webUrl(),
+                GitLabUserLookup.of(data.globalId(), data.username(), data.name(), data.avatarUrl(), data.webUrl()),
                 providerId
             );
             if (user != null) {
