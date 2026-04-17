@@ -9,8 +9,8 @@ import de.tum.in.www1.hephaestus.profile.dto.ProfileActivityStatsDTO;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -64,15 +64,10 @@ public class ProfileActivityQueryService {
      * @param actorId the actor (user) to get stats for
      * @param since start of timeframe (inclusive)
      * @param until end of timeframe (exclusive)
-     * @return activity stats for the actor
+     * @return activity stats for the actor (always non-null; zeros when no activity)
      */
     @Transactional(readOnly = true)
-    public Optional<ProfileActivityStatsDTO> getActivityStats(
-        Long workspaceId,
-        Long actorId,
-        Instant since,
-        Instant until
-    ) {
+    public ProfileActivityStatsDTO getActivityStats(Long workspaceId, Long actorId, Instant since, Instant until) {
         log.debug(
             "Fetching profile activity stats: workspaceId={}, actorId={}, since={}, until={}",
             workspaceId,
@@ -90,13 +85,10 @@ public class ProfileActivityQueryService {
             until
         );
 
-        // Filter to the specific actor
-        Optional<ActivityXpProjection> actorXp = xpData
+        int totalScore = xpData
             .stream()
             .filter(xp -> actorId.equals(xp.getActorId()))
-            .findFirst();
-
-        int totalScore = actorXp
+            .findFirst()
             .map(ActivityXpProjection::getTotalExperiencePoints)
             .map(XpPrecision::roundToInt)
             .orElse(0);
@@ -115,24 +107,15 @@ public class ProfileActivityQueryService {
             since,
             until
         );
-        Map<Long, Long> openPullRequests = profilePullRequestQueryRepository
-            .countOpenPullRequestsByAuthors(workspaceId, actorIds, since, until)
-            .stream()
-            .collect(
-                java.util.stream.Collectors.toMap(AuthorCountProjection::getAuthorId, AuthorCountProjection::getCount)
-            );
-        Map<Long, Long> mergedPullRequests = profilePullRequestQueryRepository
-            .countMergedPullRequestsByAuthors(workspaceId, actorIds, since, until)
-            .stream()
-            .collect(
-                java.util.stream.Collectors.toMap(AuthorCountProjection::getAuthorId, AuthorCountProjection::getCount)
-            );
-        Map<Long, Long> closedPullRequests = profilePullRequestQueryRepository
-            .countClosedPullRequestsByAuthors(workspaceId, actorIds, since, until)
-            .stream()
-            .collect(
-                java.util.stream.Collectors.toMap(AuthorCountProjection::getAuthorId, AuthorCountProjection::getCount)
-            );
+        Map<Long, Long> openPullRequests = toAuthorCountMap(
+            profilePullRequestQueryRepository.countOpenPullRequestsByAuthors(workspaceId, actorIds, since, until)
+        );
+        Map<Long, Long> mergedPullRequests = toAuthorCountMap(
+            profilePullRequestQueryRepository.countMergedPullRequestsByAuthors(workspaceId, actorIds, since, until)
+        );
+        Map<Long, Long> closedPullRequests = toAuthorCountMap(
+            profilePullRequestQueryRepository.countClosedPullRequestsByAuthors(workspaceId, actorIds, since, until)
+        );
 
         // 3. Aggregate breakdown stats
         int approvals = 0;
@@ -176,22 +159,26 @@ public class ProfileActivityQueryService {
             reviewedPrCount
         );
 
-        return Optional.of(
-            new ProfileActivityStatsDTO(
-                totalScore,
-                reviewedPrCount,
-                approvals,
-                changeRequests,
-                comments,
-                codeComments,
-                unknowns,
-                ownReplies.getOrDefault(actorId, 0L).intValue(),
-                openPullRequests.getOrDefault(actorId, 0L).intValue(),
-                mergedPullRequests.getOrDefault(actorId, 0L).intValue(),
-                closedPullRequests.getOrDefault(actorId, 0L).intValue(),
-                openedIssues,
-                closedIssues
-            )
+        return new ProfileActivityStatsDTO(
+            totalScore,
+            reviewedPrCount,
+            approvals,
+            changeRequests,
+            comments,
+            codeComments,
+            unknowns,
+            ownReplies.getOrDefault(actorId, 0L).intValue(),
+            openPullRequests.getOrDefault(actorId, 0L).intValue(),
+            mergedPullRequests.getOrDefault(actorId, 0L).intValue(),
+            closedPullRequests.getOrDefault(actorId, 0L).intValue(),
+            openedIssues,
+            closedIssues
         );
+    }
+
+    private static Map<Long, Long> toAuthorCountMap(List<AuthorCountProjection> counts) {
+        return counts
+            .stream()
+            .collect(Collectors.toMap(AuthorCountProjection::getAuthorId, AuthorCountProjection::getCount));
     }
 }

@@ -20,7 +20,7 @@ import org.springframework.lang.NonNull;
  *
  * <p>The score is read from the activity_event ledger (CQRS pattern).
  */
-@JsonInclude(JsonInclude.Include.NON_EMPTY)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "A scored review activity entry with XP score for profile display")
 public record ProfileReviewActivityDTO(
     @NonNull @Schema(description = "Unique identifier of the review") Long id,
@@ -32,6 +32,6 @@ public record ProfileReviewActivityDTO(
     @Schema(description = "Author of the review") UserInfoDTO author,
     @Schema(description = "Pull request that was reviewed") PullRequestBaseInfoDTO pullRequest,
     @NonNull @Schema(description = "URL to the review on the git provider") String htmlUrl,
-    @Schema(description = "XP score earned for this review", example = "25") int score,
-    @Schema(description = "Timestamp when the review was submitted") Instant submittedAt
+    @NonNull @Schema(description = "XP score earned for this review", example = "25") Integer score,
+    @NonNull @Schema(description = "Timestamp when the review was submitted") Instant submittedAt
 ) {}

@@ -172,15 +172,18 @@ public class UserProfileService {
 
         // Review activity uses ActivityEvent as the source of truth, then hydrates git entities.
         List<ProfileReviewActivityDTO> reviewActivity = buildReviewActivity(
-            userEntity.getLogin(),
+            userEntity.getId(),
             workspaceId,
             timeRange
         );
 
         // Activity stats from activity events (matches leaderboard semantics)
-        ProfileActivityStatsDTO activityStats = profileActivityQueryService
-            .getActivityStats(workspaceId, userEntity.getId(), timeRange.after(), timeRange.before())
-            .orElse(ProfileActivityStatsDTO.empty());
+        ProfileActivityStatsDTO activityStats = profileActivityQueryService.getActivityStats(
+            workspaceId,
+            userEntity.getId(),
+            timeRange.after(),
+            timeRange.before()
+        );
 
         // Keep the backend list aligned with leaderboard semantics; the profile UI can merge
         // in visible own-PR activity when presenting this list.
@@ -239,17 +242,10 @@ public class UserProfileService {
      * <p><strong>Time range convention:</strong> Uses half-open interval [since, until)
      * consistent with leaderboard queries.
      */
-    private List<ProfileReviewActivityDTO> buildReviewActivity(String login, Long workspaceId, TimeRange timeRange) {
-        if (workspaceId == null || login == null) {
+    private List<ProfileReviewActivityDTO> buildReviewActivity(Long userId, Long workspaceId, TimeRange timeRange) {
+        if (workspaceId == null || userId == null) {
             return List.of();
         }
-
-        // Get user ID from login
-        Optional<User> userOpt = userRepository.findByLogin(login);
-        if (userOpt.isEmpty()) {
-            return List.of();
-        }
-        Long userId = userOpt.get().getId();
 
         // Query ActivityEvent table (same source as leaderboard)
         List<ActivityEvent> activityEvents = activityEventRepository.findProfileActivityByActorInTimeframe(

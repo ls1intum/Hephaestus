@@ -70,8 +70,4 @@ public record ProfileActivityStatsDTO(
     @NonNull
     @Schema(description = "Number of issues closed in the timeframe", example = "2")
     Integer numberOfClosedIssues
-) {
-    public static ProfileActivityStatsDTO empty() {
-        return new ProfileActivityStatsDTO(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    }
-}
+) {}

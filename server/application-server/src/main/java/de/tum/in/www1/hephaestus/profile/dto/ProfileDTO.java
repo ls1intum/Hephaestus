@@ -30,7 +30,10 @@ public record ProfileDTO(
     @NonNull
     @Schema(description = "Repositories the user has contributed to")
     List<RepositoryInfoDTO> contributedRepositories,
-    @Schema(description = "Recent scored review activity with XP scores") List<ProfileReviewActivityDTO> reviewActivity,
+    @NonNull
+    @Schema(description = "Recent scored review activity with XP scores")
+    List<ProfileReviewActivityDTO> reviewActivity,
+    @NonNull
     @Schema(description = "Currently open pull requests authored by the user")
     List<PullRequestInfoDTO> openPullRequests,
     @NonNull
