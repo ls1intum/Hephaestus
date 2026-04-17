@@ -309,7 +309,7 @@ class LeaderboardXpQueryServiceTest {
             );
             assertThat(result.get(100L).ownReplies()).isEqualTo(2);
             assertThat(result.get(100L).openPullRequests()).isEqualTo(1);
-            assertThat(result.get(100L).reviewedPullRequestCount()).isEqualTo(3);
+            assertThat(result.get(100L).reviewedPrCount()).isEqualTo(3);
             verify(activityEventRepository, never()).findExperiencePointsByWorkspaceAndTimeframe(any(), any(), any());
         }
 

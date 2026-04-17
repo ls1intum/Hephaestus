@@ -46,18 +46,6 @@ public record LeaderboardUserXp(
     int closedIssues
 ) {
     /**
-     * Returns the count of unique pull requests reviewed.
-     *
-     * <p>This value is set from a distinct PR count query, not derived from
-     * summing event counts (since one PR can have multiple review events).
-     *
-     * @return number of distinct PRs reviewed in the timeframe
-     */
-    public int reviewedPullRequestCount() {
-        return reviewedPrCount;
-    }
-
-    /**
      * Builder for incremental construction of {@link LeaderboardUserXp}.
      *
      * <p>Used by {@link LeaderboardXpQueryService} to accumulate breakdown stats

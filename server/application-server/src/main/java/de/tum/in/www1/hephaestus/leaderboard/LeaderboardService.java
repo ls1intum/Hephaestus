@@ -257,7 +257,7 @@ public class LeaderboardService {
                 userDto,
                 null,
                 reviewedPullRequests,
-                data.reviewedPullRequestCount(),
+                data.reviewedPrCount(),
                 data.approvals(),
                 data.changeRequests(),
                 data.comments(),
