@@ -170,14 +170,42 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for non-noreply email when not found")
-        void shouldReturnNullForNonNoreplyEmailWhenNotFound() {
-            when(userRepository.findByEmail("personal@gmail.com")).thenReturn(Optional.empty());
+        @DisplayName("should return null for dotted local-part email when not found")
+        void shouldReturnNullForDottedLocalPartEmailWhenNotFound() {
+            when(userRepository.findByEmail("first.last@gmail.com")).thenReturn(Optional.empty());
 
-            Long result = resolver.resolveByEmail("personal@gmail.com", null);
+            Long result = resolver.resolveByEmail("first.last@gmail.com", null);
 
             assertThat(result).isNull();
-            // Should NOT try findByLogin since it's not a noreply email
+            // Dotted local-parts are not login-shaped, so Strategy 3 should skip them.
+            verify(userRepository, never()).findByLogin(org.mockito.ArgumentMatchers.anyString());
+        }
+
+        @Test
+        @DisplayName("should fall back to email local-part login for TUM-style address")
+        void shouldFallBackToEmailLocalPartLoginForTumStyleAddress() {
+            when(userRepository.findByEmail("ge27coy@mytum.de")).thenReturn(Optional.empty());
+
+            User user = createUser(101L);
+            when(userRepository.findByLogin("ge27coy")).thenReturn(Optional.of(user));
+
+            Long result = resolver.resolveByEmail("ge27coy@mytum.de", null);
+
+            assertThat(result).isEqualTo(101L);
+            verify(userRepository).findByEmail("ge27coy@mytum.de");
+            verify(userRepository).findByLogin("ge27coy");
+        }
+
+        @Test
+        @DisplayName("should not try login match for GitLab bot noreply email")
+        void shouldNotTryLoginMatchForGitLabBotNoreplyEmail() {
+            when(userRepository.findByEmail("group_319719_bot_abc123@noreply.gitlab.lrz.de")).thenReturn(
+                Optional.empty()
+            );
+
+            Long result = resolver.resolveByEmail("group_319719_bot_abc123@noreply.gitlab.lrz.de", null);
+
+            assertThat(result).isNull();
             verify(userRepository, never()).findByLogin(org.mockito.ArgumentMatchers.anyString());
         }
 
