@@ -4330,6 +4330,8 @@ components:
       required:
       - activityStats
       - contributedRepositories
+      - openPullRequests
+      - reviewActivity
       - reviewedPullRequests
       - userInfo
       - xpRecord
@@ -4470,7 +4472,9 @@ components:
       - htmlUrl
       - id
       - isDismissed
+      - score
       - state
+      - submittedAt
     ProfileXpRecord:
       type: object
       description: User's XP and Level progress details

@@ -915,7 +915,7 @@ export type ProfileReviewActivity = {
     /**
      * XP score earned for this review
      */
-    score?: number;
+    score: number;
     /**
      * State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED, etc.)
      */
@@ -923,7 +923,7 @@ export type ProfileReviewActivity = {
     /**
      * Timestamp when the review was submitted
      */
-    submittedAt?: Date;
+    submittedAt: Date;
 };
 
 /**
@@ -1003,11 +1003,11 @@ export type Profile = {
     /**
      * Currently open pull requests authored by the user
      */
-    openPullRequests?: Array<PullRequestInfo>;
+    openPullRequests: Array<PullRequestInfo>;
     /**
      * Recent scored review activity with XP scores
      */
-    reviewActivity?: Array<ProfileReviewActivity>;
+    reviewActivity: Array<ProfileReviewActivity>;
     /**
      * Distinct pull requests reviewed by this user
      */
