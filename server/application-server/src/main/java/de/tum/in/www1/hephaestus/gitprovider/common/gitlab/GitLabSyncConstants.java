@@ -121,6 +121,15 @@ public final class GitLabSyncConstants {
     public static final int MERGE_REQUEST_SYNC_PAGE_SIZE = 10;
 
     /**
+     * Page size for the GitLab commit↔MR linker GraphQL query.
+     * <p>
+     * The linker inverts the relation and pulls {@code commitsWithoutMergeCommits(first:100)}
+     * per MR node. With outer {@code first: 20} and nested {@code first: 100} the
+     * GraphQL complexity budget lands at ~120, comfortably under GitLab's 250 cap.
+     */
+    public static final int LINK_COMMITS_PAGE_SIZE = 20;
+
+    /**
      * Large page size for simple entity queries (labels, milestones).
      */
     public static final int LARGE_PAGE_SIZE = 100;

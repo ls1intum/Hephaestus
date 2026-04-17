@@ -3,202 +3,393 @@ package de.tum.in.www1.hephaestus.gitprovider.commit.gitlab;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
-import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import java.time.Duration;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpHeaders;
+import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Links GitLab commits to their merge requests via the REST API.
+ * Links GitLab commits to their merge requests via GraphQL.
  * <p>
  * GitHub derives this mapping from GraphQL {@code Commit.associatedPullRequests}
  * inside {@code CommitMetadataEnrichmentService}. GitLab has no equivalent field
- * on the commit payload, so we call
- * {@code GET /api/v4/projects/:id/repository/commits/:sha/merge_requests}
- * and translate the {@code iid} values to {@code issue.number} rows via
- * {@link CommitRepository#linkCommitToPullRequests}.
+ * on the commit payload, so we invert the relation and query
+ * {@code Project.mergeRequests { commitsWithoutMergeCommits { sha } }} —
+ * collapsing {@code N} per-commit round trips into
+ * {@code ceil(M_updated / LINK_COMMITS_PAGE_SIZE)} batched GraphQL calls.
  * <p>
- * Runs after commit ingestion in the per-repo sync loop and is also invoked
- * opportunistically from the push webhook handler so that pushes get linked
- * without waiting for the next scheduled cycle.
+ * Uses {@code updatedAfter} for incremental runs so only MRs touched since the
+ * last sync are inspected; a null argument performs a full sweep (used by initial
+ * workspace bootstrap).
  */
 @Service
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
 public class GitLabCommitMergeRequestLinker {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabCommitMergeRequestLinker.class);
-    private static final int PER_PAGE = 100;
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
-    private static final int MAX_COMMITS_PER_BACKFILL = 5_000;
+
+    private static final String LINK_COMMITS_DOCUMENT = "LinkCommitsToMergeRequests";
+    private static final String GET_MR_COMMITS_DOCUMENT = "GetMergeRequestCommits";
 
     private final CommitRepository commitRepository;
-    private final GitLabTokenService tokenService;
-    private final WebClient webClient;
+    private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
+    private final GitLabProperties gitLabProperties;
 
     public GitLabCommitMergeRequestLinker(
         CommitRepository commitRepository,
-        GitLabTokenService tokenService,
-        WebClient.Builder webClientBuilder
+        GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
+        GitLabProperties gitLabProperties
     ) {
         this.commitRepository = commitRepository;
-        this.tokenService = tokenService;
-        this.webClient = webClientBuilder.build();
-        log.info("GitLabCommitMergeRequestLinker bean instantiated");
+        this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
+        this.gitLabProperties = gitLabProperties;
     }
 
     /**
-     * Backfills {@code commit_pull_request} rows for every commit in the repository
-     * that currently has no linkage. Safe to run on every sync cycle — unchanged
-     * commits are skipped by the "already linked" filter.
+     * Links commits to their merge requests for every MR updated after
+     * {@code updatedAfter} (or all MRs if {@code null}).
      *
-     * @return number of (commit, MR) pairs inserted (approximate; ON CONFLICT DO NOTHING is idempotent)
+     * @param scopeId       workspace scope whose access token is used
+     * @param repository    repository to link commits in
+     * @param updatedAfter  only consider MRs updated after this instant; null for a full sweep
+     * @return sync result with the number of (commit, MR) pairs inserted
      */
-    public int linkCommitsForRepository(Long scopeId, Repository repository) {
-        String safeProjectPath = sanitizeForLog(repository.getNameWithOwner());
-        List<CommitRepository.CommitIdShaProjection> unlinked =
-            commitRepository.findIdsAndShasWithoutPullRequestLinksByRepositoryId(repository.getId());
+    public SyncResult linkCommits(Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
+        String projectPath = repository.getNameWithOwner();
+        String safeProjectPath = sanitizeForLog(projectPath);
+        long repositoryId = repository.getId();
 
         log.info(
-            "GitLab commit→MR linker entry: project={}, repoId={}, unlinkedCount={}",
+            "Starting commit→MR linking: scopeId={}, projectPath={}, updatedAfter={}",
+            scopeId,
             safeProjectPath,
-            repository.getId(),
-            unlinked.size()
+            updatedAfter
         );
-
-        if (unlinked.isEmpty()) {
-            return 0;
-        }
-
-        if (unlinked.size() > MAX_COMMITS_PER_BACKFILL) {
-            log.info(
-                "Capping commit→MR linker backfill: project={}, unlinked={}, cap={}",
-                safeProjectPath,
-                unlinked.size(),
-                MAX_COMMITS_PER_BACKFILL
-            );
-            unlinked = unlinked.subList(0, MAX_COMMITS_PER_BACKFILL);
-        }
-
-        String serverUrl = tokenService.resolveServerUrl(scopeId);
-        String token = tokenService.getAccessToken(scopeId);
-        long nativeId = repository.getNativeId();
 
         int totalLinks = 0;
-        int commitsWithLinks = 0;
-        int errors = 0;
+        int mrsProcessed = 0;
+        String cursor = null;
+        String previousCursor = null;
+        int page = 0;
+        boolean rateLimitAborted = false;
+        boolean errorAborted = false;
 
-        for (CommitRepository.CommitIdShaProjection row : unlinked) {
-            try {
-                List<Integer> iids = fetchMergeRequestIids(serverUrl, token, nativeId, row.getSha());
-                if (!iids.isEmpty()) {
-                    commitRepository.linkCommitToPullRequests(row.getId(), repository.getId(), iids);
-                    totalLinks += iids.size();
-                    commitsWithLinks++;
+        try {
+            do {
+                if (page >= GitLabSyncConstants.MAX_PAGINATION_PAGES) {
+                    log.warn("Reached max pagination pages: scopeId={}, projectPath={}", scopeId, safeProjectPath);
+                    break;
                 }
-            } catch (WebClientResponseException e) {
-                errors++;
-                if (errors <= 5) {
-                    log.debug(
-                        "commit→MR lookup failed: project={}, sha={}, status={}",
+
+                graphQlClientProvider.acquirePermission();
+
+                try {
+                    graphQlClientProvider.waitIfRateLimitLow(scopeId);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.warn("commit→MR linker interrupted: scopeId={}, projectPath={}", scopeId, safeProjectPath);
+                    rateLimitAborted = true;
+                    break;
+                }
+
+                int remaining = graphQlClientProvider.getRateLimitRemaining(scopeId);
+                int pageSize = GitLabSyncConstants.adaptPageSize(GitLabSyncConstants.LINK_COMMITS_PAGE_SIZE, remaining);
+
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+
+                ClientGraphQlResponse response = client
+                    .documentName(LINK_COMMITS_DOCUMENT)
+                    .variable("fullPath", projectPath)
+                    .variable("first", pageSize)
+                    .variable("after", cursor)
+                    .variable("updatedAfter", updatedAfter != null ? updatedAfter.toString() : null)
+                    .execute()
+                    .block(gitLabProperties.extendedGraphqlTimeout());
+
+                var handleResult = responseHandler.handle(response, "commit→MR link for " + safeProjectPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    errorAborted = true;
+                    break;
+                }
+
+                graphQlClientProvider.recordSuccess();
+
+                @SuppressWarnings({ "unchecked", "rawtypes" })
+                List<Map<String, Object>> nodes = (List) response
+                    .field("project.mergeRequests.nodes")
+                    .toEntityList(Map.class);
+
+                if (nodes == null || nodes.isEmpty()) break;
+
+                for (Map<String, Object> mrNode : nodes) {
+                    Integer iid = extractIid(mrNode);
+                    if (iid == null) continue;
+
+                    try {
+                        List<String> shas = extractShas(mrNode);
+                        if (hasMoreCommits(mrNode)) {
+                            List<String> tail = fetchRemainingCommits(
+                                scopeId,
+                                projectPath,
+                                iid,
+                                extractNestedEndCursor(mrNode),
+                                safeProjectPath + "!" + iid
+                            );
+                            if (tail == null) {
+                                // Incomplete follow-up pagination: skip the MR to avoid partial links.
+                                continue;
+                            }
+                            shas.addAll(tail);
+                        }
+                        if (!shas.isEmpty()) {
+                            int inserted = commitRepository.linkPullRequestToCommits(repositoryId, iid, shas);
+                            totalLinks += inserted;
+                        }
+                        mrsProcessed++;
+                    } catch (Exception e) {
+                        log.warn(
+                            "Failed to link commits for MR: projectPath={}, iid={}, error={}",
+                            safeProjectPath,
+                            iid,
+                            e.getMessage()
+                        );
+                    }
+                }
+
+                GitLabPageInfo pageInfo = response
+                    .field("project.mergeRequests.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
+
+                if (pageInfo == null || !pageInfo.hasNextPage()) break;
+                cursor = pageInfo.endCursor();
+                if (cursor == null) {
+                    log.warn(
+                        "Pagination cursor is null despite hasNextPage=true: projectPath={}, page={}",
                         safeProjectPath,
-                        row.getSha(),
-                        e.getStatusCode().value()
+                        page
                     );
+                    break;
                 }
-            } catch (Exception e) {
-                errors++;
-                if (errors <= 5) {
-                    log.debug(
-                        "commit→MR lookup failed: project={}, sha={}, error={}",
-                        safeProjectPath,
-                        row.getSha(),
-                        e.getMessage()
-                    );
+                if (
+                    responseHandler.isPaginationLoop(
+                        cursor,
+                        previousCursor,
+                        "commit→MR link for " + safeProjectPath,
+                        log
+                    )
+                ) {
+                    errorAborted = true;
+                    break;
                 }
-            }
+                previousCursor = cursor;
+                page++;
+
+                try {
+                    Thread.sleep(gitLabProperties.paginationThrottle().toMillis());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    rateLimitAborted = true;
+                    break;
+                }
+            } while (true);
+        } catch (Exception e) {
+            graphQlClientProvider.recordFailure(e);
+            log.error("commit→MR linker failed: scopeId={}, projectPath={}", scopeId, safeProjectPath, e);
+            errorAborted = true;
+        }
+
+        SyncResult result;
+        if (errorAborted) {
+            result = SyncResult.abortedError(totalLinks);
+        } else if (rateLimitAborted) {
+            result = SyncResult.abortedRateLimit(totalLinks);
+        } else {
+            result = SyncResult.completed(totalLinks);
         }
 
         log.info(
-            "GitLab commit→MR backfill: project={}, scanned={}, commitsLinked={}, links={}, errors={}",
+            "Completed commit→MR linking: scopeId={}, projectPath={}, status={}, mrsProcessed={}, linksInserted={}",
+            scopeId,
             safeProjectPath,
-            unlinked.size(),
-            commitsWithLinks,
-            totalLinks,
-            errors
+            result.status(),
+            mrsProcessed,
+            totalLinks
         );
-        return totalLinks;
+
+        return result;
     }
 
-    /**
-     * Link a single commit to its merge requests. Best-effort: the caller should
-     * ignore failures because push-handler execution must not depend on a live
-     * REST call succeeding.
-     */
-    public int linkCommitToMergeRequests(Long scopeId, Repository repository, Long commitId, String sha) {
-        if (commitId == null || sha == null || sha.isBlank()) {
-            return 0;
-        }
-        String serverUrl = tokenService.resolveServerUrl(scopeId);
-        String token = tokenService.getAccessToken(scopeId);
+    // ========================================================================
+    // Node extraction helpers
+    // ========================================================================
+
+    @Nullable
+    private static Integer extractIid(Map<String, Object> mrNode) {
+        Object iid = mrNode.get("iid");
+        if (iid == null) return null;
         try {
-            List<Integer> iids = fetchMergeRequestIids(serverUrl, token, repository.getNativeId(), sha);
-            if (iids.isEmpty()) {
-                return 0;
-            }
-            commitRepository.linkCommitToPullRequests(commitId, repository.getId(), iids);
-            return iids.size();
-        } catch (Exception e) {
-            log.debug(
-                "commit→MR per-commit link failed: project={}, sha={}, error={}",
-                sanitizeForLog(repository.getNameWithOwner()),
-                sha,
-                e.getMessage()
-            );
-            return 0;
+            return iid instanceof Number n ? n.intValue() : Integer.parseInt(iid.toString());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 
     @SuppressWarnings("unchecked")
-    private List<Integer> fetchMergeRequestIids(String serverUrl, String token, long projectId, String sha) {
-        String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
-        String url =
-            base +
-            "/api/v4/projects/" +
-            projectId +
-            "/repository/commits/" +
-            sha +
-            "/merge_requests?per_page=" +
-            PER_PAGE;
-
-        List<Map<String, Object>> response = (List<Map<String, Object>>) (List<?>) webClient
-            .get()
-            .uri(url)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
-            .block(REQUEST_TIMEOUT);
-
-        if (response == null || response.isEmpty()) {
-            return List.of();
-        }
-
-        List<Integer> iids = new ArrayList<>(response.size());
-        for (Map<String, Object> mr : response) {
-            Object iid = mr.get("iid");
-            if (iid instanceof Number n) {
-                iids.add(n.intValue());
+    private static List<String> extractShas(Map<String, Object> mrNode) {
+        Map<String, Object> commitsMap = (Map<String, Object>) mrNode.get("commitsWithoutMergeCommits");
+        if (commitsMap == null) return new ArrayList<>();
+        List<Map<String, Object>> commitNodes = (List<Map<String, Object>>) commitsMap.get("nodes");
+        if (commitNodes == null || commitNodes.isEmpty()) return new ArrayList<>();
+        List<String> shas = new ArrayList<>(commitNodes.size());
+        for (Map<String, Object> node : commitNodes) {
+            Object sha = node.get("sha");
+            if (sha instanceof String s && !s.isBlank()) {
+                shas.add(s);
             }
         }
-        return iids;
+        return shas;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean hasMoreCommits(Map<String, Object> mrNode) {
+        Map<String, Object> commitsMap = (Map<String, Object>) mrNode.get("commitsWithoutMergeCommits");
+        if (commitsMap == null) return false;
+        Map<String, Object> pageInfo = (Map<String, Object>) commitsMap.get("pageInfo");
+        return pageInfo != null && Boolean.TRUE.equals(pageInfo.get("hasNextPage"));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private static String extractNestedEndCursor(Map<String, Object> mrNode) {
+        Map<String, Object> commitsMap = (Map<String, Object>) mrNode.get("commitsWithoutMergeCommits");
+        if (commitsMap == null) return null;
+        Map<String, Object> pageInfo = (Map<String, Object>) commitsMap.get("pageInfo");
+        if (pageInfo == null) return null;
+        return (String) pageInfo.get("endCursor");
+    }
+
+    // ========================================================================
+    // Follow-up pagination for MRs with >100 commits
+    // ========================================================================
+
+    /**
+     * Fetches commit SHAs beyond the first nested page (100 commits) for a single MR.
+     * Returns {@code null} if pagination could not complete — caller must then skip
+     * the MR rather than persist a partial link set.
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private List<String> fetchRemainingCommits(
+        Long scopeId,
+        String projectPath,
+        int iid,
+        @Nullable String afterCursor,
+        String context
+    ) {
+        if (afterCursor == null) return new ArrayList<>();
+
+        List<String> remaining = new ArrayList<>();
+        String cursor = afterCursor;
+        String previousNestedCursor = null;
+        int page = 0;
+
+        try {
+            while (cursor != null && page < GitLabSyncConstants.MAX_PAGINATION_PAGES) {
+                graphQlClientProvider.acquirePermission();
+                graphQlClientProvider.waitIfRateLimitLow(scopeId);
+
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+                ClientGraphQlResponse response = client
+                    .documentName(GET_MR_COMMITS_DOCUMENT)
+                    .variable("fullPath", projectPath)
+                    .variable("iid", Integer.toString(iid))
+                    .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(gitLabProperties.graphqlTimeout());
+
+                var handleResult = responseHandler.handle(response, "remaining MR commits for " + context, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    return null;
+                }
+
+                graphQlClientProvider.recordSuccess();
+
+                List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) (List<?>) response
+                    .field("project.mergeRequests.nodes")
+                    .toEntityList(Map.class);
+
+                if (mrNodes == null || mrNodes.isEmpty()) break;
+
+                Map<String, Object> commitsMap = (Map<String, Object>) mrNodes.get(0).get("commitsWithoutMergeCommits");
+                if (commitsMap == null) break;
+
+                List<Map<String, Object>> commitNodes = (List<Map<String, Object>>) commitsMap.get("nodes");
+                if (commitNodes == null || commitNodes.isEmpty()) break;
+
+                for (Map<String, Object> node : commitNodes) {
+                    Object sha = node.get("sha");
+                    if (sha instanceof String s && !s.isBlank()) {
+                        remaining.add(s);
+                    }
+                }
+
+                Map<String, Object> pageInfo = (Map<String, Object>) commitsMap.get("pageInfo");
+                if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
+                cursor = (String) pageInfo.get("endCursor");
+                if (
+                    responseHandler.isPaginationLoop(
+                        cursor,
+                        previousNestedCursor,
+                        "remaining MR commits for " + context,
+                        log
+                    )
+                ) {
+                    return null;
+                }
+                previousNestedCursor = cursor;
+                page++;
+
+                Thread.sleep(gitLabProperties.paginationThrottle().toMillis());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (Exception e) {
+            log.warn("Error during nested commit pagination, aborting MR link: context={}", context, e);
+            return null;
+        }
+
+        if (!remaining.isEmpty()) {
+            log.info("Fetched {} additional commits via follow-up pagination: context={}", remaining.size(), context);
+        }
+
+        return remaining;
     }
 }

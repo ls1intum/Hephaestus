@@ -621,10 +621,11 @@ public class GitLabWorkspaceInitializationService {
                 }
             }
 
-            // Link commits to their merge requests (must run after both commits and MRs have synced)
+            // Link commits to their merge requests (must run after both commits and MRs have synced).
+            // Initial bootstrap performs a full sweep (updatedAfter == null).
             if (commitMrLinker != null) {
                 try {
-                    commitMrLinker.linkCommitsForRepository(workspace.getId(), repo);
+                    commitMrLinker.linkCommits(workspace.getId(), repo, null);
                 } catch (Exception e) {
                     log.warn(
                         "Failed commit→MR linking: workspaceId={}, repo={}",

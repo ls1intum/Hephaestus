@@ -1,0 +1,22 @@
+query LinkCommitsToMergeRequests($fullPath: ID!, $first: Int!, $after: String, $updatedAfter: Time) {
+    project(fullPath: $fullPath) {
+        mergeRequests(first: $first, after: $after, updatedAfter: $updatedAfter, sort: UPDATED_DESC) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                iid
+                commitsWithoutMergeCommits(first: 100) {
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        sha
+                    }
+                }
+            }
+        }
+    }
+}

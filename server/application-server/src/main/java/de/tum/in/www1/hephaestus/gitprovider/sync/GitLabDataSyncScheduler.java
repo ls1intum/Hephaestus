@@ -437,10 +437,12 @@ public class GitLabDataSyncScheduler {
                 }
             }
 
-            // Link commits to their merge requests (must run after both commits and MRs have synced)
+            // Link commits to their merge requests (must run after both commits and MRs have synced).
+            // The linker inverts the relation: one GraphQL call fans out per MR updated since
+            // `updatedAfter`, reading nested commit SHAs in bulk and upserting the join rows.
             if (commitMrLinker != null) {
                 try {
-                    commitMrLinker.linkCommitsForRepository(session.scopeId(), repo);
+                    commitMrLinker.linkCommits(session.scopeId(), repo, updatedAfter);
                 } catch (Exception e) {
                     log.warn(
                         "Failed commit→MR linking: scopeId={}, repo={}",

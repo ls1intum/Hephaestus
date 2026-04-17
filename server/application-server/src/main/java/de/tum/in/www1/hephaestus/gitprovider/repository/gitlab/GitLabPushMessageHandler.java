@@ -159,13 +159,14 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
             );
             ensureOrganizationLinked(repository, projectPath, provider);
 
+            Long scopeId = resolveScopeId(repository);
+
             // Decide between local git enrichment and webhook-only processing.
             // Local git provides line-level diff stats (additions/deletions per file).
             // Full enrichment (clone + commit walk) only for default branch pushes.
             // But we ALWAYS fetch on any branch push if the repo is already cloned,
             // so the practice review pipeline has fresh refs for diff computation.
             if (event.isDefaultBranch() && gitRepositoryManager.isEnabled()) {
-                Long scopeId = resolveScopeId(repository);
                 boolean scopeActive = scopeId != null && syncTargetProvider.isScopeActiveForSync(scopeId);
 
                 if (scopeActive) {
@@ -182,8 +183,26 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
                 }
                 processCommitsViaWebhook(event, repository, false);
             }
+
+            linkCommitsToMergeRequests(scopeId, repository);
         } else {
             log.warn("Failed to upsert project from push event: projectPath={}", safeProjectPath);
+        }
+    }
+
+    /**
+     * Runs one batched commit→MR linker pass covering MRs updated in the push window.
+     * A single GraphQL round trip replaces the per-commit call that previously ran
+     * inside {@link #publishCommitCreated}, collapsing N calls per push into 1.
+     */
+    private void linkCommitsToMergeRequests(@Nullable Long scopeId, Repository repository) {
+        if (scopeId == null) {
+            return;
+        }
+        try {
+            commitMergeRequestLinker.linkCommits(scopeId, repository, OffsetDateTime.now().minusHours(1));
+        } catch (Exception e) {
+            log.debug("Push-time commit→MR link failed: repoId={}, error={}", repository.getId(), e.getMessage());
         }
     }
 
@@ -444,21 +463,6 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         }
 
         Long scopeId = resolveScopeId(repository);
-
-        // Link this commit to its merge requests via GitLab REST (best-effort — scheduled
-        // sync re-runs the same backfill, so a transient failure here is self-healing).
-        if (scopeId != null) {
-            try {
-                commitMergeRequestLinker.linkCommitToMergeRequests(scopeId, repository, commit.getId(), sha);
-            } catch (Exception e) {
-                log.debug(
-                    "Push-time commit→MR link failed: repoId={}, sha={}, error={}",
-                    repository.getId(),
-                    sha,
-                    e.getMessage()
-                );
-            }
-        }
 
         EventPayload.CommitData commitData = EventPayload.CommitData.from(commit);
         EventContext context = new EventContext(

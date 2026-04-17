@@ -1,0 +1,411 @@
+package de.tum.in.www1.hephaestus.gitprovider.commit.gitlab;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler.HandleResult;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.ClientResponseField;
+import org.springframework.graphql.client.HttpGraphQlClient;
+import reactor.core.publisher.Mono;
+
+@Tag("unit")
+@DisplayName("GitLabCommitMergeRequestLinker")
+class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
+
+    private static final Long SCOPE_ID = 7L;
+    private static final Long REPO_ID = 42L;
+    private static final String PROJECT_PATH = "org/proj";
+    private static final OffsetDateTime UPDATED_AFTER = OffsetDateTime.of(2026, 4, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+
+    @Mock
+    private CommitRepository commitRepository;
+
+    @Mock
+    private GitLabGraphQlClientProvider graphQlClientProvider;
+
+    @Mock
+    private GitLabGraphQlResponseHandler responseHandler;
+
+    private final GitLabProperties gitLabProperties = new GitLabProperties(
+        "https://gitlab.com",
+        Duration.ofSeconds(30),
+        Duration.ofSeconds(60),
+        Duration.ofMillis(1), // fast throttle for tests
+        Duration.ofMinutes(5)
+    );
+
+    private GitLabCommitMergeRequestLinker linker;
+    private Repository repository;
+
+    @BeforeEach
+    void setUp() {
+        lenient()
+            .when(responseHandler.handle(any(), anyString(), any()))
+            .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
+        lenient().when(graphQlClientProvider.getRateLimitRemaining(anyLong())).thenReturn(100);
+
+        linker = new GitLabCommitMergeRequestLinker(
+            commitRepository,
+            graphQlClientProvider,
+            responseHandler,
+            gitLabProperties
+        );
+
+        repository = new Repository();
+        repository.setId(REPO_ID);
+        repository.setNameWithOwner(PROJECT_PATH);
+    }
+
+    @Test
+    @DisplayName("single-page response links commits to their MRs")
+    void singlePage_linksCommitsToMergeRequests() {
+        ClientGraphQlResponse page = mockMrsPage(
+            List.of(mrNode(101, List.of("sha-a1", "sha-a2"), false, null), mrNode(102, List.of("sha-b1"), false, null)),
+            new GitLabPageInfo(false, null)
+        );
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, page);
+        when(
+            commitRepository.linkPullRequestToCommits(eq(REPO_ID), eq(101), eq(List.of("sha-a1", "sha-a2")))
+        ).thenReturn(2);
+        when(commitRepository.linkPullRequestToCommits(eq(REPO_ID), eq(102), eq(List.of("sha-b1")))).thenReturn(1);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        assertThat(result.count()).isEqualTo(3);
+        verify(commitRepository).linkPullRequestToCommits(REPO_ID, 101, List.of("sha-a1", "sha-a2"));
+        verify(commitRepository).linkPullRequestToCommits(REPO_ID, 102, List.of("sha-b1"));
+        verify(graphQlClientProvider).acquirePermission();
+        verify(graphQlClientProvider).recordSuccess();
+    }
+
+    @Test
+    @DisplayName("MR with no commits is skipped without calling the repository")
+    void mrWithNoCommits_isSkipped() {
+        ClientGraphQlResponse page = mockMrsPage(
+            List.of(mrNode(55, List.of(), false, null)),
+            new GitLabPageInfo(false, null)
+        );
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, page);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        assertThat(result.count()).isZero();
+        verify(commitRepository, never()).linkPullRequestToCommits(anyLong(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("multi-page outer pagination visits all pages before completing")
+    void multiPagePagination_visitsAllPages() {
+        ClientGraphQlResponse page1 = mockMrsPage(
+            List.of(mrNode(1, List.of("sha-1"), false, null)),
+            new GitLabPageInfo(true, "cursor-1")
+        );
+        ClientGraphQlResponse page2 = mockMrsPage(
+            List.of(mrNode(2, List.of("sha-2"), false, null)),
+            new GitLabPageInfo(false, null)
+        );
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, page1, page2);
+        when(commitRepository.linkPullRequestToCommits(eq(REPO_ID), anyInt(), any())).thenReturn(1);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        assertThat(result.count()).isEqualTo(2);
+        verify(commitRepository).linkPullRequestToCommits(REPO_ID, 1, List.of("sha-1"));
+        verify(commitRepository).linkPullRequestToCommits(REPO_ID, 2, List.of("sha-2"));
+        verify(graphQlClientProvider, atLeast(2)).acquirePermission();
+    }
+
+    @Test
+    @DisplayName("ABORT from response handler records failure and aborts with error")
+    void abortAction_recordsFailureAndAbortsWithError() {
+        ClientGraphQlResponse invalid = mock(ClientGraphQlResponse.class);
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, invalid);
+        when(responseHandler.handle(eq(invalid), anyString(), any())).thenReturn(
+            new HandleResult(HandleResult.Action.ABORT, null)
+        );
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.ABORTED_ERROR);
+        assertThat(result.count()).isZero();
+        verify(graphQlClientProvider).recordFailure(any());
+        verify(commitRepository, never()).linkPullRequestToCommits(anyLong(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("RETRY from response handler repeats the request on the same cursor")
+    void retryAction_repeatsRequestOnSameCursor() {
+        ClientGraphQlResponse transientFailure = mock(ClientGraphQlResponse.class);
+        ClientGraphQlResponse good = mockMrsPage(
+            List.of(mrNode(7, List.of("sha-7"), false, null)),
+            new GitLabPageInfo(false, null)
+        );
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, transientFailure, good);
+        // First call -> RETRY, second call -> CONTINUE
+        when(responseHandler.handle(any(), anyString(), any())).thenReturn(
+            new HandleResult(HandleResult.Action.RETRY, null),
+            new HandleResult(HandleResult.Action.CONTINUE, null)
+        );
+        when(commitRepository.linkPullRequestToCommits(eq(REPO_ID), eq(7), eq(List.of("sha-7")))).thenReturn(1);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        assertThat(result.count()).isEqualTo(1);
+        verify(graphQlClientProvider, atLeast(2)).acquirePermission();
+        // recordSuccess only after the CONTINUE response, not after RETRY
+        verify(graphQlClientProvider).recordSuccess();
+    }
+
+    @Test
+    @DisplayName("pagination loop (same cursor twice) aborts with error")
+    void paginationLoop_abortsWithError() {
+        ClientGraphQlResponse page1 = mockMrsPage(
+            List.of(mrNode(1, List.of("sha-1"), false, null)),
+            new GitLabPageInfo(true, "stuck-cursor")
+        );
+        ClientGraphQlResponse page2 = mockMrsPage(
+            List.of(mrNode(2, List.of("sha-2"), false, null)),
+            new GitLabPageInfo(true, "stuck-cursor")
+        );
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, page1, page2);
+        when(commitRepository.linkPullRequestToCommits(eq(REPO_ID), anyInt(), any())).thenReturn(1);
+        // Loop detector fires on second page (same cursor returned).
+        // Lenient because strict stubbing otherwise throws PotentialStubbingProblem
+        // on iteration 1 where previousCursor is null (non-matching args).
+        lenient()
+            .when(responseHandler.isPaginationLoop(eq("stuck-cursor"), eq("stuck-cursor"), anyString(), any()))
+            .thenReturn(true);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.ABORTED_ERROR);
+        // Both pages' MRs were persisted before the loop was detected on the second pageInfo.
+        assertThat(result.count()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("follow-up pagination fetches remaining commits for MRs with >100 commits")
+    void mrWithMoreCommits_followUpPaginationMerges() {
+        ClientGraphQlResponse outerPage = mockMrsPage(
+            List.of(mrNode(9, List.of("head-1", "head-2"), true, "nested-cursor-1")),
+            new GitLabPageInfo(false, null)
+        );
+        ClientGraphQlResponse nestedPage = mockNestedMrCommitsPage(
+            List.of("tail-1", "tail-2"),
+            new GitLabPageInfo(false, null)
+        );
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, outerPage, nestedPage);
+        when(commitRepository.linkPullRequestToCommits(eq(REPO_ID), eq(9), any())).thenReturn(4);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        assertThat(result.count()).isEqualTo(4);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> shasCaptor = ArgumentCaptor.forClass(List.class);
+        verify(commitRepository).linkPullRequestToCommits(eq(REPO_ID), eq(9), shasCaptor.capture());
+        assertThat(shasCaptor.getValue()).containsExactly("head-1", "head-2", "tail-1", "tail-2");
+    }
+
+    @Test
+    @DisplayName("follow-up pagination ABORT skips the MR (no partial links)")
+    void nestedPaginationAbort_skipsMrWithoutPartialLinks() {
+        ClientGraphQlResponse outerPage = mockMrsPage(
+            List.of(mrNode(11, List.of("head-1"), true, "nested-cursor-1")),
+            new GitLabPageInfo(false, null)
+        );
+        ClientGraphQlResponse nestedInvalid = mock(ClientGraphQlResponse.class);
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, outerPage, nestedInvalid);
+        // Outer page handled as CONTINUE; nested page handled as ABORT.
+        when(responseHandler.handle(any(), anyString(), any())).thenReturn(
+            new HandleResult(HandleResult.Action.CONTINUE, null),
+            new HandleResult(HandleResult.Action.ABORT, null)
+        );
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        // Outer sync itself completed; just the one MR was skipped.
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        assertThat(result.count()).isZero();
+        verify(commitRepository, never()).linkPullRequestToCommits(anyLong(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("unexpected exception during execute records failure and aborts with error")
+    void unexpectedException_recordsFailureAndAbortsWithError() {
+        HttpGraphQlClient client = mockClient();
+        HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName(anyString())).thenReturn(requestSpec);
+        when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
+        when(requestSpec.execute()).thenThrow(new RuntimeException("boom"));
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.ABORTED_ERROR);
+        assertThat(result.count()).isZero();
+        verify(graphQlClientProvider).recordFailure(any());
+    }
+
+    @Test
+    @DisplayName("full sweep (null updatedAfter) passes null variable to GraphQL")
+    void nullUpdatedAfter_passesNullVariable() {
+        ClientGraphQlResponse page = mockMrsPage(List.of(), new GitLabPageInfo(false, null));
+        HttpGraphQlClient client = mockClient();
+        HttpGraphQlClient.RequestSpec requestSpec = mockSequentialExecute(client, page);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, null);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        verify(requestSpec).variable(eq("updatedAfter"), eq(null));
+    }
+
+    // ------------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------------
+
+    private HttpGraphQlClient mockClient() {
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        when(graphQlClientProvider.forScope(any())).thenReturn(client);
+        return client;
+    }
+
+    @SafeVarargs
+    private HttpGraphQlClient.RequestSpec mockSequentialExecute(
+        HttpGraphQlClient client,
+        ClientGraphQlResponse first,
+        ClientGraphQlResponse... rest
+    ) {
+        HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName(anyString())).thenReturn(requestSpec);
+        when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
+
+        var stubbing = when(requestSpec.execute()).thenReturn(Mono.just(first));
+        for (ClientGraphQlResponse response : rest) {
+            stubbing = stubbing.thenReturn(Mono.just(response));
+        }
+        return requestSpec;
+    }
+
+    @SuppressWarnings("unchecked")
+    private ClientGraphQlResponse mockMrsPage(List<Map<String, Object>> nodes, GitLabPageInfo pageInfo) {
+        ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
+        lenient().when(resp.isValid()).thenReturn(true);
+
+        ClientResponseField nodesField = mock(ClientResponseField.class);
+        lenient().when(nodesField.<Map>toEntityList(any(Class.class))).thenReturn((List) nodes);
+        lenient().when(resp.field("project.mergeRequests.nodes")).thenReturn(nodesField);
+
+        ClientResponseField pageInfoField = mock(ClientResponseField.class);
+        lenient().when(pageInfoField.<GitLabPageInfo>toEntity(any(Class.class))).thenReturn(pageInfo);
+        lenient().when(resp.field("project.mergeRequests.pageInfo")).thenReturn(pageInfoField);
+
+        return resp;
+    }
+
+    /**
+     * Mocks the follow-up {@code GetMergeRequestCommits} response shape:
+     * {@code project.mergeRequests.nodes[0].commitsWithoutMergeCommits.{nodes,pageInfo}}.
+     */
+    @SuppressWarnings("unchecked")
+    private ClientGraphQlResponse mockNestedMrCommitsPage(List<String> shas, GitLabPageInfo pageInfo) {
+        ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
+        lenient().when(resp.isValid()).thenReturn(true);
+
+        Map<String, Object> pageInfoMap = new LinkedHashMap<>();
+        pageInfoMap.put("hasNextPage", pageInfo.hasNextPage());
+        pageInfoMap.put("endCursor", pageInfo.endCursor());
+
+        Map<String, Object> commitsMap = new LinkedHashMap<>();
+        commitsMap.put(
+            "nodes",
+            shas
+                .stream()
+                .map(sha -> Map.<String, Object>of("sha", sha))
+                .toList()
+        );
+        commitsMap.put("pageInfo", pageInfoMap);
+
+        Map<String, Object> mrNode = new LinkedHashMap<>();
+        mrNode.put("commitsWithoutMergeCommits", commitsMap);
+
+        ClientResponseField nodesField = mock(ClientResponseField.class);
+        when(nodesField.<Map>toEntityList(any(Class.class))).thenReturn((List) List.of(mrNode));
+        when(resp.field("project.mergeRequests.nodes")).thenReturn(nodesField);
+
+        return resp;
+    }
+
+    /**
+     * Builds the map shape that the linker reads from
+     * {@code project.mergeRequests.nodes[*]}.
+     */
+    private static Map<String, Object> mrNode(
+        int iid,
+        List<String> shas,
+        boolean nestedHasNextPage,
+        String nestedEndCursor
+    ) {
+        Map<String, Object> pageInfoMap = new LinkedHashMap<>();
+        pageInfoMap.put("hasNextPage", nestedHasNextPage);
+        pageInfoMap.put("endCursor", nestedEndCursor);
+
+        Map<String, Object> commitsMap = new LinkedHashMap<>();
+        commitsMap.put(
+            "nodes",
+            shas
+                .stream()
+                .map(sha -> Map.<String, Object>of("sha", sha))
+                .toList()
+        );
+        commitsMap.put("pageInfo", pageInfoMap);
+
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("iid", iid);
+        node.put("commitsWithoutMergeCommits", commitsMap);
+        return node;
+    }
+}
