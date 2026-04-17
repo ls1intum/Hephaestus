@@ -33,6 +33,7 @@ Set the following secrets before starting the stack:
 | `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` | Secret used by the app server to call Keycloak |
 | `SLACK_BOT_TOKEN` | Optional: Slack bot token for notifications |
 | `SLACK_SIGNING_SECRET` | Optional: Slack signing secret for webhook verification |
+| `LEGAL_PROFILE` | Selects a bundled imprint/privacy profile. Use `tum` only for the canonical AET deployment; self-hosters leave empty and mount `/legal-overrides/`. See [Legal Pages](./legal-pages). |
 
 ### GitHub integration
 
@@ -158,6 +159,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
    - Verify that the super admin user can access workspace admin endpoints for workspaces where they have membership (they are automatically elevated to workspace ADMIN level for those workspaces).
    - Trigger a test webhook from GitHub or GitLab to validate the ingest pipeline.
    - Verify that `GITLAB_ENABLED`, `GITLAB_WORKSPACE_CREATION`, `SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` are all present in the deployed environment before testing GitLab practice review.
+   - Open `/imprint` and `/privacy`. If the red "not configured" banner is shown, configure a [legal profile or overrides](./legal-pages) **before** opening the deployment to end users — serving the built-in disclaimer is a § 5 DDG / Art. 13 GDPR violation.
 
 ## Global admin privileges
 
