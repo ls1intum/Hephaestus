@@ -1,5 +1,6 @@
 import {
 	CheckIcon,
+	ChevronLeftIcon,
 	CommentDiscussionIcon,
 	CommentIcon,
 	FileDiffIcon,
@@ -96,11 +97,16 @@ export function ActivityBadges({
 				Activity badges. Reviews affect score. The rest is shown for context.
 			</span>
 			{reviewedPullRequests.length > 0 && (
-				<ReviewsPopover
-					reviewedPullRequests={reviewedPullRequests}
-					highlight={highlightReviews}
-					providerType={providerType}
-				/>
+				<>
+					<ReviewsPopover
+						reviewedPullRequests={reviewedPullRequests}
+						highlight={highlightReviews}
+						providerType={providerType}
+					/>
+					<div className="flex items-center text-provider-muted-foreground">
+						<ChevronLeftIcon className="h-4 w-4" />
+					</div>
+				</>
 			)}
 			{changeRequests > 0 && (
 				<Tooltip>
@@ -158,10 +164,7 @@ export function ActivityBadges({
 				</Tooltip>
 			)}
 			{hasScoredActivity && hasVisibleOnlyActivity && (
-				<>
-					<div className="mx-1 h-4 border-l border-border" aria-hidden="true" />
-					<span className="text-xs text-muted-foreground">Also shown</span>
-				</>
+				<div className="mx-1 h-4 border-l border-border" aria-hidden="true" />
 			)}
 			{ownReplies > 0 && (
 				<Tooltip>
@@ -241,7 +244,7 @@ export function ActivityBadges({
 					<TooltipTrigger
 						className="cursor-help"
 						aria-label={`${closedIssues} closed issues. Visible only and does not affect score.`}
-						render={<div className="flex items-center gap-1 text-provider-closed-foreground" />}
+						render={<div className="flex items-center gap-1 text-provider-done-foreground" />}
 					>
 						<IssueClosedIcon className="h-4 w-4" />
 						<span>{closedIssues}</span>
