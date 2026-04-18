@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.BaseGitLabProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -163,11 +164,13 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         }
 
         User author = findOrCreateUser(
-            data.authorGlobalId(),
-            data.authorUsername(),
-            data.authorName(),
-            data.authorAvatarUrl(),
-            data.authorWebUrl(),
+            GitLabUserLookup.of(
+                data.authorGlobalId(),
+                data.authorUsername(),
+                data.authorName(),
+                data.authorAvatarUrl(),
+                data.authorWebUrl()
+            ),
             providerId
         );
 
