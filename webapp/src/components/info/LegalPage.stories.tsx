@@ -1,14 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import {
 	LEGAL_PAGE_TITLES,
-	type LegalLocale,
 	type LegalPageId,
 	type ResolvedLegalContent,
 	type resolveLegalContent,
 } from "@/lib/legal";
 import { LegalPage } from "./LegalPage";
 
-const TUM_IMPRINT_EN = `Information in accordance with § 5 DDG — German Digital Services Act.
+const TUM_IMPRINT = `Information in accordance with § 5 DDG — German Digital Services Act.
 
 ## Publisher
 
@@ -19,18 +18,7 @@ Technical University of Munich  \nArcisstraße 21  \n80333 Munich, Germany
 Prof. Dr. Stephan Krusche  \nApplied Education Technologies (AET)  \nBoltzmannstraße 3  \n85748 Garching bei München, Germany
 `;
 
-const TUM_IMPRINT_DE = `Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz).
-
-## Herausgeber
-
-Technische Universität München  \nArcisstraße 21  \n80333 München, Deutschland
-
-## Inhaltlich verantwortlich
-
-Prof. Dr. Stephan Krusche  \nApplied Education Technologies (AET)  \nBoltzmannstraße 3  \n85748 Garching bei München, Deutschland
-`;
-
-const TUM_PRIVACY_EN = `# Privacy Statement
+const TUM_PRIVACY = `# Privacy Statement
 
 The Technical University of Munich (TUM), through AET, operates the Hephaestus platform.
 
@@ -41,19 +29,6 @@ Technical University of Munich  \nArcisstraße 21, 80333 Munich, Germany
 ## 7. Third-Country Transfers
 
 Recipients in the U.S. are DPF-certified under Art. 45(3) GDPR; SCCs under Art. 46(2)(c) GDPR serve as a fall-back.
-`;
-
-const TUM_PRIVACY_DE = `# Datenschutzerklärung
-
-Die Technische Universität München (TUM) betreibt über AET die Hephaestus-Plattform.
-
-## 1. Verantwortlicher
-
-Technische Universität München  \nArcisstraße 21, 80333 München, Deutschland
-
-## 7. Drittlandsübermittlungen
-
-Empfänger in den USA sind DPF-zertifiziert gemäß Art. 45 Abs. 3 DSGVO; Standardvertragsklauseln gemäß Art. 46 Abs. 2 lit. c DSGVO dienen als Auffang-Garantie.
 `;
 
 const DISCLAIMER_IMPRINT = `# Imprint not configured
@@ -69,22 +44,21 @@ This Hephaestus instance has been deployed without a legal profile. The operator
 `;
 
 type FixtureKey = "tum" | "disclaimer";
-const FIXTURES: Record<FixtureKey, Record<LegalPageId, Record<LegalLocale, string>>> = {
+const FIXTURES: Record<FixtureKey, Record<LegalPageId, string>> = {
 	tum: {
-		imprint: { en: TUM_IMPRINT_EN, de: TUM_IMPRINT_DE },
-		privacy: { en: TUM_PRIVACY_EN, de: TUM_PRIVACY_DE },
+		imprint: TUM_IMPRINT,
+		privacy: TUM_PRIVACY,
 	},
 	disclaimer: {
-		imprint: { en: DISCLAIMER_IMPRINT, de: DISCLAIMER_IMPRINT },
-		privacy: { en: DISCLAIMER_PRIVACY, de: DISCLAIMER_PRIVACY },
+		imprint: DISCLAIMER_IMPRINT,
+		privacy: DISCLAIMER_PRIVACY,
 	},
 };
 
 function makeResolver(key: FixtureKey): typeof resolveLegalContent {
-	return async (page, locale): Promise<ResolvedLegalContent> => ({
-		markdown: FIXTURES[key][page][locale],
+	return async (page): Promise<ResolvedLegalContent> => ({
+		markdown: FIXTURES[key][page],
 		source: key === "tum" ? "profile" : "disclaimer",
-		locale,
 		profile: key === "tum" ? "tum" : "",
 	});
 }
@@ -112,14 +86,9 @@ const meta = {
 			control: { type: "inline-radio" },
 			options: ["imprint", "privacy"] satisfies LegalPageId[],
 		},
-		initialLocale: {
-			description: "Initial locale; otherwise detected from `navigator.languages`.",
-			control: { type: "inline-radio" },
-			options: ["en", "de"] satisfies LegalLocale[],
-		},
 		title: {
-			description: "Page title per locale (shown above the Markdown body).",
-			control: "object",
+			description: "Page title (shown above the Markdown body).",
+			control: "text",
 		},
 		resolver: {
 			description: "Injected async resolver (fixture in stories, real fetcher in prod).",
@@ -135,42 +104,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** TUM profile — canonical upstream deployment, English. */
-export const TumImprintEn: Story = {
+/** TUM profile — canonical upstream imprint. */
+export const TumImprint: Story = {
 	args: {
 		page: "imprint",
 		title: LEGAL_PAGE_TITLES.imprint,
-		initialLocale: "en",
 		resolver: makeResolver("tum"),
 	},
 };
 
-/** TUM profile — canonical upstream deployment, German. */
-export const TumImprintDe: Story = {
-	args: {
-		page: "imprint",
-		title: LEGAL_PAGE_TITLES.imprint,
-		initialLocale: "de",
-		resolver: makeResolver("tum"),
-	},
-};
-
-/** TUM privacy statement, English. */
-export const TumPrivacyEn: Story = {
+/** TUM profile — canonical upstream privacy statement. */
+export const TumPrivacy: Story = {
 	args: {
 		page: "privacy",
 		title: LEGAL_PAGE_TITLES.privacy,
-		initialLocale: "en",
-		resolver: makeResolver("tum"),
-	},
-};
-
-/** TUM privacy statement, German. */
-export const TumPrivacyDe: Story = {
-	args: {
-		page: "privacy",
-		title: LEGAL_PAGE_TITLES.privacy,
-		initialLocale: "de",
 		resolver: makeResolver("tum"),
 	},
 };
@@ -180,7 +127,6 @@ export const DisclaimerImprint: Story = {
 	args: {
 		page: "imprint",
 		title: LEGAL_PAGE_TITLES.imprint,
-		initialLocale: "en",
 		resolver: makeResolver("disclaimer"),
 	},
 };
@@ -190,7 +136,6 @@ export const DisclaimerPrivacy: Story = {
 	args: {
 		page: "privacy",
 		title: LEGAL_PAGE_TITLES.privacy,
-		initialLocale: "en",
 		resolver: makeResolver("disclaimer"),
 	},
 };

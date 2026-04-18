@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	detectLegalLocale,
 	isSafeLegalHref,
 	isSafeLegalImageSrc,
 	isValidLegalProfile,
@@ -8,36 +7,11 @@ import {
 } from "./legal";
 
 const TUM_PROFILE_MARKERS = [
-	"Technische Universität München",
 	"Technical University of Munich",
 	"85748 Garching",
 	"Prof. Dr. Stephan Krusche",
 	"ls1.admin@in.tum.de",
 ];
-
-describe("detectLegalLocale", () => {
-	it("returns 'de' for German navigator locales", () => {
-		expect(detectLegalLocale({ language: "de", languages: ["de"] })).toBe("de");
-		expect(detectLegalLocale({ language: "de-DE", languages: ["de-DE"] })).toBe("de");
-		expect(detectLegalLocale({ language: "de-AT", languages: ["de-AT"] })).toBe("de");
-	});
-
-	it("returns 'en' for English navigator locales", () => {
-		expect(detectLegalLocale({ language: "en", languages: ["en"] })).toBe("en");
-		expect(detectLegalLocale({ language: "en-US", languages: ["en-US"] })).toBe("en");
-	});
-
-	it("returns 'en' for unsupported locales", () => {
-		expect(detectLegalLocale({ language: "fr-FR", languages: ["fr-FR"] })).toBe("en");
-		expect(detectLegalLocale({ language: "", languages: [] })).toBe("en");
-	});
-
-	it("prefers the first matching entry in navigator.languages", () => {
-		expect(detectLegalLocale({ language: "en-US", languages: ["fr-FR", "de-DE", "en-US"] })).toBe(
-			"de",
-		);
-	});
-});
 
 describe("isValidLegalProfile", () => {
 	it("accepts lowercase alphanumerics, dashes, underscores", () => {
@@ -118,11 +92,10 @@ describe("resolveLegalContent", () => {
 
 	it("prefers the override when present", async () => {
 		mockResponses((url) => {
-			if (url === "/legal-overrides/privacy.en.md")
-				return { status: 200, body: "# override privacy" };
+			if (url === "/legal-overrides/privacy.md") return { status: 200, body: "# override privacy" };
 			return { status: 404 };
 		});
-		const resolved = await resolveLegalContent("privacy", "en", { profile: "tum" });
+		const resolved = await resolveLegalContent("privacy", { profile: "tum" });
 		expect(resolved.source).toBe("override");
 		expect(resolved.markdown).toContain("override privacy");
 	});
@@ -130,35 +103,34 @@ describe("resolveLegalContent", () => {
 	it("falls through to the profile when no override is mounted", async () => {
 		mockResponses((url) => {
 			if (url.startsWith("/legal-overrides/")) return { status: 404 };
-			if (url === "/legal/profiles/tum/privacy.de.md")
-				return { status: 200, body: "# Datenschutz profile" };
+			if (url === "/legal/profiles/tum/privacy.md")
+				return { status: 200, body: "# profile privacy" };
 			return { status: 404 };
 		});
-		const resolved = await resolveLegalContent("privacy", "de", { profile: "tum" });
+		const resolved = await resolveLegalContent("privacy", { profile: "tum" });
 		expect(resolved.source).toBe("profile");
-		expect(resolved.locale).toBe("de");
 	});
 
-	it("falls through to disclaimer when the profile has no file for the locale", async () => {
+	it("falls through to disclaimer when the profile has no file", async () => {
 		mockResponses((url) => {
 			if (url.startsWith("/legal-overrides/")) return { status: 404 };
 			if (url.startsWith("/legal/profiles/")) return { status: 404 };
-			if (url === "/legal/_disclaimer/imprint.de.md") return { status: 200, body: "# fallback de" };
+			if (url === "/legal/_disclaimer/imprint.md") return { status: 200, body: "# fallback" };
 			return { status: 404 };
 		});
-		const resolved = await resolveLegalContent("imprint", "de", { profile: "unknown-profile" });
+		const resolved = await resolveLegalContent("imprint", { profile: "unknown-profile" });
 		expect(resolved.source).toBe("disclaimer");
 	});
 
 	it("rejects SPA-fallback HTML responses so the cascade continues", async () => {
 		mockResponses((url) => {
-			if (url === "/legal-overrides/privacy.en.md")
+			if (url === "/legal-overrides/privacy.md")
 				return { status: 200, body: "<!doctype html><html></html>", contentType: "text/html" };
-			if (url === "/legal/profiles/tum/privacy.en.md")
+			if (url === "/legal/profiles/tum/privacy.md")
 				return { status: 200, body: "# real tum privacy" };
 			return { status: 404 };
 		});
-		const resolved = await resolveLegalContent("privacy", "en", { profile: "tum" });
+		const resolved = await resolveLegalContent("privacy", { profile: "tum" });
 		expect(resolved.source).toBe("profile");
 	});
 
@@ -166,9 +138,7 @@ describe("resolveLegalContent", () => {
 		(globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(async () => {
 			throw new DOMException("aborted", "AbortError");
 		});
-		await expect(resolveLegalContent("privacy", "en", { profile: "tum" })).rejects.toThrow(
-			/aborted/,
-		);
+		await expect(resolveLegalContent("privacy", { profile: "tum" })).rejects.toThrow(/aborted/);
 	});
 
 	it("invalid profile values fall through to the disclaimer without constructing profile URLs", async () => {
@@ -176,10 +146,10 @@ describe("resolveLegalContent", () => {
 		mockResponses((url) => {
 			urls.push(url);
 			if (url.startsWith("/legal-overrides/")) return { status: 404 };
-			if (url === "/legal/_disclaimer/privacy.en.md") return { status: 200, body: "# fallback" };
+			if (url === "/legal/_disclaimer/privacy.md") return { status: 200, body: "# fallback" };
 			return { status: 404 };
 		});
-		const resolved = await resolveLegalContent("privacy", "en", { profile: "../etc" });
+		const resolved = await resolveLegalContent("privacy", { profile: "../etc" });
 		expect(resolved.source).toBe("disclaimer");
 		expect(resolved.profile).toBe("");
 		expect(urls.some((u) => u.startsWith("/legal/profiles/"))).toBe(false);
@@ -192,14 +162,14 @@ describe("resolveLegalContent", () => {
 			if (url.startsWith("/legal-overrides/")) return { status: 404 };
 			if (url.startsWith("/legal/profiles/"))
 				return { status: 200, body: "<!doctype html>", contentType: "text/html" };
-			if (url === "/legal/_disclaimer/privacy.en.md")
+			if (url === "/legal/_disclaimer/privacy.md")
 				return { status: 200, body: "# Privacy statement not configured" };
-			if (url === "/legal/_disclaimer/imprint.en.md")
+			if (url === "/legal/_disclaimer/imprint.md")
 				return { status: 200, body: "# Imprint not configured" };
 			return { status: 404 };
 		});
 		for (const page of ["privacy", "imprint"] as const) {
-			const resolved = await resolveLegalContent(page, "en", { profile: "" });
+			const resolved = await resolveLegalContent(page, { profile: "" });
 			expect(resolved.source).toBe("disclaimer");
 			for (const marker of TUM_PROFILE_MARKERS) {
 				expect(resolved.markdown).not.toContain(marker);

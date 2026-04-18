@@ -38,10 +38,9 @@ const HOSTILE_MARKDOWN = `# Hostile
 `;
 
 function makeResolver(markdown: string): typeof resolveLegalContent {
-	return async (_page, locale) => ({
+	return async () => ({
 		markdown,
 		source: "profile",
-		locale,
 		profile: "tum",
 	});
 }
@@ -52,7 +51,6 @@ describe("LegalPage — XSS guardrail", () => {
 			<LegalPage
 				page="imprint"
 				title={LEGAL_PAGE_TITLES.imprint}
-				initialLocale="en"
 				resolver={makeResolver(HOSTILE_MARKDOWN)}
 			/>,
 		);
@@ -102,7 +100,6 @@ describe("LegalPage — XSS guardrail", () => {
 			<LegalPage
 				page="imprint"
 				title={LEGAL_PAGE_TITLES.imprint}
-				initialLocale="en"
 				resolver={makeResolver("[ext](https://tum.de) · [int](/privacy)")}
 			/>,
 		);
@@ -120,19 +117,13 @@ describe("LegalPage — XSS guardrail", () => {
 
 	it("renders the disclaimer banner when resolver returns disclaimer source", async () => {
 		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-		const resolver: typeof resolveLegalContent = async (_page, locale) => ({
+		const resolver: typeof resolveLegalContent = async () => ({
 			markdown: "# fallback",
 			source: "disclaimer",
-			locale,
 			profile: "",
 		});
 		const { findByTestId } = render(
-			<LegalPage
-				page="imprint"
-				title={LEGAL_PAGE_TITLES.imprint}
-				initialLocale="en"
-				resolver={resolver}
-			/>,
+			<LegalPage page="imprint" title={LEGAL_PAGE_TITLES.imprint} resolver={resolver} />,
 		);
 		await findByTestId("legal-disclaimer-banner");
 		expect(warn).toHaveBeenCalled();

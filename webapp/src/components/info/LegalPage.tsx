@@ -1,37 +1,18 @@
 import { type AnchorHTMLAttributes, type ImgHTMLAttributes, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
-import { Button } from "@/components/ui/button";
 import environment from "@/environment";
 import {
-	detectLegalLocale,
 	isSafeLegalHref,
 	isSafeLegalImageSrc,
-	LEGAL_LOCALES,
-	type LegalLocale,
 	type LegalPageId,
 	type ResolvedLegalContent,
 	resolveLegalContent,
 } from "@/lib/legal";
 
-const LOCALE_LABELS: Record<LegalLocale, string> = {
-	en: "English",
-	de: "Deutsch",
-};
+const DISCLAIMER_BANNER =
+	"This deployment has not been configured with a legal profile. The content below is a placeholder and does not identify the operator of this instance.";
 
-const DISCLAIMER_BANNER: Record<LegalLocale, string> = {
-	en: "This deployment has not been configured with a legal profile. The content below is a placeholder and does not identify the operator of this instance.",
-	de: "Für diese Bereitstellung ist kein Rechtsprofil konfiguriert. Die folgenden Inhalte sind ein Platzhalter und benennen den Betreiber dieser Instanz nicht.",
-};
-
-const ERROR_COPY: Record<LegalLocale, string> = {
-	en: "Unable to load legal content.",
-	de: "Der rechtliche Inhalt konnte nicht geladen werden.",
-};
-
-const LANGUAGE_GROUP_LABEL: Record<LegalLocale, string> = {
-	en: "Select language",
-	de: "Sprache auswählen",
-};
+const ERROR_COPY = "Unable to load legal content.";
 
 // Operator-supplied Markdown is untrusted from the renderer's point of view:
 // the override mount is writable by whoever controls the host filesystem.
@@ -71,11 +52,9 @@ const SAFE_COMPONENTS = { a: SafeAnchor, img: SafeImage };
 
 export interface LegalPageProps {
 	page: LegalPageId;
-	title: Record<LegalLocale, string>;
+	title: string;
 	/** Injected fetcher, primarily for tests and Storybook. */
 	resolver?: typeof resolveLegalContent;
-	/** Initial locale override; otherwise detected from navigator. */
-	initialLocale?: LegalLocale;
 	/**
 	 * Profile override, primarily for Storybook. Production reads
 	 * `environment.legal.profile`.
@@ -87,13 +66,8 @@ export function LegalPage({
 	page,
 	title,
 	resolver = resolveLegalContent,
-	initialLocale,
 	profileOverride,
 }: LegalPageProps) {
-	const [locale, setLocale] = useState<LegalLocale>(
-		() =>
-			initialLocale ?? detectLegalLocale(typeof navigator === "undefined" ? undefined : navigator),
-	);
 	const [resolved, setResolved] = useState<ResolvedLegalContent | null>(null);
 	const [error, setError] = useState<Error | null>(null);
 
@@ -103,7 +77,7 @@ export function LegalPage({
 		const controller = new AbortController();
 		setError(null);
 		setResolved(null);
-		resolver(page, locale, { signal: controller.signal, profile })
+		resolver(page, { signal: controller.signal, profile })
 			.then((next) => {
 				if (controller.signal.aborted) return;
 				setResolved(next);
@@ -122,28 +96,11 @@ export function LegalPage({
 				setError(err instanceof Error ? err : new Error("Failed to load legal content"));
 			});
 		return () => controller.abort();
-	}, [page, locale, profile, resolver]);
+	}, [page, profile, resolver]);
 
 	return (
 		<div className="max-w-4xl mx-auto flex flex-col gap-4">
-			<div className="flex items-start justify-between gap-4">
-				<h1 className="text-3xl font-bold">{title[locale]}</h1>
-				<div className="flex gap-1" role="group" aria-label={LANGUAGE_GROUP_LABEL[locale]}>
-					{LEGAL_LOCALES.map((candidate) => (
-						<Button
-							key={candidate}
-							type="button"
-							size="sm"
-							variant={candidate === locale ? "default" : "outline"}
-							aria-pressed={candidate === locale}
-							lang={candidate}
-							onClick={() => setLocale(candidate)}
-						>
-							{LOCALE_LABELS[candidate]}
-						</Button>
-					))}
-				</div>
-			</div>
+			<h1 className="text-3xl font-bold">{title}</h1>
 
 			{resolved?.source === "disclaimer" ? (
 				<div
@@ -151,7 +108,7 @@ export function LegalPage({
 					className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 					data-testid="legal-disclaimer-banner"
 				>
-					{DISCLAIMER_BANNER[locale]}
+					{DISCLAIMER_BANNER}
 				</div>
 			) : null}
 
@@ -160,12 +117,12 @@ export function LegalPage({
 					role="alert"
 					className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 				>
-					{ERROR_COPY[locale]}
+					{ERROR_COPY}
 				</div>
 			) : null}
 
 			{resolved ? (
-				<article lang={resolved.locale} className="prose dark:prose-invert max-w-none">
+				<article lang="en" className="prose dark:prose-invert max-w-none">
 					<Streamdown
 						mode="static"
 						rehypePlugins={[]}

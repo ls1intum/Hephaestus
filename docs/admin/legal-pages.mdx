@@ -26,13 +26,13 @@ The only situation in which it is safe to operate without configuring one of the
 
 At page load, the webapp fetches the relevant Markdown file in this priority order — first hit wins:
 
-| Priority | Path                                                      | Typical source                         |
-| -------: | --------------------------------------------------------- | -------------------------------------- |
-|       1. | `/legal-overrides/<page>.<locale>.md`                      | Bind-mounted by the operator           |
-|       2. | `/legal/profiles/<LEGAL_PROFILE>/<page>.<locale>.md`       | Baked into the image (bundled profile) |
-|       3. | `/legal/_disclaimer/<page>.<locale>.md`                    | Shipped safety-fallback                |
+| Priority | Path                                              | Typical source                         |
+| -------: | ------------------------------------------------- | -------------------------------------- |
+|       1. | `/legal-overrides/<page>.md`                      | Bind-mounted by the operator           |
+|       2. | `/legal/profiles/<LEGAL_PROFILE>/<page>.md`       | Baked into the image (bundled profile) |
+|       3. | `/legal/_disclaimer/<page>.md`                    | Shipped safety-fallback                |
 
-`<page>` is `imprint` or `privacy`; `<locale>` is `en` or `de`. The webapp falls back from the requested locale to `en` at each layer before moving to the next, and a banner alerts end users whenever the disclaimer is being served.
+`<page>` is `imprint` or `privacy`. The pages are English-only; if you need a localised version, mount the appropriate language into the override layer. A banner alerts end users whenever the disclaimer is being served.
 
 ## Choosing a configuration mode
 
@@ -48,19 +48,15 @@ Other operators must **not** select `LEGAL_PROFILE=tum` — the `tum` profile na
 
 ### Mode B — Deployment-specific overrides (recommended for forks)
 
-This is the recommended mode for self-hosters. You author two Markdown files per locale and bind-mount them into the webapp container. They shadow the bundled profile (if any) and the safety-fallback.
+This is the recommended mode for self-hosters. You author two Markdown files and bind-mount them into the webapp container. They shadow the bundled profile (if any) and the safety-fallback.
 
 1. Create a directory next to your Compose file:
 
     ```text
     legal-overrides/
-    ├── imprint.en.md
-    ├── imprint.de.md
-    ├── privacy.en.md
-    └── privacy.de.md
+    ├── imprint.md
+    └── privacy.md
     ```
-
-    German variants are optional; the webapp falls back to English when a locale is missing. A minimum viable override is just `imprint.en.md` and `privacy.en.md`.
 
 2. Mount the directory read-only into the webapp container at `/usr/share/nginx/html/legal-overrides`:
 
@@ -73,13 +69,13 @@ This is the recommended mode for self-hosters. You author two Markdown files per
           - ./legal-overrides:/usr/share/nginx/html/legal-overrides:ro
     ```
 
-    On Kubernetes, project the four Markdown files into the same path via a `ConfigMap` volume. The simplest form mounts the whole ConfigMap as the directory:
+    On Kubernetes, project the Markdown files into the same path via a `ConfigMap` volume. The simplest form mounts the whole ConfigMap as the directory:
 
     ```yaml
     volumes:
       - name: legal-overrides
         configMap:
-          name: hephaestus-legal-overrides   # keys: imprint.en.md, privacy.en.md, ...
+          name: hephaestus-legal-overrides   # keys: imprint.md, privacy.md
     volumeMounts:
       - name: legal-overrides
         mountPath: /usr/share/nginx/html/legal-overrides
@@ -90,7 +86,7 @@ This is the recommended mode for self-hosters. You author two Markdown files per
 
 3. On Coolify, add `/usr/share/nginx/html/legal-overrides` as a **Bind Mount** (not a Volume) so the files remain editable from the host filesystem. The file paths are checked on each request, so you can update them by editing the files in the mount — no redeploy needed.
 
-Overrides always win, so you can safely combine Mode A with a single-file override (for example, `privacy.en.md` only) when you are operating a derivative deployment and want to keep the upstream imprint.
+Overrides always win, so you can safely combine Mode A with a single-file override (for example, `privacy.md` only) when you are operating a derivative deployment and want to keep the upstream imprint.
 
 ### Mode C — Built-in fallback (developer default, not a production configuration)
 
@@ -116,11 +112,11 @@ Third-country transfers — if you enable the Anthropic or OpenAI LLM providers 
 After deploying, confirm the correct layer is serving each page. A 200 status is not sufficient — SPA-catchall proxies frequently return `200 text/html` for missing files. Check both the status **and** the content type:
 
 ```sh
-curl -sI https://<your-host>/legal-overrides/privacy.en.md \
+curl -sI https://<your-host>/legal-overrides/privacy.md \
   | grep -E '^(HTTP|Content-Type)'   # expect 200 + text/markdown if overrides are mounted
-curl -sI https://<your-host>/legal/profiles/<profile>/privacy.en.md \
+curl -sI https://<your-host>/legal/profiles/<profile>/privacy.md \
   | grep -E '^(HTTP|Content-Type)'
-curl -sI https://<your-host>/legal/_disclaimer/privacy.en.md \
+curl -sI https://<your-host>/legal/_disclaimer/privacy.md \
   | grep -E '^(HTTP|Content-Type)'   # always 200 + text/markdown
 ```
 
@@ -128,7 +124,7 @@ Then fetch the body of the layer you expect to be served and confirm it is your 
 
 ```sh
 curl -s https://<your-host>/imprint | head -c 200   # SPA shell
-curl -s https://<your-host>/legal-overrides/privacy.en.md | head -n 3   # should start with your heading
+curl -s https://<your-host>/legal-overrides/privacy.md | head -n 3   # should start with your heading
 ```
 
 Finally, open `/imprint` and `/privacy` in a browser. If the red "not configured" banner appears, the disclaimer is being served and you still owe a configuration.
