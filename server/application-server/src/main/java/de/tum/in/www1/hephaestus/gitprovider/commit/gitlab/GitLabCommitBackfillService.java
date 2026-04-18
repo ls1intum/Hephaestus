@@ -4,6 +4,8 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitContributor;
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitContributorRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitFileChange;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.util.CommitUtils;
@@ -18,8 +20,13 @@ import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -56,9 +63,19 @@ public class GitLabCommitBackfillService {
     private static final Logger log = LoggerFactory.getLogger(GitLabCommitBackfillService.class);
     private static final int MAX_COMMITS_PER_CYCLE = 5000;
 
+    /**
+     * Matches a {@code Co-authored-by: Name <email>} trailer line. Case-insensitive
+     * to tolerate both {@code Co-authored-by:} and {@code Co-Authored-By:} variants
+     * that different clients emit.
+     */
+    private static final Pattern CO_AUTHORED_BY_PATTERN = Pattern.compile(
+        "(?im)^\\s*co-authored-by:\\s*([^<]+?)\\s*<([^>]+)>\\s*$"
+    );
+
     private final GitRepositoryManager gitRepositoryManager;
     private final GitLabTokenService tokenService;
     private final CommitRepository commitRepository;
+    private final CommitContributorRepository contributorRepository;
     private final CommitAuthorResolver authorResolver;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
@@ -67,6 +84,7 @@ public class GitLabCommitBackfillService {
         GitRepositoryManager gitRepositoryManager,
         GitLabTokenService tokenService,
         CommitRepository commitRepository,
+        CommitContributorRepository contributorRepository,
         CommitAuthorResolver authorResolver,
         ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate
@@ -74,6 +92,7 @@ public class GitLabCommitBackfillService {
         this.gitRepositoryManager = gitRepositoryManager;
         this.tokenService = tokenService;
         this.commitRepository = commitRepository;
+        this.contributorRepository = contributorRepository;
         this.authorResolver = authorResolver;
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
@@ -135,12 +154,10 @@ public class GitLabCommitBackfillService {
                 return SyncResult.completed(0);
             }
 
-            // Phase 4: Walk commits
-            List<GitRepositoryManager.CommitInfo> commitInfos = gitRepositoryManager.walkCommits(
-                repoId,
-                fromSha,
-                headSha
-            );
+            // Phase 4: Walk commits reachable from ALL remote-tracking branches so
+            // commits living only on feature branches are also ingested (needed for
+            // complete commit→MR link coverage and cross-branch author attribution).
+            List<GitRepositoryManager.CommitInfo> commitInfos = gitRepositoryManager.walkAllBranches(repoId, fromSha);
 
             if (commitInfos.isEmpty()) {
                 return SyncResult.completed(0);
@@ -171,7 +188,7 @@ public class GitLabCommitBackfillService {
                 );
             } else if (processed > 0) {
                 log.info(
-                    "Completed commit backfill: repoId={}, repoName={}, newCommits={}, totalWalked={}, mode={}",
+                    "Completed commit backfill: repoId={}, repoName={}, newCommits={}, totalWalked={}, mode={}, scope=all-branches",
                     repoId,
                     repoName,
                     processed,
@@ -236,35 +253,128 @@ public class GitLabCommitBackfillService {
                 info.committerEmail()
             );
 
-            if (!info.fileChanges().isEmpty()) {
-                Commit commit = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId()).orElse(null);
-                if (commit != null) {
-                    for (GitRepositoryManager.FileChange fc : info.fileChanges()) {
-                        CommitFileChange fileChange = new CommitFileChange();
-                        fileChange.setFilename(fc.filename());
-                        fileChange.setChangeType(CommitFileChange.fromGitChangeType(fc.changeType()));
-                        fileChange.setAdditions(fc.additions());
-                        fileChange.setDeletions(fc.deletions());
-                        fileChange.setChanges(fc.changes());
-                        fileChange.setPreviousFilename(fc.previousFilename());
-                        commit.addFileChange(fileChange);
-                    }
-                    commitRepository.save(commit);
-                }
+            Commit commit = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId()).orElse(null);
+            if (commit == null) {
+                // Upsert just ran — this should never happen. Defensive: skip downstream writes.
+                return true;
             }
 
-            publishCommitCreated(info.sha(), repository, scopeId);
+            if (!info.fileChanges().isEmpty()) {
+                for (GitRepositoryManager.FileChange fc : info.fileChanges()) {
+                    CommitFileChange fileChange = new CommitFileChange();
+                    fileChange.setFilename(fc.filename());
+                    fileChange.setChangeType(CommitFileChange.fromGitChangeType(fc.changeType()));
+                    fileChange.setAdditions(fc.additions());
+                    fileChange.setDeletions(fc.deletions());
+                    fileChange.setChanges(fc.changes());
+                    fileChange.setPreviousFilename(fc.previousFilename());
+                    commit.addFileChange(fileChange);
+                }
+                commitRepository.save(commit);
+            }
+
+            upsertContributors(commit.getId(), info, authorId, committerId, providerId);
+
+            publishCommitCreated(commit, repository, scopeId);
             return true;
         });
         return Boolean.TRUE.equals(result);
     }
 
-    private void publishCommitCreated(String sha, Repository repository, Long scopeId) {
-        Commit commit = commitRepository.findByShaAndRepositoryId(sha, repository.getId()).orElse(null);
-        if (commit == null) {
-            return;
+    /**
+     * Writes contributor rows for the primary author, committer, and any
+     * {@code Co-authored-by:} trailers in the commit body.
+     *
+     * <p>Mirrors {@code CommitMetadataEnrichmentService} on the GitHub side:
+     * <ul>
+     *   <li>ordinal 0 / role {@code AUTHOR} — primary git author</li>
+     *   <li>ordinal 0 / role {@code COMMITTER} — git committer (same email as
+     *       author on most commits but distinct for merge/rebase/cherry-pick)</li>
+     *   <li>ordinal 1+ / role {@code CO_AUTHOR} — parsed from
+     *       {@code Co-authored-by: Name <email>} trailers, deduplicated on email
+     *       against the primary author</li>
+     * </ul>
+     */
+    private void upsertContributors(
+        Long commitId,
+        GitRepositoryManager.CommitInfo info,
+        @Nullable Long authorId,
+        @Nullable Long committerId,
+        @Nullable Long providerId
+    ) {
+        if (info.authorEmail() != null && !info.authorEmail().isBlank()) {
+            contributorRepository.upsertContributor(
+                commitId,
+                authorId,
+                CommitContributor.Role.AUTHOR.name(),
+                info.authorName(),
+                info.authorEmail(),
+                0
+            );
         }
 
+        if (info.committerEmail() != null && !info.committerEmail().isBlank()) {
+            contributorRepository.upsertContributor(
+                commitId,
+                committerId,
+                CommitContributor.Role.COMMITTER.name(),
+                info.committerName(),
+                info.committerEmail(),
+                0
+            );
+        }
+
+        List<CoAuthor> coAuthors = parseCoAuthors(info.messageBody(), info.authorEmail());
+        for (int i = 0; i < coAuthors.size(); i++) {
+            CoAuthor ca = coAuthors.get(i);
+            Long coAuthorUserId = authorResolver.resolveByEmail(ca.email(), providerId);
+            contributorRepository.upsertContributor(
+                commitId,
+                coAuthorUserId,
+                CommitContributor.Role.CO_AUTHOR.name(),
+                ca.name(),
+                ca.email(),
+                i + 1
+            );
+        }
+    }
+
+    /**
+     * Parse {@code Co-authored-by:} trailers out of a commit message body,
+     * lower-casing the email and deduplicating against the primary author's
+     * email so the primary author is never double-counted as a co-author.
+     */
+    private List<CoAuthor> parseCoAuthors(@Nullable String messageBody, @Nullable String primaryAuthorEmail) {
+        if (messageBody == null || messageBody.isBlank()) {
+            return List.of();
+        }
+
+        String primaryLower = primaryAuthorEmail != null ? primaryAuthorEmail.toLowerCase() : null;
+        Set<String> seenEmails = new HashSet<>();
+        if (primaryLower != null) {
+            seenEmails.add(primaryLower);
+        }
+
+        List<CoAuthor> result = new ArrayList<>();
+        Matcher matcher = CO_AUTHORED_BY_PATTERN.matcher(messageBody);
+        while (matcher.find()) {
+            String name = matcher.group(1).trim();
+            String email = matcher.group(2).trim();
+            if (email.isEmpty()) {
+                continue;
+            }
+            String emailLower = email.toLowerCase();
+            if (!seenEmails.add(emailLower)) {
+                continue;
+            }
+            result.add(new CoAuthor(name.isEmpty() ? null : name, email));
+        }
+        return result;
+    }
+
+    private record CoAuthor(@Nullable String name, String email) {}
+
+    private void publishCommitCreated(Commit commit, Repository repository, Long scopeId) {
         EventPayload.CommitData commitData = EventPayload.CommitData.from(commit);
         EventContext context = new EventContext(
             UUID.randomUUID(),
