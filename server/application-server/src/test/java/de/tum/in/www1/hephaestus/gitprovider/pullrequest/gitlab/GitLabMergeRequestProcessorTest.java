@@ -171,6 +171,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                     any(),
                     any(),
                     any(),
+                    any(),
                     any()
                 )
             )
@@ -230,6 +231,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                any(),
                 any()
             );
         }
@@ -266,6 +268,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 anyBoolean(),
                 anyBoolean(),
+                any(),
                 any(),
                 any(),
                 any(),
@@ -324,6 +327,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                any(),
                 any()
             );
         }
@@ -360,6 +364,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 anyBoolean(),
                 anyBoolean(),
+                any(),
                 any(),
                 any(),
                 any(),
@@ -418,6 +423,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                any(),
                 any()
             );
         }
@@ -454,6 +460,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 anyBoolean(),
                 anyBoolean(),
+                any(),
                 any(),
                 any(),
                 any(),
@@ -901,7 +908,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                eq(author.getId())
+                eq(author.getId()),
+                any()
             );
         }
 
@@ -1226,6 +1234,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                any(),
                 any()
             );
 
@@ -1280,6 +1289,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 anyBoolean(),
                 anyBoolean(),
+                any(),
                 any(),
                 any(),
                 any(),
@@ -1379,6 +1389,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 "main",
                 null,
                 null,
+                null,
                 false,
                 0,
                 "gid://gitlab/User/12345",
@@ -1434,6 +1445,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                any(),
                 any()
             );
         }
@@ -1472,6 +1484,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 0,
                 "feature/awesome-feature",
                 "main",
+                null,
                 null,
                 null,
                 false,
@@ -1529,6 +1542,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                any(),
                 any()
             );
         }
@@ -1571,6 +1585,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 0,
                 "feature/branch",
                 "main",
+                null,
                 null,
                 null,
                 false,
@@ -1623,6 +1638,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 0,
                 "feature/branch",
                 "main",
+                null,
                 null,
                 null,
                 false,
@@ -1730,6 +1746,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 "main",
                 null,
                 null,
+                null,
                 false,
                 0,
                 "gid://gitlab/User/12345",
@@ -1809,6 +1826,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 anyBoolean(),
                 anyBoolean(),
+                any(),
                 any(),
                 any(),
                 any(),
@@ -1913,6 +1931,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 "main",
                 null,
                 null,
+                null,
                 false,
                 0,
                 "gid://gitlab/User/12345",
@@ -1963,6 +1982,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 any(),
                 any(),
                 eq(expectedMapping),
+                any(),
                 any(),
                 any(),
                 any(),
@@ -2251,6 +2271,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             3,
             "feature/awesome-feature",
             "main",
+            null,
             null,
             null,
             false,

@@ -523,6 +523,20 @@ public class GitRepositoryManager {
             }
         }
 
+        // Parent SHAs come directly from the commit object graph and cost nothing
+        // extra to read here. Feeds git_commit.parent_count + parent_shas so
+        // downstream consumers (audit, commit-topology queries) don't depend on
+        // provider-specific APIs for this basic structural field.
+        RevCommit[] parents = revCommit.getParents();
+        List<String> parentShas = new ArrayList<>(parents != null ? parents.length : 0);
+        if (parents != null) {
+            for (RevCommit parent : parents) {
+                if (parent != null && parent.getId() != null) {
+                    parentShas.add(parent.getId().getName());
+                }
+            }
+        }
+
         return new CommitInfo(
             revCommit.getName(),
             message,
@@ -536,7 +550,8 @@ public class GitRepositoryManager {
             totalAdditions,
             totalDeletions,
             fileChanges.size(),
-            fileChanges
+            fileChanges,
+            parentShas
         );
     }
 
@@ -866,7 +881,8 @@ public class GitRepositoryManager {
         int additions,
         int deletions,
         int changedFiles,
-        List<FileChange> fileChanges
+        List<FileChange> fileChanges,
+        List<String> parentShas
     ) {}
 
     /**

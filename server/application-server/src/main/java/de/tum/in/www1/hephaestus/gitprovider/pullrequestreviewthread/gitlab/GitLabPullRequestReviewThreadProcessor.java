@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -50,6 +51,12 @@ public class GitLabPullRequestReviewThreadProcessor {
 
     /**
      * Groups the discussion-level data needed to find or create a review thread.
+     * <p>
+     * Position fields ({@code filePath}, {@code newLine}, {@code oldLine},
+     * {@code side}, {@code commitSha}, {@code originalCommitSha}) come from the
+     * root diff note's {@code position} and are copied onto the thread so
+     * downstream consumers can index review threads by file/line/side without
+     * joining through comments.
      */
     public record ThreadData(
         String discussionGlobalId,
@@ -57,8 +64,24 @@ public class GitLabPullRequestReviewThreadProcessor {
         @Nullable User resolvedBy,
         @Nullable String filePath,
         @Nullable Integer newLine,
+        @Nullable Integer oldLine,
+        @Nullable PullRequestReviewComment.Side side,
+        @Nullable String commitSha,
+        @Nullable String originalCommitSha,
         @Nullable Instant createdAt
-    ) {}
+    ) {
+        /** Backward-compatible overload for callers that don't carry side/SHA data. */
+        public ThreadData(
+            String discussionGlobalId,
+            boolean resolved,
+            @Nullable User resolvedBy,
+            @Nullable String filePath,
+            @Nullable Integer newLine,
+            @Nullable Instant createdAt
+        ) {
+            this(discussionGlobalId, resolved, resolvedBy, filePath, newLine, null, null, null, null, createdAt);
+        }
+    }
 
     /**
      * Groups the webhook-level data needed to find or create a webhook thread.
@@ -94,7 +117,7 @@ public class GitLabPullRequestReviewThreadProcessor {
 
         return threadRepository
             .findByNodeIdAndProviderId(data.discussionGlobalId(), providerId)
-            .map(existing -> updateThread(existing, data.resolved(), data.resolvedBy(), pr, scopeId))
+            .map(existing -> updateThread(existing, data, pr, scopeId))
             .orElseGet(() -> createThread(data, pr, provider, scopeId));
     }
 
@@ -139,15 +162,14 @@ public class GitLabPullRequestReviewThreadProcessor {
 
     private PullRequestReviewThread updateThread(
         PullRequestReviewThread existing,
-        boolean resolved,
-        @Nullable User resolvedBy,
+        ThreadData data,
         PullRequest pr,
         Long scopeId
     ) {
         PullRequestReviewThread.State previousState = existing.getState();
         boolean changed = false;
 
-        PullRequestReviewThread.State newState = resolved
+        PullRequestReviewThread.State newState = data.resolved()
             ? PullRequestReviewThread.State.RESOLVED
             : PullRequestReviewThread.State.UNRESOLVED;
 
@@ -155,12 +177,40 @@ public class GitLabPullRequestReviewThreadProcessor {
             existing.setState(newState);
             changed = true;
         }
-        if (resolved && resolvedBy != null && existing.getResolvedBy() == null) {
-            existing.setResolvedBy(resolvedBy);
+        if (data.resolved() && data.resolvedBy() != null && existing.getResolvedBy() == null) {
+            existing.setResolvedBy(data.resolvedBy());
             changed = true;
         }
-        if (!resolved && existing.getResolvedBy() != null) {
+        if (!data.resolved() && existing.getResolvedBy() != null) {
             existing.setResolvedBy(null);
+            changed = true;
+        }
+
+        // Backfill position metadata populated in later syncs. We only fill when the
+        // current row is null so that a manual correction upstream is never clobbered
+        // and legacy GitHub rows (which arrive via a different processor) are untouched.
+        if (existing.getPath() == null && data.filePath() != null) {
+            existing.setPath(data.filePath());
+            changed = true;
+        }
+        if (existing.getLine() == null && data.newLine() != null) {
+            existing.setLine(data.newLine());
+            changed = true;
+        }
+        if (existing.getSide() == null && data.side() != null) {
+            existing.setSide(data.side());
+            changed = true;
+        }
+        if (existing.getStartSide() == null && data.side() != null) {
+            existing.setStartSide(data.side());
+            changed = true;
+        }
+        if (existing.getCommitSha() == null && data.commitSha() != null) {
+            existing.setCommitSha(data.commitSha());
+            changed = true;
+        }
+        if (existing.getOriginalCommitSha() == null && data.originalCommitSha() != null) {
+            existing.setOriginalCommitSha(data.originalCommitSha());
             changed = true;
         }
 
@@ -187,6 +237,12 @@ public class GitLabPullRequestReviewThreadProcessor {
         thread.setPullRequest(pr);
         thread.setPath(data.filePath());
         thread.setLine(data.newLine());
+        thread.setSide(data.side());
+        // GraphQL DiffPosition has no line_range so the thread inherits a single-line
+        // anchor; startSide mirrors side to match GitHub semantics for single-line threads.
+        thread.setStartSide(data.side());
+        thread.setCommitSha(data.commitSha());
+        thread.setOriginalCommitSha(data.originalCommitSha());
         thread.setState(
             data.resolved() ? PullRequestReviewThread.State.RESOLVED : PullRequestReviewThread.State.UNRESOLVED
         );

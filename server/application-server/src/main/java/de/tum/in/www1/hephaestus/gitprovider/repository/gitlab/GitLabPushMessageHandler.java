@@ -301,8 +301,8 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         }
 
         Long providerId = repository.getProvider().getId();
-        Long authorId = authorResolver.resolveByEmail(info.authorEmail(), providerId);
-        Long committerId = authorResolver.resolveByEmail(info.committerEmail(), providerId);
+        Long authorId = authorResolver.resolveAndBackfillByEmail(info.authorEmail(), providerId);
+        Long committerId = authorResolver.resolveAndBackfillByEmail(info.committerEmail(), providerId);
 
         String message = info.message() != null ? info.message() : "";
         String htmlUrl = CommitUtils.buildGitLabCommitUrl(serverUrl, repository.getNameWithOwner(), info.sha());

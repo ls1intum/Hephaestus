@@ -328,6 +328,73 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("merged MR with empty primary commits triggers fallback via MergeRequest.commits")
+    void shouldFallBackToMergeRequestCommitsWhenLinkRowsEmpty() {
+        Map<String, Object> mergedMr = mrNode(500, List.of(), false, null);
+        mergedMr.put("state", "merged");
+        ClientGraphQlResponse outerPage = mockMrsPage(List.of(mergedMr), new GitLabPageInfo(false, null));
+        ClientGraphQlResponse fallbackPage = mockFallbackMrCommitsPage(
+            List.of("merge-commit-1", "merge-commit-2"),
+            new GitLabPageInfo(false, null)
+        );
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, outerPage, fallbackPage);
+        // Primary link path is skipped when shas is empty; only the fallback call fires.
+        when(
+            commitRepository.linkPullRequestToCommits(
+                eq(REPO_ID),
+                eq(500),
+                eq(List.of("merge-commit-1", "merge-commit-2"))
+            )
+        ).thenReturn(2);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        assertThat(result.count()).isEqualTo(2);
+        verify(commitRepository).linkPullRequestToCommits(REPO_ID, 500, List.of("merge-commit-1", "merge-commit-2"));
+    }
+
+    @Test
+    @DisplayName("fallback logs debug and continues when SHAs are not yet in git_commit")
+    void shouldSkipMissingCommitShasWhenNotInGitCommit() {
+        Map<String, Object> closedMr = mrNode(501, List.of(), false, null);
+        closedMr.put("state", "closed");
+        ClientGraphQlResponse outerPage = mockMrsPage(List.of(closedMr), new GitLabPageInfo(false, null));
+        ClientGraphQlResponse fallbackPage = mockFallbackMrCommitsPage(
+            List.of("unknown-sha-1"),
+            new GitLabPageInfo(false, null)
+        );
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, outerPage, fallbackPage);
+        // Primary returns 0 (empty shas); fallback also returns 0 (SHAs not yet in git_commit).
+        when(commitRepository.linkPullRequestToCommits(eq(REPO_ID), eq(501), any())).thenReturn(0);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        // Loop completes without error; caller logs debug but does not abort.
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        assertThat(result.count()).isZero();
+        verify(commitRepository).linkPullRequestToCommits(REPO_ID, 501, List.of("unknown-sha-1"));
+    }
+
+    @Test
+    @DisplayName("open MR with empty primary commits does NOT trigger fallback")
+    void shouldNotInvokeFallbackWhenMrIsOpen() {
+        Map<String, Object> openMr = mrNode(502, List.of(), false, null);
+        openMr.put("state", "opened");
+        ClientGraphQlResponse outerPage = mockMrsPage(List.of(openMr), new GitLabPageInfo(false, null));
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, outerPage);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        assertThat(result.count()).isZero();
+        verify(commitRepository, never()).linkPullRequestToCommits(anyLong(), anyInt(), any());
+    }
+
+    @Test
     @DisplayName("full sweep (null updatedAfter) passes null variable to GraphQL")
     void nullUpdatedAfter_passesNullVariable() {
         ClientGraphQlResponse page = mockMrsPage(List.of(), new GitLabPageInfo(false, null));
@@ -379,6 +446,39 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         ClientResponseField pageInfoField = mock(ClientResponseField.class);
         lenient().when(pageInfoField.<GitLabPageInfo>toEntity(any(Class.class))).thenReturn(pageInfo);
         lenient().when(resp.field("project.mergeRequests.pageInfo")).thenReturn(pageInfoField);
+
+        return resp;
+    }
+
+    /**
+     * Mocks the fallback {@code GetMergeRequestAllCommits} response shape:
+     * {@code project.mergeRequests.nodes[0].commits.{nodes,pageInfo}}.
+     */
+    @SuppressWarnings("unchecked")
+    private ClientGraphQlResponse mockFallbackMrCommitsPage(List<String> shas, GitLabPageInfo pageInfo) {
+        ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
+        lenient().when(resp.isValid()).thenReturn(true);
+
+        Map<String, Object> pageInfoMap = new LinkedHashMap<>();
+        pageInfoMap.put("hasNextPage", pageInfo.hasNextPage());
+        pageInfoMap.put("endCursor", pageInfo.endCursor());
+
+        Map<String, Object> commitsMap = new LinkedHashMap<>();
+        commitsMap.put(
+            "nodes",
+            shas
+                .stream()
+                .map(sha -> Map.<String, Object>of("sha", sha))
+                .toList()
+        );
+        commitsMap.put("pageInfo", pageInfoMap);
+
+        Map<String, Object> mrNode = new LinkedHashMap<>();
+        mrNode.put("commits", commitsMap);
+
+        ClientResponseField nodesField = mock(ClientResponseField.class);
+        when(nodesField.<Map>toEntityList(any(Class.class))).thenReturn((List) List.of(mrNode));
+        when(resp.field("project.mergeRequests.nodes")).thenReturn(nodesField);
 
         return resp;
     }

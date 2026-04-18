@@ -472,6 +472,144 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
+    @DisplayName("group-milestone fan-out (Gap 4)")
+    class GroupMilestoneFanOut {
+
+        @Test
+        @DisplayName("shouldFanOutGroupMilestoneToEveryRepoWhenProcessingOncePerRepo")
+        void shouldFanOutGroupMilestoneToEveryRepoWhenProcessingOncePerRepo() {
+            Repository secondRepo = createRepository(
+                246766L,
+                "other-repository",
+                FIXTURE_ORG_LOGIN + "/other-repository"
+            );
+
+            GitLabMilestoneDTO groupDto = new GitLabMilestoneDTO(
+                42_000L,
+                7,
+                "Sprint 7",
+                "Group-wide sprint",
+                "active",
+                "2026-06-30",
+                "/hephaestustest/-/milestones/7",
+                null,
+                true,
+                0,
+                0,
+                "2026-01-10T10:00:00Z",
+                "2026-01-10T10:00:00Z"
+            );
+
+            Milestone first = milestoneProcessor.process(groupDto, testRepository, testContext());
+            Milestone second = milestoneProcessor.process(
+                groupDto,
+                secondRepo,
+                ProcessingContext.forSync(testWorkspace.getId(), secondRepo)
+            );
+
+            assertThat(first).isNotNull();
+            assertThat(second).isNotNull();
+            assertThat(first.getId()).isNotEqualTo(second.getId());
+            assertThat(milestoneRepository.findAllByRepository_Id(testRepository.getId())).hasSize(1);
+            assertThat(milestoneRepository.findAllByRepository_Id(secondRepo.getId())).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("shouldUseDistinctNegativeNativeIdsWhenFanningOutSameGroupMilestone")
+        void shouldUseDistinctNegativeNativeIdsWhenFanningOutSameGroupMilestone() {
+            Repository secondRepo = createRepository(
+                246767L,
+                "third-repository",
+                FIXTURE_ORG_LOGIN + "/third-repository"
+            );
+
+            GitLabMilestoneDTO groupDto = new GitLabMilestoneDTO(
+                42_001L,
+                8,
+                "Sprint 8",
+                null,
+                "active",
+                null,
+                null,
+                null,
+                true,
+                null,
+                null,
+                "2026-02-01T10:00:00Z",
+                "2026-02-01T10:00:00Z"
+            );
+
+            Milestone first = milestoneProcessor.process(groupDto, testRepository, testContext());
+            Milestone second = milestoneProcessor.process(
+                groupDto,
+                secondRepo,
+                ProcessingContext.forSync(testWorkspace.getId(), secondRepo)
+            );
+
+            // Both rows must carry the shared iid …
+            assertThat(first.getNumber()).isEqualTo(8);
+            assertThat(second.getNumber()).isEqualTo(8);
+            // … but different deterministic negative nativeIds so (provider_id, native_id) stays unique.
+            assertThat(first.getNativeId()).isNegative();
+            assertThat(second.getNativeId()).isNegative();
+            assertThat(first.getNativeId()).isNotEqualTo(second.getNativeId());
+        }
+
+        @Test
+        @DisplayName("shouldPersistDescriptionAndDueOnWhenGroupMilestoneIsFannedOut")
+        void shouldPersistDescriptionAndDueOnWhenGroupMilestoneIsFannedOut() {
+            // Gap 4 notes that description, due_on, and closed_at were NULL on most rows.
+            // Verify all three survive the fan-out path.
+            GitLabMilestoneDTO groupDto = new GitLabMilestoneDTO(
+                42_002L,
+                9,
+                "Sprint 9",
+                "End-of-quarter milestone",
+                "closed",
+                "2026-03-31",
+                "/hephaestustest/-/milestones/9",
+                null,
+                true,
+                5,
+                5,
+                "2026-03-01T10:00:00Z",
+                "2026-03-30T23:59:59Z"
+            );
+
+            Milestone result = milestoneProcessor.process(groupDto, testRepository, testContext());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getDescription()).isEqualTo("End-of-quarter milestone");
+            assertThat(result.getDueOn()).isEqualTo(
+                LocalDate.of(2026, 3, 31).atStartOfDay(ZoneOffset.UTC).toInstant()
+            );
+            assertThat(result.getState()).isEqualTo(Milestone.State.CLOSED);
+            // closed_at is approximated from updatedAt on first transition to CLOSED — must not be null.
+            assertThat(result.getClosedAt()).isNotNull();
+        }
+
+        private Repository createRepository(long nativeId, String name, String fullName) {
+            Organization org = organizationRepository
+                .findByLoginIgnoreCase(FIXTURE_ORG_LOGIN)
+                .orElseThrow(() -> new IllegalStateException("Test org not found"));
+
+            Repository repo = new Repository();
+            repo.setNativeId(nativeId);
+            repo.setName(name);
+            repo.setNameWithOwner(fullName);
+            repo.setHtmlUrl("https://gitlab.lrz.de/" + fullName);
+            repo.setVisibility(Repository.Visibility.PRIVATE);
+            repo.setDefaultBranch("main");
+            repo.setCreatedAt(testRepository.getCreatedAt());
+            repo.setUpdatedAt(testRepository.getUpdatedAt());
+            repo.setPushedAt(testRepository.getPushedAt());
+            repo.setOrganization(org);
+            repo.setProvider(gitlabProvider);
+            return repositoryRepository.save(repo);
+        }
+    }
+
+    @Nested
     @DisplayName("delete()")
     class DeleteMethod {
 

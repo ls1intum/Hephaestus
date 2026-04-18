@@ -1,14 +1,9 @@
-query LinkCommitsToMergeRequests($fullPath: ID!, $first: Int!, $after: String, $updatedAfter: Time) {
+query GetMergeRequestAllCommits($fullPath: ID!, $iid: String!, $first: Int!, $after: String) {
     project(fullPath: $fullPath) {
-        mergeRequests(first: $first, after: $after, updatedAfter: $updatedAfter, sort: UPDATED_DESC) {
-            pageInfo {
-                hasNextPage
-                endCursor
-            }
+        mergeRequests(iids: [$iid], first: 1) {
             nodes {
                 iid
-                state
-                commitsWithoutMergeCommits(first: 100) {
+                commits(first: $first, after: $after) {
                     pageInfo {
                         hasNextPage
                         endCursor

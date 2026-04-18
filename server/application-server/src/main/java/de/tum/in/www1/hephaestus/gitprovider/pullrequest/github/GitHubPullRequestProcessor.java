@@ -219,7 +219,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             baseRefName,
             headRefOid,
             baseRefOid,
-            mergedBy != null ? mergedBy.getId() : null
+            mergedBy != null ? mergedBy.getId() : null,
+            null // mergeCommitSha — GitHub REST/webhook DTO does not supply it; GraphQL path can be wired later
         );
 
         // Fetch the PR to get a managed entity and handle relationships

@@ -132,6 +132,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         String oldPath = null;
         String headSha = null;
         String baseSha = null;
+        String startSha = null;
 
         if (position != null) {
             String np = GitLabFieldUtils.asString(position.get("new_path"));
@@ -142,6 +143,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             oldPath = GitLabFieldUtils.asString(position.get("old_path"));
             headSha = GitLabFieldUtils.asString(position.get("head_sha"));
             baseSha = GitLabFieldUtils.asString(position.get("base_sha"));
+            startSha = GitLabFieldUtils.asString(position.get("start_sha"));
         }
 
         // Capture effectively final for lambda
@@ -189,6 +191,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             oldPath,
             headSha,
             baseSha,
+            startSha,
             createdAt,
             updatedAt
         );

@@ -13,10 +13,13 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.dto.GitLabIssueEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueTypeRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -52,12 +55,14 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
     private final IssueRepository issueRepository;
     private final MilestoneRepository milestoneRepository;
+    private final IssueTypeRepository issueTypeRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabIssueProcessor(
         GitLabUserService gitLabUserService,
         IssueRepository issueRepository,
         MilestoneRepository milestoneRepository,
+        IssueTypeRepository issueTypeRepository,
         UserRepository userRepository,
         LabelRepository labelRepository,
         RepositoryRepository repositoryRepository,
@@ -77,6 +82,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         );
         this.issueRepository = issueRepository;
         this.milestoneRepository = milestoneRepository;
+        this.issueTypeRepository = issueTypeRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -161,7 +167,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         int commentsCount,
         @Nullable List<SyncLabelData> syncLabels,
         @Nullable List<SyncAssigneeData> syncAssignees,
-        @Nullable Integer milestoneIid
+        @Nullable Integer milestoneIid,
+        @Nullable String typeName,
+        @Nullable String closedAsDuplicateOfGid
     ) {}
 
     /**
@@ -224,6 +232,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
                 .orElse(null);
         }
 
+        String stateReason = resolveStateReason(issueState, data.closedAsDuplicateOfGid());
+        String issueTypeId = resolveIssueTypeId(data.typeName(), repository);
+
         Instant now = Instant.now();
         issueRepository.upsertCore(
             nativeId,
@@ -232,7 +243,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             sanitize(data.title()),
             sanitize(data.description()),
             issueState.name(),
-            null, // stateReason — not available in GitLab
+            stateReason,
             data.webUrl(),
             null, // locked — not available in GitLab API, null lets COALESCE preserve existing or default
             parseGitLabTimestamp(data.closedAt()),
@@ -243,7 +254,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             author != null ? author.getId() : null,
             repository.getId(),
             milestoneId,
-            null, // issueTypeId
+            issueTypeId,
             null, // parentIssueId
             null, // subIssuesTotal
             null, // subIssuesCompleted
@@ -471,6 +482,69 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Maps a GitLab issue state + {@code closedAsDuplicateOf} marker to the
+     * denormalized {@code issue.state_reason} column.
+     * <p>
+     * Returns {@code null} for open issues and for closed issues that cannot be
+     * classified. The upsert COALESCE preserves any previously set reason.
+     */
+    @Nullable
+    private static String resolveStateReason(Issue.State state, @Nullable String closedAsDuplicateOfGid) {
+        if (state != Issue.State.CLOSED) {
+            return null;
+        }
+        if (closedAsDuplicateOfGid != null && !closedAsDuplicateOfGid.isBlank()) {
+            return "DUPLICATE";
+        }
+        return "COMPLETED";
+    }
+
+    /**
+     * Resolves the GitLab {@code Issue.type} enum ({@code ISSUE}, {@code TASK}, …)
+     * to an {@code issue_type_id} FK for the repository's owning organization.
+     * <p>
+     * GitLab's GraphQL enum uses {@code SCREAMING_SNAKE_CASE}; the {@code IssueType}
+     * name column stores the human-readable form ({@code "Test Case"}). This method
+     * humanises the enum ({@code TEST_CASE} → {@code "Test Case"}) before a
+     * case-insensitive lookup. Returns {@code null} when the repository has no
+     * organization or when no matching issue type exists — the upsert COALESCE
+     * preserves any previously set FK.
+     */
+    @Nullable
+    private String resolveIssueTypeId(@Nullable String typeName, Repository repository) {
+        if (typeName == null || typeName.isBlank()) {
+            return null;
+        }
+        Organization organization = repository.getOrganization();
+        if (organization == null || organization.getId() == null) {
+            return null;
+        }
+        String humanised = humaniseTypeName(typeName);
+        return issueTypeRepository
+            .findByOrganizationIdAndNameIgnoreCase(organization.getId(), humanised)
+            .map(IssueType::getId)
+            .orElse(null);
+    }
+
+    /**
+     * Converts a GitLab GraphQL {@code IssueType} enum value ({@code TEST_CASE})
+     * to the human-readable form stored in {@code issue_type.name} ({@code "Test Case"}).
+     */
+    private static String humaniseTypeName(String enumValue) {
+        String[] parts = enumValue.split("_");
+        StringBuilder sb = new StringBuilder(enumValue.length());
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i].isEmpty()) continue;
+            if (i > 0) sb.append(' ');
+            sb.append(Character.toUpperCase(parts[i].charAt(0)));
+            if (parts[i].length() > 1) {
+                sb.append(parts[i].substring(1).toLowerCase());
+            }
+        }
+        return sb.toString();
     }
 
     /**

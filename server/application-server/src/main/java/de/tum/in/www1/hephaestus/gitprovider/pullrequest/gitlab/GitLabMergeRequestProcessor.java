@@ -129,6 +129,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         String targetBranch,
         @Nullable String diffHeadSha,
         @Nullable String baseSha,
+        @Nullable String mergeCommitSha,
         boolean discussionLocked,
         int commentsCount,
         @Nullable String authorGlobalId,
@@ -631,7 +632,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             data.targetBranch(),
             data.diffHeadSha(),
             data.baseSha(),
-            mergeUser != null ? mergeUser.getId() : null
+            mergeUser != null ? mergeUser.getId() : null,
+            data.mergeCommitSha()
         );
 
         PullRequest pr = pullRequestRepository
@@ -798,7 +800,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             targetBranch,
             headRefOid,
             null, // baseRefOid — not in webhook, null preserves existing
-            mergedBy != null ? mergedBy.getId() : null
+            mergedBy != null ? mergedBy.getId() : null,
+            null // mergeCommitSha — not in webhook, null preserves existing
         );
 
         PullRequest pr = pullRequestRepository
@@ -904,12 +907,47 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         review.setProvider(pr.getProvider());
         review.setState(PullRequestReview.State.APPROVED);
         review.setHtmlUrl(pr.getHtmlUrl() + "#approvals");
-        review.setSubmittedAt(pr.getUpdatedAt() != null ? pr.getUpdatedAt() : Instant.now());
-        review.setCreatedAt(pr.getUpdatedAt() != null ? pr.getUpdatedAt() : Instant.now());
-        review.setUpdatedAt(Instant.now());
+        // GitLab GraphQL exposes approvedBy as a plain UserCore connection without a
+        // per-user approvedAt timestamp, so we use the MR-level merged/updated time
+        // (deterministic — not Instant.now()) as the best-effort approval instant.
+        Instant approvalInstant = resolveApprovalInstant(pr);
+        review.setSubmittedAt(approvalInstant);
+        review.setCreatedAt(approvalInstant);
+        review.setUpdatedAt(approvalInstant);
+        // Anchor the approval to the MR head commit so downstream consumers have a
+        // commit SHA. Falls back to mergeCommitSha when the head is unavailable.
+        review.setCommitId(resolveApprovalCommit(pr));
         review.setAuthor(approver);
         review.setPullRequest(pr);
         return review;
+    }
+
+    /**
+     * Best-effort approval timestamp for a GitLab MR: prefers {@code mergedAt},
+     * falls back to {@code updatedAt}, then {@code createdAt}, then
+     * {@link Instant#EPOCH} as a final deterministic fallback.
+     */
+    private static Instant resolveApprovalInstant(PullRequest pr) {
+        if (pr.getMergedAt() != null) return pr.getMergedAt();
+        if (pr.getUpdatedAt() != null) return pr.getUpdatedAt();
+        if (pr.getCreatedAt() != null) return pr.getCreatedAt();
+        return Instant.EPOCH;
+    }
+
+    /**
+     * Returns the commit SHA the approval should anchor to. Prefers the MR head
+     * ({@code headRefOid}), falls back to the merge commit. May return {@code null}
+     * when neither is populated (e.g., minimal PR stubs created from webhooks).
+     */
+    @Nullable
+    private static String resolveApprovalCommit(PullRequest pr) {
+        if (pr.getHeadRefOid() != null && !pr.getHeadRefOid().isBlank()) {
+            return pr.getHeadRefOid();
+        }
+        if (pr.getMergeCommitSha() != null && !pr.getMergeCommitSha().isBlank()) {
+            return pr.getMergeCommitSha();
+        }
+        return null;
     }
 
     private void reconcileApprovals(
@@ -948,17 +986,31 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
             PullRequestReview existingReview = existingReviewsByNativeId.get(approvalNativeId);
             if (existingReview != null) {
+                boolean changed = false;
                 // Review exists - update to APPROVED if it was CHANGES_REQUESTED
                 if (existingReview.getState() != PullRequestReview.State.APPROVED) {
+                    Instant approvalInstant = resolveApprovalInstant(pr);
                     existingReview.setState(PullRequestReview.State.APPROVED);
-                    existingReview.setSubmittedAt(Instant.now());
-                    existingReview.setUpdatedAt(Instant.now());
-                    reviewRepository.save(existingReview);
+                    existingReview.setSubmittedAt(approvalInstant);
+                    existingReview.setUpdatedAt(approvalInstant);
+                    changed = true;
                     log.debug(
                         "Updated review to APPROVED from sync: prId={}, reviewerId={}",
                         pr.getId(),
                         user.getLogin()
                     );
+                }
+                // Backfill commit SHA on legacy rows that were created before we anchored
+                // approvals to a commit.
+                if (existingReview.getCommitId() == null) {
+                    String commit = resolveApprovalCommit(pr);
+                    if (commit != null) {
+                        existingReview.setCommitId(commit);
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    reviewRepository.save(existingReview);
 
                     if (ctx != null) {
                         EventPayload.ReviewData.from(existingReview).ifPresent(reviewData ->

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        PR #1021 / Gap 2 — populate review/inline-comment metadata from GitLab.
+
+        Adds commit_sha / original_commit_sha columns to pull_request_review_thread
+        so the thread can carry the root note's diffRefs.headSha and diffRefs.baseSha
+        (falling back to startSha). Without these, inline-feedback scoring and the
+        agent diff-note poster have no commit anchor for GitLab threads.
+
+        GitHub-source rows remain backward-compatible: they'll stay NULL until the
+        GitHub review sync is extended to populate them (out of scope here).
+    -->
+    <changeSet id="1776500000000-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="pull_request_review_thread" columnName="commit_sha"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="pull_request_review_thread">
+            <column name="commit_sha" type="VARCHAR(64)"/>
+            <column name="original_commit_sha" type="VARCHAR(64)"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

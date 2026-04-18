@@ -50,6 +50,10 @@ public class GitLabPullRequestReviewCommentProcessor {
 
     /**
      * Data record for a GitLab diff note extracted from GraphQL or webhook data.
+     * <p>
+     * Position fields map to GitLab's {@code DiffPosition}: {@code new_path}/{@code old_path}
+     * for file path (deletion falls back to {@code old_path}), {@code new_line}/{@code old_line}
+     * for diff lines, and {@code head_sha}/{@code base_sha}/{@code start_sha} for diff refs.
      */
     public record DiffNoteData(
         String noteGlobalId,
@@ -62,9 +66,45 @@ public class GitLabPullRequestReviewCommentProcessor {
         @Nullable String oldPath,
         @Nullable String headSha,
         @Nullable String baseSha,
+        @Nullable String startSha,
         @Nullable Instant createdAt,
         @Nullable Instant updatedAt
-    ) {}
+    ) {
+        /**
+         * Backward-compatible constructor for callers that don't carry {@code startSha}
+         * (e.g., older webhook paths). Passes {@code null} for the new field.
+         */
+        public DiffNoteData(
+            String noteGlobalId,
+            @Nullable String body,
+            @Nullable String url,
+            @Nullable String filePath,
+            @Nullable Integer newLine,
+            @Nullable Integer oldLine,
+            @Nullable String newPath,
+            @Nullable String oldPath,
+            @Nullable String headSha,
+            @Nullable String baseSha,
+            @Nullable Instant createdAt,
+            @Nullable Instant updatedAt
+        ) {
+            this(
+                noteGlobalId,
+                body,
+                url,
+                filePath,
+                newLine,
+                oldLine,
+                newPath,
+                oldPath,
+                headSha,
+                baseSha,
+                null,
+                createdAt,
+                updatedAt
+            );
+        }
+    }
 
     /**
      * Groups the contextual parameters needed to find or create a review comment.
@@ -159,21 +199,35 @@ public class GitLabPullRequestReviewCommentProcessor {
         String sanitizedBody = PostgresStringUtils.sanitize(data.body());
         comment.setBody(sanitizedBody != null ? sanitizedBody : "");
 
-        // Path from position data
-        String path = data.filePath() != null ? data.filePath() : (data.newPath() != null ? data.newPath() : "");
+        // Path from position data: prefer new_path, fall back to old_path on deletion.
+        // filePath is GitLab's resolved path (equals new_path for additions/modifications, old_path for deletions).
+        String path = resolvePath(data);
         comment.setPath(path);
 
-        // Line numbers
+        // Line numbers — preserve nullability semantics on the int/int columns (0 == "not present")
         comment.setLine(data.newLine() != null ? data.newLine() : 0);
         comment.setOriginalLine(data.oldLine() != null ? data.oldLine() : 0);
 
-        // Commit SHAs from diffRefs
-        comment.setCommitId(data.headSha() != null ? data.headSha() : "");
-        comment.setOriginalCommitId(data.baseSha() != null ? data.baseSha() : "");
+        // Side: RIGHT if comment anchored on new side (new_line set), LEFT if only old_line present.
+        comment.setSide(deriveSide(data.newLine(), data.oldLine()));
+        // GraphQL DiffPosition doesn't expose a per-note multi-line range; start_side mirrors side.
+        comment.setStartSide(comment.getSide());
 
-        // GitLab doesn't expose diff hunks or author association
-        comment.setDiffHunk(null);
+        // Commit SHAs: head_sha / base_sha come from diffRefs. Fall back to start_sha
+        // when base_sha is absent (GitLab may omit base_sha on rebased MRs but always
+        // emits start_sha for the compared branch).
+        comment.setCommitId(data.headSha() != null ? data.headSha() : "");
+        String originalSha = data.baseSha() != null ? data.baseSha() : data.startSha();
+        comment.setOriginalCommitId(originalSha != null ? originalSha : "");
+
+        // GitLab doesn't expose an author association.
         comment.setAuthorAssociation(null);
+
+        // Reconstruct a minimal unified-diff header stub from position data so downstream
+        // consumers that expect a diff_hunk have a parseable `@@ -a,b +c,d @@` anchor.
+        // GitLab's GraphQL DiffPosition does NOT expose line_range, so we can only emit a
+        // 1-line range at the commented position.
+        comment.setDiffHunk(buildDiffHunkStub(data.oldLine(), data.newLine()));
 
         // HTML URL
         comment.setHtmlUrl(data.url() != null ? data.url() : "");
@@ -210,5 +264,59 @@ public class GitLabPullRequestReviewCommentProcessor {
     private static EventContext createSyncContext(PullRequest pr, Long scopeId) {
         RepositoryRef repoRef = pr.getRepository() != null ? RepositoryRef.from(pr.getRepository()) : null;
         return EventContext.forSync(scopeId, repoRef, GitProviderType.GITLAB);
+    }
+
+    /**
+     * Resolves the file path a diff note anchors to. Precedence: {@code new_path}
+     * (the file's current-side path, populated for additions/modifications), then
+     * {@code old_path} (populated for deletions), then GitLab's pre-resolved
+     * {@code filePath}, then empty string.
+     */
+    static String resolvePath(DiffNoteData data) {
+        if (data.newPath() != null && !data.newPath().isBlank()) {
+            return data.newPath();
+        }
+        if (data.oldPath() != null && !data.oldPath().isBlank()) {
+            return data.oldPath();
+        }
+        if (data.filePath() != null && !data.filePath().isBlank()) {
+            return data.filePath();
+        }
+        return "";
+    }
+
+    /**
+     * Derives the diff side a note anchors on:
+     * <ul>
+     *   <li>{@code RIGHT} when {@code new_line} is set (note on the current/head side)</li>
+     *   <li>{@code LEFT} when only {@code old_line} is set (note on the base side — typically a deletion)</li>
+     *   <li>{@code RIGHT} as a safe default when neither line is provided (matches GitHub mapper fallback)</li>
+     * </ul>
+     */
+    @Nullable
+    static PullRequestReviewComment.Side deriveSide(@Nullable Integer newLine, @Nullable Integer oldLine) {
+        if (newLine != null) {
+            return PullRequestReviewComment.Side.RIGHT;
+        }
+        if (oldLine != null) {
+            return PullRequestReviewComment.Side.LEFT;
+        }
+        return PullRequestReviewComment.Side.RIGHT;
+    }
+
+    /**
+     * Builds a minimal unified-diff header stub (single-line range) so consumers that
+     * parse {@code diff_hunk} don't choke on a null value. GitLab's GraphQL
+     * {@code DiffPosition} does not expose a multi-line range, so this stub intentionally
+     * covers only the anchored line. Returns {@code null} when neither line is provided.
+     */
+    @Nullable
+    static String buildDiffHunkStub(@Nullable Integer oldLine, @Nullable Integer newLine) {
+        int o = oldLine != null && oldLine > 0 ? oldLine : 0;
+        int n = newLine != null && newLine > 0 ? newLine : 0;
+        if (o == 0 && n == 0) {
+            return null;
+        }
+        return String.format("@@ -%d,1 +%d,1 @@", o, n);
     }
 }

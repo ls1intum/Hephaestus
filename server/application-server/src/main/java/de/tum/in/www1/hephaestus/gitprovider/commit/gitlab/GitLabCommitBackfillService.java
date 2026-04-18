@@ -229,8 +229,8 @@ public class GitLabCommitBackfillService {
             }
 
             Long providerId = repository.getProvider() != null ? repository.getProvider().getId() : null;
-            Long authorId = authorResolver.resolveByEmail(info.authorEmail(), providerId);
-            Long committerId = authorResolver.resolveByEmail(info.committerEmail(), providerId);
+            Long authorId = authorResolver.resolveAndBackfillByEmail(info.authorEmail(), providerId);
+            Long committerId = authorResolver.resolveAndBackfillByEmail(info.committerEmail(), providerId);
 
             String message = info.message() != null ? info.message() : "";
             String htmlUrl = CommitUtils.buildGitLabCommitUrl(serverUrl, repository.getNameWithOwner(), info.sha());
@@ -252,6 +252,23 @@ public class GitLabCommitBackfillService {
                 info.authorEmail(),
                 info.committerEmail()
             );
+
+            // Persist parent topology from the local clone walk. The REST-first
+            // path in GitLabCommitSyncService also sets these via the
+            // parent_ids field; both paths feed the same columns so whichever
+            // runs first wins and subsequent runs are COALESCE-idempotent.
+            if (info.parentShas() != null && !info.parentShas().isEmpty()) {
+                commitRepository.updateParentMetadataBySha(
+                    repository.getId(),
+                    info.sha(),
+                    info.parentShas().size(),
+                    String.join(",", info.parentShas())
+                );
+            } else if (info.parentShas() != null) {
+                // Root commit (parent_count = 0). Write the count so downstream
+                // queries can distinguish "populated=0 parents" from "unpopulated".
+                commitRepository.updateParentMetadataBySha(repository.getId(), info.sha(), 0, null);
+            }
 
             Commit commit = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId()).orElse(null);
             if (commit == null) {
@@ -327,7 +344,7 @@ public class GitLabCommitBackfillService {
         List<CoAuthor> coAuthors = parseCoAuthors(info.messageBody(), info.authorEmail());
         for (int i = 0; i < coAuthors.size(); i++) {
             CoAuthor ca = coAuthors.get(i);
-            Long coAuthorUserId = authorResolver.resolveByEmail(ca.email(), providerId);
+            Long coAuthorUserId = authorResolver.resolveAndBackfillByEmail(ca.email(), providerId);
             contributorRepository.upsertContributor(
                 commitId,
                 coAuthorUserId,

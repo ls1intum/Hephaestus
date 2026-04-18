@@ -272,7 +272,8 @@ public class GitLabMergeRequestSyncService {
         String sourceBranch,
         String targetBranch,
         @Nullable String diffHeadSha,
-        @Nullable String baseSha
+        @Nullable String baseSha,
+        @Nullable String mergeCommitSha
     ) {}
 
     private record DiffStats(int additions, int deletions, int fileCount) {
@@ -504,6 +505,7 @@ public class GitLabMergeRequestSyncService {
             fields.targetBranch(),
             fields.diffHeadSha(),
             fields.baseSha(),
+            fields.mergeCommitSha(),
             fields.discussionLocked(),
             fields.userNotesCount(),
             author.globalId(),
@@ -571,6 +573,7 @@ public class GitLabMergeRequestSyncService {
         String sourceBranch = (String) node.get("sourceBranch");
         String targetBranch = (String) node.get("targetBranch");
         String diffHeadSha = (String) node.get("diffHeadSha");
+        String mergeCommitSha = (String) node.get("mergeCommitSha");
 
         // Extract baseSha from diffRefs
         String baseSha = null;
@@ -600,7 +603,8 @@ public class GitLabMergeRequestSyncService {
             sourceBranch,
             targetBranch,
             diffHeadSha,
-            baseSha
+            baseSha,
+            mergeCommitSha
         );
     }
 

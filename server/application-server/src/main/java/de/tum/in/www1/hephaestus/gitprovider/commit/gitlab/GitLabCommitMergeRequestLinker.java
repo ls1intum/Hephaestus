@@ -53,6 +53,7 @@ public class GitLabCommitMergeRequestLinker {
 
     private static final String LINK_COMMITS_DOCUMENT = "LinkCommitsToMergeRequests";
     private static final String GET_MR_COMMITS_DOCUMENT = "GetMergeRequestCommits";
+    private static final String GET_MR_ALL_COMMITS_DOCUMENT = "GetMergeRequestAllCommits";
 
     private final CommitRepository commitRepository;
     private final CommitContributorRepository commitContributorRepository;
@@ -191,10 +192,49 @@ public class GitLabCommitMergeRequestLinker {
                         for (CommitNode node : commitNodes) {
                             shas.add(node.sha());
                         }
+                        int inserted = 0;
                         if (!shas.isEmpty()) {
-                            int inserted = commitRepository.linkPullRequestToCommits(repositoryId, iid, shas);
+                            inserted = commitRepository.linkPullRequestToCommits(repositoryId, iid, shas);
                             totalLinks += inserted;
                         }
+
+                        // Fallback path: when the primary connection
+                        // (commitsWithoutMergeCommits) produced no links and the MR is
+                        // in a terminal state (merged/closed), try the unfiltered
+                        // MergeRequest.commits connection. This recovers links for MRs
+                        // that only have a merge commit, and for squashed MRs where
+                        // the squash commit is the only association.
+                        if (inserted == 0 && isTerminalState(mrNode)) {
+                            List<CommitNode> fallbackNodes = fetchAllCommitsFallback(
+                                scopeId,
+                                projectPath,
+                                iid,
+                                safeProjectPath + "!" + iid
+                            );
+                            if (fallbackNodes != null && !fallbackNodes.isEmpty()) {
+                                List<String> fallbackShas = new ArrayList<>(fallbackNodes.size());
+                                for (CommitNode node : fallbackNodes) {
+                                    fallbackShas.add(node.sha());
+                                }
+                                int fallbackInserted = commitRepository.linkPullRequestToCommits(
+                                    repositoryId,
+                                    iid,
+                                    fallbackShas
+                                );
+                                totalLinks += fallbackInserted;
+                                if (fallbackInserted == 0) {
+                                    log.debug(
+                                        "Fallback produced no link rows; referenced SHAs not yet in git_commit: " +
+                                            "projectPath={}, iid={}, shaCount={}",
+                                        safeProjectPath,
+                                        iid,
+                                        fallbackShas.size()
+                                    );
+                                }
+                                harvestEmailLoginPairs(fallbackNodes, loginToEmails);
+                            }
+                        }
+
                         harvestEmailLoginPairs(commitNodes, loginToEmails);
                         mrsProcessed++;
                     } catch (Exception e) {
@@ -335,6 +375,101 @@ public class GitLabCommitMergeRequestLinker {
         Map<String, Object> pageInfo = (Map<String, Object>) commitsMap.get("pageInfo");
         if (pageInfo == null) return null;
         return (String) pageInfo.get("endCursor");
+    }
+
+    /**
+     * Returns {@code true} when the MR node's GitLab state is a terminal state —
+     * {@code merged} or {@code closed}. Only terminal MRs are eligible for the
+     * unfiltered commits fallback: open MRs routinely appear with zero commits
+     * during the push → sync race window and must not trigger a fallback round trip.
+     */
+    private static boolean isTerminalState(Map<String, Object> mrNode) {
+        Object state = mrNode.get("state");
+        if (!(state instanceof String s)) return false;
+        String normalised = s.toLowerCase(Locale.ROOT);
+        return "merged".equals(normalised) || "closed".equals(normalised);
+    }
+
+    /**
+     * Fetches commits for a merge request via the unfiltered
+     * {@code MergeRequest.commits} connection (including merge commits).
+     * <p>
+     * Used as a fallback when the primary
+     * {@code commitsWithoutMergeCommits} path produced no link rows for a
+     * terminal-state MR — typical for squash-merged MRs whose only association
+     * is the squash commit itself. Returns an empty list when the MR has no
+     * commits; returns {@code null} only if the query failed such that the
+     * fallback must be skipped.
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private List<CommitNode> fetchAllCommitsFallback(Long scopeId, String projectPath, int iid, String context) {
+        List<CommitNode> collected = new ArrayList<>();
+        String cursor = null;
+        String previousCursor = null;
+        int page = 0;
+
+        try {
+            while (page < GitLabSyncConstants.MAX_PAGINATION_PAGES) {
+                graphQlClientProvider.acquirePermission();
+                graphQlClientProvider.waitIfRateLimitLow(scopeId);
+
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+                ClientGraphQlResponse response = client
+                    .documentName(GET_MR_ALL_COMMITS_DOCUMENT)
+                    .variable("fullPath", projectPath)
+                    .variable("iid", Integer.toString(iid))
+                    .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(gitLabProperties.graphqlTimeout());
+
+                var handleResult = responseHandler.handle(response, "fallback MR commits for " + context, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    return null;
+                }
+
+                graphQlClientProvider.recordSuccess();
+
+                List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) (List<?>) response
+                    .field("project.mergeRequests.nodes")
+                    .toEntityList(Map.class);
+
+                if (mrNodes == null || mrNodes.isEmpty()) break;
+
+                Map<String, Object> commitsMap = (Map<String, Object>) mrNodes.get(0).get("commits");
+                if (commitsMap == null) break;
+
+                List<Map<String, Object>> commitNodes = (List<Map<String, Object>>) commitsMap.get("nodes");
+                if (commitNodes != null) {
+                    for (Map<String, Object> node : commitNodes) {
+                        CommitNode parsed = toCommitNode(node);
+                        if (parsed != null) collected.add(parsed);
+                    }
+                }
+
+                Map<String, Object> pageInfo = (Map<String, Object>) commitsMap.get("pageInfo");
+                if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
+                cursor = (String) pageInfo.get("endCursor");
+                if (responseHandler.isPaginationLoop(cursor, previousCursor, "fallback MR commits for " + context, log)) {
+                    return collected;
+                }
+                previousCursor = cursor;
+                page++;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (Exception e) {
+            log.warn("Fallback MR commits fetch failed: context={}, error={}", context, e.getMessage());
+            return null;
+        }
+
+        return collected;
     }
 
     // ========================================================================

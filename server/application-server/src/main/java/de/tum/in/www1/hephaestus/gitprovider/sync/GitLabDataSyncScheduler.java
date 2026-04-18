@@ -194,6 +194,11 @@ public class GitLabDataSyncScheduler {
             // Phase 2.5: Sync issue types (org-level, before per-repo sync)
             syncIssueTypes(services, session);
 
+            // Phase 2.6: Sync group milestones (fan-out to every repo in the group).
+            // Must run before the per-repo sync so the issue-sync phase can resolve
+            // milestone references on issues by iid.
+            syncGroupMilestones(services, session);
+
             // Phase 3: Per-repository sync (labels, milestones, issues, MRs, collaborators)
             syncRepositories(services, session);
 
@@ -298,6 +303,44 @@ public class GitLabDataSyncScheduler {
             log.info("GitLab issue type sync: scopeId={}, types={}", session.scopeId(), count);
         } catch (Exception e) {
             log.error("Failed GitLab issue type sync: scopeId={}", session.scopeId(), e);
+        }
+    }
+
+    /**
+     * Syncs group milestones (including ancestors and descendant subgroups) and fans them out
+     * to every monitored repository in this workspace. Closes the gap where
+     * {@code project.milestones(includeAncestors: true)} did not reliably surface group
+     * milestones, leaving the {@code milestone} table largely empty on fresh syncs.
+     */
+    private void syncGroupMilestones(GitLabSyncServiceHolder services, SyncSession session) {
+        GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
+        if (milestoneSync == null) return;
+
+        if (session.accountLogin() == null || session.accountLogin().isBlank()) {
+            return;
+        }
+
+        List<Repository> repos = repositoryRepository.findAllByWorkspaceMonitors(session.scopeId());
+        if (repos.isEmpty()) {
+            log.debug("No repositories for group milestone sync: scopeId={}", session.scopeId());
+            return;
+        }
+
+        try {
+            SyncResult result = milestoneSync.syncMilestonesForGroup(session.scopeId(), session.accountLogin(), repos);
+            log.info(
+                "GitLab group milestone sync: scopeId={}, group={}, written={}",
+                session.scopeId(),
+                sanitizeForLog(session.accountLogin()),
+                result.count()
+            );
+        } catch (Exception e) {
+            log.error(
+                "Failed GitLab group milestone sync: scopeId={}, group={}",
+                session.scopeId(),
+                sanitizeForLog(session.accountLogin()),
+                e
+            );
         }
     }
 

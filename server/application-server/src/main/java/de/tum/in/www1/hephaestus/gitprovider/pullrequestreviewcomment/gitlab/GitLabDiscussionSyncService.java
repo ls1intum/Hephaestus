@@ -323,12 +323,39 @@ public class GitLabDiscussionSyncService {
         }
 
         // Extract position from first note for thread metadata
-        Map<String, Object> firstNote = noteNodes.get(0);
-        Map<String, Object> firstPosition = (Map<String, Object>) firstNote.get("position");
-        String filePath = firstPosition != null ? (String) firstPosition.get("filePath") : null;
-        Integer newLine = firstPosition != null ? GitLabFieldUtils.toInteger(firstPosition.get("newLine")) : null;
+        // Pick the earliest note with a non-null position as "root" for thread path/line.
+        // (Some notes in a discussion can be replies without their own position.)
+        Map<String, Object> rootNote = findRootDiffNote(noteNodes);
+        Map<String, Object> rootPosition = rootNote != null ? (Map<String, Object>) rootNote.get("position") : null;
 
-        Instant firstCreatedAt = parseTimestamp((String) firstNote.get("createdAt"));
+        String filePath = null;
+        Integer newLine = null;
+        Integer oldLine = null;
+        String headSha = null;
+        String baseSha = null;
+        PullRequestReviewComment.Side threadSide = null;
+
+        if (rootPosition != null) {
+            String np = (String) rootPosition.get("newPath");
+            String op = (String) rootPosition.get("oldPath");
+            String fp = (String) rootPosition.get("filePath");
+            filePath = np != null ? np : (op != null ? op : fp);
+            newLine = GitLabFieldUtils.toInteger(rootPosition.get("newLine"));
+            oldLine = GitLabFieldUtils.toInteger(rootPosition.get("oldLine"));
+            threadSide =
+                GitLabPullRequestReviewCommentProcessor.deriveSide(newLine, oldLine);
+
+            Map<String, Object> diffRefs = (Map<String, Object>) rootPosition.get("diffRefs");
+            if (diffRefs != null) {
+                headSha = (String) diffRefs.get("headSha");
+                baseSha = (String) diffRefs.get("baseSha");
+                if (baseSha == null) {
+                    baseSha = (String) diffRefs.get("startSha");
+                }
+            }
+        }
+
+        Instant firstCreatedAt = parseTimestamp((String) noteNodes.get(0).get("createdAt"));
 
         // Create/update the thread
         var threadData = new GitLabPullRequestReviewThreadProcessor.ThreadData(
@@ -337,6 +364,10 @@ public class GitLabDiscussionSyncService {
             resolvedBy,
             filePath,
             newLine,
+            oldLine,
+            threadSide,
+            headSha,
+            baseSha,
             firstCreatedAt
         );
         PullRequestReviewThread thread = threadProcessor.findOrCreateThread(threadData, pr, provider, scopeId);
@@ -365,27 +396,33 @@ public class GitLabDiscussionSyncService {
                 continue;
             }
 
-            // Extract position data for this note
+            // Extract position data for this note. Reply notes in GitLab can omit their
+            // own position; fall back to the root diff note's position so path/line/sha
+            // are still populated on every comment.
             Map<String, Object> position = (Map<String, Object>) noteNode.get("position");
+            Map<String, Object> effectivePosition = position != null ? position : rootPosition;
+
             String noteFilePath = null;
             Integer noteNewLine = null;
             Integer noteOldLine = null;
             String newPath = null;
             String oldPath = null;
-            String headSha = null;
-            String baseSha = null;
+            String noteHeadSha = null;
+            String noteBaseSha = null;
+            String noteStartSha = null;
 
-            if (position != null) {
-                noteFilePath = (String) position.get("filePath");
-                noteNewLine = GitLabFieldUtils.toInteger(position.get("newLine"));
-                noteOldLine = GitLabFieldUtils.toInteger(position.get("oldLine"));
-                newPath = (String) position.get("newPath");
-                oldPath = (String) position.get("oldPath");
+            if (effectivePosition != null) {
+                noteFilePath = (String) effectivePosition.get("filePath");
+                noteNewLine = GitLabFieldUtils.toInteger(effectivePosition.get("newLine"));
+                noteOldLine = GitLabFieldUtils.toInteger(effectivePosition.get("oldLine"));
+                newPath = (String) effectivePosition.get("newPath");
+                oldPath = (String) effectivePosition.get("oldPath");
 
-                Map<String, Object> diffRefs = (Map<String, Object>) position.get("diffRefs");
+                Map<String, Object> diffRefs = (Map<String, Object>) effectivePosition.get("diffRefs");
                 if (diffRefs != null) {
-                    headSha = (String) diffRefs.get("headSha");
-                    baseSha = (String) diffRefs.get("baseSha");
+                    noteHeadSha = (String) diffRefs.get("headSha");
+                    noteBaseSha = (String) diffRefs.get("baseSha");
+                    noteStartSha = (String) diffRefs.get("startSha");
                 }
             }
 
@@ -401,8 +438,9 @@ public class GitLabDiscussionSyncService {
                 noteOldLine,
                 newPath,
                 oldPath,
-                headSha,
-                baseSha,
+                noteHeadSha,
+                noteBaseSha,
+                noteStartSha,
                 parseTimestamp((String) noteNode.get("createdAt")),
                 parseTimestamp((String) noteNode.get("updatedAt"))
             );
@@ -534,6 +572,21 @@ public class GitLabDiscussionSyncService {
         }
 
         return new int[] { 0, generalNotes, 0 };
+    }
+
+    /**
+     * Returns the first note in the discussion that carries a non-null {@code position}.
+     * Used to source thread-level metadata (path, line, side, SHAs) when the leading
+     * note is a reply without its own position.
+     */
+    @Nullable
+    private static Map<String, Object> findRootDiffNote(List<Map<String, Object>> noteNodes) {
+        for (Map<String, Object> note : noteNodes) {
+            if (note.get("position") != null) {
+                return note;
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")

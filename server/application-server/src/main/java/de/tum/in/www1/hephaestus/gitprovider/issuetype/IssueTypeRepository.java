@@ -32,4 +32,24 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
         """
     )
     List<IssueType> findAllByOrganizationId(@Param("organizationId") Long organizationId);
+
+    /**
+     * Find an enabled issue type by organization and name (case-insensitive).
+     * <p>
+     * Used by GitLab issue sync to resolve {@code issue.issue_type_id} from the
+     * GraphQL {@code Issue.type} enum ({@code ISSUE}, {@code TASK}, {@code INCIDENT}, …).
+     */
+    @Query(
+        """
+        SELECT it
+        FROM IssueType it
+        WHERE it.organization.id = :organizationId
+        AND lower(it.name) = lower(:name)
+        AND it.isEnabled = true
+        """
+    )
+    java.util.Optional<IssueType> findByOrganizationIdAndNameIgnoreCase(
+        @Param("organizationId") Long organizationId,
+        @Param("name") String name
+    );
 }

@@ -203,8 +203,19 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         if (data.createdAt() != null) {
             comment.setCreatedAt(parseGitLabTimestamp(data.createdAt()));
         }
+        // GitLab's Note.updated_at must be persisted VERBATIM. Never fall back to
+        // createdAt when updatedAt is absent — that erases the edit history. If GitLab
+        // returns a distinct value from what we stored previously, track the field so a
+        // CommentUpdated event fires downstream (inline-feedback / profile views rely on
+        // updatedAt divergence to detect edits).
         if (data.updatedAt() != null) {
-            comment.setUpdatedAt(parseGitLabTimestamp(data.updatedAt()));
+            Instant newUpdatedAt = parseGitLabTimestamp(data.updatedAt());
+            if (newUpdatedAt != null && !newUpdatedAt.equals(comment.getUpdatedAt())) {
+                comment.setUpdatedAt(newUpdatedAt);
+                if (!isNew) {
+                    changedFields.add("updatedAt");
+                }
+            }
         }
 
         if (author != null && comment.getAuthor() == null) {

@@ -30,6 +30,7 @@ query GetProjectMergeRequests($fullPath: ID!, $first: Int!, $after: String, $upd
                 sourceBranch
                 targetBranch
                 diffHeadSha
+                mergeCommitSha
                 diffRefs {
                     baseSha
                 }
