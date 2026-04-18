@@ -350,8 +350,7 @@ class AchievementServiceTest extends BaseUnitTest {
             service.checkAndUnlock(createEvent(ActivityEventType.COMMIT_CREATED));
 
             verify(userAchievementRepository).save(persistedByWinner);
-            LinearAchievementProgress finalProgress =
-                (LinearAchievementProgress) persistedByWinner.getProgressData();
+            LinearAchievementProgress finalProgress = (LinearAchievementProgress) persistedByWinner.getProgressData();
             assertThat(finalProgress.current()).isEqualTo(2);
         }
 

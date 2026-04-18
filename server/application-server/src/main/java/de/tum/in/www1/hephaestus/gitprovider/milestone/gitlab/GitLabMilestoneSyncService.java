@@ -231,11 +231,7 @@ public class GitLabMilestoneSyncService {
      * @param repositoriesInGroup  repositories that should receive the milestone fan-out
      * @return sync result with total number of milestone rows written (milestones * repos)
      */
-    public SyncResult syncMilestonesForGroup(
-        Long scopeId,
-        String groupFullPath,
-        List<Repository> repositoriesInGroup
-    ) {
+    public SyncResult syncMilestonesForGroup(Long scopeId, String groupFullPath, List<Repository> repositoriesInGroup) {
         String safeGroupPath = sanitizeForLog(groupFullPath);
 
         if (groupFullPath == null || groupFullPath.isBlank()) {
@@ -243,11 +239,7 @@ public class GitLabMilestoneSyncService {
             return SyncResult.completed(0);
         }
         if (repositoriesInGroup == null || repositoriesInGroup.isEmpty()) {
-            log.debug(
-                "Skipping group milestone sync: reason=noRepos, scopeId={}, group={}",
-                scopeId,
-                safeGroupPath
-            );
+            log.debug("Skipping group milestone sync: reason=noRepos, scopeId={}, group={}", scopeId, safeGroupPath);
             return SyncResult.completed(0);
         }
 

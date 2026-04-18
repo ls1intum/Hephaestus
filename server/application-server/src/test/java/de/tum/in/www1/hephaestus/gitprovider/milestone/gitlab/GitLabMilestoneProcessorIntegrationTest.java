@@ -580,9 +580,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             assertThat(result).isNotNull();
             assertThat(result.getDescription()).isEqualTo("End-of-quarter milestone");
-            assertThat(result.getDueOn()).isEqualTo(
-                LocalDate.of(2026, 3, 31).atStartOfDay(ZoneOffset.UTC).toInstant()
-            );
+            assertThat(result.getDueOn()).isEqualTo(LocalDate.of(2026, 3, 31).atStartOfDay(ZoneOffset.UTC).toInstant());
             assertThat(result.getState()).isEqualTo(Milestone.State.CLOSED);
             // closed_at is approximated from updatedAt on first transition to CLOSED — must not be null.
             assertThat(result.getClosedAt()).isNotNull();

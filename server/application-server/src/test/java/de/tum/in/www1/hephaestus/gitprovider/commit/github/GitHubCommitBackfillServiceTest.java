@@ -142,8 +142,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
                     null
                 )
             ),
-                List.of()
-            );
+            List.of()
+        );
     }
 
     private static Commit createMockCommit(String sha, Long repoId) {

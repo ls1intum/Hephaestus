@@ -342,8 +342,7 @@ public class GitLabDiscussionSyncService {
             filePath = np != null ? np : (op != null ? op : fp);
             newLine = GitLabFieldUtils.toInteger(rootPosition.get("newLine"));
             oldLine = GitLabFieldUtils.toInteger(rootPosition.get("oldLine"));
-            threadSide =
-                GitLabPullRequestReviewCommentProcessor.deriveSide(newLine, oldLine);
+            threadSide = GitLabPullRequestReviewCommentProcessor.deriveSide(newLine, oldLine);
 
             Map<String, Object> diffRefs = (Map<String, Object>) rootPosition.get("diffRefs");
             if (diffRefs != null) {

@@ -985,8 +985,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             IssueType taskType = new IssueType();
             taskType.setId("gid://gitlab/IssueType/1");
 
-            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(42L, "Task"))
-                .thenReturn(Optional.of(taskType));
+            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(42L, "Task")).thenReturn(
+                Optional.of(taskType)
+            );
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",

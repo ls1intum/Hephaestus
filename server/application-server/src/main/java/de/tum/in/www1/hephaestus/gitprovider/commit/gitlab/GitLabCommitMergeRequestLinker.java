@@ -455,7 +455,9 @@ public class GitLabCommitMergeRequestLinker {
                 Map<String, Object> pageInfo = (Map<String, Object>) commitsMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
-                if (responseHandler.isPaginationLoop(cursor, previousCursor, "fallback MR commits for " + context, log)) {
+                if (
+                    responseHandler.isPaginationLoop(cursor, previousCursor, "fallback MR commits for " + context, log)
+                ) {
                     return collected;
                 }
                 previousCursor = cursor;

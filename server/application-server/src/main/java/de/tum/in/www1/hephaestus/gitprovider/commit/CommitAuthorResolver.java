@@ -83,7 +83,9 @@ public class CommitAuthorResolver {
      * {@code firstname.lastname@tum.de} / {@code first.middle.last@example.com} style
      * institutional addresses while filtering out {@code 42.spam@domain} style noise.
      */
-    private static final Pattern FIRSTNAME_LASTNAME_LOCAL_PART = Pattern.compile("^[A-Za-z][A-Za-z-]*(?:\\.[A-Za-z][A-Za-z-]*)+$");
+    private static final Pattern FIRSTNAME_LASTNAME_LOCAL_PART = Pattern.compile(
+        "^[A-Za-z][A-Za-z-]*(?:\\.[A-Za-z][A-Za-z-]*)+$"
+    );
 
     private static final Logger log = LoggerFactory.getLogger(CommitAuthorResolver.class);
 
@@ -155,9 +157,10 @@ public class CommitAuthorResolver {
             if (FIRSTNAME_LASTNAME_LOCAL_PART.matcher(localPart).matches()) {
                 String displayName = dottedLocalPartToDisplayName(localPart);
                 if (displayName != null) {
-                    List<User> candidates = providerId != null
-                        ? userRepository.findAllByNameAndProviderId(displayName, providerId)
-                        : userRepository.findAllByName(displayName);
+                    List<User> candidates =
+                        providerId != null
+                            ? userRepository.findAllByNameAndProviderId(displayName, providerId)
+                            : userRepository.findAllByName(displayName);
                     if (candidates.size() == 1) {
                         return candidates.get(0).getId();
                     }

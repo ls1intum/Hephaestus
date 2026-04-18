@@ -439,9 +439,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         void shouldNotBackfillForGitLabBotNoreply() {
             // Resolver returns null for bot noreply (no strategy can match), so we
             // cover the eligibility filter via isBackfillEligible directly below.
-            when(userRepository.findByEmail("group_319719_bot_abc@noreply.gitlab.lrz.de")).thenReturn(
-                Optional.empty()
-            );
+            when(userRepository.findByEmail("group_319719_bot_abc@noreply.gitlab.lrz.de")).thenReturn(Optional.empty());
 
             Long result = resolver.resolveAndBackfillByEmail("group_319719_bot_abc@noreply.gitlab.lrz.de", null);
 
@@ -456,9 +454,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
 
             User user = createUser(4875L);
             when(userRepository.findByLoginAndProviderId("go98tod", 3L)).thenReturn(Optional.of(user));
-            when(userRepository.backfillEmailIfNull(4875L, "go98tod@mytum.de")).thenThrow(
-                new RuntimeException("boom")
-            );
+            when(userRepository.backfillEmailIfNull(4875L, "go98tod@mytum.de")).thenThrow(new RuntimeException("boom"));
 
             Long result = resolver.resolveAndBackfillByEmail("go98tod@mytum.de", 3L);
 

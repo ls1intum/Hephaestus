@@ -86,12 +86,8 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         @Test
         @DisplayName("should produce distinct values for distinct discussion IDs")
         void shouldProduceDistinctValuesForDistinctDiscussionIds() {
-            long a = GitLabPullRequestReviewThreadProcessor.deterministicNativeId(
-                "gid://gitlab/Discussion/aaaaaa"
-            );
-            long b = GitLabPullRequestReviewThreadProcessor.deterministicNativeId(
-                "gid://gitlab/Discussion/bbbbbb"
-            );
+            long a = GitLabPullRequestReviewThreadProcessor.deterministicNativeId("gid://gitlab/Discussion/aaaaaa");
+            long b = GitLabPullRequestReviewThreadProcessor.deterministicNativeId("gid://gitlab/Discussion/bbbbbb");
             assertThat(a).isNotEqualTo(b);
         }
     }

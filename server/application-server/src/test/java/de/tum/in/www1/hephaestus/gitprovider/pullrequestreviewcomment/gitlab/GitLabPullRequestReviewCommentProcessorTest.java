@@ -191,7 +191,16 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
                 inv.getArgument(0, PullRequestReviewComment.class)
             );
 
-            var data = buildDiffNoteData("src/Foo.ts", "src/Foo.ts", "src/Foo.ts", 42, null, "head-sha", "base-sha", "start-sha");
+            var data = buildDiffNoteData(
+                "src/Foo.ts",
+                "src/Foo.ts",
+                "src/Foo.ts",
+                42,
+                null,
+                "head-sha",
+                "base-sha",
+                "start-sha"
+            );
             var context = new GitLabPullRequestReviewCommentProcessor.CommentContext(
                 thread,
                 pr,

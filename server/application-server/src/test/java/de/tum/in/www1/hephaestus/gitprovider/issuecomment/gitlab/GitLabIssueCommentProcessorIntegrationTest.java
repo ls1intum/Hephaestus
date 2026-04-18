@@ -102,18 +102,9 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("shouldPersistUpdatedAtVerbatimWhenCreatingNewComment")
     void shouldPersistUpdatedAtVerbatimWhenCreatingNewComment() {
-        GitLabIssueCommentProcessor.SyncNoteData data = buildData(
-            "First comment",
-            CREATED_AT,
-            UPDATED_AT_LATER
-        );
+        GitLabIssueCommentProcessor.SyncNoteData data = buildData("First comment", CREATED_AT, UPDATED_AT_LATER);
 
-        IssueComment saved = processor.processFromSync(
-            data,
-            testIssue,
-            gitlabProvider.getId(),
-            testWorkspace.getId()
-        );
+        IssueComment saved = processor.processFromSync(data, testIssue, gitlabProvider.getId(), testWorkspace.getId());
 
         assertThat(saved).isNotNull();
         Instant expectedCreated = OffsetDateTime.parse(CREATED_AT).toInstant();
