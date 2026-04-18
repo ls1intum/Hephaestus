@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.commit.gitlab;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitContributorRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
@@ -11,10 +12,17 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -47,17 +55,23 @@ public class GitLabCommitMergeRequestLinker {
     private static final String GET_MR_COMMITS_DOCUMENT = "GetMergeRequestCommits";
 
     private final CommitRepository commitRepository;
+    private final CommitContributorRepository commitContributorRepository;
+    private final UserRepository userRepository;
     private final GitLabGraphQlClientProvider graphQlClientProvider;
     private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabProperties gitLabProperties;
 
     public GitLabCommitMergeRequestLinker(
         CommitRepository commitRepository,
+        CommitContributorRepository commitContributorRepository,
+        UserRepository userRepository,
         GitLabGraphQlClientProvider graphQlClientProvider,
         GitLabGraphQlResponseHandler responseHandler,
         GitLabProperties gitLabProperties
     ) {
         this.commitRepository = commitRepository;
+        this.commitContributorRepository = commitContributorRepository;
+        this.userRepository = userRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.gitLabProperties = gitLabProperties;
@@ -76,6 +90,7 @@ public class GitLabCommitMergeRequestLinker {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = sanitizeForLog(projectPath);
         long repositoryId = repository.getId();
+        Long providerId = repository.getProvider() != null ? repository.getProvider().getId() : null;
 
         log.info(
             "Starting commit→MR linking: scopeId={}, projectPath={}, updatedAfter={}",
@@ -91,6 +106,14 @@ public class GitLabCommitMergeRequestLinker {
         int page = 0;
         boolean rateLimitAborted = false;
         boolean errorAborted = false;
+
+        // Harvested during the sweep: (login -> set of emails) captured from GitLab's
+        // server-side author resolution. Any commit whose `author` is non-null teaches
+        // us that `authorEmail` belongs to that login. For commits with `author == null`
+        // we piggyback on the "dominant login" of the same MR — authors frequently
+        // push from two addresses (e.g. {login}@mytum.de AND {login}@tum.de) and GitLab
+        // only registers one as their primary.
+        Map<String, Set<String>> loginToEmails = new HashMap<>();
 
         try {
             do {
@@ -148,9 +171,9 @@ public class GitLabCommitMergeRequestLinker {
                     if (iid == null) continue;
 
                     try {
-                        List<String> shas = extractShas(mrNode);
+                        List<CommitNode> commitNodes = extractCommitNodes(mrNode);
                         if (hasMoreCommits(mrNode)) {
-                            List<String> tail = fetchRemainingCommits(
+                            List<CommitNode> tail = fetchRemainingCommits(
                                 scopeId,
                                 projectPath,
                                 iid,
@@ -161,12 +184,18 @@ public class GitLabCommitMergeRequestLinker {
                                 // Incomplete follow-up pagination: skip the MR to avoid partial links.
                                 continue;
                             }
-                            shas.addAll(tail);
+                            commitNodes.addAll(tail);
+                        }
+
+                        List<String> shas = new ArrayList<>(commitNodes.size());
+                        for (CommitNode node : commitNodes) {
+                            shas.add(node.sha());
                         }
                         if (!shas.isEmpty()) {
                             int inserted = commitRepository.linkPullRequestToCommits(repositoryId, iid, shas);
                             totalLinks += inserted;
                         }
+                        harvestEmailLoginPairs(commitNodes, loginToEmails);
                         mrsProcessed++;
                     } catch (Exception e) {
                         log.warn(
@@ -220,6 +249,8 @@ public class GitLabCommitMergeRequestLinker {
             errorAborted = true;
         }
 
+        int attributed = reconcileCommitContributorUsers(loginToEmails, providerId, safeProjectPath);
+
         SyncResult result;
         if (errorAborted) {
             result = SyncResult.abortedError(totalLinks);
@@ -230,12 +261,13 @@ public class GitLabCommitMergeRequestLinker {
         }
 
         log.info(
-            "Completed commit→MR linking: scopeId={}, projectPath={}, status={}, mrsProcessed={}, linksInserted={}",
+            "Completed commit→MR linking: scopeId={}, projectPath={}, status={}, mrsProcessed={}, linksInserted={}, attributedContributorRows={}",
             scopeId,
             safeProjectPath,
             result.status(),
             mrsProcessed,
-            totalLinks
+            totalLinks,
+            attributed
         );
 
         return result;
@@ -257,19 +289,34 @@ public class GitLabCommitMergeRequestLinker {
     }
 
     @SuppressWarnings("unchecked")
-    private static List<String> extractShas(Map<String, Object> mrNode) {
+    private static List<CommitNode> extractCommitNodes(Map<String, Object> mrNode) {
         Map<String, Object> commitsMap = (Map<String, Object>) mrNode.get("commitsWithoutMergeCommits");
         if (commitsMap == null) return new ArrayList<>();
         List<Map<String, Object>> commitNodes = (List<Map<String, Object>>) commitsMap.get("nodes");
         if (commitNodes == null || commitNodes.isEmpty()) return new ArrayList<>();
-        List<String> shas = new ArrayList<>(commitNodes.size());
+        List<CommitNode> result = new ArrayList<>(commitNodes.size());
         for (Map<String, Object> node : commitNodes) {
-            Object sha = node.get("sha");
-            if (sha instanceof String s && !s.isBlank()) {
-                shas.add(s);
+            CommitNode parsed = toCommitNode(node);
+            if (parsed != null) result.add(parsed);
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private static CommitNode toCommitNode(Map<String, Object> node) {
+        Object sha = node.get("sha");
+        if (!(sha instanceof String s) || s.isBlank()) return null;
+        String authorEmail = node.get("authorEmail") instanceof String e ? e : null;
+        String authorUsername = null;
+        Object authorField = node.get("author");
+        if (authorField instanceof Map<?, ?> authorMap) {
+            Object username = ((Map<String, Object>) authorMap).get("username");
+            if (username instanceof String u && !u.isBlank()) {
+                authorUsername = u;
             }
         }
-        return shas;
+        return new CommitNode(s, authorEmail, authorUsername);
     }
 
     @SuppressWarnings("unchecked")
@@ -301,7 +348,7 @@ public class GitLabCommitMergeRequestLinker {
      */
     @SuppressWarnings("unchecked")
     @Nullable
-    private List<String> fetchRemainingCommits(
+    private List<CommitNode> fetchRemainingCommits(
         Long scopeId,
         String projectPath,
         int iid,
@@ -310,7 +357,7 @@ public class GitLabCommitMergeRequestLinker {
     ) {
         if (afterCursor == null) return new ArrayList<>();
 
-        List<String> remaining = new ArrayList<>();
+        List<CommitNode> remaining = new ArrayList<>();
         String cursor = afterCursor;
         String previousNestedCursor = null;
         int page = 0;
@@ -354,10 +401,8 @@ public class GitLabCommitMergeRequestLinker {
                 if (commitNodes == null || commitNodes.isEmpty()) break;
 
                 for (Map<String, Object> node : commitNodes) {
-                    Object sha = node.get("sha");
-                    if (sha instanceof String s && !s.isBlank()) {
-                        remaining.add(s);
-                    }
+                    CommitNode parsed = toCommitNode(node);
+                    if (parsed != null) remaining.add(parsed);
                 }
 
                 Map<String, Object> pageInfo = (Map<String, Object>) commitsMap.get("pageInfo");
@@ -392,4 +437,97 @@ public class GitLabCommitMergeRequestLinker {
 
         return remaining;
     }
+
+    // ========================================================================
+    // Author attribution harvest + backfill
+    // ========================================================================
+
+    /**
+     * Adds harvested (login → email) pairs from a single MR's commit list into
+     * {@code sink}.
+     *
+     * <p>Two sources contribute:
+     * <ol>
+     *   <li><b>Direct</b> — any commit whose GraphQL {@code author} field is non-null
+     *       gives us an authoritative pair.</li>
+     *   <li><b>Dominant-login fallback</b> — when exactly one login is named across
+     *       resolved commits in the MR, we attribute the MR's remaining (unresolved)
+     *       emails to that login. GitLab often fails to resolve
+     *       {@code firstname.lastname@tum.de} even though its sibling
+     *       {@code {login}@mytum.de} is registered on the same account. Within a
+     *       single MR, a uniform dominant author is a strong, low-risk signal.</li>
+     * </ol>
+     */
+    private static void harvestEmailLoginPairs(List<CommitNode> commitNodes, Map<String, Set<String>> sink) {
+        Set<String> mrLogins = new HashSet<>();
+        List<String> unresolvedEmails = new ArrayList<>();
+
+        for (CommitNode node : commitNodes) {
+            String email = node.authorEmail();
+            String login = node.authorUsername();
+            if (email == null || email.isBlank()) continue;
+            String normalisedEmail = email.toLowerCase(Locale.ROOT);
+            if (login != null) {
+                mrLogins.add(login);
+                sink.computeIfAbsent(login, k -> new HashSet<>()).add(normalisedEmail);
+            } else {
+                unresolvedEmails.add(normalisedEmail);
+            }
+        }
+
+        if (mrLogins.size() == 1 && !unresolvedEmails.isEmpty()) {
+            String dominantLogin = mrLogins.iterator().next();
+            Set<String> bucket = sink.computeIfAbsent(dominantLogin, k -> new HashSet<>());
+            bucket.addAll(unresolvedEmails);
+        }
+    }
+
+    /**
+     * Resolves each harvested {@code (login → email)} pair to a local {@code User}
+     * row and backfills {@code commit_contributor.user_id} for every contributor
+     * row that carries that email but no attributed user.
+     */
+    private int reconcileCommitContributorUsers(
+        Map<String, Set<String>> loginToEmails,
+        @Nullable Long providerId,
+        String safeProjectPath
+    ) {
+        if (loginToEmails.isEmpty()) return 0;
+
+        int updated = 0;
+        for (Map.Entry<String, Set<String>> entry : loginToEmails.entrySet()) {
+            String login = entry.getKey();
+            Set<String> emails = entry.getValue();
+            if (emails == null || emails.isEmpty()) continue;
+
+            Optional<User> user =
+                providerId != null
+                    ? userRepository.findByLoginAndProviderId(login, providerId)
+                    : userRepository.findByLogin(login);
+            Long userId = user.map(User::getId).orElse(null);
+            if (userId == null) continue;
+
+            for (String email : emails) {
+                int rows = commitContributorRepository.backfillUserIdByEmail(email, userId);
+                updated += rows;
+            }
+        }
+
+        if (updated > 0) {
+            log.info(
+                "Backfilled commit_contributor.user_id via GitLab author resolution: projectPath={}, rows={}, logins={}",
+                safeProjectPath,
+                updated,
+                loginToEmails.size()
+            );
+        }
+
+        return updated;
+    }
+
+    /**
+     * Minimal view over a {@code commitsWithoutMergeCommits} node: the SHA used
+     * for MR linking plus the author fields that feed the attribution harvest.
+     */
+    private record CommitNode(String sha, @Nullable String authorEmail, @Nullable String authorUsername) {}
 }

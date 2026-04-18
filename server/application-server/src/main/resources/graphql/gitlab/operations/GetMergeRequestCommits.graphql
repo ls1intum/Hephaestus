@@ -10,6 +10,12 @@ query GetMergeRequestCommits($fullPath: ID!, $iid: String!, $first: Int!, $after
                     }
                     nodes {
                         sha
+                        authorEmail
+                        authorName
+                        author {
+                            id
+                            username
+                        }
                     }
                 }
             }

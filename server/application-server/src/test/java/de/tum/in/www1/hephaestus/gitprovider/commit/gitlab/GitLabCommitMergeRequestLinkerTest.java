@@ -13,6 +13,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitContributorRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
@@ -21,6 +22,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -28,6 +31,7 @@ import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -50,6 +54,12 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
 
     @Mock
     private CommitRepository commitRepository;
+
+    @Mock
+    private CommitContributorRepository commitContributorRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @Mock
     private GitLabGraphQlClientProvider graphQlClientProvider;
@@ -77,6 +87,8 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
 
         linker = new GitLabCommitMergeRequestLinker(
             commitRepository,
+            commitContributorRepository,
+            userRepository,
             graphQlClientProvider,
             responseHandler,
             gitLabProperties
@@ -291,6 +303,31 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("harvested (email→login) pairs backfill commit_contributor.user_id after the sweep")
+    void harvestedAuthorPairs_backfillCommitContributorUserId() {
+        Map<String, Object> commit1 = commitNode("sha-1", "go35kin@mytum.de", "00000000014C41E0");
+        Map<String, Object> commit2 = commitNode("sha-2", "go35kin@tum.de", null);
+        Map<String, Object> mr = mrNodeWithCommits(42, List.of(commit1, commit2));
+
+        ClientGraphQlResponse page = mockMrsPage(List.of(mr), new GitLabPageInfo(false, null));
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, page);
+        when(commitRepository.linkPullRequestToCommits(eq(REPO_ID), eq(42), any())).thenReturn(2);
+
+        User user = new User();
+        user.setId(901L);
+        when(userRepository.findByLogin(eq("00000000014C41E0"))).thenReturn(Optional.of(user));
+        when(commitContributorRepository.backfillUserIdByEmail(anyString(), eq(901L))).thenReturn(1);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        // Direct pair (sha-1) plus dominant-login fallback (sha-2) reach the repository.
+        verify(commitContributorRepository).backfillUserIdByEmail(eq("go35kin@mytum.de"), eq(901L));
+        verify(commitContributorRepository).backfillUserIdByEmail(eq("go35kin@tum.de"), eq(901L));
+    }
+
+    @Test
     @DisplayName("full sweep (null updatedAfter) passes null variable to GraphQL")
     void nullUpdatedAfter_passesNullVariable() {
         ClientGraphQlResponse page = mockMrsPage(List.of(), new GitLabPageInfo(false, null));
@@ -406,6 +443,40 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         Map<String, Object> node = new LinkedHashMap<>();
         node.put("iid", iid);
         node.put("commitsWithoutMergeCommits", commitsMap);
+        return node;
+    }
+
+    /**
+     * Builds an MR node with fully populated commit fields (sha + author fields)
+     * so that the author-attribution harvest can be exercised.
+     */
+    private static Map<String, Object> mrNodeWithCommits(int iid, List<Map<String, Object>> commitNodes) {
+        Map<String, Object> pageInfoMap = new LinkedHashMap<>();
+        pageInfoMap.put("hasNextPage", false);
+        pageInfoMap.put("endCursor", null);
+
+        Map<String, Object> commitsMap = new LinkedHashMap<>();
+        commitsMap.put("nodes", commitNodes);
+        commitsMap.put("pageInfo", pageInfoMap);
+
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("iid", iid);
+        node.put("commitsWithoutMergeCommits", commitsMap);
+        return node;
+    }
+
+    private static Map<String, Object> commitNode(String sha, String authorEmail, String authorUsername) {
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("sha", sha);
+        node.put("authorEmail", authorEmail);
+        if (authorUsername != null) {
+            Map<String, Object> author = new LinkedHashMap<>();
+            author.put("id", "gid://gitlab/User/1");
+            author.put("username", authorUsername);
+            node.put("author", author);
+        } else {
+            node.put("author", null);
+        }
         return node;
     }
 }
