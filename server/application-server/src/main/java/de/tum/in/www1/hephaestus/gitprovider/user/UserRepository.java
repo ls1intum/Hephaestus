@@ -239,4 +239,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
         @Param("createdAt") Instant createdAt,
         @Param("updatedAt") Instant updatedAt
     );
+
+    /**
+     * Backfills the email for a single user only when the current value is NULL.
+     * <p>
+     * Used by the GitLab commit→MR linker to enrich identities whose primary
+     * email was not populated during the user sync (e.g. TUM accounts whose
+     * {@code publicEmail} is hidden but whose commit identity reveals an
+     * institutional address). Never overwrites an existing email.
+     *
+     * @return number of rows updated (0 when the user already has an email)
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = "UPDATE \"user\" SET email = :email WHERE id = :userId AND email IS NULL",
+        nativeQuery = true
+    )
+    int backfillEmailIfNull(@Param("userId") Long userId, @Param("email") String email);
 }
