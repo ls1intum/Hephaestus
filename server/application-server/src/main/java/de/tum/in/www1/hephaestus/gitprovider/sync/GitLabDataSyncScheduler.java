@@ -510,28 +510,36 @@ public class GitLabDataSyncScheduler {
                 }
             }
 
-            // Link commits to their merge requests (must run after both commits and MRs have synced).
-            // The linker inverts the relation: one GraphQL call fans out per MR updated since
-            // `updatedAfter`, reading nested commit SHAs in bulk and upserting the join rows.
-            if (commitMrLinker != null) {
-                try {
-                    commitMrLinker.linkCommits(session.scopeId(), repo, updatedAfter);
-                } catch (Exception e) {
-                    log.warn(
-                        "Failed commit→MR linking: scopeId={}, repo={}",
-                        session.scopeId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
-                }
-            }
-
             // Update lastSyncAt only when all enabled phases completed
             boolean allDone = (issueSync == null || issuesDone) && (mrSync == null || mrsDone);
             if (allDone) {
                 repositoryRepository.updateLastSyncAt(repo.getId(), Instant.now());
                 if (rtmId != null) {
                     syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.FULL_REPOSITORY, Instant.now());
+                }
+            }
+        }
+
+        // Second pass: link commits to MRs. Must run after every repo has finished syncing so
+        // a commit whose SHA appears on an MR in a sibling repo can still be linked. In the
+        // previous single-pass version such cross-repo links were lost because the target MR
+        // repo had not yet synced its MRs when the linker ran.
+        if (commitMrLinker != null) {
+            for (Repository repo : repos) {
+                OffsetDateTime repoUpdatedAfter = null;
+                if (repo.getLastSyncAt() != null) {
+                    Instant buffered = repo.getLastSyncAt().minus(Duration.ofMinutes(5));
+                    repoUpdatedAfter = buffered.atOffset(ZoneOffset.UTC);
+                }
+                try {
+                    commitMrLinker.linkCommits(session.scopeId(), repo, repoUpdatedAfter);
+                } catch (Exception e) {
+                    log.warn(
+                        "Failed commit→MR linking (second pass): scopeId={}, repo={}",
+                        session.scopeId(),
+                        repo.getNameWithOwner(),
+                        e
+                    );
                 }
             }
         }

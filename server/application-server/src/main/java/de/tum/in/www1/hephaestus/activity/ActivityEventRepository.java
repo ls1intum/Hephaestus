@@ -68,6 +68,41 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("xp") double xp
     );
 
+    /**
+     * Backfills {@code actor_id} and {@code xp} for {@code COMMIT_CREATED} activity events
+     * whose actor could not be resolved at ingest time.
+     *
+     * <p>When commits are ingested before their GitLab authors are resolved, the activity-event
+     * listener records the COMMIT_CREATED row with {@code actor_id = NULL} and {@code xp = 0}.
+     * Later, {@code CommitAuthorEnrichmentService} / {@code GitLabCommitMergeRequestLinker}
+     * reconcile {@code git_commit.author_id} via email match — but without this backfill the
+     * activity ledger stays permanently orphaned, so the contributor never receives XP for those
+     * commits.
+     *
+     * <p>This UPDATE joins back to {@code git_commit} and rewrites both columns in one pass,
+     * scoped to a single repository to keep the row set bounded.
+     *
+     * @return the number of updated activity events
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query(
+        value = """
+        UPDATE activity_event
+        SET actor_id = gc.author_id,
+            xp = :xpPerCommit
+        FROM git_commit gc
+        WHERE activity_event.target_type = 'commit'
+          AND activity_event.event_type = 'COMMIT_CREATED'
+          AND activity_event.actor_id IS NULL
+          AND activity_event.target_id = gc.id
+          AND gc.author_id IS NOT NULL
+          AND gc.repository_id = :repositoryId
+        """,
+        nativeQuery = true
+    )
+    int backfillCommitActors(@Param("repositoryId") Long repositoryId, @Param("xpPerCommit") double xpPerCommit);
+
     // ========================================================================
     // Leaderboard Aggregation Queries
     // ========================================================================

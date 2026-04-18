@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.commit.gitlab;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
+import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitContributorRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
@@ -61,6 +63,8 @@ public class GitLabCommitMergeRequestLinker {
     private final GitLabGraphQlClientProvider graphQlClientProvider;
     private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabProperties gitLabProperties;
+    private final ActivityEventRepository activityEventRepository;
+    private final ExperiencePointCalculator experiencePointCalculator;
 
     public GitLabCommitMergeRequestLinker(
         CommitRepository commitRepository,
@@ -68,7 +72,9 @@ public class GitLabCommitMergeRequestLinker {
         UserRepository userRepository,
         GitLabGraphQlClientProvider graphQlClientProvider,
         GitLabGraphQlResponseHandler responseHandler,
-        GitLabProperties gitLabProperties
+        GitLabProperties gitLabProperties,
+        ActivityEventRepository activityEventRepository,
+        ExperiencePointCalculator experiencePointCalculator
     ) {
         this.commitRepository = commitRepository;
         this.commitContributorRepository = commitContributorRepository;
@@ -76,6 +82,8 @@ public class GitLabCommitMergeRequestLinker {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.gitLabProperties = gitLabProperties;
+        this.activityEventRepository = activityEventRepository;
+        this.experiencePointCalculator = experiencePointCalculator;
     }
 
     /**
@@ -675,19 +683,33 @@ public class GitLabCommitMergeRequestLinker {
             }
         }
 
+        // COMMIT_CREATED activity events ingested before author resolution were recorded
+        // with actor_id=NULL and xp=0. Now that git_commit.author_id has been backfilled
+        // for this repository, rewrite those ledger rows so the contributor receives XP
+        // and appears on the leaderboard. Scoped per-repository to keep the UPDATE bounded.
+        int activityRowsUpdated = 0;
+        if (commitAuthorRowsUpdated > 0) {
+            activityRowsUpdated = activityEventRepository.backfillCommitActors(
+                repositoryId,
+                experiencePointCalculator.getXpCommitCreated()
+            );
+        }
+
         if (
             contributorRowsUpdated > 0 ||
             commitAuthorRowsUpdated > 0 ||
             commitCommitterRowsUpdated > 0 ||
-            userEmailsBackfilled > 0
+            userEmailsBackfilled > 0 ||
+            activityRowsUpdated > 0
         ) {
             log.info(
-                "Backfilled attribution via GitLab author resolution: projectPath={}, contributorRows={}, commitAuthorRows={}, commitCommitterRows={}, userEmailRows={}, logins={}",
+                "Backfilled attribution via GitLab author resolution: projectPath={}, contributorRows={}, commitAuthorRows={}, commitCommitterRows={}, userEmailRows={}, activityRows={}, logins={}",
                 safeProjectPath,
                 contributorRowsUpdated,
                 commitAuthorRowsUpdated,
                 commitCommitterRowsUpdated,
                 userEmailsBackfilled,
+                activityRowsUpdated,
                 loginToEmails.size()
             );
         }

@@ -518,13 +518,29 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         if (typeName == null || typeName.isBlank()) {
             return null;
         }
+        String humanised = humaniseTypeName(typeName);
         Organization organization = repository.getOrganization();
-        if (organization == null || organization.getId() == null) {
+        if (organization != null && organization.getId() != null) {
+            Optional<IssueType> orgScoped = issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(
+                organization.getId(),
+                humanised
+            );
+            if (orgScoped.isPresent()) {
+                return orgScoped.get().getId();
+            }
+        }
+        // Subgroups become their own Organization rows but share provider-global
+        // issue_type primary keys (GitLab GraphQL global IDs), so a provider-scoped
+        // name lookup yields the exact same row. Without this fallback, issues
+        // synced from subgroups would resolve to null because the subgroup org
+        // never had its own issue_type seed rows materialised.
+        Long providerId =
+            organization != null && organization.getProvider() != null ? organization.getProvider().getId() : null;
+        if (providerId == null) {
             return null;
         }
-        String humanised = humaniseTypeName(typeName);
         return issueTypeRepository
-            .findByOrganizationIdAndNameIgnoreCase(organization.getId(), humanised)
+            .findFirstByProviderIdAndNameIgnoreCase(providerId, humanised)
             .map(IssueType::getId)
             .orElse(null);
     }

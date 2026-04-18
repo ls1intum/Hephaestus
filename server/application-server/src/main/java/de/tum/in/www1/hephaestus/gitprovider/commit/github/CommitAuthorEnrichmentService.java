@@ -5,6 +5,8 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
+import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.util.CommitUtils;
@@ -99,6 +101,8 @@ public class CommitAuthorEnrichmentService {
     private final GitHubGraphQlSyncCoordinator graphQlSyncCoordinator;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubUserProcessor userProcessor;
+    private final ActivityEventRepository activityEventRepository;
+    private final ExperiencePointCalculator experiencePointCalculator;
 
     /**
      * Enriches unresolved commit authors/committers for a repository.
@@ -186,11 +190,24 @@ public class CommitAuthorEnrichmentService {
         );
 
         int total = enrichedByEmail + enrichedByApi;
+
+        // COMMIT_CREATED activity events recorded before author resolution were inserted
+        // with actor_id=NULL and xp=0. Now that git_commit.author_id has been resolved,
+        // rewrite those ledger rows so contributors receive XP on the leaderboard.
+        int activityRowsBackfilled = 0;
+        if (total > 0) {
+            activityRowsBackfilled = activityEventRepository.backfillCommitActors(
+                repositoryId,
+                experiencePointCalculator.getXpCommitCreated()
+            );
+        }
+
         log.info(
-            "Completed commit author enrichment: repoId={}, enrichedByEmail={}, enrichedByApi={}, total={}",
+            "Completed commit author enrichment: repoId={}, enrichedByEmail={}, enrichedByApi={}, activityRows={}, total={}",
             repositoryId,
             enrichedByEmail,
             enrichedByApi,
+            activityRowsBackfilled,
             total
         );
         return total;

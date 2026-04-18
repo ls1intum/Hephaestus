@@ -8,6 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
+import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
@@ -43,6 +45,12 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     @Mock
     private GitHubUserProcessor userProcessor;
 
+    @Mock
+    private ActivityEventRepository activityEventRepository;
+
+    @Mock
+    private ExperiencePointCalculator experiencePointCalculator;
+
     private CommitAuthorEnrichmentService service;
 
     @BeforeEach
@@ -53,7 +61,9 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             graphQlClientProvider,
             graphQlSyncCoordinator,
             exceptionClassifier,
-            userProcessor
+            userProcessor,
+            activityEventRepository,
+            experiencePointCalculator
         );
     }
 

@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuetype;
 
 import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -52,4 +54,42 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
         @Param("organizationId") Long organizationId,
         @Param("name") String name
     );
+
+    /**
+     * Provider-scoped case-insensitive name lookup used as a fallback when a GitLab
+     * issue lives in a subgroup whose {@code organization} has not had its own
+     * {@code issue_type} seed rows materialised yet.
+     * <p>
+     * The current {@link de.tum.in.www1.hephaestus.gitprovider.issuetype.gitlab.GitLabIssueTypeSyncService}
+     * only seeds types under the workspace's root accountLogin, but in GitLab each
+     * subgroup becomes its own {@code Organization} row. Without this fallback an
+     * issue synced from a subgroup would always resolve {@code issue_type_id} to
+     * {@code NULL}. Issue type primary keys are GitLab-global GraphQL IDs
+     * ({@code gid://gitlab/WorkItems::Type/1}), so a name match across the same
+     * provider yields the exact same {@code IssueType} row regardless of which
+     * organization owns it.
+     * <p>
+     * {@link Pageable} with size 1 gives us "first" semantics without provoking
+     * Spring Data runtime warnings about unordered single-row queries.
+     */
+    @Query(
+        """
+        SELECT it
+        FROM IssueType it
+        WHERE lower(it.name) = lower(:name)
+        AND it.isEnabled = true
+        AND it.organization.provider.id = :providerId
+        ORDER BY it.organization.id ASC
+        """
+    )
+    List<IssueType> findByProviderIdAndNameIgnoreCase(
+        @Param("providerId") Long providerId,
+        @Param("name") String name,
+        Pageable pageable
+    );
+
+    default Optional<IssueType> findFirstByProviderIdAndNameIgnoreCase(Long providerId, String name) {
+        List<IssueType> results = findByProviderIdAndNameIgnoreCase(providerId, name, Pageable.ofSize(1));
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
 }

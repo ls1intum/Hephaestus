@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabRateLimitTracker;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncServiceHolder;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabSyncResult;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -17,8 +19,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -73,6 +77,7 @@ public class GitLabWorkspaceInitializationService {
 
     // Services
     private final NatsConsumerService natsConsumerService;
+    private final SyncTargetProvider syncTargetProvider;
 
     // Lazy-loaded: optional GitLab beans gated by @ConditionalOnProperty
     private final ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider;
@@ -90,6 +95,7 @@ public class GitLabWorkspaceInitializationService {
         NatsProperties natsProperties,
         SyncSchedulerProperties syncSchedulerProperties,
         NatsConsumerService natsConsumerService,
+        SyncTargetProvider syncTargetProvider,
         ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
         ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider,
         ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
@@ -102,6 +108,7 @@ public class GitLabWorkspaceInitializationService {
         this.natsProperties = natsProperties;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.natsConsumerService = natsConsumerService;
+        this.syncTargetProvider = syncTargetProvider;
         this.gitLabSyncServiceHolderProvider = gitLabSyncServiceHolderProvider;
         this.gitLabWebhookServiceProvider = gitLabWebhookServiceProvider;
         this.rateLimitTrackerProvider = rateLimitTrackerProvider;
@@ -445,7 +452,58 @@ public class GitLabWorkspaceInitializationService {
         if (repos.isEmpty()) {
             log.debug("Skipped GitLab repo sync: reason=noRepos, workspaceId={}", workspace.getId());
         } else {
-            syncGitLabRepositories(workspace, gitLabServices, repos);
+            // Phase 2.6: group milestone fan-out (mirrors scheduler). Must run before the per-repo
+            // issue sync so milestone references on issues can be resolved by iid. Without this the
+            // milestone table stays empty on a fresh sync because project.milestones(includeAncestors)
+            // does not reliably surface group milestones in every GitLab deployment.
+            var milestoneSyncService = gitLabServices.getMilestoneSyncService();
+            if (milestoneSyncService != null) {
+                try {
+                    SyncResult groupMilestoneResult = milestoneSyncService.syncMilestonesForGroup(
+                        workspace.getId(),
+                        workspace.getAccountLogin(),
+                        repos
+                    );
+                    log.info(
+                        "GitLab group milestone sync: workspaceId={}, group={}, written={}",
+                        workspace.getId(),
+                        LoggingUtils.sanitizeForLog(workspace.getAccountLogin()),
+                        groupMilestoneResult.count()
+                    );
+                } catch (Exception e) {
+                    log.warn(
+                        "Failed GitLab group milestone sync: workspaceId={}, group={}",
+                        workspace.getId(),
+                        LoggingUtils.sanitizeForLog(workspace.getAccountLogin()),
+                        e
+                    );
+                }
+            }
+
+            // Build a snapshot of commit→MR linker work to perform in a second pass, so a
+            // commit whose SHA appears on an MR in a sibling repo can still be linked after
+            // all repos have finished syncing (Gap #1: cross-repo MR/commit relationships).
+            List<Repository> commitLinkTargets = new ArrayList<>();
+            syncGitLabRepositories(workspace, gitLabServices, repos, commitLinkTargets);
+
+            // Second pass: link commits to MRs now that every repo has populated its commits
+            // and every MR-targeted repo has populated its MRs.
+            var commitMrLinker = gitLabServices.getCommitMergeRequestLinker();
+            if (commitMrLinker != null) {
+                for (Repository repo : commitLinkTargets) {
+                    try {
+                        commitMrLinker.linkCommits(workspace.getId(), repo, null);
+                    } catch (Exception e) {
+                        log.warn(
+                            "Failed commit→MR linking (second pass): workspaceId={}, repo={}",
+                            workspace.getId(),
+                            repo.getNameWithOwner(),
+                            e
+                        );
+                    }
+                }
+            }
+
             syncGitLabPostRepo(workspace, gitLabServices, repos);
         }
 
@@ -454,6 +512,10 @@ public class GitLabWorkspaceInitializationService {
         if (teamSyncService != null) {
             try {
                 int teamsCount = teamSyncService.syncTeamsForGroup(workspace.getId(), workspace.getAccountLogin());
+                // Stamp the teams watermark so the cron scheduler's cooldown logic reflects that
+                // initial sync just ran; otherwise cron would re-sync teams redundantly right after
+                // workspace activation.
+                syncTargetProvider.updateTeamsSyncTimestamp(workspace.getId(), Instant.now());
                 log.info("GitLab team sync complete: workspaceId={}, teams={}", workspace.getId(), teamsCount);
             } catch (Exception e) {
                 log.warn("Failed to sync teams: workspaceId={}", workspace.getId(), e);
@@ -477,7 +539,8 @@ public class GitLabWorkspaceInitializationService {
     private void syncGitLabRepositories(
         Workspace workspace,
         GitLabSyncServiceHolder gitLabServices,
-        List<Repository> repos
+        List<Repository> repos,
+        List<Repository> commitLinkTargets
     ) {
         var labelSyncService = gitLabServices.getLabelSyncService();
         var milestoneSyncService = gitLabServices.getMilestoneSyncService();
@@ -486,7 +549,14 @@ public class GitLabWorkspaceInitializationService {
         var collaboratorSyncService = gitLabServices.getCollaboratorSyncService();
         var commitSyncService = gitLabServices.getCommitSyncService();
         var commitBackfillService = gitLabServices.getCommitBackfillService();
-        var commitMrLinker = gitLabServices.getCommitMergeRequestLinker();
+
+        // Map nameWithOwner → sync target id so each phase can stamp its per-repo watermark
+        // via the SPI. Mirrors GitLabDataSyncScheduler.syncRepositories — without this the
+        // initial sync left every watermark column NULL until the first cron run.
+        Map<String, Long> syncTargetIdsByNameWithOwner = repositoryToMonitorRepository
+            .findByWorkspaceId(workspace.getId())
+            .stream()
+            .collect(Collectors.toMap(RepositoryToMonitor::getNameWithOwner, RepositoryToMonitor::getId, (a, b) -> a));
 
         GitLabRateLimitTracker rateLimitTracker = rateLimitTrackerProvider.getIfAvailable();
         Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
@@ -522,6 +592,9 @@ public class GitLabWorkspaceInitializationService {
                 updatedAfter = buffered.atOffset(ZoneOffset.UTC);
             }
 
+            // Look up the sync-target id so each phase can stamp its per-repo watermark via the SPI.
+            Long rtmId = syncTargetIdsByNameWithOwner.get(repo.getNameWithOwner());
+
             // Cooldown: skip labels/milestones/collaborators if recently synced
             boolean skipSlowChanging = repo.getLastSyncAt() != null && repo.getLastSyncAt().isAfter(cooldownThreshold);
             if (skipSlowChanging) {
@@ -535,6 +608,9 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = labelSyncService.syncLabelsForRepository(workspace.getId(), repo);
                     totalLabels += r.count();
+                    if (rtmId != null) {
+                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.LABELS, Instant.now());
+                    }
                 } catch (Exception e) {
                     log.warn(
                         "Failed label sync: workspaceId={}, repo={}",
@@ -548,6 +624,9 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = milestoneSyncService.syncMilestonesForRepository(workspace.getId(), repo);
                     totalMilestones += r.count();
+                    if (rtmId != null) {
+                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.MILESTONES, Instant.now());
+                    }
                 } catch (Exception e) {
                     log.warn(
                         "Failed milestone sync: workspaceId={}, repo={}",
@@ -562,6 +641,9 @@ public class GitLabWorkspaceInitializationService {
                     SyncResult r = issueSyncService.syncIssues(workspace.getId(), repo, updatedAfter);
                     totalIssues += r.count();
                     issuesDone = r.isCompleted();
+                    if (rtmId != null && issuesDone) {
+                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.ISSUES, Instant.now());
+                    }
                 } catch (Exception e) {
                     log.warn(
                         "Failed issue sync: workspaceId={}, repo={}",
@@ -576,6 +658,9 @@ public class GitLabWorkspaceInitializationService {
                     SyncResult r = mrSyncService.syncMergeRequests(workspace.getId(), repo, updatedAfter);
                     totalMRs += r.count();
                     mrsDone = r.isCompleted();
+                    if (rtmId != null && mrsDone) {
+                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.PULL_REQUESTS, Instant.now());
+                    }
                 } catch (Exception e) {
                     log.warn("Failed MR sync: workspaceId={}, repo={}", workspace.getId(), repo.getNameWithOwner(), e);
                 }
@@ -584,6 +669,9 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = collaboratorSyncService.syncCollaboratorsForRepository(workspace.getId(), repo);
                     totalCollaborators += r.count();
+                    if (rtmId != null) {
+                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.COLLABORATORS, Instant.now());
+                    }
                 } catch (Exception e) {
                     log.warn(
                         "Failed collaborator sync: workspaceId={}, repo={}",
@@ -621,24 +709,18 @@ public class GitLabWorkspaceInitializationService {
                 }
             }
 
-            // Link commits to their merge requests (must run after both commits and MRs have synced).
-            // Initial bootstrap performs a full sweep (updatedAfter == null).
-            if (commitMrLinker != null) {
-                try {
-                    commitMrLinker.linkCommits(workspace.getId(), repo, null);
-                } catch (Exception e) {
-                    log.warn(
-                        "Failed commit→MR linking: workspaceId={}, repo={}",
-                        workspace.getId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
-                }
-            }
+            // Record this repo for the second-pass commit→MR linker. Running the linker in a
+            // second pass lets commits whose SHAs appear on MRs in sibling repos be linked
+            // correctly — in the previous single-pass version those links were lost because
+            // the target MR repo had not yet synced its MRs.
+            commitLinkTargets.add(repo);
 
             boolean allDone = (issueSyncService == null || issuesDone) && (mrSyncService == null || mrsDone);
             if (allDone) {
                 repositoryRepository.updateLastSyncAt(repo.getId(), Instant.now());
+                if (rtmId != null) {
+                    syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.FULL_REPOSITORY, Instant.now());
+                }
             }
         }
 
