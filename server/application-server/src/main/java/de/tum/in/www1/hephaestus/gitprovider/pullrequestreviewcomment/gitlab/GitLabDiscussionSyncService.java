@@ -13,6 +13,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.GitLabIssueCommentProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.gitlab.GitLabReviewReconciler;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.gitlab.GitLabPullRequestReviewThreadProcessor;
@@ -21,6 +23,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -62,6 +65,7 @@ public class GitLabDiscussionSyncService {
     private final GitLabPullRequestReviewThreadProcessor threadProcessor;
     private final GitLabPullRequestReviewCommentProcessor reviewCommentProcessor;
     private final GitLabIssueCommentProcessor issueCommentProcessor;
+    private final GitLabReviewReconciler reviewReconciler;
     private final GitLabProperties gitLabProperties;
 
     public GitLabDiscussionSyncService(
@@ -70,6 +74,7 @@ public class GitLabDiscussionSyncService {
         GitLabPullRequestReviewThreadProcessor threadProcessor,
         GitLabPullRequestReviewCommentProcessor reviewCommentProcessor,
         GitLabIssueCommentProcessor issueCommentProcessor,
+        GitLabReviewReconciler reviewReconciler,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
@@ -77,6 +82,7 @@ public class GitLabDiscussionSyncService {
         this.threadProcessor = threadProcessor;
         this.reviewCommentProcessor = reviewCommentProcessor;
         this.issueCommentProcessor = issueCommentProcessor;
+        this.reviewReconciler = reviewReconciler;
         this.gitLabProperties = gitLabProperties;
     }
 
@@ -335,6 +341,17 @@ public class GitLabDiscussionSyncService {
         );
         PullRequestReviewThread thread = threadProcessor.findOrCreateThread(threadData, pr, provider, scopeId);
 
+        // Pre-compute one synthetic COMMENTED review per (author, discussion) so each note
+        // below can attach to the matching review without redundant DB lookups.
+        Map<Long, PullRequestReview> reviewsByAuthor = reconcileDiscussionReviews(
+            noteNodes,
+            discussionGlobalId,
+            pr,
+            provider,
+            providerId,
+            scopeId
+        );
+
         // Process each note in the discussion as a review comment
         PullRequestReviewComment previousComment = null;
         for (Map<String, Object> noteNode : noteNodes) {
@@ -390,12 +407,16 @@ public class GitLabDiscussionSyncService {
                 parseTimestamp((String) noteNode.get("updatedAt"))
             );
 
+            PullRequestReview review =
+                author != null && author.getNativeId() != null ? reviewsByAuthor.get(author.getNativeId()) : null;
+
             var commentContext = new GitLabPullRequestReviewCommentProcessor.CommentContext(
                 thread,
                 pr,
                 author,
                 provider,
                 previousComment, // first note has no parent, subsequent notes are replies
+                review,
                 scopeId
             );
             PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(noteData, commentContext);
@@ -407,6 +428,65 @@ public class GitLabDiscussionSyncService {
         }
 
         return new int[] { diffNotes, 0, 0 };
+    }
+
+    /**
+     * Groups the non-system notes in a discussion by author, finds each author's earliest
+     * createdAt, and reconciles one synthetic COMMENTED {@link PullRequestReview} per author.
+     * <p>
+     * This is the bridge that brings GitLab MR discussions up to GitHub parity: every note
+     * author gets a review row that downstream scoring/profile UIs expect.
+     *
+     * @return map keyed by author native ID to the reconciled review (never null, possibly empty)
+     */
+    @SuppressWarnings("unchecked")
+    private Map<Long, PullRequestReview> reconcileDiscussionReviews(
+        List<Map<String, Object>> noteNodes,
+        String discussionGlobalId,
+        PullRequest pr,
+        GitProvider provider,
+        Long providerId,
+        Long scopeId
+    ) {
+        record AuthorEarliest(User author, Instant earliest) {}
+
+        Map<Long, AuthorEarliest> byAuthor = new HashMap<>();
+        for (Map<String, Object> noteNode : noteNodes) {
+            if (Boolean.TRUE.equals(noteNode.get("system")) || Boolean.TRUE.equals(noteNode.get("internal"))) {
+                continue;
+            }
+            User author = resolveAuthor(noteNode, providerId);
+            if (author == null || author.getNativeId() == null) {
+                continue;
+            }
+            Instant createdAt = parseTimestamp((String) noteNode.get("createdAt"));
+            byAuthor.merge(
+                author.getNativeId(),
+                new AuthorEarliest(author, createdAt),
+                (existing, incoming) -> {
+                    if (existing.earliest() == null) return incoming;
+                    if (incoming.earliest() == null) return existing;
+                    return incoming.earliest().isBefore(existing.earliest()) ? incoming : existing;
+                }
+            );
+        }
+
+        Map<Long, PullRequestReview> result = new HashMap<>();
+        for (Map.Entry<Long, AuthorEarliest> entry : byAuthor.entrySet()) {
+            AuthorEarliest info = entry.getValue();
+            PullRequestReview review = reviewReconciler.findOrCreateCommentedReview(
+                pr,
+                info.author(),
+                discussionGlobalId,
+                info.earliest(),
+                provider,
+                null // discussion sync has no per-note ProcessingContext; events are emitted lazily
+            );
+            if (review != null) {
+                result.put(entry.getKey(), review);
+            }
+        }
+        return result;
     }
 
     /**

@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
@@ -74,6 +75,7 @@ public class GitLabPullRequestReviewCommentProcessor {
         @Nullable User author,
         GitProvider provider,
         @Nullable PullRequestReviewComment inReplyTo,
+        @Nullable PullRequestReview review,
         Long scopeId
     ) {}
 
@@ -99,17 +101,18 @@ public class GitLabPullRequestReviewCommentProcessor {
 
         return commentRepository
             .findByNativeIdAndProviderId(nativeId, providerId)
-            .map(existing -> updateComment(existing, data, context.thread(), context.pr(), context.scopeId()))
+            .map(existing -> updateComment(existing, data, context))
             .orElseGet(() -> createComment(nativeId, data, context));
     }
 
     private PullRequestReviewComment updateComment(
         PullRequestReviewComment existing,
         DiffNoteData data,
-        PullRequestReviewThread thread,
-        PullRequest pr,
-        Long scopeId
+        CommentContext context
     ) {
+        PullRequestReviewThread thread = context.thread();
+        PullRequest pr = context.pr();
+        Long scopeId = context.scopeId();
         Set<String> changedFields = new HashSet<>();
         String sanitizedBody = PostgresStringUtils.sanitize(data.body());
         if (sanitizedBody != null && !sanitizedBody.equals(existing.getBody())) {
@@ -121,6 +124,11 @@ public class GitLabPullRequestReviewCommentProcessor {
         if (existing.getThread() == null || !existing.getThread().getId().equals(thread.getId())) {
             existing.setThread(thread);
             changedFields.add("thread");
+        }
+        // Backfill the review link when a synthetic COMMENTED review is now available
+        if (existing.getReview() == null && context.review() != null) {
+            context.review().addComment(existing);
+            changedFields.add("review");
         }
         if (data.updatedAt() != null) {
             existing.setUpdatedAt(data.updatedAt());
@@ -180,6 +188,9 @@ public class GitLabPullRequestReviewCommentProcessor {
         }
         if (context.inReplyTo() != null) {
             comment.setInReplyTo(context.inReplyTo());
+        }
+        if (context.review() != null) {
+            context.review().addComment(comment);
         }
 
         PullRequestReviewComment saved = commentRepository.save(comment);
