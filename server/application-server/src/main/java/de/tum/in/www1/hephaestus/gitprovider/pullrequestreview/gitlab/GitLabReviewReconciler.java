@@ -74,6 +74,13 @@ public class GitLabReviewReconciler {
         ProcessingContext ctx
     ) {
         if (pr == null || author == null || author.getNativeId() == null || discussionGlobalId == null) {
+            log.warn(
+                "Skipped COMMENTED review synthesis: prId={}, authorPresent={}, authorNativeIdPresent={}, discussionPresent={}",
+                pr != null ? pr.getId() : null,
+                author != null,
+                author != null && author.getNativeId() != null,
+                discussionGlobalId != null
+            );
             return null;
         }
 
