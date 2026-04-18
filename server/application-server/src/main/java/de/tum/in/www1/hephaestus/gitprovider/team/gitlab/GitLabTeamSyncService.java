@@ -15,6 +15,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabDescendantGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupMemberResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.TeamMembershipListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.TeamMembershipListener.TeamsSyncedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
@@ -38,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -59,6 +62,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>D — Sync team-repo permissions (repos whose org = subgroup fullPath)</li>
  *   <li>E — Cleanup stale teams (only if sync completed fully)</li>
  *   <li>F — Add project collaborators as team members (students in repos under subgroup)</li>
+ *   <li>G — Fire {@link TeamMembershipListener} so consumers (e.g. workspace) can
+ *       reconcile downstream state with the fully-synced team graph. Covers the
+ *       gap where subgroup-only users (tutor maintainers) never appear in
+ *       organization_membership and would otherwise miss workspace_membership.</li>
  * </ol>
  */
 @Service
@@ -82,6 +89,7 @@ public class GitLabTeamSyncService {
     private final GitLabProperties gitLabProperties;
     private final RepositoryCollaboratorRepository collaboratorRepository;
     private final TransactionTemplate transactionTemplate;
+    private final TeamMembershipListener teamMembershipListener;
 
     public GitLabTeamSyncService(
         TeamRepository teamRepository,
@@ -94,7 +102,8 @@ public class GitLabTeamSyncService {
         GitProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties,
         RepositoryCollaboratorRepository collaboratorRepository,
-        TransactionTemplate transactionTemplate
+        TransactionTemplate transactionTemplate,
+        @Nullable TeamMembershipListener teamMembershipListener
     ) {
         this.teamRepository = teamRepository;
         this.teamMembershipRepository = teamMembershipRepository;
@@ -107,6 +116,7 @@ public class GitLabTeamSyncService {
         this.gitLabProperties = gitLabProperties;
         this.collaboratorRepository = collaboratorRepository;
         this.transactionTemplate = transactionTemplate;
+        this.teamMembershipListener = teamMembershipListener;
     }
 
     /**
@@ -224,6 +234,17 @@ public class GitLabTeamSyncService {
         // Phase E: Cleanup stale teams (only if sync completed normally)
         if (syncCompletedNormally) {
             removeDeletedTeams(groupFullPath, syncedNativeIds, providerId);
+        }
+
+        // Phase G: Reconcile downstream state (e.g., workspace memberships) from the
+        // fully-synced team graph. Only fired when the sync completed end-to-end —
+        // running reconciliation on partial data would miss legitimate members.
+        if (syncCompletedNormally && teamMembershipListener != null) {
+            try {
+                teamMembershipListener.onTeamMembershipsSynced(new TeamsSyncedEvent(scopeId, groupFullPath));
+            } catch (Exception e) {
+                log.warn("Team membership listener failed for groupPath={}: error={}", groupFullPath, e.getMessage());
+            }
         }
 
         log.info(
