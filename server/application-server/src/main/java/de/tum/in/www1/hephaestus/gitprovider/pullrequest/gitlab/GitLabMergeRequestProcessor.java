@@ -592,6 +592,13 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         }
 
         Instant now = Instant.now();
+        // GitLab returns closedAt=null for merged MRs; fall back to mergedAt so closed_at
+        // reflects the true terminal timestamp (needed for leaderboard issue-state windows).
+        Instant closedAtTimestamp = parseGitLabTimestamp(data.closedAt());
+        Instant mergedAtTimestamp = parseGitLabTimestamp(data.mergedAt());
+        if (closedAtTimestamp == null && isMerged) {
+            closedAtTimestamp = mergedAtTimestamp;
+        }
         pullRequestRepository.upsertCore(
             nativeId,
             providerId,
@@ -602,7 +609,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             null, // stateReason
             data.webUrl(),
             data.discussionLocked(),
-            parseGitLabTimestamp(data.closedAt()),
+            closedAtTimestamp,
             data.commentsCount(),
             now,
             parseGitLabTimestamp(data.createdAt()),
@@ -610,7 +617,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             author != null ? author.getId() : null,
             repository.getId(),
             milestoneId,
-            parseGitLabTimestamp(data.mergedAt()),
+            mergedAtTimestamp,
             data.draft(),
             isMerged,
             data.commitCount(),
@@ -753,6 +760,12 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         boolean isMerged = mrState == Issue.State.MERGED;
 
         Instant now = Instant.now();
+        // GitLab webhooks also report closedAt=null for merged MRs; fall back to mergedAt.
+        Instant closedAtTimestamp = parseGitLabTimestamp(closedAt);
+        Instant mergedAtTimestamp = parseGitLabTimestamp(mergedAt);
+        if (closedAtTimestamp == null && isMerged) {
+            closedAtTimestamp = mergedAtTimestamp;
+        }
         pullRequestRepository.upsertCore(
             nativeId,
             providerId,
@@ -763,7 +776,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             null,
             htmlUrl,
             null, // isLocked: not in webhook — null lets COALESCE preserve existing or default
-            parseGitLabTimestamp(closedAt),
+            closedAtTimestamp,
             null, // commentsCount: not in webhook — null lets COALESCE preserve existing or default
             now, // lastSyncAt
             parseGitLabTimestamp(createdAt),
@@ -771,7 +784,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             author != null ? author.getId() : null,
             repository.getId(),
             milestoneId,
-            parseGitLabTimestamp(mergedAt),
+            mergedAtTimestamp,
             draft,
             isMerged,
             null,
