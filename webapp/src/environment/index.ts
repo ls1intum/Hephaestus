@@ -26,8 +26,7 @@ interface RuntimeEnvVars {
 	POSTHOG_ENABLED?: string;
 	POSTHOG_PROJECT_API_KEY?: string;
 	POSTHOG_API_HOST?: string;
-	LEGAL_IMPRINT_HTML?: string;
-	LEGAL_PRIVACY_HTML?: string;
+	LEGAL_PROFILE?: string;
 	TANSTACK_DEVTOOLS_ENABLED?: string;
 	GIT_BRANCH?: string;
 	GIT_COMMIT?: string;
@@ -47,8 +46,7 @@ const defaults: RuntimeEnvVars = {
 	POSTHOG_ENABLED: "false",
 	POSTHOG_PROJECT_API_KEY: "",
 	POSTHOG_API_HOST: "",
-	LEGAL_IMPRINT_HTML: "<p>This is the imprint.</p>",
-	LEGAL_PRIVACY_HTML: "<p>This is the privacy policy.</p>",
+	LEGAL_PROFILE: "",
 	TANSTACK_DEVTOOLS_ENABLED: "true",
 	GIT_BRANCH: "",
 	GIT_COMMIT: "",
@@ -86,8 +84,7 @@ const environment = {
 	},
 
 	legal: {
-		imprintHtml: env("LEGAL_IMPRINT_HTML"),
-		privacyHtml: env("LEGAL_PRIVACY_HTML"),
+		profile: env("LEGAL_PROFILE"),
 	},
 
 	devtools: {

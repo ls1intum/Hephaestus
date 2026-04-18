@@ -105,6 +105,25 @@ main() {
   [[ ${#present[@]} -gt 0 ]] && log "Set: ${present[*]}"
   [[ ${#missing[@]} -gt 0 ]] && log "Unset: ${missing[*]}"
 
+  # Legal profile sanity check: an invalid or unbundled value silently falls
+  # through to the built-in disclaimer, which is a § 5 DDG / Art. 13 GDPR
+  # violation if served in production. Emit a discoverable WARN so operators
+  # notice in `docker logs` / Coolify / kubectl logs.
+  if [[ -n "${LEGAL_PROFILE:-}" ]]; then
+    local profiles_dir="${HTML_DIR}/legal/profiles"
+    if [[ ! "$LEGAL_PROFILE" =~ ^[a-z0-9][a-z0-9_-]{0,31}$ ]]; then
+      log "WARN: LEGAL_PROFILE='${LEGAL_PROFILE}' is not a valid profile name (expected lowercase [a-z0-9_-], max 32 chars). Falling back to the built-in disclaimer. See docs/admin/legal-pages.mdx."
+    elif [[ ! -d "${profiles_dir}/${LEGAL_PROFILE}" ]]; then
+      local -a available=()
+      if [[ -d "$profiles_dir" ]]; then
+        while IFS= read -r -d '' dir; do available+=("$(basename "$dir")"); done < <(find "$profiles_dir" -mindepth 1 -maxdepth 1 -type d -print0)
+      fi
+      log "WARN: LEGAL_PROFILE='${LEGAL_PROFILE}' has no bundled profile at ${profiles_dir}/${LEGAL_PROFILE}. Available: ${available[*]:-none}. Falling back to the built-in disclaimer unless /legal-overrides/ is mounted. See docs/admin/legal-pages.mdx."
+    else
+      log "Legal profile '${LEGAL_PROFILE}' resolved to ${profiles_dir}/${LEGAL_PROFILE}."
+    fi
+  fi
+
   # Determine which vars to include in cache hash
   # Preview/dev (GIT_BRANCH set): all vars are cacheable (same deployment = same hash)
   # Production (no GIT_BRANCH): exclude DEPLOYED_AT (auto-generated timestamp would bust cache)
