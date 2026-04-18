@@ -118,9 +118,10 @@ public class GitLabReviewReconciler {
         Instant earliestNoteCreatedAt,
         ProcessingContext ctx
     ) {
-        Instant submittedAt = earliestNoteCreatedAt != null
-            ? earliestNoteCreatedAt
-            : (pr.getUpdatedAt() != null ? pr.getUpdatedAt() : Instant.now());
+        Instant submittedAt =
+            earliestNoteCreatedAt != null
+                ? earliestNoteCreatedAt
+                : (pr.getUpdatedAt() != null ? pr.getUpdatedAt() : Instant.now());
 
         PullRequestReview review = new PullRequestReview();
         review.setNativeId(reviewNativeId);

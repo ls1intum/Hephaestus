@@ -460,15 +460,11 @@ public class GitLabDiscussionSyncService {
                 continue;
             }
             Instant createdAt = parseTimestamp((String) noteNode.get("createdAt"));
-            byAuthor.merge(
-                author.getNativeId(),
-                new AuthorEarliest(author, createdAt),
-                (existing, incoming) -> {
-                    if (existing.earliest() == null) return incoming;
-                    if (incoming.earliest() == null) return existing;
-                    return incoming.earliest().isBefore(existing.earliest()) ? incoming : existing;
-                }
-            );
+            byAuthor.merge(author.getNativeId(), new AuthorEarliest(author, createdAt), (existing, incoming) -> {
+                if (existing.earliest() == null) return incoming;
+                if (incoming.earliest() == null) return existing;
+                return incoming.earliest().isBefore(existing.earliest()) ? incoming : existing;
+            });
         }
 
         Map<Long, PullRequestReview> result = new HashMap<>();

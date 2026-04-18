@@ -252,9 +252,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     @Modifying
     @Transactional
-    @Query(
-        value = "UPDATE \"user\" SET email = :email WHERE id = :userId AND email IS NULL",
-        nativeQuery = true
-    )
+    @Query(value = "UPDATE \"user\" SET email = :email WHERE id = :userId AND email IS NULL", nativeQuery = true)
     int backfillEmailIfNull(@Param("userId") Long userId, @Param("email") String email);
 }

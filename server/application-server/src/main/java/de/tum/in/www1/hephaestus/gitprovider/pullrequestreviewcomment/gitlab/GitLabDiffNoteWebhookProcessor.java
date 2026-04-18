@@ -206,7 +206,14 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         PullRequestReview review = null;
         if (author != null && attrs.discussionId() != null) {
             String discussionGid = "gid://gitlab/Discussion/" + attrs.discussionId();
-            review = reviewReconciler.findOrCreateCommentedReview(pr, author, discussionGid, createdAt, provider, context);
+            review = reviewReconciler.findOrCreateCommentedReview(
+                pr,
+                author,
+                discussionGid,
+                createdAt,
+                provider,
+                context
+            );
         }
 
         var commentContext = new GitLabPullRequestReviewCommentProcessor.CommentContext(
