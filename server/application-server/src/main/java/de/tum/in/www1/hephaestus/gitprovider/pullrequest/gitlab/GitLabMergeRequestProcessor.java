@@ -147,6 +147,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         @Nullable List<SyncUserData> syncAssignees,
         @Nullable List<SyncUserData> syncReviewers,
         @Nullable List<SyncUserData> syncApprovers,
+        @Nullable List<SyncUserData> syncParticipants,
         @Nullable Integer milestoneIid
     ) {}
 
@@ -556,6 +557,25 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             ),
             providerId
         );
+
+        // Identity harvest: seed User rows for anyone who has interacted with the MR so later
+        // events (notes, reviews, approvals) do not need to create identities on the hot path.
+        // No relationship is attached — PullRequest has no participants column.
+        if (data.syncParticipants() != null) {
+            for (SyncUserData participant : data.syncParticipants()) {
+                findOrCreateUser(
+                    new GitLabUserLookup(
+                        participant.globalId(),
+                        participant.username(),
+                        participant.name(),
+                        participant.avatarUrl(),
+                        participant.webUrl(),
+                        participant.publicEmail()
+                    ),
+                    providerId
+                );
+            }
+        }
 
         Issue.State mrState = convertState(data.state());
         boolean isMerged = "merged".equalsIgnoreCase(data.state());

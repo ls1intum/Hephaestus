@@ -87,6 +87,16 @@ query GetProjectMergeRequests($fullPath: ID!, $first: Int!, $after: String, $upd
                         ...GitLabUserFields
                     }
                 }
+                participants(first: 50) {
+                    count
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        ...GitLabUserFields
+                    }
+                }
             }
         }
     }

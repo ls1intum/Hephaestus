@@ -1397,6 +1397,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
                 3
             );
             processor.processFromSync(syncData, testRepo, 1L);
@@ -1480,6 +1481,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 "Test User",
                 "https://gitlab.com/uploads/avatar.png",
                 "https://gitlab.com/testuser",
+                null,
                 null,
                 null,
                 null,
@@ -1589,6 +1591,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
                 null
             );
             PullRequest result = processor.processFromSync(syncData, testRepo, 1L);
@@ -1624,6 +1627,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 false,
                 0,
+                null,
                 null,
                 null,
                 null,
@@ -1753,6 +1757,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                         null
                     )
                 ),
+                null,
                 null
             );
             processor.processFromSync(syncData, testRepo, 1L);
@@ -1913,6 +1918,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 "gid://gitlab/User/12345",
                 "testuser",
                 "Test User",
+                null,
                 null,
                 null,
                 null,
@@ -2254,6 +2260,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             "Test User",
             "https://gitlab.com/uploads/avatar.png",
             "https://gitlab.com/testuser",
+            null,
             null,
             null,
             null,

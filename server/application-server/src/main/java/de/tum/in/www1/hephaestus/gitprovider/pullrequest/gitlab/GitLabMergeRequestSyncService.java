@@ -477,6 +477,7 @@ public class GitLabMergeRequestSyncService {
             fields.iid(),
             mrContext
         );
+        List<GitLabMergeRequestProcessor.SyncUserData> syncParticipants = extractParticipants(node, mrContext);
 
         Integer milestoneIid = extractMilestoneIid(node);
 
@@ -521,6 +522,7 @@ public class GitLabMergeRequestSyncService {
             syncAssignees,
             syncReviewers,
             syncApprovers,
+            syncParticipants,
             milestoneIid
         );
         PullRequest pr = mergeRequestProcessor.processFromSync(syncData, repository, scopeId);
@@ -846,6 +848,44 @@ public class GitLabMergeRequestSyncService {
         }
 
         return syncApprovers;
+    }
+
+    // ========================================================================
+    // Participants extraction (identity-harvest only, best-effort)
+    // ========================================================================
+
+    /**
+     * Extracts the participants connection as a list of {@link GitLabMergeRequestProcessor.SyncUserData}.
+     * <p>
+     * Participants are harvested purely to seed {@link de.tum.in.www1.hephaestus.gitprovider.user.User}
+     * rows for anyone who has interacted with the merge request (notes, reviews, approvals, etc.).
+     * They are <em>not</em> attached to the MR as a relationship — the entity has no participants column.
+     * <p>
+     * Overflow is observable via the warning in {@link #detectNestedOverflow} but we deliberately
+     * skip follow-up pagination: missed participants will surface naturally via their own
+     * notes/reviews/commits, which each carry identity data.
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private List<GitLabMergeRequestProcessor.SyncUserData> extractParticipants(
+        Map<String, Object> node,
+        String context
+    ) {
+        Map<String, Object> participantsMap = (Map<String, Object>) node.get("participants");
+        if (participantsMap == null) return null;
+
+        List<Map<String, Object>> participantNodes = (List<Map<String, Object>>) participantsMap.get("nodes");
+        if (participantNodes == null) return null;
+
+        List<GitLabMergeRequestProcessor.SyncUserData> syncParticipants = new ArrayList<>(participantNodes.size());
+        for (Map<String, Object> p : participantNodes) {
+            syncParticipants.add(toSyncUserData(p));
+        }
+
+        // Observability only — identity harvest is best-effort.
+        detectNestedOverflow(participantsMap, "participants", participantNodes.size(), context);
+
+        return syncParticipants;
     }
 
     // ========================================================================
