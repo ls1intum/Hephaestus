@@ -233,6 +233,44 @@ services:
       timeout: 10s
       retries: 10
 
+  # Enforces the 14-day age cap on Docker container logs declared in the
+  # privacy statement and the DSMS submission package. See
+  # docker/logrotate/README.md and the Dockerfile header for the compliance
+  # links. Runs logrotate under BusyBox cron once per day; the json-file
+  # driver (per-service `logging:` blocks) handles the size cap.
+  logrotate:
+    image: "ghcr.io/ls1intum/hephaestus/logrotate:${IMAGE_TAG}"
+    restart: unless-stopped
+    # The one privileged piece: read-write access to container logs on the
+    # host. Container logs are root-owned, so the container runs as root
+    # internally; no-new-privileges + cap_drop/ALL keeps the blast radius
+    # bounded to what logrotate actually needs.
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:rw
+      - logrotate-state:/var/lib/hephaestus-logrotate
+    configs:
+      - source: logrotate-hephaestus-docker-logs
+        target: /etc/logrotate.d/hephaestus-docker-logs
+        mode: 0644
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      # Required to truncate root-owned json-file logs owned by the
+      # Docker daemon. copytruncate opens with O_WRONLY|O_TRUNC.
+      - DAC_OVERRIDE
+      - CHOWN
+      - FOWNER
+    # Not joined to shared-network: the sidecar has no need to reach any
+    # other service. Isolating it reduces the blast radius further.
+    network_mode: none
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   shared-network:
     name: shared-network
@@ -241,3 +279,37 @@ networks:
 volumes:
   postgresql-data:
   git-repos:
+  logrotate-state:
+
+# Inline the logrotate rule so a deploy is fully self-contained: the
+# compose file is the only artifact pushed to the VM, and the rotation
+# policy travels with it. Any change here is a material change to the
+# retention cap claimed in docs/admin/dsms/ and must be amended there
+# before it is deployed.
+#
+# - daily        runs once per day (BusyBox cron tick inside the sidecar)
+# - rotate 14    keeps 14 daily snapshots — the oldest is auto-deleted,
+#                giving the hard 14-day cap
+# - copytruncate the Docker daemon keeps the json-file log open and has
+#                no re-open signal; rename-then-create would leave the
+#                daemon writing to a deleted inode. copytruncate races on
+#                a brief window; acceptable for access-log data.
+# - dateext      rotated names are dated (e.g. -20260419) to avoid
+#                colliding with the numeric suffixes (.1, .2, …) produced
+#                by the json-file driver's own size-based rotation
+# - compress     gzip archived logs; delaycompress keeps yesterday's
+#                archive readable without gunzip
+configs:
+  logrotate-hephaestus-docker-logs:
+    content: |
+      /var/lib/docker/containers/*/*-json.log {
+          daily
+          rotate 14
+          missingok
+          notifempty
+          compress
+          delaycompress
+          copytruncate
+          dateext
+          dateformat -%Y%m%d
+      }

@@ -35,6 +35,11 @@ on:
         required: false
         type: string
         default: "true"
+      logrotate_changed:
+        description: "Whether logrotate sidecar files changed (or should build for other reasons)"
+        required: false
+        type: string
+        default: "true"
 
 jobs:
   webapp-build:
@@ -183,3 +188,24 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=agent-pi
+
+  logrotate-build:
+    name: "Logrotate"
+    if: inputs.should_skip != 'true' && inputs.logrotate_changed == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image-name: "ls1intum/hephaestus/logrotate"
+      docker-file: "./docker/logrotate/Dockerfile"
+      docker-context: "./docker/logrotate"
+      registry: "ghcr.io"
+      tags: |
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+      labels: |
+        org.opencontainers.image.title=Hephaestus Docker-log Rotator
+        org.opencontainers.image.description=Alpine + logrotate + dcron sidecar enforcing the 14-day Docker container log retention cap claimed in the Hephaestus privacy statement and DSMS submission package
+        org.opencontainers.image.vendor=AET TUM
+        org.opencontainers.image.licenses=MIT
+        hephaestus.component=logrotate
