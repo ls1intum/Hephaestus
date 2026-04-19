@@ -19,7 +19,7 @@ import org.springframework.test.context.jdbc.Sql;
  * used as Strategy 4b in {@link de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver}.
  *
  * <p>Verifies the {@code de_fold_name(...)} SQL function (created by Liquibase
- * migration {@code 1776600000000_changelog.xml} and registered with Hibernate
+ * migration {@code 1776587029158_changelog.xml} and registered with Hibernate
  * via {@link de.tum.in.www1.hephaestus.config.HephaestusFunctionContributor})
  * folds stored umlauts (ö→oe, ä→ae, ü→ue, ß→ss) before comparing against an
  * ASCII-folded {@code firstname.lastname} derived from a commit email local-part.

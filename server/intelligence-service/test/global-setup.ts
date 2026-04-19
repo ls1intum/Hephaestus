@@ -90,6 +90,30 @@ async function pushDrizzleSchema(connectionString: string): Promise<void> {
 	// See: https://github.com/drizzle-team/drizzle-orm/issues/2853
 	const { pushSchema } = require("drizzle-kit/api") as typeof import("drizzle-kit/api");
 
+	// Pre-create de_fold_name(text) so the functional index idx_user_de_fold_name
+	// can reference it during pushSchema. Mirrors the Liquibase migration body
+	// in 1776587029158_changelog.xml.
+	await schemaPool.query(`
+		CREATE OR REPLACE FUNCTION de_fold_name(input text)
+		RETURNS text
+		LANGUAGE sql
+		IMMUTABLE
+		STRICT
+		PARALLEL SAFE
+		AS $$
+			SELECT REPLACE(
+			           REPLACE(
+			               REPLACE(
+			                   REPLACE(LOWER(input), 'ö', 'oe'),
+			                   'ä', 'ae'
+			               ),
+			               'ü', 'ue'
+			           ),
+			           'ß', 'ss'
+			       )
+		$$;
+	`);
+
 	console.log("📦 Pushing Drizzle schema to test database...");
 
 	const result = await pushSchema(schema, db as any);

@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Guards against drift between the Liquibase-managed {@code de_fold_name(text)}
  * function body (authoritative source at
- * {@code src/main/resources/db/changelog/1776600000000_changelog.xml}) and the
+ * {@code src/main/resources/db/changelog/1776587029158_changelog.xml}) and the
  * test-only re-declaration at {@code src/test/resources/sql/de_fold_name_function.sql}.
  *
  * <p>Integration tests run with {@code spring.liquibase.enabled=false}, so the
@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 @DisplayName("de_fold_name shim ↔ migration parity")
 class DeFoldNameShimParityTest extends BaseUnitTest {
 
-    private static final Path MIGRATION = Paths.get("src/main/resources/db/changelog/1776600000000_changelog.xml");
+    private static final Path MIGRATION = Paths.get("src/main/resources/db/changelog/1776587029158_changelog.xml");
     private static final Path SHIM = Paths.get("src/test/resources/sql/de_fold_name_function.sql");
 
     private static final Pattern BODY = Pattern.compile(
@@ -46,7 +46,7 @@ class DeFoldNameShimParityTest extends BaseUnitTest {
         assertThat(normalise(shimBody))
             .as(
                 "src/test/resources/sql/de_fold_name_function.sql must re-declare the exact " +
-                    "body of the de_fold_name function defined in 1776600000000_changelog.xml. " +
+                    "body of the de_fold_name function defined in 1776587029158_changelog.xml. " +
                     "Update the shim whenever the migration body changes."
             )
             .isEqualTo(normalise(migrationBody));

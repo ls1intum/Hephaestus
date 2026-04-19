@@ -161,4 +161,32 @@
         </rollback>
     </changeSet>
 
+    <!--
+        Gap 2 (cont.) — persist the diff side for inline review comments. GitLab
+        position exposes new_line / old_line so we derive RIGHT (new/head) vs
+        LEFT (old/base); start_side mirrors the same for multi-line ranges.
+        Entity fields landed in e78596ab but their migration was missed.
+    -->
+    <changeSet id="1776587029158-9" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="pull_request_review_comment" columnName="side"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="pull_request_review_comment">
+            <column name="side" type="VARCHAR(16)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1776587029158-10" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="pull_request_review_comment" columnName="start_side"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="pull_request_review_comment">
+            <column name="start_side" type="VARCHAR(16)"/>
+        </addColumn>
+    </changeSet>
+
 </databaseChangeLog>

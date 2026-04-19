@@ -117,7 +117,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * (e.g. {@code "Jannis Höferlin"}).
      * <p>
      * Backed by the {@code de_fold_name(text)} SQL function and a functional
-     * index defined in migration {@code 1776600000000_changelog.xml}; the function
+     * index defined in migration {@code 1776587029158_changelog.xml}; the function
      * is registered with Hibernate via
      * {@link de.tum.in.www1.hephaestus.config.HephaestusFunctionContributor}.
      */

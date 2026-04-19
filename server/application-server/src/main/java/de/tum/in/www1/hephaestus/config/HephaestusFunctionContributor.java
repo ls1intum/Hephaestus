@@ -16,7 +16,7 @@ import org.hibernate.type.StandardBasicTypes;
  *   <li>{@code de_fold_name(text) -> text}: DIN 5007-2 German name folding
  *       (ö→oe, ä→ae, ü→ue, ß→ss) plus lowercasing. Backed by the SQL function
  *       of the same name and a functional index on {@code "user"(de_fold_name(name))}
- *       created in changelog {@code 1776600000000_changelog.xml}.</li>
+ *       created in changelog {@code 1776587029158_changelog.xml}.</li>
  * </ul>
  */
 public class HephaestusFunctionContributor implements FunctionContributor {
