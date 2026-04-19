@@ -98,14 +98,23 @@ public class GitLabReviewReconciler {
         Instant earliestNoteCreatedAt,
         ProcessingContext ctx
     ) {
-        if (earliestNoteCreatedAt == null) {
-            return existing;
+        if (earliestNoteCreatedAt != null) {
+            Instant currentSubmittedAt = existing.getSubmittedAt();
+            if (currentSubmittedAt == null || earliestNoteCreatedAt.isBefore(currentSubmittedAt)) {
+                existing.setSubmittedAt(earliestNoteCreatedAt);
+                existing.setUpdatedAt(Instant.now());
+                reviewRepository.save(existing);
+            }
         }
-        Instant currentSubmittedAt = existing.getSubmittedAt();
-        if (currentSubmittedAt == null || earliestNoteCreatedAt.isBefore(currentSubmittedAt)) {
-            existing.setSubmittedAt(earliestNoteCreatedAt);
-            existing.setUpdatedAt(Instant.now());
-            reviewRepository.save(existing);
+
+        // Re-publish ReviewSubmitted during re-sync so that COMMENTED reviews synced
+        // before the event emission was fixed still get an activity_event row. The
+        // activity_event unique constraint on (workspace_id, event_key) dedupes, so
+        // replaying is safe.
+        if (ctx != null) {
+            EventPayload.ReviewData.from(existing).ifPresent(reviewData ->
+                eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
+            );
         }
         return existing;
     }

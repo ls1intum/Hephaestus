@@ -282,6 +282,20 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
                 new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(ctx))
             );
             log.debug("Created issue from sync: issueId={}, iid={}", nativeId, data.iid());
+
+            // Emit lifecycle events for issues that arrived already closed during sync.
+            // Without this, bulk GraphQL ingest would never populate ISSUE_CLOSED activity
+            // events, leaving `numberOfClosedIssues` stuck at 0 on the leaderboard.
+            if (issueState == Issue.State.CLOSED) {
+                eventPublisher.publishEvent(
+                    new DomainEvent.IssueClosed(
+                        EventPayload.IssueData.from(issue),
+                        stateReason != null ? stateReason : "completed",
+                        EventContext.from(ctx)
+                    )
+                );
+                log.debug("Emitted IssueClosed for already-closed issue from sync: issueId={}", nativeId);
+            }
         }
 
         return issue;

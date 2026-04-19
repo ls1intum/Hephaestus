@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabFieldUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
@@ -171,7 +172,7 @@ public class GitLabDiscussionSyncService {
 
                 for (Map<String, Object> discussionNode : nodes) {
                     try {
-                        int[] result = processDiscussion(discussionNode, pr, provider, providerId, scopeId);
+                        int[] result = processDiscussion(discussionNode, pr, repository, provider, providerId, scopeId);
                         totalDiffNotes += result[0];
                         totalGeneralNotes += result[1];
                         totalSkipped += result[2];
@@ -237,6 +238,7 @@ public class GitLabDiscussionSyncService {
     private int[] processDiscussion(
         Map<String, Object> discussionNode,
         PullRequest pr,
+        Repository repository,
         GitProvider provider,
         Long providerId,
         Long scopeId
@@ -279,6 +281,7 @@ public class GitLabDiscussionSyncService {
                 resolved != null && resolved,
                 noteNodes,
                 pr,
+                repository,
                 provider,
                 providerId,
                 scopeId
@@ -298,6 +301,7 @@ public class GitLabDiscussionSyncService {
         boolean resolved,
         List<Map<String, Object>> noteNodes,
         PullRequest pr,
+        Repository repository,
         GitProvider provider,
         Long providerId,
         Long scopeId
@@ -388,6 +392,7 @@ public class GitLabDiscussionSyncService {
             noteNodes,
             discussionGlobalId,
             pr,
+            repository,
             provider,
             providerId,
             scopeId
@@ -492,6 +497,7 @@ public class GitLabDiscussionSyncService {
         List<Map<String, Object>> noteNodes,
         String discussionGlobalId,
         PullRequest pr,
+        Repository repository,
         GitProvider provider,
         Long providerId,
         Long scopeId
@@ -515,6 +521,11 @@ public class GitLabDiscussionSyncService {
             });
         }
 
+        // Emit REVIEW_COMMENTED events during bulk GraphQL sync so the leaderboard's
+        // numberOfComments / numberOfReviewedPRs reflect COMMENTED reviews. Without a
+        // ProcessingContext the review reconciler silently skips event publication.
+        ProcessingContext ctx = repository != null ? ProcessingContext.forSync(scopeId, repository) : null;
+
         Map<Long, PullRequestReview> result = new HashMap<>();
         for (Map.Entry<Long, AuthorEarliest> entry : byAuthor.entrySet()) {
             AuthorEarliest info = entry.getValue();
@@ -524,7 +535,7 @@ public class GitLabDiscussionSyncService {
                 discussionGlobalId,
                 info.earliest(),
                 provider,
-                null // discussion sync has no per-note ProcessingContext; events are emitted lazily
+                ctx
             );
             if (review != null) {
                 result.put(entry.getKey(), review);
