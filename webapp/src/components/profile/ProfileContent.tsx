@@ -18,7 +18,7 @@ export interface ProfileContentProps {
 	providerType?: ProviderType;
 	reviewActivity?: ProfileReviewActivity[];
 	openPullRequests?: PullRequestInfo[];
-	/** Server-computed activity stats; falls back to client computation if not provided */
+	/** Server-computed activity stats */
 	activityStats?: ProfileActivityStats;
 	/** Server-provided list of reviewed pull requests */
 	reviewedPullRequests?: PullRequestInfo[];
@@ -54,65 +54,20 @@ export function ProfileContent({
 
 	const skeletonPullRequests = isLoading ? Array.from({ length: 2 }, (_, i) => ({ id: i })) : [];
 
-	const filteredReviewActivity = isLoading ? skeletonReviews : (reviewActivity ?? []);
+	const filteredReviewActivity = isLoading
+		? skeletonReviews
+		: (reviewActivity ?? []).filter((activity) => (activity.score ?? 0) > 0);
 
 	const displayPullRequests = isLoading ? skeletonPullRequests : openPullRequests;
 
-	// Normalized stats interface for ActivityBadges
-	interface NormalizedStats {
-		approvals: number;
-		changeRequests: number;
-		comments: number;
-		codeComments: number;
-	}
-
-	// Compute stats from activity data as fallback when server stats not available
-	const computeStatsFromActivity = (activities: ProfileReviewActivity[]): NormalizedStats =>
-		activities.reduce(
-			(acc, activity) => {
-				acc.codeComments += activity.codeComments ?? 0;
-				switch (activity.state) {
-					case "APPROVED":
-						acc.approvals += 1;
-						break;
-					case "CHANGES_REQUESTED":
-						acc.changeRequests += 1;
-						break;
-					default:
-						acc.comments += 1;
-				}
-				return acc;
-			},
-			{
-				approvals: 0,
-				changeRequests: 0,
-				comments: 0,
-				codeComments: 0,
-			},
-		);
-
-	// Convert server stats to normalized format, or fall back to client computation
-	const normalizeStats = (serverStats?: ProfileActivityStats): NormalizedStats => {
-		if (serverStats) {
-			return {
-				approvals: serverStats.numberOfApprovals ?? 0,
-				changeRequests: serverStats.numberOfChangeRequests ?? 0,
-				comments: (serverStats.numberOfComments ?? 0) + (serverStats.numberOfIssueComments ?? 0),
-				codeComments: serverStats.numberOfCodeComments ?? 0,
-			};
-		}
-		return computeStatsFromActivity(reviewActivity ?? []);
-	};
-
-	const reviewStats = normalizeStats(activityStats);
 	const terms = getProviderTerms(providerType);
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
-	// Use server-provided reviewed PRs if available, otherwise extract from review activity
 	const reviewedPullRequestsForPopover: ReviewedPullRequest[] =
 		reviewedPullRequests && reviewedPullRequests.length > 0
 			? reviewedPullRequests
 			: (reviewActivity ?? [])
+					.filter((activity) => (activity.score ?? 0) > 0)
 					.map((activity) => activity.pullRequest)
 					.filter((pr): pr is PullRequestBaseInfo => Boolean(pr));
 
@@ -126,21 +81,30 @@ export function ProfileContent({
 				enableAllActivity
 			/>
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-				{/* Latest Review Activity */}
+				{/* Latest Pull Request Activity */}
 				<div className="flex flex-col gap-4">
 					<div className="flex flex-col gap-1">
 						<div className="flex flex-wrap items-center gap-3">
 							<h3 className="text-lg font-semibold">Review activity</h3>
 							<ActivityBadges
 								reviewedPullRequests={reviewedPullRequestsForPopover}
-								approvals={reviewStats.approvals}
-								changeRequests={reviewStats.changeRequests}
-								comments={reviewStats.comments}
-								codeComments={reviewStats.codeComments}
+								approvals={activityStats?.numberOfApprovals ?? 0}
+								changeRequests={activityStats?.numberOfChangeRequests ?? 0}
+								comments={activityStats?.numberOfComments ?? 0}
+								codeComments={activityStats?.numberOfCodeComments ?? 0}
+								ownReplies={activityStats?.numberOfOwnReplies ?? 0}
+								openPullRequests={activityStats?.numberOfOpenPullRequests ?? 0}
+								mergedPullRequests={activityStats?.numberOfMergedPullRequests ?? 0}
+								closedPullRequests={activityStats?.numberOfClosedPullRequests ?? 0}
+								openedIssues={activityStats?.numberOfOpenedIssues ?? 0}
+								closedIssues={activityStats?.numberOfClosedIssues ?? 0}
 								isLoading={isLoading}
 								providerType={providerType}
 							/>
 						</div>
+						<p className="text-sm text-provider-muted-foreground">
+							This list shows review work that affects score. The badges also show other activity.
+						</p>
 					</div>
 					<div className="flex flex-col gap-2 m-1">
 						{filteredReviewActivity.length > 0 ? (
@@ -163,8 +127,8 @@ export function ProfileContent({
 								title="No review activity"
 								description={
 									currUserIsDashboardUser
-										? "No reviews in this timeframe. Try expanding the filter."
-										: `${displayName || username} has no reviews in this timeframe.`
+										? `No review activity that counts yet. Try a wider timeframe.`
+										: `${displayName || username} has no review activity that counts in this timeframe.`
 								}
 							/>
 						)}

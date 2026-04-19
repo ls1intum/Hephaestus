@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.gitlab.GitLabCommitBackfillService;
+import de.tum.in.www1.hephaestus.gitprovider.commit.gitlab.GitLabCommitMergeRequestLinker;
 import de.tum.in.www1.hephaestus.gitprovider.commit.gitlab.GitLabCommitSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.gitlab.GitLabIssueDependencySyncService;
@@ -38,6 +39,7 @@ public class GitLabSyncServiceHolder {
     private final GitLabIssueTypeSyncService issueTypeSyncService;
     private final GitLabCommitSyncService commitSyncService;
     private final GitLabCommitBackfillService commitBackfillService;
+    private final GitLabCommitMergeRequestLinker commitMergeRequestLinker;
     private final GitLabSubIssueSyncService subIssueSyncService;
     private final GitLabIssueDependencySyncService issueDependencySyncService;
 
@@ -53,6 +55,7 @@ public class GitLabSyncServiceHolder {
         @Nullable GitLabIssueTypeSyncService issueTypeSyncService,
         @Nullable GitLabCommitSyncService commitSyncService,
         @Nullable GitLabCommitBackfillService commitBackfillService,
+        @Nullable GitLabCommitMergeRequestLinker commitMergeRequestLinker,
         @Nullable GitLabSubIssueSyncService subIssueSyncService,
         @Nullable GitLabIssueDependencySyncService issueDependencySyncService
     ) {
@@ -67,6 +70,7 @@ public class GitLabSyncServiceHolder {
         this.issueTypeSyncService = issueTypeSyncService;
         this.commitSyncService = commitSyncService;
         this.commitBackfillService = commitBackfillService;
+        this.commitMergeRequestLinker = commitMergeRequestLinker;
         this.subIssueSyncService = subIssueSyncService;
         this.issueDependencySyncService = issueDependencySyncService;
     }
@@ -124,6 +128,11 @@ public class GitLabSyncServiceHolder {
     @Nullable
     public GitLabCommitBackfillService getCommitBackfillService() {
         return commitBackfillService;
+    }
+
+    @Nullable
+    public GitLabCommitMergeRequestLinker getCommitMergeRequestLinker() {
+        return commitMergeRequestLinker;
     }
 
     @Nullable

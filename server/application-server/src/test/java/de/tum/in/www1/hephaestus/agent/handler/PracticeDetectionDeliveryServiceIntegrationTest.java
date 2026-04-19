@@ -177,7 +177,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             "main",
             "abc123",
             "def456",
-            null
+            null,
+            null // mergeCommitSha
         );
         // Look up the PR ID
         prId = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 42).orElseThrow().getId();

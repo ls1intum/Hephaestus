@@ -885,7 +885,7 @@ export type ProfileXpRecord = {
 };
 
 /**
- * A review activity entry with XP score for profile display
+ * A scored review activity entry with XP score for profile display
  */
 export type ProfileReviewActivity = {
     /**
@@ -915,7 +915,7 @@ export type ProfileReviewActivity = {
     /**
      * XP score earned for this review
      */
-    score?: number;
+    score: number;
     /**
      * State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED, etc.)
      */
@@ -923,7 +923,7 @@ export type ProfileReviewActivity = {
     /**
      * Timestamp when the review was submitted
      */
-    submittedAt?: Date;
+    submittedAt: Date;
 };
 
 /**
@@ -933,35 +933,55 @@ export type ProfileActivityStats = {
     /**
      * Number of approvals given
      */
-    numberOfApprovals?: number;
+    numberOfApprovals: number;
     /**
      * Number of change requests submitted
      */
-    numberOfChangeRequests?: number;
+    numberOfChangeRequests: number;
     /**
-     * Number of inline code review comments
+     * Number of issues closed in the timeframe
      */
-    numberOfCodeComments?: number;
+    numberOfClosedIssues: number;
     /**
-     * Number of review comments (COMMENTED state)
+     * Number of authored pull requests closed without merge in the timeframe
      */
-    numberOfComments?: number;
+    numberOfClosedPullRequests: number;
     /**
-     * Number of issue comments on pull requests
+     * Number of scored inline feedback comments on pull requests authored by someone else
      */
-    numberOfIssueComments?: number;
+    numberOfCodeComments: number;
+    /**
+     * Number of comment-only review submissions
+     */
+    numberOfComments: number;
+    /**
+     * Number of authored pull requests merged in the timeframe
+     */
+    numberOfMergedPullRequests: number;
+    /**
+     * Number of authored pull requests opened in the timeframe that are still open
+     */
+    numberOfOpenPullRequests: number;
+    /**
+     * Number of issues opened in the timeframe
+     */
+    numberOfOpenedIssues: number;
+    /**
+     * Number of visible-only discussion replies and inline thread replies on the user's own pull requests
+     */
+    numberOfOwnReplies: number;
     /**
      * Number of distinct pull requests reviewed
      */
-    numberOfReviewedPRs?: number;
+    numberOfReviewedPRs: number;
     /**
      * Number of reviews with unknown state
      */
-    numberOfUnknowns?: number;
+    numberOfUnknowns: number;
     /**
      * Total XP score
      */
-    score?: number;
+    score: number;
 };
 
 /**
@@ -971,7 +991,7 @@ export type Profile = {
     /**
      * Aggregated activity stats consistent with leaderboard calculations
      */
-    activityStats?: ProfileActivityStats;
+    activityStats: ProfileActivityStats;
     /**
      * Repositories the user has contributed to
      */
@@ -983,15 +1003,15 @@ export type Profile = {
     /**
      * Currently open pull requests authored by the user
      */
-    openPullRequests?: Array<PullRequestInfo>;
+    openPullRequests: Array<PullRequestInfo>;
     /**
-     * Recent review activity with XP scores
+     * Recent scored review activity with XP scores
      */
-    reviewActivity?: Array<ProfileReviewActivity>;
+    reviewActivity: Array<ProfileReviewActivity>;
     /**
      * Distinct pull requests reviewed by this user
      */
-    reviewedPullRequests?: Array<PullRequestInfo>;
+    reviewedPullRequests: Array<PullRequestInfo>;
     /**
      * Basic information about the user
      */
@@ -1359,13 +1379,37 @@ export type LeaderboardEntry = {
      */
     numberOfChangeRequests: number;
     /**
-     * Count of inline code review comments
+     * Count of issues closed in the timeframe
+     */
+    numberOfClosedIssues: number;
+    /**
+     * Count of authored pull requests closed without merge in the timeframe
+     */
+    numberOfClosedPullRequests: number;
+    /**
+     * Count of scored inline feedback comments on pull requests authored by someone else
      */
     numberOfCodeComments: number;
     /**
-     * Count of review and issue comments
+     * Count of comment-only review submissions
      */
     numberOfComments: number;
+    /**
+     * Count of authored pull requests merged in the timeframe
+     */
+    numberOfMergedPullRequests: number;
+    /**
+     * Count of authored pull requests opened in the timeframe that are still open
+     */
+    numberOfOpenPullRequests: number;
+    /**
+     * Count of issues opened in the timeframe
+     */
+    numberOfOpenedIssues: number;
+    /**
+     * Count of visible-only discussion replies and inline thread replies on the contributor's own pull requests
+     */
+    numberOfOwnReplies: number;
     /**
      * Count of distinct PRs reviewed
      */

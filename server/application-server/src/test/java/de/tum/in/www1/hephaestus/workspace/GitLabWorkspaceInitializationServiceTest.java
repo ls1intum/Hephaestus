@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabRateLimitTracker;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncServiceHolder;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
@@ -61,6 +62,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     private NatsConsumerService natsConsumerService;
 
     @Mock
+    private SyncTargetProvider syncTargetProvider;
+
+    @Mock
     private ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider;
 
     @Mock
@@ -97,6 +101,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             natsProperties,
             syncProps,
             natsConsumerService,
+            syncTargetProvider,
             gitLabSyncServiceHolderProvider,
             gitLabWebhookServiceProvider,
             rateLimitTrackerProvider,
@@ -122,6 +127,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             disabledNats,
             syncProps,
             natsConsumerService,
+            syncTargetProvider,
             gitLabSyncServiceHolderProvider,
             gitLabWebhookServiceProvider,
             rateLimitTrackerProvider,

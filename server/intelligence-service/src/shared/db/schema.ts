@@ -857,6 +857,7 @@ export const issue = pgTable(
 		nativeId: bigint("native_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		providerId: bigint("provider_id", { mode: "number" }).notNull(),
+		mergeCommitSha: varchar("merge_commit_sha", { length: 40 }),
 	},
 	(table) => [
 		index("idx_issue_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -1672,6 +1673,8 @@ export const pullRequestReviewComment = pgTable(
 		nativeId: bigint("native_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		providerId: bigint("provider_id", { mode: "number" }).notNull(),
+		side: varchar({ length: 16 }),
+		startSide: varchar("start_side", { length: 16 }),
 	},
 	(table) => [
 		index("idx_pull_request_review_comment_thread").using(
@@ -1743,6 +1746,8 @@ export const pullRequestReviewThread = pgTable(
 		nativeId: bigint("native_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		providerId: bigint("provider_id", { mode: "number" }).notNull(),
+		commitSha: varchar("commit_sha", { length: 64 }),
+		originalCommitSha: varchar("original_commit_sha", { length: 64 }),
 	},
 	(table) => [
 		index("idx_pull_request_review_thread_pull_request").using(

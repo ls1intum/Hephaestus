@@ -421,6 +421,12 @@ public class GitLabIssueSyncService {
         String closedAt = node.get("closedAt") != null ? node.get("closedAt").toString() : null;
         int userNotesCount = node.get("userNotesCount") != null ? ((Number) node.get("userNotesCount")).intValue() : 0;
         Integer milestoneIid = extractMilestoneIid(node);
+        String typeName = (String) node.get("type");
+        String closedAsDuplicateOfGid = null;
+        Map<String, Object> closedAsDuplicateOf = (Map<String, Object>) node.get("closedAsDuplicateOf");
+        if (closedAsDuplicateOf != null) {
+            closedAsDuplicateOfGid = (String) closedAsDuplicateOf.get("id");
+        }
 
         // Author
         String authorGlobalId = null,
@@ -529,7 +535,9 @@ public class GitLabIssueSyncService {
             userNotesCount,
             syncLabels,
             syncAssignees,
-            milestoneIid
+            milestoneIid,
+            typeName,
+            closedAsDuplicateOfGid
         );
         Issue issue = issueProcessor.processFromSync(syncData, repository, scopeId);
 

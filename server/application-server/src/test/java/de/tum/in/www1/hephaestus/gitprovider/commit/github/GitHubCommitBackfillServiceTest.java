@@ -141,7 +141,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
                     15,
                     null
                 )
-            )
+            ),
+            List.of()
         );
     }
 

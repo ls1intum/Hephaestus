@@ -702,7 +702,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 10,
                 0,
                 1,
-                List.of(fileChange)
+                List.of(fileChange),
+                List.of()
             );
             when(gitRepositoryManager.walkCommits(eq(100L), any(), any())).thenReturn(List.of(commitInfo));
             when(
@@ -783,6 +784,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 0,
                 0,
                 0,
+                List.of(),
                 List.of()
             );
             when(gitRepositoryManager.walkCommits(eq(100L), any(), any())).thenReturn(List.of(commitInfo));

@@ -1,0 +1,24 @@
+query GetMergeRequestAllCommits($fullPath: ID!, $iid: String!, $first: Int!, $after: String) {
+    project(fullPath: $fullPath) {
+        mergeRequests(iids: [$iid], first: 1) {
+            nodes {
+                iid
+                commits(first: $first, after: $after) {
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        sha
+                        authorEmail
+                        authorName
+                        author {
+                            id
+                            username
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

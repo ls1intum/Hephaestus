@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -191,7 +192,10 @@ public class GitLabCollaboratorSyncService {
 
         if (globalId == null || username == null) return;
 
-        User user = userService.findOrCreateUser(globalId, username, name, avatarUrl, webUrl, providerId);
+        User user = userService.findOrCreateUser(
+            GitLabUserLookup.of(globalId, username, name, avatarUrl, webUrl),
+            providerId
+        );
         if (user == null) return;
 
         syncedUserIds.add(user.getId());
