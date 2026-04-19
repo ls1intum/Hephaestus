@@ -84,6 +84,15 @@ public class GitLabReviewReconciler {
             return null;
         }
 
+        // Parity with GitHub: a PR author replying to their own MR does not produce a
+        // Review entity. Those notes are attributed via numberOfOwnReplies on the
+        // leaderboard; synthesising a COMMENTED review here would inflate peer-review
+        // counts (students whose only discussion activity is on their own MR would
+        // appear to have reviewed peers).
+        if (pr.getAuthor() != null && pr.getAuthor().getId() != null && pr.getAuthor().getId().equals(author.getId())) {
+            return null;
+        }
+
         long reviewNativeId = generateCommentedReviewNativeId(discussionGlobalId, author.getNativeId());
         Long providerId = provider.getId();
 
