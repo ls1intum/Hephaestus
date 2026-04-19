@@ -140,7 +140,7 @@ Tick in DSMS:
 - **Development activity (synchronised from source systems):** pull/merge requests, issues, code reviews, review comments, commit metadata, repository collaborator and team-membership metadata, and profile information of authors of these artifacts.
 - **Account settings & recognition:** notification preferences, UI display options, workspace memberships and roles, leaderboard rank, league assignment, achievement progress, the "AI review comments" Art. 21 objection switch.
 - **AI-assisted features:** guidance-assistant messages + AI-generated responses, conversation threads, feedback (helpful / not helpful), practice-review findings (verdict, severity, evidence, reasoning), guidance text delivered back to the Contributor.
-- **Server logs (hard 14-day cap via a `logrotate` sidecar defined in `docker/compose.app.yaml`, plus per-container size cap via the Docker `json-file` driver):** IP address, timestamp, HTTP method, URL, status code, bytes transferred, user-agent, referrer.
+- **Server logs (deterministic per-container size cap via the Docker `json-file` driver, configured in `docker/compose.app.yaml` and `docker/compose.core.yaml`):** IP address, timestamp, HTTP method, URL, status code, bytes transferred, user-agent, referrer.
 - **Browser-side storage:** Keycloak session cookies; theme preference in localStorage. No identifying data in localStorage.
 
 ### 10. Special categories (Art. 9 / Art. 10)
@@ -172,7 +172,7 @@ All U.S.-based recipients are certified under the EU–U.S. Data Privacy Framewo
 | Guidance-assistant conversations | Account lifetime; deletable on request |
 | Practice-review Findings | Workspace lifetime; deletable on request |
 | LLM-provider-side prompts | Up to 30 days (enterprise default abuse-monitoring); shorter where Zero Data Retention has been negotiated per workspace |
-| Server access logs (app server + reverse proxy) | Two-layer cap: per-container size cap via the Docker `json-file` log driver (`max-size=50m` × `max-file=5` for application services in `docker/compose.app.yaml`; `max-size=10m` × `max-file=3` for core infrastructure in `docker/compose.core.yaml`); **hard 14-day age cap** enforced by a dedicated `logrotate` sidecar service (`logrotate:` in `docker/compose.app.yaml`, image built from `docker/logrotate/`, daily rotation with `rotate 14`, `compress`, `copytruncate`; the rotation rule is inlined in the compose file's `configs:` block and travels with every deploy). Logs are retained beyond this 14-day window only where strictly necessary for an ongoing security incident, then deleted at closure |
+| Server access logs (app server + reverse proxy) | Deterministic per-container size cap enforced by the Docker `json-file` log driver: `max-size=50m` × `max-file=5` (≤ 250 MB per service) for application services in `docker/compose.app.yaml`; `max-size=10m` × `max-file=3` (≤ 30 MB per service) for core infrastructure in `docker/compose.core.yaml`. Once a container exceeds its cap, the daemon deletes the oldest log file. The cap is part of the compose configuration itself and travels with every deploy. Logs are retained beyond this size cap only where strictly necessary for an ongoing security incident, then deleted at closure |
 | Backups — PostgreSQL + Keycloak | **No scheduled off-host backups are in place at the time of submission.** Establishing a scheduled backup regime with a documented restore drill is an open AET-ops item under Art. 32(1)(c) GDPR resilience (see `04-toms.md` §3.3). The dataset has no Art. 9 content, and no statutory retention duty compels a backup today |
 | Backups — gitlab.lrz.de (LRZ-side, for deleted content) | LRZ retains its own backup window of up to 6 months for content already removed on the LRZ side, independent of Hephaestus |
 
@@ -193,7 +193,7 @@ Both are versioned in the repository under `webapp/public/legal/profiles/tumaet/
 
 ### 17. DPIA pre-check (Art. 35 GDPR)
 
-See `02-dsfa-prescreen.md`. Conclusion: **DPIA-light posture.** The AI-assisted feature surface is on the "elevated risk" side of the BayLfD innovative-technology criterion; mitigations in §5 of the pre-screen (no-training enterprise API terms, per-job LLM proxy, Art. 21 objection switch, shared-responsibility disclosure, hard 14-day server-log cap) replace a full DPIA at the current scope. The pre-screen lists the trigger conditions under which a full DPIA must be opened.
+See `02-dsfa-prescreen.md`. Conclusion: **DPIA-light posture.** The AI-assisted feature surface is on the "elevated risk" side of the BayLfD innovative-technology criterion; mitigations in §5 of the pre-screen (no-training enterprise API terms, per-job LLM proxy, Art. 21 objection switch, shared-responsibility disclosure, deterministic per-container size cap on server logs) replace a full DPIA at the current scope. The pre-screen lists the trigger conditions under which a full DPIA must be opened.
 
 ### 18. Personalrat involvement (Art. 75 BayPVG)
 
@@ -208,7 +208,7 @@ Not applicable as a separate upload; Hephaestus is self-hosted by AET on TUM inf
 - Directly from the data subject: profile settings, notification preferences, guidance-assistant messages, feedback, the Art. 21 objection switch.
 - From federated identity providers (GitHub, gitlab.lrz.de) via OAuth / OIDC during sign-in.
 - From source-system APIs (GitHub, gitlab.lrz.de) via the workspace-configured installation / access token: repository Events and Artifacts authored by the Contributor.
-- From the underlying HTTP connection: IP address, user-agent (standard web-server logging, hard 14-day cap enforced by a `logrotate` sidecar defined in `docker/compose.app.yaml`, plus per-container size cap via the Docker `json-file` driver; see §13).
+- From the underlying HTTP connection: IP address, user-agent (standard web-server logging, deterministic per-container size cap via the Docker `json-file` driver, configured in `docker/compose.app.yaml` and `docker/compose.core.yaml`; see §13).
 
 ### 21. Data-subject rights contact
 
