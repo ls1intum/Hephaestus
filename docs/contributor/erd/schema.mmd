@@ -294,6 +294,7 @@ erDiagram
         VARCHAR(40) base_ref_oid
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+        VARCHAR(40) merge_commit_sha
     }
 
     IssueAssignee {
@@ -567,6 +568,8 @@ erDiagram
         BIGINT resolved_by_id FK
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+        VARCHAR(64) commit_sha
+        VARCHAR(64) original_commit_sha
     }
 
     Repository {

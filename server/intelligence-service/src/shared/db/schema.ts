@@ -857,6 +857,7 @@ export const issue = pgTable(
 		nativeId: bigint("native_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		providerId: bigint("provider_id", { mode: "number" }).notNull(),
+		mergeCommitSha: varchar("merge_commit_sha", { length: 40 }),
 	},
 	(table) => [
 		index("idx_issue_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -1743,6 +1744,8 @@ export const pullRequestReviewThread = pgTable(
 		nativeId: bigint("native_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		providerId: bigint("provider_id", { mode: "number" }).notNull(),
+		commitSha: varchar("commit_sha", { length: 64 }),
+		originalCommitSha: varchar("original_commit_sha", { length: 64 }),
 	},
 	(table) => [
 		index("idx_pull_request_review_thread_pull_request").using(
@@ -2010,6 +2013,9 @@ export const user = pgTable(
 		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
+		index("idx_user_de_fold_name")
+			.using("btree", sql`de_fold_name((name)::text)`)
+			.where(sql`((type)::text = 'USER'::text)`),
 		uniqueIndex("uk_user_provider_login").using(
 			"btree",
 			sql`provider_id`,
