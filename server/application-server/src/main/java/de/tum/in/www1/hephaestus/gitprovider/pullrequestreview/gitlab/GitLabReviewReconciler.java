@@ -84,6 +84,15 @@ public class GitLabReviewReconciler {
             return null;
         }
 
+        // Parity with GitHub: a PR author replying to their own MR does not produce a
+        // Review entity. Those notes are attributed via numberOfOwnReplies on the
+        // leaderboard; synthesising a COMMENTED review here would inflate peer-review
+        // counts (students whose only discussion activity is on their own MR would
+        // appear to have reviewed peers).
+        if (pr.getAuthor() != null && pr.getAuthor().getId() != null && pr.getAuthor().getId().equals(author.getId())) {
+            return null;
+        }
+
         long reviewNativeId = generateCommentedReviewNativeId(discussionGlobalId, author.getNativeId());
         Long providerId = provider.getId();
 
@@ -98,14 +107,23 @@ public class GitLabReviewReconciler {
         Instant earliestNoteCreatedAt,
         ProcessingContext ctx
     ) {
-        if (earliestNoteCreatedAt == null) {
-            return existing;
+        if (earliestNoteCreatedAt != null) {
+            Instant currentSubmittedAt = existing.getSubmittedAt();
+            if (currentSubmittedAt == null || earliestNoteCreatedAt.isBefore(currentSubmittedAt)) {
+                existing.setSubmittedAt(earliestNoteCreatedAt);
+                existing.setUpdatedAt(Instant.now());
+                reviewRepository.save(existing);
+            }
         }
-        Instant currentSubmittedAt = existing.getSubmittedAt();
-        if (currentSubmittedAt == null || earliestNoteCreatedAt.isBefore(currentSubmittedAt)) {
-            existing.setSubmittedAt(earliestNoteCreatedAt);
-            existing.setUpdatedAt(Instant.now());
-            reviewRepository.save(existing);
+
+        // Re-publish ReviewSubmitted during re-sync so that COMMENTED reviews synced
+        // before the event emission was fixed still get an activity_event row. The
+        // activity_event unique constraint on (workspace_id, event_key) dedupes, so
+        // replaying is safe.
+        if (ctx != null) {
+            EventPayload.ReviewData.from(existing).ifPresent(reviewData ->
+                eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
+            );
         }
         return existing;
     }
