@@ -78,8 +78,8 @@ The essence of the Art. 26(2) Satz 2 arrangement is made available to data subje
 See `05-avv-checklist.md` for the full table. In summary, engaged processors (ordered internal → platform-wide → per-workspace) are:
 
 - **GitHub, Inc. / Microsoft Corporation** — identity provider (OAuth) and source-system API (pull requests, issues, reviews, commits synchronised on behalf of the controller via the workspace-configured GitHub App installation or access token). AVV in place at TUM/AET level.
-- **OpenAI, L.P.** — LLM provider for workspaces configured to use it. AVV at TUM/AET level for the TUM-operated tenancy; AVV at the workspace administrator's institution level when that institution supplies the API credentials (shared-responsibility model, §3.2).
-- **Microsoft Corporation (Azure OpenAI Service)** — LLM provider for workspaces configured to use it. Region-configurable; EU-region deployments process within the EU. AVV as above.
+- **Microsoft Corporation (Azure OpenAI Service)** — default LLM provider for the TUM-operated deployment. Region-configurable; EU-region deployments process within the EU. AVV at TUM/AET level for the TUM-operated tenancy; AVV at the workspace administrator's institution level when that institution supplies the API credentials (shared-responsibility model, §3.2).
+- **OpenAI, L.P.** — alternative LLM provider configurable per workspace. AVV as above.
 - **Salesforce, Inc. / Slack Technologies, LLC** — workspace notifications and engagement digests when the workspace administrator has enabled Slack. AVV in place at TUM/AET level.
 
 The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation framework (Art. 16 Abs. 1 Satz 2 BayHIG in conjunction with the BAdW-Satzung). LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-avv-checklist.md` for the full EDPB 07/2020 analysis.
@@ -98,7 +98,7 @@ Pre-populated by DSMS. Verify:
 4. Deliver adaptive Guidance back to Contributors via dashboards, the conversational guidance assistant, and automated practice-review comments on pull/merge requests.
 5. Surface workspace engagement and recognition features (leaderboards, leagues, achievements) where the workspace administrator has enabled them.
 6. Deliver workspace notifications — where the workspace administrator has enabled it — over Slack.
-7. Operate the service reliably and securely (server logs, backups) and troubleshoot incidents.
+7. Operate the service reliably and securely (server logs) and troubleshoot incidents.
 
 ### 6. Name of IT system / procedure
 
@@ -140,7 +140,7 @@ Tick in DSMS:
 - **Development activity (synchronised from source systems):** pull/merge requests, issues, code reviews, review comments, commit metadata, repository collaborator and team-membership metadata, and profile information of authors of these artifacts.
 - **Account settings & recognition:** notification preferences, UI display options, workspace memberships and roles, leaderboard rank, league assignment, achievement progress, the "AI review comments" Art. 21 objection switch.
 - **AI-assisted features:** guidance-assistant messages + AI-generated responses, conversation threads, feedback (helpful / not helpful), practice-review findings (verdict, severity, evidence, reasoning), guidance text delivered back to the Contributor.
-- **Server logs (14-day cap):** IP address, timestamp, HTTP method, URL, status code, bytes transferred, user-agent, referrer.
+- **Server logs (size-bounded rolling window via Docker `json-file` driver):** IP address, timestamp, HTTP method, URL, status code, bytes transferred, user-agent, referrer.
 - **Browser-side storage:** Keycloak session cookies; theme preference in localStorage. No identifying data in localStorage.
 
 ### 10. Special categories (Art. 9 / Art. 10)
@@ -150,7 +150,7 @@ Tick in DSMS:
 ### 11. Categories of recipients (Art. 30(1)(d))
 
 - **Internal:** AET administrators / developers (operation, maintenance, support); workspace members (see workspace-level Findings and dashboards as described in §6 of the privacy statement).
-- **External (Art. 28 processors), as configured per workspace:** GitHub / Microsoft; the LLM provider configured for the workspace (OpenAI or Azure OpenAI); Slack (when enabled).
+- **External (Art. 28 processors), as configured per workspace:** GitHub / Microsoft; the LLM provider configured for the workspace (Azure OpenAI by default on the TUM-operated deployment, or OpenAI); Slack (when enabled).
 - **External (separate controllers, not Art. 28):** Leibniz-Rechenzentrum der BAdW for gitlab.lrz.de integration.
 - **No sale, no advertising recipients, no brokers.**
 
@@ -172,9 +172,8 @@ All U.S.-based recipients are certified under the EU–U.S. Data Privacy Framewo
 | Guidance-assistant conversations | Account lifetime; deletable on request |
 | Practice-review Findings | Workspace lifetime; deletable on request |
 | LLM-provider-side prompts | Up to 30 days (enterprise default abuse-monitoring); shorter where Zero Data Retention has been negotiated per workspace |
-| Server access logs (app server + reverse proxy) | **Hard 14-day maximum** enforced by `logrotate` (host-level, rotated daily with `rotate 14`) and the Docker `json-file` log driver (`max-size=10m`, `max-file=14`). Longer only where strictly necessary for an ongoing security incident, then deleted at closure |
-| Backups — PostgreSQL | Daily full backup, 30-day rolling retention (AET ops baseline, pg_dump + nightly rsync to AET backup host) |
-| Backups — Keycloak realm | Daily JSON realm export, 30-day rolling retention |
+| Server access logs (app server + reverse proxy) | Size-bounded rolling window via the Docker `json-file` log driver (`max-size=50m`, `max-file=5` for application services in `docker/compose.app.yaml`; `max-size=10m`, `max-file=3` for core infrastructure in `docker/compose.core.yaml`) — approximately 250 MB per app service; older segments are discarded as new ones are written. A host-level time-based cap (e.g. `logrotate` with `rotate 14`) is an open operational item. Logs are retained beyond this rolling window only where strictly necessary for an ongoing security incident, then deleted at closure |
+| Backups — PostgreSQL + Keycloak | **No scheduled off-host backups are in place at the time of submission.** Establishing a scheduled backup regime with a documented restore drill is an open AET-ops item under Art. 32(1)(c) GDPR resilience (see `04-toms.md` §3.3). The dataset has no Art. 9 content, and no statutory retention duty compels a backup today |
 | Backups — gitlab.lrz.de (LRZ-side, for deleted content) | LRZ retains its own backup window of up to 6 months for content already removed on the LRZ side, independent of Hephaestus |
 
 ### 14. Technical and Organizational Measures (Art. 30(1)(g) + Art. 32)
@@ -194,7 +193,7 @@ Both are versioned in the repository under `webapp/public/legal/profiles/tumaet/
 
 ### 17. DPIA pre-check (Art. 35 GDPR)
 
-See `02-dsfa-prescreen.md`. Conclusion: **DPIA-light posture.** The AI-assisted feature surface is on the "elevated risk" side of the BayLfD innovative-technology criterion; mitigations in §5 of the pre-screen (no-training enterprise API terms, per-job LLM proxy, Art. 21 objection switch, shared-responsibility disclosure, 14-day log cap) replace a full DPIA at the current scope. The pre-screen lists the trigger conditions under which a full DPIA must be opened.
+See `02-dsfa-prescreen.md`. Conclusion: **DPIA-light posture.** The AI-assisted feature surface is on the "elevated risk" side of the BayLfD innovative-technology criterion; mitigations in §5 of the pre-screen (no-training enterprise API terms, per-job LLM proxy, Art. 21 objection switch, shared-responsibility disclosure, size-bounded server-log rolling window) replace a full DPIA at the current scope. The pre-screen lists the trigger conditions under which a full DPIA must be opened.
 
 ### 18. Personalrat involvement (Art. 75 BayPVG)
 
@@ -209,7 +208,7 @@ Not applicable as a separate upload; Hephaestus is self-hosted by AET on TUM inf
 - Directly from the data subject: profile settings, notification preferences, guidance-assistant messages, feedback, the Art. 21 objection switch.
 - From federated identity providers (GitHub, gitlab.lrz.de) via OAuth / OIDC during sign-in.
 - From source-system APIs (GitHub, gitlab.lrz.de) via the workspace-configured installation / access token: repository Events and Artifacts authored by the Contributor.
-- From the underlying HTTP connection: IP address, user-agent (standard web-server logging, 14-day cap).
+- From the underlying HTTP connection: IP address, user-agent (standard web-server logging, size-bounded rolling window via the Docker `json-file` driver; see §13).
 
 ### 21. Data-subject rights contact
 

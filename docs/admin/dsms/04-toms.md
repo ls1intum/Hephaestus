@@ -67,10 +67,9 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 
 ### 3.3 Recoverability (Wiederherstellbarkeit)
 
-- **PostgreSQL:** daily `pg_dump` with a 30-day rolling retention on the AET backup host; full restore procedure documented in AET runbooks.
-- **Keycloak:** daily realm export (JSON) with a 30-day rolling retention on the AET backup host.
-- **Application secrets:** held in the AET secret store and replicated to the backup host with the same 30-day retention.
-- Quarterly restore drill verifies the backup set.
+- **Current state:** no scheduled off-host backups are in place at the time of submission. The PostgreSQL container uses a named Docker volume on the host; the Keycloak realm configuration is versioned in the repository under `server/application-server/keycloak-hephaestus-realm-example-config.json` and can be re-applied on re-provisioning.
+- **Operational roadmap:** establishing a scheduled PostgreSQL dump + Keycloak realm export with an off-host copy and a documented restore drill is an open AET-ops item tracked under Art. 32(1)(c) GDPR resilience. The dataset has no Art. 9 content, and no statutory retention duty compels a backup today.
+- **Source of truth for user content:** the authoritative copies of pull/merge-request content live on GitHub and gitlab.lrz.de; Hephaestus-specific state that cannot be re-derived is the Keycloak user set, the Hephaestus application database (workspace state, Findings, practice configurations), and workspace-level secrets.
 
 ## 4. Testability, regular evaluation, and measure effectiveness (Art. 32(1)(d))
 
@@ -92,9 +91,9 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 
 - **Account deletion** (self-service, profile settings): removes the Keycloak account, the Hephaestus profile, preferences, guidance-assistant conversations, the Art. 21 objection switch, and the Contributor's identity link to their Findings. Source-side GitHub / gitlab.lrz.de content is *not* deleted by this action — that must be done on the source system separately.
 - **Workspace deletion / repository removal** triggers deletion of synchronised Artifacts for that workspace or repository.
-- **Server logs** are rotated under a hard 14-day maximum enforced by `logrotate` (host-level, `rotate 14`) and the Docker `json-file` log driver (`max-size=10m`, `max-file=14`).
+- **Server logs** are size-rotated by the Docker `json-file` log driver configured per container (`max-size=50m`, `max-file=5` for application services in `docker/compose.app.yaml`; `max-size=10m`, `max-file=3` for core infrastructure in `docker/compose.core.yaml`). Retention is therefore a size-bounded rolling window (~250 MB per app service) rather than a fixed time window. Adding a host-level time-based cap (e.g. `logrotate` with `rotate 14`) is an open operational item.
 - **LLM-provider-side retention** is bounded by enterprise no-training terms; default 30-day retention, shorter where Zero Data Retention has been negotiated per workspace. After the provider's window, prompts are not associated with the deleted account.
-- **Backups** follow the 30-day PostgreSQL / Keycloak rolling retention. On restore after an account deletion, the application-level deletion log is re-applied to prevent re-materialising deleted data.
+- **No backups of the Hephaestus-operated stores are currently in place**, so an account-deletion does not need to be re-applied to a backup set. If and when off-host backups are introduced (see §3.3), the application-level deletion log must be re-applied on restore to prevent re-materialising deleted data.
 
 ## 7. Organisational measures
 
@@ -109,7 +108,7 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 | Component | Role | AVV / framework | Default state |
 |---|---|---|---|
 | GitHub, Inc. / Microsoft Corporation | Identity provider (OAuth) and source-system API | AVV at TUM/AET level | Always on for GitHub-federated workspaces |
-| OpenAI, L.P. | LLM provider (per workspace) | AVV at TUM/AET level for TUM-operated tenancy; at workspace administrator's institution when that institution supplies credentials | Per-workspace, opt-in |
-| Microsoft Corporation (Azure OpenAI Service) | LLM provider (per workspace) | AVV as above | Per-workspace, opt-in |
+| Microsoft Corporation (Azure OpenAI Service) | Default LLM provider (per workspace) for the TUM-operated deployment | AVV at TUM/AET level for TUM-operated tenancy; at workspace administrator's institution when that institution supplies credentials | Default, per-workspace |
+| OpenAI, L.P. | Alternative LLM provider (per workspace) | AVV as above | Per-workspace, opt-in |
 | Salesforce, Inc. / Slack Technologies, LLC | Workspace notifications (when enabled by the workspace admin) | AVV at TUM/AET level | Per-workspace, opt-in |
 | Leibniz-Rechenzentrum der BAdW (gitlab.lrz.de) | Source system and OIDC identity provider | **Not Art. 28** — separate controller under Art. 16 Abs. 1 Satz 2 BayHIG + BAdW-Satzung (public-body cooperation; EDPB 07/2020 § 22) | Per-workspace, opt-in |

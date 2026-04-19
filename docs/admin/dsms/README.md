@@ -11,7 +11,7 @@ This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis
 
 ## Scope
 
-Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external processors: an LLM provider selected at the deployment level and bound per workspace (OpenAI or Microsoft Azure OpenAI) and Slack (when enabled per workspace). Server access logs contain IP addresses and are rotated with a hard 14-day maximum under logrotate + the Docker `json-file` log driver.
+Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external processors: an LLM provider selected at the deployment level and bound per workspace (Azure OpenAI by default on the TUM-operated deployment, or OpenAI) and Slack (when enabled per workspace). Server access logs contain IP addresses and are rotated as a size-bounded rolling window via the Docker `json-file` log driver.
 
 ## Contents
 
@@ -46,7 +46,7 @@ Re-review the VVT once per year:
 
 - Has the deployed stack changed? (new processor, new data category, new retention window?)
 - Has the platform added a new LLM provider or a new source system? Any of these requires an amended VVT, an amended privacy page, and a new row in the AVV checklist.
-- Are the retention figures in `03-vt-dsms.md` still matching the deployed config (server-log rotation, PostgreSQL / Keycloak backup schedules, LLM provider retention windows)?
+- Are the retention figures in `03-vt-dsms.md` still matching the deployed config (server-log rotation caps, whether off-host backups have been introduced, LLM provider retention windows)?
 - Has the deployment activated any of the optional integrations that are *currently disabled* (e.g. the built-in Sentry client, the built-in PostHog client)? If yes, amend the VVT, the AVV checklist, and the privacy statement before the activation goes live.
 - Has the scope of AI-assisted features grown to the point that the DPIA pre-screen in `02-dsfa-prescreen.md` must be upgraded to a full DPIA under the BayLfD template?
 
@@ -55,7 +55,7 @@ Re-review the VVT once per year:
 The DSB may comment in DSMS. Typical follow-ups and responses:
 
 - *"Rechtsgrundlage zu konkretisieren"* → §7 of the VVT cites Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG for TUM Contributors, and Art. 6(1)(b) GDPR for non-TUM Contributors. Point them there.
-- *"Löschkonzept fehlt"* → §13 of the VVT lists retention per category, including the account-deletion flow and the hard 14-day server-log cap.
+- *"Löschkonzept fehlt"* → §13 of the VVT lists retention per category, including the account-deletion flow and the size-bounded rolling server-log window (Docker `json-file` driver).
 - *"AVV fehlt für X"* → see [`05-avv-checklist.md`](./05-avv-checklist.md) for the per-processor DPA status.
 - *"DSFA erforderlich"* → upgrade [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate.
 

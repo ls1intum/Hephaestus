@@ -12,10 +12,11 @@ Follow these steps in order. Target: [https://dsms.datenschutz.tum.de/](https://
 
 1. Open `03-vt-dsms.md` alongside this guide.
 2. Re-confirm the deployment-dependent figures against production before submission. Each of these is already pinned in `03-vt-dsms.md` §13 — the phase-0 check is that the deployment has not drifted:
-   - Server / reverse-proxy log rotation at the 14-day hard maximum (`logrotate` + Docker `json-file` log driver on `hephaestus-prod.aet.cit.tum.de`).
-   - PostgreSQL and Keycloak backup jobs at 30-day rolling retention on the AET backup host.
-   - LLM providers enabled in production and, for each, whether Zero Data Retention is in effect.
+   - Container log rotation is the Docker `json-file` driver's size-bounded rolling window (`max-size=50m`, `max-file=5` for application services; `max-size=10m`, `max-file=3` for core infrastructure). A host-level time-based cap (e.g. `logrotate` with `rotate 14`) is an open operational item — if it has since been added, update §13 and §6 of the privacy page.
+   - Off-host PostgreSQL / Keycloak backups are **not in place** at the time this template was written (see `04-toms.md` §3.3). If a scheduled backup regime has since been deployed, update `04-toms.md` §3.3 and `03-vt-dsms.md` §13.
+   - LLM providers enabled in production and, for each, whether Zero Data Retention is in effect. The TUM-operated deployment defaults to Azure OpenAI; OpenAI is an alternative per workspace.
    - `SENTRY_DSN` is still empty and `POSTHOG_ENABLED=false` in production. If either has been activated, the VVT, privacy statement, and AVV checklist must be amended first (see `05-avv-checklist.md`, "Follow-up if the VVT surface changes").
+   - The Keycloak realm's `smtpServer` is still empty (no email is sent for account verification or password reset). If SMTP has since been configured, the VVT + privacy page + AVV checklist must be amended first.
 3. Have at hand: TUM login + edit access on the Hephaestus repo (for privacy-page updates).
 
 ## Phase 1 — Ship the privacy page
@@ -26,7 +27,7 @@ The live privacy page is at [https://hephaestus.aet.cit.tum.de/privacy](https://
 - DPO: **[beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)**.
 - §3.1 names **gitlab.lrz.de / Leibniz-Rechenzentrum der BAdW** as a separate controller under the Art. 16 Abs. 1 Satz 2 BayHIG public-body cooperation framing, **not** an Art. 28 processor.
 - §3.2 documents the shared-responsibility model (workspace admin configures LLM credentials, Slack, leaderboards, practice catalog, auto-trigger) with the Art. 26(2) Satz 1 duty allocation.
-- §4 lists: identity + authentication, development activity (GitHub + gitlab.lrz.de), account settings + recognition + the "AI review comments" Art. 21 objection switch, AI-assisted features, and server logs (14-day cap). It does **not** claim active Sentry or PostHog processing — both integrations are disabled in production.
+- §4 lists: identity + authentication, development activity (GitHub + gitlab.lrz.de), account settings + recognition + the "AI review comments" Art. 21 objection switch, AI-assisted features, and server logs (size-bounded rolling window via the Docker `json-file` driver). It does **not** claim active Sentry or PostHog processing — both integrations are disabled in production.
 - §6 lists every recipient: GitHub, the LLM provider per workspace (OpenAI or Azure OpenAI), and Slack.
 - §7 covers third-country transfers under DPF + SCCs Module 2 fall-back.
 - Legal basis table: **Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG** for TUM Contributors; **Art. 6(1)(b) GDPR** for non-TUM Contributors.
@@ -84,7 +85,7 @@ If any of the above is wrong, fix the Markdown source in `webapp/public/legal/pr
 The DSB reviews and may leave comments. Typical follow-ups:
 
 - *"Rechtsgrundlage zu konkretisieren"* — §7 already cites Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG for TUM Contributors and Art. 6(1)(b) for external Contributors. Point the reviewer there.
-- *"Löschkonzept fehlt"* — §13 plus the 14-day server-log cap (logrotate + Docker log driver), the account-deletion flow, and per-provider retention windows are the deletion concept.
+- *"Löschkonzept fehlt"* — §13 plus the size-bounded rolling server-log window (Docker `json-file` driver, ~250 MB per app service), the account-deletion flow, and per-provider retention windows are the deletion concept. Off-host backups are not currently in place, so no separate backup-deletion flow is required; if backups are introduced later, the application-level deletion log must be re-applied on restore.
 - *"Ist § 25 TDDDG relevant?"* — the privacy page already states that only Keycloak session cookies and the theme-preference localStorage key are used, both under § 25 Abs. 2 Nr. 2 TDDDG.
 - *"DSFA erforderlich"* — upgrade `02-dsfa-prescreen.md` to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate and names the conditions under which a full DPIA must be opened (see §6 of the pre-screen).
 - *"AVV-Vertrag für LLM-Provider"* — DPAs are maintained at TUM/AET level for the TUM-operated LLM tenancy; for credentials supplied by a workspace administrator's institution, the DPA is maintained at that institution's level (shared-responsibility model, §3.2 of the privacy page).
@@ -97,7 +98,7 @@ Check yearly:
 
 - Re-read this package; does anything disagree with deployed reality?
 - Has the app gained a new identity provider, a new source system, a new LLM provider, or activated the built-in Sentry/PostHog integrations? If yes, amend VVT + privacy page + AVV checklist before re-submitting.
-- Have log-retention, backup-retention, or LLM-provider retention windows changed?
+- Have log-retention caps, backup arrangements, or LLM-provider retention windows changed?
 - Has the AI-assisted feature surface grown to the point that a full DPIA (not just the pre-screen) is warranted?
 - Re-verify DPF certification status for each U.S. recipient against the U.S. Department of Commerce list.
 
