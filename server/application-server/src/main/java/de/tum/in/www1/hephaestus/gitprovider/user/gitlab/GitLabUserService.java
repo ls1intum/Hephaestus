@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.user.gitlab;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -83,36 +84,36 @@ public class GitLabUserService {
     }
 
     /**
-     * Finds or creates a user from GraphQL data (id, username, name, avatarUrl, webUrl).
+     * Finds or creates a user from GraphQL data.
      * <p>
      * {@code @Transactional} is required because the underlying {@code upsertUser} is a
-     * {@code @Modifying} native query.
+     * {@code @Modifying} native query. Callers with access to the {@code GitLabUserFields}
+     * GraphQL fragment should populate {@link GitLabUserLookup#publicEmail()} so that
+     * downstream commit-author resolution can match by email.
      */
     @Transactional
     @Nullable
-    public User findOrCreateUser(
-        String globalId,
-        String username,
-        @Nullable String name,
-        @Nullable String avatarUrl,
-        @Nullable String webUrl,
-        Long providerId
-    ) {
-        if (globalId == null || username == null) {
+    public User findOrCreateUser(GitLabUserLookup lookup, Long providerId) {
+        if (lookup == null || lookup.globalId() == null || lookup.username() == null) {
             return null;
         }
 
         long nativeId;
         try {
-            nativeId = GitLabSyncConstants.extractNumericId(globalId);
+            nativeId = GitLabSyncConstants.extractNumericId(lookup.globalId());
         } catch (IllegalArgumentException e) {
-            log.warn("Skipped user resolution: reason=invalidGlobalId, gid={}", globalId);
+            log.warn("Skipped user resolution: reason=invalidGlobalId, gid={}", lookup.globalId());
             return null;
         }
 
-        String resolvedName = name != null ? name : username;
-        String resolvedAvatarUrl = resolveAvatarUrl(avatarUrl);
-        String resolvedHtmlUrl = webUrl != null ? webUrl : (gitLabProperties.defaultServerUrl() + "/" + username);
+        String username = lookup.username();
+        String resolvedName = lookup.name() != null ? lookup.name() : username;
+        String resolvedAvatarUrl = resolveAvatarUrl(lookup.avatarUrl());
+        String resolvedHtmlUrl =
+            lookup.webUrl() != null ? lookup.webUrl() : (gitLabProperties.defaultServerUrl() + "/" + username);
+        String resolvedEmail = (lookup.publicEmail() != null && !lookup.publicEmail().isBlank())
+            ? lookup.publicEmail()
+            : null;
 
         userRepository.upsertUser(
             nativeId,
@@ -122,7 +123,7 @@ public class GitLabUserService {
             resolvedAvatarUrl,
             resolvedHtmlUrl,
             User.Type.USER.name(),
-            null, // email — not available from GraphQL
+            resolvedEmail,
             null, // createdAt — not in GraphQL user data
             null // updatedAt — not in GraphQL user data
         );

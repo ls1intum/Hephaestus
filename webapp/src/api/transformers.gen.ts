@@ -378,9 +378,7 @@ const profileReviewActivitySchemaResponseTransformer = (data: any) => {
     if (data.pullRequest) {
         data.pullRequest = pullRequestBaseInfoSchemaResponseTransformer(data.pullRequest);
     }
-    if (data.submittedAt) {
-        data.submittedAt = new Date(data.submittedAt);
-    }
+    data.submittedAt = new Date(data.submittedAt);
     return data;
 };
 
@@ -389,15 +387,9 @@ const profileSchemaResponseTransformer = (data: any) => {
     if (data.firstContribution) {
         data.firstContribution = new Date(data.firstContribution);
     }
-    if (data.openPullRequests) {
-        data.openPullRequests = data.openPullRequests.map((item: any) => pullRequestInfoSchemaResponseTransformer(item));
-    }
-    if (data.reviewActivity) {
-        data.reviewActivity = data.reviewActivity.map((item: any) => profileReviewActivitySchemaResponseTransformer(item));
-    }
-    if (data.reviewedPullRequests) {
-        data.reviewedPullRequests = data.reviewedPullRequests.map((item: any) => pullRequestInfoSchemaResponseTransformer(item));
-    }
+    data.openPullRequests = data.openPullRequests.map((item: any) => pullRequestInfoSchemaResponseTransformer(item));
+    data.reviewActivity = data.reviewActivity.map((item: any) => profileReviewActivitySchemaResponseTransformer(item));
+    data.reviewedPullRequests = data.reviewedPullRequests.map((item: any) => pullRequestInfoSchemaResponseTransformer(item));
     return data;
 };
 

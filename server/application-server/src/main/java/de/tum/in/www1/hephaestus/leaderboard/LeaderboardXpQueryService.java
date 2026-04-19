@@ -10,68 +10,34 @@ import de.tum.in.www1.hephaestus.activity.ActivityXpProjection;
 import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.profile.ProfilePullRequestQueryRepository;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Queries leaderboard XP data from the activity event ledger.
- *
- * <p>The leaderboard reads pre-computed XP from activity events rather than
- * recalculating on-the-fly. This is the <strong>single source of truth</strong> for XP.
- *
- * <p>Architecture:
- * <pre>
- * Domain Events → ActivityEventListener → ActivityEvent table (activity module)
- *                                                ↓
- *                        LeaderboardXpQueryService (this) ← LeaderboardService
- * </pre>
- *
- * <p><strong>Time range convention:</strong> All timeframe queries use half-open intervals
- * [since, until) - inclusive start, exclusive end. This ensures consistency across
- * the leaderboard module and prevents double-counting at interval boundaries.
- */
+/** Reads leaderboard XP totals and activity breakdowns from the activity event ledger. */
 @Service
+@RequiredArgsConstructor
 public class LeaderboardXpQueryService {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderboardXpQueryService.class);
 
     private final ActivityEventRepository activityEventRepository;
     private final UserRepository userRepository;
+    private final ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
 
-    public LeaderboardXpQueryService(ActivityEventRepository activityEventRepository, UserRepository userRepository) {
-        this.activityEventRepository = activityEventRepository;
-        this.userRepository = userRepository;
-    }
-
-    /**
-     * Get XP totals for all actors in a workspace timeframe.
-     *
-     * @param workspaceId the workspace
-     * @param since start of timeframe (inclusive)
-     * @param until end of timeframe (exclusive)
-     * @return map of actor ID to XP data
-     */
     @Transactional(readOnly = true)
     public Map<Long, LeaderboardUserXp> getLeaderboardData(Long workspaceId, Instant since, Instant until) {
         return getLeaderboardData(workspaceId, since, until, Set.of());
     }
 
-    /**
-     * Get XP totals for actors in specific teams.
-     *
-     * @param workspaceId the workspace
-     * @param since start of timeframe (inclusive)
-     * @param until end of timeframe (exclusive)
-     * @param teamIds team IDs to filter by (empty = all teams)
-     * @return map of actor ID to XP data
-     */
     @Transactional(readOnly = true)
     public Map<Long, LeaderboardUserXp> getLeaderboardData(
         Long workspaceId,
@@ -109,11 +75,67 @@ public class LeaderboardXpQueryService {
         Set<Long> actorIds = xpData.stream().map(ActivityXpProjection::getActorId).collect(toSet());
 
         // 3. Get activity breakdown by type
-        List<ActivityBreakdownProjection> breakdown = activityEventRepository.findActivityBreakdown(
-            workspaceId,
-            actorIds,
-            since,
-            until
+        List<ActivityBreakdownProjection> breakdown = teamIds.isEmpty()
+            ? activityEventRepository.findActivityBreakdown(workspaceId, actorIds, since, until)
+            : activityEventRepository.findActivityBreakdownByWorkspaceAndTeams(
+                  workspaceId,
+                  teamIds,
+                  actorIds,
+                  since,
+                  until
+              );
+
+        Map<Long, Long> ownPullRequestReplies = teamIds.isEmpty()
+            ? activityEventRepository.countOwnPullRequestRepliesByActors(workspaceId, actorIds, since, until)
+            : activityEventRepository.countOwnPullRequestRepliesByActorsAndTeams(
+                  workspaceId,
+                  teamIds,
+                  actorIds,
+                  since,
+                  until
+              );
+        Map<Long, Long> openPullRequests = toAuthorCountMap(
+            teamIds.isEmpty()
+                ? profilePullRequestQueryRepository.countOpenPullRequestsByAuthors(workspaceId, actorIds, since, until)
+                : profilePullRequestQueryRepository.countOpenPullRequestsByAuthorsAndTeams(
+                      workspaceId,
+                      teamIds,
+                      actorIds,
+                      since,
+                      until
+                  )
+        );
+        Map<Long, Long> mergedPullRequests = toAuthorCountMap(
+            teamIds.isEmpty()
+                ? profilePullRequestQueryRepository.countMergedPullRequestsByAuthors(
+                      workspaceId,
+                      actorIds,
+                      since,
+                      until
+                  )
+                : profilePullRequestQueryRepository.countMergedPullRequestsByAuthorsAndTeams(
+                      workspaceId,
+                      teamIds,
+                      actorIds,
+                      since,
+                      until
+                  )
+        );
+        Map<Long, Long> closedPullRequests = toAuthorCountMap(
+            teamIds.isEmpty()
+                ? profilePullRequestQueryRepository.countClosedPullRequestsByAuthors(
+                      workspaceId,
+                      actorIds,
+                      since,
+                      until
+                  )
+                : profilePullRequestQueryRepository.countClosedPullRequestsByAuthorsAndTeams(
+                      workspaceId,
+                      teamIds,
+                      actorIds,
+                      since,
+                      until
+                  )
         );
 
         // 4. Hydrate user data
@@ -155,22 +177,54 @@ public class LeaderboardXpQueryService {
                 case REVIEW_CHANGES_REQUESTED -> builder.addChangeRequests(count);
                 case REVIEW_COMMENTED -> builder.addComments(count);
                 case REVIEW_UNKNOWN -> builder.addUnknowns(count);
-                case COMMENT_CREATED -> builder.addIssueComments(count);
                 case REVIEW_COMMENT_CREATED -> builder.addCodeComments(count);
+                case ISSUE_CREATED -> builder.addOpenedIssues(count);
+                case ISSUE_CLOSED -> builder.addClosedIssues(count);
                 default -> {
                     // PR events and REVIEW_DISMISSED don't contribute to review stats
                 }
             }
         }
 
+        for (Map.Entry<Long, Long> entry : ownPullRequestReplies.entrySet()) {
+            LeaderboardUserXp.Builder builder = builders.get(entry.getKey());
+            if (builder != null) {
+                builder.addOwnReplies(entry.getValue().intValue());
+            }
+        }
+
+        for (Map.Entry<Long, Long> entry : openPullRequests.entrySet()) {
+            LeaderboardUserXp.Builder builder = builders.get(entry.getKey());
+            if (builder != null) {
+                builder.addOpenPullRequests(entry.getValue().intValue());
+            }
+        }
+
+        for (Map.Entry<Long, Long> entry : mergedPullRequests.entrySet()) {
+            LeaderboardUserXp.Builder builder = builders.get(entry.getKey());
+            if (builder != null) {
+                builder.addMergedPullRequests(entry.getValue().intValue());
+            }
+        }
+
+        for (Map.Entry<Long, Long> entry : closedPullRequests.entrySet()) {
+            LeaderboardUserXp.Builder builder = builders.get(entry.getKey());
+            if (builder != null) {
+                builder.addClosedPullRequests(entry.getValue().intValue());
+            }
+        }
+
         // 7. Query distinct PR counts per user from the reviews table
         // This counts DISTINCT PRs, not events (fixing numberOfReviewedPRs regression)
-        Map<Long, Long> distinctPrCountsByUser = activityEventRepository.countDistinctReviewedPullRequestsByActors(
-            workspaceId,
-            actorIds,
-            since,
-            until
-        );
+        Map<Long, Long> distinctPrCountsByUser = teamIds.isEmpty()
+            ? activityEventRepository.countDistinctReviewedPullRequestsByActors(workspaceId, actorIds, since, until)
+            : activityEventRepository.countDistinctReviewedPullRequestsByActorsAndTeams(
+                  workspaceId,
+                  teamIds,
+                  actorIds,
+                  since,
+                  until
+              );
 
         // Set the distinct PR counts on each builder
         for (Map.Entry<Long, LeaderboardUserXp.Builder> entry : builders.entrySet()) {
@@ -187,5 +241,16 @@ public class LeaderboardXpQueryService {
 
         log.debug("Built leaderboard data: workspaceId={}, userCount={}", workspaceId, result.size());
         return result;
+    }
+
+    private Map<Long, Long> toAuthorCountMap(List<ProfilePullRequestQueryRepository.AuthorCountProjection> counts) {
+        return counts
+            .stream()
+            .collect(
+                toMap(
+                    ProfilePullRequestQueryRepository.AuthorCountProjection::getAuthorId,
+                    ProfilePullRequestQueryRepository.AuthorCountProjection::getCount
+                )
+            );
     }
 }

@@ -159,9 +159,10 @@ public class LeaderboardService {
         // Add zero-score entries for team members without activity
         for (User member : allTeamMembers) {
             if (member.getId() != null && !activityData.containsKey(member.getId())) {
-                // New record signature: user, totalScore, eventCount, approvals, changeRequests,
-                // comments, unknowns, issueComments, codeComments, reviewedPrCount
-                activityData.put(member.getId(), new LeaderboardUserXp(member, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+                activityData.put(
+                    member.getId(),
+                    new LeaderboardUserXp(member, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+                );
             }
         }
 
@@ -256,12 +257,18 @@ public class LeaderboardService {
                 userDto,
                 null,
                 reviewedPullRequests,
-                data.reviewedPullRequestCount(),
+                data.reviewedPrCount(),
                 data.approvals(),
                 data.changeRequests(),
-                data.comments() + data.issueComments(),
-                data.unknowns(), // numberOfUnknowns - now properly tracked in activity events
-                data.codeComments()
+                data.comments(),
+                data.unknowns(),
+                data.codeComments(),
+                data.ownReplies(),
+                data.openPullRequests(),
+                data.mergedPullRequests(),
+                data.closedPullRequests(),
+                data.openedIssues(),
+                data.closedIssues()
             );
             result.add(entry);
         }
@@ -404,7 +411,13 @@ public class LeaderboardService {
                 stats.numberOfChangeRequests(),
                 stats.numberOfComments(),
                 stats.numberOfUnknowns(),
-                stats.numberOfCodeComments()
+                stats.numberOfCodeComments(),
+                stats.numberOfOwnReplies(),
+                stats.numberOfOpenPullRequests(),
+                stats.numberOfMergedPullRequests(),
+                stats.numberOfClosedPullRequests(),
+                stats.numberOfOpenedIssues(),
+                stats.numberOfClosedIssues()
             );
             result.add(entry);
         }
@@ -484,6 +497,18 @@ public class LeaderboardService {
         int numberOfComments = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfComments).sum();
         int numberOfUnknowns = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfUnknowns).sum();
         int numberOfCodeComments = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfCodeComments).sum();
+        int numberOfOwnReplies = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfOwnReplies).sum();
+        int numberOfOpenPullRequests = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfOpenPullRequests).sum();
+        int numberOfMergedPullRequests = entries
+            .stream()
+            .mapToInt(LeaderboardEntryDTO::numberOfMergedPullRequests)
+            .sum();
+        int numberOfClosedPullRequests = entries
+            .stream()
+            .mapToInt(LeaderboardEntryDTO::numberOfClosedPullRequests)
+            .sum();
+        int numberOfOpenedIssues = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfOpenedIssues).sum();
+        int numberOfClosedIssues = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfClosedIssues).sum();
 
         return new TeamStats(
             score,
@@ -494,7 +519,13 @@ public class LeaderboardService {
             numberOfChangeRequests,
             numberOfComments,
             numberOfUnknowns,
-            numberOfCodeComments
+            numberOfCodeComments,
+            numberOfOwnReplies,
+            numberOfOpenPullRequests,
+            numberOfMergedPullRequests,
+            numberOfClosedPullRequests,
+            numberOfOpenedIssues,
+            numberOfClosedIssues
         );
     }
 
@@ -507,6 +538,12 @@ public class LeaderboardService {
         int numberOfChangeRequests,
         int numberOfComments,
         int numberOfUnknowns,
-        int numberOfCodeComments
+        int numberOfCodeComments,
+        int numberOfOwnReplies,
+        int numberOfOpenPullRequests,
+        int numberOfMergedPullRequests,
+        int numberOfClosedPullRequests,
+        int numberOfOpenedIssues,
+        int numberOfClosedIssues
     ) {}
 }

@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
@@ -13,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +23,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -86,6 +88,7 @@ public class AchievementService {
 
     private final AchievementRegistry achievementRegistry;
     private final CacheManager cacheManager;
+    private final ObjectMapper objectMapper;
 
     /**
      * Strategy map: maps each evaluator's concrete class to its Spring-managed bean instance.
@@ -157,7 +160,7 @@ public class AchievementService {
      * @return list of newly unlocked achievement types (empty if none)
      */
     @Retryable(
-        retryFor = { ObjectOptimisticLockingFailureException.class, DataIntegrityViolationException.class },
+        retryFor = { ObjectOptimisticLockingFailureException.class },
         maxAttempts = 5,
         backoff = @Backoff(delay = 100, multiplier = 2.0, maxDelay = 2000)
     )
@@ -228,12 +231,98 @@ public class AchievementService {
             // Only persist if entity is new or progress actually changed
             boolean progressChanged = !uaProgress.getProgressData().equals(progressBefore);
             if (isNew || progressChanged || wasUnlocked) {
-                userAchievementRepository.save(uaProgress);
+                persistProgress(uaProgress, achievementDefinition, event, isNew);
                 evictAchievementCache(user.getId());
             }
         }
 
         return newlyUnlocked;
+    }
+
+    /**
+     * Persist a progress update.
+     *
+     * <p>For brand-new rows we go through a native
+     * {@code INSERT ... ON CONFLICT DO NOTHING} upsert so that two concurrent
+     * {@code AFTER_COMMIT} async listeners cannot race each other into a
+     * {@code uk_user_achievement_user_achievement} unique-constraint violation.
+     * When the upsert reports a conflict (row count {@code 0}) we re-fetch the
+     * winning row and re-apply the evaluator on top of it so this transaction's
+     * event still contributes its progress delta.
+     *
+     * <p>For existing rows we fall back to Hibernate's managed {@code save},
+     * which uses the {@code @Version} column for optimistic locking — the
+     * {@code @Retryable} on {@link #checkAndUnlock} handles those collisions.
+     */
+    private void persistProgress(
+        UserAchievement uaProgress,
+        AchievementDefinition definition,
+        ActivitySavedEvent event,
+        boolean isNew
+    ) {
+        if (!isNew) {
+            userAchievementRepository.save(uaProgress);
+            return;
+        }
+
+        if (uaProgress.getId() == null) {
+            uaProgress.setId(UUID.randomUUID());
+        }
+
+        String progressJson;
+        try {
+            progressJson = objectMapper.writeValueAsString(uaProgress.getProgressData());
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(
+                "Failed to serialize achievement progress for user=" +
+                    uaProgress.getUser().getId() +
+                    " achievement=" +
+                    uaProgress.getAchievementId(),
+                e
+            );
+        }
+
+        int inserted = userAchievementRepository.insertIfAbsent(
+            uaProgress.getId(),
+            uaProgress.getUser().getId(),
+            uaProgress.getAchievementId(),
+            progressJson,
+            uaProgress.getUnlockedAt()
+        );
+
+        if (inserted == 1) {
+            return;
+        }
+
+        // Another concurrent listener already inserted the row. Re-fetch it,
+        // re-apply this event's progress delta, and save normally.
+        log.debug(
+            "Concurrent insert detected for userId={} achievementId={} — re-applying progress on winning row",
+            uaProgress.getUser().getId(),
+            uaProgress.getAchievementId()
+        );
+        UserAchievement persisted = userAchievementRepository
+            .findByUserIdAndAchievementId(uaProgress.getUser().getId(), uaProgress.getAchievementId())
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "insertIfAbsent reported conflict but row is missing for userId=" +
+                        uaProgress.getUser().getId() +
+                        " achievementId=" +
+                        uaProgress.getAchievementId()
+                )
+            );
+
+        // If the winning row is already unlocked, nothing left to do.
+        if (persisted.getUnlockedAt() != null) {
+            return;
+        }
+
+        AchievementEvaluator evaluator = resolveEvaluator(definition);
+        boolean wasUnlocked = evaluator.updateProgress(persisted, event);
+        if (wasUnlocked) {
+            persisted.setUnlockedAt(event.occurredAt());
+        }
+        userAchievementRepository.save(persisted);
     }
 
     /**

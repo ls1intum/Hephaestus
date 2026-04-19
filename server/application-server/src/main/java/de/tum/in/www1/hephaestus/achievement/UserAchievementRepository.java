@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.achievement;
 
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -9,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -83,4 +85,53 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
     @Transactional
     @Query("DELETE FROM UserAchievement ua WHERE ua.user.id = :userId")
     void deleteByUserId(@Param("userId") Long userId);
+
+    /**
+     * Insert a new user-achievement progress row idempotently.
+     *
+     * <p>Uses Postgres {@code INSERT ... ON CONFLICT (user_id, achievement_id) DO NOTHING}
+     * so that two concurrent AFTER_COMMIT async listeners evaluating the same user +
+     * achievement cannot race each other into a unique-constraint violation on
+     * {@code uk_user_achievement_user_achievement}.
+     *
+     * <p>Callers must treat a return value of {@code 0} as "another transaction won
+     * the race" and re-fetch via {@link #findByUserIdAndAchievementId(Long, String)}
+     * to apply their own progress delta on top of the already-persisted row.
+     *
+     * <p>This method deliberately bypasses Hibernate's dirty-checking so that the
+     * SQL driver never surfaces a {@code DataIntegrityViolationException} that
+     * Hibernate would otherwise log at ERROR level before the caller can react.
+     *
+     * @param id the UUID to assign to the new row
+     * @param userId the owning user id
+     * @param achievementId the achievement definition id
+     * @param progressDataJson progress payload serialized as JSON (goes into {@code jsonb})
+     * @param unlockedAt unlock timestamp or {@code null} when still in-progress
+     * @return {@code 1} if the row was inserted, {@code 0} if a row for
+     *         {@code (user_id, achievement_id)} already existed
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        INSERT INTO user_achievement (id, user_id, achievement_id, progress_data, unlocked_at, version)
+        VALUES (
+            CAST(:id AS uuid),
+            :userId,
+            :achievementId,
+            CAST(:progressDataJson AS jsonb),
+            :unlockedAt,
+            0
+        )
+        ON CONFLICT ON CONSTRAINT uk_user_achievement_user_achievement DO NOTHING
+        """,
+        nativeQuery = true
+    )
+    int insertIfAbsent(
+        @Param("id") UUID id,
+        @Param("userId") Long userId,
+        @Param("achievementId") String achievementId,
+        @Param("progressDataJson") String progressDataJson,
+        @Param("unlockedAt") @Nullable Instant unlockedAt
+    );
 }

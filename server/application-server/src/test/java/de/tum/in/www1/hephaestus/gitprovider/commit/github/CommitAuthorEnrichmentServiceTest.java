@@ -10,17 +10,23 @@ import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 
 @DisplayName("CommitAuthorEnrichmentService")
 class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
@@ -43,6 +49,9 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     @Mock
     private GitHubUserProcessor userProcessor;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private CommitAuthorEnrichmentService service;
 
     @BeforeEach
@@ -53,7 +62,8 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             graphQlClientProvider,
             graphQlSyncCoordinator,
             exceptionClassifier,
-            userProcessor
+            userProcessor,
+            eventPublisher
         );
     }
 
@@ -69,7 +79,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L)).thenReturn(List.of());
             when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L)).thenReturn(List.of());
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L, null);
 
             assertThat(result).isEqualTo(0);
             verify(authorResolver, never()).resolveByEmail(any(), any());
@@ -93,7 +103,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(authorResolver.resolveByEmail(eq("author@example.com"), any())).thenReturn(42L);
             when(commitRepository.bulkUpdateAuthorIdByEmail("author@example.com", 1L, 42L)).thenReturn(2);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L, null);
 
             assertThat(result).isEqualTo(2);
             verify(commitRepository).bulkUpdateAuthorIdByEmail("author@example.com", 1L, 42L);
@@ -112,7 +122,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(authorResolver.resolveByEmail(eq("committer@example.com"), any())).thenReturn(99L);
             when(commitRepository.bulkUpdateCommitterIdByEmail("committer@example.com", 1L, 99L)).thenReturn(1);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L, null);
 
             assertThat(result).isEqualTo(1);
             verify(commitRepository).bulkUpdateCommitterIdByEmail("committer@example.com", 1L, 99L);
@@ -131,7 +141,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(authorResolver.resolveByEmail(eq("unknown@personal.com"), any())).thenReturn(null);
 
             // ScopeId is null so API pass is skipped
-            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L, null);
 
             assertThat(result).isEqualTo(0);
             verify(commitRepository, never()).bulkUpdateAuthorIdByEmail(any(), anyLong(), anyLong());
@@ -153,7 +163,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
 
             when(commitRepository.bulkUpdateAuthorIdByEmail("alice@example.com", 1L, 10L)).thenReturn(2);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L, null);
 
             assertThat(result).isEqualTo(2);
             // Alice's cluster updated, Bob's skipped
@@ -178,7 +188,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
 
             when(authorResolver.resolveByEmail(eq("unknown@personal.com"), any())).thenReturn(null);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L, null);
 
             assertThat(result).isEqualTo(0);
         }
@@ -203,7 +213,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(commitRepository.bulkUpdateAuthorIdByEmail("author@example.com", 1L, 10L)).thenReturn(1);
             when(commitRepository.bulkUpdateCommitterIdByEmail("committer@example.com", 1L, 20L)).thenReturn(1);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L, null);
 
             assertThat(result).isEqualTo(2);
             verify(commitRepository).bulkUpdateAuthorIdByEmail("author@example.com", 1L, 10L);
@@ -230,7 +240,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             // the GraphQL client, the API fetch will fail/return empty.
             // The service handles this gracefully — no crash, just 0 from API.
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L, null);
 
             // Only the email-resolved enrichment should count
             assertThat(result).isGreaterThanOrEqualTo(1);
@@ -255,7 +265,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(commitRepository.bulkUpdateAuthorIdByEmail("same@example.com", 1L, 10L)).thenReturn(1);
             when(commitRepository.bulkUpdateCommitterIdByEmail("same@example.com", 1L, 10L)).thenReturn(1);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L, null);
 
             assertThat(result).isEqualTo(2);
         }
@@ -274,7 +284,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             // Bulk update returns 0 (already resolved by concurrent process)
             when(commitRepository.bulkUpdateAuthorIdByEmail("author@example.com", 1L, 42L)).thenReturn(0);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L, null);
 
             assertThat(result).isEqualTo(0);
         }
@@ -293,7 +303,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             );
             when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L)).thenReturn(List.of());
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L, null);
 
             assertThat(result).isEqualTo(0);
             // Should never attempt to resolve the unresolvable email
@@ -308,7 +318,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
                 List.of("noreply@github.com")
             );
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L, 1L, null);
 
             assertThat(result).isEqualTo(0);
             verify(authorResolver, never()).resolveByEmail(eq("noreply@github.com"), any());
@@ -327,12 +337,63 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(authorResolver.resolveByEmail(eq("real@example.com"), any())).thenReturn(42L);
             when(commitRepository.bulkUpdateAuthorIdByEmail("real@example.com", 1L, 42L)).thenReturn(3);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L);
+            int result = service.enrichCommitAuthors(1L, "owner/repo", null, 1L, null);
 
             assertThat(result).isEqualTo(3);
             // noreply should be filtered, real email should be resolved
             verify(authorResolver, never()).resolveByEmail(eq("noreply@github.com"), any());
             verify(authorResolver).resolveByEmail(eq("real@example.com"), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("domain event publishing")
+    class DomainEventPublishing {
+
+        @Test
+        @DisplayName("publishes CommitAuthorsReconciled with GitHub RepositoryRef when enrichment occurs")
+        void shouldPublishReconciledEventWhenEnrichmentOccurs() {
+            Repository repository = new Repository();
+            repository.setId(1L);
+            repository.setNameWithOwner("owner/repo");
+            repository.setDefaultBranch("main");
+
+            when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
+                .thenReturn(List.of("author@example.com"))
+                .thenReturn(List.of());
+            when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L))
+                .thenReturn(List.of())
+                .thenReturn(List.of());
+            when(authorResolver.resolveByEmail(eq("author@example.com"), any())).thenReturn(42L);
+            when(commitRepository.bulkUpdateAuthorIdByEmail("author@example.com", 1L, 42L)).thenReturn(2);
+
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 7L, 1L, repository);
+
+            assertThat(result).isEqualTo(2);
+
+            ArgumentCaptor<DomainEvent.CommitAuthorsReconciled> captor = ArgumentCaptor.forClass(
+                DomainEvent.CommitAuthorsReconciled.class
+            );
+            verify(eventPublisher).publishEvent(captor.capture());
+            DomainEvent.CommitAuthorsReconciled event = captor.getValue();
+            Assertions.assertThat(event.repositoryId()).isEqualTo(1L);
+            Assertions.assertThat(event.context().providerType()).isEqualTo(GitProviderType.GITHUB);
+            Assertions.assertThat(event.context().scopeId()).isEqualTo(7L);
+            Assertions.assertThat(event.context().repository()).isNotNull();
+            Assertions.assertThat(event.context().repository().id()).isEqualTo(1L);
+            Assertions.assertThat(event.context().repository().nameWithOwner()).isEqualTo("owner/repo");
+        }
+
+        @Test
+        @DisplayName("does not publish CommitAuthorsReconciled when no commits were enriched")
+        void shouldNotPublishWhenNothingEnriched() {
+            when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L)).thenReturn(List.of());
+            when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L)).thenReturn(List.of());
+
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 7L, 1L, null);
+
+            assertThat(result).isEqualTo(0);
+            verify(eventPublisher, never()).publishEvent(any(DomainEvent.CommitAuthorsReconciled.class));
         }
     }
 }
