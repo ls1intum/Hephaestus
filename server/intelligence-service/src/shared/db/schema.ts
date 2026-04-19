@@ -510,7 +510,6 @@ export const discussion = pgTable(
 			name: "fk_discussion_provider",
 		}),
 		unique("uq_discussion_repo_number").on(table.number, table.repositoryId),
-		unique("uknlcwyn2relkgw95s8okgpkqrt").on(table.number, table.repositoryId),
 		unique("uk_discussion_answer_comment_id").on(table.answerCommentId),
 		unique("uq_discussion_provider_native_id").on(table.nativeId, table.providerId),
 	],
@@ -541,7 +540,6 @@ export const discussionCategory = pgTable(
 			name: "fk_discussion_category_repository",
 		}).onDelete("cascade"),
 		unique("uq_discussion_category_repo_slug").on(table.slug, table.repositoryId),
-		unique("uk6cjmvjyh5jc9bfnn8i9wggbo5").on(table.slug, table.repositoryId),
 	],
 );
 
@@ -1714,14 +1712,6 @@ export const pullRequestReviewComment = pgTable(
 			name: "fk_pr_review_comment_provider",
 		}),
 		unique("uq_pr_review_comment_provider_native_id").on(table.nativeId, table.providerId),
-		check(
-			"pull_request_review_comment_side_check",
-			sql`(side)::text = ANY ((ARRAY['LEFT'::character varying, 'RIGHT'::character varying, 'UNKNOWN'::character varying])::text[])`,
-		),
-		check(
-			"pull_request_review_comment_start_side_check",
-			sql`(start_side)::text = ANY ((ARRAY['LEFT'::character varying, 'RIGHT'::character varying, 'UNKNOWN'::character varying])::text[])`,
-		),
 	],
 );
 
