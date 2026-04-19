@@ -33,7 +33,7 @@ When you touch another REST controller:
 
 ### Shared advice for multiple controllers
 
-If controllers reuse the same exception hierarchy (e.g., Git provider controllers), point `@RestControllerAdvice` at the shared base package so every endpoint in that bounded context inherits the mapper. Keep advice classes focused—too many unrelated handlers in a single class become hard to maintain.
+If controllers reuse the same exception hierarchy (e.g., Git provider controllers), point `@RestControllerAdvice` at the shared base package so every endpoint in that bounded context inherits the mapper. Keep advice classes focused – too many unrelated handlers in a single class become hard to maintain.
 
 ## Validation errors deserve structure, too
 
