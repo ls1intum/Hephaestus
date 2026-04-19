@@ -5,7 +5,12 @@ vi.mock("@/environment", () => ({
 	default: { legal: { profile: "" } },
 }));
 
-import { LEGAL_PAGE_TITLES, type resolveLegalContent } from "@/lib/legal";
+import {
+	isSafeLegalHref,
+	isSafeLegalImageSrc,
+	LEGAL_PAGE_TITLES,
+	type resolveLegalContent,
+} from "@/lib/legal";
 import { LegalPage } from "./LegalPage";
 
 // Operator-supplied Markdown is untrusted. These fixtures inject every
@@ -74,14 +79,13 @@ describe("LegalPage — XSS guardrail", () => {
 		expect(anchors.length).toBeGreaterThan(0);
 		for (const a of anchors) {
 			const href = a.getAttribute("href") ?? "";
-			expect(/^(?:https?:|mailto:|tel:|#|\/)/i.test(href)).toBe(true);
+			expect({ href, safe: isSafeLegalHref(href) }).toEqual({ href, safe: true });
 		}
 
 		const images = Array.from(article.querySelectorAll("img"));
 		for (const img of images) {
 			const src = img.getAttribute("src") ?? "";
-			expect(src.startsWith("data:")).toBe(false);
-			expect(/^(?:https?:|\/)/i.test(src)).toBe(true);
+			expect({ src, safe: isSafeLegalImageSrc(src) }).toEqual({ src, safe: true });
 		}
 
 		// Markdown titles (`[x](u "title")`, `![x](u "title")`) are a UI-spoof

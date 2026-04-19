@@ -5,13 +5,13 @@ title: DSMS Submission Package
 description: Art. 30 GDPR / Verarbeitungstätigkeit record for the TUM-operated Hephaestus deployment.
 ---
 
-# Hephaestus — DSMS Submission Package
+*Last updated: 2026-04-19.*
 
-This directory is the complete record-of-processing (Art. 30 GDPR / "Verarbeitungstätigkeit") package for the TUM-operated Hephaestus deployment at `https://hephaestus.aet.cit.tum.de`. Submit it through the TUM DSMS at **[https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/)** (reachable from MWN / eduVPN with TUM login).
+This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis von Verarbeitungstätigkeiten", VVT) package for the TUM-operated Hephaestus deployment at `https://hephaestus.aet.cit.tum.de`. Submit it through the TUM DSMS at **[https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/)** (reachable from MWN / eduVPN with TUM login).
 
 ## Scope
 
-Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and optionally engages external processors configured per workspace: LLM providers (OpenAI / Microsoft Azure OpenAI / Anthropic), Slack, and the TUM SMTP relay. Server access logs contain IP addresses and are rotated with a hard 14-day maximum.
+Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external and internal processors: LLM providers configured per workspace (OpenAI / Microsoft Azure OpenAI / Anthropic), Slack (when enabled per workspace), the TUM SMTP relay, the AET-operated self-hosted Sentry instance for error telemetry, and — only where `POSTHOG_ENABLED=true` for the deployment and the Contributor has not withdrawn their research-participation consent — PostHog product analytics. Server access logs contain IP addresses and are rotated with a hard 14-day maximum under logrotate + the Docker `json-file` log driver.
 
 ## Contents
 
@@ -19,10 +19,10 @@ Hephaestus is a practice-aware guidance platform for software projects, operated
 |---|---|
 | [`README.md`](./README.md) | This file |
 | [`SUBMISSION-GUIDE.md`](./SUBMISSION-GUIDE.md) | Ordered submission procedure |
-| [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) | DPIA pre-check (Art. 35 GDPR) — concludes DPIA-light is warranted and may upgrade if the AI surface grows |
-| [`03-vt-dsms.md`](./03-vt-dsms.md) | Copy-paste VT answers for the DSMS form |
+| [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) | DPIA pre-check (Art. 35 GDPR) — records the DPIA-light posture and the conditions that would require a full DPIA |
+| [`03-vt-dsms.md`](./03-vt-dsms.md) | Copy-paste VVT answers for the DSMS form |
 | [`04-toms.md`](./04-toms.md) | Technical and Organizational Measures (Art. 32 GDPR) |
-| [`05-avv-checklist.md`](./05-avv-checklist.md) | Art. 28 processor checklist — lists every external recipient and its AVV status |
+| [`05-avv-checklist.md`](./05-avv-checklist.md) | Art. 28 processor checklist — every external and internal recipient and its AVV status |
 
 The live imprint and privacy pages are served at:
 
@@ -31,34 +31,31 @@ The live imprint and privacy pages are served at:
 
 Markdown source lives under [`webapp/public/legal/profiles/tumaet/`](https://github.com/ls1intum/Hephaestus/tree/main/webapp/public/legal/profiles/tumaet).
 
-## Why Hephaestus is broader than Apollon
+## Summary of the processing surface
 
-| Concern | Apollon | Helios | Hephaestus |
-|---|---|---|---|
-| Authentication | none | GitHub OAuth | Keycloak (GitHub + gitlab.lrz.de) |
-| Third-party processors | none | GitHub, Sentry (self-hosted) | GitHub, LLM providers (OpenAI / Azure OpenAI / Anthropic), Slack, SMTP |
-| Special category data | none | none | none |
-| AI / profiling | none | none | LLM-assisted guidance and automated practice review |
-| Retention of user content | 120-day Redis TTL | account lifetime | account lifetime |
-| DPIA required? | No | No | **DPIA-light (may upgrade)** |
-
-Hephaestus carries the largest processing surface of the three ls1intum services. The VT is more involved, the AVV checklist is non-empty, and the DPIA pre-check concludes that a DPIA-light is warranted; a full DPIA is not required at the current scope but should be reconsidered if the AI surface expands (e.g. additional LLM providers, new data categories, deeper profiling).
+- Federated identities via Keycloak (GitHub OAuth + gitlab.lrz.de OIDC).
+- Repository synchronisation from GitHub and gitlab.lrz.de into workspace-scoped datasets.
+- AI-assisted guidance and automated practice review calling a workspace-configured LLM provider under enterprise no-training terms.
+- Engagement and recognition features (leaderboards, leagues, achievements) gated per workspace.
+- Internal self-hosted error telemetry (Sentry on TUM infrastructure) and optional product analytics (PostHog) gated by the Contributor's research-participation switch in profile settings.
+- No special-category data (Art. 9 GDPR). No Art. 22 automated decision-making.
+- Residual elevated risk on the AI-assisted feature surface is covered by the BayLfD innovative-technology criterion and the mitigations documented in `02-dsfa-prescreen.md` §5.
 
 ## Annual refresh
 
-Re-review the VT once per year:
+Re-review the VVT once per year:
 
 - Has the deployed stack changed? (new processor, new data category, new retention window?)
-- Has the platform added a new LLM provider or a new source system? Any of these requires an amended VT, an amended privacy page, and a new row in the AVV checklist.
-- Are the retention figures in `03-vt-dsms.md` still matching the deployed config (server-log rotation, LLM provider retention windows, Redis / Postgres / Keycloak backup schedules)?
-- Has the scope of AI-assisted features grown to the point that the DPIA pre-screen in `02-dsfa-prescreen.md` needs to upgrade to a full DPIA under the BayLfD template?
+- Has the platform added a new LLM provider or a new source system? Any of these requires an amended VVT, an amended privacy page, and a new row in the AVV checklist.
+- Are the retention figures in `03-vt-dsms.md` still matching the deployed config (server-log rotation, PostgreSQL / Keycloak backup schedules, LLM provider retention windows, Sentry event retention, PostHog event retention where enabled)?
+- Has the scope of AI-assisted features grown to the point that the DPIA pre-screen in `02-dsfa-prescreen.md` must be upgraded to a full DPIA under the BayLfD template?
 
 ## Emergency — DSB rejection
 
 The DSB may comment in DSMS. Typical follow-ups and responses:
 
-- *"Rechtsgrundlage zu konkretisieren"* → §7 of the VT cites Art. 6(1)(e) GDPR + Art. 4 BayHIG + Art. 25 BayDSG for TUM members, and Art. 6(1)(b) GDPR for non-TUM Contributors. Point them there.
-- *"Löschkonzept fehlt"* → §13 of the VT lists retention per category, including account deletion flows and the hard 14-day server-log cap.
+- *"Rechtsgrundlage zu konkretisieren"* → §7 of the VVT cites Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG for TUM Contributors, and Art. 6(1)(b) GDPR for non-TUM Contributors. Point them there.
+- *"Löschkonzept fehlt"* → §13 of the VVT lists retention per category, including the account-deletion flow and the hard 14-day server-log cap.
 - *"AVV fehlt für X"* → see [`05-avv-checklist.md`](./05-avv-checklist.md) for the per-processor DPA status.
 - *"DSFA erforderlich"* → upgrade [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate.
 

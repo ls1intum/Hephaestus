@@ -39,6 +39,20 @@ describe("legal content layout", () => {
 		}
 	});
 
+	// Byte-count checks prove *something* shipped but not that the fallback
+	// text carries the statutory basis visitors and auditors are looking for.
+	// Pin the actual obligation markers so any future simplification that
+	// drops them fails loudly.
+	it("disclaimer imprint cites § 5 DDG as the triggering obligation", () => {
+		expect(disclaimerImprint).toContain("§ 5 DDG");
+	});
+
+	it("disclaimer privacy cites Art. 13 and Art. 14 GDPR and names the controller", () => {
+		expect(disclaimerPrivacy).toContain("Art. 13");
+		expect(disclaimerPrivacy).toContain("Art. 14");
+		expect(disclaimerPrivacy).toContain("Art. 4(7)");
+	});
+
 	it("ships imprint and privacy for the tumaet profile", () => {
 		for (const [name, body] of Object.entries(TUMAET_PROFILE)) {
 			expect(body.length, name).toBeGreaterThan(500);

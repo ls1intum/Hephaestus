@@ -1,50 +1,51 @@
 ---
 id: submission-guide
 title: DSMS Submission Guide
-description: Step-by-step procedure for submitting the Hephaestus VT through the TUM DSMS.
+description: Step-by-step procedure for submitting the Hephaestus VVT through the TUM DSMS.
 ---
 
-# Hephaestus — DSMS Submission Guide
+*Last updated: 2026-04-19.*
 
 Follow these steps in order. Target: [https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/) (log in via Shibboleth on MWN / eduVPN).
 
 ## Phase 0 — Prep (15 min)
 
 1. Open `03-vt-dsms.md` alongside this guide.
-2. Confirm the deployment-dependent figures match reality:
-   - Server / reverse-proxy log rotation and retention on the VM (`hephaestus-prod.aet.cit.tum.de`). The current baseline is a **14-day hard maximum** — verify the live `docker` and host-level log-rotation config. Adjust §13 if different.
-   - Database (PostgreSQL) and Keycloak backup schedule and retention — verify against the actual AET backup jobs and update §13 if different.
-   - LLM provider retention windows in place for each workspace's configured provider (default: 30-day enterprise abuse-monitoring for OpenAI/Azure/Anthropic unless Zero Data Retention has been negotiated).
-   - Which LLM providers are enabled in production (workspace administrators may have disabled some). §11 of the VT lists all three; trim if a provider has been removed.
+2. Re-confirm the deployment-dependent figures against production before submission. Each of these is already pinned in `03-vt-dsms.md` §13 — the phase-0 check is that the deployment has not drifted:
+   - Server / reverse-proxy log rotation at the 14-day hard maximum (`logrotate` + Docker `json-file` log driver on `hephaestus-prod.aet.cit.tum.de`).
+   - PostgreSQL and Keycloak backup jobs at 30-day rolling retention on the AET backup host.
+   - LLM providers enabled in production and, for each, whether Zero Data Retention is in effect.
+   - Self-hosted Sentry active at `sentry.ase.in.tum.de`, event retention at the Sentry default of 90 days.
+   - `POSTHOG_ENABLED` value for the deployment; if enabled, confirm the research-consent gate is honoured at the client.
 3. Have at hand: TUM login + edit access on the Hephaestus repo (for privacy-page updates).
 
-## Phase 1 — Ship the privacy page (done, but re-verify)
+## Phase 1 — Ship the privacy page
 
 The live privacy page is at [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy). Open it and confirm:
 
 - Controller identified as **TUM + Prof. Krusche (AET)**, with operational contact `ls1.admin@in.tum.de`.
 - DPO: **[beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)**.
-- §3.1 names **gitlab.lrz.de / Leibniz-Rechenzentrum der BAdW** as a separate controller under the § 16 BayHIG public-body cooperation framing, **not** an Art. 28 processor.
-- §3.2 documents the shared-responsibility model (workspace admin configures LLM credentials, Slack, leaderboards, practice catalog, auto-trigger).
-- §4 lists: identity + authentication, development activity (GitHub + gitlab.lrz.de), account settings + recognition, AI-assisted features, server logs (14-day cap).
-- §6 lists every external processor: GitHub, LLM provider per workspace (OpenAI / Azure OpenAI / Anthropic), Slack, TUM SMTP relay.
-- §7 covers third-country transfers under DPF + SCC fall-back.
-- Legal basis table: **Art. 6(1)(e) GDPR + Art. 4 BayHIG + Art. 25 BayDSG** for TUM Contributors; **Art. 6(1)(b) GDPR** for non-TUM Contributors; **Art. 6(1)(a) GDPR** for the optional notification email.
-- Cookies section names only Keycloak session cookies and the theme-preference localStorage key under **§ 25(2) Nr. 2 TDDDG**.
-- Complaint authority: **Bayerischer Landesbeauftragter für den Datenschutz (BayLfD)**.
+- §3.1 names **gitlab.lrz.de / Leibniz-Rechenzentrum der BAdW** as a separate controller under the Art. 16 Abs. 1 Satz 2 BayHIG public-body cooperation framing, **not** an Art. 28 processor.
+- §3.2 documents the shared-responsibility model (workspace admin configures LLM credentials, Slack, leaderboards, practice catalog, auto-trigger) with the Art. 26(2) Satz 1 duty allocation.
+- §4 lists: identity + authentication, development activity (GitHub + gitlab.lrz.de), account settings + recognition + consent switches, AI-assisted features, server logs (14-day cap), self-hosted error telemetry, research-consent-gated product analytics.
+- §6 lists every recipient: GitHub, LLM provider per workspace (OpenAI / Azure OpenAI / Anthropic), Slack, TUM SMTP relay, AET-operated self-hosted Sentry, PostHog (deployment-gated + consent-gated).
+- §7 covers third-country transfers under DPF + SCCs Module 2 fall-back.
+- Legal basis table: **Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG** for TUM Contributors; **Art. 6(1)(b) GDPR** for non-TUM Contributors; **Art. 6(1)(a) GDPR** for consent-gated product analytics.
+- Cookies section names only Keycloak session cookies and the theme-preference localStorage key under **§ 25 Abs. 2 Nr. 2 TDDDG**.
+- Complaint authority: **Der Bayerische Landesbeauftragte für den Datenschutz (BayLfD)**.
 
 If any of the above is wrong, fix the Markdown source in `webapp/public/legal/profiles/tumaet/privacy.md` first.
 
-## Phase 2 — Create the VT in DSMS (45 min)
+## Phase 2 — Create the VVT in DSMS (45 min)
 
 1. Log in at [https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/).
 2. Click **Create new PA**.
 3. Copy **Title** and **Description and Purpose** from `03-vt-dsms.md` ("Step 1" block).
 4. Select **Category**: `Administration / Teaching / Other`.
 5. Click **Save**. DSMS redirects to the follow-up questionnaire.
-6. Fill each follow-up field by copy-pasting from `03-vt-dsms.md` ("Step 2" block, §1 – §21). DSMS-label mapping:
+6. Fill each follow-up field by copy-pasting from `03-vt-dsms.md` ("Step 2" block, §1 – §23). DSMS-label mapping:
 
-   | DSMS field | VT section |
+   | DSMS field | VVT section |
    |---|---|
    | Responsible unit / Fachabteilung | §1 |
    | Joint controllers | §2 |
@@ -67,6 +68,8 @@ If any of the above is wrong, fix the Markdown source in `webapp/public/legal/pr
    | IT-Sicherheit | §19 |
    | Datenquelle | §20 |
    | Kontakt Betroffenenrechte | §21 |
+   | Anlagen | §22 (upload privacy PDF, pre-screen, TOMs, AVV checklist) |
+   | Status | §23 (set to Submitted) |
 
 7. Upload attachments listed in §22:
    - Privacy statement snapshot (export [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy) as PDF).
@@ -81,10 +84,10 @@ If any of the above is wrong, fix the Markdown source in `webapp/public/legal/pr
 
 The DSB reviews and may leave comments. Typical follow-ups:
 
-- *"Rechtsgrundlage zu konkretisieren"* — §7 already cites Art. 6(1)(e) GDPR + BayHIG + BayDSG for TUM members and Art. 6(1)(b) for external Contributors. Point reviewer there.
-- *"Löschkonzept fehlt"* — §13 plus the 14-day server-log cap, the account-deletion flow, and per-provider retention windows are the deletion concept.
-- *"Ist § 25 TDDDG relevant?"* — the privacy page already states that only Keycloak session cookies and the theme-preference localStorage key are used, both under § 25(2) Nr. 2 TDDDG.
-- *"DSFA erforderlich"* — upgrade `02-dsfa-prescreen.md` to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate.
+- *"Rechtsgrundlage zu konkretisieren"* — §7 already cites Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG for TUM Contributors and Art. 6(1)(b) for external Contributors. Point the reviewer there.
+- *"Löschkonzept fehlt"* — §13 plus the 14-day server-log cap (logrotate + Docker log driver), the account-deletion flow, and per-provider retention windows are the deletion concept.
+- *"Ist § 25 TDDDG relevant?"* — the privacy page already states that only Keycloak session cookies and the theme-preference localStorage key are used, both under § 25 Abs. 2 Nr. 2 TDDDG.
+- *"DSFA erforderlich"* — upgrade `02-dsfa-prescreen.md` to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate and names the conditions under which a full DPIA must be opened (see §6 of the pre-screen).
 - *"AVV-Vertrag für LLM-Provider"* — DPAs are maintained at TUM/AET level for the TUM-operated LLM tenancy; for credentials supplied by a workspace administrator's institution, the DPA is maintained at that institution's level (shared-responsibility model, §3.2 of the privacy page).
 
 Status progression: Draft → Submitted → Precheck Done → Ready for DPO approval → Approved.
@@ -94,13 +97,14 @@ Status progression: Draft → Submitted → Precheck Done → Ready for DPO appr
 Check yearly:
 
 - Re-read this package; does anything disagree with deployed reality?
-- Has the app gained a new identity provider, a new source system, a new LLM provider, or new analytics? If yes, amend VT + privacy page before re-submitting.
-- Have log-retention, backup-retention, or LLM-provider retention windows changed?
+- Has the app gained a new identity provider, a new source system, a new LLM provider, or new analytics? If yes, amend VVT + privacy page before re-submitting.
+- Have log-retention, backup-retention, LLM-provider retention windows, Sentry event retention, or PostHog event retention changed?
 - Has the AI-assisted feature surface grown to the point that a full DPIA (not just the pre-screen) is warranted?
+- Re-verify DPF certification status for each U.S. recipient against the U.S. Department of Commerce list.
 
 ## Emergency — DSB rejects
 
-If the DSB rejects the VT:
+If the DSB rejects the VVT:
 
 1. Export their DSMS comments.
 2. Update `03-vt-dsms.md` and — if the substance changed — the privacy-page Markdown under `webapp/public/legal/profiles/tumaet/`.

@@ -43,16 +43,23 @@ Use of the platform requires authentication through a self-hosted identity-manag
 Hephaestus synchronises repository *Events* and *Artifacts* from source-control platforms configured by the workspace administrator. The source systems integrated at the platform level are:
 
 - **GitHub** (github.com, operated by GitHub, Inc. / Microsoft Corp.) — used both as a federated identity provider (OAuth) and as a source system for workspaces whose repositories are hosted on GitHub.
-- **gitlab.lrz.de** — the GitLab instance operated by the **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** (Boltzmannstraße 1, 85748 Garching), used by TUM courses and research groups that host their repositories on the LRZ infrastructure. Hephaestus integrates gitlab.lrz.de both as a federated identity provider (OpenID Connect) and as a source system. The LRZ is the scientific computing centre of the BAdW and is the regular IT service provider for TUM and LMU under § 16 Abs. 1 Satz 2 BayHIG in conjunction with the BAdW-Satzung. For data-protection questions concerning the LRZ infrastructure, the LRZ Data Protection Officer is reachable at [datenschutz@lrz.de](mailto:datenschutz@lrz.de). The LRZ GitLab terms of use cover instructional use and non-commercial academic research, which is the purpose for which Hephaestus processes gitlab.lrz.de data. LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; the relationship is a public-body cooperation under § 16 Abs. 1 Satz 2 BayHIG and the BAdW-Satzung and is not an Art. 28 GDPR commission; Art. 26 GDPR does not apply because the two bodies do not jointly determine the purposes and means.
+- **gitlab.lrz.de** — the GitLab instance operated by the **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** (Boltzmannstraße 1, 85748 Garching), used by TUM courses and research groups that host their repositories on the LRZ infrastructure. Hephaestus integrates gitlab.lrz.de both as a federated identity provider (OpenID Connect) and as a source system. The LRZ is the scientific computing centre of the BAdW and is the regular IT service provider for TUM and LMU under Art. 16 Abs. 1 Satz 2 BayHIG in conjunction with the BAdW-Satzung. For data-protection questions concerning the LRZ infrastructure, the LRZ Data Protection Officer is reachable at [datenschutz@lrz.de](mailto:datenschutz@lrz.de). The LRZ GitLab terms of use cover instructional use and non-commercial academic research, which is the purpose for which Hephaestus processes gitlab.lrz.de data. LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; the relationship is a public-body cooperation under Art. 16 Abs. 1 Satz 2 BayHIG and the BAdW-Satzung and is not an Art. 28 GDPR commission; Art. 26 GDPR does not apply because the two bodies do not jointly determine the purposes and means.
 
 ### 3.2 Workspace-configurable integrations (shared-responsibility model)
 
 Hephaestus operates a **shared-responsibility model** in which TUM/AET operates the platform layer and each workspace administrator configures a limited set of external integrations for their own workspace:
 
-- **TUM / AET** operates the Hephaestus platform itself — the orchestrator, the PostgreSQL database, the Keycloak realm, the practice-review sandbox, access control, backups, incident response, and the present privacy statement.
+- **TUM / AET** operates the Hephaestus platform itself — the orchestrator, the PostgreSQL database, the Keycloak realm, the practice-review sandbox, access control, backups, self-hosted error telemetry, incident response, and the present privacy statement.
 - **The workspace administrator** (typically a TUM chair, lecturer, or research-group lead) decides, for their own workspace, (i) which Git repositories are synchronised into the workspace (the data population), (ii) which LLM provider and which credentials are used by the workspace's AI-assisted features, (iii) whether workspace notifications are routed to Slack (engaging Salesforce/Slack as a further processor), (iv) whether leaderboards, leagues and achievements are enabled for peer visibility, (v) the workspace's Practice catalog — the set of practices against which Artifacts are evaluated, and (vi) whether practice reviews are auto-triggered on new pull/merge requests.
 
-In respect of these six decisions, TUM and the workspace administrator jointly determine the purposes and means within the meaning of Art. 26 GDPR. The present section 3.2 constitutes the essence of the joint-controllership arrangement made available to the data subject pursuant to Art. 26(2) Satz 2 GDPR. TUM/AET is the single point of contact for data-subject rights (see §2 and §9); Contributors may nevertheless also address the workspace administrator directly, in particular for questions about the workspace-specific configuration. Where the workspace administrator's institution supplies the LLM API credentials, that institution is the controller for the transmission to the LLM provider and maintains any Art. 28 GDPR processing agreement with the provider; TUM is not the controller for that transmission.
+In respect of these six decisions, TUM and the workspace administrator jointly determine the purposes and means within the meaning of Art. 26 GDPR. The present section 3.2 constitutes the essence of the joint-controllership arrangement made available to the data subject pursuant to Art. 26(2) Satz 2 GDPR.
+
+**Allocation of data-protection duties pursuant to Art. 26(2) Satz 1 GDPR:**
+
+- **TUM/AET** is responsible for information duties under Art. 13/14 GDPR (via this privacy statement), platform-level TOMs under Art. 32 GDPR, breach notification under Art. 33/34 GDPR, the DPIA posture under Art. 35 GDPR, and the record of processing under Art. 30 GDPR. TUM/AET is the single point of contact for data-subject rights (see §2 and §9).
+- **The workspace administrator** is responsible for ensuring that the source-system authorisation (GitHub App installation, GitHub personal-access token, or gitlab.lrz.de personal-access token plus webhook shared secret) has been obtained lawfully, that Contributors of the workspace have been informed that their repository Artifacts are being ingested into Hephaestus, that any LLM-provider credentials supplied by their own institution are backed by a processing agreement maintained at that institution's level (with TUM not being the controller for that onward transmission), and for the substantive scoping of Practices, recognition features, Slack routing, and auto-trigger in their workspace.
+
+Contributors may nevertheless also address the workspace administrator directly, in particular for questions about the workspace-specific configuration.
 
 ## 4. Data We Collect and Process
 
@@ -101,20 +108,22 @@ Hephaestus synchronizes development activity from Git repositories configured in
 
 **Retention:** synchronized data is retained for as long as the corresponding workspace and repository are configured on the platform. When a repository or workspace is removed, the associated data is deleted. Source-side content on GitHub or gitlab.lrz.de is *not* deleted by this action and remains subject to the source platform's own retention rules.
 
-### 4.3 Account settings, notification email, and engagement & recognition
+### 4.3 Account settings, engagement & recognition, and consent switches
 
 Hephaestus stores account settings and derives engagement & recognition signals from your development activity, including:
 
 - User preferences (notification preferences, UI display options)
-- Optional notification email address (if you configure notifications, you may provide an email address separately from your GitHub email)
 - Workspace memberships and roles
 - Recognition signals: rank on the weekly leaderboard, league assignment, achievement progress (workspace-opt-in)
+- Two per-account switches:
+  - **"AI review comments"** — your Art. 21 GDPR objection switch against AI-assisted processing of your Artifacts (see §4.4).
+  - **"Participate in research"** — your Art. 6(1)(a) GDPR consent switch for product-analytics processing (see §4.7). The switch can be withdrawn at any time in your profile settings (Art. 7(3) GDPR).
 
 Recognition signals are visible to other members of the same workspace and update as activity syncs. Summaries (username and rank) may be shared via configured notification channels (e.g. a workspace Slack digest) when the workspace administrator enables them.
 
-**Purpose:** personalized guidance surfaces, workspace engagement & recognition, and notifications.
+**Purpose:** personalised guidance surfaces, workspace engagement & recognition, notifications, and honouring your consent/objection switches.
 
-**Legal basis:** Art. 6(1)(e) GDPR in conjunction with Art. 4 Satz 1 BayHIG and Art. 25 Abs. 1 BayDSG for the workspace engagement & recognition features and for workspace-level Slack digests that the workspace administrator has enabled; Art. 6(1)(a) GDPR (consent) for the optional individual notification email address that you enter into your profile (opt-in by affirmative action; revocable at any time in your profile settings).
+**Legal basis:** Art. 6(1)(e) GDPR in conjunction with Art. 4 Satz 1 BayHIG and Art. 25 Abs. 1 BayDSG for the workspace engagement & recognition features and for workspace-level Slack digests that the workspace administrator has enabled.
 
 **Retention:** for as long as your account exists. You may delete your account at any time (see Section 9).
 
@@ -153,9 +162,34 @@ Every time the platform is accessed, our web servers and reverse proxy automatic
 
 **Purpose:** operation and security of the platform, including the detection and prevention of attacks.
 
-**Legal basis:** Art. 6(1)(e) GDPR in conjunction with Art. 4 Satz 1 BayHIG, Art. 25 Abs. 1 BayDSG and § 8 BayDiG (security of the university IT system as part of the public task).
+**Legal basis:** Art. 6(1)(e) GDPR in conjunction with Art. 4 Satz 1 BayHIG, Art. 25 Abs. 1 BayDSG and Art. 8 BayDiG (security of the university IT system as part of the public task).
 
-**Retention:** log files are rotated based on file-size limits (up to 250 MB per service) and are subject to a host-side retention configuration operated by AET with a **hard maximum of 14 days** under normal operating conditions. Logs containing an IP address are retained beyond this window only where strictly necessary to investigate a specific, ongoing security incident, and are then deleted as soon as the incident is closed. Logs are not merged with other data sources and are only accessible to AET operators.
+**Retention:** log rotation is enforced jointly by `logrotate` on the container host (daily rotation with `rotate 14`, maximum one file per day) and by the Docker `json-file` log driver (`max-size=10m`, `max-file=14`), yielding a **hard maximum of 14 days** under normal operating conditions. Logs containing an IP address are retained beyond this window only where strictly necessary to investigate a specific, ongoing security incident, and are then deleted as soon as the incident is closed. Logs are not merged with other data sources and are only accessible to AET operators.
+
+### 4.6 Error telemetry (self-hosted Sentry)
+
+To diagnose client-side and server-side faults, Hephaestus reports runtime errors to a **self-hosted Sentry instance operated by AET at `sentry.ase.in.tum.de`** on TUM infrastructure. Error events include stack traces, preceding user-interaction breadcrumbs, browser/OS environment, and — because the default Sentry PII mode is active for this deployment — the Keycloak user ID and the IP address of the affected Contributor. Sentry is not shared with any third party; only AET operators have access.
+
+**Purpose:** diagnosing and correcting faults in the platform; safeguarding operability and security.
+
+**Legal basis:** Art. 6(1)(e) GDPR in conjunction with Art. 4 Satz 1 BayHIG, Art. 25 Abs. 1 BayDSG and Art. 8 BayDiG (operation and security of a university IT service).
+
+**Retention:** 90 days at the event level (Sentry default). Resolved issues can be deleted at any time at operator request.
+
+### 4.7 Product analytics (PostHog, optional and consent-gated)
+
+To inform platform improvements, Hephaestus can emit anonymised page-view and feature-usage events to **PostHog Inc.** Two cumulative preconditions apply:
+
+1. The deployment operator has set `POSTHOG_ENABLED=true` for this Hephaestus installation. If the flag is unset or `false`, **no** analytics events are sent, regardless of any user setting.
+2. You have not withdrawn your consent via the **"Participate in research"** switch in your profile settings (see §4.3). The switch defaults to active. You can withdraw at any time; withdrawal stops further events at the client.
+
+When both preconditions are met, the following data is transmitted to PostHog: your Keycloak user ID, event type and properties (page path, feature name), platform/browser metadata, and IP address.
+
+**Purpose:** product analytics to inform platform improvements.
+
+**Legal basis:** Art. 6(1)(a) GDPR (consent). Withdrawal under Art. 7(3) GDPR is honoured at any time via the profile switch; withdrawal does not affect the lawfulness of processing performed before the withdrawal.
+
+**Retention:** PostHog retains events for 7 years at the provider default. After your consent withdrawal, no new events are transmitted; an erasure request to the TUM DPO can trigger retroactive deletion at PostHog where technically feasible.
 
 ## 5. Cookies and Browser-Side Storage
 
@@ -172,25 +206,28 @@ Your personal data may be accessible to the following recipients in connection w
 
 - **AET team members** — platform administrators and developers (operation, maintenance, support).
 - **Workspace members** — other members of workspaces you belong to can see your username, avatar, the *Findings* attached to pull/merge requests you authored within that workspace, per-practice *Finding* rollups about you on workspace dashboards, and workspace engagement and recognition signals (rank, league, achievements) where those features are enabled for the workspace. Workspace administrators, team leads, and teaching staff in the same workspace see the same information for the Contributors they work with.
-- **Leibniz-Rechenzentrum (LRZ) der BAdW** — when a workspace synchronises from gitlab.lrz.de, or when a Contributor signs in via the gitlab.lrz.de OIDC identity provider, personal data is exchanged with LRZ infrastructure in Garching. LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; the relationship is a public-body cooperation under § 16 Abs. 1 Satz 2 BayHIG and the BAdW-Satzung and is not an Art. 28 GDPR commission (§3.1). LRZ privacy information: [doku.lrz.de/display/PUBLIC/Datenschutzerklaerung](https://doku.lrz.de/display/PUBLIC/Datenschutzerklaerung). LRZ GitLab terms of use: [doku.lrz.de/gitlab-nutzungsrichtlinien-10746021.html](https://doku.lrz.de/gitlab-nutzungsrichtlinien-10746021.html).
+- **Leibniz-Rechenzentrum (LRZ) der BAdW** — when a workspace synchronises from gitlab.lrz.de, or when a Contributor signs in via the gitlab.lrz.de OIDC identity provider, personal data is exchanged with LRZ infrastructure in Garching. LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; the relationship is a public-body cooperation under Art. 16 Abs. 1 Satz 2 BayHIG and the BAdW-Satzung and is not an Art. 28 GDPR commission (§3.1). LRZ privacy information: [doku.lrz.de/display/PUBLIC/Datenschutzerklaerung](https://doku.lrz.de/display/PUBLIC/Datenschutzerklaerung). LRZ GitLab terms of use: [doku.lrz.de/gitlab-nutzungsrichtlinien-10746021.html](https://doku.lrz.de/gitlab-nutzungsrichtlinien-10746021.html).
 
-The platform uses the following processors and third-party services. Some of them are only engaged when the workspace administrator of your workspace has configured the corresponding feature (see §3.2 on the shared-responsibility model):
+The platform uses the following processors and third-party services. Some of them are only engaged when the workspace administrator of your workspace has configured the corresponding feature (see §3.2 on the shared-responsibility model) or when the deployment operator has opted into them at the platform level:
 
 - **GitHub, Inc. / Microsoft Corporation** — identity-provider (OAuth) for Contributors logging in with GitHub; repository-data synchronization for GitHub-hosted workspaces. [Privacy policy](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
 - **LLM provider per workspace** — the AI-assisted features of each workspace call one of the following providers, as configured by the workspace administrator: **OpenAI, L.P.** (enterprise API, no-training terms — [privacy policy](https://openai.com/policies/privacy-policy)); **Microsoft Corporation (Azure OpenAI Service)**, region-configurable, EU-region deployments process within the EU — [privacy policy](https://privacy.microsoft.com/privacystatement); **Anthropic, PBC** (Claude API under enterprise no-training terms) — [privacy policy](https://www.anthropic.com/legal/privacy). Only the provider configured for your workspace receives your AI-assisted interactions.
 - **Salesforce, Inc. / Slack Technologies, LLC** — workspace notifications and engagement/recognition digests *only when your workspace administrator has enabled Slack for the workspace*. [Privacy policy](https://slack.com/trust/privacy/privacy-policy).
-- **SMTP infrastructure operated by AET** via the TUM mail relay — email delivery (including Keycloak account-verification and password-reset messages, and any optional notification emails that Contributors configure). No transfer outside TUM/AET.
+- **SMTP infrastructure operated by AET** via the TUM mail relay — email delivery for Keycloak account-verification and password-reset messages. No transfer outside TUM/AET.
+- **Self-hosted Sentry** at `sentry.ase.in.tum.de`, operated by AET on TUM infrastructure — error telemetry (see §4.6). Not a third-party transfer; only AET operators have access.
+- **PostHog Inc.** — product analytics (see §4.7), engaged only when both preconditions in §4.7 are met. [Privacy policy](https://posthog.com/privacy).
 
-Where the relationship with one of the above is subject to Art. 28 GDPR, a data-processing agreement (Auftragsverarbeitungsvertrag / DPA) is in place at the level of TUM/AET for the TUM-operated integrations (GitHub, the TUM-operated LLM tenancy, Slack and the TUM SMTP relay); for LLM-provider transmissions that use credentials supplied by the workspace administrator's institution, the DPA is maintained at that institution's level (§3.2, §4.4). The relationship with the LRZ is *not* an Art. 28 commission but a public-body cooperation under § 16 Abs. 1 Satz 2 BayHIG and the BAdW-Satzung.
+Where the relationship with one of the above is subject to Art. 28 GDPR, a data-processing agreement (Auftragsverarbeitungsvertrag / DPA) is in place at the level of TUM/AET for the TUM-operated integrations (GitHub, the TUM-operated LLM tenancy, Slack, the TUM SMTP relay, and PostHog when engaged); for LLM-provider transmissions that use credentials supplied by the workspace administrator's institution, the DPA is maintained at that institution's level (§3.2, §4.4). The relationship with the LRZ is *not* an Art. 28 commission but a public-body cooperation under Art. 16 Abs. 1 Satz 2 BayHIG and the BAdW-Satzung.
 
 ## 7. Third-Country Transfers
 
-The core platform infrastructure (application server, database, Keycloak) is operated on servers managed by AET at TUM within Germany. The gitlab.lrz.de source system runs on LRZ infrastructure in Garching, Germany — no third-country transfer. The following third-party services are based in the United States; transfers to them are protected by the safeguards listed below. Where the recipient is certified under the EU–U.S. Data Privacy Framework for the category of data transferred, the primary safeguard is the Commission adequacy decision under Art. 45(3) GDPR in relation to the DPF. For any processing not covered by the recipient's DPF certification, Standard Contractual Clauses pursuant to Art. 46(2)(c) GDPR serve as a fall-back safeguard:
+The core platform infrastructure (application server, database, Keycloak, self-hosted Sentry) is operated on servers managed by AET at TUM within Germany. The gitlab.lrz.de source system runs on LRZ infrastructure in Garching, Germany — no third-country transfer. The following third-party services are based in the United States; transfers to them are protected by the safeguards listed below. Where the recipient is certified under the EU–U.S. Data Privacy Framework (DPF), the primary safeguard is the Commission adequacy decision under Art. 45(3) GDPR (Commission Implementing Decision of 10 July 2023 on the EU-U.S. Data Privacy Framework). For any processing not covered by the recipient's DPF certification, Standard Contractual Clauses under Art. 46(2)(c) GDPR pursuant to Commission Implementing Decision (EU) 2021/914 — **Module 2 (controller-to-processor)** — serve as a fall-back safeguard:
 
-- **GitHub, Inc. / Microsoft Corporation** — DPF-certified; Standard Contractual Clauses in place as a fall-back. Azure OpenAI in a European region processes data within the EU.
-- **OpenAI, L.P.** — DPF-certified; Standard Contractual Clauses in place as a fall-back.
-- **Anthropic, PBC** — DPF-certified; Standard Contractual Clauses in place as a fall-back (engaged only for workspaces whose administrator has selected Anthropic as LLM provider).
-- **Salesforce, Inc. (Slack)** — DPF-certified; Standard Contractual Clauses in place as a fall-back.
+- **GitHub, Inc. / Microsoft Corporation** — DPF-certified; SCCs Module 2 as fall-back. Azure OpenAI in a European region processes data within the EU.
+- **OpenAI, L.P.** — DPF-certified; SCCs Module 2 as fall-back.
+- **Anthropic, PBC** — DPF-certified; SCCs Module 2 as fall-back (engaged only for workspaces whose administrator has selected Anthropic as LLM provider).
+- **Salesforce, Inc. (Slack)** — DPF-certified; SCCs Module 2 as fall-back.
+- **PostHog Inc.** — DPF-certified; SCCs Module 2 as fall-back (engaged only under the preconditions in §4.7).
 
 No personal data is transferred to third countries without appropriate safeguards in accordance with Chapter V GDPR.
 
@@ -208,7 +245,7 @@ Under the GDPR, you have the following rights with respect to your personal data
 - **Restriction of processing (Art. 18 GDPR):** request restriction under certain circumstances.
 - **Data portability (Art. 20 GDPR):** receive the data you have provided in a structured, machine-readable format.
 - **Object (Art. 21 GDPR):** object to processing based on Art. 6(1)(e) GDPR. If you object, TUM/AET will cease the corresponding processing unless compelling legitimate grounds for the processing can be demonstrated.
-- **Withdraw consent (Art. 7(3) GDPR):** where processing is based on consent (Section 4.3, optional notification email), you may withdraw your consent at any time. The withdrawal does not affect the lawfulness of prior processing.
+- **Withdraw consent (Art. 7(3) GDPR):** where processing is based on consent (the "Participate in research" switch described in Section 4.3 and Section 4.7), you may withdraw your consent at any time in your profile settings. The withdrawal does not affect the lawfulness of prior processing.
 
 To exercise any of these rights, please contact [ls1.admin@in.tum.de](mailto:ls1.admin@in.tum.de) or the TUM Data Protection Officer (see Section 2).
 

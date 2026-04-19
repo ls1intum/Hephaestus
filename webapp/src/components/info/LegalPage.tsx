@@ -50,6 +50,12 @@ function SafeImage({ src, alt, className }: ImgHTMLAttributes<HTMLImageElement>)
 
 const SAFE_COMPONENTS = { a: SafeAnchor, img: SafeImage };
 
+// Warn once per page, per module-lifetime. The entrypoint already logs a
+// discoverable WARN at container startup; this is a belt-and-braces nudge for
+// operators who open devtools, not a metric, so re-emitting on every render
+// adds noise without information.
+const warnedDisclaimer = new Set<LegalPageId>();
+
 export interface LegalPageProps {
 	page: LegalPageId;
 	title: string;
@@ -81,7 +87,8 @@ export function LegalPage({
 			.then((next) => {
 				if (controller.signal.aborted) return;
 				setResolved(next);
-				if (next.source === "disclaimer") {
+				if (next.source === "disclaimer" && !warnedDisclaimer.has(page)) {
+					warnedDisclaimer.add(page);
 					// Shipping the disclaimer in production violates § 5 DDG and Art. 13
 					// GDPR; the red banner alone is not enough because operators rarely
 					// open the page themselves.

@@ -15,7 +15,9 @@ export interface ResolvedLegalContent {
 // only the character class we ship filesystem directories in. Anything else
 // (whitespace, `..`, `/`, ...) falls through to the disclaimer, mirroring the
 // "unset profile" case — the resolver never constructs an unexpected URL.
-const PROFILE_PATTERN = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+// Kept in sync with webapp/docker/entrypoint.sh — a unit test pins the pair.
+export const LEGAL_PROFILE_PATTERN_SOURCE = "^[a-z0-9][a-z0-9_-]{0,31}$";
+const PROFILE_PATTERN = new RegExp(LEGAL_PROFILE_PATTERN_SOURCE);
 
 export function isValidLegalProfile(profile: string): boolean {
 	return PROFILE_PATTERN.test(profile);
@@ -23,8 +25,11 @@ export function isValidLegalProfile(profile: string): boolean {
 
 // Restrict hyperlink protocols in operator-supplied markdown. `javascript:`,
 // `data:`, `vbscript:`, unknown schemes are silently dropped at render time.
-const SAFE_HREF_PATTERN = /^(?:https?:|mailto:|tel:|#|\/)/i;
-const SAFE_IMG_SRC_PATTERN = /^(?:https?:|\/)/i;
+// `\/(?!\/)` permits absolute same-origin paths like `/privacy` while rejecting
+// scheme-relative URLs like `//evil.com/x` that would otherwise bypass the
+// external-link target="_blank" + rel="noopener" hardening in SafeAnchor.
+const SAFE_HREF_PATTERN = /^(?:https?:|mailto:|tel:|#|\/(?!\/))/i;
+const SAFE_IMG_SRC_PATTERN = /^(?:https?:|\/(?!\/))/i;
 
 export function isSafeLegalHref(href: unknown): href is string {
 	return typeof href === "string" && SAFE_HREF_PATTERN.test(href);

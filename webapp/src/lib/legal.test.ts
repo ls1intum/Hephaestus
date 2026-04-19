@@ -3,6 +3,7 @@ import {
 	isSafeLegalHref,
 	isSafeLegalImageSrc,
 	isValidLegalProfile,
+	LEGAL_PROFILE_PATTERN_SOURCE,
 	resolveLegalContent,
 } from "./legal";
 
@@ -30,6 +31,13 @@ describe("isValidLegalProfile", () => {
 		expect(isValidLegalProfile("TUMAET")).toBe(false);
 		expect(isValidLegalProfile("a".repeat(33))).toBe(false);
 	});
+
+	// The same pattern is duplicated in webapp/docker/entrypoint.sh so the
+	// container can warn operators before the browser ever loads. Pin the
+	// string verbatim so a widening of one side can't drift from the other.
+	it("exposes the exact regex source shared with entrypoint.sh", () => {
+		expect(LEGAL_PROFILE_PATTERN_SOURCE).toBe("^[a-z0-9][a-z0-9_-]{0,31}$");
+	});
 });
 
 describe("isSafeLegalHref / isSafeLegalImageSrc", () => {
@@ -50,6 +58,15 @@ describe("isSafeLegalHref / isSafeLegalImageSrc", () => {
 		expect(isSafeLegalHref("file:///etc/passwd")).toBe(false);
 		expect(isSafeLegalHref(null)).toBe(false);
 		expect(isSafeLegalHref(undefined)).toBe(false);
+	});
+
+	// Scheme-relative URLs (`//host/...`) inherit the page's scheme but hit an
+	// arbitrary origin, so they must be blocked even though the leading `/`
+	// looks like an absolute path.
+	it("rejects scheme-relative URLs that would escape the origin", () => {
+		expect(isSafeLegalHref("//evil.com/pwn")).toBe(false);
+		expect(isSafeLegalHref("///evil.com/pwn")).toBe(false);
+		expect(isSafeLegalImageSrc("//evil.com/x.png")).toBe(false);
 	});
 
 	it("images must be http(s) or an absolute path; data-URIs are rejected", () => {
@@ -134,11 +151,26 @@ describe("resolveLegalContent", () => {
 		expect(resolved.source).toBe("profile");
 	});
 
-	it("re-throws AbortError so teardown is distinguishable from network failure", async () => {
+	// Some reverse proxies rewrite misses to a 200 with an empty body instead of
+	// the SPA fallback. The cascade must keep walking or we'd render a blank page.
+	it("rejects empty/whitespace-only bodies so the cascade continues", async () => {
+		mockResponses((url) => {
+			if (url === "/legal-overrides/privacy.md") return { status: 200, body: "   \n\t\n  " };
+			if (url === "/legal/profiles/tumaet/privacy.md")
+				return { status: 200, body: "# real tumaet privacy" };
+			return { status: 404 };
+		});
+		const resolved = await resolveLegalContent("privacy", { profile: "tumaet" });
+		expect(resolved.source).toBe("profile");
+	});
+
+	it("re-throws AbortError as a DOMException so teardown is distinguishable", async () => {
 		(globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(async () => {
 			throw new DOMException("aborted", "AbortError");
 		});
-		await expect(resolveLegalContent("privacy", { profile: "tumaet" })).rejects.toThrow(/aborted/);
+		await expect(resolveLegalContent("privacy", { profile: "tumaet" })).rejects.toSatisfy(
+			(err: unknown) => err instanceof DOMException && err.name === "AbortError",
+		);
 	});
 
 	it("invalid profile values fall through to the disclaimer without constructing profile URLs", async () => {

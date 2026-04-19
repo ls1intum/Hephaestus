@@ -1,5 +1,7 @@
 Information in accordance with § 5 DDG (Digitale-Dienste-Gesetz — German Digital Services Act).
 
+*Last updated: 2026-04-19.*
+
 ## Publisher
 
 Technical University of Munich (Technische Universität München)
@@ -25,7 +27,7 @@ DE811193231 (in accordance with § 27a UStG — German VAT Act)
 
 ## Responsible for Content
 
-Responsible for the content of this platform in accordance with § 18(2) MStV (Medienstaatsvertrag — German Interstate Media Treaty):
+Responsible for the content of this platform in accordance with § 18 Abs. 1 MStV (Medienstaatsvertrag — German Interstate Media Treaty):
 
 Prof. Dr. Stephan Krusche  
 Applied Education Technologies (AET)  
