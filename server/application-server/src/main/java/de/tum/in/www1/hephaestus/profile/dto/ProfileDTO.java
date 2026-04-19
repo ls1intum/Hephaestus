@@ -9,19 +9,6 @@ import java.time.Instant;
 import java.util.List;
 import org.springframework.lang.NonNull;
 
-/**
- * Profile-specific DTO representing a user's complete profile view.
- *
- * <p>This DTO lives in the profile module because it composes:
- * <ul>
- *   <li>User info (from gitprovider)</li>
- *   <li>Repository contributions (from gitprovider)</li>
- *   <li>Review activity WITH XP scores (profile-specific composition)</li>
- *   <li>Open pull requests (from gitprovider)</li>
- * </ul>
- *
- * <p>The gitprovider module has NO knowledge of XP or scoring.
- */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Complete user profile including contribution history and activity")
 public record ProfileDTO(

@@ -3,31 +3,7 @@ package de.tum.in.www1.hephaestus.leaderboard;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import org.springframework.lang.NonNull;
 
-/**
- * Immutable leaderboard XP data for a single user.
- *
- * <p>Contains aggregated XP totals and activity breakdown statistics
- * computed from the activity event ledger.
- *
- * <p>Use {@link Builder} for incremental construction when hydrating
- * data from multiple database projections.
- *
- * @param user the user entity (never null)
- * @param totalScore total XP score for the timeframe (rounded from BigDecimal)
- * @param eventCount number of activity events recorded
- * @param approvals number of REVIEW_APPROVED events
- * @param changeRequests number of REVIEW_CHANGES_REQUESTED events
- * @param comments number of REVIEW_COMMENTED events
- * @param unknowns number of REVIEW_UNKNOWN events
- * @param codeComments number of scored REVIEW_COMMENT_CREATED events on pull requests authored by someone else
- * @param reviewedPrCount number of DISTINCT pull requests reviewed (from separate query)
- * @param ownReplies number of visible-only discussion replies and inline thread replies on the actor's own pull requests
- * @param openPullRequests number of authored pull requests opened in timeframe that are still open
- * @param mergedPullRequests number of authored pull requests merged in timeframe
- * @param closedPullRequests number of authored pull requests closed without merge in timeframe
- * @param openedIssues number of issues opened in timeframe
- * @param closedIssues number of issues closed in timeframe
- */
+/** Immutable leaderboard XP + activity breakdown for a single user. Use {@link Builder} to hydrate from multiple projections. */
 public record LeaderboardUserXp(
     @NonNull User user,
     int totalScore,
@@ -45,12 +21,6 @@ public record LeaderboardUserXp(
     int openedIssues,
     int closedIssues
 ) {
-    /**
-     * Builder for incremental construction of {@link LeaderboardUserXp}.
-     *
-     * <p>Used by {@link LeaderboardXpQueryService} to accumulate breakdown stats
-     * from multiple activity projections before building the immutable result.
-     */
     public static final class Builder {
 
         private final User user;

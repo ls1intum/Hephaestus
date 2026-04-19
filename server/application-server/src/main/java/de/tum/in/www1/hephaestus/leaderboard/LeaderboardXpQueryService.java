@@ -16,29 +16,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Queries leaderboard XP data from the activity event ledger.
- *
- * <p>The leaderboard reads pre-computed XP from activity events rather than
- * recalculating on-the-fly. This is the <strong>single source of truth</strong> for XP.
- *
- * <p>Architecture:
- * <pre>
- * Domain Events → ActivityEventListener → ActivityEvent table (activity module)
- *                                                ↓
- *                        LeaderboardXpQueryService (this) ← LeaderboardService
- * </pre>
- *
- * <p><strong>Time range convention:</strong> All timeframe queries use half-open intervals
- * [since, until) - inclusive start, exclusive end. This ensures consistency across
- * the leaderboard module and prevents double-counting at interval boundaries.
- */
+/** Reads leaderboard XP totals and activity breakdowns from the activity event ledger. */
 @Service
+@RequiredArgsConstructor
 public class LeaderboardXpQueryService {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderboardXpQueryService.class);
@@ -47,38 +33,11 @@ public class LeaderboardXpQueryService {
     private final UserRepository userRepository;
     private final ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
 
-    public LeaderboardXpQueryService(
-        ActivityEventRepository activityEventRepository,
-        UserRepository userRepository,
-        ProfilePullRequestQueryRepository profilePullRequestQueryRepository
-    ) {
-        this.activityEventRepository = activityEventRepository;
-        this.userRepository = userRepository;
-        this.profilePullRequestQueryRepository = profilePullRequestQueryRepository;
-    }
-
-    /**
-     * Get XP totals for all actors in a workspace timeframe.
-     *
-     * @param workspaceId the workspace
-     * @param since start of timeframe (inclusive)
-     * @param until end of timeframe (exclusive)
-     * @return map of actor ID to XP data
-     */
     @Transactional(readOnly = true)
     public Map<Long, LeaderboardUserXp> getLeaderboardData(Long workspaceId, Instant since, Instant until) {
         return getLeaderboardData(workspaceId, since, until, Set.of());
     }
 
-    /**
-     * Get XP totals for actors in specific teams.
-     *
-     * @param workspaceId the workspace
-     * @param since start of timeframe (inclusive)
-     * @param until end of timeframe (exclusive)
-     * @param teamIds team IDs to filter by (empty = all teams)
-     * @return map of actor ID to XP data
-     */
     @Transactional(readOnly = true)
     public Map<Long, LeaderboardUserXp> getLeaderboardData(
         Long workspaceId,

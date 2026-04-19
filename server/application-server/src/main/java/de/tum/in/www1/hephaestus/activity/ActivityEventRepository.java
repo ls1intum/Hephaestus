@@ -19,23 +19,17 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Activity event repository with leaderboard aggregation queries.
+ * Activity event repository — single source of truth for pre-computed XP.
  *
- * <p>The leaderboard reads pre-computed XP from this table instead of
- * recalculating on-the-fly. This is the single source of truth for XP.
- *
- * <p><strong>Time range convention:</strong> All timeframe queries use half-open intervals
- * [since, until) - inclusive start, exclusive end. This is the standard convention for
- * time ranges and ensures no events are double-counted or missed at interval boundaries.
+ * <p>Timeframe queries use half-open intervals [since, until): inclusive start, exclusive end.
  */
 @Repository
 public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UUID> {
     /**
-     * Atomically inserts an activity event if absent (race-condition safe).
+     * Atomically inserts an activity event if absent.
      *
-     * <p>Uses PostgreSQL's ON CONFLICT DO NOTHING to handle concurrent inserts.
-     * This avoids the race condition where exists() check passes but save() fails
-     * with DataIntegrityViolationException at transaction commit time.
+     * <p>ON CONFLICT DO NOTHING avoids the race where exists() passes but save() fails
+     * with DataIntegrityViolationException at commit.
      *
      * @return 1 if inserted, 0 if duplicate (conflict on workspace_id + event_key)
      */
@@ -69,20 +63,9 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     );
 
     /**
-     * Backfills {@code actor_id} and {@code xp} for {@code COMMIT_CREATED} activity events
-     * whose actor could not be resolved at ingest time.
-     *
-     * <p>When commits are ingested before their GitLab authors are resolved, the activity-event
-     * listener records the COMMIT_CREATED row with {@code actor_id = NULL} and {@code xp = 0}.
-     * Later, {@code CommitAuthorEnrichmentService} / {@code GitLabCommitMergeRequestLinker}
-     * reconcile {@code git_commit.author_id} via email match — but without this backfill the
-     * activity ledger stays permanently orphaned, so the contributor never receives XP for those
-     * commits.
-     *
-     * <p>This UPDATE joins back to {@code git_commit} and rewrites both columns in one pass,
-     * scoped to a single repository to keep the row set bounded.
-     *
-     * @return the number of updated activity events
+     * Backfills {@code actor_id} and {@code xp} for COMMIT_CREATED events whose actor
+     * was unresolved at ingest. Without this, commits ingested before their GitLab authors
+     * are resolved via email match stay orphaned and never award XP.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
@@ -108,17 +91,8 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     // ========================================================================
 
     /**
-     * Aggregate XP by actor for workspace-level leaderboard.
-     *
-     * <p>This query does NOT filter by hidden repo settings because that is a
-     * team-specific setting. The workspace leaderboard shows all activity across
-     * the entire workspace. Use {@link #findExperiencePointsByWorkspaceAndTeamsAndTimeframe}
-     * for team-filtered results that respect per-team hidden repo settings.
-     *
-     * @param workspaceId the workspace
-     * @param since start of timeframe (inclusive)
-     * @param until end of timeframe (exclusive)
-     * @return aggregated XP per actor
+     * Workspace-level XP aggregation. Does NOT apply per-team hidden-repo settings; use
+     * {@link #findExperiencePointsByWorkspaceAndTeamsAndTimeframe} for team-filtered results.
      */
     @Query(
         """
@@ -141,23 +115,9 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     );
 
     /**
-     * Aggregate XP by actor for leaderboard, filtered by teams.
-
-     *
-     * <p>This query includes label filtering for review-related events. For each team:
-     * <ul>
-     *   <li>If a team has NO label filters configured for the repository, all events are included</li>
-     *   <li>If a team HAS label filters, only events for PRs with at least one matching label are included</li>
-     * </ul>
-     *
-     * <p>Label filtering is applied to review events (targetType = 'review') by joining through
-     * PullRequestReview to PullRequest to check labels. Non-review events are not label-filtered.
-     *
-     * @param workspaceId the workspace
-     * @param teamIds set of team IDs to filter by
-     * @param since start of timeframe (inclusive)
-     * @param until end of timeframe (exclusive)
-     * @return aggregated XP per actor in the specified teams
+     * Team-filtered XP aggregation. Applies label filtering to review events only:
+     * if a team has label filters for a repo, review events are kept only when the PR
+     * has at least one matching label. Non-review events are not label-filtered.
      */
     @Query(
         """
@@ -220,18 +180,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("until") Instant until
     );
 
-    /**
-     * Activity breakdown by type for workspace-level leaderboard stats display.
-     *
-     * <p>This query does NOT filter by hidden repo settings because that is a
-     * team-specific setting. The workspace leaderboard shows all activity.
-     *
-     * @param workspaceId the workspace
-     * @param actorIds actors to get breakdown for
-     * @param since start of timeframe (inclusive)
-     * @param until end of timeframe (exclusive)
-     * @return breakdown by actor and event type
-     */
+    /** Workspace-level activity breakdown by event type. Does NOT apply per-team hidden-repo settings. */
     @Query(
         """
         SELECT e.actor.id as actorId,
@@ -521,22 +470,8 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     }
 
     /**
-     * Count DISTINCT pull requests reviewed by each actor for workspace-level leaderboard.
-     *
-     * <p>This query counts unique PRs via the reviews, not event counts.
-     * Joins through activity events to reviews to get the distinct PR IDs.
-     *
-     * <p>Does NOT filter by hidden repo settings because that is a team-specific setting.
-     * The workspace leaderboard shows all activity.
-     *
-     * <p><strong>Self-review exclusion:</strong> PRs where the reviewer is also the
-     * PR author are excluded from the count.
-     *
-     * @param workspaceId the workspace
-     * @param actorIds actors to count for
-     * @param since start of timeframe (inclusive)
-     * @param until end of timeframe (exclusive)
-     * @return map of actor ID to distinct PR count
+     * Count DISTINCT PRs reviewed per actor (workspace-level).
+     * Self-reviews (reviewer == PR author) are excluded.
      */
     @Query(
         """
@@ -566,9 +501,6 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("until") Instant until
     );
 
-    /**
-     * Helper method to convert projection list to a map.
-     */
     default Map<Long, Long> countDistinctReviewedPullRequestsByActors(
         Long workspaceId,
         Set<Long> actorIds,
@@ -656,19 +588,9 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     }
 
     /**
-     * Fetch DISTINCT pull request IDs reviewed by a single actor for profile display.
-     *
-     * <p>Unlike leaderboard queries, this does NOT filter by hidden repo settings because
-     * the profile is a personal activity log showing all work done by the user.
-     *
-     * <p>Self-review exclusion is kept since reviewing your own PR is not meaningful
-     * review activity (it's just the PR author looking at their own work).
-     *
-     * @param workspaceId the workspace
-     * @param actorId the actor to get reviewed PRs for
-     * @param since start of timeframe (inclusive)
-     * @param until end of timeframe (exclusive)
-     * @return list of distinct PullRequest IDs reviewed
+     * DISTINCT PR IDs reviewed by a single actor for profile display.
+     * Unlike leaderboard queries, does NOT apply hidden-repo settings (profile shows all
+     * of the user's work). Self-reviews are still excluded.
      */
     @Query(
         """
@@ -697,9 +619,6 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("until") Instant until
     );
 
-    /**
-     * Projection for distinct PR count by actor.
-     */
     interface DistinctPrCountProjection {
         Long getActorId();
         Long getPrCount();
@@ -714,16 +633,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     // Profile XP Lookups
     // ========================================================================
 
-    /**
-     * Calculate total lifetime XP for a specific actor in a workspace.
-     *
-     * <p>Used for profile headers to show the user's current level and total XP.
-     * Returns 0 if no events exist.
-     *
-     * @param workspaceId the workspace
-     * @param actorId the actor (user)
-     * @return total accumulated XP (0 if none)
-     */
+    /** Total lifetime XP for an actor in a workspace. Returns 0 if no events exist. */
     @Query(
         """
         SELECT COALESCE(SUM(e.xp), 0)
@@ -737,18 +647,6 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     )
     long findTotalXpByWorkspaceAndActor(@Param("workspaceId") Long workspaceId, @Param("actorId") Long actorId);
 
-    /**
-     * Fetch XP for specific target entities by their IDs and types.
-
-     *
-     * <p>Used by the profile module to look up pre-computed XP for individual
-     * reviews/comments instead of recalculating on-the-fly.
-     *
-     * @param workspaceId the workspace
-     * @param targetIds set of target entity IDs (review IDs, comment IDs)
-     * @param targetTypes set of target types to filter by
-     * @return XP indexed by target ID
-     */
     @Query(
         """
         SELECT e.targetId as targetId, e.xp as xp
@@ -764,14 +662,6 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("targetTypes") Set<String> targetTypes
     );
 
-    /**
-     * Type-safe overload for fetching XP by target IDs and types.
-     *
-     * @param workspaceId the workspace
-     * @param targetIds set of target entity IDs (review IDs, comment IDs)
-     * @param targetTypes set of target types (type-safe enum)
-     * @return XP indexed by target ID
-     */
     default List<TargetXpProjection> findXpByTargetIdsAndTypes(
         Long workspaceId,
         Set<Long> targetIds,
@@ -781,20 +671,11 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         return findXpByTargetIdsAndTypesInternal(workspaceId, targetIds, typeValues);
     }
 
-    /**
-     * Projection for target-specific XP lookup.
-     */
     interface TargetXpProjection {
         Long getTargetId();
         Double getXp();
     }
 
-    /**
-     * Deletes all activity events for a workspace.
-     * Used during workspace purge to clean up activity data.
-     *
-     * @param workspaceId the workspace ID
-     */
     @Query(value = "SELECT COUNT(*) FROM activity_event WHERE workspace_id = :workspaceId", nativeQuery = true)
     long countByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
@@ -808,24 +689,9 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     // ========================================================================
 
     /**
-     * Finds all activity events for a specific actor in a timeframe, scoped to a workspace.
-     *
-     * <p>Used by the profile module to show a user's complete activity history.
-     * Unlike leaderboard queries, this does NOT filter by hidden repo settings because:
-     * <ul>
-     *   <li>The profile is a personal activity log, not a competition</li>
-     *   <li>Users should see all their work regardless of team-level hiding settings</li>
-     *   <li>"Hidden from contributions" is for team leaderboard ranking, not personal visibility</li>
-     * </ul>
-     *
-     * <p>Filters for review-related and comment-related events only, excluding PR events
-     * which are not displayed in the profile's review activity section.
-     *
-     * @param workspaceId the workspace to scope to
-     * @param actorId the actor (user) to get events for
-     * @param since start of timeframe (inclusive)
-     * @param until end of timeframe (exclusive)
-     * @return activity events for the actor, ordered by occurrence time descending
+     * Profile activity history (review + comment events, PR events excluded).
+     * Does NOT apply hidden-repo settings: "hidden from contributions" only affects team
+     * leaderboard ranking, not personal profile visibility.
      */
     @Query(
         """
@@ -860,17 +726,6 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     // Achievement Progress Queries
     // ========================================================================
 
-    /**
-     * Count activity events of specific types for a user across all workspaces.
-     *
-     * <p>Used by the achievement system to evaluate progress toward achievements.
-     * Counts are not workspace-scoped because achievements represent cumulative
-     * lifetime accomplishments.
-     *
-     * @param actorId the user's ID
-     * @param eventTypes set of event type names (enum names as strings)
-     * @return total count of matching events
-     */
     @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
     @Query(
         value = """
@@ -884,15 +739,8 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     long countByActorIdAndEventTypes(@Param("actorId") Long actorId, @Param("eventTypes") Set<String> eventTypes);
 
     /**
-     * Slice all activity events for a specific actor in chronological order.
-     *
-     * <p>Used for recalculating achievements correctly after historical data syncs.
-     * Uses Slice instead of Stream to prevent open-cursor issues when interleaving
-     * nested database queries during processing.
-     *
-     * @param actorId the user's ID
-     * @param pageable the pagination information
-     * @return slice of activity events ordered by occurred_at ASC
+     * Chronological slice of an actor's events for achievement recalculation.
+     * Uses Slice (not Stream) to avoid open-cursor issues when interleaving nested queries.
      */
     @WorkspaceAgnostic("Achievement recalculation replays all user events across workspaces")
     @Query(
@@ -905,13 +753,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     )
     Slice<ActivityEvent> findSliceByActorIdOrderByOccurredAtAsc(@Param("actorId") Long actorId, Pageable pageable);
 
-    /**
-     * Count events of a specific type by actor within a time window.
-     * Used by achievement evaluators (BruteForce, NightOwl).
-     *
-     * <p>Uses the repository-wide half-open interval convention [start, end):
-     * inclusive start, exclusive end.
-     */
+    /** Count events of a type for an actor in [start, end). Used by BruteForce / NightOwl. */
     @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
     @Query(
         value = """
@@ -932,14 +774,8 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     );
 
     /**
-     * Count events of a specific type by actor within a time window with an inclusive end.
-     *
-     * <p>This method is intended for achievement evaluators that conceptually define their
-     * window as [start, end] and want to count events up to and including the event at the
-     * boundary timestamp. Callers can safely pass {@code event.occurredAt()} as {@code end}
-     * without adding artificial time padding.
-     *
-     * <p>Interval semantics: [start, end] — inclusive start, inclusive end.
+     * Count events for an actor in [start, end] (inclusive end). Lets achievement evaluators
+     * pass {@code event.occurredAt()} as {@code end} without adding artificial padding.
      */
     @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
     @Query(
@@ -960,10 +796,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("end") Instant end
     );
 
-    /**
-     * Find the most recent event timestamp for an actor before a given time.
-     * Used by LongTimeReturn achievement evaluator.
-     */
+    /** Most recent event timestamp for an actor before {@code before}. Used by LongTimeReturn. */
     @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
     @Query(
         value = """

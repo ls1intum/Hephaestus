@@ -8,17 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.springframework.lang.NonNull;
 
-/**
- * Leaderboard entry representing a ranked contributor or team.
- *
- * <p>This DTO supports both individual and team leaderboard modes:
- * <ul>
- *   <li><strong>Individual mode:</strong> {@code user} is populated, {@code team} is null</li>
- *   <li><strong>Team mode:</strong> {@code team} is populated, {@code user} is null</li>
- * </ul>
- *
- * <p>The score and activity counts reflect contributions within the requested timeframe.
- */
+/** Ranked leaderboard entry. Exactly one of {@code user} / {@code team} is populated depending on leaderboard mode. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "A ranked entry in the leaderboard (individual or team)")
 public record LeaderboardEntryDTO(

@@ -8,18 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.springframework.lang.NonNull;
 
-/**
- * Profile-specific DTO for review activity with XP score.
- *
- * <p>This DTO belongs in the profile module because:
- * <ul>
- *   <li>XP/score is a Hephaestus domain concept, not a GitHub concept</li>
- *   <li>gitprovider is a pure ETL layer with no knowledge of gamification</li>
- *   <li>The profile view composes git provider data with activity XP</li>
- * </ul>
- *
- * <p>The score is read from the activity_event ledger (CQRS pattern).
- */
+/** Review activity with XP score sourced from the activity_event ledger (CQRS read model). */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "A scored review activity entry with XP score for profile display")
 public record ProfileReviewActivityDTO(

@@ -10,14 +10,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Workspace-scoped queries for pull requests in the profile context.
- *
- * <p>This repository lives in the profile package because it joins gitprovider entities
- * with workspace entities (RepositoryToMonitor). The gitprovider package should not
- * depend on workspace entities to maintain clean architecture.
- *
- * <p>These queries are used for user profile display where workspace context is required.
- * Callers wrap invocations in their own {@code @Transactional(readOnly = true)}.
+ * Lives in the profile package (not gitprovider) because it joins gitprovider entities
+ * with workspace entities (RepositoryToMonitor) — the gitprovider package must not
+ * depend on workspace entities.
  */
 @Repository
 public interface ProfilePullRequestQueryRepository extends JpaRepository<PullRequest, Long> {

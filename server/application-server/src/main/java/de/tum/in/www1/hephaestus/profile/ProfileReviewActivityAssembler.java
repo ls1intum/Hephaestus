@@ -10,33 +10,12 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Assembles profile review activity DTOs from git provider entities and pre-computed XP.
- *
- * <p>This assembler lives in the profile module (not gitprovider) because:
- * <ul>
- *   <li>It composes data from multiple sources (git entities + activity ledger XP)</li>
- *   <li>XP/score is a Hephaestus domain concept unknown to the gitprovider ETL layer</li>
- *   <li>The profile module owns the view-layer composition</li>
- * </ul>
- *
- * <p>Architecture:
- * <pre>
- * gitprovider (ETL)     →    activity (XP source)    →    profile (composition)
- * ────────────────           ──────────────────           ─────────────────────
- * PullRequestReview          activity_event.xp            ProfileReviewActivityDTO
- * IssueComment               (pre-computed)               (review + xp)
- * </pre>
+ * Composes git provider entities with pre-computed activity-ledger XP into profile DTOs.
+ * Lives in profile (not gitprovider) because XP is unknown to the ETL layer.
  */
 @Component
 public class ProfileReviewActivityAssembler {
 
-    /**
-     * Assemble a profile review DTO from a PullRequestReview entity and pre-computed XP.
-     *
-     * @param review the git provider review entity
-     * @param xp pre-computed XP from activity_event ledger
-     * @return assembled profile DTO
-     */
     public ProfileReviewActivityDTO assemble(@NonNull PullRequestReview review, int xp) {
         return new ProfileReviewActivityDTO(
             review.getId(),
@@ -51,15 +30,7 @@ public class ProfileReviewActivityAssembler {
         );
     }
 
-    /**
-     * Assemble a profile review DTO from an IssueComment entity and pre-computed XP.
-     *
-     * <p>Issue comments on PRs are treated as review activity with COMMENTED state.
-     *
-     * @param comment the git provider issue comment entity
-     * @param xp pre-computed XP from activity_event ledger
-     * @return assembled profile DTO
-     */
+    /** Issue comments on PRs are represented as review activity with COMMENTED state. */
     public ProfileReviewActivityDTO assemble(@NonNull IssueComment comment, int xp) {
         return new ProfileReviewActivityDTO(
             comment.getId(),

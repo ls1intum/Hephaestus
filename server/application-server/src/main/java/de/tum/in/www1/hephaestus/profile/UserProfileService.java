@@ -37,6 +37,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,33 +45,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for user profile data aggregation.
- *
- * <p>Uses ActivityEvent as the single source of truth for review activity,
- * consistent with leaderboard queries. This ensures profile and leaderboard
- * display identical data with the same filtering rules:
- * <ul>
- *   <li>Workspace scoping via ActivityEvent.workspace.id (not RepositoryToMonitor)</li>
- *   <li>Hidden repo exclusion via WorkspaceTeamRepositorySettings</li>
- *   <li>Human users only (type = USER)</li>
- * </ul>
- *
- * <p>Architecture:
- * <pre>
- * ActivityEvent (source of truth)    profile (this)
- * ────────────────────────────────   ─────────────────────
- * activity_event                  →  ProfileActivityStatsDTO
- * (targets: review, comment)         ProfileReviewActivityDTO
- * </pre>
- *
- * <p><strong>Entity hydration:</strong> ActivityEvent contains target IDs and XP.
- * Entity details (PR title, author, etc.) are batch-fetched from gitprovider tables
- * using the target IDs.
- *
- * <p><strong>Time range convention:</strong> Uses half-open intervals [since, until)
- * consistent with leaderboard queries.
+ * Aggregates user profile data from the ActivityEvent ledger so profile and
+ * leaderboard views stay consistent.
  */
 @Service
+@RequiredArgsConstructor
 public class UserProfileService {
 
     private static final Logger log = LoggerFactory.getLogger(UserProfileService.class);
@@ -88,34 +67,6 @@ public class UserProfileService {
     private final ProfileActivityQueryService profileActivityQueryService;
     private final PullRequestRepository pullRequestRepository;
     private final ActivityEventRepository activityEventRepository;
-
-    public UserProfileService(
-        UserRepository userRepository,
-        ProfileRepositoryQueryRepository profileRepositoryQueryRepository,
-        ProfilePullRequestQueryRepository profilePullRequestQueryRepository,
-        PullRequestReviewRepository pullRequestReviewRepository,
-        PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
-        IssueCommentRepository issueCommentRepository,
-        ProfileReviewActivityAssembler reviewActivityAssembler,
-        WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceContributionActivityService workspaceContributionActivityService,
-        ProfileActivityQueryService profileActivityQueryService,
-        PullRequestRepository pullRequestRepository,
-        ActivityEventRepository activityEventRepository
-    ) {
-        this.userRepository = userRepository;
-        this.profileRepositoryQueryRepository = profileRepositoryQueryRepository;
-        this.profilePullRequestQueryRepository = profilePullRequestQueryRepository;
-        this.pullRequestReviewRepository = pullRequestReviewRepository;
-        this.pullRequestReviewCommentRepository = pullRequestReviewCommentRepository;
-        this.issueCommentRepository = issueCommentRepository;
-        this.reviewActivityAssembler = reviewActivityAssembler;
-        this.workspaceMembershipService = workspaceMembershipService;
-        this.workspaceContributionActivityService = workspaceContributionActivityService;
-        this.profileActivityQueryService = profileActivityQueryService;
-        this.pullRequestRepository = pullRequestRepository;
-        this.activityEventRepository = activityEventRepository;
-    }
 
     /**
      * Get user profile with workspace-scoped activity data.
@@ -349,20 +300,8 @@ public class UserProfileService {
             .toList();
     }
 
-    /**
-     * Build list of distinct pull requests reviewed by the user.
-     *
-     * <p>Queries activity events for distinct PR IDs, then hydrates them using
-     * the PullRequestRepository. This matches the leaderboard's approach of
-     * using activity events as the source of truth for reviewed PRs.
-     *
-     * @param workspaceId workspace to scope to
-     * @param userId      the user's ID
-     * @param timeRange   the time range for activity
-     * @return list of distinct PRs reviewed, or empty list if no data
-     */
     private List<PullRequestInfoDTO> buildReviewedPullRequestsList(Long workspaceId, Long userId, TimeRange timeRange) {
-        if (workspaceId == null || userId == null) {
+        if (workspaceId == null) {
             return List.of();
         }
 
@@ -381,7 +320,7 @@ public class UserProfileService {
     }
 
     private ProfileXpRecordDTO buildUserXpRecord(Long workspaceId, Long userId) {
-        if (workspaceId == null || userId == null) {
+        if (workspaceId == null) {
             return ProfileXpRecordDTO.empty();
         }
 
