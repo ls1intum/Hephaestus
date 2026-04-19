@@ -6,7 +6,7 @@ import {
 	resolveLegalContent,
 } from "./legal";
 
-const TUM_PROFILE_MARKERS = [
+const TUMAET_PROFILE_MARKERS = [
 	"Technical University of Munich",
 	"85748 Garching",
 	"Prof. Dr. Stephan Krusche",
@@ -15,7 +15,7 @@ const TUM_PROFILE_MARKERS = [
 
 describe("isValidLegalProfile", () => {
 	it("accepts lowercase alphanumerics, dashes, underscores", () => {
-		expect(isValidLegalProfile("tum")).toBe(true);
+		expect(isValidLegalProfile("tumaet")).toBe(true);
 		expect(isValidLegalProfile("my-fork_01")).toBe(true);
 		expect(isValidLegalProfile("a")).toBe(true);
 	});
@@ -24,10 +24,10 @@ describe("isValidLegalProfile", () => {
 		expect(isValidLegalProfile("")).toBe(false);
 		expect(isValidLegalProfile("..")).toBe(false);
 		expect(isValidLegalProfile("../admin")).toBe(false);
-		expect(isValidLegalProfile("tum/../admin")).toBe(false);
+		expect(isValidLegalProfile("tumaet/../admin")).toBe(false);
 		expect(isValidLegalProfile("a b")).toBe(false);
-		expect(isValidLegalProfile("-tum")).toBe(false);
-		expect(isValidLegalProfile("TUM")).toBe(false);
+		expect(isValidLegalProfile("-tumaet")).toBe(false);
+		expect(isValidLegalProfile("TUMAET")).toBe(false);
 		expect(isValidLegalProfile("a".repeat(33))).toBe(false);
 	});
 });
@@ -95,7 +95,7 @@ describe("resolveLegalContent", () => {
 			if (url === "/legal-overrides/privacy.md") return { status: 200, body: "# override privacy" };
 			return { status: 404 };
 		});
-		const resolved = await resolveLegalContent("privacy", { profile: "tum" });
+		const resolved = await resolveLegalContent("privacy", { profile: "tumaet" });
 		expect(resolved.source).toBe("override");
 		expect(resolved.markdown).toContain("override privacy");
 	});
@@ -103,11 +103,11 @@ describe("resolveLegalContent", () => {
 	it("falls through to the profile when no override is mounted", async () => {
 		mockResponses((url) => {
 			if (url.startsWith("/legal-overrides/")) return { status: 404 };
-			if (url === "/legal/profiles/tum/privacy.md")
+			if (url === "/legal/profiles/tumaet/privacy.md")
 				return { status: 200, body: "# profile privacy" };
 			return { status: 404 };
 		});
-		const resolved = await resolveLegalContent("privacy", { profile: "tum" });
+		const resolved = await resolveLegalContent("privacy", { profile: "tumaet" });
 		expect(resolved.source).toBe("profile");
 	});
 
@@ -126,11 +126,11 @@ describe("resolveLegalContent", () => {
 		mockResponses((url) => {
 			if (url === "/legal-overrides/privacy.md")
 				return { status: 200, body: "<!doctype html><html></html>", contentType: "text/html" };
-			if (url === "/legal/profiles/tum/privacy.md")
-				return { status: 200, body: "# real tum privacy" };
+			if (url === "/legal/profiles/tumaet/privacy.md")
+				return { status: 200, body: "# real tumaet privacy" };
 			return { status: 404 };
 		});
-		const resolved = await resolveLegalContent("privacy", { profile: "tum" });
+		const resolved = await resolveLegalContent("privacy", { profile: "tumaet" });
 		expect(resolved.source).toBe("profile");
 	});
 
@@ -138,7 +138,7 @@ describe("resolveLegalContent", () => {
 		(globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(async () => {
 			throw new DOMException("aborted", "AbortError");
 		});
-		await expect(resolveLegalContent("privacy", { profile: "tum" })).rejects.toThrow(/aborted/);
+		await expect(resolveLegalContent("privacy", { profile: "tumaet" })).rejects.toThrow(/aborted/);
 	});
 
 	it("invalid profile values fall through to the disclaimer without constructing profile URLs", async () => {
@@ -155,7 +155,7 @@ describe("resolveLegalContent", () => {
 		expect(urls.some((u) => u.startsWith("/legal/profiles/"))).toBe(false);
 	});
 
-	it("non-TUM profiles must not leak TUM canonical identity markers", async () => {
+	it("non-tumaet profiles must not leak TUM canonical identity markers", async () => {
 		const collected: string[] = [];
 		mockResponses((url) => {
 			collected.push(url);
@@ -171,7 +171,7 @@ describe("resolveLegalContent", () => {
 		for (const page of ["privacy", "imprint"] as const) {
 			const resolved = await resolveLegalContent(page, { profile: "" });
 			expect(resolved.source).toBe("disclaimer");
-			for (const marker of TUM_PROFILE_MARKERS) {
+			for (const marker of TUMAET_PROFILE_MARKERS) {
 				expect(resolved.markdown).not.toContain(marker);
 			}
 		}

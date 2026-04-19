@@ -43,9 +43,9 @@ const DISCLAIMER_PRIVACY = `# Privacy statement not configured
 This Hephaestus instance has been deployed without a legal profile. The operator remains the controller under Art. 4(7) GDPR and owes a transparent privacy statement (Art. 13 / 14 GDPR).
 `;
 
-type FixtureKey = "tum" | "disclaimer";
+type FixtureKey = "tumaet" | "disclaimer";
 const FIXTURES: Record<FixtureKey, Record<LegalPageId, string>> = {
-	tum: {
+	tumaet: {
 		imprint: TUM_IMPRINT,
 		privacy: TUM_PRIVACY,
 	},
@@ -58,8 +58,8 @@ const FIXTURES: Record<FixtureKey, Record<LegalPageId, string>> = {
 function makeResolver(key: FixtureKey): typeof resolveLegalContent {
 	return async (page): Promise<ResolvedLegalContent> => ({
 		markdown: FIXTURES[key][page],
-		source: key === "tum" ? "profile" : "disclaimer",
-		profile: key === "tum" ? "tum" : "",
+		source: key === "tumaet" ? "profile" : "disclaimer",
+		profile: key === "tumaet" ? "tumaet" : "",
 	});
 }
 
@@ -104,21 +104,21 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** TUM profile — canonical upstream imprint. */
-export const TumImprint: Story = {
+/** `tumaet` profile — canonical upstream imprint. */
+export const TumaetImprint: Story = {
 	args: {
 		page: "imprint",
 		title: LEGAL_PAGE_TITLES.imprint,
-		resolver: makeResolver("tum"),
+		resolver: makeResolver("tumaet"),
 	},
 };
 
-/** TUM profile — canonical upstream privacy statement. */
-export const TumPrivacy: Story = {
+/** `tumaet` profile — canonical upstream privacy statement. */
+export const TumaetPrivacy: Story = {
 	args: {
 		page: "privacy",
 		title: LEGAL_PAGE_TITLES.privacy,
-		resolver: makeResolver("tum"),
+		resolver: makeResolver("tumaet"),
 	},
 };
 

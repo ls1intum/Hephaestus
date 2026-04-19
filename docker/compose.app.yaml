@@ -10,7 +10,7 @@ services:
       KEYCLOAK_CLIENT_ID: hephaestus
       KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN}
       # Imprint/privacy source. Leave unset and bind-mount a host directory
-      # onto /usr/share/nginx/html/legal-overrides for forks. Use "tum" only
+      # onto /usr/share/nginx/html/legal-overrides for forks. Use "tumaet" only
       # for the canonical AET deployment. See docs/admin/legal-pages.mdx.
       LEGAL_PROFILE: ${LEGAL_PROFILE:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT}

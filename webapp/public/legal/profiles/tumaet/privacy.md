@@ -1,33 +1,33 @@
-# Privacy Statement
+Privacy Statement for Hephaestus in accordance with Art. 13 and 14 GDPR.
+
+*Last updated: 2026-04-19.*
 
 The Technical University of Munich (TUM), through the Research Group for Applied Education Technologies (AET), operates the Hephaestus platform ("Hephaestus" or "the platform"). Personal data collected through Hephaestus is processed in accordance with the General Data Protection Regulation (GDPR / DSGVO), the Bavarian Data Protection Act (BayDSG), the Bavarian Higher Education Innovation Act (BayHIG), and the German Telecommunications Digital Services Data Protection Act (TDDDG).
-
-The following sections describe the type, scope, purpose, and legal basis of the collection and processing of personal data in accordance with Art. 13 and 14 GDPR.
 
 ## 1. Controller
 
 The controller within the meaning of Art. 4(7) GDPR is:
 
 Technical University of Munich  
-Postal address: Arcisstraße 21, 80333 Munich, Germany  
+Arcisstraße 21, 80333 Munich, Germany  
+represented by its President, Prof. Dr. Thomas F. Hofmann  
 Telephone: +49 (0)89 289-01  
-Email: poststelle(at)tum.de
+Email: [poststelle@tum.de](mailto:poststelle@tum.de)
 
-The platform is operated by:
+Operational responsibility for Hephaestus lies with:
 
 Research Group for Applied Education Technologies (AET)  
 Prof. Dr. Stephan Krusche  
-Boltzmannstraße 3, 85748 Garching b. Munich, Germany  
+TUM School of Computation, Information and Technology  
+Department of Computer Science  
+Boltzmannstraße 3, 85748 Garching bei München, Germany  
 Email: [ls1.admin@in.tum.de](mailto:ls1.admin@in.tum.de)
 
 ## 2. Data Protection Officer
 
-The Data Protection Officer of the Technical University of Munich can be reached at:
-
-Dr. Fabian Franzen  
-Datenschutzbüro, Boltzmannstraße 3, 85748 Garching, Germany  
-Telephone: +49 (0)89 289-17052  
-Email: [beauftragter(at)datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)  
+Technical University of Munich — Office of the Data Protection Officer  
+Arcisstraße 21, 80333 Munich, Germany  
+Email: [beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)  
 Website: [www.datenschutz.tum.de](https://www.datenschutz.tum.de/en/datenschutz/der-datenschutzbeauftragte/)
 
 ## 3. Purpose and Scope

@@ -8,7 +8,7 @@ description: How Hephaestus resolves the /imprint and /privacy pages, and what t
 Hephaestus ships with two legal pages, `/imprint` and `/privacy`, that are rendered from Markdown files served directly by nginx. This page explains the three-layer resolution used by the webapp, and what each self-hosted operator is responsible for.
 
 :::danger Serving the built-in disclaimer in production is a legal violation
-If your deployment is reachable to end users and `/imprint` or `/privacy` still show the red "not configured" banner, you are operating without a valid imprint (§ 5 DDG) and without a valid privacy statement (Art. 13 GDPR). Either select `LEGAL_PROFILE=tum` (if you are the canonical TUM deployment) or mount your own `/legal-overrides/` directory **before** opening the deployment to users.
+If your deployment is reachable to end users and `/imprint` or `/privacy` still show the red "not configured" banner, you are operating without a valid imprint (§ 5 DDG) and without a valid privacy statement (Art. 13 GDPR). Either select `LEGAL_PROFILE=tumaet` (if you are the canonical TUM / AET deployment) or mount your own `/legal-overrides/` directory **before** opening the deployment to users.
 :::
 
 ## Operator obligations
@@ -38,13 +38,13 @@ At page load, the webapp fetches the relevant Markdown file in this priority ord
 
 ### Mode A — Bundled profile (operators of `hephaestus.aet.cit.tum.de`)
 
-If your deployment is the canonical TUM / AET deployment, set `LEGAL_PROFILE=tum` in your environment. No other configuration is needed — the `tum` profile is baked into the webapp image and contains the audited texts matching the DSMS record on file at TUM.
+If your deployment is the canonical TUM / AET deployment, set `LEGAL_PROFILE=tumaet` in your environment. No other configuration is needed — the `tumaet` profile is baked into the webapp image and contains the audited texts matching the [DSMS record](./dsms) on file at TUM.
 
 ```env
-LEGAL_PROFILE=tum
+LEGAL_PROFILE=tumaet
 ```
 
-Other operators must **not** select `LEGAL_PROFILE=tum` — the `tum` profile names TU München and the AET research group as the responsible parties and would be legally inaccurate for any other deployment.
+Other operators must **not** select `LEGAL_PROFILE=tumaet` — the `tumaet` profile names TU München and the AET research group as the responsible parties and would be legally inaccurate for any other deployment.
 
 ### Mode B — Deployment-specific overrides (recommended for forks)
 

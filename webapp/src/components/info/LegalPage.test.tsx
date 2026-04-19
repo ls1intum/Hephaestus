@@ -41,7 +41,7 @@ function makeResolver(markdown: string): typeof resolveLegalContent {
 	return async () => ({
 		markdown,
 		source: "profile",
-		profile: "tum",
+		profile: "tumaet",
 	});
 }
 
