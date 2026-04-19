@@ -17,6 +17,10 @@ query GetProjectIssues($fullPath: ID!, $first: Int!, $after: String, $updatedAft
                 createdAt
                 updatedAt
                 closedAt
+                type
+                closedAsDuplicateOf {
+                    id
+                }
                 milestone {
                     id
                     iid

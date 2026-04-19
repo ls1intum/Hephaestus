@@ -1,5 +1,5 @@
 import { CheckIcon, CopyIcon } from "@primer/octicons-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PullRequestBaseInfo, PullRequestInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
@@ -23,6 +23,7 @@ export function ReviewsPopover({
 }: ReviewsPopoverProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [showCopySuccess, setShowCopySuccess] = useState(false);
+	const copySuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const hasReviews = reviewedPullRequests.length > 0;
 	const terms = getProviderTerms(providerType);
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
@@ -75,23 +76,25 @@ export function ReviewsPopover({
 			navigator.clipboard.writeText(plainText);
 		}
 
-		// Show success indication
 		setShowCopySuccess(true);
 
-		// Reset the success indicator after 2 seconds
-		setTimeout(() => {
+		if (copySuccessTimerRef.current !== null) {
+			clearTimeout(copySuccessTimerRef.current);
+		}
+		copySuccessTimerRef.current = setTimeout(() => {
 			setShowCopySuccess(false);
+			copySuccessTimerRef.current = null;
 		}, 2000);
 	};
 
-	// Clear timeout when component unmounts
 	useEffect(() => {
 		return () => {
-			if (showCopySuccess) {
-				setShowCopySuccess(false);
+			if (copySuccessTimerRef.current !== null) {
+				clearTimeout(copySuccessTimerRef.current);
+				copySuccessTimerRef.current = null;
 			}
 		};
-	}, [showCopySuccess]);
+	}, []);
 
 	return (
 		<Popover open={isOpen} onOpenChange={setIsOpen}>

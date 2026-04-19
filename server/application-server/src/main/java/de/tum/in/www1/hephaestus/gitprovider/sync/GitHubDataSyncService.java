@@ -1106,7 +1106,8 @@ public class GitHubDataSyncService {
                 repository.getId(),
                 repository.getNameWithOwner(),
                 syncTarget.scopeId(),
-                repository.getProvider().getId()
+                repository.getProvider().getId(),
+                repository
             );
         } catch (Exception e) {
             log.warn("Commit author enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());

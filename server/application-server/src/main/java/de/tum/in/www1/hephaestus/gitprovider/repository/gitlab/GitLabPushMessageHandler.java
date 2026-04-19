@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitFileChange;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.commit.gitlab.GitLabCommitMergeRequestLinker;
 import de.tum.in.www1.hephaestus.gitprovider.commit.util.CommitUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
@@ -77,6 +78,7 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
     private final ScopeIdResolver scopeIdResolver;
     private final SyncTargetProvider syncTargetProvider;
     private final ApplicationEventPublisher eventPublisher;
+    private final GitLabCommitMergeRequestLinker commitMergeRequestLinker;
 
     GitLabPushMessageHandler(
         GitLabProjectProcessor projectProcessor,
@@ -91,6 +93,7 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         ScopeIdResolver scopeIdResolver,
         SyncTargetProvider syncTargetProvider,
         ApplicationEventPublisher eventPublisher,
+        GitLabCommitMergeRequestLinker commitMergeRequestLinker,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -107,6 +110,7 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         this.scopeIdResolver = scopeIdResolver;
         this.syncTargetProvider = syncTargetProvider;
         this.eventPublisher = eventPublisher;
+        this.commitMergeRequestLinker = commitMergeRequestLinker;
     }
 
     @Override
@@ -155,13 +159,14 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
             );
             ensureOrganizationLinked(repository, projectPath, provider);
 
+            Long scopeId = resolveScopeId(repository);
+
             // Decide between local git enrichment and webhook-only processing.
             // Local git provides line-level diff stats (additions/deletions per file).
             // Full enrichment (clone + commit walk) only for default branch pushes.
             // But we ALWAYS fetch on any branch push if the repo is already cloned,
             // so the practice review pipeline has fresh refs for diff computation.
             if (event.isDefaultBranch() && gitRepositoryManager.isEnabled()) {
-                Long scopeId = resolveScopeId(repository);
                 boolean scopeActive = scopeId != null && syncTargetProvider.isScopeActiveForSync(scopeId);
 
                 if (scopeActive) {
@@ -178,8 +183,26 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
                 }
                 processCommitsViaWebhook(event, repository, false);
             }
+
+            linkCommitsToMergeRequests(scopeId, repository);
         } else {
             log.warn("Failed to upsert project from push event: projectPath={}", safeProjectPath);
+        }
+    }
+
+    /**
+     * Runs one batched commit→MR linker pass covering MRs updated in the push window.
+     * A single GraphQL round trip replaces the per-commit call that previously ran
+     * inside {@link #publishCommitCreated}, collapsing N calls per push into 1.
+     */
+    private void linkCommitsToMergeRequests(@Nullable Long scopeId, Repository repository) {
+        if (scopeId == null) {
+            return;
+        }
+        try {
+            commitMergeRequestLinker.linkCommits(scopeId, repository, OffsetDateTime.now().minusHours(1));
+        } catch (Exception e) {
+            log.debug("Push-time commit→MR link failed: repoId={}, error={}", repository.getId(), e.getMessage());
         }
     }
 
@@ -278,8 +301,8 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         }
 
         Long providerId = repository.getProvider().getId();
-        Long authorId = authorResolver.resolveByEmail(info.authorEmail(), providerId);
-        Long committerId = authorResolver.resolveByEmail(info.committerEmail(), providerId);
+        Long authorId = authorResolver.resolveAndBackfillByEmail(info.authorEmail(), providerId);
+        Long committerId = authorResolver.resolveAndBackfillByEmail(info.committerEmail(), providerId);
 
         String message = info.message() != null ? info.message() : "";
         String htmlUrl = CommitUtils.buildGitLabCommitUrl(serverUrl, repository.getNameWithOwner(), info.sha());
@@ -439,11 +462,13 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
             return;
         }
 
+        Long scopeId = resolveScopeId(repository);
+
         EventPayload.CommitData commitData = EventPayload.CommitData.from(commit);
         EventContext context = new EventContext(
             UUID.randomUUID(),
             Instant.now(),
-            resolveScopeId(repository),
+            scopeId,
             RepositoryRef.from(repository),
             DataSource.WEBHOOK,
             null,

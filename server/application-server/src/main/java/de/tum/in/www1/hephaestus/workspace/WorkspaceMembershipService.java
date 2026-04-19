@@ -166,6 +166,57 @@ public class WorkspaceMembershipService {
         workspaceMembershipRepository.saveAll(members);
     }
 
+    /**
+     * Additively ensures that every given user has a {@link WorkspaceMembership} in
+     * the workspace, without touching existing members or roles.
+     * <p>
+     * Uses the race-safe native upsert in
+     * {@link WorkspaceMembershipRepository#insertIfAbsent}: if a membership already
+     * exists for the user, it is left untouched (role, league points, hidden flag all
+     * preserved). Only missing memberships are created with role {@code MEMBER} and
+     * default league points.
+     * <p>
+     * Intended for reconciliation paths that discover users via the team graph or
+     * other side channels and must never downgrade existing OWNER/ADMIN roles.
+     *
+     * @param workspace the workspace to ensure memberships in
+     * @param userIds   the set of user IDs that should have a membership
+     * @return the number of users processed (0 if workspace or userIds are null/empty)
+     */
+    @Transactional
+    public int ensureMemberships(Workspace workspace, Set<Long> userIds) {
+        if (workspace == null || workspace.getId() == null) {
+            return 0;
+        }
+        if (userIds == null || userIds.isEmpty()) {
+            return 0;
+        }
+
+        Long workspaceId = workspace.getId();
+        int inserted = 0;
+        for (Long userId : userIds) {
+            if (userId == null) {
+                continue;
+            }
+            inserted += workspaceMembershipRepository.insertIfAbsent(
+                workspaceId,
+                userId,
+                WorkspaceMembership.WorkspaceRole.MEMBER.name(),
+                POINTS_DEFAULT
+            );
+        }
+
+        if (inserted > 0) {
+            log.info(
+                "Ensured workspace memberships from team graph: workspaceId={}, considered={}, created={}",
+                workspaceId,
+                userIds.size(),
+                inserted
+            );
+        }
+        return inserted;
+    }
+
     @Transactional
     public void syncWorkspaceMembers(Workspace workspace, Map<Long, WorkspaceMembership.WorkspaceRole> desiredRoles) {
         if (workspace == null || workspace.getId() == null) {

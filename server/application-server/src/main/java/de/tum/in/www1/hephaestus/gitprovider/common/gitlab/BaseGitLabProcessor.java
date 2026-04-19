@@ -102,21 +102,16 @@ public abstract class BaseGitLabProcessor {
     }
 
     /**
-     * Finds or creates a user from GraphQL data (id, username, name, avatarUrl, webUrl).
+     * Finds or creates a user from GraphQL data wrapped in a {@link GitLabUserLookup}.
      * <p>
-     * Delegates to {@link GitLabUserService#findOrCreateUser(String, String, String, String, String, Long)}.
+     * Callers with access to the {@code GitLabUserFields} GraphQL fragment should populate
+     * {@link GitLabUserLookup#publicEmail()} so downstream commit-author resolution can
+     * match the user by email.
      */
     @Transactional
     @Nullable
-    public User findOrCreateUser(
-        String globalId,
-        String username,
-        @Nullable String name,
-        @Nullable String avatarUrl,
-        @Nullable String webUrl,
-        Long providerId
-    ) {
-        return gitLabUserService.findOrCreateUser(globalId, username, name, avatarUrl, webUrl, providerId);
+    public User findOrCreateUser(GitLabUserLookup lookup, Long providerId) {
+        return gitLabUserService.findOrCreateUser(lookup, providerId);
     }
 
     // ========================================================================

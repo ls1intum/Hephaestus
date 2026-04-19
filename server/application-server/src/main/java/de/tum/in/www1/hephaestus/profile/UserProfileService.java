@@ -2,15 +2,19 @@ package de.tum.in.www1.hephaestus.profile;
 
 import de.tum.in.www1.hephaestus.activity.ActivityEvent;
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
+import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
@@ -23,42 +27,29 @@ import de.tum.in.www1.hephaestus.workspace.WorkspaceContributionActivityService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for user profile data aggregation.
- *
- * <p>Uses ActivityEvent as the single source of truth for review activity,
- * consistent with leaderboard queries. This ensures profile and leaderboard
- * display identical data with the same filtering rules:
- * <ul>
- *   <li>Workspace scoping via ActivityEvent.workspace.id (not RepositoryToMonitor)</li>
- *   <li>Hidden repo exclusion via WorkspaceTeamRepositorySettings</li>
- *   <li>Human users only (type = USER)</li>
- * </ul>
- *
- * <p>Architecture:
- * <pre>
- * ActivityEvent (source of truth)    profile (this)
- * ────────────────────────────────   ─────────────────────
- * activity_event                  →  ProfileActivityStatsDTO
- * (targets: review, comment)         ProfileReviewActivityDTO
- * </pre>
- *
- * <p><strong>Entity hydration:</strong> ActivityEvent contains target IDs and XP.
- * Entity details (PR title, author, etc.) are batch-fetched from gitprovider tables
- * using the target IDs.
- *
- * <p><strong>Time range convention:</strong> Uses half-open intervals [since, until)
- * consistent with leaderboard queries.
+ * Aggregates user profile data from the ActivityEvent ledger so profile and
+ * leaderboard views stay consistent.
  */
 @Service
+@RequiredArgsConstructor
 public class UserProfileService {
 
     private static final Logger log = LoggerFactory.getLogger(UserProfileService.class);
@@ -68,6 +59,7 @@ public class UserProfileService {
     private final ProfileRepositoryQueryRepository profileRepositoryQueryRepository;
     private final ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
     private final PullRequestReviewRepository pullRequestReviewRepository;
+    private final PullRequestReviewCommentRepository pullRequestReviewCommentRepository;
     private final IssueCommentRepository issueCommentRepository;
     private final ProfileReviewActivityAssembler reviewActivityAssembler;
     private final WorkspaceMembershipService workspaceMembershipService;
@@ -75,32 +67,6 @@ public class UserProfileService {
     private final ProfileActivityQueryService profileActivityQueryService;
     private final PullRequestRepository pullRequestRepository;
     private final ActivityEventRepository activityEventRepository;
-
-    public UserProfileService(
-        UserRepository userRepository,
-        ProfileRepositoryQueryRepository profileRepositoryQueryRepository,
-        ProfilePullRequestQueryRepository profilePullRequestQueryRepository,
-        PullRequestReviewRepository pullRequestReviewRepository,
-        IssueCommentRepository issueCommentRepository,
-        ProfileReviewActivityAssembler reviewActivityAssembler,
-        WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceContributionActivityService workspaceContributionActivityService,
-        ProfileActivityQueryService profileActivityQueryService,
-        PullRequestRepository pullRequestRepository,
-        ActivityEventRepository activityEventRepository
-    ) {
-        this.userRepository = userRepository;
-        this.profileRepositoryQueryRepository = profileRepositoryQueryRepository;
-        this.profilePullRequestQueryRepository = profilePullRequestQueryRepository;
-        this.pullRequestReviewRepository = pullRequestReviewRepository;
-        this.issueCommentRepository = issueCommentRepository;
-        this.reviewActivityAssembler = reviewActivityAssembler;
-        this.workspaceMembershipService = workspaceMembershipService;
-        this.workspaceContributionActivityService = workspaceContributionActivityService;
-        this.profileActivityQueryService = profileActivityQueryService;
-        this.pullRequestRepository = pullRequestRepository;
-        this.activityEventRepository = activityEventRepository;
-    }
 
     /**
      * Get user profile with workspace-scoped activity data.
@@ -148,7 +114,7 @@ public class UserProfileService {
             workspaceId == null
                 ? List.of()
                 : profilePullRequestQueryRepository
-                      .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
+                      .findAuthoredByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
                       .stream()
                       .map(PullRequestInfoDTO::fromPullRequest)
                       .toList();
@@ -163,32 +129,19 @@ public class UserProfileService {
                       .sorted(Comparator.comparing(RepositoryInfoDTO::name))
                       .toList();
 
-        // Review activity: query PullRequestReview and IssueComment directly
-        // This ensures all reviews are shown, regardless of ActivityEvent records
-        List<ProfileReviewActivityDTO> reviewActivity = buildReviewActivity(
-            userEntity.getLogin(),
-            workspaceId,
-            timeRange
-        );
+        // Review activity uses ActivityEvent as the source of truth, then hydrates git entities.
+        List<ProfileReviewActivityDTO> reviewActivity = buildReviewActivity(userEntity.getId(), workspaceId, timeRange);
 
         // Activity stats from activity events (matches leaderboard semantics)
-        ProfileActivityStatsDTO activityStats = profileActivityQueryService
-            .getActivityStats(workspaceId, userEntity.getId(), timeRange.after(), timeRange.before())
-            .map(stats ->
-                new ProfileActivityStatsDTO.Builder()
-                    .withScore(stats.totalScore())
-                    .withNumberOfReviewedPRs(stats.reviewedPrCount())
-                    .withNumberOfApprovals(stats.approvals())
-                    .withNumberOfChangeRequests(stats.changeRequests())
-                    .withNumberOfComments(stats.comments())
-                    .withNumberOfIssueComments(stats.issueComments())
-                    .withNumberOfCodeComments(stats.codeComments())
-                    .withNumberOfUnknowns(stats.unknowns())
-                    .build()
-            )
-            .orElse(ProfileActivityStatsDTO.empty());
+        ProfileActivityStatsDTO activityStats = profileActivityQueryService.getActivityStats(
+            workspaceId,
+            userEntity.getId(),
+            timeRange.after(),
+            timeRange.before()
+        );
 
-        // Distinct PRs reviewed (hydrated from activity events)
+        // Keep the backend list aligned with leaderboard semantics; the profile UI can merge
+        // in visible own-PR activity when presenting this list.
         List<PullRequestInfoDTO> reviewedPullRequests = buildReviewedPullRequestsList(
             workspaceId,
             userEntity.getId(),
@@ -244,17 +197,10 @@ public class UserProfileService {
      * <p><strong>Time range convention:</strong> Uses half-open interval [since, until)
      * consistent with leaderboard queries.
      */
-    private List<ProfileReviewActivityDTO> buildReviewActivity(String login, Long workspaceId, TimeRange timeRange) {
-        if (workspaceId == null || login == null) {
+    private List<ProfileReviewActivityDTO> buildReviewActivity(Long userId, Long workspaceId, TimeRange timeRange) {
+        if (workspaceId == null || userId == null) {
             return List.of();
         }
-
-        // Get user ID from login
-        Optional<User> userOpt = userRepository.findByLogin(login);
-        if (userOpt.isEmpty()) {
-            return List.of();
-        }
-        Long userId = userOpt.get().getId();
 
         // Query ActivityEvent table (same source as leaderboard)
         List<ActivityEvent> activityEvents = activityEventRepository.findProfileActivityByActorInTimeframe(
@@ -271,13 +217,19 @@ public class UserProfileService {
         // Separate review events from comment events
         Set<Long> reviewIds = activityEvents
             .stream()
-            .filter(e -> "review".equals(e.getTargetType()))
+            .filter(e -> ActivityTargetType.REVIEW.getValue().equals(e.getTargetType()))
             .map(ActivityEvent::getTargetId)
             .collect(Collectors.toSet());
 
         Set<Long> commentIds = activityEvents
             .stream()
-            .filter(e -> "issue_comment".equals(e.getTargetType()))
+            .filter(e -> ActivityTargetType.ISSUE_COMMENT.getValue().equals(e.getTargetType()))
+            .map(ActivityEvent::getTargetId)
+            .collect(Collectors.toSet());
+
+        Set<Long> reviewCommentIds = activityEvents
+            .stream()
+            .filter(e -> ActivityTargetType.REVIEW_COMMENT.getValue().equals(e.getTargetType()))
             .map(ActivityEvent::getTargetId)
             .collect(Collectors.toSet());
 
@@ -296,65 +248,60 @@ public class UserProfileService {
                   .stream()
                   .collect(Collectors.toMap(IssueComment::getId, Function.identity()));
 
-        // Build XP lookup map from activity events
-        Map<Long, Double> xpByTargetId = activityEvents
+        Map<Long, PullRequestReviewComment> reviewCommentsById = reviewCommentIds.isEmpty()
+            ? Map.of()
+            : pullRequestReviewCommentRepository
+                  .findAllByIdWithRelations(reviewCommentIds)
+                  .stream()
+                  .collect(Collectors.toMap(PullRequestReviewComment::getId, Function.identity()));
+
+        Map<ActivityTargetKey, Double> xpByTarget = activityEvents
             .stream()
-            .collect(
-                Collectors.toMap(
-                    ActivityEvent::getTargetId,
-                    ActivityEvent::getXp,
-                    Double::sum // Sum if same targetId appears multiple times
+            .collect(Collectors.toMap(ActivityTargetKey::from, ActivityEvent::getXp, Double::sum));
+
+        List<ActivityEvent> distinctActivityEvents = new ArrayList<>(
+            activityEvents
+                .stream()
+                .collect(
+                    Collectors.toMap(
+                        ActivityTargetKey::from,
+                        Function.identity(),
+                        (existing, replacement) -> existing,
+                        LinkedHashMap::new
+                    )
                 )
-            );
+                .values()
+        );
 
-        // Assemble DTOs from activity events
-
-        return activityEvents
+        return distinctActivityEvents
             .stream()
             .map(event -> {
-                int xp = XpPrecision.roundToInt(xpByTargetId.getOrDefault(event.getTargetId(), 0.0));
-                if ("review".equals(event.getTargetType())) {
+                int xp = XpPrecision.roundToInt(xpByTarget.getOrDefault(ActivityTargetKey.from(event), 0.0));
+                if (ActivityTargetType.REVIEW.getValue().equals(event.getTargetType())) {
                     PullRequestReview review = reviewsById.get(event.getTargetId());
                     if (review != null) {
                         return reviewActivityAssembler.assemble(review, xp);
                     }
-                } else if ("issue_comment".equals(event.getTargetType())) {
+                } else if (ActivityTargetType.ISSUE_COMMENT.getValue().equals(event.getTargetType())) {
                     IssueComment comment = commentsById.get(event.getTargetId());
-                    if (comment != null) {
+                    if (comment != null && isPullRequestComment(comment)) {
+                        return reviewActivityAssembler.assemble(comment, xp);
+                    }
+                } else if (ActivityTargetType.REVIEW_COMMENT.getValue().equals(event.getTargetType())) {
+                    PullRequestReviewComment comment = reviewCommentsById.get(event.getTargetId());
+                    if (comment != null && !isOwnPullRequestComment(comment)) {
                         return reviewActivityAssembler.assemble(comment, xp);
                     }
                 }
                 return null;
             })
             .filter(Objects::nonNull)
-            // Deduplicate by ID (same review can have multiple events like EDITED)
-            .collect(
-                Collectors.toMap(
-                    ProfileReviewActivityDTO::id,
-                    Function.identity(),
-                    (existing, replacement) -> existing // Keep first occurrence
-                )
-            )
-            .values()
-            .stream()
             .sorted(Comparator.comparing(ProfileReviewActivityDTO::submittedAt).reversed())
             .toList();
     }
 
-    /**
-     * Build list of distinct pull requests reviewed by the user.
-     *
-     * <p>Queries activity events for distinct PR IDs, then hydrates them using
-     * the PullRequestRepository. This matches the leaderboard's approach of
-     * using activity events as the source of truth for reviewed PRs.
-     *
-     * @param workspaceId workspace to scope to
-     * @param userId      the user's ID
-     * @param timeRange   the time range for activity
-     * @return list of distinct PRs reviewed, or empty list if no data
-     */
     private List<PullRequestInfoDTO> buildReviewedPullRequestsList(Long workspaceId, Long userId, TimeRange timeRange) {
-        if (workspaceId == null || userId == null) {
+        if (workspaceId == null) {
             return List.of();
         }
 
@@ -373,11 +320,36 @@ public class UserProfileService {
     }
 
     private ProfileXpRecordDTO buildUserXpRecord(Long workspaceId, Long userId) {
-        if (workspaceId == null || userId == null) {
+        if (workspaceId == null) {
             return ProfileXpRecordDTO.empty();
         }
 
         return XpSystem.getLevelProgress(activityEventRepository.findTotalXpByWorkspaceAndActor(workspaceId, userId));
+    }
+
+    private boolean isPullRequestComment(IssueComment comment) {
+        Issue issue = comment.getIssue();
+        if (issue == null) {
+            return false;
+        }
+        // Unproxy to resolve the concrete SINGLE_TABLE subtype; a Hibernate proxy of
+        // Issue cannot be instanceof PullRequest even when the row IS a PullRequest.
+        return Hibernate.unproxy(issue) instanceof PullRequest;
+    }
+
+    private boolean isOwnPullRequestComment(PullRequestReviewComment comment) {
+        return (
+            comment.getAuthor() != null &&
+            comment.getPullRequest() != null &&
+            comment.getPullRequest().getAuthor() != null &&
+            Objects.equals(comment.getAuthor().getId(), comment.getPullRequest().getAuthor().getId())
+        );
+    }
+
+    private record ActivityTargetKey(String targetType, Long targetId) {
+        private static ActivityTargetKey from(ActivityEvent event) {
+            return new ActivityTargetKey(event.getTargetType(), event.getTargetId());
+        }
     }
 
     private record TimeRange(Instant after, Instant before) {}

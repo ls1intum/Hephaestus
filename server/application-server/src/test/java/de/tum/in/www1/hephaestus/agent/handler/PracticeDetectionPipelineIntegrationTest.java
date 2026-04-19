@@ -180,7 +180,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             "main",
             "pipelinesha",
             "basesha",
-            null
+            null,
+            null // mergeCommitSha
         );
         prId = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 50).orElseThrow().getId();
 
@@ -446,7 +447,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 "main",
                 "pipelinesha",
                 "basesha",
-                null
+                null,
+                null // mergeCommitSha
             );
 
             setJobOutput(validAgentOutput(true));
