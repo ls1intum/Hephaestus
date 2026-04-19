@@ -34,7 +34,6 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 - PostgreSQL schemas and row-level scoping ensure workspace data is not cross-accessible.
 - Each workspace's LLM-provider configuration is isolated; credentials are stored encrypted at rest and are not shared across workspaces.
 - Keycloak realm is dedicated to Hephaestus; no co-tenancy with unrelated TUM services.
-- Sentry (self-hosted) scopes events to the Hephaestus project; access is restricted to AET operators.
 
 ## 2. Integrity (Art. 32(1)(b))
 
@@ -43,13 +42,13 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 - All external traffic is TLS-terminated at Traefik (Let's Encrypt). HTTP redirects to HTTPS with HSTS `max-age=63072000; includeSubdomains; preload`.
 - Internal service-to-service traffic stays within the Docker network (application server, intelligence service, PostgreSQL, Keycloak, sandbox orchestrator).
 - WebSocket traffic uses `wss://` (TLS) in production.
-- Outbound transfers to processors (GitHub API, LLM providers, Slack, PostHog when enabled) are TLS-only. Transfer safeguards for U.S. recipients: EU-U.S. DPF adequacy decision + SCCs Module 2 fall-back (see `05-avv-checklist.md` §12).
+- Outbound transfers to processors (GitHub API, LLM providers, Slack) are TLS-only. Transfer safeguards for U.S. recipients: EU-U.S. DPF adequacy decision + SCCs Module 2 fall-back (see `05-avv-checklist.md`).
 
 ### 2.2 Input control (Eingabekontrolle)
 
 - Git is the authoritative source for all application code; changes are traceable via signed commits + PR history.
 - The GitHub Actions deployment pipeline pushes images tagged by the source commit SHA; cosign-signed images are the only artifacts allowed in production.
-- All API writes are authenticated and authorised; audit records are produced for high-value actions (workspace creation, role assignment, LLM-provider credential changes, account deletion, research-consent toggle changes).
+- All API writes are authenticated and authorised; audit records are produced for high-value actions (workspace creation, role assignment, LLM-provider credential changes, account deletion).
 
 ## 3. Availability and resilience (Art. 32(1)(b), (c))
 
@@ -86,17 +85,14 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 ## 5. Pseudonymisation, encryption, and confidentiality at rest (Art. 32(1)(a))
 
 - User accounts are linked to federated identity-provider identifiers (GitHub user ID, gitlab.lrz.de `sub`). The platform does not derive further identifiers of its own beyond surrogate primary keys.
-- Network traffic is TLS-encrypted end-to-end (browser → Traefik → internal services; Hephaestus → LLM provider / Slack / PostHog over HTTPS).
+- Network traffic is TLS-encrypted end-to-end (browser → Traefik → internal services; Hephaestus → LLM provider / Slack over HTTPS).
 - PostgreSQL and Keycloak data at rest are protected by disk-level protections on the host. Workspace-level secrets (LLM API keys, Slack tokens) are stored encrypted with a platform-level secret key held only on the application server.
-- Self-hosted Sentry ingests events over TLS; event storage is scoped to AET infrastructure.
 
 ## 6. Deletion (Löschkontrolle)
 
-- **Account deletion** (self-service, profile settings): removes the Keycloak account, the Hephaestus profile, preferences, guidance-assistant conversations, consent/objection switches, and the Contributor's identity link to their Findings. Source-side GitHub / gitlab.lrz.de content is *not* deleted by this action — that must be done on the source system separately.
+- **Account deletion** (self-service, profile settings): removes the Keycloak account, the Hephaestus profile, preferences, guidance-assistant conversations, the Art. 21 objection switch, and the Contributor's identity link to their Findings. Source-side GitHub / gitlab.lrz.de content is *not* deleted by this action — that must be done on the source system separately.
 - **Workspace deletion / repository removal** triggers deletion of synchronised Artifacts for that workspace or repository.
 - **Server logs** are rotated under a hard 14-day maximum enforced by `logrotate` (host-level, `rotate 14`) and the Docker `json-file` log driver (`max-size=10m`, `max-file=14`).
-- **Sentry events** are retained 90 days at the event level (Sentry default).
-- **PostHog events** (when deployment-enabled) are retained 7 years at the PostHog default; the research-consent withdrawal stops further events at the client.
 - **LLM-provider-side retention** is bounded by enterprise no-training terms; default 30-day retention, shorter where Zero Data Retention has been negotiated per workspace. After the provider's window, prompts are not associated with the deleted account.
 - **Backups** follow the 30-day PostgreSQL / Keycloak rolling retention. On restore after an account deletion, the application-level deletion log is re-applied to prevent re-materialising deleted data.
 
@@ -112,12 +108,10 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 
 | Component | Role | AVV / framework | Default state |
 |---|---|---|---|
-| AET operations (self-hosted Sentry, `sentry.ase.in.tum.de`) | Error telemetry | In-house; TUM-internal framework | Always on |
 | AET operations (TUM SMTP relay) | Email delivery (Keycloak lifecycle) | In-house; TUM-internal framework | Always on |
 | GitHub, Inc. / Microsoft Corporation | Identity provider (OAuth) and source-system API | AVV at TUM/AET level | Always on for GitHub-federated workspaces |
 | OpenAI, L.P. | LLM provider (per workspace) | AVV at TUM/AET level for TUM-operated tenancy; at workspace administrator's institution when that institution supplies credentials | Per-workspace, opt-in |
 | Microsoft Corporation (Azure OpenAI Service) | LLM provider (per workspace) | AVV as above | Per-workspace, opt-in |
 | Anthropic, PBC | LLM provider (per workspace) | AVV as above | Per-workspace, opt-in |
 | Salesforce, Inc. / Slack Technologies, LLC | Workspace notifications (when enabled by the workspace admin) | AVV at TUM/AET level | Per-workspace, opt-in |
-| PostHog Inc. | Product analytics (page/feature events, Keycloak user ID, IP) | AVV at TUM/AET level; engaged only when `POSTHOG_ENABLED=true` and the Contributor has not withdrawn research-participation consent | Off by default |
 | Leibniz-Rechenzentrum der BAdW (gitlab.lrz.de) | Source system and OIDC identity provider | **Not Art. 28** — separate controller under Art. 16 Abs. 1 Satz 2 BayHIG + BAdW-Satzung (public-body cooperation; EDPB 07/2020 § 22) | Per-workspace, opt-in |

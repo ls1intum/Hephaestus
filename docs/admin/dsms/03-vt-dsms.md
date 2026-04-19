@@ -77,14 +77,12 @@ The essence of the Art. 26(2) Satz 2 arrangement is made available to data subje
 
 See `05-avv-checklist.md` for the full table. In summary, engaged processors (ordered internal → platform-wide → per-workspace) are:
 
-- **AET operations (self-hosted Sentry on `sentry.ase.in.tum.de`)** — platform-wide error telemetry. In-house; TUM-internal framework.
 - **AET operations (TUM SMTP relay via the TUM mail infrastructure)** — email delivery for Keycloak account lifecycle (verification, password reset). In-house; TUM-internal framework.
 - **GitHub, Inc. / Microsoft Corporation** — identity provider (OAuth) and source-system API (pull requests, issues, reviews, commits synchronised on behalf of the controller via the workspace-configured GitHub App installation or access token). AVV in place at TUM/AET level.
 - **OpenAI, L.P.** — LLM provider for workspaces configured to use it. AVV at TUM/AET level for the TUM-operated tenancy; AVV at the workspace administrator's institution level when that institution supplies the API credentials (shared-responsibility model, §3.2).
 - **Microsoft Corporation (Azure OpenAI Service)** — LLM provider for workspaces configured to use it. Region-configurable; EU-region deployments process within the EU. AVV as above.
 - **Anthropic, PBC** — LLM provider for workspaces configured to use it. AVV as above.
 - **Salesforce, Inc. / Slack Technologies, LLC** — workspace notifications and engagement digests when the workspace administrator has enabled Slack. AVV in place at TUM/AET level.
-- **PostHog Inc.** — product-analytics processor. Engaged only when `POSTHOG_ENABLED=true` is set for the deployment and the individual Contributor has not withdrawn their research-participation consent. AVV in place at TUM/AET level when engaged.
 
 The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation framework (Art. 16 Abs. 1 Satz 2 BayHIG in conjunction with the BAdW-Satzung). LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-avv-checklist.md` for the full EDPB 07/2020 analysis.
 
@@ -102,8 +100,7 @@ Pre-populated by DSMS. Verify:
 4. Deliver adaptive Guidance back to Contributors via dashboards, the conversational guidance assistant, and automated practice-review comments on pull/merge requests.
 5. Surface workspace engagement and recognition features (leaderboards, leagues, achievements) where the workspace administrator has enabled them.
 6. Deliver workspace notifications over email (TUM SMTP) and — where the workspace administrator has enabled it — Slack.
-7. Operate the service reliably and securely (server logs, backups, self-hosted error telemetry) and troubleshoot incidents.
-8. Improve the platform through consent-gated product analytics where `POSTHOG_ENABLED=true` for the deployment and the Contributor has not withdrawn their research-participation consent.
+7. Operate the service reliably and securely (server logs, backups) and troubleshoot incidents.
 
 ### 6. Name of IT system / procedure
 
@@ -116,8 +113,6 @@ Stack:
   - Identity:           Self-hosted Keycloak (GitHub OAuth + gitlab.lrz.de OIDC)
   - Review sandbox:     Isolated Docker containers with per-job LLM proxy
   - Reverse proxy:      Traefik v3 / Let's Encrypt
-  - Error telemetry:    Self-hosted Sentry at sentry.ase.in.tum.de (AET-operated)
-  - Product analytics:  PostHog, off by default, research-consent gated when on
   - Deployment:         Docker Compose on AET servers at TUM
 Source (MIT): github.com/ls1intum/Hephaestus
 ```
@@ -130,8 +125,6 @@ Source (MIT): github.com/ls1intum/Hephaestus
 | Core service for non-TUM Contributors (external open-source contributors, partner-university members) | **Art. 6(1)(b) GDPR** (performance of the service the Contributor requested by signing in) |
 | AI-assisted features (guidance assistant, practice review) | Same as the row above; Contributors may object under **Art. 21 GDPR** via the "AI review comments" profile toggle (stops future transmissions; does not by itself delete previously generated Findings) |
 | Server logs & reverse-proxy logs | **Art. 6(1)(e) GDPR** i.V.m. **Art. 4 Satz 1 BayHIG**, **Art. 25 Abs. 1 BayDSG**, **Art. 8 BayDiG** (operation and security of a university IT service) |
-| Error telemetry (self-hosted Sentry) | **Art. 6(1)(e) GDPR** i.V.m. **Art. 4 Satz 1 BayHIG**, **Art. 25 Abs. 1 BayDSG**, **Art. 8 BayDiG** (security and operability of the service; Sentry runs on AET infrastructure and is not shared with third parties) |
-| Product analytics (PostHog) when `POSTHOG_ENABLED=true` | **Art. 6(1)(a) GDPR** (consent; implemented as the "Participate in research" toggle in profile settings; the toggle defaults to active only while PostHog is disabled platform-wide, and any analytics event is suppressed once the Contributor deactivates it — see Art. 7(3) GDPR withdrawal) |
 | Keycloak session cookies and theme-preference localStorage | **§ 25 Abs. 2 Nr. 2 TDDDG** (technisch unbedingt erforderlich für einen vom Nutzer ausdrücklich gewünschten Telemediendienst) i.V.m. **Art. 6(1)(e) GDPR** |
 
 ### 8. Categories of data subjects (Art. 30(1)(c))
@@ -147,11 +140,9 @@ Tick in DSMS:
 
 - **Identity & authentication (Keycloak):** external user ID at the identity provider (GitHub user ID or `sub` claim from gitlab.lrz.de), username / login, email, full name, avatar URL, profile URL.
 - **Development activity (synchronised from source systems):** pull/merge requests, issues, code reviews, review comments, commit metadata, repository collaborator and team-membership metadata, and profile information of authors of these artifacts.
-- **Account settings & recognition:** notification preferences, UI display options, workspace memberships and roles, leaderboard rank, league assignment, achievement progress, the "AI review comments" Art. 21 objection switch, the "Participate in research" research-consent switch.
+- **Account settings & recognition:** notification preferences, UI display options, workspace memberships and roles, leaderboard rank, league assignment, achievement progress, the "AI review comments" Art. 21 objection switch.
 - **AI-assisted features:** guidance-assistant messages + AI-generated responses, conversation threads, feedback (helpful / not helpful), practice-review findings (verdict, severity, evidence, reasoning), guidance text delivered back to the Contributor.
 - **Server logs (14-day cap):** IP address, timestamp, HTTP method, URL, status code, bytes transferred, user-agent, referrer.
-- **Error telemetry (self-hosted Sentry):** stack trace, breadcrumbs, browser environment, Keycloak user ID and IP of the affected Contributor (`sendDefaultPii: true`).
-- **Product analytics (PostHog — only when deployment-enabled and Contributor-consented):** Keycloak user ID, page-view events, feature-usage events, platform/browser metadata, IP address.
 - **Browser-side storage:** Keycloak session cookies; theme preference in localStorage. No identifying data in localStorage.
 
 ### 10. Special categories (Art. 9 / Art. 10)
@@ -161,9 +152,8 @@ Tick in DSMS:
 ### 11. Categories of recipients (Art. 30(1)(d))
 
 - **Internal:** AET administrators / developers (operation, maintenance, support); workspace members (see workspace-level Findings and dashboards as described in §6 of the privacy statement).
-- **Internal (AET-operated processors):** self-hosted Sentry on `sentry.ase.in.tum.de` (error telemetry, always on); TUM SMTP relay (Keycloak account lifecycle emails).
+- **Internal (AET-operated processors):** TUM SMTP relay (Keycloak account lifecycle emails).
 - **External (Art. 28 processors), as configured per workspace:** GitHub / Microsoft; the LLM provider configured for the workspace (OpenAI / Azure OpenAI / Anthropic); Slack (when enabled).
-- **External (Art. 28 processors), when deployment-enabled:** PostHog (only when `POSTHOG_ENABLED=true` for the deployment and the Contributor has not withdrawn research-participation consent).
 - **External (separate controllers, not Art. 28):** Leibniz-Rechenzentrum der BAdW for gitlab.lrz.de integration.
 - **No sale, no advertising recipients, no brokers.**
 
@@ -175,7 +165,6 @@ All U.S.-based recipients are certified under the EU–U.S. Data Privacy Framewo
 - **OpenAI, L.P.** — DPF-certified (active; to be re-verified). SCCs Module 2 as fall-back.
 - **Anthropic, PBC** — DPF-certified (active; to be re-verified). SCCs Module 2 as fall-back.
 - **Salesforce, Inc. (Slack)** — DPF-certified (active; to be re-verified). SCCs Module 2 as fall-back.
-- **PostHog Inc.** — DPF-certified (active; to be re-verified). SCCs Module 2 as fall-back. Engaged only under the preconditions in §11.
 
 ### 13. Retention periods per data category (Art. 30(1)(f))
 
@@ -183,13 +172,11 @@ All U.S.-based recipients are certified under the EU–U.S. Data Privacy Framewo
 |---|---|
 | Identity data in Keycloak + Hephaestus DB | Account lifetime; removed on user-triggered account deletion |
 | Development activity synchronised from GitHub / gitlab.lrz.de | For as long as the repository and workspace are configured; source-side content on GitHub / gitlab.lrz.de is not affected by deletions inside Hephaestus |
-| Account settings, notification prefs, recognition signals, consent/objection switches | Account lifetime |
+| Account settings, notification prefs, recognition signals, Art. 21 objection switch | Account lifetime |
 | Guidance-assistant conversations | Account lifetime; deletable on request |
 | Practice-review Findings | Workspace lifetime; deletable on request |
 | LLM-provider-side prompts | Up to 30 days (enterprise default abuse-monitoring); shorter where Zero Data Retention has been negotiated per workspace |
 | Server access logs (app server + reverse proxy) | **Hard 14-day maximum** enforced by `logrotate` (host-level, rotated daily with `rotate 14`) and the Docker `json-file` log driver (`max-size=10m`, `max-file=14`). Longer only where strictly necessary for an ongoing security incident, then deleted at closure |
-| Self-hosted Sentry events | 90 days at the event level (Sentry default); project-level override documented in AET ops |
-| PostHog events (when deployment-enabled) | 7 years (PostHog default); no TUM-level override requested at the current scope |
 | Backups — PostgreSQL | Daily full backup, 30-day rolling retention (AET ops baseline, pg_dump + nightly rsync to AET backup host) |
 | Backups — Keycloak realm | Daily JSON realm export, 30-day rolling retention |
 | Backups — gitlab.lrz.de (LRZ-side, for deleted content) | LRZ retains its own backup window of up to 6 months for content already removed on the LRZ side, independent of Hephaestus |
@@ -223,11 +210,10 @@ Not applicable as a separate upload; Hephaestus is self-hosted by AET on TUM inf
 
 ### 20. Source of data
 
-- Directly from the data subject: profile settings, notification preferences, guidance-assistant messages, feedback, consent/objection switches.
+- Directly from the data subject: profile settings, notification preferences, guidance-assistant messages, feedback, the Art. 21 objection switch.
 - From federated identity providers (GitHub, gitlab.lrz.de) via OAuth / OIDC during sign-in.
 - From source-system APIs (GitHub, gitlab.lrz.de) via the workspace-configured installation / access token: repository Events and Artifacts authored by the Contributor.
 - From the underlying HTTP connection: IP address, user-agent (standard web-server logging, 14-day cap).
-- From the Contributor's browser: error telemetry to the self-hosted Sentry, and — where enabled and consented — PostHog product-analytics events.
 
 ### 21. Data-subject rights contact
 

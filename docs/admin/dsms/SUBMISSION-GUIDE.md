@@ -15,8 +15,7 @@ Follow these steps in order. Target: [https://dsms.datenschutz.tum.de/](https://
    - Server / reverse-proxy log rotation at the 14-day hard maximum (`logrotate` + Docker `json-file` log driver on `hephaestus-prod.aet.cit.tum.de`).
    - PostgreSQL and Keycloak backup jobs at 30-day rolling retention on the AET backup host.
    - LLM providers enabled in production and, for each, whether Zero Data Retention is in effect.
-   - Self-hosted Sentry active at `sentry.ase.in.tum.de`, event retention at the Sentry default of 90 days.
-   - `POSTHOG_ENABLED` value for the deployment; if enabled, confirm the research-consent gate is honoured at the client.
+   - `SENTRY_DSN` is still empty and `POSTHOG_ENABLED=false` in production. If either has been activated, the VVT, privacy statement, and AVV checklist must be amended first (see `05-avv-checklist.md`, "Follow-up if the VVT surface changes").
 3. Have at hand: TUM login + edit access on the Hephaestus repo (for privacy-page updates).
 
 ## Phase 1 — Ship the privacy page
@@ -27,10 +26,10 @@ The live privacy page is at [https://hephaestus.aet.cit.tum.de/privacy](https://
 - DPO: **[beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)**.
 - §3.1 names **gitlab.lrz.de / Leibniz-Rechenzentrum der BAdW** as a separate controller under the Art. 16 Abs. 1 Satz 2 BayHIG public-body cooperation framing, **not** an Art. 28 processor.
 - §3.2 documents the shared-responsibility model (workspace admin configures LLM credentials, Slack, leaderboards, practice catalog, auto-trigger) with the Art. 26(2) Satz 1 duty allocation.
-- §4 lists: identity + authentication, development activity (GitHub + gitlab.lrz.de), account settings + recognition + consent switches, AI-assisted features, server logs (14-day cap), self-hosted error telemetry, research-consent-gated product analytics.
-- §6 lists every recipient: GitHub, LLM provider per workspace (OpenAI / Azure OpenAI / Anthropic), Slack, TUM SMTP relay, AET-operated self-hosted Sentry, PostHog (deployment-gated + consent-gated).
+- §4 lists: identity + authentication, development activity (GitHub + gitlab.lrz.de), account settings + recognition + the "AI review comments" Art. 21 objection switch, AI-assisted features, and server logs (14-day cap). It does **not** claim active Sentry or PostHog processing — both integrations are disabled in production.
+- §6 lists every recipient: GitHub, LLM provider per workspace (OpenAI / Azure OpenAI / Anthropic), Slack, TUM SMTP relay.
 - §7 covers third-country transfers under DPF + SCCs Module 2 fall-back.
-- Legal basis table: **Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG** for TUM Contributors; **Art. 6(1)(b) GDPR** for non-TUM Contributors; **Art. 6(1)(a) GDPR** for consent-gated product analytics.
+- Legal basis table: **Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG** for TUM Contributors; **Art. 6(1)(b) GDPR** for non-TUM Contributors.
 - Cookies section names only Keycloak session cookies and the theme-preference localStorage key under **§ 25 Abs. 2 Nr. 2 TDDDG**.
 - Complaint authority: **Der Bayerische Landesbeauftragte für den Datenschutz (BayLfD)**.
 
@@ -97,8 +96,8 @@ Status progression: Draft → Submitted → Precheck Done → Ready for DPO appr
 Check yearly:
 
 - Re-read this package; does anything disagree with deployed reality?
-- Has the app gained a new identity provider, a new source system, a new LLM provider, or new analytics? If yes, amend VVT + privacy page before re-submitting.
-- Have log-retention, backup-retention, LLM-provider retention windows, Sentry event retention, or PostHog event retention changed?
+- Has the app gained a new identity provider, a new source system, a new LLM provider, or activated the built-in Sentry/PostHog integrations? If yes, amend VVT + privacy page + AVV checklist before re-submitting.
+- Have log-retention, backup-retention, or LLM-provider retention windows changed?
 - Has the AI-assisted feature surface grown to the point that a full DPIA (not just the pre-screen) is warranted?
 - Re-verify DPF certification status for each U.S. recipient against the U.S. Department of Commerce list.
 

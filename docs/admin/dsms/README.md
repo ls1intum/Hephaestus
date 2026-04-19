@@ -11,7 +11,7 @@ This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis
 
 ## Scope
 
-Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external and internal processors: LLM providers configured per workspace (OpenAI / Microsoft Azure OpenAI / Anthropic), Slack (when enabled per workspace), the TUM SMTP relay, the AET-operated self-hosted Sentry instance for error telemetry, and — only where `POSTHOG_ENABLED=true` for the deployment and the Contributor has not withdrawn their research-participation consent — PostHog product analytics. Server access logs contain IP addresses and are rotated with a hard 14-day maximum under logrotate + the Docker `json-file` log driver.
+Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external and internal processors: LLM providers configured per workspace (OpenAI / Microsoft Azure OpenAI / Anthropic), Slack (when enabled per workspace), and the TUM SMTP relay. Server access logs contain IP addresses and are rotated with a hard 14-day maximum under logrotate + the Docker `json-file` log driver.
 
 ## Contents
 
@@ -37,7 +37,6 @@ Markdown source lives under [`webapp/public/legal/profiles/tumaet/`](https://git
 - Repository synchronisation from GitHub and gitlab.lrz.de into workspace-scoped datasets.
 - AI-assisted guidance and automated practice review calling a workspace-configured LLM provider under enterprise no-training terms.
 - Engagement and recognition features (leaderboards, leagues, achievements) gated per workspace.
-- Internal self-hosted error telemetry (Sentry on TUM infrastructure) and optional product analytics (PostHog) gated by the Contributor's research-participation switch in profile settings.
 - No special-category data (Art. 9 GDPR). No Art. 22 automated decision-making.
 - Residual elevated risk on the AI-assisted feature surface is covered by the BayLfD innovative-technology criterion and the mitigations documented in `02-dsfa-prescreen.md` §5.
 
@@ -47,7 +46,8 @@ Re-review the VVT once per year:
 
 - Has the deployed stack changed? (new processor, new data category, new retention window?)
 - Has the platform added a new LLM provider or a new source system? Any of these requires an amended VVT, an amended privacy page, and a new row in the AVV checklist.
-- Are the retention figures in `03-vt-dsms.md` still matching the deployed config (server-log rotation, PostgreSQL / Keycloak backup schedules, LLM provider retention windows, Sentry event retention, PostHog event retention where enabled)?
+- Are the retention figures in `03-vt-dsms.md` still matching the deployed config (server-log rotation, PostgreSQL / Keycloak backup schedules, LLM provider retention windows)?
+- Has the deployment activated any of the optional integrations that are *currently disabled* (e.g. the built-in Sentry client, the built-in PostHog client)? If yes, amend the VVT, the AVV checklist, and the privacy statement before the activation goes live.
 - Has the scope of AI-assisted features grown to the point that the DPIA pre-screen in `02-dsfa-prescreen.md` must be upgraded to a full DPIA under the BayLfD template?
 
 ## Emergency — DSB rejection
