@@ -1,21 +1,102 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import {
+	LEGAL_PAGE_TITLES,
+	type LegalPageId,
+	type ResolvedLegalContent,
+	type resolveLegalContent,
+} from "@/lib/legal";
 import { LegalPage } from "./LegalPage";
 
+const TUM_IMPRINT = `Information in accordance with § 5 DDG — German Digital Services Act.
+
+## Publisher
+
+Technical University of Munich  \nArcisstraße 21  \n80333 Munich, Germany
+
+## Responsible for Content
+
+Prof. Dr. Stephan Krusche  \nApplied Education Technologies (AET)  \nBoltzmannstraße 3  \n85748 Garching bei München, Germany
+`;
+
+const TUM_PRIVACY = `# Privacy Statement
+
+The Technical University of Munich (TUM), through AET, operates the Hephaestus platform.
+
+## 1. Controller
+
+Technical University of Munich  \nArcisstraße 21, 80333 Munich, Germany
+
+## 7. Third-Country Transfers
+
+Recipients in the U.S. are DPF-certified under Art. 45(3) GDPR; SCCs under Art. 46(2)(c) GDPR serve as a fall-back.
+`;
+
+const DISCLAIMER_IMPRINT = `# Imprint not configured
+
+This Hephaestus instance has been deployed without a legal profile.
+
+The operator is legally required under § 5 DDG to identify itself and cannot rely on this fallback.
+`;
+
+const DISCLAIMER_PRIVACY = `# Privacy statement not configured
+
+This Hephaestus instance has been deployed without a legal profile. The operator remains the controller under Art. 4(7) GDPR and owes a transparent privacy statement (Art. 13 / 14 GDPR).
+`;
+
+type FixtureKey = "tumaet" | "disclaimer";
+const FIXTURES: Record<FixtureKey, Record<LegalPageId, string>> = {
+	tumaet: {
+		imprint: TUM_IMPRINT,
+		privacy: TUM_PRIVACY,
+	},
+	disclaimer: {
+		imprint: DISCLAIMER_IMPRINT,
+		privacy: DISCLAIMER_PRIVACY,
+	},
+};
+
+function makeResolver(key: FixtureKey): typeof resolveLegalContent {
+	return async (page): Promise<ResolvedLegalContent> => ({
+		markdown: FIXTURES[key][page],
+		source: key === "tumaet" ? "profile" : "disclaimer",
+		profile: key === "tumaet" ? "tumaet" : "",
+	});
+}
+
 /**
- * Legal page component for displaying Imprint and Privacy Policy information.
- * Renders HTML content with proper styling.
+ * Renders an imprint or privacy page from Markdown resolved through the
+ * operator-override → bundled-profile → disclaimer cascade. Stories inject a
+ * fixture resolver so each variant mounts without network I/O.
  */
 const meta = {
 	component: LegalPage,
 	tags: ["autodocs"],
+	parameters: {
+		layout: "padded",
+		docs: {
+			description: {
+				component:
+					"Legal-page shell used by `/imprint` and `/privacy`. Resolves the Markdown body through a three-layer cascade and surfaces a disclaimer banner when the shipped fallback is active.",
+			},
+		},
+	},
 	argTypes: {
+		page: {
+			description: "Which legal page to render.",
+			control: { type: "inline-radio" },
+			options: ["imprint", "privacy"] satisfies LegalPageId[],
+		},
 		title: {
-			description: "Title displayed at the top of the legal page",
+			description: "Page title (shown above the Markdown body).",
 			control: "text",
 		},
-		content: {
-			description: "HTML content to be rendered on the page",
-			control: "text",
+		resolver: {
+			description: "Injected async resolver (fixture in stories, real fetcher in prod).",
+			control: false,
+		},
+		profileOverride: {
+			description: "Forces a specific profile; production reads `environment.legal.profile`.",
+			control: false,
 		},
 	},
 } satisfies Meta<typeof LegalPage>;
@@ -23,76 +104,38 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Example imprint content for the story
-const imprintContent = `
-  <h2>Project Information</h2>
-  <p>Hephaestus Project<br/>
-  Technical University of Munich<br/>
-  Department of Informatics<br/>
-  Chair for Applied Software Engineering<br/>
-  Germany</p>
-
-  <h2>Contact</h2>
-  <p>Email: info@example.com<br/>
-  Phone: +49 123 456789</p>
-
-  <h2>Project Lead</h2>
-  <p>Felix T.J. Dietrich</p>
-
-  <h2>Data Protection</h2>
-  <p>We take data protection seriously. See our Privacy Policy for details.</p>
-`;
-
-// Example privacy policy content for the story
-const privacyContent = `
-  <h2>Privacy Policy</h2>
-  <p>Last updated: May 10, 2025</p>
-  
-  <h3>1. Introduction</h3>
-  <p>This Privacy Policy explains how the Hephaestus project ("we", "us", or "our") collects, uses, and shares your personal information when you use our services.</p>
-  
-  <h3>2. Information We Collect</h3>
-  <p>We may collect the following types of information:</p>
-  <ul>
-    <li>Personal information provided during registration (name, email address)</li>
-    <li>GitHub profile information when you connect your GitHub account</li>
-    <li>Usage data regarding your interactions with our platform</li>
-  </ul>
-  
-  <h3>3. How We Use Your Information</h3>
-  <p>We use the information we collect to:</p>
-  <ul>
-    <li>Provide, maintain, and improve our services</li>
-    <li>Process and analyze GitHub repository data to provide insights</li>
-    <li>Communicate with you about your account or our services</li>
-  </ul>
-  
-  <h3>4. Data Storage and Security</h3>
-  <p>We implement appropriate security measures to protect your personal information.</p>
-  
-  <h3>5. Contact Us</h3>
-  <p>If you have any questions about this Privacy Policy, please contact us at privacy@example.com.</p>
-`;
-
-/**
- * Imprint legal information showing project details, contacts, and data protection.
- */
-/**
- * Imprint page displaying legal contact and responsible entity information.
- */
-export const Imprint: Story = {
+/** `tumaet` profile — canonical upstream imprint. */
+export const TumaetImprint: Story = {
 	args: {
-		title: "Imprint",
-		content: imprintContent,
+		page: "imprint",
+		title: LEGAL_PAGE_TITLES.imprint,
+		resolver: makeResolver("tumaet"),
 	},
 };
 
-/**
- * Privacy Policy detailing how user data is collected, used, and protected.
- */
-export const Privacy: Story = {
+/** `tumaet` profile — canonical upstream privacy statement. */
+export const TumaetPrivacy: Story = {
 	args: {
-		title: "Privacy Policy",
-		content: privacyContent,
+		page: "privacy",
+		title: LEGAL_PAGE_TITLES.privacy,
+		resolver: makeResolver("tumaet"),
+	},
+};
+
+/** Safety fallback shown when no profile is configured (imprint). */
+export const DisclaimerImprint: Story = {
+	args: {
+		page: "imprint",
+		title: LEGAL_PAGE_TITLES.imprint,
+		resolver: makeResolver("disclaimer"),
+	},
+};
+
+/** Safety fallback shown when no profile is configured (privacy). */
+export const DisclaimerPrivacy: Story = {
+	args: {
+		page: "privacy",
+		title: LEGAL_PAGE_TITLES.privacy,
+		resolver: makeResolver("disclaimer"),
 	},
 };
