@@ -20,36 +20,48 @@ public class MockSecurityContextUtils {
 
     /**
      * Creates a security context with JWT authentication for the specified user.
+     * <p>
+     * When {@code githubId > 0} the {@code github_id} claim is set to that value — this
+     * matches the production Keycloak IdP mapper so the app can resolve the user by
+     * {@code (provider, native_id)} rather than falling back to {@code preferred_username}.
+     * Pass {@code 0L} to omit the claim (e.g. to exercise unauthenticated paths).
      *
      * @param username the username for the JWT claims
      * @param userId the user ID for the JWT claims
      * @param authorities the authorities/roles for the user
      * @param tokenValue the JWT token value (used to identify user type in TestSecurityConfig)
+     * @param githubId value for the {@code github_id} claim, or {@code 0} to omit
+     * @param gitlabId value for the {@code gitlab_id} claim, or {@code 0} to omit
      * @return configured SecurityContext
      */
     public static SecurityContext createSecurityContext(
         String username,
         String userId,
         String[] authorities,
-        String tokenValue
+        String tokenValue,
+        long githubId,
+        long gitlabId
     ) {
         SecurityContext context = SecurityContextHolder.createEmptyContext();
 
-        // Create mock JWT claims
         Map<String, Object> claims = new HashMap<>();
         claims.put("sub", userId);
         claims.put("preferred_username", username);
         claims.put("iss", "https://test-issuer");
         claims.put("aud", "test-audience");
+        if (githubId > 0) {
+            claims.put("github_id", githubId);
+        }
+        if (gitlabId > 0) {
+            claims.put("gitlab_id", gitlabId);
+        }
 
-        // Add realm access with roles
         if (authorities.length > 0) {
             Map<String, Object> realmAccess = new HashMap<>();
             realmAccess.put("roles", Arrays.asList(authorities));
             claims.put("realm_access", realmAccess);
         }
 
-        // Create mock JWT with specified token value
         Jwt jwt = Jwt.withTokenValue(tokenValue)
             .header("alg", "HS256")
             .header("typ", "JWT")
@@ -58,15 +70,27 @@ public class MockSecurityContextUtils {
             .expiresAt(Instant.now().plusSeconds(3600))
             .build();
 
-        // Create authorities from the annotation
         var springAuthorities = Arrays.stream(authorities)
             .map(SimpleGrantedAuthority::new)
             .collect(Collectors.toList());
 
-        // Create JWT authentication token
         Authentication authentication = new JwtAuthenticationToken(jwt, springAuthorities);
         context.setAuthentication(authentication);
 
         return context;
+    }
+
+    /**
+     * Convenience overload that omits identity claims. Prefer the full overload so test
+     * fixtures exercise the primary {@code (provider, native_id)} resolution path rather
+     * than only the legacy login lookup.
+     */
+    public static SecurityContext createSecurityContext(
+        String username,
+        String userId,
+        String[] authorities,
+        String tokenValue
+    ) {
+        return createSecurityContext(username, userId, authorities, tokenValue, 0L, 0L);
     }
 }

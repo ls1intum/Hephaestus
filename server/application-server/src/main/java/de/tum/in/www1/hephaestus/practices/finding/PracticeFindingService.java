@@ -1,8 +1,8 @@
 package de.tum.in.www1.hephaestus.practices.finding;
 
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.practices.finding.dto.ContributorPracticeSummaryProjection;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
@@ -20,19 +20,23 @@ import org.springframework.transaction.annotation.Transactional;
  * Service for reading practice findings scoped to the authenticated contributor.
  *
  * <p>All methods resolve the current user from the security context via
- * {@link UserRepository#getCurrentUser()}. If the user is not yet synced as a
+ * {@link AuthenticatedUserService#findPrimaryUser()}. If the user is not yet synced as a
  * contributor (e.g., first login before any PR activity), list/summary endpoints
  * return empty results rather than failing.
  *
  * <p>For single-finding access, contributor ownership is enforced in SQL — a
  * non-owner receives 404 (not 403) to avoid leaking finding existence.
+ *
+ * <p>Known gap: findings are keyed to a single provider row on the contributor. For a
+ * Keycloak account with both GitHub and GitLab identities linked, only findings from the
+ * primary row are returned today; a dedicated multi-contributor query is a follow-up.
  */
 @Service
 @RequiredArgsConstructor
 public class PracticeFindingService {
 
     private final PracticeFindingRepository practiceFindingRepository;
-    private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
 
     /**
      * Paginated findings for the current user in a workspace, with optional filters.
@@ -46,7 +50,7 @@ public class PracticeFindingService {
         Verdict verdict,
         Pageable pageable
     ) {
-        Optional<User> currentUser = userRepository.getCurrentUser();
+        Optional<User> currentUser = authenticatedUserService.findPrimaryUser();
         if (currentUser.isEmpty()) {
             return Page.empty(pageable);
         }
@@ -66,7 +70,7 @@ public class PracticeFindingService {
      */
     @Transactional(readOnly = true)
     public List<ContributorPracticeSummaryProjection> getSummary(Long workspaceId) {
-        Optional<User> currentUser = userRepository.getCurrentUser();
+        Optional<User> currentUser = authenticatedUserService.findPrimaryUser();
         if (currentUser.isEmpty()) {
             return List.of();
         }
@@ -82,7 +86,7 @@ public class PracticeFindingService {
      */
     @Transactional(readOnly = true)
     public PracticeFinding getFinding(Long workspaceId, UUID findingId) {
-        Optional<User> currentUser = userRepository.getCurrentUser();
+        Optional<User> currentUser = authenticatedUserService.findPrimaryUser();
         if (currentUser.isEmpty()) {
             throw new EntityNotFoundException("PracticeFinding", findingId.toString());
         }

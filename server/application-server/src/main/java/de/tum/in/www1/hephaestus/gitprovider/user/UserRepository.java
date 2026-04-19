@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
-import de.tum.in.www1.hephaestus.SecurityUtils;
-import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -11,14 +10,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     @Query(
         """
             SELECT u
             FROM User u
-            WHERE u.login ILIKE :login
+            WHERE LOWER(u.login) = LOWER(:login)
             ORDER BY u.id
         """
     )
@@ -36,7 +34,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
             SELECT u
             FROM User u
-            WHERE u.login ILIKE :login
+            WHERE LOWER(u.login) = LOWER(:login)
               AND u.provider.id = :providerId
         """
     )
@@ -46,7 +44,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
             SELECT u
             FROM User u
-            WHERE u.email ILIKE :email
+            WHERE LOWER(u.email) = LOWER(:email)
             ORDER BY u.id
         """
     )
@@ -64,7 +62,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
             SELECT u
             FROM User u
-            WHERE u.email ILIKE :email
+            WHERE LOWER(u.email) = LOWER(:email)
               AND u.provider.id = :providerId
         """
     )
@@ -131,21 +129,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
         return findAllByTeamIds(List.of(teamId));
     }
 
-    /**
-     * @return existing user object by current user login
-     */
-    default Optional<User> getCurrentUser() {
-        var currentUserLogin = SecurityUtils.getCurrentUserLogin();
-        return currentUserLogin.flatMap(this::findByLogin);
-    }
-
-    /**
-     * @return existing user object by current user login
-     */
-    default User getCurrentUserElseThrow() {
-        return getCurrentUser().orElseThrow(() -> new EntityNotFoundException("User", "current authenticated user"));
-    }
-
     @Query(
         """
             SELECT u
@@ -156,6 +139,27 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllByLoginLowerIn(@Param("logins") Set<String> logins);
 
     Optional<User> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+
+    /**
+     * Find all user rows that share a native id across every git provider of a given type.
+     * <p>
+     * A single native id may correspond to multiple provider rows when several GitLab
+     * instances (e.g. gitlab.com and a self-hosted server) are configured with overlapping
+     * numeric ids, so this returns a list rather than an {@link Optional}.
+     */
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE u.provider.type = :providerType
+              AND u.nativeId = :nativeId
+            ORDER BY u.id
+        """
+    )
+    List<User> findAllByProviderTypeAndNativeId(
+        @Param("providerType") GitProviderType providerType,
+        @Param("nativeId") Long nativeId
+    );
 
     /**
      * Try to acquire a transaction-scoped advisory lock on the given login.

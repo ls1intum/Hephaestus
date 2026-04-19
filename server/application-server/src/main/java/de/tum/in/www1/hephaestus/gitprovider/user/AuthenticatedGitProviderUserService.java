@@ -11,8 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.Nullable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,22 +23,25 @@ public class AuthenticatedGitProviderUserService {
     private static final String GITHUB_SERVER_URL = "https://github.com";
 
     private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
     private final GitProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
 
     public AuthenticatedGitProviderUserService(
         UserRepository userRepository,
+        AuthenticatedUserService authenticatedUserService,
         GitProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties
     ) {
         this.userRepository = userRepository;
+        this.authenticatedUserService = authenticatedUserService;
         this.gitProviderRepository = gitProviderRepository;
         this.gitLabProperties = gitLabProperties;
     }
 
     @Transactional
     public Optional<User> resolveOrProvisionCurrentUser(@Nullable String gitLabServerUrl) {
-        var currentUser = userRepository.getCurrentUser();
+        var currentUser = authenticatedUserService.findPrimaryUser();
         if (currentUser.isPresent()) {
             return currentUser;
         }
@@ -51,7 +52,7 @@ public class AuthenticatedGitProviderUserService {
         }
         String login = currentLogin.orElseThrow();
 
-        Jwt jwt = getCurrentJwt();
+        Jwt jwt = SecurityUtils.getCurrentJwt().orElse(null);
         if (jwt == null) {
             return Optional.empty();
         }
@@ -82,15 +83,21 @@ public class AuthenticatedGitProviderUserService {
 
     @Transactional
     public void ensureCurrentGitLabUserExists(@Nullable String gitLabServerUrl) {
-        String login = SecurityUtils.getCurrentUserLoginOrThrow();
-        if (userRepository.findByLogin(login).isPresent()) {
+        // Short-circuit when the principal already has a GitLab-provider row synced. Must be
+        // claim-based (not findByLogin) — a login collision with an unrelated user's row on
+        // another provider would otherwise skip provisioning silently.
+        boolean alreadyHasGitLabRow = authenticatedUserService
+            .findAllLinkedUsers()
+            .stream()
+            .anyMatch(u -> u.getProvider() != null && u.getProvider().getType() == GitProviderType.GITLAB);
+        if (alreadyHasGitLabRow) {
             return;
         }
 
-        Jwt jwt = getCurrentJwt();
-        if (jwt == null) {
-            throw new IllegalStateException("No JWT found for authenticated user");
-        }
+        String login = SecurityUtils.getCurrentUserLoginOrThrow();
+        Jwt jwt = SecurityUtils.getCurrentJwt().orElseThrow(() ->
+            new IllegalStateException("No JWT found for authenticated user")
+        );
 
         Long gitlabId = jwt.getClaim("gitlab_id");
         if (gitlabId != null) {
@@ -111,15 +118,6 @@ public class AuthenticatedGitProviderUserService {
             HttpStatus.CONFLICT,
             "No GitLab identity found. Please link your GitLab account in Settings → Linked Accounts."
         );
-    }
-
-    @Nullable
-    private Jwt getCurrentJwt() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt)) {
-            return null;
-        }
-        return jwt;
     }
 
     private String resolveGitLabServerUrl(@Nullable String configServerUrl) {

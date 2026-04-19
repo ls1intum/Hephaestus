@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.account;
 
 import de.tum.in.www1.hephaestus.config.KeycloakProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,20 +45,20 @@ public class AccountController {
 
     private final AccountService accountService;
     private final Keycloak keycloak;
-    private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
     private final KeycloakProperties keycloakProperties;
     private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
 
     public AccountController(
         AccountService accountService,
         Keycloak keycloak,
-        UserRepository userRepository,
+        AuthenticatedUserService authenticatedUserService,
         KeycloakProperties keycloakProperties,
         AuthenticatedGitProviderUserService authenticatedGitProviderUserService
     ) {
         this.accountService = accountService;
         this.keycloak = keycloak;
-        this.userRepository = userRepository;
+        this.authenticatedUserService = authenticatedUserService;
         this.keycloakProperties = keycloakProperties;
         this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
     }
@@ -76,7 +76,7 @@ public class AccountController {
         }
 
         String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
-        var gitUser = userRepository.getCurrentUser();
+        var gitUser = authenticatedUserService.findPrimaryUser();
         if (gitUser.isEmpty()) {
             log.warn("Could not resolve Git provider user for Keycloak subject {}", keycloakUserId);
         }

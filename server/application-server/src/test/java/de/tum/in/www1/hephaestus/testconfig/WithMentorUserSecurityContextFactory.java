@@ -14,7 +14,9 @@ public class WithMentorUserSecurityContextFactory implements WithSecurityContext
             annotation.username(),
             annotation.userId(),
             annotation.authorities(),
-            "mock-jwt-token-for-mentor-user"
+            "mock-jwt-token-for-mentor-user",
+            annotation.githubId(),
+            annotation.gitlabId()
         );
     }
 }

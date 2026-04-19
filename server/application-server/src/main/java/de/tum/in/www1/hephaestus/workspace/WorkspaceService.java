@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
@@ -61,6 +63,7 @@ public class WorkspaceService {
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
     private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
 
     // Services
     private final WorkspaceSlugService workspaceSlugService;
@@ -72,6 +75,7 @@ public class WorkspaceService {
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
         UserRepository userRepository,
+        AuthenticatedUserService authenticatedUserService,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceSettingsService workspaceSettingsService,
         LeaguePointsRecalculator leaguePointsRecalculator,
@@ -80,6 +84,7 @@ public class WorkspaceService {
     ) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
+        this.authenticatedUserService = authenticatedUserService;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceSettingsService = workspaceSettingsService;
         this.leaguePointsRecalculator = leaguePointsRecalculator;
@@ -167,9 +172,19 @@ public class WorkspaceService {
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
-        // Always prefer the authenticated user to prevent privilege escalation.
-        // Fall back to the deprecated ownerUserId only when no auth context exists (e.g. tests).
-        Long ownerUserId = userRepository.getCurrentUser().map(User::getId).orElse(request.ownerUserId());
+        // Always prefer the authenticated user to prevent privilege escalation. For dual-IdP
+        // principals, pick the linked row matching the workspace's provider so subsequent
+        // API calls run against the correct IdP identity; fall back to the primary row when
+        // the target provider isn't linked. Fall back to the deprecated ownerUserId only
+        // when no auth context exists (e.g. tests).
+        GitProviderType targetProvider =
+            request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT
+                ? GitProviderType.GITLAB
+                : GitProviderType.GITHUB;
+        Long ownerUserId = authenticatedUserService
+            .findLinkedUserForProvider(targetProvider)
+            .map(User::getId)
+            .orElse(request.ownerUserId());
 
         Workspace workspace = createWorkspace(
             request.workspaceSlug(),

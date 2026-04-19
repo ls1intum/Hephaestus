@@ -3,8 +3,8 @@ package de.tum.in.www1.hephaestus.mentor;
 import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.config.IntelligenceServiceProperties;
 import de.tum.in.www1.hephaestus.core.proxy.ProxyStreamingUtils;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -62,16 +62,16 @@ public class MentorProxyController {
 
     private final WebClient mentorWebClient;
     private final String intelligenceServiceBaseUrl;
-    private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
 
     public MentorProxyController(
         WebClient mentorWebClient,
         IntelligenceServiceProperties intelligenceServiceProperties,
-        UserRepository userRepository
+        AuthenticatedUserService authenticatedUserService
     ) {
         this.mentorWebClient = mentorWebClient;
         this.intelligenceServiceBaseUrl = intelligenceServiceProperties.url();
-        this.userRepository = userRepository;
+        this.authenticatedUserService = authenticatedUserService;
     }
 
     /**
@@ -108,7 +108,7 @@ public class MentorProxyController {
         String target = intelligenceServiceBaseUrl + mentorPath + (query != null ? ("?" + query) : "");
 
         // Look up the current user for passing user context to intelligence service
-        User currentUser = userRepository.getCurrentUser().orElse(null);
+        User currentUser = authenticatedUserService.findPrimaryUser().orElse(null);
         if (currentUser == null) {
             var login = SecurityUtils.getCurrentUserLogin().orElse("unknown");
             log.warn(

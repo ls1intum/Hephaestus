@@ -3,8 +3,8 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.in.www1.hephaestus.workspace.authorization.WorkspaceAccessService;
@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.workspace.exception.InsufficientWorkspacePermis
 import de.tum.in.www1.hephaestus.workspace.exception.LastOwnerRemovalException;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
+import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -34,7 +35,7 @@ import org.springframework.web.bind.annotation.*;
 public class WorkspaceMembershipController {
 
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
     private final WorkspaceAccessService accessService;
 
     /**
@@ -49,15 +50,47 @@ public class WorkspaceMembershipController {
     @GetMapping("/me")
     @SecurityRequirements
     public ResponseEntity<WorkspaceMembershipDTO> getCurrentUserMembership(WorkspaceContext context) {
-        User currentUser = requireCurrentUser();
-        WorkspaceMembership membership = workspaceMembershipService.getMembership(context.id(), currentUser.getId());
-        WorkspaceRole effectiveRole = membership.getRole();
+        // Keycloak principals may map to multiple User rows (one per linked IdP). Membership
+        // and role must be computed as the union across those rows — picking any single row
+        // would disagree with WorkspaceContextFilter (which unions roles for authorization)
+        // and could under-report the user's effective privileges in the UI.
+        List<User> linkedUsers = authenticatedUserService.findAllLinkedUsers();
+        if (linkedUsers.isEmpty()) {
+            throw new AccessForbiddenException("User not authenticated");
+        }
+
+        // We re-query even though WorkspaceContextFilter already unioned roles into
+        // context.roles(): the DTO needs entity fields (createdAt, hidden, leaguePoints)
+        // not carried on the context. Do not "optimize" by reading context.roles() alone.
+        List<Long> linkedUserIds = linkedUsers.stream().map(User::getId).toList();
+        List<WorkspaceMembership> memberships = workspaceMembershipService.listMembershipsForUsers(
+            context.id(),
+            linkedUserIds
+        );
+        if (memberships.isEmpty()) {
+            throw new EntityNotFoundException("WorkspaceMembership", linkedUsers.get(0).getId());
+        }
+
+        WorkspaceMembership highestMembership = memberships
+            .stream()
+            .max(Comparator.comparingInt(m -> roleRank(m.getRole())))
+            .orElseThrow();
+
+        WorkspaceRole effectiveRole = highestMembership.getRole();
         if (
             effectiveRole != WorkspaceRole.OWNER && effectiveRole != WorkspaceRole.ADMIN && SecurityUtils.isSuperAdmin()
         ) {
             effectiveRole = WorkspaceRole.ADMIN;
         }
-        return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership, effectiveRole));
+        return ResponseEntity.ok(WorkspaceMembershipDTO.from(highestMembership, effectiveRole));
+    }
+
+    private static int roleRank(WorkspaceRole role) {
+        return switch (role) {
+            case OWNER -> 3;
+            case ADMIN -> 2;
+            case MEMBER -> 1;
+        };
     }
 
     /**
@@ -172,12 +205,6 @@ public class WorkspaceMembershipController {
     // ══════════════════════════════════════════════════════════════════════════
     // Helper methods - throw proper exceptions for consistent RFC-7807 responses
     // ══════════════════════════════════════════════════════════════════════════
-
-    private User requireCurrentUser() {
-        return userRepository
-            .getCurrentUser()
-            .orElseThrow(() -> new AccessForbiddenException("User not authenticated"));
-    }
 
     private WorkspaceMembership requireMembership(Long workspaceId, Long userId) {
         return workspaceMembershipService

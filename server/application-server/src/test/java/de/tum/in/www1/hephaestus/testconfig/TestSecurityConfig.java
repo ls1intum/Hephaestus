@@ -38,47 +38,55 @@ public class TestSecurityConfig {
     @Primary
     public JwtDecoder mockJwtDecoder() {
         return token -> {
-            // Determine user based on token pattern
+            // Every branch seeds a github_id or gitlab_id that matches the seeded User's
+            // native_id in TestUserConfig, so AuthenticatedUserService resolves by
+            // (provider, native_id) — the production path — instead of any legacy login lookup.
             String username;
             String userId;
             String[] roles;
+            Long githubId = null;
+            Long gitlabId = null;
 
             if ("mock-jwt-token-for-mentor-user".equals(token)) {
                 username = "mentor";
                 userId = "mentor-user-id";
                 roles = new String[] { "mentor_access" };
+                githubId = 2L;
             } else if ("mock-jwt-token-for-gitlab-user".equals(token)) {
                 username = "gitlabuser";
                 userId = "gitlab-user-id";
                 roles = new String[] {};
+                gitlabId = 18024L;
             } else if ("mock-jwt-token-for-admin-user".equals(token)) {
                 username = "admin";
                 userId = "admin-user-id";
                 roles = new String[] { "admin" };
+                githubId = 3L;
             } else if ("mock-jwt-token-for-test-user".equals(token)) {
                 username = "testuser";
                 userId = "test-user-id";
                 roles = new String[] {};
+                githubId = 1L;
             } else {
-                // Default fallback
                 username = "testuser";
                 userId = "test-user-id";
                 roles = new String[] {};
+                githubId = 1L;
             }
 
-            // Create a mock JWT that matches the structure expected by the main SecurityConfig
             Map<String, Object> claims = new HashMap<>();
             claims.put("sub", userId);
             claims.put("preferred_username", username);
             claims.put("iss", "https://test-issuer");
             claims.put("aud", "test-audience");
-
-            if ("mock-jwt-token-for-gitlab-user".equals(token)) {
-                claims.put("gitlab_id", 18024L);
+            if (githubId != null) {
+                claims.put("github_id", githubId);
+            }
+            if (gitlabId != null) {
+                claims.put("gitlab_id", gitlabId);
                 claims.put("identity_provider", "gitlab-lrz");
             }
 
-            // Add realm_access with roles (same structure as Keycloak)
             if (roles.length > 0) {
                 Map<String, Object> realmAccess = new HashMap<>();
                 realmAccess.put("roles", Arrays.asList(roles));

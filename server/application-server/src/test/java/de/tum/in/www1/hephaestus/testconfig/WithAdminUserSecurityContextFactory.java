@@ -14,7 +14,9 @@ public class WithAdminUserSecurityContextFactory implements WithSecurityContextF
             annotation.username(),
             annotation.userId(),
             annotation.authorities(),
-            "mock-jwt-token-for-admin-user"
+            "mock-jwt-token-for-admin-user",
+            annotation.githubId(),
+            annotation.gitlabId()
         );
     }
 }
