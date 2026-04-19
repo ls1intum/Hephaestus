@@ -162,7 +162,7 @@ Every time the platform is accessed, our web servers and reverse proxy automatic
 
 **Legal basis:** Art. 6(1)(e) GDPR in conjunction with Art. 4 Satz 1 BayHIG, Art. 25 Abs. 1 BayDSG and Art. 8 BayDiG (security of the university IT system as part of the public task).
 
-**Retention:** container logs are bounded by the Docker `json-file` log driver with `max-size=50m` and `max-file=5` per container — a size-bounded rolling window (approximately 250 MB per service) from which older segments are discarded as new ones are written. Effective time coverage depends on write rate. Logs containing an IP address are retained beyond this rolling window only where strictly necessary to investigate a specific, ongoing security incident, and are then deleted as soon as the incident is closed. Logs are not merged with other data sources and are only accessible to AET operators.
+**Retention:** container logs are subject to a two-layer cap. A per-container size cap is enforced by the Docker `json-file` log driver (`max-size=50m` × `max-file=5` for application services, `max-size=10m` × `max-file=3` for core infrastructure); a host-level **hard 14-day age cap** is enforced by `logrotate` on the production host (`/etc/logrotate.d/hephaestus-docker-logs`, daily rotation with `rotate 14`, `compress`, `copytruncate`, configuration tracked in the repository under `docker/logrotate/`). Logs containing an IP address are retained beyond this 14-day window only where strictly necessary to investigate a specific, ongoing security incident, and are then deleted as soon as the incident is closed. Logs are not merged with other data sources and are only accessible to AET operators.
 
 ## 5. Cookies and Browser-Side Storage
 

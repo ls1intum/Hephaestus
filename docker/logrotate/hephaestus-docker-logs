@@ -1,0 +1,42 @@
+# /etc/logrotate.d/hephaestus-docker-logs
+#
+# Host-level time-based retention cap (14 days) for Docker container logs
+# on the Hephaestus production host. Complements the per-container size
+# caps set by the json-file log driver in docker/compose.app.yaml
+# (max-size=50m, max-file=5) and docker/compose.core.yaml
+# (max-size=10m, max-file=3).
+#
+# Per-container size cap  = bounds how much disk each container can use.
+# This file's age-based cap = bounds how long any log line survives.
+#
+# Together they yield a hard 14-day age cap on every container's access
+# log with a per-container size safety net.
+#
+# ---
+#
+# copytruncate is required because the Docker daemon keeps the json-file
+# log open and does not re-open it on signal. The brief copy-then-truncate
+# race window is acceptable for access-log data.
+#
+# dateext is required so this file's rotated names do not collide with
+# the `.1`, `.2`, ... numeric suffixes produced by the json-file driver's
+# own size-based rotation. The glob `*-json.log` matches only the active
+# log file, not already-rotated segments.
+#
+# nocreate is implied by copytruncate and is correct here: we are not
+# creating a new file — the existing file stays open for the Docker
+# daemon and is merely truncated.
+#
+# See docker/logrotate/README.md for install, verify, and ops notes.
+
+/var/lib/docker/containers/*/*-json.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    dateext
+    dateformat -%Y%m%d
+}
