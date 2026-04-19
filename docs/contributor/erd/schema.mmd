@@ -548,6 +548,8 @@ erDiagram
         BOOLEAN outdated
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+        VARCHAR(16) side
+        VARCHAR(16) start_side
     }
 
     PullRequestReviewThread {

@@ -1673,6 +1673,8 @@ export const pullRequestReviewComment = pgTable(
 		nativeId: bigint("native_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		providerId: bigint("provider_id", { mode: "number" }).notNull(),
+		side: varchar({ length: 16 }),
+		startSide: varchar("start_side", { length: 16 }),
 	},
 	(table) => [
 		index("idx_pull_request_review_comment_thread").using(
