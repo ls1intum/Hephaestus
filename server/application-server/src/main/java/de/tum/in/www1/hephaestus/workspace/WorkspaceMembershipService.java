@@ -269,9 +269,22 @@ public class WorkspaceMembershipService {
 
         for (WorkspaceMembership member : existingMembers) {
             Long memberUserId = member.getUser() != null ? member.getUser().getId() : null;
-            if (memberUserId != null && !desiredUserIds.contains(memberUserId)) {
-                toDelete.add(member);
+            if (memberUserId == null || desiredUserIds.contains(memberUserId)) {
+                continue;
             }
+            // Preserve memberships an admin has explicitly hidden from the leaderboard.
+            // `hidden=true` is a sticky, admin-authored signal that must survive org-sync
+            // churn (transient API gaps, webhook reorder, remove-then-re-add). Deleting
+            // the row would lose that signal on re-creation and silently un-hide the user.
+            if (member.isHidden()) {
+                log.debug(
+                    "Preserved hidden workspace membership during sync: workspaceId={}, userId={}",
+                    workspace.getId(),
+                    memberUserId
+                );
+                continue;
+            }
+            toDelete.add(member);
         }
 
         if (!toCreate.isEmpty()) {

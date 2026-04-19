@@ -6,6 +6,7 @@ import java.io.Serializable;
 import java.time.Instant;
 import java.util.Locale;
 import lombok.*;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * Join entity representing a user's membership in a workspace with role-based access control.
@@ -42,6 +43,7 @@ import lombok.*;
  */
 @Entity
 @Table(name = "workspace_membership")
+@DynamicUpdate
 @Getter
 @Setter
 @NoArgsConstructor
