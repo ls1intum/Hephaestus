@@ -276,26 +276,27 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             issue = issueRepository.save(issue);
         }
 
+        ProcessingContext ctx = ProcessingContext.forSync(scopeId, repository);
         if (isNew) {
-            ProcessingContext ctx = ProcessingContext.forSync(scopeId, repository);
             eventPublisher.publishEvent(
                 new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(ctx))
             );
             log.debug("Created issue from sync: issueId={}, iid={}", nativeId, data.iid());
+        }
 
-            // Emit lifecycle events for issues that arrived already closed during sync.
-            // Without this, bulk GraphQL ingest would never populate ISSUE_CLOSED activity
-            // events, leaving `numberOfClosedIssues` stuck at 0 on the leaderboard.
-            if (issueState == Issue.State.CLOSED) {
-                eventPublisher.publishEvent(
-                    new DomainEvent.IssueClosed(
-                        EventPayload.IssueData.from(issue),
-                        stateReason != null ? stateReason : "completed",
-                        EventContext.from(ctx)
-                    )
-                );
-                log.debug("Emitted IssueClosed for already-closed issue from sync: issueId={}", nativeId);
-            }
+        // Emit lifecycle events for CLOSED issues on every sync (not just on create).
+        // Bulk GraphQL ingest never produced these before, so deployments that already
+        // ran an earlier sync have no ISSUE_CLOSED activity rows for historical issues.
+        // Firing on re-sync backfills them; the activity_event (workspace_id, event_key)
+        // unique constraint dedupes, so replaying an existing close is a safe no-op.
+        if (issueState == Issue.State.CLOSED) {
+            eventPublisher.publishEvent(
+                new DomainEvent.IssueClosed(
+                    EventPayload.IssueData.from(issue),
+                    stateReason != null ? stateReason : "completed",
+                    EventContext.from(ctx)
+                )
+            );
         }
 
         return issue;
