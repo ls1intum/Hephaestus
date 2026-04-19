@@ -220,16 +220,14 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             User user = new User();
             user.setId(-18024L);
 
-            when(
-                gitLabUserService.findOrCreateUser(
-                    "gid://gitlab/User/18024",
-                    "ga84xah",
-                    "Felix Dietrich",
-                    "https://avatar.url",
-                    "https://gitlab.lrz.de/ga84xah",
-                    1L
-                )
-            ).thenReturn(user);
+            GitLabUserLookup expectedLookup = GitLabUserLookup.of(
+                "gid://gitlab/User/18024",
+                "ga84xah",
+                "Felix Dietrich",
+                "https://avatar.url",
+                "https://gitlab.lrz.de/ga84xah"
+            );
+            when(gitLabUserService.findOrCreateUser(expectedLookup, 1L)).thenReturn(user);
 
             User result = processor.callFindOrCreateUser(
                 "gid://gitlab/User/18024",
@@ -419,7 +417,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         User callFindOrCreateUser(String globalId, String username, String name, String avatarUrl, String webUrl) {
-            return findOrCreateUser(globalId, username, name, avatarUrl, webUrl, 1L);
+            return findOrCreateUser(GitLabUserLookup.of(globalId, username, name, avatarUrl, webUrl), 1L);
         }
 
         Label callFindOrCreateLabel(GitLabWebhookLabel dto, Repository repository) {

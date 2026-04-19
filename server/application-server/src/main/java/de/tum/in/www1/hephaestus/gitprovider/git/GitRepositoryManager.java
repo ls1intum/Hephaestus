@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -399,6 +400,97 @@ public class GitRepositoryManager {
     }
 
     /**
+     * Walk commits reachable from every remote-tracking branch ({@code refs/remotes/origin/*}).
+     *
+     * <p>Unlike {@link #walkCommits(Long, String, String)} which traverses a single ref's
+     * ancestry, this method marks every branch head as a walk start point so a commit that
+     * only exists on a feature branch (never merged into the default branch) is still
+     * discovered. The result is deduplicated by SHA, preserving the first occurrence order
+     * emitted by the walk (newest first).
+     *
+     * <p>When {@code fromSha} is provided, it is marked {@code uninteresting} so commits
+     * reachable from that point are excluded — useful for incremental backfills.
+     *
+     * @param repositoryId the repository database ID
+     * @param fromSha      optional exclusion point for incremental walks; pass {@code null}
+     *                     on initial backfill
+     * @return commit info for every unique commit reachable from any remote branch
+     */
+    public List<CommitInfo> walkAllBranches(Long repositoryId, @Nullable String fromSha) {
+        if (!properties.enabled()) {
+            return List.of();
+        }
+
+        return lockManager.withReadLock(repositoryId, () -> {
+            Path repoPath = getRepositoryPath(repositoryId);
+            LinkedHashMap<String, CommitInfo> uniqueCommits = new LinkedHashMap<>();
+
+            try (Git git = Git.open(repoPath.toFile())) {
+                Repository repo = git.getRepository();
+
+                List<org.eclipse.jgit.lib.Ref> remoteRefs = new ArrayList<>(
+                    repo.getRefDatabase().getRefsByPrefix("refs/remotes/origin/")
+                );
+                if (remoteRefs.isEmpty()) {
+                    log.warn("No remote branches found for multi-branch walk: repoId={}", repositoryId);
+                    return List.of();
+                }
+
+                ObjectId fromId = fromSha != null ? repo.resolve(fromSha) : null;
+
+                try (RevWalk revWalk = new RevWalk(repo)) {
+                    for (org.eclipse.jgit.lib.Ref ref : remoteRefs) {
+                        // Skip symbolic refs like refs/remotes/origin/HEAD — they alias another branch.
+                        if (ref.isSymbolic()) {
+                            continue;
+                        }
+                        ObjectId objectId = ref.getObjectId();
+                        if (objectId == null) {
+                            continue;
+                        }
+                        try {
+                            revWalk.markStart(revWalk.parseCommit(objectId));
+                        } catch (IOException e) {
+                            log.debug(
+                                "Skipped ref during multi-branch walk: repoId={}, ref={}, error={}",
+                                repositoryId,
+                                ref.getName(),
+                                e.getMessage()
+                            );
+                        }
+                    }
+
+                    if (fromId != null) {
+                        try {
+                            revWalk.markUninteresting(revWalk.parseCommit(fromId));
+                        } catch (IOException e) {
+                            log.debug(
+                                "Cannot mark fromSha uninteresting — falling back to full walk: repoId={}, fromSha={}, error={}",
+                                repositoryId,
+                                fromSha,
+                                e.getMessage()
+                            );
+                        }
+                    }
+
+                    for (RevCommit revCommit : revWalk) {
+                        String sha = revCommit.getName();
+                        if (uniqueCommits.containsKey(sha)) {
+                            continue;
+                        }
+                        uniqueCommits.put(sha, extractCommitInfo(repo, revCommit));
+                    }
+                }
+            } catch (IOException e) {
+                log.error("Failed to walk all branches: repoId={}, error={}", repositoryId, e.getMessage(), e);
+                throw new GitOperationException("Failed to walk all branches for repository: " + repositoryId, e);
+            }
+
+            return new ArrayList<>(uniqueCommits.values());
+        });
+    }
+
+    /**
      * Extract detailed commit information including file changes.
      */
     private CommitInfo extractCommitInfo(Repository repo, RevCommit revCommit) throws IOException {
@@ -431,6 +523,20 @@ public class GitRepositoryManager {
             }
         }
 
+        // Parent SHAs come directly from the commit object graph and cost nothing
+        // extra to read here. Feeds git_commit.parent_count + parent_shas so
+        // downstream consumers (audit, commit-topology queries) don't depend on
+        // provider-specific APIs for this basic structural field.
+        RevCommit[] parents = revCommit.getParents();
+        List<String> parentShas = new ArrayList<>(parents != null ? parents.length : 0);
+        if (parents != null) {
+            for (RevCommit parent : parents) {
+                if (parent != null && parent.getId() != null) {
+                    parentShas.add(parent.getId().getName());
+                }
+            }
+        }
+
         return new CommitInfo(
             revCommit.getName(),
             message,
@@ -444,7 +550,8 @@ public class GitRepositoryManager {
             totalAdditions,
             totalDeletions,
             fileChanges.size(),
-            fileChanges
+            fileChanges,
+            parentShas
         );
     }
 
@@ -774,7 +881,8 @@ public class GitRepositoryManager {
         int additions,
         int deletions,
         int changedFiles,
-        List<FileChange> fileChanges
+        List<FileChange> fileChanges,
+        List<String> parentShas
     ) {}
 
     /**

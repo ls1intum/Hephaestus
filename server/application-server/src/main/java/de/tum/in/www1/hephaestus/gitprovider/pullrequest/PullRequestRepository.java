@@ -202,6 +202,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             merged_at, is_draft, is_merged, commits, additions, deletions, changed_files,
             review_decision, merge_state_status, mergeable,
             head_ref_name, base_ref_name, head_ref_oid, base_ref_oid, merged_by_id,
+            merge_commit_sha,
             issue_type
         )
         VALUES (
@@ -213,6 +214,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             COALESCE(:commits, 0), COALESCE(:additions, 0), COALESCE(:deletions, 0), COALESCE(:changedFiles, 0),
             :reviewDecision, :mergeStateStatus, :mergeable,
             :headRefName, :baseRefName, :headRefOid, :baseRefOid, :mergedById,
+            :mergeCommitSha,
             'PULL_REQUEST'
         )
         ON CONFLICT (repository_id, issue_type, number) DO UPDATE SET
@@ -242,7 +244,8 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             base_ref_name = COALESCE(EXCLUDED.base_ref_name, issue.base_ref_name),
             head_ref_oid = COALESCE(EXCLUDED.head_ref_oid, issue.head_ref_oid),
             base_ref_oid = COALESCE(EXCLUDED.base_ref_oid, issue.base_ref_oid),
-            merged_by_id = COALESCE(EXCLUDED.merged_by_id, issue.merged_by_id)
+            merged_by_id = COALESCE(EXCLUDED.merged_by_id, issue.merged_by_id),
+            merge_commit_sha = COALESCE(EXCLUDED.merge_commit_sha, issue.merge_commit_sha)
         """,
         nativeQuery = true
     )
@@ -278,6 +281,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         @Param("baseRefName") String baseRefName,
         @Param("headRefOid") String headRefOid,
         @Param("baseRefOid") String baseRefOid,
-        @Param("mergedById") Long mergedById
+        @Param("mergedById") Long mergedById,
+        @Param("mergeCommitSha") String mergeCommitSha
     );
 }

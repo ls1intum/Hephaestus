@@ -124,3 +124,41 @@ export const MergeRequestProvider: Story = {
 		providerType: "GITLAB",
 	},
 };
+
+/**
+ * Other activity without score-earning reviews.
+ */
+export const OtherActivity: Story = {
+	args: {
+		reviewedPullRequests: [],
+		approvals: 0,
+		changeRequests: 0,
+		comments: 0,
+		codeComments: 0,
+		ownReplies: 2,
+		openPullRequests: 1,
+		mergedPullRequests: 3,
+		closedPullRequests: 1,
+		openedIssues: 2,
+		closedIssues: 1,
+	},
+};
+
+/**
+ * Realistic mixed state with reviewed PRs first and authored activity after it.
+ */
+export const MixedActivity: Story = {
+	args: {
+		reviewedPullRequests: basePullRequests,
+		approvals: 2,
+		changeRequests: 1,
+		comments: 3,
+		codeComments: 4,
+		ownReplies: 2,
+		openPullRequests: 1,
+		mergedPullRequests: 2,
+		closedPullRequests: 1,
+		openedIssues: 1,
+		closedIssues: 1,
+	},
+};

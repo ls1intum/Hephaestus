@@ -3,14 +3,17 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.gitlab;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.commit.gitlab.GitLabCommitMergeRequestLinker;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
@@ -83,6 +86,9 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
+    private GitLabCommitMergeRequestLinker commitMergeRequestLinker;
+
+    @Mock
     private NatsMessageDeserializer deserializer;
 
     private TransactionTemplate transactionTemplate;
@@ -134,6 +140,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             scopeIdResolver,
             syncTargetProvider,
             eventPublisher,
+            commitMergeRequestLinker,
             deserializer,
             transactionTemplate
         );
@@ -275,6 +282,35 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         verify(projectProcessor).processPushEvent(projectInfo, gitLabProvider);
         // Processor returned null — no org linking attempted
         verify(organizationRepository, never()).findByLoginIgnoreCaseAndProviderId(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("batched commit→MR linker runs once per push when scope resolves")
+    void batchedLinker_runsOncePerPush() throws IOException {
+        var projectInfo = createProjectInfo(42L, "org/proj");
+        Repository repo = new Repository();
+        repo.setId(42L);
+        repo.setNameWithOwner("org/proj");
+        when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
+        when(scopeIdResolver.findScopeIdByRepositoryName("org/proj")).thenReturn(Optional.of(7L));
+
+        var pushEvent = new GitLabPushEventDTO(
+            "push",
+            "refs/heads/main",
+            "before",
+            "after",
+            "after",
+            42L,
+            projectInfo,
+            3, // three commits in push
+            null
+        );
+
+        Message msg = mockMessage("gitlab.org.proj.push", pushEvent);
+        handler.onMessage(msg);
+
+        // ONE batched GraphQL call, not one per commit.
+        verify(commitMergeRequestLinker, times(1)).linkCommits(eq(7L), eq(repo), any());
     }
 
     @Test

@@ -8,6 +8,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncServiceHold
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncContextProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.gitlab.GitLabIssueDependencySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.gitlab.GitLabIssueTypeSyncService;
@@ -29,6 +31,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -191,6 +194,11 @@ public class GitLabDataSyncScheduler {
             // Phase 2.5: Sync issue types (org-level, before per-repo sync)
             syncIssueTypes(services, session);
 
+            // Phase 2.6: Sync group milestones (fan-out to every repo in the group).
+            // Must run before the per-repo sync so the issue-sync phase can resolve
+            // milestone references on issues by iid.
+            syncGroupMilestones(services, session);
+
             // Phase 3: Per-repository sync (labels, milestones, issues, MRs, collaborators)
             syncRepositories(services, session);
 
@@ -298,6 +306,44 @@ public class GitLabDataSyncScheduler {
         }
     }
 
+    /**
+     * Syncs group milestones (including ancestors and descendant subgroups) and fans them out
+     * to every monitored repository in this workspace. Closes the gap where
+     * {@code project.milestones(includeAncestors: true)} did not reliably surface group
+     * milestones, leaving the {@code milestone} table largely empty on fresh syncs.
+     */
+    private void syncGroupMilestones(GitLabSyncServiceHolder services, SyncSession session) {
+        GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
+        if (milestoneSync == null) return;
+
+        if (session.accountLogin() == null || session.accountLogin().isBlank()) {
+            return;
+        }
+
+        List<Repository> repos = repositoryRepository.findAllByWorkspaceMonitors(session.scopeId());
+        if (repos.isEmpty()) {
+            log.debug("No repositories for group milestone sync: scopeId={}", session.scopeId());
+            return;
+        }
+
+        try {
+            SyncResult result = milestoneSync.syncMilestonesForGroup(session.scopeId(), session.accountLogin(), repos);
+            log.info(
+                "GitLab group milestone sync: scopeId={}, group={}, written={}",
+                session.scopeId(),
+                sanitizeForLog(session.accountLogin()),
+                result.count()
+            );
+        } catch (Exception e) {
+            log.error(
+                "Failed GitLab group milestone sync: scopeId={}, group={}",
+                session.scopeId(),
+                sanitizeForLog(session.accountLogin()),
+                e
+            );
+        }
+    }
+
     private void syncRepositories(GitLabSyncServiceHolder services, SyncSession session) {
         GitLabLabelSyncService labelSync = services.getLabelSyncService();
         GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
@@ -306,6 +352,7 @@ public class GitLabDataSyncScheduler {
         GitLabCollaboratorSyncService collaboratorSync = services.getCollaboratorSyncService();
         GitLabCommitSyncService commitSync = services.getCommitSyncService();
         var commitBackfill = services.getCommitBackfillService();
+        var commitMrLinker = services.getCommitMergeRequestLinker();
 
         // Find all repositories monitored by this workspace (via RepositoryToMonitor join,
         // which correctly includes subgroup repos — not just top-level group repos)
@@ -315,6 +362,13 @@ public class GitLabDataSyncScheduler {
             log.debug("No repositories to sync for GitLab workspace: scopeId={}", session.scopeId());
             return;
         }
+
+        // Map nameWithOwner → sync target id from the session so each phase can write
+        // its per-repo watermark via the SPI without reaching into workspace internals.
+        Map<String, Long> syncTargetIdsByNameWithOwner = session
+            .syncTargets()
+            .stream()
+            .collect(Collectors.toMap(SyncTarget::repositoryNameWithOwner, SyncTarget::id, (a, b) -> a));
 
         GitLabRateLimitTracker rateLimitTracker = rateLimitTrackerProvider.getIfAvailable();
         int totalLabels = 0,
@@ -348,6 +402,11 @@ public class GitLabDataSyncScheduler {
                 updatedAfter = buffered.atOffset(ZoneOffset.UTC);
             }
 
+            // Look up the sync-target id from the session so each phase can write its
+            // per-repo watermark via the SPI. Not all repositories have an entry in the
+            // session (edge case), in which case we skip the watermark writes silently.
+            Long rtmId = syncTargetIdsByNameWithOwner.get(repo.getNameWithOwner());
+
             boolean issuesDone = false;
             boolean mrsDone = false;
 
@@ -356,6 +415,9 @@ public class GitLabDataSyncScheduler {
                 try {
                     SyncResult r = labelSync.syncLabelsForRepository(session.scopeId(), repo);
                     totalLabels += r.count();
+                    if (rtmId != null) {
+                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.LABELS, Instant.now());
+                    }
                 } catch (Exception e) {
                     log.warn("Failed label sync: scopeId={}, repo={}", session.scopeId(), repo.getNameWithOwner(), e);
                 }
@@ -366,6 +428,9 @@ public class GitLabDataSyncScheduler {
                 try {
                     SyncResult r = milestoneSync.syncMilestonesForRepository(session.scopeId(), repo);
                     totalMilestones += r.count();
+                    if (rtmId != null) {
+                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.MILESTONES, Instant.now());
+                    }
                 } catch (Exception e) {
                     log.warn(
                         "Failed milestone sync: scopeId={}, repo={}",
@@ -382,6 +447,9 @@ public class GitLabDataSyncScheduler {
                     SyncResult r = issueSync.syncIssues(session.scopeId(), repo, updatedAfter);
                     totalIssues += r.count();
                     issuesDone = r.isCompleted();
+                    if (rtmId != null && issuesDone) {
+                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.ISSUES, Instant.now());
+                    }
                 } catch (Exception e) {
                     log.warn("Failed issue sync: scopeId={}, repo={}", session.scopeId(), repo.getNameWithOwner(), e);
                 }
@@ -393,6 +461,9 @@ public class GitLabDataSyncScheduler {
                     SyncResult r = mrSync.syncMergeRequests(session.scopeId(), repo, updatedAfter);
                     totalMRs += r.count();
                     mrsDone = r.isCompleted();
+                    if (rtmId != null && mrsDone) {
+                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.PULL_REQUESTS, Instant.now());
+                    }
                 } catch (Exception e) {
                     log.warn("Failed MR sync: scopeId={}, repo={}", session.scopeId(), repo.getNameWithOwner(), e);
                 }
@@ -403,6 +474,9 @@ public class GitLabDataSyncScheduler {
                 try {
                     SyncResult r = collaboratorSync.syncCollaboratorsForRepository(session.scopeId(), repo);
                     totalCollaborators += r.count();
+                    if (rtmId != null) {
+                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.COLLABORATORS, Instant.now());
+                    }
                 } catch (Exception e) {
                     log.warn(
                         "Failed collaborator sync: scopeId={}, repo={}",
@@ -440,6 +514,33 @@ public class GitLabDataSyncScheduler {
             boolean allDone = (issueSync == null || issuesDone) && (mrSync == null || mrsDone);
             if (allDone) {
                 repositoryRepository.updateLastSyncAt(repo.getId(), Instant.now());
+                if (rtmId != null) {
+                    syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.FULL_REPOSITORY, Instant.now());
+                }
+            }
+        }
+
+        // Second pass: link commits to MRs. Must run after every repo has finished syncing so
+        // a commit whose SHA appears on an MR in a sibling repo can still be linked. In the
+        // previous single-pass version such cross-repo links were lost because the target MR
+        // repo had not yet synced its MRs when the linker ran.
+        if (commitMrLinker != null) {
+            for (Repository repo : repos) {
+                OffsetDateTime repoUpdatedAfter = null;
+                if (repo.getLastSyncAt() != null) {
+                    Instant buffered = repo.getLastSyncAt().minus(Duration.ofMinutes(5));
+                    repoUpdatedAfter = buffered.atOffset(ZoneOffset.UTC);
+                }
+                try {
+                    commitMrLinker.linkCommits(session.scopeId(), repo, repoUpdatedAfter);
+                } catch (Exception e) {
+                    log.warn(
+                        "Failed commit→MR linking (second pass): scopeId={}, repo={}",
+                        session.scopeId(),
+                        repo.getNameWithOwner(),
+                        e
+                    );
+                }
             }
         }
 
@@ -512,6 +613,7 @@ public class GitLabDataSyncScheduler {
 
         try {
             int count = teamSync.syncTeamsForGroup(session.scopeId(), session.accountLogin());
+            syncTargetProvider.updateTeamsSyncTimestamp(session.scopeId(), Instant.now());
             log.info("GitLab team sync: scopeId={}, teams={}", session.scopeId(), count);
         } catch (Exception e) {
             log.error("Failed GitLab team sync: scopeId={}", session.scopeId(), e);

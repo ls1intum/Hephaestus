@@ -30,6 +30,7 @@ query GetProjectMergeRequests($fullPath: ID!, $first: Int!, $after: String, $upd
                 sourceBranch
                 targetBranch
                 diffHeadSha
+                mergeCommitSha
                 diffRefs {
                     baseSha
                 }
@@ -78,6 +79,16 @@ query GetProjectMergeRequests($fullPath: ID!, $first: Int!, $after: String, $upd
                     }
                 }
                 approvedBy(first: 20) {
+                    count
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        ...GitLabUserFields
+                    }
+                }
+                participants(first: 50) {
                     count
                     pageInfo {
                         hasNextPage

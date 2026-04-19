@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookLabel;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
@@ -23,6 +24,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.dto.GitLabIssueEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueTypeRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
@@ -83,6 +86,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     private MilestoneRepository milestoneRepository;
 
     @Mock
+    private IssueTypeRepository issueTypeRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private GitLabIssueProcessor processor;
@@ -103,6 +109,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             gitLabUserService,
             issueRepository,
             milestoneRepository,
+            issueTypeRepository,
             userRepository,
             labelRepository,
             repositoryRepository,
@@ -218,6 +225,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
+                null,
+                null,
                 null,
                 null,
                 null
@@ -421,6 +430,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
                 null
             );
             GitLabIssueEventDTO event = new GitLabIssueEventDTO(
@@ -499,16 +509,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(
-                gitLabUserService.findOrCreateUser(
-                    anyString(),
-                    anyString(),
-                    anyString(),
-                    anyString(),
-                    anyString(),
-                    eq(PROVIDER_ID)
-                )
-            ).thenReturn(author);
+            when(gitLabUserService.findOrCreateUser(any(GitLabUserLookup.class), eq(PROVIDER_ID))).thenReturn(author);
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
@@ -527,6 +528,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 "https://gitlab.lrz.de/uploads/avatar.png",
                 "https://gitlab.lrz.de/ga84xah",
                 0,
+                null,
+                null,
                 null,
                 null,
                 null
@@ -584,6 +587,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 0,
                 null,
                 null,
+                null,
+                null,
                 null
             );
             Issue result = processor.processFromSync(syncData, testRepo, 1L);
@@ -611,6 +616,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
+                null,
+                null,
                 null,
                 null,
                 null
@@ -645,6 +652,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
+                null,
+                null,
                 null,
                 null,
                 null
@@ -689,7 +698,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 0,
                 null,
                 null,
-                3
+                3,
+                null,
+                null
             );
             processor.processFromSync(syncData, testRepo, 1L);
 
@@ -748,7 +759,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 0,
                 null,
                 null,
-                99
+                99,
+                null,
+                null
             );
             processor.processFromSync(syncData, testRepo, 1L);
 
@@ -805,6 +818,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 0,
                 null,
                 null,
+                null,
+                null,
                 null
             );
             processor.processFromSync(syncData, testRepo, 1L);
@@ -840,11 +855,190 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 0,
                 null,
                 null,
+                null,
+                null,
                 null
             );
             processor.processFromSync(syncData, testRepo, 1L);
 
             verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("processFromSync() maps COMPLETED state reason when closed with no duplicate marker")
+        void shouldMapCompletedStateReasonWhenClosedWithNoOtherSignal() {
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
+                "gid://gitlab/Issue/422296",
+                "5",
+                "Title",
+                null,
+                "closed",
+                false,
+                "https://example.com",
+                null,
+                null,
+                "2026-02-01T10:00:00Z",
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(issueRepository).upsertCore(
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
+                eq(ISSUE_IID),
+                any(),
+                any(),
+                eq("CLOSED"),
+                eq("COMPLETED"),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        @DisplayName("processFromSync() maps DUPLICATE state reason when closedAsDuplicateOf is present")
+        void shouldMapDuplicateStateReasonWhenClosedAsDuplicateOfPresent() {
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
+                "gid://gitlab/Issue/422296",
+                "5",
+                "Title",
+                null,
+                "closed",
+                false,
+                "https://example.com",
+                null,
+                null,
+                "2026-02-01T10:00:00Z",
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                null,
+                null,
+                null,
+                null,
+                "gid://gitlab/Issue/999"
+            );
+
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(issueRepository).upsertCore(
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
+                eq(ISSUE_IID),
+                any(),
+                any(),
+                eq("CLOSED"),
+                eq("DUPLICATE"),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        @DisplayName("processFromSync() resolves issueTypeId when humanised type name matches")
+        void shouldResolveIssueTypeIdWhenTypeNameMatches() {
+            de.tum.in.www1.hephaestus.gitprovider.organization.Organization organization =
+                new de.tum.in.www1.hephaestus.gitprovider.organization.Organization();
+            organization.setId(42L);
+            testRepo.setOrganization(organization);
+
+            IssueType taskType = new IssueType();
+            taskType.setId("gid://gitlab/IssueType/1");
+
+            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(42L, "Task")).thenReturn(
+                Optional.of(taskType)
+            );
+
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
+                "gid://gitlab/Issue/422296",
+                "5",
+                "Title",
+                null,
+                "opened",
+                false,
+                "https://example.com",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                null,
+                null,
+                null,
+                "TASK",
+                null
+            );
+
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(issueRepository).upsertCore(
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
+                eq(ISSUE_IID),
+                any(),
+                any(),
+                eq("OPEN"),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                any(),
+                eq("gid://gitlab/IssueType/1"),
+                any(),
+                any(),
+                any(),
+                any()
+            );
         }
     }
 
@@ -886,6 +1080,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             action,
             confidential,
             RAW_USER_ID,
+            null,
             null,
             "2026-01-31 19:03:35 +0100",
             "2026-01-31 19:03:35 +0100",

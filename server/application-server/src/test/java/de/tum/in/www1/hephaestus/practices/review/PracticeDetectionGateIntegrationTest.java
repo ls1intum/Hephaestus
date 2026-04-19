@@ -179,7 +179,8 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             "main",
             "gatesha",
             "basesha",
-            null
+            null,
+            null // mergeCommitSha
         );
         PullRequest pr = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 100).orElseThrow();
 

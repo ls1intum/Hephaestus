@@ -7,15 +7,19 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.BaseGitLabProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.dto.GitLabIssueEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueTypeRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -51,12 +55,14 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
     private final IssueRepository issueRepository;
     private final MilestoneRepository milestoneRepository;
+    private final IssueTypeRepository issueTypeRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabIssueProcessor(
         GitLabUserService gitLabUserService,
         IssueRepository issueRepository,
         MilestoneRepository milestoneRepository,
+        IssueTypeRepository issueTypeRepository,
         UserRepository userRepository,
         LabelRepository labelRepository,
         RepositoryRepository repositoryRepository,
@@ -76,6 +82,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         );
         this.issueRepository = issueRepository;
         this.milestoneRepository = milestoneRepository;
+        this.issueTypeRepository = issueTypeRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -92,6 +99,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         var attrs = event.objectAttributes();
         User author = resolveWebhookAuthor(event, context.providerId());
+        Long providerId = context.repository().getProvider().getId();
+        Long milestoneId = resolveWebhookMilestoneId(attrs.milestoneId(), providerId);
         Issue issue = upsertIssue(
             attrs.id(),
             attrs.iid(),
@@ -103,6 +112,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             attrs.updatedAt(),
             attrs.closedAt(),
             author,
+            milestoneId,
             context.repository(),
             context
         );
@@ -157,7 +167,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         int commentsCount,
         @Nullable List<SyncLabelData> syncLabels,
         @Nullable List<SyncAssigneeData> syncAssignees,
-        @Nullable Integer milestoneIid
+        @Nullable Integer milestoneIid,
+        @Nullable String typeName,
+        @Nullable String closedAsDuplicateOfGid
     ) {}
 
     /**
@@ -198,11 +210,13 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         // Resolve author
         User author = findOrCreateUser(
-            data.authorGlobalId(),
-            data.authorUsername(),
-            data.authorName(),
-            data.authorAvatarUrl(),
-            data.authorWebUrl(),
+            GitLabUserLookup.of(
+                data.authorGlobalId(),
+                data.authorUsername(),
+                data.authorName(),
+                data.authorAvatarUrl(),
+                data.authorWebUrl()
+            ),
             providerId
         );
 
@@ -218,6 +232,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
                 .orElse(null);
         }
 
+        String stateReason = resolveStateReason(issueState, data.closedAsDuplicateOfGid());
+        String issueTypeId = resolveIssueTypeId(data.typeName(), repository);
+
         Instant now = Instant.now();
         issueRepository.upsertCore(
             nativeId,
@@ -226,7 +243,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             sanitize(data.title()),
             sanitize(data.description()),
             issueState.name(),
-            null, // stateReason — not available in GitLab
+            stateReason,
             data.webUrl(),
             null, // locked — not available in GitLab API, null lets COALESCE preserve existing or default
             parseGitLabTimestamp(data.closedAt()),
@@ -237,7 +254,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             author != null ? author.getId() : null,
             repository.getId(),
             milestoneId,
-            null, // issueTypeId
+            issueTypeId,
             null, // parentIssueId
             null, // subIssuesTotal
             null, // subIssuesCompleted
@@ -259,12 +276,27 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             issue = issueRepository.save(issue);
         }
 
+        ProcessingContext ctx = ProcessingContext.forSync(scopeId, repository);
         if (isNew) {
-            ProcessingContext ctx = ProcessingContext.forSync(scopeId, repository);
             eventPublisher.publishEvent(
                 new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(ctx))
             );
             log.debug("Created issue from sync: issueId={}, iid={}", nativeId, data.iid());
+        }
+
+        // Emit lifecycle events for CLOSED issues on every sync (not just on create).
+        // Bulk GraphQL ingest never produced these before, so deployments that already
+        // ran an earlier sync have no ISSUE_CLOSED activity rows for historical issues.
+        // Firing on re-sync backfills them; the activity_event (workspace_id, event_key)
+        // unique constraint dedupes, so replaying an existing close is a safe no-op.
+        if (issueState == Issue.State.CLOSED) {
+            eventPublisher.publishEvent(
+                new DomainEvent.IssueClosed(
+                    EventPayload.IssueData.from(issue),
+                    stateReason != null ? stateReason : "completed",
+                    EventContext.from(ctx)
+                )
+            );
         }
 
         return issue;
@@ -340,6 +372,17 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     }
 
     @Nullable
+    private Long resolveWebhookMilestoneId(@Nullable Long gitlabMilestoneId, Long providerId) {
+        if (gitlabMilestoneId == null) {
+            return null;
+        }
+        return milestoneRepository
+            .findByNativeIdAndProviderId(gitlabMilestoneId, providerId)
+            .map(Milestone::getId)
+            .orElse(null);
+    }
+
+    @Nullable
     private Issue upsertIssue(
         Long rawId,
         Integer iid,
@@ -351,6 +394,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         @Nullable String updatedAt,
         @Nullable String closedAt,
         @Nullable User author,
+        @Nullable Long milestoneId,
         Repository repository,
         ProcessingContext context
     ) {
@@ -386,7 +430,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             parseGitLabTimestamp(updatedAt),
             author != null ? author.getId() : null,
             repository.getId(),
-            null,
+            milestoneId,
             null,
             null,
             null,
@@ -456,6 +500,84 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     }
 
     /**
+     * Maps a GitLab issue state + {@code closedAsDuplicateOf} marker to the
+     * denormalized {@code issue.state_reason} column.
+     * <p>
+     * Returns {@code null} for open issues and for closed issues that cannot be
+     * classified. The upsert COALESCE preserves any previously set reason.
+     */
+    @Nullable
+    private static String resolveStateReason(Issue.State state, @Nullable String closedAsDuplicateOfGid) {
+        if (state != Issue.State.CLOSED) {
+            return null;
+        }
+        if (closedAsDuplicateOfGid != null && !closedAsDuplicateOfGid.isBlank()) {
+            return "DUPLICATE";
+        }
+        return "COMPLETED";
+    }
+
+    /**
+     * Resolves the GitLab {@code Issue.type} enum ({@code ISSUE}, {@code TASK}, …)
+     * to an {@code issue_type_id} FK for the repository's owning organization.
+     * <p>
+     * GitLab's GraphQL enum uses {@code SCREAMING_SNAKE_CASE}; the {@code IssueType}
+     * name column stores the human-readable form ({@code "Test Case"}). This method
+     * humanises the enum ({@code TEST_CASE} → {@code "Test Case"}) before a
+     * case-insensitive lookup. Returns {@code null} when the repository has no
+     * organization or when no matching issue type exists — the upsert COALESCE
+     * preserves any previously set FK.
+     */
+    @Nullable
+    private String resolveIssueTypeId(@Nullable String typeName, Repository repository) {
+        if (typeName == null || typeName.isBlank()) {
+            return null;
+        }
+        String humanised = humaniseTypeName(typeName);
+        Organization organization = repository.getOrganization();
+        if (organization == null || organization.getId() == null) {
+            return null;
+        }
+        Optional<IssueType> orgScoped = issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(
+            organization.getId(),
+            humanised
+        );
+        if (orgScoped.isPresent()) {
+            return orgScoped.get().getId();
+        }
+        // Subgroups become their own Organization rows but share provider-global
+        // issue_type primary keys (GitLab GraphQL global IDs), so a provider-scoped
+        // name lookup yields the exact same row. Without this fallback, issues
+        // synced from subgroups would resolve to null because the subgroup org
+        // never had its own issue_type seed rows materialised. Resolve the provider
+        // id via a JPQL subquery on organizationId — touching the lazy Organization
+        // proxy here raised LazyInitializationException when the Repository outlived
+        // its original Hibernate session.
+        return issueTypeRepository
+            .findFirstByOrganizationProviderAndNameIgnoreCase(organization.getId(), humanised)
+            .map(IssueType::getId)
+            .orElse(null);
+    }
+
+    /**
+     * Converts a GitLab GraphQL {@code IssueType} enum value ({@code TEST_CASE})
+     * to the human-readable form stored in {@code issue_type.name} ({@code "Test Case"}).
+     */
+    private static String humaniseTypeName(String enumValue) {
+        String[] parts = enumValue.split("_");
+        StringBuilder sb = new StringBuilder(enumValue.length());
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i].isEmpty()) continue;
+            if (i > 0) sb.append(' ');
+            sb.append(Character.toUpperCase(parts[i].charAt(0)));
+            if (parts[i].length() > 1) {
+                sb.append(parts[i].substring(1).toLowerCase());
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
      * Updates assignees from GraphQL sync data within the current transaction.
      */
     private boolean updateSyncAssignees(
@@ -470,11 +592,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Set<User> newAssignees = new HashSet<>();
         for (SyncAssigneeData data : syncAssignees) {
             User user = findOrCreateUser(
-                data.globalId(),
-                data.username(),
-                data.name(),
-                data.avatarUrl(),
-                data.webUrl(),
+                GitLabUserLookup.of(data.globalId(), data.username(), data.name(), data.avatarUrl(), data.webUrl()),
                 providerId
             );
             if (user != null) {

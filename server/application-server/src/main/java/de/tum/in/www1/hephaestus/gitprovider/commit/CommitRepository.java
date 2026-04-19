@@ -297,6 +297,38 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     );
 
     /**
+     * Link a pull request to commits by SHA within the same repository.
+     * <p>
+     * Used by the GitLab commit↔MR linker, which gets data MR-first from
+     * GraphQL ({@code Project.mergeRequests { commitsWithoutMergeCommits { sha } }})
+     * — the inverse of the commit-first GitHub path.
+     * <p>
+     * Idempotent: {@code ON CONFLICT DO NOTHING} skips pairs that are already
+     * linked. Returns the number of rows inserted.
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        INSERT INTO commit_pull_request (commit_id, pull_request_id)
+        SELECT gc.id, i.id
+        FROM git_commit gc
+        JOIN issue i ON i.repository_id = gc.repository_id
+        WHERE gc.repository_id = :repositoryId
+          AND gc.sha IN (:shas)
+          AND i.number = :prNumber
+          AND i.issue_type = 'PULL_REQUEST'
+        ON CONFLICT DO NOTHING
+        """,
+        nativeQuery = true
+    )
+    int linkPullRequestToCommits(
+        @Param("repositoryId") Long repositoryId,
+        @Param("prNumber") Integer prNumber,
+        @Param("shas") List<String> shas
+    );
+
+    /**
      * Bulk-update enrichment metadata fields on a commit.
      * <p>
      * Uses {@code COALESCE} so that NULL parameters preserve existing database values.
@@ -351,6 +383,40 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("parentShas") String parentShas,
         @Param("statusCheckRollupState") String statusCheckRollupState,
         @Param("onBehalfOfLogin") String onBehalfOfLogin
+    );
+
+    /**
+     * Populate parent metadata ({@code parent_count}, {@code parent_shas}) for a
+     * single commit.
+     * <p>
+     * Uses {@code COALESCE} for {@code parent_shas} so a null parameter preserves
+     * an existing value. {@code parent_count} is always written when non-null,
+     * allowing the enrichment to recompute when the GitLab API reports a different
+     * parent list (rare, but possible with force pushes).
+     * <p>
+     * This complements {@link #upsertCommit}, which does not accept parent fields
+     * — the GitLab REST commit list endpoint exposes {@code parent_ids}, so we
+     * backfill immediately after the upsert to keep the commit path atomic-enough
+     * from a single caller's point of view while keeping {@code upsertCommit}'s
+     * parameter surface small.
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        UPDATE git_commit SET
+            parent_count = COALESCE(:parentCount, git_commit.parent_count),
+            parent_shas = COALESCE(:parentShas, git_commit.parent_shas),
+            updated_at = NOW()
+        WHERE repository_id = :repositoryId AND sha = :sha
+        """,
+        nativeQuery = true
+    )
+    int updateParentMetadataBySha(
+        @Param("repositoryId") Long repositoryId,
+        @Param("sha") String sha,
+        @Param("parentCount") Integer parentCount,
+        @Param("parentShas") String parentShas
     );
 
     /**

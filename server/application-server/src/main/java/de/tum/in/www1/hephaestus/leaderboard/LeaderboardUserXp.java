@@ -3,26 +3,7 @@ package de.tum.in.www1.hephaestus.leaderboard;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import org.springframework.lang.NonNull;
 
-/**
- * Immutable leaderboard XP data for a single user.
- *
- * <p>Contains aggregated XP totals and activity breakdown statistics
- * computed from the activity event ledger.
- *
- * <p>Use {@link Builder} for incremental construction when hydrating
- * data from multiple database projections.
- *
- * @param user the user entity (never null)
- * @param totalScore total XP score for the timeframe (rounded from BigDecimal)
- * @param eventCount number of activity events recorded
- * @param approvals number of REVIEW_APPROVED events
- * @param changeRequests number of REVIEW_CHANGES_REQUESTED events
- * @param comments number of REVIEW_COMMENTED events
- * @param unknowns number of REVIEW_UNKNOWN events
- * @param issueComments number of COMMENT_CREATED events
- * @param codeComments number of REVIEW_COMMENT_CREATED events
- * @param reviewedPrCount number of DISTINCT pull requests reviewed (from separate query)
- */
+/** Immutable leaderboard XP + activity breakdown for a single user. Use {@link Builder} to hydrate from multiple projections. */
 public record LeaderboardUserXp(
     @NonNull User user,
     int totalScore,
@@ -31,28 +12,15 @@ public record LeaderboardUserXp(
     int changeRequests,
     int comments,
     int unknowns,
-    int issueComments,
     int codeComments,
-    int reviewedPrCount
+    int reviewedPrCount,
+    int ownReplies,
+    int openPullRequests,
+    int mergedPullRequests,
+    int closedPullRequests,
+    int openedIssues,
+    int closedIssues
 ) {
-    /**
-     * Returns the count of unique pull requests reviewed.
-     *
-     * <p>This value is set from a distinct PR count query, not derived from
-     * summing event counts (since one PR can have multiple review events).
-     *
-     * @return number of distinct PRs reviewed in the timeframe
-     */
-    public int reviewedPullRequestCount() {
-        return reviewedPrCount;
-    }
-
-    /**
-     * Builder for incremental construction of {@link LeaderboardUserXp}.
-     *
-     * <p>Used by {@link LeaderboardXpQueryService} to accumulate breakdown stats
-     * from multiple activity projections before building the immutable result.
-     */
     public static final class Builder {
 
         private final User user;
@@ -62,9 +30,14 @@ public record LeaderboardUserXp(
         private int changeRequests = 0;
         private int comments = 0;
         private int unknowns = 0;
-        private int issueComments = 0;
         private int codeComments = 0;
         private int reviewedPrCount = 0;
+        private int ownReplies = 0;
+        private int openPullRequests = 0;
+        private int mergedPullRequests = 0;
+        private int closedPullRequests = 0;
+        private int openedIssues = 0;
+        private int closedIssues = 0;
 
         public Builder(User user, int totalScore, int eventCount) {
             this.user = user;
@@ -92,13 +65,38 @@ public record LeaderboardUserXp(
             return this;
         }
 
-        public Builder addIssueComments(int count) {
-            this.issueComments += count;
+        public Builder addCodeComments(int count) {
+            this.codeComments += count;
             return this;
         }
 
-        public Builder addCodeComments(int count) {
-            this.codeComments += count;
+        public Builder addOwnReplies(int count) {
+            this.ownReplies += count;
+            return this;
+        }
+
+        public Builder addOpenPullRequests(int count) {
+            this.openPullRequests += count;
+            return this;
+        }
+
+        public Builder addMergedPullRequests(int count) {
+            this.mergedPullRequests += count;
+            return this;
+        }
+
+        public Builder addClosedPullRequests(int count) {
+            this.closedPullRequests += count;
+            return this;
+        }
+
+        public Builder addOpenedIssues(int count) {
+            this.openedIssues += count;
+            return this;
+        }
+
+        public Builder addClosedIssues(int count) {
+            this.closedIssues += count;
             return this;
         }
 
@@ -116,9 +114,14 @@ public record LeaderboardUserXp(
                 changeRequests,
                 comments,
                 unknowns,
-                issueComments,
                 codeComments,
-                reviewedPrCount
+                reviewedPrCount,
+                ownReplies,
+                openPullRequests,
+                mergedPullRequests,
+                closedPullRequests,
+                openedIssues,
+                closedIssues
             );
         }
     }

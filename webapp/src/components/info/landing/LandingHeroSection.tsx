@@ -54,6 +54,12 @@ const SAMPLE_LEADERBOARD_ENTRIES: LeaderboardEntry[] = [
 		numberOfChangeRequests: 3,
 		numberOfComments: 4,
 		numberOfCodeComments: 6,
+		numberOfOwnReplies: 2,
+		numberOfOpenPullRequests: 1,
+		numberOfMergedPullRequests: 3,
+		numberOfClosedPullRequests: 0,
+		numberOfOpenedIssues: 2,
+		numberOfClosedIssues: 1,
 		numberOfUnknowns: 0,
 		reviewedPullRequests: createMockReviewedPullRequest(12),
 	},
@@ -73,6 +79,12 @@ const SAMPLE_LEADERBOARD_ENTRIES: LeaderboardEntry[] = [
 		numberOfChangeRequests: 2,
 		numberOfComments: 5,
 		numberOfCodeComments: 3,
+		numberOfOwnReplies: 1,
+		numberOfOpenPullRequests: 2,
+		numberOfMergedPullRequests: 1,
+		numberOfClosedPullRequests: 1,
+		numberOfOpenedIssues: 1,
+		numberOfClosedIssues: 0,
 		numberOfUnknowns: 0,
 		reviewedPullRequests: createMockReviewedPullRequest(5),
 	},
@@ -92,6 +104,12 @@ const SAMPLE_LEADERBOARD_ENTRIES: LeaderboardEntry[] = [
 		numberOfChangeRequests: 1,
 		numberOfComments: 4,
 		numberOfCodeComments: 2,
+		numberOfOwnReplies: 0,
+		numberOfOpenPullRequests: 1,
+		numberOfMergedPullRequests: 1,
+		numberOfClosedPullRequests: 0,
+		numberOfOpenedIssues: 0,
+		numberOfClosedIssues: 1,
 		numberOfUnknowns: 0,
 		reviewedPullRequests: createMockReviewedPullRequest(2),
 	},
@@ -150,7 +168,10 @@ export function LandingHeroSection({
 
 			{/* Leaderboard Preview */}
 			<div className="mx-auto max-w-4xl px-4 md:px-6">
-				<div className="shadow-xl border border-muted rounded-md overflow-hidden -mb-3">
+				<div
+					aria-hidden="true"
+					className="shadow-xl border border-muted rounded-md overflow-hidden -mb-3"
+				>
 					<div
 						className="overflow-auto pointer-events-none"
 						style={{
@@ -164,6 +185,9 @@ export function LandingHeroSection({
 						/>
 					</div>
 				</div>
+				<p className="mt-3 text-center text-sm text-muted-foreground">
+					Review activity drives score. Additional badges highlight authored work and collaboration.
+				</p>
 			</div>
 		</section>
 	);

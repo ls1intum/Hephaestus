@@ -70,6 +70,44 @@ public interface UserRepository extends JpaRepository<User, Long> {
     )
     Optional<User> findByEmailAndProviderId(@Param("email") String email, @Param("providerId") Long providerId);
 
+    /**
+     * Finds all users whose display name matches (case-insensitive) the given value.
+     * <p>
+     * Used by {@link de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver}
+     * to resolve {@code firstname.lastname@tum.de} style commit author emails against
+     * the GitLab-synced {@code User.name} field ("Firstname Lastname"). The resolver
+     * only acts when exactly one candidate is returned so the match stays deterministic.
+     */
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE LOWER(u.name) = LOWER(:name)
+              AND u.provider.id = :providerId
+              AND u.type = 'USER'
+            ORDER BY u.id
+        """
+    )
+    List<User> findAllByNameAndProviderId(@Param("name") String name, @Param("providerId") Long providerId);
+
+    /**
+     * Finds all users whose display name matches (case-insensitive) the given value
+     * across every provider. Falls back to this variant when the caller cannot scope
+     * the lookup to a specific provider.
+     *
+     * @see #findAllByNameAndProviderId
+     */
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE LOWER(u.name) = LOWER(:name)
+              AND u.type = 'USER'
+            ORDER BY u.id
+        """
+    )
+    List<User> findAllByName(@Param("name") String name);
+
     @Query(
         """
             SELECT DISTINCT u
@@ -239,4 +277,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
         @Param("createdAt") Instant createdAt,
         @Param("updatedAt") Instant updatedAt
     );
+
+    /**
+     * Backfills the email for a single user only when the current value is NULL.
+     * <p>
+     * Used by the GitLab commit→MR linker to enrich identities whose primary
+     * email was not populated during the user sync (e.g. TUM accounts whose
+     * {@code publicEmail} is hidden but whose commit identity reveals an
+     * institutional address). Never overwrites an existing email.
+     *
+     * @return number of rows updated (0 when the user already has an email)
+     */
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE \"user\" SET email = :email WHERE id = :userId AND email IS NULL", nativeQuery = true)
+    int backfillEmailIfNull(@Param("userId") Long userId, @Param("email") String email);
 }

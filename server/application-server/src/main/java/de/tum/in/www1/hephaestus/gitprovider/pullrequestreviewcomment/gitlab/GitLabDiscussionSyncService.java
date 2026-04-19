@@ -3,15 +3,19 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabFieldUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.GitLabIssueCommentProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.gitlab.GitLabReviewReconciler;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.gitlab.GitLabPullRequestReviewThreadProcessor;
@@ -20,6 +24,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -61,6 +66,7 @@ public class GitLabDiscussionSyncService {
     private final GitLabPullRequestReviewThreadProcessor threadProcessor;
     private final GitLabPullRequestReviewCommentProcessor reviewCommentProcessor;
     private final GitLabIssueCommentProcessor issueCommentProcessor;
+    private final GitLabReviewReconciler reviewReconciler;
     private final GitLabProperties gitLabProperties;
 
     public GitLabDiscussionSyncService(
@@ -69,6 +75,7 @@ public class GitLabDiscussionSyncService {
         GitLabPullRequestReviewThreadProcessor threadProcessor,
         GitLabPullRequestReviewCommentProcessor reviewCommentProcessor,
         GitLabIssueCommentProcessor issueCommentProcessor,
+        GitLabReviewReconciler reviewReconciler,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
@@ -76,6 +83,7 @@ public class GitLabDiscussionSyncService {
         this.threadProcessor = threadProcessor;
         this.reviewCommentProcessor = reviewCommentProcessor;
         this.issueCommentProcessor = issueCommentProcessor;
+        this.reviewReconciler = reviewReconciler;
         this.gitLabProperties = gitLabProperties;
     }
 
@@ -164,7 +172,7 @@ public class GitLabDiscussionSyncService {
 
                 for (Map<String, Object> discussionNode : nodes) {
                     try {
-                        int[] result = processDiscussion(discussionNode, pr, provider, providerId, scopeId);
+                        int[] result = processDiscussion(discussionNode, pr, repository, provider, providerId, scopeId);
                         totalDiffNotes += result[0];
                         totalGeneralNotes += result[1];
                         totalSkipped += result[2];
@@ -230,6 +238,7 @@ public class GitLabDiscussionSyncService {
     private int[] processDiscussion(
         Map<String, Object> discussionNode,
         PullRequest pr,
+        Repository repository,
         GitProvider provider,
         Long providerId,
         Long scopeId
@@ -272,6 +281,7 @@ public class GitLabDiscussionSyncService {
                 resolved != null && resolved,
                 noteNodes,
                 pr,
+                repository,
                 provider,
                 providerId,
                 scopeId
@@ -291,6 +301,7 @@ public class GitLabDiscussionSyncService {
         boolean resolved,
         List<Map<String, Object>> noteNodes,
         PullRequest pr,
+        Repository repository,
         GitProvider provider,
         Long providerId,
         Long scopeId
@@ -303,23 +314,61 @@ public class GitLabDiscussionSyncService {
             Map<String, Object> resolvedByMap = (Map<String, Object>) discussionNode.get("resolvedBy");
             if (resolvedByMap != null) {
                 resolvedBy = issueCommentProcessor.findOrCreateUser(
-                    (String) resolvedByMap.get("id"),
-                    (String) resolvedByMap.get("username"),
-                    (String) resolvedByMap.get("name"),
-                    (String) resolvedByMap.get("avatarUrl"),
-                    (String) resolvedByMap.get("webUrl"),
+                    GitLabUserLookup.of(
+                        (String) resolvedByMap.get("id"),
+                        (String) resolvedByMap.get("username"),
+                        (String) resolvedByMap.get("name"),
+                        (String) resolvedByMap.get("avatarUrl"),
+                        (String) resolvedByMap.get("webUrl")
+                    ),
                     providerId
                 );
             }
         }
 
         // Extract position from first note for thread metadata
-        Map<String, Object> firstNote = noteNodes.get(0);
-        Map<String, Object> firstPosition = (Map<String, Object>) firstNote.get("position");
-        String filePath = firstPosition != null ? (String) firstPosition.get("filePath") : null;
-        Integer newLine = firstPosition != null ? GitLabFieldUtils.toInteger(firstPosition.get("newLine")) : null;
+        // Pick the earliest note with a non-null position as "root" for thread path/line.
+        // (Some notes in a discussion can be replies without their own position.)
+        Map<String, Object> rootNote = findRootDiffNote(noteNodes);
+        Map<String, Object> rootPosition = rootNote != null ? (Map<String, Object>) rootNote.get("position") : null;
 
-        Instant firstCreatedAt = parseTimestamp((String) firstNote.get("createdAt"));
+        String filePath = null;
+        Integer newLine = null;
+        Integer oldLine = null;
+        String headSha = null;
+        String baseSha = null;
+        PullRequestReviewComment.Side threadSide = null;
+        Boolean outdated = null;
+
+        if (rootPosition != null) {
+            String np = (String) rootPosition.get("newPath");
+            String op = (String) rootPosition.get("oldPath");
+            String fp = (String) rootPosition.get("filePath");
+            filePath = np != null ? np : (op != null ? op : fp);
+            newLine = GitLabFieldUtils.toInteger(rootPosition.get("newLine"));
+            oldLine = GitLabFieldUtils.toInteger(rootPosition.get("oldLine"));
+            threadSide = GitLabPullRequestReviewCommentProcessor.deriveSide(newLine, oldLine);
+
+            Map<String, Object> diffRefs = (Map<String, Object>) rootPosition.get("diffRefs");
+            if (diffRefs != null) {
+                headSha = (String) diffRefs.get("headSha");
+                baseSha = (String) diffRefs.get("baseSha");
+                if (baseSha == null) {
+                    baseSha = (String) diffRefs.get("startSha");
+                }
+            }
+
+            // Infer the "outdated" state that GitLab reports for discussions whose diff
+            // anchor has been dropped by a later push. A text-position note with a non-null
+            // file path but no newLine/oldLine is GitLab's signal that the referenced hunk
+            // no longer exists in the head diff — i.e. the discussion is outdated.
+            String positionType = (String) rootPosition.get("positionType");
+            if ("text".equals(positionType) && filePath != null) {
+                outdated = newLine == null && oldLine == null;
+            }
+        }
+
+        Instant firstCreatedAt = parseTimestamp((String) noteNodes.get(0).get("createdAt"));
 
         // Create/update the thread
         var threadData = new GitLabPullRequestReviewThreadProcessor.ThreadData(
@@ -328,9 +377,26 @@ public class GitLabDiscussionSyncService {
             resolvedBy,
             filePath,
             newLine,
+            oldLine,
+            threadSide,
+            headSha,
+            baseSha,
+            outdated,
             firstCreatedAt
         );
         PullRequestReviewThread thread = threadProcessor.findOrCreateThread(threadData, pr, provider, scopeId);
+
+        // Pre-compute one synthetic COMMENTED review per (author, discussion) so each note
+        // below can attach to the matching review without redundant DB lookups.
+        Map<Long, PullRequestReview> reviewsByAuthor = reconcileDiscussionReviews(
+            noteNodes,
+            discussionGlobalId,
+            pr,
+            repository,
+            provider,
+            providerId,
+            scopeId
+        );
 
         // Process each note in the discussion as a review comment
         PullRequestReviewComment previousComment = null;
@@ -345,27 +411,33 @@ public class GitLabDiscussionSyncService {
                 continue;
             }
 
-            // Extract position data for this note
+            // Extract position data for this note. Reply notes in GitLab can omit their
+            // own position; fall back to the root diff note's position so path/line/sha
+            // are still populated on every comment.
             Map<String, Object> position = (Map<String, Object>) noteNode.get("position");
+            Map<String, Object> effectivePosition = position != null ? position : rootPosition;
+
             String noteFilePath = null;
             Integer noteNewLine = null;
             Integer noteOldLine = null;
             String newPath = null;
             String oldPath = null;
-            String headSha = null;
-            String baseSha = null;
+            String noteHeadSha = null;
+            String noteBaseSha = null;
+            String noteStartSha = null;
 
-            if (position != null) {
-                noteFilePath = (String) position.get("filePath");
-                noteNewLine = GitLabFieldUtils.toInteger(position.get("newLine"));
-                noteOldLine = GitLabFieldUtils.toInteger(position.get("oldLine"));
-                newPath = (String) position.get("newPath");
-                oldPath = (String) position.get("oldPath");
+            if (effectivePosition != null) {
+                noteFilePath = (String) effectivePosition.get("filePath");
+                noteNewLine = GitLabFieldUtils.toInteger(effectivePosition.get("newLine"));
+                noteOldLine = GitLabFieldUtils.toInteger(effectivePosition.get("oldLine"));
+                newPath = (String) effectivePosition.get("newPath");
+                oldPath = (String) effectivePosition.get("oldPath");
 
-                Map<String, Object> diffRefs = (Map<String, Object>) position.get("diffRefs");
+                Map<String, Object> diffRefs = (Map<String, Object>) effectivePosition.get("diffRefs");
                 if (diffRefs != null) {
-                    headSha = (String) diffRefs.get("headSha");
-                    baseSha = (String) diffRefs.get("baseSha");
+                    noteHeadSha = (String) diffRefs.get("headSha");
+                    noteBaseSha = (String) diffRefs.get("baseSha");
+                    noteStartSha = (String) diffRefs.get("startSha");
                 }
             }
 
@@ -381,11 +453,15 @@ public class GitLabDiscussionSyncService {
                 noteOldLine,
                 newPath,
                 oldPath,
-                headSha,
-                baseSha,
+                noteHeadSha,
+                noteBaseSha,
+                noteStartSha,
                 parseTimestamp((String) noteNode.get("createdAt")),
                 parseTimestamp((String) noteNode.get("updatedAt"))
             );
+
+            PullRequestReview review =
+                author != null && author.getNativeId() != null ? reviewsByAuthor.get(author.getNativeId()) : null;
 
             var commentContext = new GitLabPullRequestReviewCommentProcessor.CommentContext(
                 thread,
@@ -393,6 +469,7 @@ public class GitLabDiscussionSyncService {
                 author,
                 provider,
                 previousComment, // first note has no parent, subsequent notes are replies
+                review,
                 scopeId
             );
             PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(noteData, commentContext);
@@ -404,6 +481,67 @@ public class GitLabDiscussionSyncService {
         }
 
         return new int[] { diffNotes, 0, 0 };
+    }
+
+    /**
+     * Groups the non-system notes in a discussion by author, finds each author's earliest
+     * createdAt, and reconciles one synthetic COMMENTED {@link PullRequestReview} per author.
+     * <p>
+     * This is the bridge that brings GitLab MR discussions up to GitHub parity: every note
+     * author gets a review row that downstream scoring/profile UIs expect.
+     *
+     * @return map keyed by author native ID to the reconciled review (never null, possibly empty)
+     */
+    @SuppressWarnings("unchecked")
+    private Map<Long, PullRequestReview> reconcileDiscussionReviews(
+        List<Map<String, Object>> noteNodes,
+        String discussionGlobalId,
+        PullRequest pr,
+        Repository repository,
+        GitProvider provider,
+        Long providerId,
+        Long scopeId
+    ) {
+        record AuthorEarliest(User author, Instant earliest) {}
+
+        Map<Long, AuthorEarliest> byAuthor = new HashMap<>();
+        for (Map<String, Object> noteNode : noteNodes) {
+            if (Boolean.TRUE.equals(noteNode.get("system")) || Boolean.TRUE.equals(noteNode.get("internal"))) {
+                continue;
+            }
+            User author = resolveAuthor(noteNode, providerId);
+            if (author == null || author.getNativeId() == null) {
+                continue;
+            }
+            Instant createdAt = parseTimestamp((String) noteNode.get("createdAt"));
+            byAuthor.merge(author.getNativeId(), new AuthorEarliest(author, createdAt), (existing, incoming) -> {
+                if (existing.earliest() == null) return incoming;
+                if (incoming.earliest() == null) return existing;
+                return incoming.earliest().isBefore(existing.earliest()) ? incoming : existing;
+            });
+        }
+
+        // Emit REVIEW_COMMENTED events during bulk GraphQL sync so the leaderboard's
+        // numberOfComments / numberOfReviewedPRs reflect COMMENTED reviews. Without a
+        // ProcessingContext the review reconciler silently skips event publication.
+        ProcessingContext ctx = repository != null ? ProcessingContext.forSync(scopeId, repository) : null;
+
+        Map<Long, PullRequestReview> result = new HashMap<>();
+        for (Map.Entry<Long, AuthorEarliest> entry : byAuthor.entrySet()) {
+            AuthorEarliest info = entry.getValue();
+            PullRequestReview review = reviewReconciler.findOrCreateCommentedReview(
+                pr,
+                info.author(),
+                discussionGlobalId,
+                info.earliest(),
+                provider,
+                ctx
+            );
+            if (review != null) {
+                result.put(entry.getKey(), review);
+            }
+        }
+        return result;
     }
 
     /**
@@ -457,6 +595,21 @@ public class GitLabDiscussionSyncService {
         return new int[] { 0, generalNotes, 0 };
     }
 
+    /**
+     * Returns the first note in the discussion that carries a non-null {@code position}.
+     * Used to source thread-level metadata (path, line, side, SHAs) when the leading
+     * note is a reply without its own position.
+     */
+    @Nullable
+    private static Map<String, Object> findRootDiffNote(List<Map<String, Object>> noteNodes) {
+        for (Map<String, Object> note : noteNodes) {
+            if (note.get("position") != null) {
+                return note;
+            }
+        }
+        return null;
+    }
+
     @SuppressWarnings("unchecked")
     @Nullable
     private User resolveAuthor(Map<String, Object> noteNode, Long providerId) {
@@ -465,11 +618,13 @@ public class GitLabDiscussionSyncService {
             return null;
         }
         return issueCommentProcessor.findOrCreateUser(
-            (String) authorMap.get("id"),
-            (String) authorMap.get("username"),
-            (String) authorMap.get("name"),
-            (String) authorMap.get("avatarUrl"),
-            (String) authorMap.get("webUrl"),
+            GitLabUserLookup.of(
+                (String) authorMap.get("id"),
+                (String) authorMap.get("username"),
+                (String) authorMap.get("name"),
+                (String) authorMap.get("avatarUrl"),
+                (String) authorMap.get("webUrl")
+            ),
             providerId
         );
     }

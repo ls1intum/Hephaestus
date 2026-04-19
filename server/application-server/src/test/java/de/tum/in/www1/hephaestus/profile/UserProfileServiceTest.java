@@ -15,6 +15,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -66,6 +68,9 @@ class UserProfileServiceTest {
     private PullRequestReviewRepository pullRequestReviewRepository;
 
     @Mock
+    private PullRequestReviewCommentRepository pullRequestReviewCommentRepository;
+
+    @Mock
     private IssueCommentRepository issueCommentRepository;
 
     @Mock
@@ -95,6 +100,7 @@ class UserProfileServiceTest {
             profileRepositoryQueryRepository,
             profilePullRequestQueryRepository,
             pullRequestReviewRepository,
+            pullRequestReviewCommentRepository,
             issueCommentRepository,
             reviewActivityAssembler,
             workspaceMembershipService,
@@ -119,7 +125,7 @@ class UserProfileServiceTest {
             PullRequestReview review = createReview(400L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -169,7 +175,7 @@ class UserProfileServiceTest {
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -193,6 +199,7 @@ class UserProfileServiceTest {
 
             // Verify no hydration queries (efficiency)
             verifyNoInteractions(pullRequestReviewRepository);
+            verifyNoInteractions(pullRequestReviewCommentRepository);
             verifyNoInteractions(issueCommentRepository);
         }
 
@@ -208,7 +215,7 @@ class UserProfileServiceTest {
             IssueComment comment = createIssueComment(500L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -248,6 +255,7 @@ class UserProfileServiceTest {
 
             // Assert: Single batch query for each entity type (no N+1)
             verify(pullRequestReviewRepository, times(1)).findAllByIdWithRelations(any());
+            verifyNoInteractions(pullRequestReviewCommentRepository);
             verify(issueCommentRepository, times(1)).findAllByIdWithRelations(any());
 
             // Verify each item assembled with its correct XP from ActivityEvent
@@ -263,7 +271,7 @@ class UserProfileServiceTest {
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
                 List.of()
             );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
@@ -291,6 +299,189 @@ class UserProfileServiceTest {
 
             // Assembler should not be called for missing entity
             verifyNoInteractions(reviewActivityAssembler);
+        }
+
+        @Test
+        @DisplayName("hydrates review comments on other users pull requests from activity events")
+        void hydratesReviewCommentsOnOtherUsersPullRequestsFromActivityEvents() {
+            User actor = createUser(USER_ID, USER_LOGIN);
+            User prAuthor = createUser(99L, "pr-author");
+            Repository repo = createRepository(200L);
+            PullRequest pr = createPullRequest(300L, prAuthor, repo);
+            PullRequestReviewComment reviewComment = createReviewComment(600L, actor, pr);
+
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(actor));
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
+            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+
+            ActivityEvent event = createActivityEvent(
+                WORKSPACE_ID,
+                USER_ID,
+                600L,
+                ActivityTargetType.REVIEW_COMMENT,
+                0.0
+            );
+            when(
+                activityEventRepository.findProfileActivityByActorInTimeframe(
+                    eq(WORKSPACE_ID),
+                    eq(USER_ID),
+                    any(),
+                    any()
+                )
+            ).thenReturn(List.of(event));
+
+            when(pullRequestReviewCommentRepository.findAllByIdWithRelations(Set.of(600L))).thenReturn(
+                List.of(reviewComment)
+            );
+            when(reviewActivityAssembler.assemble(eq(reviewComment), eq(0))).thenReturn(
+                createProfileReviewDTO(600L, 0)
+            );
+            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().reviewActivity()).hasSize(1);
+            verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(600L));
+            verify(reviewActivityAssembler).assemble(eq(reviewComment), eq(0));
+        }
+
+        @Test
+        @DisplayName("skips own pull request review comments from scored activity feed")
+        void skipsOwnPullRequestReviewCommentsFromScoredActivityFeed() {
+            User user = createUser(USER_ID, USER_LOGIN);
+            Repository repo = createRepository(200L);
+            PullRequest pr = createPullRequest(300L, user, repo);
+            PullRequestReviewComment reviewComment = createReviewComment(600L, user, pr);
+
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
+            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+
+            ActivityEvent event = createActivityEvent(
+                WORKSPACE_ID,
+                USER_ID,
+                600L,
+                ActivityTargetType.REVIEW_COMMENT,
+                0.0
+            );
+            when(
+                activityEventRepository.findProfileActivityByActorInTimeframe(
+                    eq(WORKSPACE_ID),
+                    eq(USER_ID),
+                    any(),
+                    any()
+                )
+            ).thenReturn(List.of(event));
+
+            when(pullRequestReviewCommentRepository.findAllByIdWithRelations(Set.of(600L))).thenReturn(
+                List.of(reviewComment)
+            );
+
+            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().reviewActivity()).isEmpty();
+            verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(600L));
+            verify(reviewActivityAssembler, never()).assemble(eq(reviewComment), eq(0));
+        }
+
+        @Test
+        @DisplayName("skips issue comments on regular issues")
+        void skipsIssueCommentsOnRegularIssues() {
+            User user = createUser(USER_ID, USER_LOGIN);
+            Repository repo = createRepository(200L);
+            Issue issue = createIssue(300L, user, repo);
+            IssueComment comment = createIssueComment(500L, user, issue);
+
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
+            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+
+            ActivityEvent event = createActivityEvent(
+                WORKSPACE_ID,
+                USER_ID,
+                500L,
+                ActivityTargetType.ISSUE_COMMENT,
+                0.0
+            );
+            when(
+                activityEventRepository.findProfileActivityByActorInTimeframe(
+                    eq(WORKSPACE_ID),
+                    eq(USER_ID),
+                    any(),
+                    any()
+                )
+            ).thenReturn(List.of(event));
+
+            when(issueCommentRepository.findAllByIdWithRelations(Set.of(500L))).thenReturn(List.of(comment));
+
+            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().reviewActivity()).isEmpty();
+            verify(issueCommentRepository).findAllByIdWithRelations(Set.of(500L));
+            verify(reviewActivityAssembler, never()).assemble(eq(comment), anyInt());
+        }
+
+        @Test
+        @DisplayName("keeps issue comments and review comments when IDs collide across target types")
+        void keepsDifferentTargetTypesWhenIdsCollide() {
+            User user = createUser(USER_ID, USER_LOGIN);
+            Repository repo = createRepository(200L);
+            PullRequest pr = createPullRequest(300L, user, repo);
+            IssueComment issueComment = createIssueComment(700L, user, pr);
+            PullRequestReviewComment reviewComment = createReviewComment(700L, user, pr);
+
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
+            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
+            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+
+            ActivityEvent issueCommentEvent = createActivityEvent(
+                WORKSPACE_ID,
+                USER_ID,
+                700L,
+                ActivityTargetType.ISSUE_COMMENT,
+                0.0
+            );
+            ActivityEvent reviewCommentEvent = createActivityEvent(
+                WORKSPACE_ID,
+                USER_ID,
+                700L,
+                ActivityTargetType.REVIEW_COMMENT,
+                0.0
+            );
+            when(
+                activityEventRepository.findProfileActivityByActorInTimeframe(
+                    eq(WORKSPACE_ID),
+                    eq(USER_ID),
+                    any(),
+                    any()
+                )
+            ).thenReturn(List.of(issueCommentEvent, reviewCommentEvent));
+
+            when(issueCommentRepository.findAllByIdWithRelations(Set.of(700L))).thenReturn(List.of(issueComment));
+            when(pullRequestReviewCommentRepository.findAllByIdWithRelations(Set.of(700L))).thenReturn(
+                List.of(reviewComment)
+            );
+
+            ProfileReviewActivityDTO issueCommentDto = createProfileReviewDTO(700L, 0);
+            when(reviewActivityAssembler.assemble(eq(issueComment), eq(0))).thenReturn(issueCommentDto);
+
+            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().reviewActivity()).hasSize(1);
+            verify(issueCommentRepository).findAllByIdWithRelations(Set.of(700L));
+            verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(700L));
+            verify(reviewActivityAssembler).assemble(eq(issueComment), eq(0));
+            verify(reviewActivityAssembler, never()).assemble(eq(reviewComment), eq(0));
         }
     }
 
@@ -323,6 +514,18 @@ class UserProfileServiceTest {
         return pr;
     }
 
+    private Issue createIssue(Long id, User author, Repository repo) {
+        Issue issue = new Issue();
+        issue.setId(id);
+        issue.setAuthor(author);
+        issue.setRepository(repo);
+        issue.setNumber(2);
+        issue.setTitle("Test Issue");
+        issue.setHtmlUrl("https://github.com/test/issues/2");
+        issue.setState(Issue.State.OPEN);
+        return issue;
+    }
+
     private PullRequestReview createReview(Long id, User author, PullRequest pr) {
         PullRequestReview review = new PullRequestReview();
         review.setId(id);
@@ -344,6 +547,17 @@ class UserProfileServiceTest {
         return comment;
     }
 
+    private PullRequestReviewComment createReviewComment(Long id, User author, PullRequest pullRequest) {
+        PullRequestReviewComment comment = new PullRequestReviewComment();
+        comment.setId(id);
+        comment.setAuthor(author);
+        comment.setPullRequest(pullRequest);
+        comment.setCreatedAt(Instant.now());
+        comment.setHtmlUrl("https://github.com/test/review-comment/1");
+        comment.setBody("Reply to tutor note");
+        return comment;
+    }
+
     private ActivityEvent createActivityEvent(
         Long workspaceId,
         Long actorId,
@@ -359,13 +573,17 @@ class UserProfileServiceTest {
             .eventType(
                 targetType == ActivityTargetType.REVIEW
                     ? ActivityEventType.REVIEW_APPROVED
-                    : ActivityEventType.COMMENT_CREATED
+                    : targetType == ActivityTargetType.REVIEW_COMMENT
+                        ? ActivityEventType.REVIEW_COMMENT_CREATED
+                        : ActivityEventType.COMMENT_CREATED
             )
             .eventKey(
                 ActivityEvent.buildKey(
                     targetType == ActivityTargetType.REVIEW
                         ? ActivityEventType.REVIEW_APPROVED
-                        : ActivityEventType.COMMENT_CREATED,
+                        : targetType == ActivityTargetType.REVIEW_COMMENT
+                            ? ActivityEventType.REVIEW_COMMENT_CREATED
+                            : ActivityEventType.COMMENT_CREATED,
                     targetId,
                     Instant.now()
                 )
