@@ -68,8 +68,37 @@ public class GitLabPullRequestReviewThreadProcessor {
         @Nullable PullRequestReviewComment.Side side,
         @Nullable String commitSha,
         @Nullable String originalCommitSha,
+        @Nullable Boolean outdated,
         @Nullable Instant createdAt
     ) {
+        /** Backward-compatible overload for callers that don't carry outdated data. */
+        public ThreadData(
+            String discussionGlobalId,
+            boolean resolved,
+            @Nullable User resolvedBy,
+            @Nullable String filePath,
+            @Nullable Integer newLine,
+            @Nullable Integer oldLine,
+            @Nullable PullRequestReviewComment.Side side,
+            @Nullable String commitSha,
+            @Nullable String originalCommitSha,
+            @Nullable Instant createdAt
+        ) {
+            this(
+                discussionGlobalId,
+                resolved,
+                resolvedBy,
+                filePath,
+                newLine,
+                oldLine,
+                side,
+                commitSha,
+                originalCommitSha,
+                null,
+                createdAt
+            );
+        }
+
         /** Backward-compatible overload for callers that don't carry side/SHA data. */
         public ThreadData(
             String discussionGlobalId,
@@ -79,7 +108,7 @@ public class GitLabPullRequestReviewThreadProcessor {
             @Nullable Integer newLine,
             @Nullable Instant createdAt
         ) {
-            this(discussionGlobalId, resolved, resolvedBy, filePath, newLine, null, null, null, null, createdAt);
+            this(discussionGlobalId, resolved, resolvedBy, filePath, newLine, null, null, null, null, null, createdAt);
         }
     }
 
@@ -213,6 +242,10 @@ public class GitLabPullRequestReviewThreadProcessor {
             existing.setOriginalCommitSha(data.originalCommitSha());
             changed = true;
         }
+        if (existing.getOutdated() == null && data.outdated() != null) {
+            existing.setOutdated(data.outdated());
+            changed = true;
+        }
 
         if (changed) {
             existing.setUpdatedAt(Instant.now());
@@ -243,6 +276,7 @@ public class GitLabPullRequestReviewThreadProcessor {
         thread.setStartSide(data.side());
         thread.setCommitSha(data.commitSha());
         thread.setOriginalCommitSha(data.originalCommitSha());
+        thread.setOutdated(data.outdated());
         thread.setState(
             data.resolved() ? PullRequestReviewThread.State.RESOLVED : PullRequestReviewThread.State.UNRESOLVED
         );

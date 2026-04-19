@@ -50,6 +50,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     private ActivityEventService activityEventService;
 
     @Mock
+    private ActivityEventRepository activityEventRepository;
+
+    @Mock
     private ExperiencePointCalculator experiencePointCalculator;
 
     @Mock
@@ -100,6 +103,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
         listener = new ActivityEventListener(
             activityEventService,
+            activityEventRepository,
             experiencePointCalculator,
             reviewRepository,
             pullRequestRepository,
@@ -950,6 +954,47 @@ class ActivityEventListenerTest extends BaseUnitTest {
             listener.onDiscussionCommentCreated(event);
 
             verifyNoInteractions(activityEventService);
+        }
+    }
+
+    @Nested
+    @DisplayName("Commit Authors Reconciled Event")
+    class CommitAuthorsReconciledTests {
+
+        @Test
+        @DisplayName("backfills commit actors using configured xp-per-commit when event has repository id")
+        void backfillsCommitActorsOnReconciliation() {
+            when(activityEventRepository.backfillCommitActors(eq(200L), eq(0.5))).thenReturn(3);
+
+            var event = new DomainEvent.CommitAuthorsReconciled(200L, createContext());
+
+            listener.onCommitAuthorsReconciled(event);
+
+            verify(activityEventRepository).backfillCommitActors(200L, 0.5);
+        }
+
+        @Test
+        @DisplayName("does nothing when repository id is missing from event")
+        void noOpWhenRepositoryIdMissing() {
+            var event = new DomainEvent.CommitAuthorsReconciled(null, createContext());
+
+            listener.onCommitAuthorsReconciled(event);
+
+            verify(activityEventRepository, never()).backfillCommitActors(anyLong(), anyDouble());
+        }
+
+        @Test
+        @DisplayName("swallows backfill exceptions so the event pipeline does not break")
+        void swallowsBackfillExceptions() {
+            when(activityEventRepository.backfillCommitActors(eq(200L), anyDouble())).thenThrow(
+                new RuntimeException("db outage")
+            );
+
+            var event = new DomainEvent.CommitAuthorsReconciled(200L, createContext());
+
+            listener.onCommitAuthorsReconciled(event);
+
+            verify(activityEventRepository).backfillCommitActors(200L, 0.5);
         }
     }
 

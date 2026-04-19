@@ -244,11 +244,13 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.actor.type = de.tum.in.www1.hephaestus.gitprovider.user.User$Type.USER
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
-        AND NOT EXISTS (
-            SELECT 1 FROM PullRequestReviewComment prrc
-            WHERE prrc.id = e.targetId
-            AND e.targetType = 'review_comment'
-            AND prrc.author.id = prrc.pullRequest.author.id
+        AND NOT (
+            e.targetType = 'review_comment'
+            AND EXISTS (
+                SELECT 1 FROM PullRequestReviewComment prrc
+                WHERE prrc.id = e.targetId
+                AND prrc.author.id = prrc.pullRequest.author.id
+            )
         )
         GROUP BY e.actor.id, e.eventType
         """
@@ -386,11 +388,13 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
                 )
             )
         )
-        AND NOT EXISTS (
-            SELECT 1 FROM PullRequestReviewComment prrc
-            WHERE prrc.id = e.targetId
-            AND e.targetType = 'review_comment'
-            AND prrc.author.id = prrc.pullRequest.author.id
+        AND NOT (
+            e.targetType = 'review_comment'
+            AND EXISTS (
+                SELECT 1 FROM PullRequestReviewComment prrc
+                WHERE prrc.id = e.targetId
+                AND prrc.author.id = prrc.pullRequest.author.id
+            )
         )
         GROUP BY e.actor.id, e.eventType
         """

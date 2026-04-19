@@ -190,6 +190,63 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
             assertThat(saved.getSide()).isNull();
             assertThat(saved.getCommitSha()).isNull();
             assertThat(saved.getOriginalCommitSha()).isNull();
+            assertThat(saved.getOutdated()).isNull();
+        }
+
+        @Test
+        @DisplayName("should mark thread outdated=true on create when discussion position has dropped its hunk")
+        void shouldMarkThreadOutdatedWhenPositionHasNullLines() {
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
+            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
+                inv.getArgument(0, PullRequestReviewThread.class)
+            );
+
+            var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
+                DISCUSSION_GID,
+                false,
+                null,
+                "src/Foo.ts",
+                null,
+                null,
+                PullRequestReviewComment.Side.RIGHT,
+                "head-sha",
+                "base-sha",
+                true,
+                CREATED_AT
+            );
+
+            PullRequestReviewThread saved = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
+
+            assertThat(saved).isNotNull();
+            assertThat(saved.getOutdated()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should mark thread outdated=false on create when discussion position is still active")
+        void shouldMarkThreadOutdatedFalseWhenPositionIsActive() {
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
+            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
+                inv.getArgument(0, PullRequestReviewThread.class)
+            );
+
+            var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
+                DISCUSSION_GID,
+                false,
+                null,
+                "src/Foo.ts",
+                42,
+                null,
+                PullRequestReviewComment.Side.RIGHT,
+                "head-sha",
+                "base-sha",
+                false,
+                CREATED_AT
+            );
+
+            PullRequestReviewThread saved = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
+
+            assertThat(saved).isNotNull();
+            assertThat(saved.getOutdated()).isFalse();
         }
     }
 
@@ -288,6 +345,87 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("should backfill outdated flag when existing thread has null value")
+        void shouldBackfillOutdatedWhenExistingHasNull() {
+            PullRequestReviewThread existing = new PullRequestReviewThread();
+            existing.setId(500L);
+            existing.setNodeId(DISCUSSION_GID);
+            existing.setProvider(provider);
+            existing.setPullRequest(pr);
+            existing.setState(PullRequestReviewThread.State.UNRESOLVED);
+            existing.setPath("src/Foo.ts");
+            existing.setLine(42);
+            existing.setOutdated(null);
+
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(
+                Optional.of(existing)
+            );
+            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
+                inv.getArgument(0, PullRequestReviewThread.class)
+            );
+
+            var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
+                DISCUSSION_GID,
+                false,
+                null,
+                "src/Foo.ts",
+                42,
+                null,
+                PullRequestReviewComment.Side.RIGHT,
+                "head-sha",
+                "base-sha",
+                true,
+                CREATED_AT
+            );
+
+            PullRequestReviewThread result = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
+
+            assertThat(result.getOutdated()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should not overwrite outdated flag when existing thread already has a value")
+        void shouldNotOverwriteOutdatedWhenExistingHasValue() {
+            PullRequestReviewThread existing = new PullRequestReviewThread();
+            existing.setId(500L);
+            existing.setNodeId(DISCUSSION_GID);
+            existing.setProvider(provider);
+            existing.setPullRequest(pr);
+            existing.setState(PullRequestReviewThread.State.UNRESOLVED);
+            existing.setPath("src/Foo.ts");
+            existing.setLine(42);
+            existing.setSide(PullRequestReviewComment.Side.RIGHT);
+            existing.setStartSide(PullRequestReviewComment.Side.RIGHT);
+            existing.setCommitSha("head-sha");
+            existing.setOriginalCommitSha("base-sha");
+            existing.setOutdated(false);
+
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(
+                Optional.of(existing)
+            );
+
+            var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
+                DISCUSSION_GID,
+                false,
+                null,
+                "src/Foo.ts",
+                42,
+                null,
+                PullRequestReviewComment.Side.RIGHT,
+                "head-sha",
+                "base-sha",
+                true,
+                CREATED_AT
+            );
+
+            PullRequestReviewThread result = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
+
+            assertThat(result.getOutdated()).isFalse();
+            // Nothing changed so no save should happen
+            verify(threadRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("should transition state from UNRESOLVED to RESOLVED and publish ReviewThreadResolved")
         void shouldTransitionStateAndPublishResolvedEventWhenDiscussionResolvesExistingThread() {
             PullRequestReviewThread existing = new PullRequestReviewThread();
@@ -355,8 +493,29 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
             assertThat(data.oldLine()).isNull();
             assertThat(data.commitSha()).isNull();
             assertThat(data.originalCommitSha()).isNull();
+            assertThat(data.outdated()).isNull();
             assertThat(data.filePath()).isEqualTo("src/Foo.ts");
             assertThat(data.newLine()).isEqualTo(42);
+        }
+
+        @Test
+        @DisplayName("should default outdated to null for 10-arg callers")
+        void shouldDefaultOutdatedToNullFor10ArgCallers() {
+            var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
+                DISCUSSION_GID,
+                false,
+                null,
+                "src/Foo.ts",
+                42,
+                null,
+                PullRequestReviewComment.Side.RIGHT,
+                "head-sha",
+                "base-sha",
+                CREATED_AT
+            );
+
+            assertThat(data.outdated()).isNull();
+            assertThat(data.commitSha()).isEqualTo("head-sha");
         }
     }
 }

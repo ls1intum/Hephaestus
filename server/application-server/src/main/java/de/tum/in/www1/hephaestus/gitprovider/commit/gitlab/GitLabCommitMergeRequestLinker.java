@@ -2,10 +2,12 @@ package de.tum.in.www1.hephaestus.gitprovider.commit.gitlab;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
-import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitContributorRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
@@ -28,6 +30,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
@@ -63,8 +66,7 @@ public class GitLabCommitMergeRequestLinker {
     private final GitLabGraphQlClientProvider graphQlClientProvider;
     private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabProperties gitLabProperties;
-    private final ActivityEventRepository activityEventRepository;
-    private final ExperiencePointCalculator experiencePointCalculator;
+    private final ApplicationEventPublisher eventPublisher;
 
     public GitLabCommitMergeRequestLinker(
         CommitRepository commitRepository,
@@ -73,8 +75,7 @@ public class GitLabCommitMergeRequestLinker {
         GitLabGraphQlClientProvider graphQlClientProvider,
         GitLabGraphQlResponseHandler responseHandler,
         GitLabProperties gitLabProperties,
-        ActivityEventRepository activityEventRepository,
-        ExperiencePointCalculator experiencePointCalculator
+        ApplicationEventPublisher eventPublisher
     ) {
         this.commitRepository = commitRepository;
         this.commitContributorRepository = commitContributorRepository;
@@ -82,8 +83,7 @@ public class GitLabCommitMergeRequestLinker {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.gitLabProperties = gitLabProperties;
-        this.activityEventRepository = activityEventRepository;
-        this.experiencePointCalculator = experiencePointCalculator;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -297,7 +297,13 @@ public class GitLabCommitMergeRequestLinker {
             errorAborted = true;
         }
 
-        int attributed = reconcileCommitContributorUsers(loginToEmails, providerId, repositoryId, safeProjectPath);
+        int attributed = reconcileCommitContributorUsers(
+            loginToEmails,
+            providerId,
+            scopeId,
+            repository,
+            safeProjectPath
+        );
 
         SyncResult result;
         if (errorAborted) {
@@ -637,10 +643,12 @@ public class GitLabCommitMergeRequestLinker {
     private int reconcileCommitContributorUsers(
         Map<String, Set<String>> loginToEmails,
         @Nullable Long providerId,
-        long repositoryId,
+        Long scopeId,
+        Repository repository,
         String safeProjectPath
     ) {
         if (loginToEmails.isEmpty()) return 0;
+        long repositoryId = repository.getId();
 
         int contributorRowsUpdated = 0;
         int commitAuthorRowsUpdated = 0;
@@ -683,15 +691,15 @@ public class GitLabCommitMergeRequestLinker {
             }
         }
 
-        // COMMIT_CREATED activity events ingested before author resolution were recorded
-        // with actor_id=NULL and xp=0. Now that git_commit.author_id has been backfilled
-        // for this repository, rewrite those ledger rows so the contributor receives XP
-        // and appears on the leaderboard. Scoped per-repository to keep the UPDATE bounded.
-        int activityRowsUpdated = 0;
+        // Signal downstream consumers (the activity ledger) that commit author identities
+        // for this repository have been reconciled. The activity module listens for this
+        // event and backfills COMMIT_CREATED rows whose actor_id was NULL at ingest time.
         if (commitAuthorRowsUpdated > 0) {
-            activityRowsUpdated = activityEventRepository.backfillCommitActors(
-                repositoryId,
-                experiencePointCalculator.getXpCommitCreated()
+            eventPublisher.publishEvent(
+                new DomainEvent.CommitAuthorsReconciled(
+                    repositoryId,
+                    EventContext.forSync(scopeId, RepositoryRef.from(repository), GitProviderType.GITLAB)
+                )
             );
         }
 
@@ -699,17 +707,15 @@ public class GitLabCommitMergeRequestLinker {
             contributorRowsUpdated > 0 ||
             commitAuthorRowsUpdated > 0 ||
             commitCommitterRowsUpdated > 0 ||
-            userEmailsBackfilled > 0 ||
-            activityRowsUpdated > 0
+            userEmailsBackfilled > 0
         ) {
             log.info(
-                "Backfilled attribution via GitLab author resolution: projectPath={}, contributorRows={}, commitAuthorRows={}, commitCommitterRows={}, userEmailRows={}, activityRows={}, logins={}",
+                "Backfilled attribution via GitLab author resolution: projectPath={}, contributorRows={}, commitAuthorRows={}, commitCommitterRows={}, userEmailRows={}, logins={}",
                 safeProjectPath,
                 contributorRowsUpdated,
                 commitAuthorRowsUpdated,
                 commitCommitterRowsUpdated,
                 userEmailsBackfilled,
-                activityRowsUpdated,
                 loginToEmails.size()
             );
         }

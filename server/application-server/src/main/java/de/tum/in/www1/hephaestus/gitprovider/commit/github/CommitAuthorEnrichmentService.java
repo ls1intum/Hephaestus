@@ -5,17 +5,20 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
-import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.util.CommitUtils;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
@@ -29,6 +32,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
@@ -101,8 +105,7 @@ public class CommitAuthorEnrichmentService {
     private final GitHubGraphQlSyncCoordinator graphQlSyncCoordinator;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubUserProcessor userProcessor;
-    private final ActivityEventRepository activityEventRepository;
-    private final ExperiencePointCalculator experiencePointCalculator;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Enriches unresolved commit authors/committers for a repository.
@@ -114,9 +117,18 @@ public class CommitAuthorEnrichmentService {
      * @param nameWithOwner    the repository name with owner (e.g. "owner/repo")
      * @param scopeId          the scope ID for GraphQL client authentication
      * @param providerId       the provider ID for scoping user lookups
+     * @param repository       the repository entity used to populate the {@link RepositoryRef}
+     *                         on the published {@link DomainEvent.CommitAuthorsReconciled} event;
+     *                         may be {@code null} when a reference cannot be materialised.
      * @return the number of commits enriched
      */
-    public int enrichCommitAuthors(Long repositoryId, String nameWithOwner, @Nullable Long scopeId, Long providerId) {
+    public int enrichCommitAuthors(
+        Long repositoryId,
+        String nameWithOwner,
+        @Nullable Long scopeId,
+        Long providerId,
+        @Nullable Repository repository
+    ) {
         // Phase 1: Find all distinct unresolved emails from the database
         List<String> unresolvedAuthorEmails = commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(
             repositoryId
@@ -165,49 +177,48 @@ public class CommitAuthorEnrichmentService {
         Set<String> allStillUnresolved = new HashSet<>(stillUnresolvedAuthorEmails);
         allStillUnresolved.addAll(stillUnresolvedCommitterEmails);
 
+        int enrichedByApi = 0;
         if (allStillUnresolved.isEmpty()) {
             log.info("Enriched all commit authors via email: repoId={}, enriched={}", repositoryId, enrichedByEmail);
-            return enrichedByEmail;
-        }
-
-        if (scopeId == null) {
+        } else if (scopeId == null) {
             log.debug(
                 "Skipping GitHub API enrichment: reason=noScopeId, repoId={}, remaining={}",
                 repositoryId,
                 allStillUnresolved.size()
             );
-            return enrichedByEmail;
+        } else {
+            // Phase 4: Cluster remaining unresolved by email, fetch from GitHub GraphQL API
+            enrichedByApi = enrichByGitHubGraphQl(
+                repositoryId,
+                nameWithOwner,
+                scopeId,
+                stillUnresolvedAuthorEmails,
+                stillUnresolvedCommitterEmails,
+                providerId
+            );
         }
-
-        // Phase 4: Cluster remaining unresolved by email, fetch from GitHub GraphQL API
-        int enrichedByApi = enrichByGitHubGraphQl(
-            repositoryId,
-            nameWithOwner,
-            scopeId,
-            stillUnresolvedAuthorEmails,
-            stillUnresolvedCommitterEmails,
-            providerId
-        );
 
         int total = enrichedByEmail + enrichedByApi;
 
-        // COMMIT_CREATED activity events recorded before author resolution were inserted
-        // with actor_id=NULL and xp=0. Now that git_commit.author_id has been resolved,
-        // rewrite those ledger rows so contributors receive XP on the leaderboard.
-        int activityRowsBackfilled = 0;
+        // Signal downstream consumers (the activity ledger) that commit author identities
+        // for this repository have been reconciled. The activity module listens for this
+        // event and backfills COMMIT_CREATED rows whose actor_id was NULL at ingest time.
+        // Must publish regardless of which phase did the work — a Phase-2-only enrichment
+        // would otherwise silently fail to trigger the activity backfill.
         if (total > 0) {
-            activityRowsBackfilled = activityEventRepository.backfillCommitActors(
-                repositoryId,
-                experiencePointCalculator.getXpCommitCreated()
+            eventPublisher.publishEvent(
+                new DomainEvent.CommitAuthorsReconciled(
+                    repositoryId,
+                    EventContext.forSync(scopeId, RepositoryRef.from(repository), GitProviderType.GITHUB)
+                )
             );
         }
 
         log.info(
-            "Completed commit author enrichment: repoId={}, enrichedByEmail={}, enrichedByApi={}, activityRows={}, total={}",
+            "Completed commit author enrichment: repoId={}, enrichedByEmail={}, enrichedByApi={}, total={}",
             repositoryId,
             enrichedByEmail,
             enrichedByApi,
-            activityRowsBackfilled,
             total
         );
         return total;

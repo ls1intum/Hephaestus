@@ -13,10 +13,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
-import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitContributorRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler.HandleResult;
@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -70,10 +71,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     private GitLabGraphQlResponseHandler responseHandler;
 
     @Mock
-    private ActivityEventRepository activityEventRepository;
-
-    @Mock
-    private ExperiencePointCalculator experiencePointCalculator;
+    private ApplicationEventPublisher eventPublisher;
 
     private final GitLabProperties gitLabProperties = new GitLabProperties(
         "https://gitlab.com",
@@ -93,8 +91,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
             .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
         lenient().when(graphQlClientProvider.getRateLimitRemaining(anyLong())).thenReturn(100);
 
-        lenient().when(experiencePointCalculator.getXpCommitCreated()).thenReturn(5.0);
-
         linker = new GitLabCommitMergeRequestLinker(
             commitRepository,
             commitContributorRepository,
@@ -102,8 +98,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
             graphQlClientProvider,
             responseHandler,
             gitLabProperties,
-            activityEventRepository,
-            experiencePointCalculator
+            eventPublisher
         );
 
         repository = new Repository();
@@ -404,6 +399,66 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
         assertThat(result.count()).isZero();
         verify(commitRepository, never()).linkPullRequestToCommits(anyLong(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("publishes CommitAuthorsReconciled with GitLab RepositoryRef when commit_author rows are updated")
+    void shouldPublishReconciledEventWhenCommitAuthorsUpdated() {
+        Map<String, Object> commit = commitNode("sha-1", "dev@example.com", "devlogin");
+        Map<String, Object> mr = mrNodeWithCommits(42, List.of(commit));
+
+        ClientGraphQlResponse page = mockMrsPage(List.of(mr), new GitLabPageInfo(false, null));
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, page);
+        when(commitRepository.linkPullRequestToCommits(eq(REPO_ID), eq(42), any())).thenReturn(1);
+
+        User user = new User();
+        user.setId(901L);
+        when(userRepository.findByLogin(eq("devlogin"))).thenReturn(Optional.of(user));
+        when(commitContributorRepository.backfillUserIdByEmail(anyString(), eq(901L))).thenReturn(1);
+        when(commitRepository.bulkUpdateAuthorIdByEmail(eq("dev@example.com"), eq(REPO_ID), eq(901L))).thenReturn(1);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+
+        ArgumentCaptor<DomainEvent.CommitAuthorsReconciled> captor = ArgumentCaptor.forClass(
+            DomainEvent.CommitAuthorsReconciled.class
+        );
+        verify(eventPublisher).publishEvent(captor.capture());
+
+        DomainEvent.CommitAuthorsReconciled event = captor.getValue();
+        assertThat(event.repositoryId()).isEqualTo(REPO_ID);
+        assertThat(event.context().scopeId()).isEqualTo(SCOPE_ID);
+        assertThat(event.context().providerType()).isEqualTo(GitProviderType.GITLAB);
+        assertThat(event.context().repository()).isNotNull();
+        assertThat(event.context().repository().id()).isEqualTo(REPO_ID);
+        assertThat(event.context().repository().nameWithOwner()).isEqualTo(PROJECT_PATH);
+    }
+
+    @Test
+    @DisplayName("does not publish CommitAuthorsReconciled when no commit_author rows are updated")
+    void shouldNotPublishWhenNoCommitAuthorsUpdated() {
+        Map<String, Object> commit = commitNode("sha-1", "dev@example.com", "devlogin");
+        Map<String, Object> mr = mrNodeWithCommits(42, List.of(commit));
+
+        ClientGraphQlResponse page = mockMrsPage(List.of(mr), new GitLabPageInfo(false, null));
+        HttpGraphQlClient client = mockClient();
+        mockSequentialExecute(client, page);
+        when(commitRepository.linkPullRequestToCommits(eq(REPO_ID), eq(42), any())).thenReturn(1);
+
+        User user = new User();
+        user.setId(901L);
+        when(userRepository.findByLogin(eq("devlogin"))).thenReturn(Optional.of(user));
+        // Contributor row is backfilled but no commit_author row is actually updated
+        // (e.g. git_commit.author_id was already populated). Event must NOT be published.
+        when(commitContributorRepository.backfillUserIdByEmail(anyString(), eq(901L))).thenReturn(1);
+        when(commitRepository.bulkUpdateAuthorIdByEmail(anyString(), anyLong(), anyLong())).thenReturn(0);
+
+        SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
+
+        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.CommitAuthorsReconciled.class));
     }
 
     @Test

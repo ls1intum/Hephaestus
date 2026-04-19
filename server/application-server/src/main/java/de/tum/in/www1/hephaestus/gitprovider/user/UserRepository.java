@@ -108,6 +108,48 @@ public interface UserRepository extends JpaRepository<User, Long> {
     )
     List<User> findAllByName(@Param("name") String name);
 
+    /**
+     * Finds all users whose display name matches the given value after applying
+     * German DIN 5007-2 folding (ö→oe, ä→ae, ü→ue, ß→ss, plus lowercasing) on
+     * the database side. Called when {@link #findAllByNameAndProviderId} returns
+     * no hits because the commit email is already ASCII-folded (e.g.
+     * {@code jannis.hoeferlin@tum.de}) but the DB stores the native umlaut form
+     * (e.g. {@code "Jannis Höferlin"}).
+     * <p>
+     * Backed by the {@code de_fold_name(text)} SQL function and a functional
+     * index defined in migration {@code 1776600000000_changelog.xml}; the function
+     * is registered with Hibernate via
+     * {@link de.tum.in.www1.hephaestus.config.HephaestusFunctionContributor}.
+     */
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE function('de_fold_name', u.name) = function('de_fold_name', :asciiFoldedName)
+              AND u.provider.id = :providerId
+              AND u.type = 'USER'
+            ORDER BY u.id
+        """
+    )
+    List<User> findAllByUmlautFoldedNameAndProviderId(
+        @Param("asciiFoldedName") String asciiFoldedName,
+        @Param("providerId") Long providerId
+    );
+
+    /**
+     * Provider-agnostic counterpart to {@link #findAllByUmlautFoldedNameAndProviderId}.
+     */
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE function('de_fold_name', u.name) = function('de_fold_name', :asciiFoldedName)
+              AND u.type = 'USER'
+            ORDER BY u.id
+        """
+    )
+    List<User> findAllByUmlautFoldedName(@Param("asciiFoldedName") String asciiFoldedName);
+
     @Query(
         """
             SELECT DISTINCT u

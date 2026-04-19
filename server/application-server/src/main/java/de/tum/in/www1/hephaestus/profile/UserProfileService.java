@@ -27,9 +27,17 @@ import de.tum.in.www1.hephaestus.workspace.WorkspaceContributionActivityService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.hibernate.Hibernate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -381,7 +389,13 @@ public class UserProfileService {
     }
 
     private boolean isPullRequestComment(IssueComment comment) {
-        return comment.getIssue() instanceof PullRequest;
+        Issue issue = comment.getIssue();
+        if (issue == null) {
+            return false;
+        }
+        // Unproxy to resolve the concrete SINGLE_TABLE subtype; a Hibernate proxy of
+        // Issue cannot be instanceof PullRequest even when the row IS a PullRequest.
+        return Hibernate.unproxy(issue) instanceof PullRequest;
     }
 
     private boolean isOwnPullRequestComment(PullRequestReviewComment comment) {

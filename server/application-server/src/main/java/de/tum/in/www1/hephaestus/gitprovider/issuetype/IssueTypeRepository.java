@@ -92,4 +92,35 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
         List<IssueType> results = findByProviderIdAndNameIgnoreCase(providerId, name, Pageable.ofSize(1));
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
+
+    /**
+     * Resolves an issue type by name for the same provider as the given organization.
+     * <p>
+     * Uses a JPQL subquery to find the organization's provider id so callers never
+     * have to dereference {@code organization.getProvider()} on a detached lazy proxy —
+     * which was raising {@code LazyInitializationException} during GitLab issue sync
+     * when the {@code Repository}'s Organization proxy outlived its Hibernate session.
+     */
+    @Query(
+        """
+        SELECT it
+        FROM IssueType it
+        WHERE lower(it.name) = lower(:name)
+        AND it.isEnabled = true
+        AND it.organization.provider.id = (
+            SELECT o.provider.id FROM Organization o WHERE o.id = :organizationId
+        )
+        ORDER BY it.organization.id ASC
+        """
+    )
+    List<IssueType> findByOrganizationProviderAndNameIgnoreCase(
+        @Param("organizationId") Long organizationId,
+        @Param("name") String name,
+        Pageable pageable
+    );
+
+    default Optional<IssueType> findFirstByOrganizationProviderAndNameIgnoreCase(Long organizationId, String name) {
+        List<IssueType> results = findByOrganizationProviderAndNameIgnoreCase(organizationId, name, Pageable.ofSize(1));
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
 }

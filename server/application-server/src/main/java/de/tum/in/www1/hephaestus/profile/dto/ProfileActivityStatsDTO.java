@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.profile.dto;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.lang.NonNull;
 
@@ -30,7 +29,6 @@ import org.springframework.lang.NonNull;
  * @param numberOfOpenedIssues count of issues opened in timeframe
  * @param numberOfClosedIssues count of issues closed in timeframe
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Aggregated activity statistics with XP scores for a user profile")
 public record ProfileActivityStatsDTO(
     @NonNull @Schema(description = "Total XP score", example = "1250") Integer score,

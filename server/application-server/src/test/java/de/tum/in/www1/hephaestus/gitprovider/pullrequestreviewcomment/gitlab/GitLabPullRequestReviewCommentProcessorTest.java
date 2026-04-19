@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -435,17 +434,5 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
             Instant.parse("2024-01-15T10:00:00Z"),
             Instant.parse("2024-01-15T10:00:00Z")
         );
-    }
-
-    @SuppressWarnings("unused")
-    private static User dummyUser() {
-        User user = new User();
-        user.setLogin("nobody");
-        return user;
-    }
-
-    @SuppressWarnings("unused")
-    private static Object ignoreArg() {
-        return anyLong();
     }
 }

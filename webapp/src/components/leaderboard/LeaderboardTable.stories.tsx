@@ -253,3 +253,72 @@ export const WithCurrentUser: Story = {
 		},
 	},
 };
+
+const mockTeamLeaderboardEntries: LeaderboardEntry[] = [
+	{
+		rank: 1,
+		score: 310,
+		team: {
+			id: 10,
+			name: "Platform",
+			hidden: false,
+			labels: [],
+			members: [],
+			membershipCount: 6,
+			repoPermissionCount: 3,
+			repositories: [],
+		},
+		reviewedPullRequests,
+		numberOfReviewedPRs: 26,
+		numberOfApprovals: 14,
+		numberOfChangeRequests: 7,
+		numberOfComments: 3,
+		numberOfUnknowns: 2,
+		numberOfCodeComments: 28,
+		numberOfOwnReplies: 9,
+		numberOfOpenPullRequests: 3,
+		numberOfMergedPullRequests: 12,
+		numberOfClosedPullRequests: 1,
+		numberOfOpenedIssues: 6,
+		numberOfClosedIssues: 4,
+	},
+	{
+		rank: 2,
+		score: 180,
+		team: {
+			id: 20,
+			name: "Integrations",
+			hidden: false,
+			labels: [],
+			members: [],
+			membershipCount: 4,
+			repoPermissionCount: 2,
+			repositories: [],
+		},
+		reviewedPullRequests: reviewedPullRequests.slice(0, 1),
+		numberOfReviewedPRs: 12,
+		numberOfApprovals: 5,
+		numberOfChangeRequests: 3,
+		numberOfComments: 1,
+		numberOfUnknowns: 0,
+		numberOfCodeComments: 10,
+		numberOfOwnReplies: 4,
+		numberOfOpenPullRequests: 2,
+		numberOfMergedPullRequests: 7,
+		numberOfClosedPullRequests: 0,
+		numberOfOpenedIssues: 3,
+		numberOfClosedIssues: 2,
+	},
+];
+
+/**
+ * Team variant with aggregated team-level activity metrics.
+ */
+export const TeamVariant: Story = {
+	args: {
+		leaderboard: mockTeamLeaderboardEntries,
+		isLoading: false,
+		variant: "TEAM",
+		onTeamClick: fn(),
+	},
+};

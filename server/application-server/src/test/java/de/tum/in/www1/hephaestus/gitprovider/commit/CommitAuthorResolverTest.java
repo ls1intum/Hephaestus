@@ -357,6 +357,83 @@ class CommitAuthorResolverTest extends BaseUnitTest {
             assertThat(result).isNull();
             verify(userRepository, never()).findAllByNameAndProviderId(anyString(), anyLong());
         }
+
+        @Test
+        @DisplayName("should fall back to umlaut-folded name match when exact name match is empty")
+        void shouldFallBackToUmlautFoldedNameMatchWhenExactMatchEmpty() {
+            // jannis.hoeferlin@tum.de → "Jannis Hoeferlin" (ASCII) → DB has "Jannis Höferlin"
+            when(userRepository.findByEmailAndProviderId("jannis.hoeferlin@tum.de", 3L)).thenReturn(Optional.empty());
+            when(userRepository.findAllByNameAndProviderId("Jannis Hoeferlin", 3L)).thenReturn(List.of());
+
+            User user = createUser(6001L);
+            when(userRepository.findAllByUmlautFoldedNameAndProviderId("Jannis Hoeferlin", 3L)).thenReturn(
+                List.of(user)
+            );
+
+            Long result = resolver.resolveByEmail("jannis.hoeferlin@tum.de", 3L);
+
+            assertThat(result).isEqualTo(6001L);
+            verify(userRepository).findAllByUmlautFoldedNameAndProviderId("Jannis Hoeferlin", 3L);
+        }
+
+        @Test
+        @DisplayName("should fall back to provider-agnostic umlaut-folded match when providerId is null")
+        void shouldFallBackToProviderAgnosticUmlautFoldedMatch() {
+            when(userRepository.findByEmail("sebastian.mueller@tum.de")).thenReturn(Optional.empty());
+            when(userRepository.findAllByName("Sebastian Mueller")).thenReturn(List.of());
+
+            User user = createUser(6002L);
+            when(userRepository.findAllByUmlautFoldedName("Sebastian Mueller")).thenReturn(List.of(user));
+
+            Long result = resolver.resolveByEmail("sebastian.mueller@tum.de", null);
+
+            assertThat(result).isEqualTo(6002L);
+            verify(userRepository).findAllByUmlautFoldedName("Sebastian Mueller");
+        }
+
+        @Test
+        @DisplayName("should skip umlaut-folded match when exact name match already succeeded")
+        void shouldSkipUmlautFoldedMatchWhenExactMatchSucceeded() {
+            when(userRepository.findByEmailAndProviderId("erik.kiessig@tum.de", 3L)).thenReturn(Optional.empty());
+
+            User user = createUser(5202L);
+            when(userRepository.findAllByNameAndProviderId("Erik Kiessig", 3L)).thenReturn(List.of(user));
+
+            Long result = resolver.resolveByEmail("erik.kiessig@tum.de", 3L);
+
+            assertThat(result).isEqualTo(5202L);
+            // No fall-through to the folded lookup when the exact match already resolves.
+            verify(userRepository, never()).findAllByUmlautFoldedNameAndProviderId(anyString(), anyLong());
+        }
+
+        @Test
+        @DisplayName("should skip umlaut-folded match when exact match is ambiguous")
+        void shouldSkipUmlautFoldedMatchWhenExactMatchAmbiguous() {
+            when(userRepository.findByEmailAndProviderId("john.smith@tum.de", 3L)).thenReturn(Optional.empty());
+            when(userRepository.findAllByNameAndProviderId("John Smith", 3L)).thenReturn(
+                List.of(createUser(1L), createUser(2L))
+            );
+
+            Long result = resolver.resolveByEmail("john.smith@tum.de", 3L);
+
+            assertThat(result).isNull();
+            // Ambiguous exact matches must not silently fall through to a folded lookup.
+            verify(userRepository, never()).findAllByUmlautFoldedNameAndProviderId(anyString(), anyLong());
+        }
+
+        @Test
+        @DisplayName("should skip umlaut-folded match when folded candidates are ambiguous")
+        void shouldSkipUmlautFoldedMatchWhenFoldedAmbiguous() {
+            when(userRepository.findByEmailAndProviderId("max.mueller@tum.de", 3L)).thenReturn(Optional.empty());
+            when(userRepository.findAllByNameAndProviderId("Max Mueller", 3L)).thenReturn(List.of());
+            when(userRepository.findAllByUmlautFoldedNameAndProviderId("Max Mueller", 3L)).thenReturn(
+                List.of(createUser(1L), createUser(2L))
+            );
+
+            Long result = resolver.resolveByEmail("max.mueller@tum.de", 3L);
+
+            assertThat(result).isNull();
+        }
     }
 
     // ========== resolveAndBackfillByEmail ==========

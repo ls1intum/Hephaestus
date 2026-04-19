@@ -520,27 +520,26 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         }
         String humanised = humaniseTypeName(typeName);
         Organization organization = repository.getOrganization();
-        if (organization != null && organization.getId() != null) {
-            Optional<IssueType> orgScoped = issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(
-                organization.getId(),
-                humanised
-            );
-            if (orgScoped.isPresent()) {
-                return orgScoped.get().getId();
-            }
+        if (organization == null || organization.getId() == null) {
+            return null;
+        }
+        Optional<IssueType> orgScoped = issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(
+            organization.getId(),
+            humanised
+        );
+        if (orgScoped.isPresent()) {
+            return orgScoped.get().getId();
         }
         // Subgroups become their own Organization rows but share provider-global
         // issue_type primary keys (GitLab GraphQL global IDs), so a provider-scoped
         // name lookup yields the exact same row. Without this fallback, issues
         // synced from subgroups would resolve to null because the subgroup org
-        // never had its own issue_type seed rows materialised.
-        Long providerId =
-            organization != null && organization.getProvider() != null ? organization.getProvider().getId() : null;
-        if (providerId == null) {
-            return null;
-        }
+        // never had its own issue_type seed rows materialised. Resolve the provider
+        // id via a JPQL subquery on organizationId — touching the lazy Organization
+        // proxy here raised LazyInitializationException when the Repository outlived
+        // its original Hibernate session.
         return issueTypeRepository
-            .findFirstByProviderIdAndNameIgnoreCase(providerId, humanised)
+            .findFirstByOrganizationProviderAndNameIgnoreCase(organization.getId(), humanised)
             .map(IssueType::getId)
             .orElse(null);
     }

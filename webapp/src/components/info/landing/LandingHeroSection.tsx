@@ -168,7 +168,10 @@ export function LandingHeroSection({
 
 			{/* Leaderboard Preview */}
 			<div className="mx-auto max-w-4xl px-4 md:px-6">
-				<div className="shadow-xl border border-muted rounded-md overflow-hidden -mb-3">
+				<div
+					aria-hidden="true"
+					className="shadow-xl border border-muted rounded-md overflow-hidden -mb-3"
+				>
 					<div
 						className="overflow-auto pointer-events-none"
 						style={{

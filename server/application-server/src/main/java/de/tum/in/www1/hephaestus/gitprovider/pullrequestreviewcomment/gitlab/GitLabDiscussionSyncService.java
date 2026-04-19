@@ -334,6 +334,7 @@ public class GitLabDiscussionSyncService {
         String headSha = null;
         String baseSha = null;
         PullRequestReviewComment.Side threadSide = null;
+        Boolean outdated = null;
 
         if (rootPosition != null) {
             String np = (String) rootPosition.get("newPath");
@@ -352,6 +353,15 @@ public class GitLabDiscussionSyncService {
                     baseSha = (String) diffRefs.get("startSha");
                 }
             }
+
+            // Infer the "outdated" state that GitLab reports for discussions whose diff
+            // anchor has been dropped by a later push. A text-position note with a non-null
+            // file path but no newLine/oldLine is GitLab's signal that the referenced hunk
+            // no longer exists in the head diff — i.e. the discussion is outdated.
+            String positionType = (String) rootPosition.get("positionType");
+            if ("text".equals(positionType) && filePath != null) {
+                outdated = newLine == null && oldLine == null;
+            }
         }
 
         Instant firstCreatedAt = parseTimestamp((String) noteNodes.get(0).get("createdAt"));
@@ -367,6 +377,7 @@ public class GitLabDiscussionSyncService {
             threadSide,
             headSha,
             baseSha,
+            outdated,
             firstCreatedAt
         );
         PullRequestReviewThread thread = threadProcessor.findOrCreateThread(threadData, pr, provider, scopeId);

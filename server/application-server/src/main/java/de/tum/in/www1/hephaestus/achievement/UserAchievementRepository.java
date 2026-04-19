@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -131,6 +132,6 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
         @Param("userId") Long userId,
         @Param("achievementId") String achievementId,
         @Param("progressDataJson") String progressDataJson,
-        @Param("unlockedAt") Instant unlockedAt
+        @Param("unlockedAt") @Nullable Instant unlockedAt
     );
 }

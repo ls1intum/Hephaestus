@@ -171,6 +171,27 @@ public class CommitAuthorResolver {
                             candidates.size()
                         );
                     }
+                    // Strategy 4b: fallback for umlaut accounts. The dotted local-part is
+                    // already ASCII-folded (e.g. "jannis.hoeferlin") but the DB may store
+                    // the native form ("Jannis Höferlin"). Re-query with a DB-side fold so
+                    // {@code oe/ae/ue/ss} in the input lines up with {@code ö/ä/ü/ß} in
+                    // {@code User.name}. Deterministic-only: single-candidate wins.
+                    if (candidates.isEmpty()) {
+                        List<User> folded =
+                            providerId != null
+                                ? userRepository.findAllByUmlautFoldedNameAndProviderId(displayName, providerId)
+                                : userRepository.findAllByUmlautFoldedName(displayName);
+                        if (folded.size() == 1) {
+                            return folded.get(0).getId();
+                        }
+                        if (folded.size() > 1) {
+                            log.debug(
+                                "Skipped umlaut-folded display-name match: ambiguous candidates for email={}, candidates={}",
+                                email,
+                                folded.size()
+                            );
+                        }
+                    }
                 }
             }
         }

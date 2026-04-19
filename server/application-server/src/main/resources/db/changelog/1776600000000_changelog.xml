@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        PR #1021 / Gap 4b — German DIN 5007-2 name folding as a first-class SQL function.
+
+        GitLab commit emails carry DIN 5007-2 transliterations of umlauts in the
+        local-part (jannis.hoeferlin@tum.de), while User.name stores the original
+        UTF-8 form (Jannis Höferlin). Off-the-shelf accent folding (unaccent,
+        ICU und-u-ks-level1) strips diacritics (ö→o), not expands them (ö→oe),
+        so matching commit local-parts to display names needs a German-specific
+        fold.
+
+        Instead of inlining a 4x REPLACE chain in every JPQL query, we
+        centralise the rule as an IMMUTABLE SQL function and back it with a
+        functional index. Hibernate calls it via a registered FunctionContributor.
+    -->
+    <changeSet id="1776600000000-1" author="hephaestus" runOnChange="true">
+        <sql splitStatements="false" endDelimiter=";">
+            CREATE OR REPLACE FUNCTION de_fold_name(input text)
+            RETURNS text
+            LANGUAGE sql
+            IMMUTABLE
+            STRICT
+            PARALLEL SAFE
+            AS $$
+                SELECT REPLACE(
+                           REPLACE(
+                               REPLACE(
+                                   REPLACE(LOWER(input), 'ö', 'oe'),
+                                   'ä', 'ae'
+                               ),
+                               'ü', 'ue'
+                           ),
+                           'ß', 'ss'
+                       )
+            $$;
+        </sql>
+    </changeSet>
+
+    <changeSet id="1776600000000-2" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_user_de_fold_name"/>
+            </not>
+        </preConditions>
+        <sql splitStatements="false">
+            CREATE INDEX idx_user_de_fold_name ON "user" (de_fold_name(name))
+            WHERE type = 'USER'
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS idx_user_de_fold_name</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
