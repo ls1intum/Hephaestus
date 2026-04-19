@@ -77,11 +77,9 @@ The essence of the Art. 26(2) Satz 2 arrangement is made available to data subje
 
 See `05-avv-checklist.md` for the full table. In summary, engaged processors (ordered internal → platform-wide → per-workspace) are:
 
-- **AET operations (TUM SMTP relay via the TUM mail infrastructure)** — email delivery for Keycloak account lifecycle (verification, password reset). In-house; TUM-internal framework.
 - **GitHub, Inc. / Microsoft Corporation** — identity provider (OAuth) and source-system API (pull requests, issues, reviews, commits synchronised on behalf of the controller via the workspace-configured GitHub App installation or access token). AVV in place at TUM/AET level.
 - **OpenAI, L.P.** — LLM provider for workspaces configured to use it. AVV at TUM/AET level for the TUM-operated tenancy; AVV at the workspace administrator's institution level when that institution supplies the API credentials (shared-responsibility model, §3.2).
 - **Microsoft Corporation (Azure OpenAI Service)** — LLM provider for workspaces configured to use it. Region-configurable; EU-region deployments process within the EU. AVV as above.
-- **Anthropic, PBC** — LLM provider for workspaces configured to use it. AVV as above.
 - **Salesforce, Inc. / Slack Technologies, LLC** — workspace notifications and engagement digests when the workspace administrator has enabled Slack. AVV in place at TUM/AET level.
 
 The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation framework (Art. 16 Abs. 1 Satz 2 BayHIG in conjunction with the BAdW-Satzung). LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-avv-checklist.md` for the full EDPB 07/2020 analysis.
@@ -99,7 +97,7 @@ Pre-populated by DSMS. Verify:
 3. Detect workspace-defined Practices in synchronised Artifacts and produce advisory Findings.
 4. Deliver adaptive Guidance back to Contributors via dashboards, the conversational guidance assistant, and automated practice-review comments on pull/merge requests.
 5. Surface workspace engagement and recognition features (leaderboards, leagues, achievements) where the workspace administrator has enabled them.
-6. Deliver workspace notifications over email (TUM SMTP) and — where the workspace administrator has enabled it — Slack.
+6. Deliver workspace notifications — where the workspace administrator has enabled it — over Slack.
 7. Operate the service reliably and securely (server logs, backups) and troubleshoot incidents.
 
 ### 6. Name of IT system / procedure
@@ -152,8 +150,7 @@ Tick in DSMS:
 ### 11. Categories of recipients (Art. 30(1)(d))
 
 - **Internal:** AET administrators / developers (operation, maintenance, support); workspace members (see workspace-level Findings and dashboards as described in §6 of the privacy statement).
-- **Internal (AET-operated processors):** TUM SMTP relay (Keycloak account lifecycle emails).
-- **External (Art. 28 processors), as configured per workspace:** GitHub / Microsoft; the LLM provider configured for the workspace (OpenAI / Azure OpenAI / Anthropic); Slack (when enabled).
+- **External (Art. 28 processors), as configured per workspace:** GitHub / Microsoft; the LLM provider configured for the workspace (OpenAI or Azure OpenAI); Slack (when enabled).
 - **External (separate controllers, not Art. 28):** Leibniz-Rechenzentrum der BAdW for gitlab.lrz.de integration.
 - **No sale, no advertising recipients, no brokers.**
 
@@ -163,7 +160,6 @@ All U.S.-based recipients are certified under the EU–U.S. Data Privacy Framewo
 
 - **GitHub, Inc. / Microsoft Corporation** — DPF-certified (active; to be re-verified). Azure OpenAI in a European region processes data within the EU.
 - **OpenAI, L.P.** — DPF-certified (active; to be re-verified). SCCs Module 2 as fall-back.
-- **Anthropic, PBC** — DPF-certified (active; to be re-verified). SCCs Module 2 as fall-back.
 - **Salesforce, Inc. (Slack)** — DPF-certified (active; to be re-verified). SCCs Module 2 as fall-back.
 
 ### 13. Retention periods per data category (Art. 30(1)(f))

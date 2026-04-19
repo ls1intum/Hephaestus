@@ -27,7 +27,7 @@ The live privacy page is at [https://hephaestus.aet.cit.tum.de/privacy](https://
 - §3.1 names **gitlab.lrz.de / Leibniz-Rechenzentrum der BAdW** as a separate controller under the Art. 16 Abs. 1 Satz 2 BayHIG public-body cooperation framing, **not** an Art. 28 processor.
 - §3.2 documents the shared-responsibility model (workspace admin configures LLM credentials, Slack, leaderboards, practice catalog, auto-trigger) with the Art. 26(2) Satz 1 duty allocation.
 - §4 lists: identity + authentication, development activity (GitHub + gitlab.lrz.de), account settings + recognition + the "AI review comments" Art. 21 objection switch, AI-assisted features, and server logs (14-day cap). It does **not** claim active Sentry or PostHog processing — both integrations are disabled in production.
-- §6 lists every recipient: GitHub, LLM provider per workspace (OpenAI / Azure OpenAI / Anthropic), Slack, TUM SMTP relay.
+- §6 lists every recipient: GitHub, the LLM provider per workspace (OpenAI or Azure OpenAI), and Slack.
 - §7 covers third-country transfers under DPF + SCCs Module 2 fall-back.
 - Legal basis table: **Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG** for TUM Contributors; **Art. 6(1)(b) GDPR** for non-TUM Contributors.
 - Cookies section names only Keycloak session cookies and the theme-preference localStorage key under **§ 25 Abs. 2 Nr. 2 TDDDG**.

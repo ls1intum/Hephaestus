@@ -11,7 +11,7 @@ This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis
 
 ## Scope
 
-Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external and internal processors: LLM providers configured per workspace (OpenAI / Microsoft Azure OpenAI / Anthropic), Slack (when enabled per workspace), and the TUM SMTP relay. Server access logs contain IP addresses and are rotated with a hard 14-day maximum under logrotate + the Docker `json-file` log driver.
+Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external processors: an LLM provider selected at the deployment level and bound per workspace (OpenAI or Microsoft Azure OpenAI) and Slack (when enabled per workspace). Server access logs contain IP addresses and are rotated with a hard 14-day maximum under logrotate + the Docker `json-file` log driver.
 
 ## Contents
 

@@ -108,10 +108,8 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 
 | Component | Role | AVV / framework | Default state |
 |---|---|---|---|
-| AET operations (TUM SMTP relay) | Email delivery (Keycloak lifecycle) | In-house; TUM-internal framework | Always on |
 | GitHub, Inc. / Microsoft Corporation | Identity provider (OAuth) and source-system API | AVV at TUM/AET level | Always on for GitHub-federated workspaces |
 | OpenAI, L.P. | LLM provider (per workspace) | AVV at TUM/AET level for TUM-operated tenancy; at workspace administrator's institution when that institution supplies credentials | Per-workspace, opt-in |
 | Microsoft Corporation (Azure OpenAI Service) | LLM provider (per workspace) | AVV as above | Per-workspace, opt-in |
-| Anthropic, PBC | LLM provider (per workspace) | AVV as above | Per-workspace, opt-in |
 | Salesforce, Inc. / Slack Technologies, LLC | Workspace notifications (when enabled by the workspace admin) | AVV at TUM/AET level | Per-workspace, opt-in |
 | Leibniz-Rechenzentrum der BAdW (gitlab.lrz.de) | Source system and OIDC identity provider | **Not Art. 28** — separate controller under Art. 16 Abs. 1 Satz 2 BayHIG + BAdW-Satzung (public-body cooperation; EDPB 07/2020 § 22) | Per-workspace, opt-in |
