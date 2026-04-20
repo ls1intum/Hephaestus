@@ -55,6 +55,13 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
         @Param("userId") Long userId
     );
 
+    @Query(
+        """
+            SELECT wm FROM WorkspaceMembership wm
+            JOIN FETCH wm.user
+            WHERE wm.workspace.id = :workspaceId AND wm.user.id IN :userIds
+        """
+    )
     List<WorkspaceMembership> findAllByWorkspace_IdAndUser_IdIn(Long workspaceId, Collection<Long> userIds);
 
     @Query(

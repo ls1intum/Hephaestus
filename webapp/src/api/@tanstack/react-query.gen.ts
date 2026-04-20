@@ -158,9 +158,9 @@ export const unlinkAccountMutation = (options?: Partial<Options<UnlinkAccountDat
 };
 
 /**
- * Claim an identity provider from another user
+ * Claim identity provider (temporarily disabled)
  *
- * Transfers a federated identity from another Keycloak user to the current user. Used when a user has accidentally created two accounts by logging in with different IdPs. Deletes the orphan account if it has no remaining identities.
+ * Account merging is temporarily disabled until a secure relinking flow is implemented. Use the standard linked-account flow instead.
  */
 export const claimIdentityMutation = (options?: Partial<Options<ClaimIdentityData>>): UseMutationOptions<unknown, DefaultError, Options<ClaimIdentityData>> => {
     const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<ClaimIdentityData>> = {

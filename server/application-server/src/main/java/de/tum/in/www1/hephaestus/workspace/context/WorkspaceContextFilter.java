@@ -2,14 +2,12 @@ package de.tum.in.www1.hephaestus.workspace.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
-import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceSlugHistoryRepository;
 import jakarta.servlet.Filter;
@@ -57,7 +55,6 @@ public class WorkspaceContextFilter implements Filter {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final AuthenticatedUserService authenticatedUserService;
-    private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
     private final ObjectMapper objectMapper;
 
@@ -65,14 +62,12 @@ public class WorkspaceContextFilter implements Filter {
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         AuthenticatedUserService authenticatedUserService,
-        WorkspaceMembershipService workspaceMembershipService,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         ObjectMapper objectMapper
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.authenticatedUserService = authenticatedUserService;
-        this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.objectMapper = objectMapper;
     }
@@ -216,41 +211,6 @@ public class WorkspaceContextFilter implements Filter {
         if (!roles.isEmpty()) {
             log.debug("Resolved user roles: roles={}", roles);
             return roles;
-        }
-
-        // Auto-heal only when workspace has zero memberships (fresh dev DB). Pick the linked
-        // user row whose provider matches the workspace's so subsequent GitHub/GitLab API
-        // calls resolve to the correct IdP identity; if none matches (e.g. a GitLab-only
-        // account entering a GitHub workspace) leave the workspace empty and deny access
-        // rather than attaching ownership to the wrong provider.
-        GitProviderType workspaceProvider = workspace.getProviderType();
-        User autoHealUser = linkedUsers
-            .stream()
-            .filter(u -> u.getProvider() != null && u.getProvider().getType() == workspaceProvider)
-            .findFirst()
-            .orElse(null);
-        if (autoHealUser != null && workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()) {
-            try {
-                var created = workspaceMembershipService.createMembership(
-                    workspace,
-                    autoHealUser.getId(),
-                    WorkspaceRole.ADMIN
-                );
-                log.info(
-                    "Auto-added user to workspace: userLogin={}, workspaceSlug={}, role={}",
-                    LoggingUtils.sanitizeForLog(autoHealUser.getLogin()),
-                    LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                    created.getRole()
-                );
-                return Set.of(created.getRole());
-            } catch (IllegalArgumentException ex) {
-                log.debug(
-                    "Skipped membership auto-add: userLogin={}, workspaceSlug={}",
-                    LoggingUtils.sanitizeForLog(autoHealUser.getLogin()),
-                    LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                    ex
-                );
-            }
         }
 
         log.debug("Returning empty roles: reason=noMembership, workspaceId={}", workspace.getId());

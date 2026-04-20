@@ -79,9 +79,28 @@ class AuthenticatedUserServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("findPrimaryUser prefers the linked row whose login matches preferred_username")
-    void prefersMatchingLogin() {
-        // The GitHub login differs from Keycloak's preferred_username — the original multi-IdP bug.
+    @DisplayName("findPrimaryUser ignores preferred_username and remains deterministic")
+    void ignoresPreferredUsernameWhenChoosingPrimaryUser() {
+        // Even when preferred_username matches the GitHub-unrelated GitLab row, primary-user
+        // selection must stay deterministic rather than trusting an operator-controlled claim.
+        User githubUser = makeUser(202L, "FelixTJDietrich", GitProviderType.GITHUB, 5898705L);
+        User gitlabUser = makeUser(101L, "ga84xah", GitProviderType.GITLAB, 18024L);
+        when(userRepository.findAllByProviderTypeAndNativeId(eq(GitProviderType.GITHUB), eq(5898705L))).thenReturn(
+            List.of(githubUser)
+        );
+        when(userRepository.findAllByProviderTypeAndNativeId(eq(GitProviderType.GITLAB), eq(18024L))).thenReturn(
+            List.of(gitlabUser)
+        );
+
+        AuthenticatedUserService service = new AuthenticatedUserService(userRepository);
+        setJwt(Map.of("preferred_username", "ga84xah", "github_id", 5898705L, "gitlab_id", 18024L));
+
+        assertThat(service.findPrimaryUser()).contains(gitlabUser);
+    }
+
+    @Test
+    @DisplayName("findPrimaryUser falls back to lowest-id row when multiple linked users exist")
+    void primaryUserIsDeterministicWithoutPreferredUsernameHeuristic() {
         User githubUser = makeUser(101L, "FelixTJDietrich", GitProviderType.GITHUB, 5898705L);
         User gitlabUser = makeUser(202L, "ga84xah", GitProviderType.GITLAB, 18024L);
         when(userRepository.findAllByProviderTypeAndNativeId(eq(GitProviderType.GITHUB), eq(5898705L))).thenReturn(
@@ -94,7 +113,7 @@ class AuthenticatedUserServiceTest extends BaseUnitTest {
         AuthenticatedUserService service = new AuthenticatedUserService(userRepository);
         setJwt(Map.of("preferred_username", "ga84xah", "github_id", 5898705L, "gitlab_id", 18024L));
 
-        assertThat(service.findPrimaryUser()).contains(gitlabUser);
+        assertThat(service.findPrimaryUser()).contains(githubUser);
     }
 
     @Test
@@ -135,8 +154,8 @@ class AuthenticatedUserServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("findLinkedUserForProvider falls back to primary when the requested provider is not linked")
-    void fallsBackToPrimaryWhenProviderMissing() {
+    @DisplayName("findLinkedUserForProvider returns empty when the requested provider is not linked")
+    void returnsEmptyWhenProviderMissing() {
         User githubUser = makeUser(101L, "FelixTJDietrich", GitProviderType.GITHUB, 5898705L);
         when(userRepository.findAllByProviderTypeAndNativeId(eq(GitProviderType.GITHUB), eq(5898705L))).thenReturn(
             List.of(githubUser)
@@ -145,7 +164,29 @@ class AuthenticatedUserServiceTest extends BaseUnitTest {
         AuthenticatedUserService service = new AuthenticatedUserService(userRepository);
         setJwt(Map.of("preferred_username", "FelixTJDietrich", "github_id", 5898705L));
 
-        assertThat(service.findLinkedUserForProvider(GitProviderType.GITLAB)).contains(githubUser);
+        assertThat(service.findLinkedUserForProvider(GitProviderType.GITLAB)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("ignores ambiguous GitLab claim matches across multiple server instances")
+    void ignoresAmbiguousGitLabClaimMatches() {
+        User githubUser = makeUser(101L, "github-user", GitProviderType.GITHUB, 5898705L);
+        User gitlabPublic = makeUser(202L, "gitlab-public", GitProviderType.GITLAB, 18024L);
+        User gitlabSelfHosted = makeUser(303L, "gitlab-self-hosted", GitProviderType.GITLAB, 18024L);
+        gitlabPublic.getProvider().setServerUrl("https://gitlab.com");
+        gitlabSelfHosted.getProvider().setServerUrl("https://gitlab.lrz.de");
+        when(userRepository.findAllByProviderTypeAndNativeId(eq(GitProviderType.GITHUB), eq(5898705L))).thenReturn(
+            List.of(githubUser)
+        );
+        when(userRepository.findAllByProviderTypeAndNativeId(eq(GitProviderType.GITLAB), eq(18024L))).thenReturn(
+            List.of(gitlabPublic, gitlabSelfHosted)
+        );
+
+        AuthenticatedUserService service = new AuthenticatedUserService(userRepository);
+        setJwt(Map.of("preferred_username", "github-user", "github_id", 5898705L, "gitlab_id", 18024L));
+
+        assertThat(service.findAllLinkedUsers()).containsExactly(githubUser);
+        assertThat(service.findLinkedUserForProvider(GitProviderType.GITLAB)).isEmpty();
     }
 
     private static User makeUser(long id, String login, GitProviderType providerType, long nativeId) {

@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 
@@ -29,11 +30,8 @@ public class TestSecurityConfig {
      * This decoder will be used by the main SecurityConfig's OAuth2 resource server configuration.
      * The JWT contains the same realm_access structure as a real Keycloak token.
      *
-     * It dynamically determines the user based on the token value pattern:
-     * - "mock-jwt-token-for-mentor-user" -> mentor user
-     * - "mock-jwt-token-for-admin-user" -> admin user
-     * - "mock-jwt-token-for-test-user" -> test user
-     * - any other token -> defaults to testuser
+     * It dynamically determines the user based on the token value pattern.
+     * Unknown or malformed tokens are rejected instead of silently authenticating as a default user.
      */
     @Bean
     @Primary
@@ -73,10 +71,7 @@ public class TestSecurityConfig {
                 roles = new String[] {};
                 githubId = 1L;
             } else {
-                username = "testuser";
-                userId = "test-user-id";
-                roles = new String[] {};
-                githubId = 1L;
+                throw new BadJwtException("Unknown mock JWT token");
             }
 
             Map<String, Object> claims = new HashMap<>();
@@ -110,17 +105,28 @@ public class TestSecurityConfig {
 
     private Jwt decodeEncodedMockJwt(String token) {
         String encodedPayload = token.substring("mock-jwt.".length());
-        String payload = new String(Base64.getUrlDecoder().decode(encodedPayload));
+        final String payload;
+        try {
+            payload = new String(Base64.getUrlDecoder().decode(encodedPayload));
+        } catch (IllegalArgumentException exception) {
+            throw new BadJwtException("Invalid mock JWT payload", exception);
+        }
         String[] parts = payload.split("\\|", -1);
         if (parts.length != 5) {
-            throw new IllegalArgumentException("Invalid mock JWT payload");
+            throw new BadJwtException("Invalid mock JWT payload");
         }
 
         String username = unescape(parts[0]);
         String userId = unescape(parts[1]);
         String authoritiesValue = unescape(parts[2]);
-        long githubId = Long.parseLong(parts[3]);
-        long gitlabId = Long.parseLong(parts[4]);
+        final long githubId;
+        final long gitlabId;
+        try {
+            githubId = Long.parseLong(parts[3]);
+            gitlabId = Long.parseLong(parts[4]);
+        } catch (NumberFormatException exception) {
+            throw new BadJwtException("Invalid mock JWT identity claims", exception);
+        }
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("sub", userId);

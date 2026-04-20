@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
@@ -18,8 +19,10 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Central service for workspace management operations.
@@ -173,18 +176,29 @@ public class WorkspaceService {
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
         // Always prefer the authenticated user to prevent privilege escalation. For dual-IdP
-        // principals, pick the linked row matching the workspace's provider so subsequent
-        // API calls run against the correct IdP identity; fall back to the primary row when
-        // the target provider isn't linked. Fall back to the deprecated ownerUserId only
-        // when no auth context exists (e.g. tests).
+        // principals, require the linked row matching the workspace's provider so subsequent
+        // API calls run against the correct IdP identity. If the session cannot be resolved
+        // to an unambiguous provider-specific row, fail closed instead of attaching ownership
+        // to the wrong provider. Fall back to the deprecated ownerUserId only when no auth
+        // context exists (e.g. tests).
         GitProviderType targetProvider =
             request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT
                 ? GitProviderType.GITLAB
                 : GitProviderType.GITHUB;
-        Long ownerUserId = authenticatedUserService
-            .findLinkedUserForProvider(targetProvider)
-            .map(User::getId)
-            .orElse(request.ownerUserId());
+        Long ownerUserId;
+        if (SecurityUtils.getCurrentJwt().isPresent()) {
+            ownerUserId = authenticatedUserService
+                .findLinkedUserForProvider(targetProvider)
+                .map(User::getId)
+                .orElseThrow(() ->
+                    new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Cannot resolve an unambiguous " + targetProvider + " identity for the current session"
+                    )
+                );
+        } else {
+            ownerUserId = request.ownerUserId();
+        }
 
         Workspace workspace = createWorkspace(
             request.workspaceSlug(),

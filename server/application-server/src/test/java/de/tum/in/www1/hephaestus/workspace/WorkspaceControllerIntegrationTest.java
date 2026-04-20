@@ -3,10 +3,13 @@ package de.tum.in.www1.hephaestus.workspace;
 import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
+import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
@@ -100,6 +103,84 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .isUnauthorized();
 
         assertThat(workspaceRepository.count()).isZero();
+    }
+
+    @Test
+    void createWorkspaceRejectsUnknownBearerToken() {
+        User owner = persistUser("invalid-token-owner");
+
+        var request = new CreateWorkspaceRequestDTO(
+            "invalid-token-space",
+            "Invalid Token",
+            "invalid-token",
+            AccountType.ORG,
+            owner.getId(),
+            null,
+            null,
+            null
+        );
+
+        webTestClient
+            .post()
+            .uri("/workspaces")
+            .headers(headers -> headers.setBearerAuth("definitely-not-a-valid-mock-token"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isUnauthorized();
+
+        assertThat(workspaceRepository.findByWorkspaceSlug("invalid-token-space")).isEmpty();
+    }
+
+    @Test
+    void createGitLabWorkspaceRejectsAmbiguousLinkedGitLabIdentity() {
+        GitProvider gitlabDefault = ensureGitLabProvider();
+        GitProvider gitlabSelfHosted = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.lrz.de")
+            .orElseGet(() ->
+                gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.lrz.de"))
+            );
+        TestUserFactory.ensureUser(userRepository, "gitlab-default", 18024L, gitlabDefault);
+        TestUserFactory.ensureUser(userRepository, "gitlab-self-hosted", 18024L, gitlabSelfHosted);
+
+        var request = new CreateWorkspaceRequestDTO(
+            "ambiguous-gitlab-space",
+            "Ambiguous GitLab",
+            "ambiguous-group",
+            AccountType.ORG,
+            null,
+            Workspace.GitProviderMode.GITLAB_PAT,
+            "glpat-ambiguous-token",
+            "https://gitlab.lrz.de"
+        );
+
+        ProblemDetail problem = webTestClient
+            .post()
+            .uri("/workspaces")
+            .headers(headers ->
+                headers.setBearerAuth(
+                    MockSecurityContextUtils.buildTokenValue(
+                        "ambiguous-user",
+                        "ambiguous-user-id",
+                        new String[] {},
+                        0L,
+                        18024L
+                    )
+                )
+            )
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isEqualTo(HttpStatus.CONFLICT)
+            .expectBody(ProblemDetail.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(problem).isNotNull();
+        assertThat(problem.getDetail()).contains("Cannot resolve an unambiguous GITLAB identity");
+        assertThat(workspaceRepository.findByWorkspaceSlug("ambiguous-gitlab-space")).isEmpty();
     }
 
     @Test

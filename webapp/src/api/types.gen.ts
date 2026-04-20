@@ -2074,11 +2074,11 @@ export type ClaimIdentityData = {
     url: '/user/linked-accounts/{providerAlias}/claim';
 };
 
-export type ClaimIdentityResponses = {
+export type ClaimIdentityErrors = {
     /**
-     * OK
+     * Account merging is temporarily unavailable
      */
-    200: unknown;
+    409: unknown;
 };
 
 export type GetUserSettingsData = {

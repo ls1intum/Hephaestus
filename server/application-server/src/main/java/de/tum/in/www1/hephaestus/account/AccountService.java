@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.account;
 
 import de.tum.in.www1.hephaestus.config.KeycloakProperties;
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
@@ -255,71 +256,16 @@ public class AccountService {
         }
     }
 
-    /**
-     * Claims a federated identity that is currently linked to a different Keycloak user.
-     * Removes the identity from the other user, adds it to the current user,
-     * and deletes the other user if they have no remaining federated identities.
-     *
-     * <p>This handles the common scenario where a user logs in via two different IdPs
-     * with different emails, creating two separate Keycloak accounts, and then wants
-     * to merge them.
-     *
-     * @param currentUserId the Keycloak ID of the currently authenticated user
-     * @param providerAlias the identity provider alias to claim (e.g. "gitlab-lrz")
-     */
     public void claimIdentity(String currentUserId, String providerAlias) {
-        try {
-            var realmResource = keycloak.realm(keycloakProperties.realm());
-
-            // Find all users with this provider linked
-            var allUsers = realmResource.users().searchByAttributes("*");
-            String otherUserId = null;
-            FederatedIdentityRepresentation targetIdentity = null;
-
-            for (var user : allUsers) {
-                if (user.getId().equals(currentUserId)) {
-                    continue;
-                }
-                var feds = realmResource.users().get(user.getId()).getFederatedIdentity();
-                for (var fed : feds) {
-                    if (fed.getIdentityProvider().equals(providerAlias)) {
-                        otherUserId = user.getId();
-                        targetIdentity = fed;
-                        break;
-                    }
-                }
-                if (otherUserId != null) {
-                    break;
-                }
-            }
-
-            if (otherUserId == null || targetIdentity == null) {
-                throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "No other user found with identity provider " + providerAlias
-                );
-            }
-
-            // Remove the identity from the other user
-            realmResource.users().get(otherUserId).removeFederatedIdentity(providerAlias);
-            log.info("Removed {} identity from orphan user {}", providerAlias, otherUserId);
-
-            // Add it to the current user
-            realmResource.users().get(currentUserId).addFederatedIdentity(providerAlias, targetIdentity);
-            log.info("Added {} identity to current user {}", providerAlias, currentUserId);
-
-            // Delete the orphan user if they have no remaining federated identities
-            var remainingFeds = realmResource.users().get(otherUserId).getFederatedIdentity();
-            if (remainingFeds.isEmpty()) {
-                realmResource.users().delete(otherUserId);
-                log.info("Deleted orphan Keycloak user {} (no remaining identities)", otherUserId);
-            }
-        } catch (ResponseStatusException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Failed to claim identity {} for user {}", providerAlias, currentUserId, e);
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to claim identity: " + e.getMessage());
-        }
+        log.warn(
+            "Rejected unsafe identity-claim attempt: currentUserId={}, providerAlias={}",
+            LoggingUtils.sanitizeForLog(currentUserId),
+            LoggingUtils.sanitizeForLog(providerAlias)
+        );
+        throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "Account merging is temporarily unavailable until a secure relinking flow is implemented. Please use the standard identity-provider linking flow instead."
+        );
     }
 
     private static UserSettingsDTO toDTO(UserPreferences preferences) {

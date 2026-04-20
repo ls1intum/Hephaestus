@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
+import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithUser;
 import de.tum.in.www1.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
@@ -50,6 +51,10 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
     private Practice practiceB;
     private AgentJob agentJob;
     private User contributor; // login = "testuser" to match @WithUser
+
+    private User createGitLabContributor(String login, long nativeId) {
+        return TestUserFactory.ensureUser(userRepository, login, nativeId, ensureGitLabProvider());
+    }
 
     @BeforeEach
     void setUpWorkspace() {
@@ -646,6 +651,43 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .jsonPath("$[0].positiveCount")
                 .isEqualTo(1);
         }
+
+        @Test
+        @WithUser(username = "testuser", githubId = 1L, gitlabId = 18024L)
+        @DisplayName("includes findings from a linked non-primary contributor row in summary")
+        void shouldIncludeLinkedContributorRowsInSummary() {
+            Instant now = Instant.now();
+            User gitlabContributor = createGitLabContributor("testuser-gl", 18024L);
+            insertFinding(practiceA, contributor, "GitHub finding", "POSITIVE", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
+            insertFinding(
+                practiceA,
+                gitlabContributor,
+                "GitLab finding",
+                "NEGATIVE",
+                "MAJOR",
+                0.8f,
+                "PULL_REQUEST",
+                2L,
+                now.minus(1, ChronoUnit.HOURS)
+            );
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "/summary", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(1)
+                .jsonPath("$[0].totalFindings")
+                .isEqualTo(2)
+                .jsonPath("$[0].positiveCount")
+                .isEqualTo(1)
+                .jsonPath("$[0].negativeCount")
+                .isEqualTo(1);
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -738,6 +780,37 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .exchange()
                 .expectStatus()
                 .isNotFound();
+        }
+
+        @Test
+        @WithUser(username = "testuser", githubId = 1L, gitlabId = 18024L)
+        @DisplayName("returns detail for finding owned by a linked non-primary contributor row")
+        void shouldReturnDetailForLinkedContributorRow() {
+            User gitlabContributor = createGitLabContributor("testuser-gl", 18024L);
+            UUID findingId = insertFinding(
+                practiceA,
+                gitlabContributor,
+                "Linked-row detail",
+                "NEGATIVE",
+                "MAJOR",
+                0.85f,
+                "PULL_REQUEST",
+                42L,
+                Instant.now()
+            );
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "/{findingId}", workspace.getWorkspaceSlug(), findingId)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.id")
+                .isEqualTo(findingId.toString())
+                .jsonPath("$.title")
+                .isEqualTo("Linked-row detail");
         }
 
         @Test

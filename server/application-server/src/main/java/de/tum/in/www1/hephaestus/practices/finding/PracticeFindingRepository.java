@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -128,6 +129,32 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         Pageable pageable
     );
 
+    @Query(
+        value = """
+        SELECT f FROM PracticeFinding f
+        JOIN FETCH f.practice p
+        WHERE f.contributor.id IN :contributorIds
+        AND p.workspace.id = :workspaceId
+        AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:verdict IS NULL OR f.verdict = :verdict)
+        """,
+        countQuery = """
+        SELECT COUNT(f) FROM PracticeFinding f
+        JOIN f.practice p
+        WHERE f.contributor.id IN :contributorIds
+        AND p.workspace.id = :workspaceId
+        AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:verdict IS NULL OR f.verdict = :verdict)
+        """
+    )
+    Page<PracticeFinding> findByContributorsAndWorkspace(
+        @Param("contributorIds") Collection<Long> contributorIds,
+        @Param("workspaceId") Long workspaceId,
+        @Param("practiceSlug") String practiceSlug,
+        @Param("verdict") Verdict verdict,
+        Pageable pageable
+    );
+
     /**
      * Per-practice aggregation: verdict counts and last finding date for a contributor.
      */
@@ -153,6 +180,28 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         @Param("workspaceId") Long workspaceId
     );
 
+    @Query(
+        """
+        SELECT p.slug AS practiceSlug,
+               p.name AS practiceName,
+               p.category AS category,
+               COUNT(f) AS totalFindings,
+               SUM(CASE WHEN f.verdict = de.tum.in.www1.hephaestus.practices.model.Verdict.POSITIVE THEN 1L ELSE 0L END) AS positiveCount,
+               SUM(CASE WHEN f.verdict = de.tum.in.www1.hephaestus.practices.model.Verdict.NEGATIVE THEN 1L ELSE 0L END) AS negativeCount,
+               MAX(f.detectedAt) AS lastFindingAt
+        FROM PracticeFinding f
+        JOIN f.practice p
+        WHERE f.contributor.id IN :contributorIds
+        AND p.workspace.id = :workspaceId
+        GROUP BY p.slug, p.name, p.category
+        ORDER BY p.name ASC
+        """
+    )
+    List<ContributorPracticeSummaryProjection> findSummaryByContributorsAndWorkspace(
+        @Param("contributorIds") Collection<Long> contributorIds,
+        @Param("workspaceId") Long workspaceId
+    );
+
     /**
      * Single finding by ID within a workspace, restricted to a specific contributor.
      *
@@ -171,6 +220,21 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
     Optional<PracticeFinding> findByIdAndContributorAndWorkspace(
         @Param("findingId") UUID findingId,
         @Param("contributorId") Long contributorId,
+        @Param("workspaceId") Long workspaceId
+    );
+
+    @Query(
+        """
+        SELECT f FROM PracticeFinding f
+        JOIN FETCH f.practice p
+        WHERE f.id = :findingId
+        AND f.contributor.id IN :contributorIds
+        AND p.workspace.id = :workspaceId
+        """
+    )
+    Optional<PracticeFinding> findByIdAndContributorsAndWorkspace(
+        @Param("findingId") UUID findingId,
+        @Param("contributorIds") Collection<Long> contributorIds,
         @Param("workspaceId") Long workspaceId
     );
 

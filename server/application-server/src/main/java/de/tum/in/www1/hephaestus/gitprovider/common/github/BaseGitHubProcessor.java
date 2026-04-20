@@ -17,7 +17,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
 /**
@@ -30,8 +31,9 @@ import org.springframework.lang.Nullable;
  * <b>Design rationale:</b> These operations are identical across processors,
  * extracting them eliminates duplication and ensures consistent behavior.
  */
-@Slf4j
 public abstract class BaseGitHubProcessor {
+
+    protected final Logger log = LoggerFactory.getLogger(getClass());
 
     protected final UserRepository userRepository;
     protected final LabelRepository labelRepository;

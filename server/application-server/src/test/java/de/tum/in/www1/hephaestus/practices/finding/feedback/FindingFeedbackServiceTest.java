@@ -239,8 +239,8 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
                 .createdAt(Instant.now())
                 .build();
             when(
-                feedbackRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
-            ).thenReturn(Optional.of(feedback));
+                feedbackRepository.findLatestByFindingIdAndContributors(FINDING_ID, List.of(CONTRIBUTOR_ID))
+            ).thenReturn(List.of(feedback));
 
             Optional<FindingFeedbackDTO> result = service.getLatestFeedback(workspaceContext, FINDING_ID);
 
@@ -256,8 +256,8 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
             when(
-                feedbackRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
-            ).thenReturn(Optional.empty());
+                feedbackRepository.findLatestByFindingIdAndContributors(FINDING_ID, List.of(CONTRIBUTOR_ID))
+            ).thenReturn(List.of());
 
             Optional<FindingFeedbackDTO> result = service.getLatestFeedback(workspaceContext, FINDING_ID);
 
@@ -310,7 +310,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             };
 
             when(
-                feedbackRepository.countByContributorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)
+                feedbackRepository.countByContributorsAndWorkspaceGroupByAction(List.of(CONTRIBUTOR_ID), WORKSPACE_ID)
             ).thenReturn(List.of(appliedProjection, disputedProjection));
 
             FindingFeedbackEngagementDTO result = service.getEngagement(workspaceContext);
@@ -325,7 +325,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void returnsZerosWhenEmpty() {
             when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
             when(
-                feedbackRepository.countByContributorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)
+                feedbackRepository.countByContributorsAndWorkspaceGroupByAction(List.of(CONTRIBUTOR_ID), WORKSPACE_ID)
             ).thenReturn(List.of());
 
             FindingFeedbackEngagementDTO result = service.getEngagement(workspaceContext);

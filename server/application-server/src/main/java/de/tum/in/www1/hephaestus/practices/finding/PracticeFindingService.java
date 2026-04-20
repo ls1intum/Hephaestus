@@ -8,8 +8,8 @@ import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,16 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
  * Service for reading practice findings scoped to the authenticated contributor.
  *
  * <p>All methods resolve the current user from the security context via
- * {@link AuthenticatedUserService#findPrimaryUser()}. If the user is not yet synced as a
+ * {@link AuthenticatedUserService#findAllLinkedUsers()}. If the user is not yet synced as a
  * contributor (e.g., first login before any PR activity), list/summary endpoints
  * return empty results rather than failing.
  *
  * <p>For single-finding access, contributor ownership is enforced in SQL — a
  * non-owner receives 404 (not 403) to avoid leaking finding existence.
- *
- * <p>Known gap: findings are keyed to a single provider row on the contributor. For a
- * Keycloak account with both GitHub and GitLab identities linked, only findings from the
- * primary row are returned today; a dedicated multi-contributor query is a follow-up.
  */
 @Service
 @RequiredArgsConstructor
@@ -50,12 +46,12 @@ public class PracticeFindingService {
         Verdict verdict,
         Pageable pageable
     ) {
-        Optional<User> currentUser = authenticatedUserService.findPrimaryUser();
-        if (currentUser.isEmpty()) {
+        List<Long> contributorIds = getLinkedContributorIds();
+        if (contributorIds.isEmpty()) {
             return Page.empty(pageable);
         }
-        return practiceFindingRepository.findByContributorAndWorkspace(
-            currentUser.get().getId(),
+        return practiceFindingRepository.findByContributorsAndWorkspace(
+            contributorIds,
             workspaceId,
             practiceSlug,
             verdict,
@@ -70,11 +66,11 @@ public class PracticeFindingService {
      */
     @Transactional(readOnly = true)
     public List<ContributorPracticeSummaryProjection> getSummary(Long workspaceId) {
-        Optional<User> currentUser = authenticatedUserService.findPrimaryUser();
-        if (currentUser.isEmpty()) {
+        List<Long> contributorIds = getLinkedContributorIds();
+        if (contributorIds.isEmpty()) {
             return List.of();
         }
-        return practiceFindingRepository.findSummaryByContributorAndWorkspace(currentUser.get().getId(), workspaceId);
+        return practiceFindingRepository.findSummaryByContributorsAndWorkspace(contributorIds, workspaceId);
     }
 
     /**
@@ -86,12 +82,12 @@ public class PracticeFindingService {
      */
     @Transactional(readOnly = true)
     public PracticeFinding getFinding(Long workspaceId, UUID findingId) {
-        Optional<User> currentUser = authenticatedUserService.findPrimaryUser();
-        if (currentUser.isEmpty()) {
+        List<Long> contributorIds = getLinkedContributorIds();
+        if (contributorIds.isEmpty()) {
             throw new EntityNotFoundException("PracticeFinding", findingId.toString());
         }
         return practiceFindingRepository
-            .findByIdAndContributorAndWorkspace(findingId, currentUser.get().getId(), workspaceId)
+            .findByIdAndContributorsAndWorkspace(findingId, contributorIds, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
     }
 
@@ -106,5 +102,14 @@ public class PracticeFindingService {
             pullRequestId,
             workspaceId
         );
+    }
+
+    private List<Long> getLinkedContributorIds() {
+        return authenticatedUserService
+            .findAllLinkedUsers()
+            .stream()
+            .map(User::getId)
+            .distinct()
+            .collect(Collectors.toList());
     }
 }

@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -183,11 +184,11 @@ public class AccountController {
 
     @PostMapping("/linked-accounts/{providerAlias}/claim")
     @Operation(
-        summary = "Claim an identity provider from another user",
-        description = "Transfers a federated identity from another Keycloak user to the current user. " +
-            "Used when a user has accidentally created two accounts by logging in with different IdPs. " +
-            "Deletes the orphan account if it has no remaining identities."
+        summary = "Claim identity provider (temporarily disabled)",
+        description = "Account merging is temporarily disabled until a secure relinking flow is implemented. " +
+            "Use the standard linked-account flow instead."
     )
+    @ApiResponse(responseCode = "409", description = "Account merging is temporarily unavailable")
     public ResponseEntity<Void> claimIdentity(
         @PathVariable @jakarta.validation.constraints.Pattern(regexp = "^[a-z0-9-]{1,64}$") String providerAlias,
         @AuthenticationPrincipal JwtAuthenticationToken auth

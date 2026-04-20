@@ -112,11 +112,16 @@ public class FindingFeedbackService {
             .findByIdAndWorkspaceId(findingId, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
 
-        return authenticatedUserService
-            .findAllLinkedUsers()
+        var linkedUsers = authenticatedUserService.findAllLinkedUsers();
+        if (linkedUsers.isEmpty()) {
+            return Optional.empty();
+        }
+
+        var contributorIds = linkedUsers.stream().map(User::getId).toList();
+
+        return feedbackRepository
+            .findLatestByFindingIdAndContributors(findingId, contributorIds)
             .stream()
-            .map(u -> feedbackRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(findingId, u.getId()))
-            .flatMap(Optional::stream)
             .max((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
             .map(FindingFeedbackDTO::from);
     }
@@ -130,12 +135,11 @@ public class FindingFeedbackService {
         if (linkedUsers.isEmpty()) {
             throw new AccessForbiddenException("User not authenticated");
         }
+        var contributorIds = linkedUsers.stream().map(User::getId).toList();
         Map<FindingFeedbackAction, Long> counts = new EnumMap<>(FindingFeedbackAction.class);
-        for (User user : linkedUsers) {
-            feedbackRepository
-                .countByContributorAndWorkspaceGroupByAction(user.getId(), workspaceContext.id())
-                .forEach(p -> counts.merge(p.getAction(), p.getCount(), Long::sum));
-        }
+        feedbackRepository
+            .countByContributorsAndWorkspaceGroupByAction(contributorIds, workspaceContext.id())
+            .forEach(p -> counts.put(p.getAction(), p.getCount()));
         return new FindingFeedbackEngagementDTO(
             counts.getOrDefault(FindingFeedbackAction.APPLIED, 0L),
             counts.getOrDefault(FindingFeedbackAction.DISPUTED, 0L),
