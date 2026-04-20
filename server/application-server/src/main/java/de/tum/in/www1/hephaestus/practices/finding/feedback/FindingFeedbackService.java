@@ -114,7 +114,7 @@ public class FindingFeedbackService {
 
         var linkedUsers = authenticatedUserService.findAllLinkedUsers();
         if (linkedUsers.isEmpty()) {
-            return Optional.empty();
+            throw new AccessForbiddenException("User not authenticated");
         }
 
         var contributorIds = linkedUsers.stream().map(User::getId).toList();

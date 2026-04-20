@@ -164,7 +164,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
                         "ambiguous-user",
                         "ambiguous-user-id",
                         new String[] {},
-                        0L,
+                        null,
                         18024L
                     )
                 )

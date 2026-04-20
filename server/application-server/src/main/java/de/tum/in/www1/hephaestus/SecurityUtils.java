@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus;
 
-import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -100,9 +99,9 @@ public final class SecurityUtils {
             return Optional.of(Long.parseLong(raw.toString().trim()));
         } catch (NumberFormatException ex) {
             log.warn(
-                "Ignoring unparseable JWT claim: claim={}, value={}",
+                "Ignoring unparseable JWT claim: claim={}, valueType={}",
                 claimName,
-                LoggingUtils.sanitizeForLog(String.valueOf(raw))
+                raw.getClass().getSimpleName()
             );
             return Optional.empty();
         }

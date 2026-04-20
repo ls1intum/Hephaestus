@@ -8,7 +8,9 @@ import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
 import de.tum.in.www1.hephaestus.testconfig.WithUser;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceMembershipDTO;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,24 +38,35 @@ class MultiIdpWorkspaceVisibilityIntegrationTest extends AbstractWorkspaceIntegr
         return TestUserFactory.ensureUser(userRepository, login, nativeId, ensureGitHubProvider());
     }
 
+    private String unique(String prefix) {
+        return prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
     @Test
     @WithAdminUser(username = "admin", githubId = 3L, gitlabId = 42L)
     @DisplayName("lists workspaces belonging to both linked IdP rows")
     void listsWorkspacesFromBothLinkedRows() {
         User adminGithubRow = requireSeededGitHubUser("admin", 3L);
-        User adminGitlabRow = TestUserFactory.ensureUser(userRepository, "admin-gl", 42L, ensureGitLabProvider());
+        User adminGitlabRow = TestUserFactory.ensureUser(
+            userRepository,
+            unique("admin-gl"),
+            42L,
+            ensureGitLabProvider()
+        );
+        String githubSlug = unique("gh-workspace");
+        String gitlabSlug = unique("gl-workspace");
 
         Workspace githubWorkspace = createWorkspace(
-            "gh-workspace",
+            githubSlug,
             "GitHub Workspace",
-            "gh-owner",
+            unique("gh-owner"),
             AccountType.ORG,
             adminGithubRow
         );
         Workspace gitlabWorkspace = createWorkspace(
-            "gl-workspace",
+            gitlabSlug,
             "GitLab Workspace",
-            "gl-owner",
+            unique("gl-owner"),
             AccountType.ORG,
             adminGitlabRow
         );
@@ -72,12 +85,18 @@ class MultiIdpWorkspaceVisibilityIntegrationTest extends AbstractWorkspaceIntegr
         // and the GitLab workspace silently disappeared from the list. The aggregator must
         // still find it.
         requireSeededGitHubUser("admin", 3L);
-        User adminGitlabRow = TestUserFactory.ensureUser(userRepository, "admin-gl", 42L, ensureGitLabProvider());
+        User adminGitlabRow = TestUserFactory.ensureUser(
+            userRepository,
+            unique("admin-gl"),
+            42L,
+            ensureGitLabProvider()
+        );
+        String gitlabSlug = unique("gl-only");
 
         Workspace gitlabWorkspace = createWorkspace(
-            "gl-only",
+            gitlabSlug,
             "GitLab Only",
-            "gl-only",
+            unique("gl-only"),
             AccountType.ORG,
             adminGitlabRow
         );
@@ -92,11 +111,22 @@ class MultiIdpWorkspaceVisibilityIntegrationTest extends AbstractWorkspaceIntegr
     @DisplayName("single-IdP user continues to see only their own workspaces")
     void singleIdpUserRegressionLock() {
         User githubUser = requireSeededGitHubUser("testuser", 1L);
-        Workspace mine = createWorkspace("mine", "Mine", "mine", AccountType.ORG, githubUser);
+        Workspace mine = createWorkspace(unique("mine"), "Mine", unique("mine"), AccountType.ORG, githubUser);
 
         // Workspace owned by an unrelated user — must NOT appear in accessible workspaces.
-        User strangerGithubRow = TestUserFactory.ensureUser(userRepository, "stranger", 999L, ensureGitHubProvider());
-        Workspace stranger = createWorkspace("stranger-ws", "Stranger", "stranger", AccountType.ORG, strangerGithubRow);
+        User strangerGithubRow = TestUserFactory.ensureUser(
+            userRepository,
+            unique("stranger"),
+            999L,
+            ensureGitHubProvider()
+        );
+        Workspace stranger = createWorkspace(
+            unique("stranger-ws"),
+            "Stranger",
+            unique("stranger"),
+            AccountType.ORG,
+            strangerGithubRow
+        );
 
         List<Workspace> accessible = workspaceQueryService.findAccessibleWorkspaces();
         assertThat(accessible).extracting(Workspace::getId).contains(mine.getId()).doesNotContain(stranger.getId());
@@ -107,20 +137,31 @@ class MultiIdpWorkspaceVisibilityIntegrationTest extends AbstractWorkspaceIntegr
     @DisplayName("union role across linked rows — owner on one row, member on the other, effective role is OWNER")
     void unionRoleAcrossLinkedRows() {
         User adminGithubRow = requireSeededGitHubUser("admin", 3L);
-        User adminGitlabRow = TestUserFactory.ensureUser(userRepository, "admin-gl", 42L, ensureGitLabProvider());
+        User adminGitlabRow = TestUserFactory.ensureUser(
+            userRepository,
+            unique("admin-gl"),
+            42L,
+            ensureGitLabProvider()
+        );
 
         // Workspace owner is the GitHub row (OWNER by default); add the GitLab row as MEMBER.
         // After aggregation the effective role must be OWNER, not MEMBER.
-        Workspace ws = createWorkspace("dual", "Dual", "dual", AccountType.ORG, adminGithubRow);
+        Workspace ws = createWorkspace(unique("dual"), "Dual", unique("dual"), AccountType.ORG, adminGithubRow);
         ensureWorkspaceMembership(ws, adminGitlabRow, WorkspaceRole.MEMBER);
 
-        List<WorkspaceMembership> memberships = workspaceMembershipRepository.findAllByWorkspace_IdAndUser_IdIn(
-            ws.getId(),
-            List.of(adminGithubRow.getId(), adminGitlabRow.getId())
-        );
-        assertThat(memberships)
-            .extracting(WorkspaceMembership::getRole)
-            .contains(WorkspaceRole.OWNER, WorkspaceRole.MEMBER);
+        WorkspaceMembershipDTO membership = webTestClient
+            .get()
+            .uri("/workspaces/{slug}/members/me", ws.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceMembershipDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(membership).isNotNull();
+        assertThat(membership.role()).isEqualTo(WorkspaceRole.OWNER);
     }
 
     @Test
@@ -128,10 +169,17 @@ class MultiIdpWorkspaceVisibilityIntegrationTest extends AbstractWorkspaceIntegr
     @DisplayName("lists workspaces through the HTTP registry endpoint across linked rows")
     void listsAccessibleWorkspacesThroughHttpEndpoint() {
         User adminGithubRow = requireSeededGitHubUser("admin", 3L);
-        User adminGitlabRow = TestUserFactory.ensureUser(userRepository, "admin-gl", 42L, ensureGitLabProvider());
+        User adminGitlabRow = TestUserFactory.ensureUser(
+            userRepository,
+            unique("admin-gl"),
+            42L,
+            ensureGitLabProvider()
+        );
+        String githubSlug = unique("gh-visible");
+        String gitlabSlug = unique("gl-visible");
 
-        createWorkspace("gh-visible", "GitHub Visible", "gh-visible", AccountType.ORG, adminGithubRow);
-        createWorkspace("gl-visible", "GitLab Visible", "gl-visible", AccountType.ORG, adminGitlabRow);
+        createWorkspace(githubSlug, "GitHub Visible", unique("gh-visible"), AccountType.ORG, adminGithubRow);
+        createWorkspace(gitlabSlug, "GitLab Visible", unique("gl-visible"), AccountType.ORG, adminGitlabRow);
 
         webTestClient
             .get()
@@ -146,7 +194,7 @@ class MultiIdpWorkspaceVisibilityIntegrationTest extends AbstractWorkspaceIntegr
                 assertThat(slugs).isInstanceOf(List.class);
                 @SuppressWarnings("unchecked")
                 List<String> workspaceSlugs = (List<String>) slugs;
-                assertThat(workspaceSlugs).contains("gh-visible", "gl-visible");
+                assertThat(workspaceSlugs).contains(githubSlug, gitlabSlug);
             });
     }
 }

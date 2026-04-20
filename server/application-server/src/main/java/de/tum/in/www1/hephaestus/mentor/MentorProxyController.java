@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.config.IntelligenceServiceProperties;
 import de.tum.in.www1.hephaestus.core.proxy.ProxyStreamingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -63,15 +64,18 @@ public class MentorProxyController {
     private final WebClient mentorWebClient;
     private final String intelligenceServiceBaseUrl;
     private final AuthenticatedUserService authenticatedUserService;
+    private final WorkspaceRepository workspaceRepository;
 
     public MentorProxyController(
         WebClient mentorWebClient,
         IntelligenceServiceProperties intelligenceServiceProperties,
-        AuthenticatedUserService authenticatedUserService
+        AuthenticatedUserService authenticatedUserService,
+        WorkspaceRepository workspaceRepository
     ) {
         this.mentorWebClient = mentorWebClient;
         this.intelligenceServiceBaseUrl = intelligenceServiceProperties.url();
         this.authenticatedUserService = authenticatedUserService;
+        this.workspaceRepository = workspaceRepository;
     }
 
     /**
@@ -108,7 +112,10 @@ public class MentorProxyController {
         String target = intelligenceServiceBaseUrl + mentorPath + (query != null ? ("?" + query) : "");
 
         // Look up the current user for passing user context to intelligence service
-        User currentUser = authenticatedUserService.findPrimaryUser().orElse(null);
+        User currentUser = workspaceRepository
+            .findById(workspaceContext.id())
+            .flatMap(workspace -> authenticatedUserService.findLinkedUserForProvider(workspace.getProviderType()))
+            .orElse(null);
         if (currentUser == null) {
             var login = SecurityUtils.getCurrentUserLogin().orElse("unknown");
             log.warn(

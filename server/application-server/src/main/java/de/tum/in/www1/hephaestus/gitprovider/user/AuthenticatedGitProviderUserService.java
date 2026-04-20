@@ -6,12 +6,12 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.Nullable;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -52,16 +52,15 @@ public class AuthenticatedGitProviderUserService {
         }
         String login = currentLogin.orElseThrow();
 
-        Jwt jwt = SecurityUtils.getCurrentJwt().orElse(null);
-        if (jwt == null) {
+        if (SecurityUtils.getCurrentJwt().isEmpty()) {
             return Optional.empty();
         }
 
-        Long gitlabId = jwt.getClaim("gitlab_id");
-        if (gitlabId != null) {
+        Optional<Long> gitlabId = SecurityUtils.getCurrentGitLabId();
+        if (gitlabId.isPresent()) {
             String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
             Long userId = upsertGitLabUser(
-                gitlabId,
+                gitlabId.orElseThrow(),
                 login,
                 login,
                 "",
@@ -72,9 +71,16 @@ public class AuthenticatedGitProviderUserService {
             return userRepository.findById(userId);
         }
 
-        Long githubId = jwt.getClaim("github_id");
-        if (githubId != null) {
-            Long userId = upsertGitHubUser(githubId, login, login, "", GITHUB_SERVER_URL + "/" + login, User.Type.USER);
+        Optional<Long> githubId = SecurityUtils.getCurrentGitHubId();
+        if (githubId.isPresent()) {
+            Long userId = upsertGitHubUser(
+                githubId.orElseThrow(),
+                login,
+                login,
+                "",
+                GITHUB_SERVER_URL + "/" + login,
+                User.Type.USER
+            );
             return userRepository.findById(userId);
         }
 
@@ -83,31 +89,43 @@ public class AuthenticatedGitProviderUserService {
 
     @Transactional
     public void ensureCurrentGitLabUserExists(@Nullable String gitLabServerUrl) {
+        String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
         // Short-circuit when the principal already has a GitLab-provider row synced. Must be
         // claim-based (not findByLogin) — a login collision with an unrelated user's row on
         // another provider would otherwise skip provisioning silently.
         boolean alreadyHasGitLabRow = authenticatedUserService
             .findAllLinkedUsers()
             .stream()
-            .anyMatch(u -> u.getProvider() != null && u.getProvider().getType() == GitProviderType.GITLAB);
+            .anyMatch(
+                u ->
+                    u.getProvider() != null &&
+                    u.getProvider().getType() == GitProviderType.GITLAB &&
+                    Objects.equals(resolvedUrl, u.getProvider().getServerUrl())
+            );
         if (alreadyHasGitLabRow) {
             return;
         }
 
         String login = SecurityUtils.getCurrentUserLoginOrThrow();
-        Jwt jwt = SecurityUtils.getCurrentJwt().orElseThrow(() ->
+        SecurityUtils.getCurrentJwt().orElseThrow(() ->
             new IllegalStateException("No JWT found for authenticated user")
         );
 
-        Long gitlabId = jwt.getClaim("gitlab_id");
-        if (gitlabId != null) {
-            String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
-            upsertGitLabUser(gitlabId, login, login, "", resolvedUrl + "/" + login, resolvedUrl, User.Type.USER);
+        Optional<Long> gitlabId = SecurityUtils.getCurrentGitLabId();
+        if (gitlabId.isPresent()) {
+            upsertGitLabUser(
+                gitlabId.orElseThrow(),
+                login,
+                login,
+                "",
+                resolvedUrl + "/" + login,
+                resolvedUrl,
+                User.Type.USER
+            );
             return;
         }
 
-        Long githubId = jwt.getClaim("github_id");
-        if (githubId != null) {
+        if (SecurityUtils.getCurrentGitHubId().isPresent()) {
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
                 "You need to link your GitLab account before creating a GitLab workspace. Go to Settings → Linked Accounts to connect your GitLab identity."

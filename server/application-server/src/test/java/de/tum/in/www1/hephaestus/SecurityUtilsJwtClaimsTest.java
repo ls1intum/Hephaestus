@@ -28,7 +28,7 @@ class SecurityUtilsJwtClaimsTest extends BaseUnitTest {
 
     @Test
     @DisplayName("returns empty claims when no authentication is present")
-    void returnsEmptyWhenUnauthenticated() {
+    void shouldReturnEmptyClaimsWhenUnauthenticated() {
         assertThat(SecurityUtils.getCurrentGitHubId()).isEmpty();
         assertThat(SecurityUtils.getCurrentGitLabId()).isEmpty();
         assertThat(SecurityUtils.getCurrentJwt()).isEmpty();
@@ -36,7 +36,7 @@ class SecurityUtilsJwtClaimsTest extends BaseUnitTest {
 
     @Test
     @DisplayName("reads numeric github_id and gitlab_id claims from the JWT")
-    void readsNumericIdentityClaims() {
+    void shouldReadNumericIdentityClaimsWhenJwtPresent() {
         setJwt(Map.of("preferred_username", "ga84xah", "github_id", 5898705L, "gitlab_id", 18024L));
 
         assertThat(SecurityUtils.getCurrentGitHubId()).contains(5898705L);
@@ -46,7 +46,7 @@ class SecurityUtilsJwtClaimsTest extends BaseUnitTest {
 
     @Test
     @DisplayName("parses string-form identity claims (some Keycloak mappers emit strings)")
-    void parsesStringIdentityClaims() {
+    void shouldParseStringIdentityClaimsWhenStringsProvided() {
         setJwt(Map.of("preferred_username", "user", "github_id", "42", "gitlab_id", " 7 "));
 
         assertThat(SecurityUtils.getCurrentGitHubId()).contains(42L);
@@ -55,7 +55,7 @@ class SecurityUtilsJwtClaimsTest extends BaseUnitTest {
 
     @Test
     @DisplayName("returns empty when an identity claim is not numeric")
-    void returnsEmptyOnUnparseableClaim() {
+    void shouldReturnEmptyWhenIdentityClaimUnparseable() {
         setJwt(Map.of("preferred_username", "user", "github_id", "not-a-number"));
 
         assertThat(SecurityUtils.getCurrentGitHubId()).isEmpty();
@@ -64,7 +64,7 @@ class SecurityUtilsJwtClaimsTest extends BaseUnitTest {
 
     @Test
     @DisplayName("unwraps single-element Collection claims (Keycloak multivalued mappers)")
-    void unwrapsSingleElementCollection() {
+    void shouldUnwrapSingleElementCollectionWhenPresent() {
         // Keycloak user-attribute mappers with "Multivalued" toggle emit JSON arrays even
         // for a single value. Must still resolve.
         setJwt(Map.of("preferred_username", "u", "github_id", java.util.List.of(5898705L)));
@@ -74,7 +74,7 @@ class SecurityUtilsJwtClaimsTest extends BaseUnitTest {
 
     @Test
     @DisplayName("rejects multi-element Collection claims instead of resolving to an arbitrary value")
-    void rejectsMultiValuedCollection() {
+    void shouldRejectMultiValuedCollectionWhenMultipleValues() {
         // If Keycloak ever emits multiple values for an identity claim we must fail closed,
         // not pick the first — picking silently could resolve to a different user.
         setJwt(Map.of("preferred_username", "u", "github_id", java.util.List.of(5898705L, 9999L)));
@@ -84,7 +84,7 @@ class SecurityUtilsJwtClaimsTest extends BaseUnitTest {
 
     @Test
     @DisplayName("rejects empty Collection claims")
-    void rejectsEmptyCollection() {
+    void shouldRejectEmptyCollectionWhenNoValues() {
         setJwt(Map.of("preferred_username", "u", "github_id", java.util.List.of()));
 
         assertThat(SecurityUtils.getCurrentGitHubId()).isEmpty();

@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -38,15 +39,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @WorkspaceAgnostic("Identity resolution is scoped to the authenticated principal, not to a workspace")
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class AuthenticatedUserService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthenticatedUserService.class);
 
     private final UserRepository userRepository;
-
-    public AuthenticatedUserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
 
     /**
      * Every {@link User} row linked to the current authenticated principal. Empty when no

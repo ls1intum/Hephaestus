@@ -44,7 +44,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
                         "gitlabuser",
                         "gitlab-user-id",
                         new String[] {},
-                        0L,
+                        null,
                         18024L
                     )
                 )
@@ -75,7 +75,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
             .uri("/user/linked-accounts/{providerAlias}/claim", "gitlab-lrz")
             .headers(headers ->
                 headers.setBearerAuth(
-                    MockSecurityContextUtils.buildTokenValue("testuser", "test-user-id", new String[] {}, 1L, 0L)
+                    MockSecurityContextUtils.buildTokenValue("testuser", "test-user-id", new String[] {}, 1L, null)
                 )
             )
             .exchange()

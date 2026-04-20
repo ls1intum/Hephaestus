@@ -265,6 +265,58 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("returns newest feedback across linked contributor rows")
+        void returnsNewestFeedbackAcrossLinkedRows() {
+            Long secondContributorId = 11L;
+            PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
+            when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(
+                List.of(createUser(CONTRIBUTOR_ID), createUser(secondContributorId))
+            );
+
+            FindingFeedback older = FindingFeedback.builder()
+                .id(UUID.randomUUID())
+                .finding(finding)
+                .findingId(FINDING_ID)
+                .contributorId(CONTRIBUTOR_ID)
+                .action(FindingFeedbackAction.APPLIED)
+                .createdAt(Instant.now().minusSeconds(60))
+                .build();
+            FindingFeedback newer = FindingFeedback.builder()
+                .id(UUID.randomUUID())
+                .finding(finding)
+                .findingId(FINDING_ID)
+                .contributorId(secondContributorId)
+                .action(FindingFeedbackAction.DISPUTED)
+                .createdAt(Instant.now())
+                .build();
+
+            when(
+                feedbackRepository.findLatestByFindingIdAndContributors(
+                    FINDING_ID,
+                    List.of(CONTRIBUTOR_ID, secondContributorId)
+                )
+            ).thenReturn(List.of(older, newer));
+
+            Optional<FindingFeedbackDTO> result = service.getLatestFeedback(workspaceContext, FINDING_ID);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().action()).isEqualTo(FindingFeedbackAction.DISPUTED);
+        }
+
+        @Test
+        @DisplayName("throws AccessForbiddenException when no linked identity is resolved")
+        void throwsWhenNoLinkedIdentityResolved() {
+            PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
+            when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of());
+
+            assertThatThrownBy(() -> service.getLatestFeedback(workspaceContext, FINDING_ID))
+                .isInstanceOf(AccessForbiddenException.class)
+                .hasMessageContaining("User not authenticated");
+        }
+
+        @Test
         @DisplayName("throws EntityNotFoundException when finding not in workspace")
         void throwsWhenFindingNotInWorkspace() {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.empty());
@@ -331,6 +383,40 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             FindingFeedbackEngagementDTO result = service.getEngagement(workspaceContext);
 
             assertThat(result.applied()).isZero();
+            assertThat(result.disputed()).isZero();
+            assertThat(result.notApplicable()).isZero();
+        }
+
+        @Test
+        @DisplayName("queries engagement across all linked contributor rows")
+        void queriesEngagementAcrossLinkedRows() {
+            Long secondContributorId = 11L;
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(
+                List.of(createUser(CONTRIBUTOR_ID), createUser(secondContributorId))
+            );
+
+            var appliedProjection = new FindingFeedbackRepository.ActionCountProjection() {
+                @Override
+                public FindingFeedbackAction getAction() {
+                    return FindingFeedbackAction.APPLIED;
+                }
+
+                @Override
+                public Long getCount() {
+                    return 5L;
+                }
+            };
+
+            when(
+                feedbackRepository.countByContributorsAndWorkspaceGroupByAction(
+                    List.of(CONTRIBUTOR_ID, secondContributorId),
+                    WORKSPACE_ID
+                )
+            ).thenReturn(List.of(appliedProjection));
+
+            FindingFeedbackEngagementDTO result = service.getEngagement(workspaceContext);
+
+            assertThat(result.applied()).isEqualTo(5L);
             assertThat(result.disputed()).isZero();
             assertThat(result.notApplicable()).isZero();
         }

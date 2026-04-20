@@ -77,13 +77,13 @@ public class AccountController {
         }
 
         String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
-        var gitUser = authenticatedUserService.findPrimaryUser();
-        if (gitUser.isEmpty()) {
+        List<User> gitUsers = authenticatedUserService.findAllLinkedUsers();
+        if (gitUsers.isEmpty()) {
             log.warn("Could not resolve Git provider user for Keycloak subject {}", keycloakUserId);
         }
 
         try {
-            accountService.deleteUserTrackingData(gitUser.orElse(null), keycloakUserId);
+            accountService.deleteUserTrackingData(gitUsers, keycloakUserId);
         } catch (PosthogClientException exception) {
             log.error("Failed to remove analytics data before deleting user {}", keycloakUserId, exception);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();

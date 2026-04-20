@@ -137,14 +137,22 @@ public class AccountService {
      * Delete all tracking data for a user (GDPR compliance).
      * Called before account deletion.
      *
-     * @param user the git provider user, or null if unresolved
+     * @param users the git provider users linked to the principal
      * @param keycloakUserId the Keycloak subject identifier
      */
-    public void deleteUserTrackingData(User user, String keycloakUserId) {
-        boolean anyDeleted = deletePosthogIdentities(user, keycloakUserId);
+    public void deleteUserTrackingData(List<User> users, String keycloakUserId) {
+        boolean anyDeleted = deletePosthogIdentities(users, keycloakUserId);
         if (!anyDeleted) {
-            String login = user != null ? user.getLogin() : "unknown";
-            log.warn("No PostHog person matched provided identifiers during account deletion: userLogin={}", login);
+            String logins = users
+                .stream()
+                .map(User::getLogin)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.joining(","));
+            log.warn(
+                "No PostHog person matched provided identifiers during account deletion: userLogins={}",
+                logins.isBlank() ? "unknown" : logins
+            );
         }
     }
 
@@ -273,12 +281,18 @@ public class AccountService {
     }
 
     private boolean deletePosthogIdentities(User user, String primaryDistinctId) {
+        return deletePosthogIdentities(user != null ? List.of(user) : List.of(), primaryDistinctId);
+    }
+
+    private boolean deletePosthogIdentities(List<User> users, String primaryDistinctId) {
         Set<String> distinctIds = new LinkedHashSet<>();
         if (StringUtils.hasText(primaryDistinctId)) {
             distinctIds.add(primaryDistinctId);
         }
-        if (user != null) {
-            distinctIds.add(String.valueOf(user.getId()));
+        for (User user : users) {
+            if (user != null && user.getId() != null) {
+                distinctIds.add(String.valueOf(user.getId()));
+            }
         }
 
         boolean anyDeleted = false;

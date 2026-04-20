@@ -284,6 +284,27 @@ class AccountServiceTest extends BaseUnitTest {
         }
     }
 
+    @Nested
+    @DisplayName("deleteUserTrackingData")
+    class DeleteUserTrackingData {
+
+        @Test
+        @DisplayName("deletes tracking data for all linked git user rows")
+        void deletesTrackingDataForAllLinkedRows() {
+            User primaryUser = createUser();
+            User linkedUser = new User();
+            linkedUser.setId(2L);
+            linkedUser.setLogin("testuser-gl");
+            when(posthogClient.deletePersonData(any())).thenReturn(true);
+
+            accountService.deleteUserTrackingData(List.of(primaryUser, linkedUser), KEYCLOAK_USER_ID);
+
+            verify(posthogClient).deletePersonData(KEYCLOAK_USER_ID);
+            verify(posthogClient).deletePersonData("1");
+            verify(posthogClient).deletePersonData("2");
+        }
+    }
+
     // ── getLinkedAccounts ───────────────────────────────────────────────────
 
     @Nested

@@ -119,11 +119,11 @@ public class TestSecurityConfig {
         String username = unescape(parts[0]);
         String userId = unescape(parts[1]);
         String authoritiesValue = unescape(parts[2]);
-        final long githubId;
-        final long gitlabId;
+        final Long githubId;
+        final Long gitlabId;
         try {
-            githubId = Long.parseLong(parts[3]);
-            gitlabId = Long.parseLong(parts[4]);
+            githubId = parts[3].isBlank() ? null : Long.parseLong(parts[3]);
+            gitlabId = parts[4].isBlank() ? null : Long.parseLong(parts[4]);
         } catch (NumberFormatException exception) {
             throw new BadJwtException("Invalid mock JWT identity claims", exception);
         }
@@ -133,10 +133,10 @@ public class TestSecurityConfig {
         claims.put("preferred_username", username);
         claims.put("iss", "https://test-issuer");
         claims.put("aud", "test-audience");
-        if (githubId > 0) {
+        if (githubId != null) {
             claims.put("github_id", githubId);
         }
-        if (gitlabId > 0) {
+        if (gitlabId != null) {
             claims.put("gitlab_id", gitlabId);
         }
         if (!authoritiesValue.isBlank()) {

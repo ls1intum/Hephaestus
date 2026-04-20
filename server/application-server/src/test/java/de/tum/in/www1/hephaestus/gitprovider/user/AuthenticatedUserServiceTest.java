@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -32,6 +33,11 @@ class AuthenticatedUserServiceTest extends BaseUnitTest {
 
     @Mock
     UserRepository userRepository;
+
+    @BeforeEach
+    void resetSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @AfterEach
     void clearSecurityContext() {
