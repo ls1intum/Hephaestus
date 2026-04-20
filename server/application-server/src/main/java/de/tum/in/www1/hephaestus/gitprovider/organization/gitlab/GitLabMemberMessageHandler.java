@@ -17,6 +17,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.dto.GitLabMemberEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserClassifier;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,7 +142,7 @@ public class GitLabMemberMessageHandler extends GitLabMessageHandler<GitLabMembe
                 name,
                 avatarUrl,
                 "", // htmlUrl not available in member webhook payload
-                User.Type.USER.name(),
+                GitLabUserClassifier.classify(login).name(),
                 null,
                 null,
                 null

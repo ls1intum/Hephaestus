@@ -4,7 +4,7 @@ title: Technical and Organizational Measures
 description: Art. 32 GDPR TOMs for the TUM-operated Hephaestus deployment.
 ---
 
-*Last updated: 2026-04-19.*
+_Last updated: 2026-04-20._
 
 Documents the measures taken pursuant to Art. 32 GDPR. Structured along the categories of the BayLfD / DSK TOM-Leitfaden so every Muss-Liste category is addressed on its own line.
 
@@ -89,9 +89,9 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 
 ## 6. Deletion (Löschkontrolle)
 
-- **Account deletion** (self-service, profile settings): removes the Keycloak account, the Hephaestus profile, preferences, guidance-assistant conversations, the Art. 21 objection switch, and the Contributor's identity link to their Findings. Source-side GitHub / gitlab.lrz.de content is *not* deleted by this action — that must be done on the source system separately.
+- **Account deletion** (self-service, profile settings): removes the Keycloak account, the Hephaestus profile, preferences, guidance-assistant conversations, the Art. 21 objection switch, and the Contributor's identity link to their Findings. Source-side GitHub / gitlab.lrz.de content is _not_ deleted by this action — that must be done on the source system separately.
 - **Workspace deletion / repository removal** triggers deletion of synchronised Artifacts for that workspace or repository.
-- **Server logs** are written to a fixed-size buffer per service: 250 MB (5 × 50 MB) for application services in `docker/compose.app.yaml`; 30 MB (3 × 10 MB) for core infrastructure in `docker/compose.core.yaml`. When the buffer fills, the Docker `json-file` driver overwrites the oldest log file. Effective rolling-window duration is volume-dependent and is measured on production at each DSMS submission (see `SUBMISSION-GUIDE.md` Phase 0). The buffer ships with every deploy as part of the per-service `logging:` blocks; there is no manual host-level configuration. Raising the buffer size or removing the `logging:` blocks is a material change to the retention bound and must be reflected in the VVT and the privacy statement.
+- **Web access logs** are generated directly by the embedded Tomcat server inside the Spring Boot application server and stored on the dedicated `/var/log/hephaestus` volume. Retention is enforced natively with `server.tomcat.accesslog.max-days=14`, and the log pattern is minimised to timestamp, client IP, method, path, protocol, status, response size, and processing time. Extending the retention window or widening the logged fields is a material change that must be reflected in the VVT and the privacy statement.
 - **LLM-provider-side retention** is bounded by enterprise no-training terms; default 30-day retention, shorter where Zero Data Retention has been negotiated per workspace. After the provider's window, prompts are not associated with the deleted account.
 - **No backups of the Hephaestus-operated stores are currently in place**, so an account-deletion does not need to be re-applied to a backup set. If and when off-host backups are introduced (see §3.3), the application-level deletion log must be re-applied on restore to prevent re-materialising deleted data.
 
@@ -105,10 +105,10 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 
 ## 8. Sub-processors and internal processors
 
-| Component | Role | AVV / framework | Default state |
-|---|---|---|---|
-| GitHub, Inc. / Microsoft Corporation | Identity provider (OAuth) and source-system API | AVV at TUM/AET level | Always on for GitHub-federated workspaces |
-| Microsoft Corporation (Azure OpenAI Service) | Default LLM provider (per workspace) for the TUM-operated deployment | AVV at TUM/AET level for TUM-operated tenancy; at workspace administrator's institution when that institution supplies credentials | Default, per-workspace |
-| OpenAI, L.P. | Alternative LLM provider (per workspace) | AVV as above | Per-workspace, opt-in |
-| Salesforce, Inc. / Slack Technologies, LLC | Workspace notifications (when enabled by the workspace admin) | AVV at TUM/AET level | Per-workspace, opt-in |
-| Leibniz-Rechenzentrum der BAdW (gitlab.lrz.de) | Source system and OIDC identity provider | **Not Art. 28** — separate controller under Art. 16 Abs. 1 Satz 2 BayHIG + BAdW-Satzung (public-body cooperation; EDPB 07/2020 § 22) | Per-workspace, opt-in |
+| Component                                      | Role                                                                 | AVV / framework                                                                                                                      | Default state                             |
+| ---------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| GitHub, Inc. / Microsoft Corporation           | Identity provider (OAuth) and source-system API                      | AVV at TUM/AET level                                                                                                                 | Always on for GitHub-federated workspaces |
+| Microsoft Corporation (Azure OpenAI Service)   | Default LLM provider (per workspace) for the TUM-operated deployment | AVV at TUM/AET level for TUM-operated tenancy; at workspace administrator's institution when that institution supplies credentials   | Default, per-workspace                    |
+| OpenAI, L.P.                                   | Alternative LLM provider (per workspace)                             | AVV as above                                                                                                                         | Per-workspace, opt-in                     |
+| Salesforce, Inc. / Slack Technologies, LLC     | Workspace notifications (when enabled by the workspace admin)        | AVV at TUM/AET level                                                                                                                 | Per-workspace, opt-in                     |
+| Leibniz-Rechenzentrum der BAdW (gitlab.lrz.de) | Source system and OIDC identity provider                             | **Not Art. 28** — separate controller under Art. 16 Abs. 1 Satz 2 BayHIG + BAdW-Satzung (public-body cooperation; EDPB 07/2020 § 22) | Per-workspace, opt-in                     |
