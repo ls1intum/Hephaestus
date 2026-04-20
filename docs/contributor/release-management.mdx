@@ -50,7 +50,7 @@ sequenceDiagram
 
 | Step | Duration |
 | --- | --- |
-| PR merged to `main` | — |
+| PR merged to `main` | – |
 | CI runs (tests, builds) | ~10 min |
 | semantic-release creates tag | ~1 min |
 | Staging deploy | ~2 min |
@@ -63,14 +63,14 @@ sequenceDiagram
 ### Normal release
 
 1. **Merge your PR** to `main` (squash merge)
-2. **Wait for CI** — tests run, then semantic-release creates a tag
-3. **Staging deploys automatically** — you get a notification
-4. **Verify staging** — check https://staging.hephaestus.cit.tum.de
-5. **Approve production** — Go to the Actions run → Click "Review deployments" → Approve
+2. **Wait for CI** – tests run, then semantic-release creates a tag
+3. **Staging deploys automatically** – you get a notification
+4. **Verify staging** – check https://staging.hephaestus.cit.tum.de
+5. **Approve production** – Go to the Actions run → Click "Review deployments" → Approve
 
 ### Hotfix
 
-Same as normal release. There's no separate process — the fast pipeline handles everything.
+Same as normal release. There's no separate process – the fast pipeline handles everything.
 
 1. Create a branch from `main`
 2. Open a PR, get it reviewed
@@ -92,13 +92,13 @@ Same as normal release. There's no separate process — the fast pipeline handle
 | `perf:` | ✅ | Patch |
 | `feat!:` / BREAKING | ✅ | Major |
 | `revert:` | ✅ | Patch |
-| `docs:` | ❌ | — |
-| `style:` | ❌ | — |
-| `refactor:` | ❌ | — |
-| `test:` | ❌ | — |
-| `build:` | ❌ | — |
-| `ci:` | ❌ | — |
-| `chore:` | ❌ | — |
+| `docs:` | ❌ | – |
+| `style:` | ❌ | – |
+| `refactor:` | ❌ | – |
+| `test:` | ❌ | – |
+| `build:` | ❌ | – |
+| `ci:` | ❌ | – |
+| `chore:` | ❌ | – |
 
 Only `feat`, `fix`, `perf`, `revert`, and breaking changes trigger new releases.
 

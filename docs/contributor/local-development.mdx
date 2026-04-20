@@ -53,7 +53,7 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 
 ### Port overrides
 
-Every host-side port is configurable so multiple Hephaestus instances (or other services) can coexist on the same machine. Container-internal ports never change — only the `localhost` binding moves.
+Every host-side port is configurable so multiple Hephaestus instances (or other services) can coexist on the same machine. Container-internal ports never change – only the `localhost` binding moves.
 
 #### Default port map
 
@@ -83,7 +83,7 @@ Ports flow through the system like this:
 
 #### Changing ports
 
-**Basic example** — move PostgreSQL and Keycloak to non-standard ports:
+**Basic example** – move PostgreSQL and Keycloak to non-standard ports:
 
 ```bash
 # server/application-server/.env
@@ -226,12 +226,12 @@ monitoring:
 Empty lists = no filtering (production behavior). Non-empty = only sync matching items.
 
 :::tip
-Filters don't delete data—they just skip sync operations. Workspace and organization metadata is still created for all installations.
+Filters don't delete data – they just skip sync operations. Workspace and organization metadata is still created for all installations.
 :::
 
 ### Keycloak integration
 
-Keycloak runs in Docker as part of the development compose stack. The bundled realm import no longer ships test users—authentication always flows through GitHub and mirrors production.
+Keycloak runs in Docker as part of the development compose stack. The bundled realm import no longer ships test users – authentication always flows through GitHub and mirrors production.
 
 #### Configure the GitHub identity provider
 
@@ -307,7 +307,7 @@ npm run dev
 ### UI foundations
 
 - We ship Tailwind CSS 4 in JIT mode. Keep utility classes in JSX and rely on design tokens defined in `src/styles.css`.
-- Ensure Tailwind IntelliSense is enabled in your IDE—typeahead prevents typos and invalid compositions.
+- Ensure Tailwind IntelliSense is enabled in your IDE – typeahead prevents typos and invalid compositions.
 - Avoid premature abstractions with `@apply`; duplication is fine when it keeps components readable.
 
 ### Component workflow (Storybook + Chromatic)
@@ -321,7 +321,7 @@ npm -w webapp run chromatic:ci        # Visual regression in CI
 ```
 
 - Every new UI component ships with at least one story covering empty, loading, and error states.
-- Chromatic runs on every pull request—review visual diffs before merging.
+- Chromatic runs on every pull request – review visual diffs before merging.
 - Reference [ui.shadcn.com](https://ui.shadcn.com/) for composition patterns; stick to headless Radix primitives when you need new widgets.
 
 ### OpenAPI client
@@ -334,7 +334,7 @@ npm -w webapp run openapi-ts
 
 - Generated types drop the `Dto` suffix and mirror the Spring Boot API responses.
 - Pair every new endpoint with a typed TanStack Query hook for caching and invalidation.
-- Never hand-roll fetch calls—shared interceptors handle auth tokens and error telemetry.
+- Never hand-roll fetch calls – shared interceptors handle auth tokens and error telemetry.
 
 ## Intelligence service (`server/intelligence-service`)
 

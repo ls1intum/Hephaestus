@@ -67,6 +67,17 @@ public class PullRequestReviewThread extends BaseGitServiceEntity {
     @Column(length = 16)
     private PullRequestReviewComment.Side startSide;
 
+    /** SHA of the head commit the thread's root note anchors to (GitLab: {@code diffRefs.headSha}). */
+    @Column(name = "commit_sha", length = 64)
+    private String commitSha;
+
+    /**
+     * SHA of the base commit the thread's root note anchors to (GitLab: {@code diffRefs.baseSha},
+     * falling back to {@code startSha} when the base is unavailable).
+     */
+    @Column(name = "original_commit_sha", length = 64)
+    private String originalCommitSha;
+
     private Boolean outdated;
 
     private Boolean collapsed;

@@ -20,6 +20,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -50,6 +51,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class ActivityEventListener {
 
     private final ActivityEventService activityEventService;
+    private final ActivityEventRepository activityEventRepository;
     private final ExperiencePointCalculator xpCalc;
     private final PullRequestReviewRepository reviewRepository;
     private final PullRequestRepository pullRequestRepository;
@@ -1675,6 +1677,48 @@ public class ActivityEventListener {
                 xpForActor(actor, xpCalc.getXpCommitCreated())
             )
         );
+    }
+
+    /**
+     * Handle commit author reconciliation events emitted by the gitprovider module
+     * after commit author identities have been resolved (via email lookup, provider
+     * user API, or server-side author harvest) for a repository.
+     *
+     * <p>COMMIT_CREATED activity events ingested before author resolution were
+     * recorded with {@code actor_id=NULL} and {@code xp=0}. This handler rewrites
+     * those ledger rows so the newly attributed contributor receives XP and appears
+     * on the leaderboard. Scoped per-repository to keep the UPDATE bounded.
+     *
+     * <p>Uses {@link EventListener} (not {@code @TransactionalEventListener}) because
+     * the publishers ({@code CommitAuthorEnrichmentService}, {@code GitLabCommitMergeRequestLinker})
+     * run bulk UPDATEs that auto-commit per statement outside a surrounding transaction.
+     * {@code AFTER_COMMIT} would silently drop the event when no transaction is active.
+     * The underlying {@code backfillCommitActors} UPDATE is idempotent (guarded by
+     * {@code actor_id IS NULL}), so replay safety is preserved.
+     *
+     * <p>The XP rate is resolved at receive time, not publish time; this is acceptable
+     * because the XP-per-commit policy is static in practice.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @EventListener
+    public void onCommitAuthorsReconciled(DomainEvent.CommitAuthorsReconciled event) {
+        Long repositoryId = event.repositoryId();
+        if (repositoryId == null) {
+            return;
+        }
+        String correlationId = event.context() != null ? event.context().correlationId() : null;
+        try {
+            int updated = activityEventRepository.backfillCommitActors(repositoryId, xpCalc.getXpCommitCreated());
+            log.info(
+                "Backfilled {} COMMIT_CREATED activity events: repoId={}, correlationId={}",
+                updated,
+                repositoryId,
+                correlationId
+            );
+        } catch (Exception e) {
+            log.error("Failed to backfill commit actors: repoId={}, correlationId={}", repositoryId, correlationId, e);
+        }
     }
 
     // ========================================================================

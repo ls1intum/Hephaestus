@@ -6,9 +6,9 @@
 
 This site is powered by [Docusaurus 3](https://docusaurus.io/) with Rspack, SWC, and LightningCSS for 2-4x faster builds. The content is split into three guides:
 
-- **User Guide** — End-user workflows (mentor sessions, leaderboard, workspace management)
-- **Contributor Guide** — Engineering guides, ERD + StarUML assets, and local development setup
-- **Admin Guide** — Production deployment runbooks
+- **User Guide** – End-user workflows (mentor sessions, leaderboard, workspace management)
+- **Contributor Guide** – Engineering guides, ERD + StarUML assets, and local development setup
+- **Admin Guide** – Production deployment runbooks
 
 ## Quick Start
 
@@ -47,9 +47,9 @@ npm run docs:lint    # TypeScript + Markdown linting
 
 CI runs these checks automatically:
 
-1. **TypeScript check** — `npm run typecheck`
-2. **Markdown lint** — `npm run lint:md`
-3. **Build with strict validation** — `npm run build`
+1. **TypeScript check** – `npm run typecheck`
+2. **Markdown lint** – `npm run lint:md`
+3. **Build with strict validation** – `npm run build`
 
 The build fails on:
 
@@ -61,9 +61,9 @@ The build fails on:
 
 Using **Docusaurus Faster** for optimized builds:
 
-- **Rspack** — Rust-based bundler (replaces Webpack)
-- **SWC** — Fast JS/TS transpilation and minification
-- **LightningCSS** — Fast CSS processing
+- **Rspack** – Rust-based bundler (replaces Webpack)
+- **SWC** – Fast JS/TS transpilation and minification
+- **LightningCSS** – Fast CSS processing
 
 Result: 2-4x faster build times compared to default Docusaurus configuration.
 

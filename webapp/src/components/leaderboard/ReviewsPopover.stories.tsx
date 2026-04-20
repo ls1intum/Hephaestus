@@ -15,6 +15,13 @@ const mockPullRequests: PullRequestInfo[] = [
 		additions: 50,
 		deletions: 10,
 		htmlUrl: "https://github.com/org/repo/pull/101",
+		repository: {
+			id: 1,
+			name: "Hephaestus",
+			nameWithOwner: "org/repo",
+			htmlUrl: "https://github.com/org/repo",
+			hiddenFromContributions: false,
+		},
 	},
 	{
 		id: 2,
@@ -27,6 +34,13 @@ const mockPullRequests: PullRequestInfo[] = [
 		additions: 120,
 		deletions: 5,
 		htmlUrl: "https://github.com/org/repo/pull/102",
+		repository: {
+			id: 2,
+			name: "Artemis",
+			nameWithOwner: "org/repo-2",
+			htmlUrl: "https://github.com/org/repo-2",
+			hiddenFromContributions: false,
+		},
 	},
 ];
 
@@ -58,13 +72,6 @@ export const Highlighted: Story = {
 	},
 };
 
-export const NoReviews: Story = {
-	args: {
-		reviewedPullRequests: [],
-		highlight: false,
-	},
-};
-
 // --- Alternate provider variants ---
 
 const mockMergeRequests: PullRequestInfo[] = [
@@ -79,6 +86,13 @@ const mockMergeRequests: PullRequestInfo[] = [
 		additions: 50,
 		deletions: 10,
 		htmlUrl: "https://gitlab.com/org/repo/-/merge_requests/101",
+		repository: {
+			id: 1,
+			name: "Hephaestus",
+			nameWithOwner: "org/repo",
+			htmlUrl: "https://gitlab.com/org/repo",
+			hiddenFromContributions: false,
+		},
 	},
 	{
 		id: 2,
@@ -91,6 +105,13 @@ const mockMergeRequests: PullRequestInfo[] = [
 		additions: 120,
 		deletions: 5,
 		htmlUrl: "https://gitlab.com/org/repo/-/merge_requests/102",
+		repository: {
+			id: 2,
+			name: "Artemis",
+			nameWithOwner: "org/repo-2",
+			htmlUrl: "https://gitlab.com/org/repo-2",
+			hiddenFromContributions: false,
+		},
 	},
 ];
 

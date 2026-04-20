@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -203,9 +204,9 @@ public class GitLabCommitSyncService {
         Instant authoredAt = parseInstant(authoredDateStr);
         Instant committedAt = parseInstant(committedDateStr);
 
-        // Resolve author and committer
-        Long authorId = authorResolver.resolveByEmail(authorEmail, providerId);
-        Long committerId = authorResolver.resolveByEmail(committerEmail, providerId);
+        // Resolve author and committer (backfills user.email when currently NULL)
+        Long authorId = authorResolver.resolveAndBackfillByEmail(authorEmail, providerId);
+        Long committerId = authorResolver.resolveAndBackfillByEmail(committerEmail, providerId);
 
         // Upsert commit (passes null for stats — REST list endpoint doesn't provide them)
         commitRepository.upsertCommit(
@@ -225,6 +226,28 @@ public class GitLabCommitSyncService {
             authorEmail,
             committerEmail
         );
+
+        // Persist parent metadata when the REST payload includes parent_ids.
+        // Matches GitHub's CommitMetadataEnrichmentService which backfills the
+        // same columns via GraphQL Commit.parents.
+        Integer parentCount = null;
+        String parentShas = null;
+        Object parentIdsField = commitData.get("parent_ids");
+        if (parentIdsField instanceof List<?> parentIdsList) {
+            List<String> parentShasList = new ArrayList<>(parentIdsList.size());
+            for (Object pid : parentIdsList) {
+                if (pid instanceof String s && !s.isBlank()) {
+                    parentShasList.add(s);
+                }
+            }
+            parentCount = parentShasList.size();
+            if (!parentShasList.isEmpty()) {
+                parentShas = String.join(",", parentShasList);
+            }
+        }
+        if (parentCount != null) {
+            commitRepository.updateParentMetadataBySha(repository.getId(), sha, parentCount, parentShas);
+        }
 
         // Upsert primary author contributor
         if (authorEmail != null) {

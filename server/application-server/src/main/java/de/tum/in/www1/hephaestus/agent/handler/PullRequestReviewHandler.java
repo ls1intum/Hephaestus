@@ -476,10 +476,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         try {
             result = deliveryService.deliver(job, scopedFindings);
             log.info(
-                "Delivery complete: inserted={}, unknownSlug={}, overCap={}, duplicate={}, jobId={}",
+                "Delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
                 result.inserted(),
                 result.discardedUnknownSlug(),
-                result.discardedOverCap(),
                 result.discardedDuplicate(),
                 job.getId()
             );

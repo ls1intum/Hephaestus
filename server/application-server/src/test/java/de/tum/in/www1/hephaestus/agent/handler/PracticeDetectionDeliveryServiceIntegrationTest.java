@@ -177,7 +177,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             "main",
             "abc123",
             "def456",
-            null
+            null,
+            null // mergeCommitSha
         );
         // Look up the PR ID
         prId = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 42).orElseThrow().getId();
@@ -295,11 +296,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             var result = deliveryService.deliver(agentJob, findings);
 
-            // 5 inserted (cap), 2 discarded over cap, 0 duplicates
-            assertThat(result.inserted()).isEqualTo(5);
+            assertThat(result.inserted()).isEqualTo(7);
             assertThat(result.discardedDuplicate()).isEqualTo(0);
-            assertThat(result.discardedOverCap()).isEqualTo(2);
-            assertThat(practiceFindingRepository.findAll()).hasSize(5);
+            assertThat(practiceFindingRepository.findAll()).hasSize(7);
         }
     }
 

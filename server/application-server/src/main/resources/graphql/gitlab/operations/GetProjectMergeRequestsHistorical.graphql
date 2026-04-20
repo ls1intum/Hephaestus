@@ -30,6 +30,7 @@ query GetProjectMergeRequestsHistorical($fullPath: ID!, $first: Int!, $after: St
                 sourceBranch
                 targetBranch
                 diffHeadSha
+                mergeCommitSha
                 diffRefs {
                     baseSha
                 }

@@ -120,6 +120,19 @@ public class PullRequest extends Issue {
     @Column(length = 40)
     private String baseRefOid;
 
+    /**
+     * The SHA of the merge commit produced when this pull request was merged.
+     * <p>
+     * For GitLab merge requests, populated from GraphQL {@code MergeRequest.mergeCommitSha}.
+     * This is the anchor used by the commit→MR linker fallback when
+     * {@code commitsWithoutMergeCommits} harvest does not cover historical MRs
+     * (see PR #1021 Gap 1). Null for unmerged pull requests and for GitHub
+     * until its GraphQL sync is wired through to populate it.
+     */
+    @Nullable
+    @Column(name = "merge_commit_sha", length = 40)
+    private String mergeCommitSha;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "merged_by_id")
     @ToString.Exclude

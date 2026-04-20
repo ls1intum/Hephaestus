@@ -12,7 +12,10 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.dto.GitLabNoteE
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.gitlab.GitLabReviewReconciler;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.gitlab.GitLabPullRequestReviewThreadProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -51,6 +54,8 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
     private final PullRequestRepository pullRequestRepository;
     private final GitLabPullRequestReviewThreadProcessor threadProcessor;
     private final GitLabPullRequestReviewCommentProcessor reviewCommentProcessor;
+    private final PullRequestReviewCommentRepository reviewCommentRepository;
+    private final GitLabReviewReconciler reviewReconciler;
 
     public GitLabDiffNoteWebhookProcessor(
         GitLabUserService gitLabUserService,
@@ -62,7 +67,9 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         GitLabProperties gitLabProperties,
         PullRequestRepository pullRequestRepository,
         GitLabPullRequestReviewThreadProcessor threadProcessor,
-        GitLabPullRequestReviewCommentProcessor reviewCommentProcessor
+        GitLabPullRequestReviewCommentProcessor reviewCommentProcessor,
+        PullRequestReviewCommentRepository reviewCommentRepository,
+        GitLabReviewReconciler reviewReconciler
     ) {
         super(
             gitLabUserService,
@@ -76,6 +83,8 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         this.pullRequestRepository = pullRequestRepository;
         this.threadProcessor = threadProcessor;
         this.reviewCommentProcessor = reviewCommentProcessor;
+        this.reviewCommentRepository = reviewCommentRepository;
+        this.reviewReconciler = reviewReconciler;
     }
 
     /**
@@ -123,6 +132,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         String oldPath = null;
         String headSha = null;
         String baseSha = null;
+        String startSha = null;
 
         if (position != null) {
             String np = GitLabFieldUtils.asString(position.get("new_path"));
@@ -133,6 +143,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             oldPath = GitLabFieldUtils.asString(position.get("old_path"));
             headSha = GitLabFieldUtils.asString(position.get("head_sha"));
             baseSha = GitLabFieldUtils.asString(position.get("base_sha"));
+            startSha = GitLabFieldUtils.asString(position.get("start_sha"));
         }
 
         // Capture effectively final for lambda
@@ -180,16 +191,41 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             oldPath,
             headSha,
             baseSha,
+            startSha,
             createdAt,
             updatedAt
         );
+
+        // Resolve parent: if the thread already has a starter comment, this note is a reply.
+        // This mirrors GitLab's semantics where all notes in a discussion share the same
+        // discussion_id; the earliest note is the thread starter and subsequent notes reply to it.
+        PullRequestReviewComment inReplyTo =
+            thread.getId() != null
+                ? reviewCommentRepository.findFirstByThreadIdOrderByCreatedAtAsc(thread.getId()).orElse(null)
+                : null;
+
+        // Reconcile a synthetic COMMENTED review per (author, discussion) so the note links
+        // to a review row, matching GitHub parity and unblocking profile/leaderboard scoring.
+        PullRequestReview review = null;
+        if (author != null && attrs.discussionId() != null) {
+            String discussionGid = "gid://gitlab/Discussion/" + attrs.discussionId();
+            review = reviewReconciler.findOrCreateCommentedReview(
+                pr,
+                author,
+                discussionGid,
+                createdAt,
+                provider,
+                context
+            );
+        }
 
         var commentContext = new GitLabPullRequestReviewCommentProcessor.CommentContext(
             thread,
             pr,
             author,
             provider,
-            null, // no parent for webhook diff notes
+            inReplyTo,
+            review,
             context.scopeId()
         );
         PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(noteData, commentContext);

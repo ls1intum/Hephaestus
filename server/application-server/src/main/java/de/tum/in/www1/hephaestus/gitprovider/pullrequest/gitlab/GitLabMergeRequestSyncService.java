@@ -272,7 +272,8 @@ public class GitLabMergeRequestSyncService {
         String sourceBranch,
         String targetBranch,
         @Nullable String diffHeadSha,
-        @Nullable String baseSha
+        @Nullable String baseSha,
+        @Nullable String mergeCommitSha
     ) {}
 
     private record DiffStats(int additions, int deletions, int fileCount) {
@@ -284,9 +285,10 @@ public class GitLabMergeRequestSyncService {
         @Nullable String username,
         @Nullable String name,
         @Nullable String avatarUrl,
-        @Nullable String webUrl
+        @Nullable String webUrl,
+        @Nullable String publicEmail
     ) {
-        static final UserFields EMPTY = new UserFields(null, null, null, null, null);
+        static final UserFields EMPTY = new UserFields(null, null, null, null, null, null);
     }
 
     // ========================================================================
@@ -476,6 +478,7 @@ public class GitLabMergeRequestSyncService {
             fields.iid(),
             mrContext
         );
+        List<GitLabMergeRequestProcessor.SyncUserData> syncParticipants = extractParticipants(node, mrContext);
 
         Integer milestoneIid = extractMilestoneIid(node);
 
@@ -502,6 +505,7 @@ public class GitLabMergeRequestSyncService {
             fields.targetBranch(),
             fields.diffHeadSha(),
             fields.baseSha(),
+            fields.mergeCommitSha(),
             fields.discussionLocked(),
             fields.userNotesCount(),
             author.globalId(),
@@ -509,15 +513,18 @@ public class GitLabMergeRequestSyncService {
             author.name(),
             author.avatarUrl(),
             author.webUrl(),
+            author.publicEmail(),
             mergeUser.globalId(),
             mergeUser.username(),
             mergeUser.name(),
             mergeUser.avatarUrl(),
             mergeUser.webUrl(),
+            mergeUser.publicEmail(),
             syncLabels,
             syncAssignees,
             syncReviewers,
             syncApprovers,
+            syncParticipants,
             milestoneIid
         );
         PullRequest pr = mergeRequestProcessor.processFromSync(syncData, repository, scopeId);
@@ -566,6 +573,7 @@ public class GitLabMergeRequestSyncService {
         String sourceBranch = (String) node.get("sourceBranch");
         String targetBranch = (String) node.get("targetBranch");
         String diffHeadSha = (String) node.get("diffHeadSha");
+        String mergeCommitSha = (String) node.get("mergeCommitSha");
 
         // Extract baseSha from diffRefs
         String baseSha = null;
@@ -595,7 +603,8 @@ public class GitLabMergeRequestSyncService {
             sourceBranch,
             targetBranch,
             diffHeadSha,
-            baseSha
+            baseSha,
+            mergeCommitSha
         );
     }
 
@@ -652,7 +661,20 @@ public class GitLabMergeRequestSyncService {
             (String) userMap.get("username"),
             (String) userMap.get("name"),
             (String) userMap.get("avatarUrl"),
-            (String) userMap.get("webUrl")
+            (String) userMap.get("webUrl"),
+            (String) userMap.get("publicEmail")
+        );
+    }
+
+    /** Reads a {@link GitLabMergeRequestProcessor.SyncUserData} from a user-node map. */
+    private static GitLabMergeRequestProcessor.SyncUserData toSyncUserData(Map<String, Object> userMap) {
+        return new GitLabMergeRequestProcessor.SyncUserData(
+            (String) userMap.get("id"),
+            (String) userMap.get("username"),
+            (String) userMap.get("name"),
+            (String) userMap.get("avatarUrl"),
+            (String) userMap.get("webUrl"),
+            (String) userMap.get("publicEmail")
         );
     }
 
@@ -726,15 +748,7 @@ public class GitLabMergeRequestSyncService {
 
         List<GitLabMergeRequestProcessor.SyncUserData> syncAssignees = new ArrayList<>(assigneeNodes.size());
         for (Map<String, Object> a : assigneeNodes) {
-            syncAssignees.add(
-                new GitLabMergeRequestProcessor.SyncUserData(
-                    (String) a.get("id"),
-                    (String) a.get("username"),
-                    (String) a.get("name"),
-                    (String) a.get("avatarUrl"),
-                    (String) a.get("webUrl")
-                )
-            );
+            syncAssignees.add(toSyncUserData(a));
         }
 
         NestedOverflow overflow = detectNestedOverflow(assigneesMap, "assignees", assigneeNodes.size(), context);
@@ -777,15 +791,7 @@ public class GitLabMergeRequestSyncService {
 
         List<GitLabMergeRequestProcessor.SyncUserData> syncReviewers = new ArrayList<>(reviewerNodes.size());
         for (Map<String, Object> r : reviewerNodes) {
-            syncReviewers.add(
-                new GitLabMergeRequestProcessor.SyncUserData(
-                    (String) r.get("id"),
-                    (String) r.get("username"),
-                    (String) r.get("name"),
-                    (String) r.get("avatarUrl"),
-                    (String) r.get("webUrl")
-                )
-            );
+            syncReviewers.add(toSyncUserData(r));
         }
 
         NestedOverflow overflow = detectNestedOverflow(reviewersMap, "reviewers", reviewerNodes.size(), context);
@@ -827,15 +833,7 @@ public class GitLabMergeRequestSyncService {
 
         List<GitLabMergeRequestProcessor.SyncUserData> syncApprovers = new ArrayList<>(approverNodes.size());
         for (Map<String, Object> a : approverNodes) {
-            syncApprovers.add(
-                new GitLabMergeRequestProcessor.SyncUserData(
-                    (String) a.get("id"),
-                    (String) a.get("username"),
-                    (String) a.get("name"),
-                    (String) a.get("avatarUrl"),
-                    (String) a.get("webUrl")
-                )
-            );
+            syncApprovers.add(toSyncUserData(a));
         }
 
         NestedOverflow overflow = detectNestedOverflow(approvedByMap, "approvedBy", approverNodes.size(), context);
@@ -854,6 +852,44 @@ public class GitLabMergeRequestSyncService {
         }
 
         return syncApprovers;
+    }
+
+    // ========================================================================
+    // Participants extraction (identity-harvest only, best-effort)
+    // ========================================================================
+
+    /**
+     * Extracts the participants connection as a list of {@link GitLabMergeRequestProcessor.SyncUserData}.
+     * <p>
+     * Participants are harvested purely to seed {@link de.tum.in.www1.hephaestus.gitprovider.user.User}
+     * rows for anyone who has interacted with the merge request (notes, reviews, approvals, etc.).
+     * They are <em>not</em> attached to the MR as a relationship — the entity has no participants column.
+     * <p>
+     * Overflow is observable via the warning in {@link #detectNestedOverflow} but we deliberately
+     * skip follow-up pagination: missed participants will surface naturally via their own
+     * notes/reviews/commits, which each carry identity data.
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private List<GitLabMergeRequestProcessor.SyncUserData> extractParticipants(
+        Map<String, Object> node,
+        String context
+    ) {
+        Map<String, Object> participantsMap = (Map<String, Object>) node.get("participants");
+        if (participantsMap == null) return null;
+
+        List<Map<String, Object>> participantNodes = (List<Map<String, Object>>) participantsMap.get("nodes");
+        if (participantNodes == null) return null;
+
+        List<GitLabMergeRequestProcessor.SyncUserData> syncParticipants = new ArrayList<>(participantNodes.size());
+        for (Map<String, Object> p : participantNodes) {
+            syncParticipants.add(toSyncUserData(p));
+        }
+
+        // Observability only — identity harvest is best-effort.
+        detectNestedOverflow(participantsMap, "participants", participantNodes.size(), context);
+
+        return syncParticipants;
     }
 
     // ========================================================================
@@ -1052,15 +1088,7 @@ public class GitLabMergeRequestSyncService {
                 if (assigneeNodes == null || assigneeNodes.isEmpty()) break;
 
                 for (Map<String, Object> a : assigneeNodes) {
-                    allRemaining.add(
-                        new GitLabMergeRequestProcessor.SyncUserData(
-                            (String) a.get("id"),
-                            (String) a.get("username"),
-                            (String) a.get("name"),
-                            (String) a.get("avatarUrl"),
-                            (String) a.get("webUrl")
-                        )
-                    );
+                    allRemaining.add(toSyncUserData(a));
                 }
 
                 Map<String, Object> pageInfo = (Map<String, Object>) assigneesMap.get("pageInfo");
@@ -1158,15 +1186,7 @@ public class GitLabMergeRequestSyncService {
                 if (reviewerNodes == null || reviewerNodes.isEmpty()) break;
 
                 for (Map<String, Object> r : reviewerNodes) {
-                    allRemaining.add(
-                        new GitLabMergeRequestProcessor.SyncUserData(
-                            (String) r.get("id"),
-                            (String) r.get("username"),
-                            (String) r.get("name"),
-                            (String) r.get("avatarUrl"),
-                            (String) r.get("webUrl")
-                        )
-                    );
+                    allRemaining.add(toSyncUserData(r));
                 }
 
                 Map<String, Object> pageInfo = (Map<String, Object>) reviewersMap.get("pageInfo");
@@ -1264,15 +1284,7 @@ public class GitLabMergeRequestSyncService {
                 if (approverNodes == null || approverNodes.isEmpty()) break;
 
                 for (Map<String, Object> a : approverNodes) {
-                    allRemaining.add(
-                        new GitLabMergeRequestProcessor.SyncUserData(
-                            (String) a.get("id"),
-                            (String) a.get("username"),
-                            (String) a.get("name"),
-                            (String) a.get("avatarUrl"),
-                            (String) a.get("webUrl")
-                        )
-                    );
+                    allRemaining.add(toSyncUserData(a));
                 }
 
                 Map<String, Object> pageInfo = (Map<String, Object>) approvedByMap.get("pageInfo");

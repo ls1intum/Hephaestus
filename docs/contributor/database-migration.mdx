@@ -16,7 +16,7 @@ Liquibase manages schema changes in the application server. Follow this workflow
    npm run db:draft-changelog
    ```
 
-3. **Review `changelog_new.xml` carefully**—check for destructive operations.
+3. **Review `changelog_new.xml` carefully** – check for destructive operations.
 4. Rename and move the file to `server/application-server/src/main/resources/db/changelog/{id}_changelog.xml`.
 5. Regenerate docs and models:
 
@@ -125,7 +125,7 @@ Every migration may affect the intelligence service. Regenerate models with:
 npm run db:generate-models:intelligence-service
 ```
 
-The command applies migrations, introspects the database, and updates `server/intelligence-service/src/shared/db/schema.ts`. Treat the generated file as disposable—never edit it manually.
+The command applies migrations, introspects the database, and updates `server/intelligence-service/src/shared/db/schema.ts`. Treat the generated file as disposable – never edit it manually.
 
 ## Resources
 

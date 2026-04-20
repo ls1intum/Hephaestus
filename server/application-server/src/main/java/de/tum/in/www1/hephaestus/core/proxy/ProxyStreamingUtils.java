@@ -106,8 +106,8 @@ public final class ProxyStreamingUtils {
         }
     }
 
-    /** Default timeout for SSE streaming — slightly above typical WebClient responseTimeout. */
-    private static final Duration DEFAULT_SSE_TIMEOUT = Duration.ofSeconds(310);
+    /** Total wall-clock time for an SSE stream. Must accommodate LLM thinking + output generation. */
+    private static final Duration DEFAULT_SSE_TIMEOUT = Duration.ofMinutes(10);
 
     /**
      * Stream SSE data directly to the {@link HttpServletResponse} output stream.

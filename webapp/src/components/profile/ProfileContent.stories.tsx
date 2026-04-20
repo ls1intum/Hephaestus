@@ -138,6 +138,51 @@ const mockOpenPullRequests = [
 	},
 ];
 
+const mockActivityStats = {
+	score: 195,
+	numberOfReviewedPRs: 3,
+	numberOfApprovals: 1,
+	numberOfChangeRequests: 1,
+	numberOfComments: 1,
+	numberOfCodeComments: 5,
+	numberOfUnknowns: 0,
+	numberOfOwnReplies: 2,
+	numberOfOpenPullRequests: 2,
+	numberOfMergedPullRequests: 1,
+	numberOfClosedPullRequests: 0,
+	numberOfOpenedIssues: 1,
+	numberOfClosedIssues: 1,
+};
+
+const mockReviewedPullRequests = mockReviewActivity
+	.map((activity) => activity.pullRequest)
+	.filter(
+		(pullRequest): pullRequest is NonNullable<(typeof mockReviewActivity)[number]["pullRequest"]> =>
+			Boolean(pullRequest),
+	)
+	.map((pullRequest) => ({
+		...pullRequest,
+		commentsCount: 0,
+		additions: 0,
+		deletions: 0,
+	}));
+
+const emptyActivityStats = {
+	score: 0,
+	numberOfReviewedPRs: 0,
+	numberOfApprovals: 0,
+	numberOfChangeRequests: 0,
+	numberOfComments: 0,
+	numberOfCodeComments: 0,
+	numberOfUnknowns: 0,
+	numberOfOwnReplies: 0,
+	numberOfOpenPullRequests: 0,
+	numberOfMergedPullRequests: 0,
+	numberOfClosedPullRequests: 0,
+	numberOfOpenedIssues: 0,
+	numberOfClosedIssues: 0,
+};
+
 /**
  * Main content section of the profile page that displays a user's activity.
  * Shows pull requests, review activity, and other contribution metrics.
@@ -200,6 +245,8 @@ export const Default: Story = {
 	args: {
 		reviewActivity: mockReviewActivity,
 		openPullRequests: mockOpenPullRequests,
+		activityStats: mockActivityStats,
+		reviewedPullRequests: mockReviewedPullRequests,
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
@@ -216,6 +263,7 @@ export const Default: Story = {
 export const Loading: Story = {
 	args: {
 		isLoading: true,
+		activityStats: emptyActivityStats,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
 		workspaceSlug: "aet",
@@ -232,6 +280,11 @@ export const EmptyReviews: Story = {
 	args: {
 		reviewActivity: [],
 		openPullRequests: mockOpenPullRequests,
+		activityStats: {
+			...emptyActivityStats,
+			numberOfOpenPullRequests: 2,
+			numberOfOwnReplies: 1,
+		},
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
@@ -249,6 +302,11 @@ export const EmptyPullRequests: Story = {
 	args: {
 		reviewActivity: mockReviewActivity,
 		openPullRequests: [],
+		activityStats: {
+			...mockActivityStats,
+			numberOfOpenPullRequests: 0,
+		},
+		reviewedPullRequests: mockReviewedPullRequests,
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
@@ -266,6 +324,7 @@ export const CompletelyEmpty: Story = {
 	args: {
 		reviewActivity: [],
 		openPullRequests: [],
+		activityStats: emptyActivityStats,
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
