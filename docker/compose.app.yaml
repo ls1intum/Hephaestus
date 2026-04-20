@@ -102,6 +102,14 @@ services:
       POSTHOG_PERSONAL_API_KEY: ${POSTHOG_PERSONAL_API_KEY:-}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
       WEBHOOK_EXTERNAL_URL: https://${APP_HOSTNAME}/webhooks
+      LOGGING_FILE_NAME: ${LOGGING_FILE_NAME:-/var/log/hephaestus/application.log}
+      LOGBACK_ROLLINGPOLICY_FILE_NAME_PATTERN: ${LOGBACK_ROLLINGPOLICY_FILE_NAME_PATTERN:-/var/log/hephaestus/application-%d{yyyy-MM-dd}.%i.log.gz}
+      LOGBACK_ROLLINGPOLICY_CLEAN_HISTORY_ON_START: ${LOGBACK_ROLLINGPOLICY_CLEAN_HISTORY_ON_START:-true}
+      LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE: ${LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE:-10MB}
+      LOGBACK_ROLLINGPOLICY_MAX_HISTORY: ${LOGBACK_ROLLINGPOLICY_MAX_HISTORY:-14}
+      LOGBACK_ROLLINGPOLICY_TOTAL_SIZE_CAP: ${LOGBACK_ROLLINGPOLICY_TOTAL_SIZE_CAP:-250MB}
+      TOMCAT_ACCESS_LOG_DIRECTORY: ${TOMCAT_ACCESS_LOG_DIRECTORY:-/var/log/hephaestus/access}
+      TOMCAT_ACCESS_LOG_MAX_DAYS: ${TOMCAT_ACCESS_LOG_MAX_DAYS:-14}
       # GitLab integration
       GITLAB_ENABLED: ${GITLAB_ENABLED:-false}
       KEYCLOAK_GITLAB_BASE_URL: ${KEYCLOAK_GITLAB_BASE_URL:-https://gitlab.lrz.de}
@@ -140,6 +148,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
+      - application-server-logs:/var/log/hephaestus
     networks:
       - shared-network
     labels:
@@ -241,3 +250,4 @@ networks:
 volumes:
   postgresql-data:
   git-repos:
+  application-server-logs:

@@ -4,7 +4,7 @@ title: DSMS Verzeichnis von Verarbeitungstätigkeiten (VVT)
 description: Copy-paste answers for the DSMS follow-up questionnaire.
 ---
 
-*Last updated: 2026-04-19.*
+_Last updated: 2026-04-20._
 
 Copy-paste ready. Ordered to match the DSMS "Create new PA" form and follow-up questionnaire. Submit at: [https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/).
 
@@ -117,13 +117,13 @@ Source (MIT): github.com/ls1intum/Hephaestus
 
 ### 7. Legal basis (cite GDPR article + national norm)
 
-| Processing | Legal basis |
-|---|---|
-| Core service (authentication, repository sync, practice detection, guidance) for TUM Contributors | **Art. 6(1)(e) GDPR** i.V.m. **Art. 4 Satz 1 BayHIG** and **Art. 25 Abs. 1 BayDSG** (public-interest task: teaching and operation of university IT services) |
-| Core service for non-TUM Contributors (external open-source contributors, partner-university members) | **Art. 6(1)(b) GDPR** (performance of the service the Contributor requested by signing in) |
-| AI-assisted features (guidance assistant, practice review) | Same as the row above; Contributors may object under **Art. 21 GDPR** via the "AI review comments" profile toggle (stops future transmissions; does not by itself delete previously generated Findings) |
-| Server logs & reverse-proxy logs | **Art. 6(1)(e) GDPR** i.V.m. **Art. 4 Satz 1 BayHIG**, **Art. 25 Abs. 1 BayDSG**, **Art. 8 BayDiG** (operation and security of a university IT service) |
-| Keycloak session cookies and theme-preference localStorage | **§ 25 Abs. 2 Nr. 2 TDDDG** (technisch unbedingt erforderlich für einen vom Nutzer ausdrücklich gewünschten Telemediendienst) i.V.m. **Art. 6(1)(e) GDPR** |
+| Processing                                                                                            | Legal basis                                                                                                                                                                                             |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core service (authentication, repository sync, practice detection, guidance) for TUM Contributors     | **Art. 6(1)(e) GDPR** i.V.m. **Art. 4 Satz 1 BayHIG** and **Art. 25 Abs. 1 BayDSG** (public-interest task: teaching and operation of university IT services)                                            |
+| Core service for non-TUM Contributors (external open-source contributors, partner-university members) | **Art. 6(1)(b) GDPR** (performance of the service the Contributor requested by signing in)                                                                                                              |
+| AI-assisted features (guidance assistant, practice review)                                            | Same as the row above; Contributors may object under **Art. 21 GDPR** via the "AI review comments" profile toggle (stops future transmissions; does not by itself delete previously generated Findings) |
+| Application-server security logs                                                                      | **Art. 6(1)(e) GDPR** i.V.m. **Art. 4 Satz 1 BayHIG**, **Art. 25 Abs. 1 BayDSG**, **Art. 8 BayDiG** (operation and security of a university IT service)                                                 |
+| Keycloak session cookies and theme-preference localStorage                                            | **§ 25 Abs. 2 Nr. 2 TDDDG** (technisch unbedingt erforderlich für einen vom Nutzer ausdrücklich gewünschten Telemediendienst) i.V.m. **Art. 6(1)(e) GDPR**                                              |
 
 ### 8. Categories of data subjects (Art. 30(1)(c))
 
@@ -164,17 +164,18 @@ All U.S.-based recipients are certified under the EU–U.S. Data Privacy Framewo
 
 ### 13. Retention periods per data category (Art. 30(1)(f))
 
-| Category | Retention |
-|---|---|
-| Identity data in Keycloak + Hephaestus DB | Account lifetime; removed on user-triggered account deletion |
-| Development activity synchronised from GitHub / gitlab.lrz.de | For as long as the repository and workspace are configured; source-side content on GitHub / gitlab.lrz.de is not affected by deletions inside Hephaestus |
-| Account settings, notification prefs, recognition signals, Art. 21 objection switch | Account lifetime |
-| Guidance-assistant conversations | Account lifetime; deletable on request |
-| Practice-review Findings | Workspace lifetime; deletable on request |
-| LLM-provider-side prompts | Up to 30 days (enterprise default abuse-monitoring); shorter where Zero Data Retention has been negotiated per workspace |
-| Server access logs (app server + reverse proxy) | Fixed-size buffer per service: **250 MB** (5 × 50 MB) for application services in `docker/compose.app.yaml`; **30 MB** (3 × 10 MB) for core infrastructure in `docker/compose.core.yaml`. When the buffer fills, the Docker `json-file` driver overwrites the oldest log file. Effective rolling-window duration is volume-dependent and is measured on production during DSMS Phase 0 prep (see `SUBMISSION-GUIDE.md`); the current measurement is reported in the DSMS submission text rather than committed here, so traffic shifts do not constitute a material change. Logs are retained beyond the buffer only where strictly necessary for an ongoing security incident, then deleted at closure |
-| Backups — PostgreSQL + Keycloak | **No scheduled off-host backups are in place at the time of submission.** Establishing a scheduled backup regime with a documented restore drill is an open AET-ops item under Art. 32(1)(c) GDPR resilience (see `04-toms.md` §3.3). The dataset has no Art. 9 content, and no statutory retention duty compels a backup today |
-| Backups — gitlab.lrz.de (LRZ-side, for deleted content) | LRZ retains its own backup window of up to 6 months for content already removed on the LRZ side, independent of Hephaestus |
+| Category                                                                            | Retention                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity data in Keycloak + Hephaestus DB                                           | Account lifetime; removed on user-triggered account deletion                                                                                                                                                                                                                                                                                                                              |
+| Development activity synchronised from GitHub / gitlab.lrz.de                       | For as long as the repository and workspace are configured; source-side content on GitHub / gitlab.lrz.de is not affected by deletions inside Hephaestus                                                                                                                                                                                                                                  |
+| Account settings, notification prefs, recognition signals, Art. 21 objection switch | Account lifetime                                                                                                                                                                                                                                                                                                                                                                          |
+| Guidance-assistant conversations                                                    | Account lifetime; deletable on request                                                                                                                                                                                                                                                                                                                                                    |
+| Practice-review Findings                                                            | Workspace lifetime; deletable on request                                                                                                                                                                                                                                                                                                                                                  |
+| LLM-provider-side prompts                                                           | Up to 30 days (enterprise default abuse-monitoring); shorter where Zero Data Retention has been negotiated per workspace                                                                                                                                                                                                                                                                  |
+| Server access logs (application server)                                             | Native Spring Boot / Tomcat web access log, retained for **14 days** via `server.tomcat.accesslog.max-days=14`. Logged fields are intentionally limited to timestamp, client IP, HTTP method, request path, protocol, status, response size, and processing time. Access logs are retained longer only where strictly necessary for an ongoing security incident, then deleted at closure |
+| Application runtime logs (application server)                                       | Separate Spring Boot / Logback log file under `/var/log/hephaestus/application.log`, rotated with `logging.logback.rollingpolicy.max-history=14` and `logging.logback.rollingpolicy.total-size-cap=250MB` to keep operational diagnostics bounded                                                                                                                                         |
+| Backups — PostgreSQL + Keycloak                                                     | **No scheduled off-host backups are in place at the time of submission.** Establishing a scheduled backup regime with a documented restore drill is an open AET-ops item under Art. 32(1)(c) GDPR resilience (see `04-toms.md` §3.3). The dataset has no Art. 9 content, and no statutory retention duty compels a backup today                                                           |
+| Backups — gitlab.lrz.de (LRZ-side, for deleted content)                             | LRZ retains its own backup window of up to 6 months for content already removed on the LRZ side, independent of Hephaestus                                                                                                                                                                                                                                                                |
 
 ### 14. Technical and Organizational Measures (Art. 30(1)(g) + Art. 32)
 
@@ -208,7 +209,7 @@ Not applicable as a separate upload; Hephaestus is self-hosted by AET on TUM inf
 - Directly from the data subject: profile settings, notification preferences, guidance-assistant messages, feedback, the Art. 21 objection switch.
 - From federated identity providers (GitHub, gitlab.lrz.de) via OAuth / OIDC during sign-in.
 - From source-system APIs (GitHub, gitlab.lrz.de) via the workspace-configured installation / access token: repository Events and Artifacts authored by the Contributor.
-- From the underlying HTTP connection: IP address, user-agent (standard web-server logging, bounded by a per-service storage cap; see §13).
+- From the underlying HTTP connection: IP address and request metadata captured in the application server's native access log (see §13).
 
 ### 21. Data-subject rights contact
 
