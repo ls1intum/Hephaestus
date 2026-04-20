@@ -14,10 +14,6 @@ import org.springframework.context.annotation.Profile;
 @Profile("test")
 public class TestUserConfig {
 
-    public User ensureSeededUser(UserRepository userRepository, String login, long nativeId, GitProvider provider) {
-        return TestUserFactory.ensureUser(userRepository, login, nativeId, provider);
-    }
-
     @Bean
     public ApplicationRunner seedTestUsers(UserRepository userRepository, GitProviderRepository gitProviderRepository) {
         return args -> {

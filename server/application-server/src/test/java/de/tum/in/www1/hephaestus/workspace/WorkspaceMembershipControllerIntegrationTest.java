@@ -64,7 +64,7 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
 
     @Test
     @WithAdminUser(username = "admin", githubId = 3L, gitlabId = 42L)
-    void currentMembershipUsesHighestRoleAcrossLinkedRows() {
+    void shouldReturnHighestRoleWhenMembershipSpansLinkedRows() {
         User adminGithubRow = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
         User adminGitlabRow = TestUserFactory.ensureUser(userRepository, "admin-gl", 42L, ensureGitLabProvider());
         Workspace workspace = createWorkspace(

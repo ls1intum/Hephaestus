@@ -69,7 +69,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("POST /user/linked-accounts/{providerAlias}/claim returns conflict while merge flow is disabled")
-    void claimIdentityReturnsConflictWhileDisabled() {
+    void shouldReturnConflictWhenClaimIdentityFlowIsDisabled() {
         ProblemDetail problem = webTestClient
             .post()
             .uri("/user/linked-accounts/{providerAlias}/claim", "gitlab-lrz")
