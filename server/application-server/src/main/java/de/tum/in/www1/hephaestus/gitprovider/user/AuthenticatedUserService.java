@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import de.tum.in.www1.hephaestus.SecurityUtils;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  * across providers would let a misconfigured token resolve to an unrelated user row.
  */
 @Service
+@WorkspaceAgnostic("Identity resolution is scoped to the authenticated principal, not to a workspace")
 @Transactional(readOnly = true)
 public class AuthenticatedUserService {
 

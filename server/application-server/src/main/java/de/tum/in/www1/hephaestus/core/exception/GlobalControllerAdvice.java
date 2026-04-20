@@ -19,6 +19,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -135,6 +136,14 @@ public class GlobalControllerAdvice {
             "Service unavailable",
             "An upstream service is temporarily unavailable. Please try again later."
         );
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    ProblemDetail handleResponseStatusException(ResponseStatusException exception) {
+        HttpStatus status = HttpStatus.valueOf(exception.getStatusCode().value());
+        String detail = exception.getReason() != null ? exception.getReason() : status.getReasonPhrase();
+        log.debug("Handled response status exception: status={}, message={}", status, detail);
+        return problem(status, status.getReasonPhrase(), detail);
     }
 
     // ========================================================================

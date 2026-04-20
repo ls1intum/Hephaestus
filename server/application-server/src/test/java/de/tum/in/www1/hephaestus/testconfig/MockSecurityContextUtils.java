@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.testconfig;
 
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -17,6 +18,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  * Eliminates code duplication across different user type security context factories.
  */
 public class MockSecurityContextUtils {
+
+    private static final String ENCODED_TOKEN_PREFIX = "mock-jwt.";
 
     /**
      * Creates a security context with JWT authentication for the specified user.
@@ -78,6 +81,28 @@ public class MockSecurityContextUtils {
         context.setAuthentication(authentication);
 
         return context;
+    }
+
+    public static String buildTokenValue(
+        String username,
+        String userId,
+        String[] authorities,
+        long githubId,
+        long gitlabId
+    ) {
+        String payload = String.join(
+            "|",
+            escape(username),
+            escape(userId),
+            escape(String.join(",", authorities)),
+            Long.toString(githubId),
+            Long.toString(gitlabId)
+        );
+        return ENCODED_TOKEN_PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes());
+    }
+
+    private static String escape(String value) {
+        return value.replace("%", "%25").replace("|", "%7C").replace(",", "%2C");
     }
 
     /**

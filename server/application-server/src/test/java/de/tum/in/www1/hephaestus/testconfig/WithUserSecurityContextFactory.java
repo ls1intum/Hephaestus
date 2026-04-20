@@ -14,7 +14,13 @@ public class WithUserSecurityContextFactory implements WithSecurityContextFactor
             annotation.username(),
             annotation.userId(),
             annotation.authorities(),
-            "mock-jwt-token-for-test-user",
+            MockSecurityContextUtils.buildTokenValue(
+                annotation.username(),
+                annotation.userId(),
+                annotation.authorities(),
+                annotation.githubId(),
+                annotation.gitlabId()
+            ),
             annotation.githubId(),
             annotation.gitlabId()
         );

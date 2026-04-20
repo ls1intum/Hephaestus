@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.testconfig;
 import de.tum.in.www1.hephaestus.SecurityConfig;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -38,6 +39,10 @@ public class TestSecurityConfig {
     @Primary
     public JwtDecoder mockJwtDecoder() {
         return token -> {
+            if (token.startsWith("mock-jwt.")) {
+                return decodeEncodedMockJwt(token);
+            }
+
             // Every branch seeds a github_id or gitlab_id that matches the seeded User's
             // native_id in TestUserConfig, so AuthenticatedUserService resolves by
             // (provider, native_id) — the production path — instead of any legacy login lookup.
@@ -101,5 +106,49 @@ public class TestSecurityConfig {
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build();
         };
+    }
+
+    private Jwt decodeEncodedMockJwt(String token) {
+        String encodedPayload = token.substring("mock-jwt.".length());
+        String payload = new String(Base64.getUrlDecoder().decode(encodedPayload));
+        String[] parts = payload.split("\\|", -1);
+        if (parts.length != 5) {
+            throw new IllegalArgumentException("Invalid mock JWT payload");
+        }
+
+        String username = unescape(parts[0]);
+        String userId = unescape(parts[1]);
+        String authoritiesValue = unescape(parts[2]);
+        long githubId = Long.parseLong(parts[3]);
+        long gitlabId = Long.parseLong(parts[4]);
+
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("sub", userId);
+        claims.put("preferred_username", username);
+        claims.put("iss", "https://test-issuer");
+        claims.put("aud", "test-audience");
+        if (githubId > 0) {
+            claims.put("github_id", githubId);
+        }
+        if (gitlabId > 0) {
+            claims.put("gitlab_id", gitlabId);
+        }
+        if (!authoritiesValue.isBlank()) {
+            Map<String, Object> realmAccess = new HashMap<>();
+            realmAccess.put("roles", Arrays.asList(authoritiesValue.split(",")));
+            claims.put("realm_access", realmAccess);
+        }
+
+        return Jwt.withTokenValue(token)
+            .header("alg", "HS256")
+            .header("typ", "JWT")
+            .claims(claimsMap -> claimsMap.putAll(claims))
+            .issuedAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .build();
+    }
+
+    private String unescape(String value) {
+        return value.replace("%7C", "|").replace("%2C", ",").replace("%25", "%");
     }
 }

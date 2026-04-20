@@ -25,13 +25,15 @@ class MultiIdpWorkspaceVisibilityIntegrationTest extends AbstractWorkspaceIntegr
     @Autowired
     private WorkspaceQueryService workspaceQueryService;
 
+    private User requireSeededGitHubUser(String login, long nativeId) {
+        return TestUserFactory.ensureUser(userRepository, login, nativeId, ensureGitHubProvider());
+    }
+
     @Test
     @WithAdminUser(username = "admin", githubId = 3L, gitlabId = 42L)
     @DisplayName("lists workspaces belonging to both linked IdP rows")
     void listsWorkspacesFromBothLinkedRows() {
-        User adminGithubRow = userRepository
-            .findByNativeIdAndProviderId(3L, ensureGitHubProvider().getId())
-            .orElseThrow();
+        User adminGithubRow = requireSeededGitHubUser("admin", 3L);
         User adminGitlabRow = TestUserFactory.ensureUser(userRepository, "admin-gl", 42L, ensureGitLabProvider());
 
         Workspace githubWorkspace = createWorkspace(
@@ -62,7 +64,7 @@ class MultiIdpWorkspaceVisibilityIntegrationTest extends AbstractWorkspaceIntegr
         // The legacy single-user lookup returned the GitHub row (matching preferred_username)
         // and the GitLab workspace silently disappeared from the list. The aggregator must
         // still find it.
-        userRepository.findByNativeIdAndProviderId(3L, ensureGitHubProvider().getId()).orElseThrow();
+        requireSeededGitHubUser("admin", 3L);
         User adminGitlabRow = TestUserFactory.ensureUser(userRepository, "admin-gl", 42L, ensureGitLabProvider());
 
         Workspace gitlabWorkspace = createWorkspace(
@@ -82,7 +84,7 @@ class MultiIdpWorkspaceVisibilityIntegrationTest extends AbstractWorkspaceIntegr
     @WithUser(username = "testuser", githubId = 1L)
     @DisplayName("single-IdP user continues to see only their own workspaces")
     void singleIdpUserRegressionLock() {
-        User githubUser = userRepository.findByNativeIdAndProviderId(1L, ensureGitHubProvider().getId()).orElseThrow();
+        User githubUser = requireSeededGitHubUser("testuser", 1L);
         Workspace mine = createWorkspace("mine", "Mine", "mine", AccountType.ORG, githubUser);
 
         // Workspace owned by an unrelated user — must NOT appear in accessible workspaces.
@@ -97,9 +99,7 @@ class MultiIdpWorkspaceVisibilityIntegrationTest extends AbstractWorkspaceIntegr
     @WithAdminUser(username = "admin", githubId = 3L, gitlabId = 42L)
     @DisplayName("union role across linked rows — owner on one row, member on the other, effective role is OWNER")
     void unionRoleAcrossLinkedRows() {
-        User adminGithubRow = userRepository
-            .findByNativeIdAndProviderId(3L, ensureGitHubProvider().getId())
-            .orElseThrow();
+        User adminGithubRow = requireSeededGitHubUser("admin", 3L);
         User adminGitlabRow = TestUserFactory.ensureUser(userRepository, "admin-gl", 42L, ensureGitLabProvider());
 
         // Workspace owner is the GitHub row (OWNER by default); add the GitLab row as MEMBER.

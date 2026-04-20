@@ -14,7 +14,13 @@ public class WithMockUserSecurityContextFactory implements WithSecurityContextFa
             annotation.username(),
             annotation.userId(),
             annotation.authorities(),
-            "mock-token",
+            MockSecurityContextUtils.buildTokenValue(
+                annotation.username(),
+                annotation.userId(),
+                annotation.authorities(),
+                annotation.githubId(),
+                annotation.gitlabId()
+            ),
             annotation.githubId(),
             annotation.gitlabId()
         );

@@ -190,6 +190,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
             SELECT u
             FROM User u
+            JOIN FETCH u.provider p
             WHERE u.provider.type = :providerType
               AND u.nativeId = :nativeId
             ORDER BY u.id

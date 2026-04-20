@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.testconfig;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
@@ -12,6 +13,10 @@ import org.springframework.context.annotation.Profile;
 @Configuration
 @Profile("test")
 public class TestUserConfig {
+
+    public User ensureSeededUser(UserRepository userRepository, String login, long nativeId, GitProvider provider) {
+        return TestUserFactory.ensureUser(userRepository, login, nativeId, provider);
+    }
 
     @Bean
     public ApplicationRunner seedTestUsers(UserRepository userRepository, GitProviderRepository gitProviderRepository) {
