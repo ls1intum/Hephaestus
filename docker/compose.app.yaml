@@ -140,6 +140,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
+      - application-server-logs:/var/log/hephaestus
     networks:
       - shared-network
     labels:
@@ -241,3 +242,4 @@ networks:
 volumes:
   postgresql-data:
   git-repos:
+  application-server-logs:
