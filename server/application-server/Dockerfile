@@ -26,7 +26,7 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar /app/server.jar
 
 RUN addgroup --system spring && adduser --system spring --ingroup spring
-RUN mkdir -p /var/log/hephaestus/access && chown -R spring:spring /app /var/log/hephaestus
+RUN mkdir -p /var/log/hephaestus/access && chown -R spring:spring /var/log/hephaestus
 
 USER spring:spring
 

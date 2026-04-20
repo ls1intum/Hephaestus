@@ -18,30 +18,14 @@ server:
     forward-headers-strategy: native
     tomcat:
         redirect-context-root: false
-        remoteip:
-            remote-ip-header: x-forwarded-for
-            protocol-header: x-forwarded-proto
-            host-header: x-forwarded-host
-            port-header: x-forwarded-port
         accesslog:
             enabled: true
-            directory: ${TOMCAT_ACCESS_LOG_DIRECTORY:/var/log/hephaestus/access}
+            directory: /var/log/hephaestus/access
             prefix: access
             suffix: .log
             file-date-format: .yyyy-MM-dd
-            max-days: ${TOMCAT_ACCESS_LOG_MAX_DAYS:14}
+            max-days: 14
             pattern: "%{yyyy-MM-dd'T'HH:mm:ssXXX}t %a %m %U %H %s %b %D"
-
-logging:
-    file:
-        name: ${LOGGING_FILE_NAME:/var/log/hephaestus/application.log}
-    logback:
-        rollingpolicy:
-            file-name-pattern: ${LOGBACK_ROLLINGPOLICY_FILE_NAME_PATTERN:/var/log/hephaestus/application-%d{yyyy-MM-dd}.%i.log.gz}
-            clean-history-on-start: ${LOGBACK_ROLLINGPOLICY_CLEAN_HISTORY_ON_START:true}
-            max-file-size: ${LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE:10MB}
-            max-history: ${LOGBACK_ROLLINGPOLICY_MAX_HISTORY:14}
-            total-size-cap: ${LOGBACK_ROLLINGPOLICY_TOTAL_SIZE_CAP:250MB}
 
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}

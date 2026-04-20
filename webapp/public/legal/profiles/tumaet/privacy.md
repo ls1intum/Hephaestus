@@ -161,7 +161,7 @@ Every time the platform is accessed, the application server writes a security-or
 
 **Legal basis:** Art. 6(1)(e) GDPR in conjunction with Art. 4 Satz 1 BayHIG, Art. 25 Abs. 1 BayDSG and Art. 8 BayDiG (security of the university IT system as part of the public task).
 
-**Retention:** these web access logs are retained for **14 days** and then deleted automatically using the application server's native Spring Boot / Tomcat log-retention mechanism. They are kept longer only where this is strictly necessary to investigate a specific, ongoing security incident, and are deleted as soon as the incident is closed. The logs are not merged with other data sources and are accessible only to AET operators.
+**Retention:** these security logs are retained for **up to 14 days** and then deleted automatically. They are kept longer only where this is strictly necessary to investigate a specific, ongoing security incident, and are deleted as soon as the incident is closed. The logs are not merged with other data sources and are accessible only to AET operators.
 
 ## 5. Cookies and Browser-Side Storage
 

@@ -12,7 +12,7 @@ Follow these steps in order. Target: [https://dsms.datenschutz.tum.de/](https://
 
 1. Open `03-vt-dsms.md` alongside this guide.
 2. Re-confirm the deployment-dependent figures against production before submission. Each of these is already pinned in `03-vt-dsms.md` §13 — the phase-0 check is that the deployment has not drifted:
-   - Application-server web access logs are retained for **14 days** with Spring Boot / Tomcat native retention. Two checks before submission:
+   - Application-server web access logs are retained for **14 days** with the embedded server's native retention. Two checks before submission:
      1. Confirm the native settings are still present in `server/application-server/src/main/resources/application-prod.yml`: `server.tomcat.accesslog.enabled=true`, `server.tomcat.accesslog.max-days=14`, and the minimal access-log pattern.
      2. Confirm the log volume still contains date-stamped access logs under `/var/log/hephaestus/access/` on the production host or in the running container, and that files older than 14 days are absent.
    - Off-host PostgreSQL / Keycloak backups are **not in place** at the time this template was written (see `04-toms.md` §3.3). If a scheduled backup regime has since been deployed, update `04-toms.md` §3.3 and `03-vt-dsms.md` §13.
@@ -87,7 +87,7 @@ If any of the above is wrong, fix the Markdown source in `webapp/public/legal/pr
 The DSB reviews and may leave comments. Typical follow-ups:
 
 - _"Rechtsgrundlage zu konkretisieren"_ — §7 already cites Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG for TUM Contributors and Art. 6(1)(b) for external Contributors. Point the reviewer there.
-- _"Löschkonzept fehlt"_ — §13 plus the 14-day application-server access-log retention enforced by Spring Boot / Tomcat, the capped Spring Boot runtime-log archive, the account-deletion flow, and the per-provider retention windows together form the deletion concept. Off-host backups are not currently in place, so no separate backup-deletion flow is required; if backups are introduced later, the application-level deletion log must be re-applied on restore.
+- _"Löschkonzept fehlt"_ — §13 plus the 14-day application-server access-log retention, the account-deletion flow, and the per-provider retention windows together form the deletion concept. Off-host backups are not currently in place, so no separate backup-deletion flow is required; if backups are introduced later, the application-level deletion log must be re-applied on restore.
 - _"Ist § 25 TDDDG relevant?"_ — the privacy page already states that only Keycloak session cookies and the theme-preference localStorage key are used, both under § 25 Abs. 2 Nr. 2 TDDDG.
 - _"DSFA erforderlich"_ — upgrade `02-dsfa-prescreen.md` to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate and names the conditions under which a full DPIA must be opened (see §6 of the pre-screen).
 - _"AVV-Vertrag für LLM-Provider"_ — DPAs are maintained at TUM/AET level for the TUM-operated LLM tenancy; for credentials supplied by a workspace administrator's institution, the DPA is maintained at that institution's level (shared-responsibility model, §3.2 of the privacy page).
