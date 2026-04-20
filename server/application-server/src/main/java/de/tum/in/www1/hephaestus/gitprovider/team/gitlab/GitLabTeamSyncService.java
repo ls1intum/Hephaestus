@@ -14,6 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabDescendantGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupMemberResponse;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.TeamMembershipListener;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.TeamMembershipListener.TeamsSyncedEvent;
@@ -74,6 +75,7 @@ public class GitLabTeamSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabTeamSyncService.class);
     private static final String GET_GROUP_DESCENDANTS_DOCUMENT = "GetGroupDescendants";
+    private static final String GET_GROUP_DOCUMENT = "GetGroup";
     private static final String GET_GROUP_MEMBERS_DOCUMENT = "GetGroupMembers";
     private static final int TEAM_PAGE_SIZE = 20;
     private static final int MEMBER_PAGE_SIZE = 100;
@@ -144,11 +146,24 @@ public class GitLabTeamSyncService {
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-        // Phase A: Fetch descendant groups and create teams
+        // Phase A: Fetch the root group itself, then its descendants. The root
+        // team anchors the parent chain so staff members (inherited from the
+        // root group down to every subgroup in GitLab's permission model) live
+        // on the root, not duplicated into every child.
         Map<Long, Team> syncedTeamsByNativeId = new HashMap<>();
         Map<Long, Long> parentNativeIdByChildNativeId = new HashMap<>();
         Map<Long, String> teamFullPathsByNativeId = new HashMap<>();
         Set<Long> syncedNativeIds = new HashSet<>();
+
+        Team rootTeam = fetchAndProcessRootGroup(
+            client,
+            scopeId,
+            groupFullPath,
+            provider,
+            syncedTeamsByNativeId,
+            teamFullPathsByNativeId,
+            syncedNativeIds
+        );
 
         boolean syncCompletedNormally = fetchAndProcessDescendantGroups(
             client,
@@ -162,10 +177,15 @@ public class GitLabTeamSyncService {
         );
 
         int totalSynced = syncedTeamsByNativeId.size();
-        log.info("Phase A complete: groupPath={}, teamsFound={}", groupFullPath, totalSynced);
+        log.info(
+            "Phase A complete: groupPath={}, teamsFound={} (root={})",
+            groupFullPath,
+            totalSynced,
+            rootTeam != null
+        );
 
         if (totalSynced == 0) {
-            log.info("No descendant groups found: groupPath={}", groupFullPath);
+            log.info("No groups found for team sync: groupPath={}", groupFullPath);
             return 0;
         }
 
@@ -260,6 +280,70 @@ public class GitLabTeamSyncService {
     }
 
     // ========================================================================
+    // Phase A.0: Fetch Root Group
+    // ========================================================================
+
+    /**
+     * Fetches the root group metadata and upserts it as a Team so subgroups have
+     * a real parent row to point at. A failure here is non-fatal: the root team
+     * is a parity-with-GitHub enhancement, not a prerequisite for descendant
+     * sync. Returns the persisted root Team, or {@code null} if unavailable.
+     */
+    @Nullable
+    private Team fetchAndProcessRootGroup(
+        HttpGraphQlClient client,
+        Long scopeId,
+        String groupFullPath,
+        GitProvider provider,
+        Map<Long, Team> syncedTeamsByNativeId,
+        Map<Long, String> teamFullPathsByNativeId,
+        Set<Long> syncedNativeIds
+    ) {
+        try {
+            graphQlClientProvider.acquirePermission();
+            graphQlClientProvider.waitIfRateLimitLow(scopeId);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted fetching root group: groupPath={}", groupFullPath);
+            return null;
+        }
+
+        ClientGraphQlResponse response;
+        try {
+            response = client
+                .documentName(GET_GROUP_DOCUMENT)
+                .variable("fullPath", groupFullPath)
+                .execute()
+                .block(gitLabProperties.graphqlTimeout());
+        } catch (Exception e) {
+            log.warn("Failed to fetch root group: groupPath={}, error={}", groupFullPath, e.getMessage());
+            return null;
+        }
+
+        var handleResult = responseHandler.handle(response, "root group " + groupFullPath, log);
+        if (handleResult.action() != GitLabGraphQlResponseHandler.HandleResult.Action.CONTINUE) {
+            return null;
+        }
+        graphQlClientProvider.recordSuccess();
+
+        GitLabGroupResponse rootPayload = response.field("group").toEntity(GitLabGroupResponse.class);
+        if (rootPayload == null) {
+            return null;
+        }
+
+        Team rootTeam = teamProcessor.processRoot(rootPayload, groupFullPath, provider);
+        if (rootTeam == null) {
+            return null;
+        }
+
+        long nativeId = rootTeam.getNativeId();
+        syncedTeamsByNativeId.put(nativeId, rootTeam);
+        teamFullPathsByNativeId.put(nativeId, groupFullPath);
+        syncedNativeIds.add(nativeId);
+        return rootTeam;
+    }
+
+    // ========================================================================
     // Phase A: Fetch Descendant Groups
     // ========================================================================
 
@@ -329,12 +413,10 @@ public class GitLabTeamSyncService {
                         syncedNativeIds.add(nativeId);
                         teamFullPathsByNativeId.put(nativeId, group.fullPath());
 
-                        // Track parent for resolution in Phase B
-                        if (
-                            group.parent() != null &&
-                            group.parent().fullPath() != null &&
-                            !group.parent().fullPath().equals(groupFullPath)
-                        ) {
+                        // Track parent for resolution in Phase B. The root group is
+                        // synced as a Team too, so first-level subgroups legitimately
+                        // reference it as their parent — no longer skipped.
+                        if (group.parent() != null && group.parent().fullPath() != null) {
                             try {
                                 long parentNativeId = extractNumericId(group.parent().id());
                                 parentNativeIdByChildNativeId.put(nativeId, parentNativeId);
@@ -564,7 +646,6 @@ public class GitLabTeamSyncService {
             return;
         }
 
-        // Map access level
         TeamMembership.Role role = mapAccessLevel(
             member.accessLevel() != null ? member.accessLevel().stringValue() : null
         );

@@ -7,5 +7,9 @@ query GetGroup($fullPath: ID!) {
         webUrl
         description
         visibility
+        parent {
+            id
+            fullPath
+        }
     }
 }

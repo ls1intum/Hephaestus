@@ -74,7 +74,7 @@ public class GitLabUserService {
             name,
             avatarUrl,
             htmlUrl,
-            User.Type.USER.name(),
+            GitLabUserClassifier.classify(login).name(),
             dto.email(),
             null, // createdAt — not in webhook
             null // updatedAt — not in webhook
@@ -122,7 +122,7 @@ public class GitLabUserService {
             resolvedName,
             resolvedAvatarUrl,
             resolvedHtmlUrl,
-            User.Type.USER.name(),
+            GitLabUserClassifier.classify(username).name(),
             resolvedEmail,
             null, // createdAt — not in GraphQL user data
             null // updatedAt — not in GraphQL user data

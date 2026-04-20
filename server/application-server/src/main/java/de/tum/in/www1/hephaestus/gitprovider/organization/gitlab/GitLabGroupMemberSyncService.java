@@ -24,6 +24,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMemberRole
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserClassifier;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -298,7 +299,7 @@ public class GitLabGroupMemberSyncService {
                 name,
                 avatarUrl,
                 htmlUrl,
-                User.Type.USER.name(),
+                GitLabUserClassifier.classify(login).name(),
                 null,
                 null,
                 null
