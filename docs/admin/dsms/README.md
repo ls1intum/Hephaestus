@@ -11,7 +11,7 @@ This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis
 
 ## Scope
 
-Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external processors: an LLM provider selected at the deployment level and bound per workspace (Azure OpenAI by default on the TUM-operated deployment, or OpenAI) and Slack (when enabled per workspace). Server access logs contain IP addresses and are capped by a deterministic per-container size cap enforced by the Docker `json-file` log driver (`max-size=50m` × `max-file=5` for application services, `max-size=10m` × `max-file=3` for core infrastructure) — the daemon discards the oldest log file once the cap is reached.
+Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external processors: an LLM provider selected at the deployment level and bound per workspace (Azure OpenAI by default on the TUM-operated deployment, or OpenAI) and Slack (when enabled per workspace). Server access logs contain IP addresses and are bounded by a per-service storage cap enforced at the container runtime; once the cap is reached, the oldest log entries are automatically discarded. Configuration anchor: the per-service `logging:` blocks in `docker/compose.app.yaml` and `docker/compose.core.yaml`.
 
 ## Contents
 
@@ -55,7 +55,7 @@ Re-review the VVT once per year:
 The DSB may comment in DSMS. Typical follow-ups and responses:
 
 - *"Rechtsgrundlage zu konkretisieren"* → §7 of the VVT cites Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG for TUM Contributors, and Art. 6(1)(b) GDPR for non-TUM Contributors. Point them there.
-- *"Löschkonzept fehlt"* → §13 of the VVT lists retention per category, including the account-deletion flow and the deterministic per-container size cap on server logs (Docker `json-file` driver `max-size` × `max-file`, configured in `docker/compose.app.yaml` and `docker/compose.core.yaml`).
+- *"Löschkonzept fehlt"* → §13 of the VVT lists retention per category, including the account-deletion flow and the per-service storage cap on server logs (configured via the `logging:` blocks in `docker/compose.app.yaml` and `docker/compose.core.yaml`).
 - *"AVV fehlt für X"* → see [`05-avv-checklist.md`](./05-avv-checklist.md) for the per-processor DPA status.
 - *"DSFA erforderlich"* → upgrade [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate.
 
