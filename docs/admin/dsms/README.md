@@ -11,7 +11,7 @@ This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis
 
 ## Scope
 
-Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external processors: an LLM provider selected at the deployment level and bound per workspace (Azure OpenAI by default on the TUM-operated deployment, or OpenAI) and Slack (when enabled per workspace). Server access logs contain IP addresses and are bounded by a per-service storage cap enforced at the container runtime; once the cap is reached, the oldest log entries are automatically discarded. Configuration anchor: the per-service `logging:` blocks in `docker/compose.app.yaml` and `docker/compose.core.yaml`.
+Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche). The platform federates identities through Keycloak (GitHub OAuth + gitlab.lrz.de OIDC), synchronises repository activity from GitHub and gitlab.lrz.de, and engages the following external processors: an LLM provider selected at the deployment level and bound per workspace (Azure OpenAI by default on the TUM-operated deployment, or OpenAI) and Slack (when enabled per workspace). Server access logs contain IP addresses and are written to a fixed-size buffer per service (250 MB / 30 MB; configured via the `logging:` blocks in `docker/compose.app.yaml` and `docker/compose.core.yaml`); the oldest log file is overwritten when the buffer fills. The effective rolling-window duration is volume-dependent and is measured on production at each DSMS submission.
 
 ## Contents
 
@@ -55,7 +55,7 @@ Re-review the VVT once per year:
 The DSB may comment in DSMS. Typical follow-ups and responses:
 
 - *"Rechtsgrundlage zu konkretisieren"* → §7 of the VVT cites Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG for TUM Contributors, and Art. 6(1)(b) GDPR for non-TUM Contributors. Point them there.
-- *"Löschkonzept fehlt"* → §13 of the VVT lists retention per category, including the account-deletion flow and the per-service storage cap on server logs (configured via the `logging:` blocks in `docker/compose.app.yaml` and `docker/compose.core.yaml`).
+- *"Löschkonzept fehlt"* → §13 of the VVT lists retention per category, including the account-deletion flow and the 250 MB / 30 MB fixed-buffer cap on server logs (configured via the `logging:` blocks in `docker/compose.app.yaml` and `docker/compose.core.yaml`; effective rolling-window duration measured per submission).
 - *"AVV fehlt für X"* → see [`05-avv-checklist.md`](./05-avv-checklist.md) for the per-processor DPA status.
 - *"DSFA erforderlich"* → upgrade [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate.
 

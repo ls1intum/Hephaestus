@@ -162,7 +162,7 @@ Every time the platform is accessed, our web servers and reverse proxy automatic
 
 **Legal basis:** Art. 6(1)(e) GDPR in conjunction with Art. 4 Satz 1 BayHIG, Art. 25 Abs. 1 BayDSG and Art. 8 BayDiG (security of the university IT system as part of the public task).
 
-**Retention:** server logs are kept only as long as needed for the security purpose above. Each service has a strict storage cap (typically a few hundred megabytes per service); once the cap is reached, the oldest log entries are automatically discarded. In practice this means an IP address remains in the logs for a limited rolling window — long enough to investigate recent activity, but not retained indefinitely. Logs containing an IP address are kept beyond this rolling window only where strictly necessary to investigate a specific, ongoing security incident, and are deleted as soon as the incident is closed. Server logs are not merged with other data sources and are only accessible to AET operators.
+**Retention:** server logs are written to a fixed-size buffer per service (250 MB for each application service, 30 MB for each underlying infrastructure service). Once the buffer fills, the oldest entries are overwritten as new ones arrive. The length of time an IP address remains in the logs is therefore bounded by this buffer size and depends on traffic volume — it is not a fixed number of days. Logs are kept beyond this rolling window only where strictly necessary to investigate a specific, ongoing security incident, and are deleted as soon as the incident is closed. Server logs are not merged with other data sources and are accessible only to AET operators.
 
 ## 5. Cookies and Browser-Side Storage
 
