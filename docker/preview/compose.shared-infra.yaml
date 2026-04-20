@@ -86,7 +86,7 @@ services:
   # Keycloak PostgreSQL - Database for Keycloak (internal only)
   # ---------------------------------------------------------------------------
   keycloak-db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
     restart: unless-stopped
     environment:
       POSTGRES_DB: keycloak
