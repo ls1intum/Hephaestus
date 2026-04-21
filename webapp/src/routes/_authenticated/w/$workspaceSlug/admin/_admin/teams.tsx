@@ -15,8 +15,6 @@ import type {
 	UpdateTeamVisibilityData,
 } from "@/api/types.gen";
 import { AdminTeamsTable } from "@/components/admin/AdminTeamsTable";
-import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/teams")({
 	component: AdminTeamsContainer,
@@ -24,9 +22,8 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 
 function AdminTeamsContainer() {
 	const queryClient = useQueryClient();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const slug = workspaceSlug ?? "";
-	const hasWorkspace = Boolean(workspaceSlug);
+	const { workspaceSlug } = Route.useParams();
+	const slug = workspaceSlug;
 
 	// Query for teams data
 	const teamsQueryKey = getAllTeamsQueryKey({
@@ -34,7 +31,6 @@ function AdminTeamsContainer() {
 	});
 	const teamsQuery = useQuery({
 		...getAllTeamsOptions({ path: { workspaceSlug: slug } }),
-		enabled: hasWorkspace,
 	});
 
 	// Mutations
@@ -115,9 +111,6 @@ function AdminTeamsContainer() {
 
 	// Handler functions
 	const handleHideTeam = async (teamId: number, hidden: boolean) => {
-		if (!hasWorkspace) {
-			return;
-		}
 		await updateTeamVisibility.mutateAsync({
 			path: { workspaceSlug: slug, id: teamId },
 			body: hidden,
@@ -126,18 +119,12 @@ function AdminTeamsContainer() {
 	};
 
 	const handleAddLabelToTeam = async (teamId: number, repositoryId: number, label: string) => {
-		if (!hasWorkspace) {
-			return;
-		}
 		await addLabelToTeam.mutateAsync({
 			path: { workspaceSlug: slug, teamId, repositoryId, label },
 		});
 	};
 
 	const handleRemoveLabelFromTeam = async (teamId: number, labelId: number) => {
-		if (!hasWorkspace) {
-			return;
-		}
 		await removeLabelFromTeam.mutateAsync({
 			path: { workspaceSlug: slug, teamId, labelId },
 		});
@@ -148,9 +135,6 @@ function AdminTeamsContainer() {
 		repositoryId: number,
 		hidden: boolean,
 	) => {
-		if (!hasWorkspace) {
-			return;
-		}
 		await updateRepositoryVisibility.mutateAsync({
 			path: { workspaceSlug: slug, teamId, repositoryId },
 			body: hidden,
@@ -158,14 +142,10 @@ function AdminTeamsContainer() {
 		});
 	};
 
-	if (!hasWorkspace && !isWorkspaceLoading) {
-		return <NoWorkspace />;
-	}
-
 	return (
 		<AdminTeamsTable
 			teams={teamsQuery.data || []}
-			isLoading={isWorkspaceLoading || teamsQuery.isLoading || !workspaceSlug}
+			isLoading={teamsQuery.isLoading}
 			onHideTeam={handleHideTeam}
 			onToggleRepositoryVisibility={handleToggleRepositoryVisibility}
 			onAddLabelToTeam={handleAddLabelToTeam}

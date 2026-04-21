@@ -14,7 +14,6 @@ import { LeaderboardPage } from "@/components/leaderboard/LeaderboardPage";
 import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
 import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import {
@@ -40,6 +39,11 @@ type LeaderboardSearchParams = z.infer<typeof leaderboardSearchSchema>;
 // Export route with search param validation
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 	component: LeaderboardContainer,
+	staticData: {
+		workspaceSwitch: {
+			preserveSearch: true,
+		},
+	},
 	validateSearch: leaderboardSearchSchema,
 	// Configure search middleware to retain params when navigating
 	search: {
@@ -48,13 +52,17 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 });
 
 function LeaderboardContainer() {
+	const { workspaceSlug: routeWorkspaceSlug } = Route.useParams();
 	// Get the current user from auth context
 	const { username } = useAuth();
-	const { workspaceSlug, providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const { leaderboardEnabled, leaguesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
-	const slug = workspaceSlug ?? "";
-	const hasWorkspace = Boolean(workspaceSlug);
-	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
+	const {
+		leaderboardEnabled,
+		leaguesEnabled,
+		isLoading: featuresLoading,
+	} = useWorkspaceFeatures(routeWorkspaceSlug);
+	const slug = routeWorkspaceSlug;
+	const hasWorkspace = Boolean(routeWorkspaceSlug);
+	const showNoWorkspace = !hasWorkspace;
 
 	// Access properly validated search params with correct types
 	const { team, sort, after, before, mode } = Route.useSearch();
@@ -67,6 +75,7 @@ function LeaderboardContainer() {
 		}),
 		enabled: hasWorkspace,
 	});
+	const providerType = workspaceQuery.data?.providerType ?? "GITHUB";
 
 	// Extract leaderboard schedule from workspace config
 	const getSchedule = (): LeaderboardSchedule => {
@@ -135,7 +144,7 @@ function LeaderboardContainer() {
 
 	// Query for user profile data (mirror leaderboard filters if provided)
 	const userProfileOptions = getUserProfileOptions({
-		path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
+		path: { workspaceSlug: routeWorkspaceSlug, login: username || "" },
 		query: {
 			after: parsedAfter,
 			before: parsedBefore,
@@ -251,11 +260,11 @@ function LeaderboardContainer() {
 	});
 
 	// When leaderboard is disabled, show the profile page as the home view
-	if (!featuresLoading && !leaderboardEnabled && workspaceSlug && username) {
+	if (!featuresLoading && !leaderboardEnabled && routeWorkspaceSlug && username) {
 		return (
 			<Navigate
 				to="/w/$workspaceSlug/user/$username"
-				params={{ workspaceSlug, username }}
+				params={{ workspaceSlug: routeWorkspaceSlug, username }}
 				replace
 			/>
 		);
@@ -342,11 +351,7 @@ function LeaderboardContainer() {
 		<LeaderboardPage
 			providerType={providerType}
 			leaderboard={leaderboardQuery.data || []}
-			isLoading={
-				isWorkspaceLoading ||
-				teamsQuery.isPending ||
-				(leaderboardQuery.isPending && !leaderboardQuery.data)
-			}
+			isLoading={teamsQuery.isPending || (leaderboardQuery.isPending && !leaderboardQuery.data)}
 			currentUser={userProfileQuery.data?.userInfo}
 			currentUserEntry={currentUserEntry}
 			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}

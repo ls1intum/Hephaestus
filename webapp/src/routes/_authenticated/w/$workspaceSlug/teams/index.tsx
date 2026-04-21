@@ -3,14 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getAllTeamsOptions } from "@/api/@tanstack/react-query.gen";
 import { TeamsPage } from "@/components/teams/TeamsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/teams/")({
 	component: TeamsContainer,
 });
 
 function TeamsContainer() {
-	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const { workspaceSlug } = Route.useParams();
 	const teamsQuery = useQuery({
 		...getAllTeamsOptions({ path: { workspaceSlug: workspaceSlug ?? "" } }),
 		enabled: Boolean(workspaceSlug),

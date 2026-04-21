@@ -6,8 +6,6 @@ import { getUsersWithTeamsOptions } from "@/api/@tanstack/react-query.gen";
 import { AdminAchievementsPage } from "@/components/admin/AdminAchievementsPage";
 import { adaptApiUserTeams } from "@/components/admin/types";
 import { Spinner } from "@/components/ui/spinner";
-import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/achievements")({
@@ -15,15 +13,11 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 });
 
 function AdminAchievementsContainer() {
-	const {
-		workspaceSlug,
-		isLoading: isWorkspaceLoading,
-		error: workspaceError,
-	} = useActiveWorkspaceSlug();
-	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const { workspaceSlug } = Route.useParams();
+	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	const usersQueryOptions = getUsersWithTeamsOptions({
-		path: { workspaceSlug: workspaceSlug ?? "" },
+		path: { workspaceSlug },
 	});
 	const {
 		data: usersData,
@@ -31,25 +25,21 @@ function AdminAchievementsContainer() {
 		error: usersError,
 	} = useQuery({
 		...usersQueryOptions,
-		enabled: Boolean(workspaceSlug) && (usersQueryOptions.enabled ?? true),
+		enabled: usersQueryOptions.enabled ?? true,
 	});
 
 	// Show error toasts via useEffect (not in render path)
 	useEffect(() => {
-		if (workspaceError || usersError) {
-			const errorMessage = (workspaceError as Error)?.message || (usersError as Error)?.message;
+		if (usersError) {
+			const errorMessage = (usersError as Error)?.message;
 			toast.error(`Failed to load data: ${errorMessage}`);
 		}
-	}, [workspaceError, usersError]);
+	}, [usersError]);
 
 	const users = (usersData?.map(adaptApiUserTeams) || []).sort((a, b) =>
 		a.user.name.localeCompare(b.user.name),
 	);
-	const isLoading = isWorkspaceLoading || usersLoading;
-
-	if (!workspaceSlug && !isWorkspaceLoading) {
-		return <NoWorkspace />;
-	}
+	const isLoading = usersLoading;
 
 	// Feature guard — declarative redirect when achievements are disabled
 	if (!featuresLoading && !achievementsEnabled && workspaceSlug) {
@@ -65,10 +55,6 @@ function AdminAchievementsContainer() {
 	}
 
 	return (
-		<AdminAchievementsPage
-			users={users}
-			isLoading={isLoading || !workspaceSlug}
-			workspaceSlug={workspaceSlug ?? ""}
-		/>
+		<AdminAchievementsPage users={users} isLoading={isLoading} workspaceSlug={workspaceSlug} />
 	);
 }

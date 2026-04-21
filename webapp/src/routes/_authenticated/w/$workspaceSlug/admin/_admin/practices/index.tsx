@@ -9,7 +9,6 @@ import {
 	setActiveMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { AdminPracticesPage } from "@/components/admin/practices/AdminPracticesPage";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices/")({
 	component: PracticesListContainer,
@@ -17,16 +16,12 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 
 function PracticesListContainer() {
 	const queryClient = useQueryClient();
-	const {
-		workspaceSlug,
-		isLoading: isWorkspaceLoading,
-		error: workspaceError,
-	} = useActiveWorkspaceSlug();
+	const { workspaceSlug } = Route.useParams();
 
 	const [togglingPractices, setTogglingPractices] = useState<Set<string>>(new Set());
 
 	const practicesQueryOptions = listPracticesOptions({
-		path: { workspaceSlug: workspaceSlug ?? "" },
+		path: { workspaceSlug },
 	});
 	const {
 		data: practices,
@@ -34,12 +29,12 @@ function PracticesListContainer() {
 		error: practicesError,
 	} = useQuery({
 		...practicesQueryOptions,
-		enabled: Boolean(workspaceSlug) && (practicesQueryOptions.enabled ?? true),
+		enabled: practicesQueryOptions.enabled ?? true,
 	});
 
 	const invalidatePractices = () => {
 		queryClient.invalidateQueries({
-			queryKey: listPracticesQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+			queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
 		});
 	};
 
@@ -72,12 +67,12 @@ function PracticesListContainer() {
 	});
 
 	useEffect(() => {
-		if (workspaceError || practicesError) {
-			const err = workspaceError ?? practicesError;
+		if (practicesError) {
+			const err = practicesError;
 			const message = err instanceof Error ? err.message : "Unknown error";
 			toast.error(`Failed to load data: ${message}`);
 		}
-	}, [workspaceError, practicesError]);
+	}, [practicesError]);
 
 	const handleDeletePractice = async (slug: string) => {
 		if (!workspaceSlug) return;
@@ -97,9 +92,9 @@ function PracticesListContainer() {
 
 	return (
 		<AdminPracticesPage
-			workspaceSlug={workspaceSlug ?? ""}
+			workspaceSlug={workspaceSlug}
 			practices={practices ?? []}
-			isLoading={isWorkspaceLoading || isPracticesLoading || !workspaceSlug}
+			isLoading={isPracticesLoading}
 			isDeleting={deletePractice.isPending}
 			togglingPractices={togglingPractices}
 			onDeletePractice={handleDeletePractice}

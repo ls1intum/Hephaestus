@@ -2,14 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { getCurrentUserMembershipOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { useActiveWorkspaceSlug } from "./use-active-workspace";
+import { useWorkspaceSwitcher } from "./use-workspace-switcher";
 
 export function useWorkspaceAccess() {
-	const {
-		workspaceSlug,
-		workspaces,
-		selectWorkspace,
-		isLoading: workspacesLoading,
-	} = useActiveWorkspaceSlug();
+	const { workspaceSlug, workspaces, isLoading: workspacesLoading } = useActiveWorkspaceSlug();
+	const switchWorkspace = useWorkspaceSwitcher();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 
 	const membershipQuery = useQuery({
@@ -27,7 +24,7 @@ export function useWorkspaceAccess() {
 	return {
 		workspaceSlug,
 		workspaces,
-		selectWorkspace,
+		switchWorkspace,
 		role,
 		isMember,
 		isAdmin,

@@ -1,10 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { Spinner } from "@/components/ui/spinner";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achievements")({
 	component: AchievementsPage,
@@ -16,21 +14,18 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achieveme
  */
 function AchievementsPage() {
 	const { userProfile, getUserProfilePictureUrl, username } = useAuth();
-	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
 	const { workspaceSlug } = Route.useParams();
-	const navigate = useNavigate();
-	const { achievementsEnabled, isLoading } = useWorkspaceFeatures();
+	const { achievementsEnabled, isLoading } = useWorkspaceFeatures(workspaceSlug);
 
-	useEffect(() => {
-		if (!isLoading && !achievementsEnabled && workspaceSlug && username) {
-			// Silent redirect — UI elements are already hidden when disabled
-			navigate({
-				to: "/w/$workspaceSlug/user/$username",
-				params: { workspaceSlug, username },
-				replace: true,
-			});
-		}
-	}, [isLoading, achievementsEnabled, workspaceSlug, username, navigate]);
+	if (!isLoading && !achievementsEnabled && workspaceSlug && username) {
+		return (
+			<Navigate
+				to="/w/$workspaceSlug/user/$username"
+				params={{ workspaceSlug, username }}
+				replace
+			/>
+		);
+	}
 
 	if (isLoading || !achievementsEnabled) {
 		return (
@@ -42,7 +37,7 @@ function AchievementsPage() {
 
 	return (
 		<AchievementsView
-			workspaceSlug={selectedSlug || ""}
+			workspaceSlug={workspaceSlug}
 			targetUsername={username || ""}
 			isOwnProfile={true}
 			fallbackName={userProfile?.name || userProfile?.username}

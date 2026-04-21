@@ -9,6 +9,11 @@ import type { ChatMessage } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$threadId")({
 	component: ThreadContainer,
+	staticData: {
+		workspaceSwitch: {
+			fallbackTo: "/w/$workspaceSlug/mentor",
+		},
+	},
 });
 
 function ThreadContainer() {

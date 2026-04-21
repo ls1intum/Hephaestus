@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	getPracticeOptions,
@@ -9,19 +9,22 @@ import {
 import type { UpdatePracticeRequest } from "@/api/types.gen";
 import { PracticeForm } from "@/components/admin/practices/PracticeForm";
 import { Spinner } from "@/components/ui/spinner";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/_admin/practices/$practiceSlug",
 )({
 	component: EditPracticeContainer,
+	staticData: {
+		workspaceSwitch: {
+			fallbackTo: "/w/$workspaceSlug/admin/practices",
+		},
+	},
 });
 
 function EditPracticeContainer() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const { practiceSlug } = Route.useParams();
-	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const { practiceSlug, workspaceSlug } = Route.useParams();
 
 	const practiceQueryOptions = getPracticeOptions({
 		path: { workspaceSlug: workspaceSlug ?? "", practiceSlug },
@@ -57,12 +60,16 @@ function EditPracticeContainer() {
 		navigate({ to: ".." });
 	};
 
-	if (isLoading || !practice) {
+	if (isLoading) {
 		return (
 			<div className="flex justify-center items-center h-64">
 				<Spinner className="h-8 w-8" />
 			</div>
 		);
+	}
+
+	if (!practice) {
+		return <Navigate to="/w/$workspaceSlug/admin/practices" params={{ workspaceSlug }} replace />;
 	}
 
 	return (

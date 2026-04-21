@@ -250,7 +250,7 @@ function AppSidebarContainer() {
 	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 	const navigate = useNavigate();
 	const workspaceAccess = useWorkspaceAccess();
-	const { workspaceSlug, workspaces, selectWorkspace } = workspaceAccess;
+	const { workspaceSlug, workspaces, switchWorkspace } = workspaceAccess;
 	const hasWorkspace = Boolean(workspaceSlug);
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
 	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
@@ -276,10 +276,7 @@ function AppSidebarContainer() {
 
 	const handleWorkspaceChange = (ws: typeof activeWorkspace) => {
 		if (!ws) return;
-		selectWorkspace(ws.workspaceSlug);
-		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
-		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
-		navigate({ to: target as never, replace: true });
+		switchWorkspace(ws.workspaceSlug);
 	};
 
 	const handleAddWorkspace = () => {
