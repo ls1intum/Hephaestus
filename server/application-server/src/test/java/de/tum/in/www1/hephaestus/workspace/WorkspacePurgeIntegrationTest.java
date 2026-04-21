@@ -11,7 +11,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
-import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -59,18 +58,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
      */
     private Workspace createGitLabWorkspaceWithData(String slug) {
         User owner = persistUser(slug + "-owner");
-        Workspace workspace = workspaceService.createWorkspace(
-            new CreateWorkspaceRequestDTO(
-                slug,
-                "Purge Test " + slug,
-                slug + "-group",
-                AccountType.ORG,
-                owner.getId(),
-                Workspace.GitProviderMode.GITLAB_PAT,
-                "glpat-purge-test-token",
-                null
-            )
-        );
+        Workspace workspace = createWorkspace(slug, "Purge Test " + slug, slug + "-group", AccountType.ORG, owner);
+        workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
+        workspace.setPersonalAccessToken("glpat-purge-test-token");
 
         // Set GitLab webhook fields (simulates a registered webhook)
         workspace.setGitlabGroupId(42L);
@@ -138,18 +128,16 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @DisplayName("purge deletes all workspace-scoped data and marks workspace as PURGED")
         void purgeDeletesAllWorkspaceScopedData() {
             User owner = persistUser("cleanup-owner");
-            Workspace workspace = workspaceService.createWorkspace(
-                new CreateWorkspaceRequestDTO(
-                    "cleanup-ws",
-                    "Cleanup Test",
-                    "cleanup-group",
-                    AccountType.ORG,
-                    owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
-                    "glpat-cleanup-token",
-                    null
-                )
+            Workspace workspace = createWorkspace(
+                "cleanup-ws",
+                "Cleanup Test",
+                "cleanup-group",
+                AccountType.ORG,
+                owner
             );
+            workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
+            workspace.setPersonalAccessToken("glpat-cleanup-token");
+            workspace = workspaceRepository.save(workspace);
             Long workspaceId = workspace.getId();
 
             // Add a monitored repository (saved directly — purge reloads workspace with EAGER fetch)
@@ -207,18 +195,16 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @DisplayName("purging an already-purged workspace is a no-op")
         void purgeIsIdempotent() {
             User owner = persistUser("idempotent-owner");
-            Workspace workspace = workspaceService.createWorkspace(
-                new CreateWorkspaceRequestDTO(
-                    "idempotent-ws",
-                    "Idempotent Test",
-                    "idempotent-group",
-                    AccountType.ORG,
-                    owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
-                    "glpat-idempotent-token",
-                    null
-                )
+            Workspace workspace = createWorkspace(
+                "idempotent-ws",
+                "Idempotent Test",
+                "idempotent-group",
+                AccountType.ORG,
+                owner
             );
+            workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
+            workspace.setPersonalAccessToken("glpat-idempotent-token");
+            workspace = workspaceRepository.save(workspace);
 
             // First purge
             Workspace first = workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
@@ -322,18 +308,16 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void nonOwnerIsDeniedAccess() {
             // Create workspace with a different owner — mentor user is NOT the owner
             User owner = persistUser("non-owner-test-owner");
-            Workspace workspace = workspaceService.createWorkspace(
-                new CreateWorkspaceRequestDTO(
-                    "non-owner-ws",
-                    "Non-Owner Test",
-                    "non-owner-group",
-                    AccountType.ORG,
-                    owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
-                    "glpat-non-owner-token",
-                    null
-                )
+            Workspace workspace = createWorkspace(
+                "non-owner-ws",
+                "Non-Owner Test",
+                "non-owner-group",
+                AccountType.ORG,
+                owner
             );
+            workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
+            workspace.setPersonalAccessToken("glpat-non-owner-token");
+            workspace = workspaceRepository.save(workspace);
 
             // Mentor user has MEMBER role (not OWNER)
             User mentorUser = persistUser("mentor");

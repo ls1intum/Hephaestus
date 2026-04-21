@@ -1650,12 +1650,6 @@ export type CreateWorkspaceRequest = {
      */
     gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
     /**
-     * Deprecated: ignored by the server. The authenticated user always becomes the owner.
-     *
-     * @deprecated
-     */
-    ownerUserId?: number;
-    /**
      * Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
      */
     personalAccessToken?: string;

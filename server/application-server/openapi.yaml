@@ -3577,12 +3577,6 @@ components:
           - GITHUB_APP_INSTALLATION
           - GITLAB_PAT
           example: GITLAB_PAT
-        ownerUserId:
-          type: integer
-          format: int64
-          deprecated: true
-          description: "Deprecated: ignored by the server. The authenticated user\
-            \ always becomes the owner."
         personalAccessToken:
           type: string
           description: Personal Access Token for GitLab API access. Required when

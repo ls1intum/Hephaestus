@@ -53,13 +53,6 @@ public record CreateWorkspaceRequestDTO(
     @Schema(description = "Type of account (USER or ORG)", requiredMode = Schema.RequiredMode.REQUIRED)
     AccountType accountType,
 
-    @Deprecated(forRemoval = true)
-    @Schema(
-        description = "Deprecated: ignored by the server. The authenticated user always becomes the owner.",
-        requiredMode = Schema.RequiredMode.NOT_REQUIRED
-    )
-    Long ownerUserId,
-
     @Schema(
         description = "Git provider authentication mode. Defaults to PAT_ORG (GitHub PAT) if not specified.",
         example = "GITLAB_PAT"

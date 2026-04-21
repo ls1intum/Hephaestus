@@ -179,26 +179,20 @@ public class WorkspaceService {
         // principals, require the linked row matching the workspace's provider so subsequent
         // API calls run against the correct IdP identity. If the session cannot be resolved
         // to an unambiguous provider-specific row, fail closed instead of attaching ownership
-        // to the wrong provider. Fall back to the deprecated ownerUserId only when no auth
-        // context exists (e.g. tests).
+        // to the wrong provider.
         GitProviderType targetProvider =
             request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT
                 ? GitProviderType.GITLAB
                 : GitProviderType.GITHUB;
-        Long ownerUserId;
-        if (SecurityUtils.getCurrentJwt().isPresent()) {
-            ownerUserId = authenticatedUserService
-                .findLinkedUserForProvider(targetProvider)
-                .map(User::getId)
-                .orElseThrow(() ->
-                    new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Cannot resolve an unambiguous " + targetProvider + " identity for the current session"
-                    )
-                );
-        } else {
-            ownerUserId = request.ownerUserId();
-        }
+        Long ownerUserId = SecurityUtils.getCurrentJwt()
+            .flatMap(jwt -> authenticatedUserService.findLinkedUserForProvider(targetProvider))
+            .map(User::getId)
+            .orElseThrow(() ->
+                new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Cannot resolve an unambiguous " + targetProvider + " identity for the current session"
+                )
+            );
 
         Workspace workspace = createWorkspace(
             request.workspaceSlug(),

@@ -13,6 +13,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -60,6 +61,14 @@ public class GlobalControllerAdvice {
     ProblemDetail handleAuthorizationDenied(AuthorizationDeniedException exception) {
         log.debug("Authorization denied: message={}", exception.getMessage());
         return problem(HttpStatus.FORBIDDEN, "Access denied", "Insufficient permissions for this operation.");
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    ProblemDetail handleAccessDenied(AccessDeniedException exception) {
+        log.debug("Access denied: message={}", exception.getMessage());
+        String detail =
+            exception.getMessage() != null ? exception.getMessage() : "Insufficient permissions for this operation.";
+        return problem(HttpStatus.FORBIDDEN, "Access denied", detail);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
