@@ -41,7 +41,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     private WorkspaceLifecycleService workspaceLifecycleService;
 
     @Test
-    @WithMentorUser
+    @WithMentorUser(gitlabId = 18024L)
     void createGitLabWorkspacePersistsCorrectProviderModeAndServerUrl() {
         User owner = persistUser("mentor");
 
@@ -50,7 +50,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "My GitLab Workspace",
             "my-group/my-project",
             AccountType.ORG,
-            owner.getId(),
             Workspace.GitProviderMode.GITLAB_PAT,
             "glpat-test-token-12345",
             "https://gitlab.example.com"
@@ -86,7 +85,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithMentorUser
+    @WithMentorUser(gitlabId = 18024L)
     void createGitLabWorkspaceWithDefaultServerUrlOmitsServerUrl() {
         User owner = persistUser("mentor");
 
@@ -95,7 +94,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "Default GitLab",
             "my-group",
             AccountType.ORG,
-            owner.getId(),
             Workspace.GitProviderMode.GITLAB_PAT,
             "glpat-test-token-67890",
             null
@@ -129,7 +127,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "No Token",
             "my-group",
             AccountType.ORG,
-            owner.getId(),
             Workspace.GitProviderMode.GITLAB_PAT,
             null, // missing token
             null
@@ -167,7 +164,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "HTTP GitLab",
             "my-group",
             AccountType.ORG,
-            owner.getId(),
             Workspace.GitProviderMode.GITLAB_PAT,
             "glpat-test-token",
             "http://insecure.example.com" // not HTTPS
@@ -196,16 +192,15 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithMentorUser
+    @WithMentorUser(gitlabId = 18024L)
     void createGitLabWorkspaceAssignsOwnerMembership() {
-        User owner = persistUser("mentor");
+        persistUser("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
             "gitlab-ownership",
             "Owner Test",
             "owner-group",
             AccountType.ORG,
-            owner.getId(),
             Workspace.GitProviderMode.GITLAB_PAT,
             "glpat-owner-token",
             null
@@ -226,14 +221,20 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
 
         WorkspaceDTO workspace = Objects.requireNonNull(created);
 
+        User gitLabOwner = userRepository
+            .findAllByProviderTypeAndNativeId(GitProviderType.GITLAB, 18024L)
+            .stream()
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("GitLab owner user not created"));
+
         var membership = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.id(), owner.getId())
-            .orElseThrow(() -> new AssertionError("Owner membership not created"));
+            .findByWorkspace_IdAndUser_Id(workspace.id(), gitLabOwner.getId())
+            .orElseThrow(() -> new AssertionError("Owner membership not created for linked GitLab user"));
         assertThat(membership.getRole()).isEqualTo(WorkspaceMembership.WorkspaceRole.OWNER);
     }
 
     @Test
-    @WithMentorUser
+    @WithMentorUser(gitlabId = 18024L)
     void createGitLabWorkspaceResponseNeverContainsRawToken() {
         User owner = persistUser("mentor");
         String secretToken = "test-token-placeholder";
@@ -243,7 +244,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "Secret Test",
             "secret-group",
             AccountType.ORG,
-            owner.getId(),
             Workspace.GitProviderMode.GITLAB_PAT,
             secretToken,
             null
@@ -268,7 +268,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithMentorUser
+    @WithMentorUser(gitlabId = 18024L)
     void gitLabWorkspaceAppearsInListWithCorrectProviderType() {
         User owner = persistUser("mentor");
 
@@ -282,7 +282,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "GitLab WS",
             "gitlab-group",
             AccountType.ORG,
-            owner.getId(),
             Workspace.GitProviderMode.GITLAB_PAT,
             "glpat-list-token",
             null
@@ -323,18 +322,16 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     @WithAdminUser
     void gitLabWorkspaceLifecycleSuspendAndPurgeWorkCorrectly() {
         User owner = persistUser("lifecycle-owner");
-        Workspace workspace = workspaceService.createWorkspace(
-            new CreateWorkspaceRequestDTO(
-                "gitlab-lifecycle",
-                "Lifecycle Test",
-                "lifecycle-group",
-                AccountType.ORG,
-                owner.getId(),
-                Workspace.GitProviderMode.GITLAB_PAT,
-                "glpat-lifecycle-token",
-                null
-            )
+        Workspace workspace = createWorkspace(
+            "gitlab-lifecycle",
+            "Lifecycle Test",
+            "lifecycle-group",
+            AccountType.ORG,
+            owner
         );
+        workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
+        workspace.setPersonalAccessToken("glpat-lifecycle-token");
+        workspace = workspaceRepository.save(workspace);
         ensureOwnerMembership(workspace);
 
         // Verify it's ACTIVE and GITLAB

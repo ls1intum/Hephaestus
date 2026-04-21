@@ -2,13 +2,12 @@ package de.tum.in.www1.hephaestus.workspace.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceSlugHistoryRepository;
 import jakarta.servlet.Filter;
@@ -20,8 +19,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -54,23 +54,20 @@ public class WorkspaceContextFilter implements Filter {
 
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
-    private final UserRepository userRepository;
-    private final WorkspaceMembershipService workspaceMembershipService;
+    private final AuthenticatedUserService authenticatedUserService;
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
     private final ObjectMapper objectMapper;
 
     public WorkspaceContextFilter(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
-        UserRepository userRepository,
-        WorkspaceMembershipService workspaceMembershipService,
+        AuthenticatedUserService authenticatedUserService,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         ObjectMapper objectMapper
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
-        this.userRepository = userRepository;
-        this.workspaceMembershipService = workspaceMembershipService;
+        this.authenticatedUserService = authenticatedUserService;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.objectMapper = objectMapper;
     }
@@ -148,14 +145,15 @@ public class WorkspaceContextFilter implements Filter {
                 return;
             }
 
-            // Fetch user roles
-            var currentUser = userRepository.getCurrentUser();
-            Set<WorkspaceRole> roles = fetchUserRoles(workspace, currentUser);
+            // Fetch user roles. A Keycloak principal may map to multiple user rows (one per
+            // linked IdP), so aggregate membership state across all of them before denying access.
+            var linkedUsers = authenticatedUserService.findAllLinkedUsers();
+            Set<WorkspaceRole> roles = fetchUserRoles(workspace, linkedUsers);
 
             boolean isPublicRead = Boolean.TRUE.equals(workspace.getIsPubliclyViewable()) && isReadRequest;
 
             if (roles.isEmpty() && !isPublicRead) {
-                if (currentUser.isEmpty()) {
+                if (linkedUsers.isEmpty()) {
                     sendWorkspaceUnauthorizedError(httpResponse, slug);
                 } else {
                     log.debug("Denied workspace access: reason=notMember, workspaceSlug={}", safeSlug);
@@ -190,60 +188,33 @@ public class WorkspaceContextFilter implements Filter {
     }
 
     /**
-     * Fetch workspace roles for the current authenticated user.
+     * Fetch workspace roles for the current authenticated principal across all of its
+     * linked provider user rows. The returned set is the union of roles granted to any
+     * of those rows in this workspace.
      *
      * @param workspace Workspace entity
-     * @param userOpt Optional user
-     * @return Set of workspace roles (empty if user has no membership or not authenticated)
+     * @param linkedUsers all User rows that belong to the authenticated Keycloak principal
+     * @return Set of workspace roles (empty if no linked row has a membership here)
      */
-    private Set<WorkspaceRole> fetchUserRoles(Workspace workspace, Optional<User> userOpt) {
-        try {
-            if (userOpt.isEmpty()) {
-                log.debug("Skipped role fetch: reason=noAuthenticatedUser");
-                return Set.of();
-            }
-
-            var membershipOpt = workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(
-                workspace.getId(),
-                userOpt.get().getId()
-            );
-
-            if (membershipOpt.isPresent()) {
-                log.debug("Resolved user role: role={}", membershipOpt.get().getRole());
-                return Set.of(membershipOpt.get().getRole());
-            }
-
-            // Auto-heal only when workspace has zero memberships (fresh dev DB)
-            if (workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()) {
-                try {
-                    var created = workspaceMembershipService.createMembership(
-                        workspace,
-                        userOpt.get().getId(),
-                        WorkspaceRole.ADMIN
-                    );
-                    log.info(
-                        "Auto-added user to workspace: userLogin={}, workspaceSlug={}, role={}",
-                        LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
-                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                        created.getRole()
-                    );
-                    return Set.of(created.getRole());
-                } catch (IllegalArgumentException ex) {
-                    log.debug(
-                        "Skipped membership auto-add: userLogin={}, workspaceSlug={}",
-                        LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
-                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                        ex
-                    );
-                }
-            }
-
-            log.debug("Returning empty roles: reason=noMembership, workspaceId={}", workspace.getId());
-            return Set.of();
-        } catch (Exception e) {
-            log.warn("Failed to fetch user roles: workspaceId={}", workspace.getId(), e);
+    private Set<WorkspaceRole> fetchUserRoles(Workspace workspace, List<User> linkedUsers) {
+        if (linkedUsers.isEmpty()) {
+            log.debug("Skipped role fetch: reason=noAuthenticatedUser");
             return Set.of();
         }
+
+        List<Long> linkedUserIds = linkedUsers.stream().map(User::getId).toList();
+        Set<WorkspaceRole> roles = EnumSet.noneOf(WorkspaceRole.class);
+        workspaceMembershipRepository
+            .findAllByWorkspace_IdAndUser_IdIn(workspace.getId(), linkedUserIds)
+            .forEach(m -> roles.add(m.getRole()));
+
+        if (!roles.isEmpty()) {
+            log.debug("Resolved user roles: roles={}", roles);
+            return roles;
+        }
+
+        log.debug("Returning empty roles: reason=noMembership, workspaceId={}", workspace.getId());
+        return Set.of();
     }
 
     private boolean handleSlugRedirect(
@@ -286,13 +257,14 @@ public class WorkspaceContextFilter implements Filter {
         }
 
         // Avoid leaking workspace existence for private workspaces when the user lacks membership.
+        // Check membership across all linked provider rows for the Keycloak principal.
         boolean isPublic = Boolean.TRUE.equals(workspace.getIsPubliclyViewable());
-        boolean hasMembership = userRepository
-            .getCurrentUser()
-            .flatMap(user ->
-                workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
-            )
-            .isPresent();
+        List<Long> linkedUserIds = authenticatedUserService.findAllLinkedUsers().stream().map(User::getId).toList();
+        boolean hasMembership =
+            !linkedUserIds.isEmpty() &&
+            !workspaceMembershipRepository
+                .findAllByWorkspace_IdAndUser_IdIn(workspace.getId(), linkedUserIds)
+                .isEmpty();
 
         if (!isPublic && !hasMembership) {
             return false;

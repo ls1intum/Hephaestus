@@ -2,10 +2,11 @@ package de.tum.in.www1.hephaestus.account;
 
 import de.tum.in.www1.hephaestus.config.KeycloakProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -45,20 +46,20 @@ public class AccountController {
 
     private final AccountService accountService;
     private final Keycloak keycloak;
-    private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
     private final KeycloakProperties keycloakProperties;
     private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
 
     public AccountController(
         AccountService accountService,
         Keycloak keycloak,
-        UserRepository userRepository,
+        AuthenticatedUserService authenticatedUserService,
         KeycloakProperties keycloakProperties,
         AuthenticatedGitProviderUserService authenticatedGitProviderUserService
     ) {
         this.accountService = accountService;
         this.keycloak = keycloak;
-        this.userRepository = userRepository;
+        this.authenticatedUserService = authenticatedUserService;
         this.keycloakProperties = keycloakProperties;
         this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
     }
@@ -76,13 +77,13 @@ public class AccountController {
         }
 
         String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
-        var gitUser = userRepository.getCurrentUser();
-        if (gitUser.isEmpty()) {
+        List<User> gitUsers = authenticatedUserService.findAllLinkedUsers();
+        if (gitUsers.isEmpty()) {
             log.warn("Could not resolve Git provider user for Keycloak subject {}", keycloakUserId);
         }
 
         try {
-            accountService.deleteUserTrackingData(gitUser.orElse(null), keycloakUserId);
+            accountService.deleteUserTrackingData(gitUsers, keycloakUserId);
         } catch (PosthogClientException exception) {
             log.error("Failed to remove analytics data before deleting user {}", keycloakUserId, exception);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
@@ -183,11 +184,11 @@ public class AccountController {
 
     @PostMapping("/linked-accounts/{providerAlias}/claim")
     @Operation(
-        summary = "Claim an identity provider from another user",
-        description = "Transfers a federated identity from another Keycloak user to the current user. " +
-            "Used when a user has accidentally created two accounts by logging in with different IdPs. " +
-            "Deletes the orphan account if it has no remaining identities."
+        summary = "Claim identity provider (temporarily disabled)",
+        description = "Account merging is temporarily disabled until a secure relinking flow is implemented. " +
+            "Use the standard linked-account flow instead."
     )
+    @ApiResponse(responseCode = "409", description = "Account merging is temporarily unavailable")
     public ResponseEntity<Void> claimIdentity(
         @PathVariable @jakarta.validation.constraints.Pattern(regexp = "^[a-z0-9-]{1,64}$") String providerAlias,
         @AuthenticationPrincipal JwtAuthenticationToken auth

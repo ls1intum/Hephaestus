@@ -2,7 +2,8 @@ package de.tum.in.www1.hephaestus.practices.finding.feedback;
 
 import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.finding.feedback.dto.CreateFindingFeedbackDTO;
 import de.tum.in.www1.hephaestus.practices.finding.feedback.dto.FindingFeedbackDTO;
@@ -42,7 +43,7 @@ public class FindingFeedbackService {
 
     private final FindingFeedbackRepository feedbackRepository;
     private final PracticeFindingRepository findingRepository;
-    private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
 
     /**
      * Submits feedback on a practice finding. Creates a new append-only record.
@@ -64,10 +65,16 @@ public class FindingFeedbackService {
             .findByIdAndWorkspaceId(findingId, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
 
-        var currentUser = userRepository.getCurrentUserElseThrow();
-        if (!finding.getContributor().getId().equals(currentUser.getId())) {
-            throw new AccessForbiddenException("Only the finding's contributor can provide feedback");
-        }
+        // The contributor of a finding may sit on either of the caller's linked provider
+        // rows (GitHub or GitLab). Grant access when any linked row matches, and attribute
+        // the new feedback row to that matched contributor for data consistency.
+        Long contributorId = finding.getContributor().getId();
+        User currentUser = authenticatedUserService
+            .findAllLinkedUsers()
+            .stream()
+            .filter(u -> u.getId().equals(contributorId))
+            .findFirst()
+            .orElseThrow(() -> new AccessForbiddenException("Only the finding's contributor can provide feedback"));
 
         if (
             request.action() == FindingFeedbackAction.DISPUTED &&
@@ -105,9 +112,17 @@ public class FindingFeedbackService {
             .findByIdAndWorkspaceId(findingId, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
 
-        var currentUser = userRepository.getCurrentUserElseThrow();
+        var linkedUsers = authenticatedUserService.findAllLinkedUsers();
+        if (linkedUsers.isEmpty()) {
+            throw new AccessForbiddenException("User not authenticated");
+        }
+
+        var contributorIds = linkedUsers.stream().map(User::getId).toList();
+
         return feedbackRepository
-            .findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(findingId, currentUser.getId())
+            .findLatestByFindingIdAndContributors(findingId, contributorIds)
+            .stream()
+            .max((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
             .map(FindingFeedbackDTO::from);
     }
 
@@ -116,10 +131,14 @@ public class FindingFeedbackService {
      */
     @Transactional(readOnly = true)
     public FindingFeedbackEngagementDTO getEngagement(WorkspaceContext workspaceContext) {
-        var currentUser = userRepository.getCurrentUserElseThrow();
+        var linkedUsers = authenticatedUserService.findAllLinkedUsers();
+        if (linkedUsers.isEmpty()) {
+            throw new AccessForbiddenException("User not authenticated");
+        }
+        var contributorIds = linkedUsers.stream().map(User::getId).toList();
         Map<FindingFeedbackAction, Long> counts = new EnumMap<>(FindingFeedbackAction.class);
         feedbackRepository
-            .countByContributorAndWorkspaceGroupByAction(currentUser.getId(), workspaceContext.id())
+            .countByContributorsAndWorkspaceGroupByAction(contributorIds, workspaceContext.id())
             .forEach(p -> counts.put(p.getAction(), p.getCount()));
         return new FindingFeedbackEngagementDTO(
             counts.getOrDefault(FindingFeedbackAction.APPLIED, 0L),

@@ -148,10 +148,8 @@ paths:
       - Account
   /user/linked-accounts/{providerAlias}/claim:
     post:
-      description: Transfers a federated identity from another Keycloak user to the
-        current user. Used when a user has accidentally created two accounts by logging
-        in with different IdPs. Deletes the orphan account if it has no remaining
-        identities.
+      description: Account merging is temporarily disabled until a secure relinking
+        flow is implemented. Use the standard linked-account flow instead.
       operationId: claimIdentity
       parameters:
       - in: path
@@ -161,9 +159,9 @@ paths:
           type: string
           pattern: "^[a-z0-9-]{1,64}$"
       responses:
-        "200":
-          description: OK
-      summary: Claim an identity provider from another user
+        "409":
+          description: Account merging is temporarily unavailable
+      summary: Claim identity provider (temporarily disabled)
       tags:
       - Account
   /user/settings:
@@ -3579,12 +3577,6 @@ components:
           - GITHUB_APP_INSTALLATION
           - GITLAB_PAT
           example: GITLAB_PAT
-        ownerUserId:
-          type: integer
-          format: int64
-          deprecated: true
-          description: "Deprecated: ignored by the server. The authenticated user\
-            \ always becomes the owner."
         personalAccessToken:
           type: string
           description: Personal Access Token for GitLab API access. Required when

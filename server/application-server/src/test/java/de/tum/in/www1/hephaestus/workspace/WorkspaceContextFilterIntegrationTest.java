@@ -109,6 +109,32 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     @WithAdminUser
+    void emptyMembershipWorkspaceDoesNotAutoGrantAdmin() {
+        persistUser("admin");
+        User owner = persistUser("owner-no-membership");
+        Workspace workspace = createWorkspace(
+            "empty-membership-space",
+            "Empty Membership",
+            "empty-membership",
+            AccountType.ORG,
+            owner
+        );
+
+        workspaceMembershipRepository.deleteAllByWorkspaceId(workspace.getId());
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        assertThat(workspaceMembershipRepository.findByWorkspace_Id(workspace.getId())).isEmpty();
+    }
+
+    @Test
+    @WithAdminUser
     void workspaceContextDoesNotLeakBetweenRequests() {
         User owner = persistUser("admin");
         Workspace first = createWorkspace("gamma-space", "Gamma", "gamma", AccountType.ORG, owner);

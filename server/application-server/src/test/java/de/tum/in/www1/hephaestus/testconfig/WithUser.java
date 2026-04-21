@@ -24,4 +24,15 @@ public @interface WithUser {
      * The user ID for the mock user.
      */
     String userId() default "testuser-user-id";
+
+    /**
+     * Value for the {@code github_id} identity claim. Defaults to {@code 1L} (testuser
+     * seeded by {@code TestUserConfig}).
+     */
+    long githubId() default 1L;
+
+    /**
+     * Value for the {@code gitlab_id} identity claim. Defaults to {@code 0} (omitted).
+     */
+    long gitlabId() default 0L;
 }

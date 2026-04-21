@@ -63,6 +63,36 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     @Test
+    @WithAdminUser(username = "admin", githubId = 3L, gitlabId = 42L)
+    void shouldReturnHighestRoleWhenMembershipSpansLinkedRows() {
+        User adminGithubRow = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
+        User adminGitlabRow = TestUserFactory.ensureUser(userRepository, "admin-gl", 42L, ensureGitLabProvider());
+        Workspace workspace = createWorkspace(
+            "membership-me",
+            "Membership Me",
+            "membership-me",
+            AccountType.ORG,
+            adminGithubRow
+        );
+        workspaceMembershipService.createMembership(workspace, adminGitlabRow.getId(), WorkspaceRole.MEMBER);
+
+        WorkspaceMembershipDTO membership = webTestClient
+            .get()
+            .uri("/workspaces/{slug}/members/me", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceMembershipDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(membership).isNotNull();
+        assertThat(membership.role()).isEqualTo(WorkspaceRole.OWNER);
+        assertThat(membership.userLogin()).isEqualTo("admin");
+    }
+
+    @Test
     @WithAdminUser
     void adminCanAssignRoleToMember() {
         User owner = persistUser("membership-owner-2");

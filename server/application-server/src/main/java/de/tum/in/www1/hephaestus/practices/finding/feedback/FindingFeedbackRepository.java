@@ -27,6 +27,21 @@ public interface FindingFeedbackRepository extends JpaRepository<FindingFeedback
         Long contributorId
     );
 
+    @Query(
+        value = """
+        SELECT DISTINCT ON (ff.contributor_id) ff.*
+        FROM finding_feedback ff
+        WHERE ff.finding_id = :findingId
+          AND ff.contributor_id IN (:contributorIds)
+        ORDER BY ff.contributor_id, ff.created_at DESC
+        """,
+        nativeQuery = true
+    )
+    List<FindingFeedback> findLatestByFindingIdAndContributors(
+        @Param("findingId") UUID findingId,
+        @Param("contributorIds") Collection<Long> contributorIds
+    );
+
     /**
      * Returns the latest feedback per finding for a given contributor, using PostgreSQL's
      * {@code DISTINCT ON} for efficient "latest row per group" retrieval.
@@ -67,6 +82,22 @@ public interface FindingFeedbackRepository extends JpaRepository<FindingFeedback
     )
     List<ActionCountProjection> countByContributorAndWorkspaceGroupByAction(
         @Param("contributorId") Long contributorId,
+        @Param("workspaceId") Long workspaceId
+    );
+
+    @Query(
+        """
+        SELECT ff.action AS action, COUNT(ff) AS count
+        FROM FindingFeedback ff
+        JOIN ff.finding f
+        JOIN f.practice p
+        WHERE ff.contributorId IN :contributorIds
+          AND p.workspace.id = :workspaceId
+        GROUP BY ff.action
+        """
+    )
+    List<ActionCountProjection> countByContributorsAndWorkspaceGroupByAction(
+        @Param("contributorIds") Collection<Long> contributorIds,
         @Param("workspaceId") Long workspaceId
     );
 

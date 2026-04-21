@@ -10,11 +10,21 @@ public class WithUserSecurityContextFactory implements WithSecurityContextFactor
 
     @Override
     public SecurityContext createSecurityContext(WithUser annotation) {
+        Long githubId = annotation.githubId() > 0 ? annotation.githubId() : null;
+        Long gitlabId = annotation.gitlabId() > 0 ? annotation.gitlabId() : null;
         return MockSecurityContextUtils.createSecurityContext(
             annotation.username(),
             annotation.userId(),
             annotation.authorities(),
-            "mock-jwt-token-for-test-user"
+            MockSecurityContextUtils.buildTokenValue(
+                annotation.username(),
+                annotation.userId(),
+                annotation.authorities(),
+                githubId,
+                gitlabId
+            ),
+            githubId,
+            gitlabId
         );
     }
 }

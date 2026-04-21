@@ -24,4 +24,15 @@ public @interface WithAdminUser {
      * The user ID for the mock admin user.
      */
     String userId() default "admin-user-id";
+
+    /**
+     * Value for the {@code github_id} identity claim. Defaults to {@code 3L} (admin seeded
+     * by {@code TestUserConfig}).
+     */
+    long githubId() default 3L;
+
+    /**
+     * Value for the {@code gitlab_id} identity claim. Defaults to {@code 0} (omitted).
+     */
+    long gitlabId() default 0L;
 }

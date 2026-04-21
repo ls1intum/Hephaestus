@@ -1650,12 +1650,6 @@ export type CreateWorkspaceRequest = {
      */
     gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
     /**
-     * Deprecated: ignored by the server. The authenticated user always becomes the owner.
-     *
-     * @deprecated
-     */
-    ownerUserId?: number;
-    /**
      * Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
      */
     personalAccessToken?: string;
@@ -2074,11 +2068,11 @@ export type ClaimIdentityData = {
     url: '/user/linked-accounts/{providerAlias}/claim';
 };
 
-export type ClaimIdentityResponses = {
+export type ClaimIdentityErrors = {
     /**
-     * OK
+     * Account merging is temporarily unavailable
      */
-    200: unknown;
+    409: unknown;
 };
 
 export type GetUserSettingsData = {

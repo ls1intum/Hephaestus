@@ -3,10 +3,13 @@ package de.tum.in.www1.hephaestus.workspace;
 import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
+import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
@@ -30,6 +33,9 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 @AutoConfigureWebTestClient
 @DisplayName("Workspace controller integration")
+@org.springframework.test.context.TestPropertySource(
+    properties = "hephaestus.features.flags.gitlab-workspace-creation=true"
+)
 class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -53,7 +59,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @Test
     @WithAdminUser
     void createWorkspaceWithInvalidPayloadReturnsValidationProblemDetail() {
-        var request = new CreateWorkspaceRequestDTO("INVALID SLUG", "", "", null, null, null, null, null);
+        var request = new CreateWorkspaceRequestDTO("INVALID SLUG", "", "", null, null, null, null);
 
         ProblemDetail problem = webTestClient
             .post()
@@ -77,14 +83,11 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Test
     void createWorkspaceRequiresAuthentication() {
-        User owner = persistUser("unauthenticated-owner");
-
         var request = new CreateWorkspaceRequestDTO(
             "unauthenticated",
             "Unauthenticated",
             "unauthenticated",
             AccountType.ORG,
-            owner.getId(),
             null,
             null,
             null
@@ -103,6 +106,80 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     }
 
     @Test
+    void createWorkspaceRejectsUnknownBearerToken() {
+        var request = new CreateWorkspaceRequestDTO(
+            "invalid-token-space",
+            "Invalid Token",
+            "invalid-token",
+            AccountType.ORG,
+            null,
+            null,
+            null
+        );
+
+        webTestClient
+            .post()
+            .uri("/workspaces")
+            .headers(headers -> headers.setBearerAuth("definitely-not-a-valid-mock-token"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isUnauthorized();
+
+        assertThat(workspaceRepository.findByWorkspaceSlug("invalid-token-space")).isEmpty();
+    }
+
+    @Test
+    void createGitLabWorkspaceRejectsAmbiguousLinkedGitLabIdentity() {
+        GitProvider gitlabDefault = ensureGitLabProvider();
+        GitProvider gitlabSelfHosted = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.lrz.de")
+            .orElseGet(() ->
+                gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.lrz.de"))
+            );
+        TestUserFactory.ensureUser(userRepository, "gitlab-default", 18024L, gitlabDefault);
+        TestUserFactory.ensureUser(userRepository, "gitlab-self-hosted", 18024L, gitlabSelfHosted);
+
+        var request = new CreateWorkspaceRequestDTO(
+            "ambiguous-gitlab-space",
+            "Ambiguous GitLab",
+            "ambiguous-group",
+            AccountType.ORG,
+            Workspace.GitProviderMode.GITLAB_PAT,
+            "glpat-ambiguous-token",
+            "https://gitlab.lrz.de"
+        );
+
+        ProblemDetail problem = webTestClient
+            .post()
+            .uri("/workspaces")
+            .headers(headers ->
+                headers.setBearerAuth(
+                    MockSecurityContextUtils.buildTokenValue(
+                        "ambiguous-user",
+                        "ambiguous-user-id",
+                        new String[] {},
+                        null,
+                        18024L
+                    )
+                )
+            )
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isEqualTo(HttpStatus.CONFLICT)
+            .expectBody(ProblemDetail.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(problem).isNotNull();
+        assertThat(problem.getDetail()).contains("Cannot resolve an unambiguous GITLAB identity");
+        assertThat(workspaceRepository.findByWorkspaceSlug("ambiguous-gitlab-space")).isEmpty();
+    }
+
+    @Test
     @WithMentorUser
     void anyAuthenticatedUserCanCreateWorkspace() {
         User owner = persistUser("mentor");
@@ -112,7 +189,6 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Mentor Space",
             "mentor-org",
             AccountType.ORG,
-            owner.getId(),
             null,
             null,
             null
@@ -141,7 +217,6 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Controller Space",
             "controller",
             AccountType.ORG,
-            owner.getId(),
             null,
             null,
             null
@@ -436,6 +511,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @WithAdminUser
     void duplicateWorkspaceSlugReturnsConflictProblemDetail() {
         User owner = persistUser("duplicate-owner");
+        persistUser("admin");
         createWorkspace("duplicate-space", "Duplicate", "duplicate", AccountType.ORG, owner);
 
         var request = new CreateWorkspaceRequestDTO(
@@ -443,7 +519,6 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Duplicate",
             "duplicate",
             AccountType.ORG,
-            owner.getId(),
             null,
             null,
             null
@@ -591,7 +666,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.ACTIVE))
             .exchange()
             .expectStatus()
-            .isEqualTo(HttpStatus.CONFLICT)
+            .isForbidden()
             .expectHeader()
             .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
             .expectBody(ProblemDetail.class)
@@ -599,8 +674,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .getResponseBody();
 
         assertThat(problem).isNotNull();
-        assertThat(problem.getTitle()).isEqualTo("Workspace lifecycle violation");
-        assertThat(problem.getDetail()).contains("purged");
+        assertThat(problem.getTitle()).isEqualTo("Membership required");
+        assertThat(problem.getDetail()).contains("You must be a member of workspace purged-space");
     }
 
     @Test

@@ -27,8 +27,7 @@ public class TestAuthUtils {
             return jwt.getTokenValue();
         }
 
-        // Default fallback for authenticated requests
-        return "mock-jwt-token-for-test-user";
+        throw new IllegalStateException("No JWT authentication present in SecurityContext for this test request");
     }
 
     /**
@@ -72,8 +71,8 @@ public class TestAuthUtils {
     }
 
     /**
-     * Creates a headers consumer that adds authentication based on the current security context,
-     * with a fallback to testuser if no authentication is present.
+     * Creates a headers consumer that adds authentication based on the current security context.
+     * Fails fast when a test forgot to establish authentication.
      *
      * Usage with WebTestClient:
      * <pre>

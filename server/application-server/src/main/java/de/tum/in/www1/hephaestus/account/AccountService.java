@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.account;
 
 import de.tum.in.www1.hephaestus.config.KeycloakProperties;
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
@@ -136,14 +137,22 @@ public class AccountService {
      * Delete all tracking data for a user (GDPR compliance).
      * Called before account deletion.
      *
-     * @param user the git provider user, or null if unresolved
+     * @param users the git provider users linked to the principal
      * @param keycloakUserId the Keycloak subject identifier
      */
-    public void deleteUserTrackingData(User user, String keycloakUserId) {
-        boolean anyDeleted = deletePosthogIdentities(user, keycloakUserId);
+    public void deleteUserTrackingData(List<User> users, String keycloakUserId) {
+        boolean anyDeleted = deletePosthogIdentities(users, keycloakUserId);
         if (!anyDeleted) {
-            String login = user != null ? user.getLogin() : "unknown";
-            log.warn("No PostHog person matched provided identifiers during account deletion: userLogin={}", login);
+            String logins = users
+                .stream()
+                .map(User::getLogin)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.joining(","));
+            log.warn(
+                "No PostHog person matched provided identifiers during account deletion: userLogins={}",
+                logins.isBlank() ? "unknown" : logins
+            );
         }
     }
 
@@ -255,71 +264,16 @@ public class AccountService {
         }
     }
 
-    /**
-     * Claims a federated identity that is currently linked to a different Keycloak user.
-     * Removes the identity from the other user, adds it to the current user,
-     * and deletes the other user if they have no remaining federated identities.
-     *
-     * <p>This handles the common scenario where a user logs in via two different IdPs
-     * with different emails, creating two separate Keycloak accounts, and then wants
-     * to merge them.
-     *
-     * @param currentUserId the Keycloak ID of the currently authenticated user
-     * @param providerAlias the identity provider alias to claim (e.g. "gitlab-lrz")
-     */
     public void claimIdentity(String currentUserId, String providerAlias) {
-        try {
-            var realmResource = keycloak.realm(keycloakProperties.realm());
-
-            // Find all users with this provider linked
-            var allUsers = realmResource.users().searchByAttributes("*");
-            String otherUserId = null;
-            FederatedIdentityRepresentation targetIdentity = null;
-
-            for (var user : allUsers) {
-                if (user.getId().equals(currentUserId)) {
-                    continue;
-                }
-                var feds = realmResource.users().get(user.getId()).getFederatedIdentity();
-                for (var fed : feds) {
-                    if (fed.getIdentityProvider().equals(providerAlias)) {
-                        otherUserId = user.getId();
-                        targetIdentity = fed;
-                        break;
-                    }
-                }
-                if (otherUserId != null) {
-                    break;
-                }
-            }
-
-            if (otherUserId == null || targetIdentity == null) {
-                throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "No other user found with identity provider " + providerAlias
-                );
-            }
-
-            // Remove the identity from the other user
-            realmResource.users().get(otherUserId).removeFederatedIdentity(providerAlias);
-            log.info("Removed {} identity from orphan user {}", providerAlias, otherUserId);
-
-            // Add it to the current user
-            realmResource.users().get(currentUserId).addFederatedIdentity(providerAlias, targetIdentity);
-            log.info("Added {} identity to current user {}", providerAlias, currentUserId);
-
-            // Delete the orphan user if they have no remaining federated identities
-            var remainingFeds = realmResource.users().get(otherUserId).getFederatedIdentity();
-            if (remainingFeds.isEmpty()) {
-                realmResource.users().delete(otherUserId);
-                log.info("Deleted orphan Keycloak user {} (no remaining identities)", otherUserId);
-            }
-        } catch (ResponseStatusException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Failed to claim identity {} for user {}", providerAlias, currentUserId, e);
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to claim identity: " + e.getMessage());
-        }
+        log.warn(
+            "Rejected unsafe identity-claim attempt: currentUserId={}, providerAlias={}",
+            LoggingUtils.sanitizeForLog(currentUserId),
+            LoggingUtils.sanitizeForLog(providerAlias)
+        );
+        throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "Account merging is temporarily unavailable until a secure relinking flow is implemented. Please use the standard identity-provider linking flow instead."
+        );
     }
 
     private static UserSettingsDTO toDTO(UserPreferences preferences) {
@@ -327,12 +281,18 @@ public class AccountService {
     }
 
     private boolean deletePosthogIdentities(User user, String primaryDistinctId) {
+        return deletePosthogIdentities(user != null ? List.of(user) : List.of(), primaryDistinctId);
+    }
+
+    private boolean deletePosthogIdentities(List<User> users, String primaryDistinctId) {
         Set<String> distinctIds = new LinkedHashSet<>();
         if (StringUtils.hasText(primaryDistinctId)) {
             distinctIds.add(primaryDistinctId);
         }
-        if (user != null) {
-            distinctIds.add(String.valueOf(user.getId()));
+        for (User user : users) {
+            if (user != null && user.getId() != null) {
+                distinctIds.add(String.valueOf(user.getId()));
+            }
         }
 
         boolean anyDeleted = false;

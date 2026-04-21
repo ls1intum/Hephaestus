@@ -6,8 +6,8 @@ import de.tum.in.www1.hephaestus.feature.FeatureFlagService;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.github.GitHubProperties;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceProvidersDTO;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,7 +35,7 @@ public class WorkspaceQueryService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
-    private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
     private final GitHubProperties gitHubProperties;
     private final GitLabProperties gitLabProperties;
     private final FeatureFlagService featureFlagService;
@@ -44,7 +44,7 @@ public class WorkspaceQueryService {
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
-        UserRepository userRepository,
+        AuthenticatedUserService authenticatedUserService,
         GitHubProperties gitHubProperties,
         GitLabProperties gitLabProperties,
         FeatureFlagService featureFlagService
@@ -52,7 +52,7 @@ public class WorkspaceQueryService {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
-        this.userRepository = userRepository;
+        this.authenticatedUserService = authenticatedUserService;
         this.gitHubProperties = gitHubProperties;
         this.gitLabProperties = gitLabProperties;
         this.featureFlagService = featureFlagService;
@@ -100,30 +100,34 @@ public class WorkspaceQueryService {
      * @return list of accessible workspaces for the current user
      */
     public List<Workspace> findAccessibleWorkspaces() {
-        return findAccessibleWorkspaces(userRepository.getCurrentUser());
+        return findAccessibleWorkspacesForUsers(authenticatedUserService.findAllLinkedUsers());
     }
 
     /**
-     * Returns workspaces a specific user can see: memberships + publicly viewable workspaces.
-     * If the user is empty, only publicly viewable workspaces are returned.
-     * Only ACTIVE workspaces are included - SUSPENDED and PURGED workspaces are excluded.
-     *
-     * @param currentUser the user to check accessibility for
-     * @return list of accessible workspaces
+     * Returns workspaces accessible to a set of user rows that all belong to the same
+     * authenticated principal — necessary because a Keycloak account with multiple
+     * federated IdPs (e.g. GitHub + GitLab) maps to one {@code "user"} row per IdP,
+     * each potentially holding its own workspace memberships.
+     * Only ACTIVE workspaces are included — SUSPENDED and PURGED workspaces are excluded.
      */
-    List<Workspace> findAccessibleWorkspaces(Optional<User> currentUser) {
+    List<Workspace> findAccessibleWorkspacesForUsers(List<User> currentUsers) {
         // Always include public, active workspaces
         List<Workspace> publicWorkspaces = workspaceRepository.findByStatusAndIsPubliclyViewableTrue(
             Workspace.WorkspaceStatus.ACTIVE
         );
 
-        if (currentUser.isEmpty()) {
+        if (currentUsers.isEmpty()) {
             return publicWorkspaces;
         }
 
-        // Fetch memberships for the current user and load workspaces by ID
-        var memberships = workspaceMembershipRepository.findByUser_Id(currentUser.get().getId());
-        var workspaceIds = memberships.stream().map(WorkspaceMembership::getWorkspace).map(Workspace::getId).toList();
+        List<Long> userIds = currentUsers.stream().map(User::getId).distinct().toList();
+        var workspaceIds = workspaceMembershipRepository
+            .findByUser_IdIn(userIds)
+            .stream()
+            .map(WorkspaceMembership::getWorkspace)
+            .map(Workspace::getId)
+            .distinct()
+            .toList();
 
         List<Workspace> memberWorkspaces = workspaceIds.isEmpty()
             ? List.of()

@@ -55,6 +55,16 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
     }
 
     protected User persistUser(String login) {
+        if ("testuser".equals(login)) {
+            return TestUserFactory.ensureUser(userRepository, "testuser", 1L, ensureGitHubProvider());
+        }
+        if ("mentor".equals(login)) {
+            return TestUserFactory.ensureUser(userRepository, "mentor", 2L, ensureGitHubProvider());
+        }
+        if ("admin".equals(login)) {
+            return TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
+        }
+
         GitProvider provider = ensureGitHubProvider();
         User user = new User();
         long nativeId = userIdGenerator.incrementAndGet();

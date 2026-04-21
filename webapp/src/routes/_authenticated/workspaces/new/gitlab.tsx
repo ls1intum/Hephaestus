@@ -1,13 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import { toast } from "sonner";
 import {
-	claimIdentityMutation,
 	createWorkspaceMutation,
 	getIdentityProvidersOptions,
-	getLinkedAccountsQueryKey,
 	getProvidersOptions,
 	listGitLabGroupsMutation,
 	listWorkspacesQueryKey,
@@ -42,10 +40,7 @@ const STEP_META = [
 ] as const;
 
 /**
- * Prompts the user to link their GitLab account. Offers two paths:
- * 1. "Link GitLab" — standard Keycloak account linking (works when no conflict)
- * 2. "Claim GitLab Identity" — transfers the identity from an orphan account (handles the
- *    case where the user previously logged in via GitLab directly, creating a separate account)
+ * Prompts the user to link their GitLab account using the standard Keycloak linking flow.
  */
 function GitLabLinkPrompt({
 	gitlabIdpAlias,
@@ -54,22 +49,6 @@ function GitLabLinkPrompt({
 	gitlabIdpAlias?: string;
 	linkAccount: (alias: string) => Promise<void>;
 }) {
-	const queryClient = useQueryClient();
-	const [showClaim, setShowClaim] = useState(false);
-
-	const claimMutation = useMutation({
-		...claimIdentityMutation(),
-		onSuccess: () => {
-			toast.success(
-				"GitLab account linked successfully. Please log out and back in for the changes to take effect.",
-			);
-			queryClient.invalidateQueries({ queryKey: getLinkedAccountsQueryKey() });
-		},
-		onError: (error) => {
-			toast.error(`Failed to claim identity: ${(error as Error).message}`);
-		},
-	});
-
 	return (
 		<div className="mx-auto max-w-2xl py-8">
 			<Link
@@ -95,36 +74,14 @@ function GitLabLinkPrompt({
 						</Button>
 					)}
 
-					{!showClaim && (
-						<button
-							type="button"
-							className="text-sm text-muted-foreground hover:text-foreground text-left"
-							onClick={() => setShowClaim(true)}
-						>
-							Already logged in with GitLab before? Having trouble linking?
-						</button>
-					)}
-
-					{showClaim && gitlabIdpAlias && (
-						<Alert>
-							<AlertTitle>Previously logged in with GitLab?</AlertTitle>
-							<AlertDescription className="space-y-3">
-								<p>
-									If you previously signed in with GitLab directly, a separate account was created.
-									Click below to merge it with your current account.
-								</p>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={claimMutation.isPending}
-									onClick={() => claimMutation.mutate({ path: { providerAlias: gitlabIdpAlias } })}
-								>
-									{claimMutation.isPending ? <Spinner className="mr-2" /> : null}
-									Merge GitLab Identity
-								</Button>
-							</AlertDescription>
-						</Alert>
-					)}
+					<Alert>
+						<AlertTitle>Need help linking GitLab?</AlertTitle>
+						<AlertDescription>
+							If you previously signed in with a separate GitLab-based account, sign in with that
+							account first and use the standard linked-account flow from Settings. Automatic
+							account merging is disabled until a secure relinking flow is available.
+						</AlertDescription>
+					</Alert>
 				</div>
 			</div>
 		</div>

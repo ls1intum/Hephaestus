@@ -1,8 +1,11 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
@@ -16,8 +19,10 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Central service for workspace management operations.
@@ -61,6 +66,7 @@ public class WorkspaceService {
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
     private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
 
     // Services
     private final WorkspaceSlugService workspaceSlugService;
@@ -72,6 +78,7 @@ public class WorkspaceService {
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
         UserRepository userRepository,
+        AuthenticatedUserService authenticatedUserService,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceSettingsService workspaceSettingsService,
         LeaguePointsRecalculator leaguePointsRecalculator,
@@ -80,6 +87,7 @@ public class WorkspaceService {
     ) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
+        this.authenticatedUserService = authenticatedUserService;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceSettingsService = workspaceSettingsService;
         this.leaguePointsRecalculator = leaguePointsRecalculator;
@@ -167,9 +175,24 @@ public class WorkspaceService {
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
-        // Always prefer the authenticated user to prevent privilege escalation.
-        // Fall back to the deprecated ownerUserId only when no auth context exists (e.g. tests).
-        Long ownerUserId = userRepository.getCurrentUser().map(User::getId).orElse(request.ownerUserId());
+        // Always prefer the authenticated user to prevent privilege escalation. For dual-IdP
+        // principals, require the linked row matching the workspace's provider so subsequent
+        // API calls run against the correct IdP identity. If the session cannot be resolved
+        // to an unambiguous provider-specific row, fail closed instead of attaching ownership
+        // to the wrong provider.
+        GitProviderType targetProvider =
+            request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT
+                ? GitProviderType.GITLAB
+                : GitProviderType.GITHUB;
+        Long ownerUserId = SecurityUtils.getCurrentJwt()
+            .flatMap(jwt -> authenticatedUserService.findLinkedUserForProvider(targetProvider))
+            .map(User::getId)
+            .orElseThrow(() ->
+                new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Cannot resolve an unambiguous " + targetProvider + " identity for the current session"
+                )
+            );
 
         Workspace workspace = createWorkspace(
             request.workspaceSlug(),

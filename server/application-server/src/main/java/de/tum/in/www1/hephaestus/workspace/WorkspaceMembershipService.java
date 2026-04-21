@@ -471,6 +471,19 @@ public class WorkspaceMembershipService {
     }
 
     /**
+     * Batch lookup of memberships for a workspace across multiple user rows. Used when a
+     * Keycloak principal maps to several IdP-linked user rows and the caller needs every
+     * membership in a single query instead of iterating per row.
+     */
+    @Transactional(readOnly = true)
+    public List<WorkspaceMembership> listMembershipsForUsers(Long workspaceId, Collection<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return List.of();
+        }
+        return workspaceMembershipRepository.findAllByWorkspace_IdAndUser_IdIn(workspaceId, userIds);
+    }
+
+    /**
      * Lists all members of a workspace with pagination.
      *
      * @param workspaceId Workspace ID

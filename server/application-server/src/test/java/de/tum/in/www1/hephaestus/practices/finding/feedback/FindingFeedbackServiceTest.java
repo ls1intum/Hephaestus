@@ -8,8 +8,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.finding.feedback.dto.CreateFindingFeedbackDTO;
 import de.tum.in.www1.hephaestus.practices.finding.feedback.dto.FindingFeedbackDTO;
@@ -46,7 +46,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
     private PracticeFindingRepository findingRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private AuthenticatedUserService authenticatedUserService;
 
     @Captor
     private ArgumentCaptor<FindingFeedback> feedbackCaptor;
@@ -56,7 +56,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        service = new FindingFeedbackService(feedbackRepository, findingRepository, userRepository);
+        service = new FindingFeedbackService(feedbackRepository, findingRepository, authenticatedUserService);
         workspaceContext = new WorkspaceContext(WORKSPACE_ID, "test-ws", "Test WS", null, null, false, Set.of());
     }
 
@@ -83,7 +83,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void appliedFeedbackSaves() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
-            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
             when(feedbackRepository.save(any(FindingFeedback.class))).thenAnswer(inv -> {
                 FindingFeedback fb = inv.getArgument(0);
                 fb.onCreate();
@@ -107,7 +107,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void disputedWithExplanationSaves() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
-            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
             when(feedbackRepository.save(any(FindingFeedback.class))).thenAnswer(inv -> {
                 FindingFeedback fb = inv.getArgument(0);
                 fb.onCreate();
@@ -126,7 +126,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void notApplicableSaves() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
-            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
             when(feedbackRepository.save(any(FindingFeedback.class))).thenAnswer(inv -> {
                 FindingFeedback fb = inv.getArgument(0);
                 fb.onCreate();
@@ -147,7 +147,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void disputedWithoutExplanationThrows() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
-            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
 
             var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, null);
             assertThatThrownBy(() -> service.submitFeedback(workspaceContext, FINDING_ID, request))
@@ -160,7 +160,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void disputedWithBlankExplanationThrows() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
-            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
 
             var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, "   ");
             assertThatThrownBy(() -> service.submitFeedback(workspaceContext, FINDING_ID, request))
@@ -173,12 +173,36 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void nonContributorThrows() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
-            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(OTHER_USER_ID));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(OTHER_USER_ID)));
 
             var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
             assertThatThrownBy(() -> service.submitFeedback(workspaceContext, FINDING_ID, request))
                 .isInstanceOf(AccessForbiddenException.class)
                 .hasMessageContaining("contributor");
+        }
+
+        @Test
+        @DisplayName("contributor matched via a linked provider row (multi-IdP) is allowed to submit")
+        void linkedProviderRowAllowedAsContributor() {
+            PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
+            when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
+            // First linked row is a different provider; the contributor row is among the
+            // caller's linked identities, so access must still be granted.
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(
+                List.of(createUser(OTHER_USER_ID), createUser(CONTRIBUTOR_ID))
+            );
+            when(feedbackRepository.save(any(FindingFeedback.class))).thenAnswer(inv -> {
+                FindingFeedback fb = inv.getArgument(0);
+                fb.onCreate();
+                return fb;
+            });
+
+            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
+            FindingFeedbackDTO result = service.submitFeedback(workspaceContext, FINDING_ID, request);
+
+            assertThat(result.action()).isEqualTo(FindingFeedbackAction.APPLIED);
+            verify(feedbackRepository).save(feedbackCaptor.capture());
+            assertThat(feedbackCaptor.getValue().getContributorId()).isEqualTo(CONTRIBUTOR_ID);
         }
 
         @Test
@@ -204,7 +228,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void returnsLatestWhenPresent() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
-            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
 
             FindingFeedback feedback = FindingFeedback.builder()
                 .id(UUID.randomUUID())
@@ -215,8 +239,8 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
                 .createdAt(Instant.now())
                 .build();
             when(
-                feedbackRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
-            ).thenReturn(Optional.of(feedback));
+                feedbackRepository.findLatestByFindingIdAndContributors(FINDING_ID, List.of(CONTRIBUTOR_ID))
+            ).thenReturn(List.of(feedback));
 
             Optional<FindingFeedbackDTO> result = service.getLatestFeedback(workspaceContext, FINDING_ID);
 
@@ -230,14 +254,66 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void returnsEmptyWhenNone() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
-            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
             when(
-                feedbackRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
-            ).thenReturn(Optional.empty());
+                feedbackRepository.findLatestByFindingIdAndContributors(FINDING_ID, List.of(CONTRIBUTOR_ID))
+            ).thenReturn(List.of());
 
             Optional<FindingFeedbackDTO> result = service.getLatestFeedback(workspaceContext, FINDING_ID);
 
             assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("returns newest feedback across linked contributor rows")
+        void returnsNewestFeedbackAcrossLinkedRows() {
+            Long secondContributorId = 11L;
+            PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
+            when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(
+                List.of(createUser(CONTRIBUTOR_ID), createUser(secondContributorId))
+            );
+
+            FindingFeedback older = FindingFeedback.builder()
+                .id(UUID.randomUUID())
+                .finding(finding)
+                .findingId(FINDING_ID)
+                .contributorId(CONTRIBUTOR_ID)
+                .action(FindingFeedbackAction.APPLIED)
+                .createdAt(Instant.now().minusSeconds(60))
+                .build();
+            FindingFeedback newer = FindingFeedback.builder()
+                .id(UUID.randomUUID())
+                .finding(finding)
+                .findingId(FINDING_ID)
+                .contributorId(secondContributorId)
+                .action(FindingFeedbackAction.DISPUTED)
+                .createdAt(Instant.now())
+                .build();
+
+            when(
+                feedbackRepository.findLatestByFindingIdAndContributors(
+                    FINDING_ID,
+                    List.of(CONTRIBUTOR_ID, secondContributorId)
+                )
+            ).thenReturn(List.of(older, newer));
+
+            Optional<FindingFeedbackDTO> result = service.getLatestFeedback(workspaceContext, FINDING_ID);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().action()).isEqualTo(FindingFeedbackAction.DISPUTED);
+        }
+
+        @Test
+        @DisplayName("throws AccessForbiddenException when no linked identity is resolved")
+        void throwsWhenNoLinkedIdentityResolved() {
+            PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
+            when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of());
+
+            assertThatThrownBy(() -> service.getLatestFeedback(workspaceContext, FINDING_ID))
+                .isInstanceOf(AccessForbiddenException.class)
+                .hasMessageContaining("User not authenticated");
         }
 
         @Test
@@ -260,7 +336,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("returns correct counts with workspace scoping")
         void returnsCorrectCounts() {
-            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
 
             var appliedProjection = new FindingFeedbackRepository.ActionCountProjection() {
                 @Override
@@ -286,7 +362,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             };
 
             when(
-                feedbackRepository.countByContributorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)
+                feedbackRepository.countByContributorsAndWorkspaceGroupByAction(List.of(CONTRIBUTOR_ID), WORKSPACE_ID)
             ).thenReturn(List.of(appliedProjection, disputedProjection));
 
             FindingFeedbackEngagementDTO result = service.getEngagement(workspaceContext);
@@ -299,14 +375,48 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("returns all zeros when no feedback exists")
         void returnsZerosWhenEmpty() {
-            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(List.of(createUser(CONTRIBUTOR_ID)));
             when(
-                feedbackRepository.countByContributorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)
+                feedbackRepository.countByContributorsAndWorkspaceGroupByAction(List.of(CONTRIBUTOR_ID), WORKSPACE_ID)
             ).thenReturn(List.of());
 
             FindingFeedbackEngagementDTO result = service.getEngagement(workspaceContext);
 
             assertThat(result.applied()).isZero();
+            assertThat(result.disputed()).isZero();
+            assertThat(result.notApplicable()).isZero();
+        }
+
+        @Test
+        @DisplayName("queries engagement across all linked contributor rows")
+        void queriesEngagementAcrossLinkedRows() {
+            Long secondContributorId = 11L;
+            when(authenticatedUserService.findAllLinkedUsers()).thenReturn(
+                List.of(createUser(CONTRIBUTOR_ID), createUser(secondContributorId))
+            );
+
+            var appliedProjection = new FindingFeedbackRepository.ActionCountProjection() {
+                @Override
+                public FindingFeedbackAction getAction() {
+                    return FindingFeedbackAction.APPLIED;
+                }
+
+                @Override
+                public Long getCount() {
+                    return 5L;
+                }
+            };
+
+            when(
+                feedbackRepository.countByContributorsAndWorkspaceGroupByAction(
+                    List.of(CONTRIBUTOR_ID, secondContributorId),
+                    WORKSPACE_ID
+                )
+            ).thenReturn(List.of(appliedProjection));
+
+            FindingFeedbackEngagementDTO result = service.getEngagement(workspaceContext);
+
+            assertThat(result.applied()).isEqualTo(5L);
             assertThat(result.disputed()).isZero();
             assertThat(result.notApplicable()).isZero();
         }

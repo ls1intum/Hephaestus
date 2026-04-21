@@ -10,11 +10,21 @@ public class WithMentorUserSecurityContextFactory implements WithSecurityContext
 
     @Override
     public SecurityContext createSecurityContext(WithMentorUser annotation) {
+        Long githubId = annotation.githubId() > 0 ? annotation.githubId() : null;
+        Long gitlabId = annotation.gitlabId() > 0 ? annotation.gitlabId() : null;
         return MockSecurityContextUtils.createSecurityContext(
             annotation.username(),
             annotation.userId(),
             annotation.authorities(),
-            "mock-jwt-token-for-mentor-user"
+            MockSecurityContextUtils.buildTokenValue(
+                annotation.username(),
+                annotation.userId(),
+                annotation.authorities(),
+                githubId,
+                gitlabId
+            ),
+            githubId,
+            gitlabId
         );
     }
 }
