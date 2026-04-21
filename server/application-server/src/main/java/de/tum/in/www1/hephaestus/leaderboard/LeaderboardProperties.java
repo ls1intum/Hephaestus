@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.lang.Nullable;
@@ -28,6 +29,7 @@ import org.springframework.validation.annotation.Validated;
  *       enabled: true
  *       team: engineering
  *       channel-id: C0123456789
+ *       workspace-slugs: [acme]
  * }</pre>
  *
  * @param schedule     schedule configuration for when the leaderboard cycle ends
@@ -44,7 +46,7 @@ public record LeaderboardProperties(@Valid Schedule schedule, @Valid Notificatio
             schedule = new Schedule(1, "09:00");
         }
         if (notification == null) {
-            notification = new Notification(false, null, null);
+            notification = new Notification(false, null, null, List.of());
         }
     }
 
@@ -71,18 +73,30 @@ public record LeaderboardProperties(@Valid Schedule schedule, @Valid Notificatio
     /**
      * Slack notification configuration for weekly leaderboard announcements.
      *
-     * @param enabled   whether to send Slack notifications at the end of each cycle
-     * @param team      optional team filter for the leaderboard (null means all teams)
-     * @param channelId Slack channel ID to send notifications to (required if enabled)
+     * @param enabled        whether to send Slack notifications at the end of each cycle
+     * @param team           optional team filter for the leaderboard (null means all teams)
+     * @param channelId      Slack channel ID to send notifications to (required if enabled)
+     * @param workspaceSlugs slugs of workspaces opted in to notifications; empty list disables all.
+     *                       Temporary allowlist until per-workspace Slack routing replaces the global channel.
      */
     public record Notification(
         @DefaultValue("false") boolean enabled,
         @Nullable String team,
-        @Nullable String channelId
+        @Nullable String channelId,
+        @DefaultValue({}) List<String> workspaceSlugs
     ) {
+        public Notification {
+            workspaceSlugs = workspaceSlugs == null ? List.of() : List.copyOf(workspaceSlugs);
+        }
+
         @AssertTrue(message = "channelId must be provided when notifications are enabled")
         public boolean isChannelIdValid() {
             return !enabled || (channelId != null && !channelId.isBlank());
+        }
+
+        @AssertTrue(message = "workspaceSlugs must be non-empty when notifications are enabled")
+        public boolean isWorkspaceSlugsValid() {
+            return !enabled || !workspaceSlugs.isEmpty();
         }
     }
 }

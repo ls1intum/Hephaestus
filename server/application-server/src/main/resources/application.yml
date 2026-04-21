@@ -266,6 +266,10 @@ hephaestus:
             enabled: false
             team: "all"
             channel-id: ""
+            # Workspace slugs opted in to Slack notifications. Temporary allowlist while the
+            # global Slack channel/token is shared across tenants — remove once per-workspace
+            # Slack routing lands.
+            workspace-slugs: []
         # PR authors whose assignee-reviewers don't earn points (e.g., AI bots)
         self-review-author-logins:
             - Copilot
