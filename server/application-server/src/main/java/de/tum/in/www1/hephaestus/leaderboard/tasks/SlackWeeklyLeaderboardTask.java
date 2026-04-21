@@ -170,9 +170,14 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             return;
         }
 
-        List<Workspace> workspaces = workspaceRepository.findAll();
+        List<String> allowedSlugs = leaderboardProperties.notification().workspaceSlugs();
+        List<Workspace> workspaces = workspaceRepository
+            .findAll()
+            .stream()
+            .filter(w -> allowedSlugs.contains(w.getWorkspaceSlug()))
+            .toList();
         if (workspaces.isEmpty()) {
-            log.info("Skipped Slack notification: reason=noWorkspacesConfigured");
+            log.info("Skipped Slack notification: reason=noWorkspacesConfigured, allowedSlugs={}", allowedSlugs);
             return;
         }
 

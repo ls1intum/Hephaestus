@@ -45,6 +45,7 @@ hephaestus:
             enabled: ${LEADERBOARD_NOTIFICATION_ENABLED:true}
             team: ${LEADERBOARD_NOTIFICATION_TEAM:all}
             channel-id: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
+            workspace-slugs: ${LEADERBOARD_NOTIFICATION_WORKSPACE_SLUGS:}
 
     workspace:
         init-default: false
