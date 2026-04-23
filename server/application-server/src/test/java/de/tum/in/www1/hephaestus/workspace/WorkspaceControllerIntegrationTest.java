@@ -204,6 +204,59 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Test
     @WithAdminUser
+    void listWorkspacesIsSortedByDisplayName() {
+        User ownerAlpha = persistUser("sorted-alpha-owner");
+        User ownerZulu = persistUser("sorted-zulu-owner");
+        User ownerBravo = persistUser("sorted-bravo-owner");
+
+        Workspace workspaceZulu = createWorkspace(
+            "sorted-zulu",
+            "Zulu Workspace",
+            "sorted-zulu",
+            AccountType.ORG,
+            ownerZulu
+        );
+        Workspace workspaceAlpha = createWorkspace(
+            "sorted-alpha",
+            "Alpha Workspace",
+            "sorted-alpha",
+            AccountType.ORG,
+            ownerAlpha
+        );
+        Workspace workspaceBravo = createWorkspace(
+            "sorted-bravo",
+            "Bravo Workspace",
+            "sorted-bravo",
+            AccountType.ORG,
+            ownerBravo
+        );
+
+        ensureAdminMembership(workspaceZulu);
+        ensureAdminMembership(workspaceAlpha);
+        ensureAdminMembership(workspaceBravo);
+
+        List<WorkspaceListItemDTO> workspaces = webTestClient
+            .get()
+            .uri("/workspaces")
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBodyList(WorkspaceListItemDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(workspaces)
+            .isNotNull()
+            .filteredOn(workspace ->
+                List.of("sorted-zulu", "sorted-alpha", "sorted-bravo").contains(workspace.workspaceSlug())
+            )
+            .extracting(WorkspaceListItemDTO::workspaceSlug)
+            .containsExactly("sorted-alpha", "sorted-bravo", "sorted-zulu");
+    }
+
+    @Test
+    @WithAdminUser
     void repositoryListingAndDeletionAreScopedByWorkspaceSlug() {
         User ownerAlpha = persistUser("alpha-owner");
         User ownerBeta = persistUser("beta-owner");
