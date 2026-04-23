@@ -13,7 +13,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
  * this hook automatically redirects to another available workspace.
  */
 export function useActiveWorkspaceSlug() {
-	const { selectedSlug, setSelectedSlug } = useWorkspaceStore();
+	const { selectedSlug, hasHydrated, setSelectedSlug } = useWorkspaceStore();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 	const navigate = useNavigate();
 	const query = useQuery({
@@ -25,6 +25,7 @@ export function useActiveWorkspaceSlug() {
 	});
 	const workspaces = Array.isArray(query.data) ? query.data : [];
 	const location = useLocation();
+	const workspaceSelectionLoading = isAuthenticated && !authLoading && !hasHydrated;
 
 	// Track if we've already attempted a redirect to prevent infinite loops
 	const hasAttemptedRedirect = useRef(false);
@@ -40,6 +41,10 @@ export function useActiveWorkspaceSlug() {
 	const activeSlug = (() => {
 		if (slugFromPath) {
 			return isValidSlug(slugFromPath) ? slugFromPath : undefined;
+		}
+
+		if (!hasHydrated) {
+			return undefined;
 		}
 
 		if (isValidSlug(selectedSlug)) {
@@ -107,10 +112,10 @@ export function useActiveWorkspaceSlug() {
 	// so we must wait until we have workspace data before syncing.
 	useEffect(() => {
 		const workspacesLoaded = !query.isLoading && query.data !== undefined;
-		if (workspacesLoaded && activeSlug !== selectedSlug) {
+		if (hasHydrated && workspacesLoaded && activeSlug !== selectedSlug) {
 			setSelectedSlug(activeSlug);
 		}
-	}, [activeSlug, selectedSlug, setSelectedSlug, query.isLoading, query.data]);
+	}, [activeSlug, hasHydrated, selectedSlug, setSelectedSlug, query.isLoading, query.data]);
 
 	// Clear persisted selection when the user logs out to avoid cross-user leakage
 	useEffect(() => {
@@ -126,7 +131,7 @@ export function useActiveWorkspaceSlug() {
 		workspaces,
 		providerType: activeWorkspace?.providerType ?? "GITHUB",
 		selectWorkspace: setSelectedSlug,
-		isLoading: query.isLoading,
+		isLoading: query.isLoading || workspaceSelectionLoading,
 		error: query.error as Error | null,
 	};
 }

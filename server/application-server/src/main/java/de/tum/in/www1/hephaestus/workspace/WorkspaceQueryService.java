@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceProvidersDTO;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
@@ -31,6 +32,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @WorkspaceAgnostic("Manages workspaces themselves - operates at admin/registry level")
 public class WorkspaceQueryService {
+
+    private static final Comparator<Workspace> ACCESSIBLE_WORKSPACE_COMPARATOR = Comparator.comparing(
+        Workspace::getDisplayName,
+        String.CASE_INSENSITIVE_ORDER
+    ).thenComparing(Workspace::getWorkspaceSlug, String.CASE_INSENSITIVE_ORDER);
 
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
@@ -118,7 +124,7 @@ public class WorkspaceQueryService {
         );
 
         if (currentUser.isEmpty()) {
-            return publicWorkspaces;
+            return publicWorkspaces.stream().sorted(ACCESSIBLE_WORKSPACE_COMPARATOR).toList();
         }
 
         // Fetch memberships for the current user and load workspaces by ID
@@ -140,6 +146,7 @@ public class WorkspaceQueryService {
             )
             .values()
             .stream()
+            .sorted(ACCESSIBLE_WORKSPACE_COMPARATOR)
             .toList();
     }
 
