@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_authenticated/")({
 	component: RedirectToWorkspace,
 });
 
-function RedirectToWorkspace() {
+export function RedirectToWorkspace() {
 	const navigate = useNavigate();
 	const { isAuthenticated } = useAuth();
 	const { workspaceSlug, workspaces, selectWorkspace, isLoading } = useActiveWorkspaceSlug();
