@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.BaseGitLabProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabUserLookup;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
@@ -101,7 +102,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         String username,
         @Nullable String name,
         @Nullable String avatarUrl,
-        @Nullable String webUrl
+        @Nullable String webUrl,
+        @Nullable String publicEmail
     ) {}
 
     public record SyncMergeRequestData(
@@ -127,6 +129,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         String targetBranch,
         @Nullable String diffHeadSha,
         @Nullable String baseSha,
+        @Nullable String mergeCommitSha,
         boolean discussionLocked,
         int commentsCount,
         @Nullable String authorGlobalId,
@@ -134,15 +137,18 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         @Nullable String authorName,
         @Nullable String authorAvatarUrl,
         @Nullable String authorWebUrl,
+        @Nullable String authorPublicEmail,
         @Nullable String mergeUserGlobalId,
         @Nullable String mergeUserUsername,
         @Nullable String mergeUserName,
         @Nullable String mergeUserAvatarUrl,
         @Nullable String mergeUserWebUrl,
+        @Nullable String mergeUserPublicEmail,
         @Nullable List<SyncLabelData> syncLabels,
         @Nullable List<SyncUserData> syncAssignees,
         @Nullable List<SyncUserData> syncReviewers,
         @Nullable List<SyncUserData> syncApprovers,
+        @Nullable List<SyncUserData> syncParticipants,
         @Nullable Integer milestoneIid
     ) {}
 
@@ -207,6 +213,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         User author = resolveWebhookAuthor(event, context.providerId());
         User mergedBy = resolveWebhookMergeUser(event, context.providerId());
+        Long milestoneId = resolveWebhookMilestoneId(attrs.milestoneId(), context.repository().getProvider().getId());
 
         String headRefOid = attrs.lastCommit() != null ? attrs.lastCommit().id() : null;
 
@@ -227,6 +234,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             attrs.mergedAt(),
             author,
             mergedBy,
+            milestoneId,
             context.repository(),
             context,
             isNew
@@ -528,26 +536,51 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         boolean isNew = existingOpt.isEmpty();
 
         User author = findOrCreateUser(
-            data.authorGlobalId(),
-            data.authorUsername(),
-            data.authorName(),
-            data.authorAvatarUrl(),
-            data.authorWebUrl(),
+            new GitLabUserLookup(
+                data.authorGlobalId(),
+                data.authorUsername(),
+                data.authorName(),
+                data.authorAvatarUrl(),
+                data.authorWebUrl(),
+                data.authorPublicEmail()
+            ),
             providerId
         );
 
         User mergeUser = findOrCreateUser(
-            data.mergeUserGlobalId(),
-            data.mergeUserUsername(),
-            data.mergeUserName(),
-            data.mergeUserAvatarUrl(),
-            data.mergeUserWebUrl(),
+            new GitLabUserLookup(
+                data.mergeUserGlobalId(),
+                data.mergeUserUsername(),
+                data.mergeUserName(),
+                data.mergeUserAvatarUrl(),
+                data.mergeUserWebUrl(),
+                data.mergeUserPublicEmail()
+            ),
             providerId
         );
 
+        // Identity harvest: seed User rows for anyone who has interacted with the MR so later
+        // events (notes, reviews, approvals) do not need to create identities on the hot path.
+        // No relationship is attached — PullRequest has no participants column.
+        if (data.syncParticipants() != null) {
+            for (SyncUserData participant : data.syncParticipants()) {
+                findOrCreateUser(
+                    new GitLabUserLookup(
+                        participant.globalId(),
+                        participant.username(),
+                        participant.name(),
+                        participant.avatarUrl(),
+                        participant.webUrl(),
+                        participant.publicEmail()
+                    ),
+                    providerId
+                );
+            }
+        }
+
         Issue.State mrState = convertState(data.state());
         boolean isMerged = "merged".equalsIgnoreCase(data.state());
-        String reviewDecision = data.approved() ? "APPROVED" : "REVIEW_REQUIRED";
+        String reviewDecision = deriveReviewDecision(data.approved(), data.detailedMergeStatus());
         String mergeStateStatus = mapDetailedMergeStatus(data.detailedMergeStatus());
 
         // Resolve milestone by iid + repository (milestones are synced before MRs)
@@ -560,6 +593,13 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         }
 
         Instant now = Instant.now();
+        // GitLab returns closedAt=null for merged MRs; fall back to mergedAt so closed_at
+        // reflects the true terminal timestamp (needed for leaderboard issue-state windows).
+        Instant closedAtTimestamp = parseGitLabTimestamp(data.closedAt());
+        Instant mergedAtTimestamp = parseGitLabTimestamp(data.mergedAt());
+        if (closedAtTimestamp == null && isMerged) {
+            closedAtTimestamp = mergedAtTimestamp;
+        }
         pullRequestRepository.upsertCore(
             nativeId,
             providerId,
@@ -570,7 +610,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             null, // stateReason
             data.webUrl(),
             data.discussionLocked(),
-            parseGitLabTimestamp(data.closedAt()),
+            closedAtTimestamp,
             data.commentsCount(),
             now,
             parseGitLabTimestamp(data.createdAt()),
@@ -578,7 +618,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             author != null ? author.getId() : null,
             repository.getId(),
             milestoneId,
-            parseGitLabTimestamp(data.mergedAt()),
+            mergedAtTimestamp,
             data.draft(),
             isMerged,
             data.commitCount(),
@@ -592,7 +632,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             data.targetBranch(),
             data.diffHeadSha(),
             data.baseSha(),
-            mergeUser != null ? mergeUser.getId() : null
+            mergeUser != null ? mergeUser.getId() : null,
+            data.mergeCommitSha()
         );
 
         PullRequest pr = pullRequestRepository
@@ -675,6 +716,17 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     @Nullable
+    private Long resolveWebhookMilestoneId(@Nullable Long gitlabMilestoneId, Long providerId) {
+        if (gitlabMilestoneId == null) {
+            return null;
+        }
+        return milestoneRepository
+            .findByNativeIdAndProviderId(gitlabMilestoneId, providerId)
+            .map(Milestone::getId)
+            .orElse(null);
+    }
+
+    @Nullable
     private PullRequest upsertMergeRequest(
         Long rawId,
         Integer iid,
@@ -692,6 +744,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         @Nullable String mergedAt,
         @Nullable User author,
         @Nullable User mergedBy,
+        @Nullable Long milestoneId,
         Repository repository,
         ProcessingContext context,
         boolean isNew
@@ -709,6 +762,12 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         boolean isMerged = mrState == Issue.State.MERGED;
 
         Instant now = Instant.now();
+        // GitLab webhooks also report closedAt=null for merged MRs; fall back to mergedAt.
+        Instant closedAtTimestamp = parseGitLabTimestamp(closedAt);
+        Instant mergedAtTimestamp = parseGitLabTimestamp(mergedAt);
+        if (closedAtTimestamp == null && isMerged) {
+            closedAtTimestamp = mergedAtTimestamp;
+        }
         pullRequestRepository.upsertCore(
             nativeId,
             providerId,
@@ -719,15 +778,15 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             null,
             htmlUrl,
             null, // isLocked: not in webhook — null lets COALESCE preserve existing or default
-            parseGitLabTimestamp(closedAt),
+            closedAtTimestamp,
             null, // commentsCount: not in webhook — null lets COALESCE preserve existing or default
             now, // lastSyncAt
             parseGitLabTimestamp(createdAt),
             parseGitLabTimestamp(updatedAt),
             author != null ? author.getId() : null,
             repository.getId(),
-            null,
-            parseGitLabTimestamp(mergedAt),
+            milestoneId,
+            mergedAtTimestamp,
             draft,
             isMerged,
             null,
@@ -741,7 +800,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             targetBranch,
             headRefOid,
             null, // baseRefOid — not in webhook, null preserves existing
-            mergedBy != null ? mergedBy.getId() : null
+            mergedBy != null ? mergedBy.getId() : null,
+            null // mergeCommitSha — not in webhook, null preserves existing
         );
 
         PullRequest pr = pullRequestRepository
@@ -787,6 +847,24 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         };
     }
 
+    /**
+     * Derives the PR review decision from GitLab's binary approval flag plus detailed merge status.
+     *
+     * <p>GitLab's {@code approved} field is binary and cannot express CHANGES_REQUESTED. The
+     * {@code detailed_merge_status == "requested_changes"} signal (Premium, GA 17.3) surfaces
+     * active change requests on the MR, so we lift it into the three-state model that the
+     * leaderboard/profile UI expects.
+     */
+    private static String deriveReviewDecision(boolean approved, @Nullable String detailedStatus) {
+        if (approved) {
+            return "APPROVED";
+        }
+        if (detailedStatus != null && "requested_changes".equalsIgnoreCase(detailedStatus)) {
+            return "CHANGES_REQUESTED";
+        }
+        return "REVIEW_REQUIRED";
+    }
+
     @Nullable
     private static String mapDetailedMergeStatus(@Nullable String detailedStatus) {
         if (detailedStatus == null) return null;
@@ -829,12 +907,47 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         review.setProvider(pr.getProvider());
         review.setState(PullRequestReview.State.APPROVED);
         review.setHtmlUrl(pr.getHtmlUrl() + "#approvals");
-        review.setSubmittedAt(pr.getUpdatedAt() != null ? pr.getUpdatedAt() : Instant.now());
-        review.setCreatedAt(pr.getUpdatedAt() != null ? pr.getUpdatedAt() : Instant.now());
-        review.setUpdatedAt(Instant.now());
+        // GitLab GraphQL exposes approvedBy as a plain UserCore connection without a
+        // per-user approvedAt timestamp, so we use the MR-level merged/updated time
+        // (deterministic — not Instant.now()) as the best-effort approval instant.
+        Instant approvalInstant = resolveApprovalInstant(pr);
+        review.setSubmittedAt(approvalInstant);
+        review.setCreatedAt(approvalInstant);
+        review.setUpdatedAt(approvalInstant);
+        // Anchor the approval to the MR head commit so downstream consumers have a
+        // commit SHA. Falls back to mergeCommitSha when the head is unavailable.
+        review.setCommitId(resolveApprovalCommit(pr));
         review.setAuthor(approver);
         review.setPullRequest(pr);
         return review;
+    }
+
+    /**
+     * Best-effort approval timestamp for a GitLab MR: prefers {@code mergedAt},
+     * falls back to {@code updatedAt}, then {@code createdAt}, then
+     * {@link Instant#EPOCH} as a final deterministic fallback.
+     */
+    private static Instant resolveApprovalInstant(PullRequest pr) {
+        if (pr.getMergedAt() != null) return pr.getMergedAt();
+        if (pr.getUpdatedAt() != null) return pr.getUpdatedAt();
+        if (pr.getCreatedAt() != null) return pr.getCreatedAt();
+        return Instant.EPOCH;
+    }
+
+    /**
+     * Returns the commit SHA the approval should anchor to. Prefers the MR head
+     * ({@code headRefOid}), falls back to the merge commit. May return {@code null}
+     * when neither is populated (e.g., minimal PR stubs created from webhooks).
+     */
+    @Nullable
+    private static String resolveApprovalCommit(PullRequest pr) {
+        if (pr.getHeadRefOid() != null && !pr.getHeadRefOid().isBlank()) {
+            return pr.getHeadRefOid();
+        }
+        if (pr.getMergeCommitSha() != null && !pr.getMergeCommitSha().isBlank()) {
+            return pr.getMergeCommitSha();
+        }
+        return null;
     }
 
     private void reconcileApprovals(
@@ -856,11 +969,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         for (SyncUserData approver : syncApprovers) {
             User user = findOrCreateUser(
-                approver.globalId(),
-                approver.username(),
-                approver.name(),
-                approver.avatarUrl(),
-                approver.webUrl(),
+                new GitLabUserLookup(
+                    approver.globalId(),
+                    approver.username(),
+                    approver.name(),
+                    approver.avatarUrl(),
+                    approver.webUrl(),
+                    approver.publicEmail()
+                ),
                 providerId
             );
             if (user == null) continue;
@@ -870,17 +986,31 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
             PullRequestReview existingReview = existingReviewsByNativeId.get(approvalNativeId);
             if (existingReview != null) {
+                boolean changed = false;
                 // Review exists - update to APPROVED if it was CHANGES_REQUESTED
                 if (existingReview.getState() != PullRequestReview.State.APPROVED) {
+                    Instant approvalInstant = resolveApprovalInstant(pr);
                     existingReview.setState(PullRequestReview.State.APPROVED);
-                    existingReview.setSubmittedAt(Instant.now());
-                    existingReview.setUpdatedAt(Instant.now());
-                    reviewRepository.save(existingReview);
+                    existingReview.setSubmittedAt(approvalInstant);
+                    existingReview.setUpdatedAt(approvalInstant);
+                    changed = true;
                     log.debug(
                         "Updated review to APPROVED from sync: prId={}, reviewerId={}",
                         pr.getId(),
                         user.getLogin()
                     );
+                }
+                // Backfill commit SHA on legacy rows that were created before we anchored
+                // approvals to a commit.
+                if (existingReview.getCommitId() == null) {
+                    String commit = resolveApprovalCommit(pr);
+                    if (commit != null) {
+                        existingReview.setCommitId(commit);
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    reviewRepository.save(existingReview);
 
                     if (ctx != null) {
                         EventPayload.ReviewData.from(existingReview).ifPresent(reviewData ->
@@ -982,11 +1112,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Set<User> newAssignees = new HashSet<>();
         for (SyncUserData data : syncAssignees) {
             User user = findOrCreateUser(
-                data.globalId(),
-                data.username(),
-                data.name(),
-                data.avatarUrl(),
-                data.webUrl(),
+                new GitLabUserLookup(
+                    data.globalId(),
+                    data.username(),
+                    data.name(),
+                    data.avatarUrl(),
+                    data.webUrl(),
+                    data.publicEmail()
+                ),
                 providerId
             );
             if (user != null) newAssignees.add(user);
@@ -1010,11 +1143,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Set<User> newReviewers = new HashSet<>();
         for (SyncUserData data : syncReviewers) {
             User user = findOrCreateUser(
-                data.globalId(),
-                data.username(),
-                data.name(),
-                data.avatarUrl(),
-                data.webUrl(),
+                new GitLabUserLookup(
+                    data.globalId(),
+                    data.username(),
+                    data.name(),
+                    data.avatarUrl(),
+                    data.webUrl(),
+                    data.publicEmail()
+                ),
                 providerId
             );
             if (user != null) newReviewers.add(user);

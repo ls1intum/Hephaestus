@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment;
 
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -63,7 +64,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
             AND ic.createdAt < :before
             AND ic.author.type = 'USER'
             AND rtm.workspace.id = :workspaceId
-            AND (:onlyFromPullRequests = false OR i.htmlUrl LIKE '%/pull/%')
+            AND (:onlyFromPullRequests = false OR TYPE(i) = PullRequest)
         ORDER BY ic.createdAt DESC
         """
     )

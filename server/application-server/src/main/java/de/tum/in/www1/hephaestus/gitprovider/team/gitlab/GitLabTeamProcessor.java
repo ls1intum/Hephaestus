@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.team.gitlab;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabDescendantGroupResponse;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import java.time.Instant;
@@ -103,6 +104,77 @@ public class GitLabTeamProcessor {
     }
 
     /**
+     * Processes the root group as a Team entity (upsert).
+     * <p>
+     * Mirrors {@link #process(GitLabDescendantGroupResponse, String, GitProvider)} but
+     * sources data from {@link GitLabGroupResponse} (which is what the {@code GetGroup}
+     * query returns for a single group by fullPath). The root team anchors the
+     * parent chain for descendants and carries the staff-wide direct members
+     * (instructors, TAs, group access tokens) that GitLab inherits down to every
+     * subgroup — they belong on the root, not replicated into every child.
+     *
+     * @param group         the root group payload
+     * @param rootFullPath  the root group full path (also the Team.organization)
+     * @param provider      the git provider entity
+     * @return the persisted Team, or null if input is invalid
+     */
+    @Transactional
+    @Nullable
+    public Team processRoot(GitLabGroupResponse group, String rootFullPath, GitProvider provider) {
+        if (group == null || group.id() == null || group.fullPath() == null) {
+            log.warn("Skipped root team processing: reason=nullOrMissingId");
+            return null;
+        }
+
+        long nativeId;
+        try {
+            nativeId = GitLabSyncConstants.extractNumericId(group.id());
+        } catch (IllegalArgumentException e) {
+            log.warn("Skipped root team processing: reason=invalidGlobalId, gid={}", group.id());
+            return null;
+        }
+
+        Long providerId = provider.getId();
+        String slug = rootSlug(group.fullPath());
+
+        Team team = teamRepository
+            .findByNativeIdAndProviderId(nativeId, providerId)
+            .orElseGet(() ->
+                teamRepository
+                    .findByOrganizationIgnoreCaseAndSlugAndProviderId(rootFullPath, slug, providerId)
+                    .orElseGet(() -> {
+                        Team t = new Team();
+                        t.setNativeId(nativeId);
+                        t.setProvider(provider);
+                        t.setOrganization(rootFullPath);
+                        return t;
+                    })
+            );
+
+        boolean isNew = team.getId() == null;
+
+        team.setName(group.name());
+        team.setSlug(slug);
+        team.setHtmlUrl(group.webUrl());
+        team.setPrivacy(mapVisibility(group.visibility()));
+        team.setLastSyncAt(Instant.now());
+
+        if (group.description() != null) {
+            team.setDescription(group.description());
+        }
+
+        Team saved = teamRepository.save(team);
+
+        if (isNew) {
+            log.debug("Created GitLab root team: teamId={}, slug={}, name={}", saved.getId(), slug, group.name());
+        } else {
+            log.debug("Updated GitLab root team: teamId={}, slug={}, name={}", saved.getId(), slug, group.name());
+        }
+
+        return saved;
+    }
+
+    /**
      * Deletes a team by native ID and provider ID.
      */
     @Transactional
@@ -152,5 +224,19 @@ public class GitLabTeamProcessor {
         }
         // Fallback: return the full path if it doesn't start with root
         return fullPath;
+    }
+
+    /**
+     * Slug for the root Team: the last segment of its fullPath. Chosen so the
+     * {@code (provider_id, organization, slug)} unique constraint still holds
+     * when descendant teams (whose slugs are the relative path below the root)
+     * share the same organization.
+     */
+    static String rootSlug(String fullPath) {
+        if (fullPath == null || fullPath.isBlank()) {
+            return "";
+        }
+        int idx = fullPath.lastIndexOf('/');
+        return idx < 0 ? fullPath : fullPath.substring(idx + 1);
     }
 }

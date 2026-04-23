@@ -28,7 +28,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        parser = new PracticeDetectionResultParser(objectMapper, 100);
+        parser = new PracticeDetectionResultParser(objectMapper);
     }
 
     /** Wraps a raw JSON string in the jobOutput envelope ({rawOutput: "..."}). */
@@ -122,9 +122,8 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("truncates findings when count exceeds max instead of rejecting all")
-        void exceedsMaxTruncates() {
-            var smallParser = new PracticeDetectionResultParser(objectMapper, 2);
+        @DisplayName("keeps all findings when count is high")
+        void keepsAllFindings() {
             ObjectNode root = objectMapper.createObjectNode();
             ArrayNode arr = root.putArray("findings");
             for (int i = 0; i < 5; i++) {
@@ -133,12 +132,11 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 arr.add(f);
             }
 
-            ParseResult result = smallParser.parse(wrapRawOutput(root.toString()));
+            ParseResult result = parser.parse(wrapRawOutput(root.toString()));
 
-            // Should keep first 2, not reject all 5
-            assertThat(result.validFindings()).hasSize(2);
+            assertThat(result.validFindings()).hasSize(5);
             assertThat(result.validFindings().get(0).practiceSlug()).isEqualTo("practice-0");
-            assertThat(result.validFindings().get(1).practiceSlug()).isEqualTo("practice-1");
+            assertThat(result.validFindings().get(4).practiceSlug()).isEqualTo("practice-4");
         }
 
         @Test
@@ -557,10 +555,10 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("diffNotes exceeding max are capped")
+        @DisplayName("delivery diffNotes exceeding max are capped")
         void diffNotesExceedMaxCapped() {
             var sb = new StringBuilder("{\"diffNotes\": [");
-            for (int i = 0; i < PracticeDetectionResultParser.MAX_DIFF_NOTES + 5; i++) {
+            for (int i = 0; i < PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES + 5; i++) {
                 if (i > 0) sb.append(',');
                 sb.append(
                     "{\"filePath\": \"f%d.txt\", \"startLine\": %d, \"body\": \"Note %d\"}".formatted(i, i + 1, i)
@@ -571,7 +569,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput(raw));
 
             assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().diffNotes()).hasSize(PracticeDetectionResultParser.MAX_DIFF_NOTES);
+            assertThat(result.delivery().diffNotes()).hasSize(PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES);
         }
     }
 
@@ -741,10 +739,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("caps at MAX_DIFF_NOTES total")
+        @DisplayName("caps inline delivery notes at MAX_DELIVERY_DIFF_NOTES total")
         void capsAtMaxDiffNotes() {
-            // Create one finding with more than MAX_DIFF_NOTES suggestedDiffNotes
-            int count = PracticeDetectionResultParser.MAX_DIFF_NOTES + 5;
+            int count = PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES + 5;
             ObjectNode[] notes = new ObjectNode[count];
             for (int i = 0; i < count; i++) {
                 notes[i] = suggestedNote("src/File" + i + ".java", i + 1, "Note " + i);
@@ -758,7 +755,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput(raw));
 
             assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().diffNotes()).hasSize(PracticeDetectionResultParser.MAX_DIFF_NOTES);
+            assertThat(result.delivery().diffNotes()).hasSize(PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES);
         }
 
         @Test

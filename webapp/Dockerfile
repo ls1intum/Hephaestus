@@ -39,7 +39,7 @@ ENV BUILD_GIT_BRANCH=$COOLIFY_BRANCH
 ENV BUILD_GIT_COMMIT=$SOURCE_COMMIT
 
 RUN apk update && apk upgrade && \
-    apk add --no-cache bash sed grep && \
+    apk add --no-cache bash sed grep curl && \
     rm -rf /var/cache/apk/*
 
 COPY --from=build /app/dist /usr/share/nginx/html

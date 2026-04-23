@@ -145,7 +145,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             "main",
             "sha1abc",
             "sha1base",
-            null
+            null,
+            null // mergeCommitSha
         );
         prId = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 10).orElseThrow().getId();
     }

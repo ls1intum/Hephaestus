@@ -9,8 +9,10 @@ services:
       KEYCLOAK_REALM: hephaestus
       KEYCLOAK_CLIENT_ID: hephaestus
       KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN}
-      LEGAL_IMPRINT_HTML: ${LEGAL_IMPRINT_HTML}
-      LEGAL_PRIVACY_HTML: ${LEGAL_PRIVACY_HTML}
+      # Imprint/privacy source. Leave unset and bind-mount a host directory
+      # onto /usr/share/nginx/html/legal-overrides for forks. Use "tumaet" only
+      # for the canonical AET deployment. See docs/admin/legal-pages.mdx.
+      LEGAL_PROFILE: ${LEGAL_PROFILE:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT}
       SENTRY_DSN: ${SENTRY_DSN}
       POSTHOG_ENABLED: ${POSTHOG_ENABLED:-false}
@@ -91,6 +93,7 @@ services:
       LEADERBOARD_NOTIFICATION_ENABLED: ${LEADERBOARD_NOTIFICATION_ENABLED}
       LEADERBOARD_NOTIFICATION_TEAM: ${LEADERBOARD_NOTIFICATION_TEAM}
       LEADERBOARD_NOTIFICATION_CHANNEL_ID: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID}
+      LEADERBOARD_NOTIFICATION_WORKSPACE_SLUGS: ${LEADERBOARD_NOTIFICATION_WORKSPACE_SLUGS}
       LEADERBOARD_SCHEDULE_DAY: ${LEADERBOARD_SCHEDULE_DAY}
       LEADERBOARD_SCHEDULE_TIME: ${LEADERBOARD_SCHEDULE_TIME}
       SENTRY_DSN: ${SENTRY_DSN}
@@ -138,6 +141,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
+      - application-server-logs:/var/log/hephaestus
     networks:
       - shared-network
     labels:
@@ -239,3 +243,4 @@ networks:
 volumes:
   postgresql-data:
   git-repos:
+  application-server-logs:

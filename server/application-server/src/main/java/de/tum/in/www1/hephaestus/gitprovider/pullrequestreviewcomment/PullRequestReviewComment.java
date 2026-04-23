@@ -80,6 +80,17 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     // The line of the blob to which the comment applies. The last line of the range for a multi-line comment
     private int originalLine;
 
+    // Which side of the diff the comment refers to (RIGHT = new/head, LEFT = old/base).
+    // Derived from GitLab position (RIGHT if new_line set, LEFT if only old_line).
+    @Enumerated(EnumType.STRING)
+    @Column(length = 16)
+    private Side side;
+
+    // Which side of the diff the start of a multi-line comment range refers to.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "start_side", length = 16)
+    private Side startSide;
+
     // Whether the comment body content is outdated (i.e., code it refers to has changed)
     private Boolean outdated;
 

@@ -7,4 +7,5 @@ fragment GitLabUserFields on User {
     name
     avatarUrl
     webUrl
+    publicEmail
 }

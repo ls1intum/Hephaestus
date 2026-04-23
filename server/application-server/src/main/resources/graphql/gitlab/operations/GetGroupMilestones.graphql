@@ -1,0 +1,37 @@
+query GetGroupMilestones(
+    $fullPath: ID!
+    $first: Int!
+    $after: String
+    $includeAncestors: Boolean
+    $includeDescendants: Boolean
+) {
+    group(fullPath: $fullPath) {
+        milestones(
+            first: $first
+            after: $after
+            includeAncestors: $includeAncestors
+            includeDescendants: $includeDescendants
+        ) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                id
+                iid
+                title
+                description
+                state
+                dueDate
+                webPath
+                createdAt
+                updatedAt
+                groupMilestone
+                stats {
+                    closedIssuesCount
+                    totalIssuesCount
+                }
+            }
+        }
+    }
+}

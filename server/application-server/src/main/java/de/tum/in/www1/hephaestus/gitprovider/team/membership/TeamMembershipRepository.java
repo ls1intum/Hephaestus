@@ -1,6 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.membership;
 
+import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -27,4 +30,24 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
      * @return true if the membership exists
      */
     boolean existsByTeam_IdAndUser_Id(Long teamId, Long userId);
+
+    /**
+     * Collect distinct user IDs of every member across all teams whose
+     * {@code Team.organization} matches the given root group path (case-insensitive).
+     * <p>
+     * Used to reconcile workspace memberships from the team graph — e.g., tutors
+     * who are subgroup maintainers and therefore appear in {@code team_membership}
+     * but not in {@code organization_membership}.
+     *
+     * @param organization the root group full path (e.g., {@code "ase/introcourse"})
+     * @return distinct user IDs of all members of teams under that root group
+     */
+    @Query(
+        """
+            SELECT DISTINCT tm.user.id
+            FROM TeamMembership tm
+            WHERE LOWER(tm.team.organization) = LOWER(:organization)
+        """
+    )
+    Set<Long> findDistinctUserIdsByTeamOrganizationIgnoreCase(@Param("organization") String organization);
 }

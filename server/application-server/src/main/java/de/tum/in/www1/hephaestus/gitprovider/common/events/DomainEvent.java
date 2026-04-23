@@ -543,11 +543,26 @@ public final class DomainEvent {
     // ========================================================================
 
     /** All commit-related events. */
-    public sealed interface CommitEvent extends Event, ContextualEvent permits CommitCreated {
+    public sealed interface CommitEvent extends Event, ContextualEvent permits CommitCreated, CommitAuthorsReconciled {
+        @Nullable
         EventPayload.CommitData commit();
     }
 
     public record CommitCreated(EventPayload.CommitData commit, EventContext context) implements CommitEvent {}
+
+    /**
+     * Bulk reconciliation marker emitted after commit author identities have been
+     * resolved for a repository (via email lookup, provider user API, or server-side
+     * author harvest). Carries no per-commit payload; downstream consumers use it
+     * as a signal that previously unresolved {@code actor_id} references across the
+     * repository's ledger can now be re-evaluated.
+     */
+    public record CommitAuthorsReconciled(Long repositoryId, EventContext context) implements CommitEvent {
+        @Override
+        public EventPayload.CommitData commit() {
+            return null;
+        }
+    }
 
     // ========================================================================
     // Discussion Events

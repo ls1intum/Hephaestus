@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.activity.scoring;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
@@ -295,6 +296,24 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
             double xp = calculator.calculateStandaloneReviewCommentXp(pullRequest, 99L, 100);
 
             assertThat(xp).as("Null PR author should not block XP").isEqualTo(0.5);
+        }
+
+        @Test
+        @DisplayName("issue comments on own pull request return zero XP")
+        void calculateIssueCommentExperiencePoints_ownPullRequestComment_returnsZero() {
+            User prAuthor = createUser(10L, "pr-author");
+            PullRequest pullRequest = createPullRequest(prAuthor);
+
+            IssueComment issueComment = new IssueComment();
+            issueComment.setId(123L);
+            issueComment.setIssue(pullRequest);
+            issueComment.setAuthor(prAuthor);
+            issueComment.setBody("Author reply to tutor feedback");
+            issueComment.setHtmlUrl("https://github.com/test/test-repo/pull/1#issuecomment-123");
+
+            double xp = calculator.calculateIssueCommentExperiencePoints(issueComment);
+
+            assertThat(xp).isZero();
         }
     }
 

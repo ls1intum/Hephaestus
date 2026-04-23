@@ -47,6 +47,7 @@ public record GitLabIssueEventDTO(
         boolean confidential,
         @JsonProperty("author_id") Long authorId,
         @JsonProperty("assignee_id") @Nullable Long assigneeId,
+        @JsonProperty("milestone_id") @Nullable Long milestoneId,
         @JsonProperty("created_at") String createdAt,
         @JsonProperty("updated_at") String updatedAt,
         @JsonProperty("closed_at") @Nullable String closedAt,

@@ -59,4 +59,38 @@ public interface CommitContributorRepository extends JpaRepository<CommitContrib
      * Delete all contributors for a commit.
      */
     void deleteByCommitId(Long commitId);
+
+    /**
+     * Backfill {@code user_id} on every contributor row whose email matches
+     * {@code email} (case-insensitive) and that currently has no user attached.
+     *
+     * <p>Used by the GitLab commit→MR linker after it harvests
+     * {@code (authorEmail, author.username)} pairs from the MR GraphQL sweep:
+     * the raw commit fingerprint captured by the git backfill only records an
+     * email, but GitLab's server-side resolver knows the author account for
+     * every email it recognises. Propagating that mapping back to the ledger
+     * closes the gap for authors whose email does not match the
+     * {@link de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver}
+     * TUM/LRZ/noreply heuristics (e.g. {@code firstname.lastname@tum.de}).
+     *
+     * <p>The scope is intentionally narrow: we never overwrite an existing
+     * {@code user_id}, and repositories other than the one being synced are
+     * updated intentionally because contributor rows in separate repos share
+     * the same email/user identity.
+     *
+     * @param email  the commit-author email to match (case-insensitive)
+     * @param userId the database user id to attach
+     * @return the number of rows updated
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        UPDATE commit_contributor
+        SET user_id = :userId
+        WHERE LOWER(email) = LOWER(:email) AND user_id IS NULL
+        """,
+        nativeQuery = true
+    )
+    int backfillUserIdByEmail(@Param("email") String email, @Param("userId") Long userId);
 }

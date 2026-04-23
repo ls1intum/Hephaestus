@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { LegalPage } from "@/components/info/LegalPage";
-import environment from "@/environment";
+import { LEGAL_PAGE_TITLES } from "@/lib/legal";
 
 export const Route = createFileRoute("/privacy")({
 	component: PrivacyContainer,
 });
 
-export function PrivacyContainer() {
-	return <LegalPage title="Privacy Policy" content={environment.legal.privacyHtml} />;
+function PrivacyContainer() {
+	return <LegalPage page="privacy" title={LEGAL_PAGE_TITLES.privacy} />;
 }

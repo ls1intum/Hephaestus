@@ -1,0 +1,134 @@
+---
+id: legal-pages
+sidebar_position: 2
+title: Legal Pages (Imprint & Privacy)
+description: How Hephaestus resolves the /imprint and /privacy pages, and what the operator of a self-hosted deployment is responsible for.
+---
+
+Hephaestus ships with two legal pages, `/imprint` and `/privacy`, that are rendered from Markdown files served directly by nginx. This page explains the three-layer resolution used by the webapp, and what each self-hosted operator is responsible for.
+
+:::danger Serving the built-in disclaimer in production is a legal violation
+If your deployment is reachable to end users and `/imprint` or `/privacy` still show the red "not configured" banner, you are operating without a valid imprint (§ 5 DDG) and without a valid privacy statement (Art. 13 GDPR). Either select `LEGAL_PROFILE=tumaet` (if you are the canonical TUM / AET deployment) or mount your own `/legal-overrides/` directory **before** opening the deployment to users.
+:::
+
+## Operator obligations
+
+Regardless of where you get the source code, **the operator of a running Hephaestus instance is the controller** for the personal data processed by that instance within the meaning of Art. 4(7) GDPR, and the **content provider** within the meaning of § 5 DDG (Digitale-Dienste-Gesetz). Neither obligation can be satisfied by linking to the upstream `hephaestus.aet.cit.tum.de` pages, and neither obligation can be delegated to the Hephaestus project.
+
+Practically, every running deployment must publish:
+
+1. an **imprint** that directly identifies the operator (§ 5 DDG — name, postal address, phone, email, VAT ID if applicable, authorised representative, regulatory authority); and
+2. a **privacy statement** compliant with Art. 13 and Art. 14 GDPR covering at least authentication, repository synchronisation, server logs, error telemetry, and any optional features (LLM / Slack) that the deployment has enabled.
+
+The only situation in which it is safe to operate without configuring one of these is a strictly-internal, zero-data, local-development deployment.
+
+## Three-layer resolution
+
+At page load, the webapp fetches the relevant Markdown file in this priority order — first hit wins:
+
+| Priority | Path                                              | Typical source                         |
+| -------: | ------------------------------------------------- | -------------------------------------- |
+|       1. | `/legal-overrides/<page>.md`                      | Bind-mounted by the operator           |
+|       2. | `/legal/profiles/<LEGAL_PROFILE>/<page>.md`       | Baked into the image (bundled profile) |
+|       3. | `/legal/_disclaimer/<page>.md`                    | Shipped safety-fallback                |
+
+`<page>` is `imprint` or `privacy`. A banner alerts end users whenever the disclaimer is being served.
+
+## Choosing a configuration mode
+
+### Mode A — Bundled profile (operators of `hephaestus.aet.cit.tum.de`)
+
+If your deployment is the canonical TUM / AET deployment, set `LEGAL_PROFILE=tumaet` in your environment. No other configuration is needed — the `tumaet` profile is baked into the webapp image and contains the audited texts matching the [DSMS record](./dsms) on file at TUM.
+
+```env
+LEGAL_PROFILE=tumaet
+```
+
+Other operators must **not** select `LEGAL_PROFILE=tumaet` — the `tumaet` profile names TU München and the AET research group as the responsible parties and would be legally inaccurate for any other deployment.
+
+### Mode B — Deployment-specific overrides (recommended for forks)
+
+This is the recommended mode for self-hosters. You author two Markdown files and bind-mount them into the webapp container. They shadow the bundled profile (if any) and the safety-fallback.
+
+1. Create a directory next to your Compose file:
+
+    ```text
+    legal-overrides/
+    ├── imprint.md
+    └── privacy.md
+    ```
+
+2. Mount the directory read-only into the webapp container at `/usr/share/nginx/html/legal-overrides`:
+
+    ```yaml
+    services:
+      webapp:
+        environment:
+          LEGAL_PROFILE: ""      # leave empty; overrides take priority anyway
+        volumes:
+          - ./legal-overrides:/usr/share/nginx/html/legal-overrides:ro
+    ```
+
+    On Kubernetes, project the Markdown files into the same path via a `ConfigMap` volume. The simplest form mounts the whole ConfigMap as the directory:
+
+    ```yaml
+    volumes:
+      - name: legal-overrides
+        configMap:
+          name: hephaestus-legal-overrides   # keys: imprint.md, privacy.md
+    volumeMounts:
+      - name: legal-overrides
+        mountPath: /usr/share/nginx/html/legal-overrides
+        readOnly: true
+    ```
+
+    If you must overlay only a subset of files onto an existing directory, use `items` with `subPath` (or a `projected` volume) — otherwise the ConfigMap mount hides the directory's original contents. A ConfigMap is limited to ~1 MiB in total, comfortably above the size of both pages.
+
+3. On Coolify, add `/usr/share/nginx/html/legal-overrides` as a **Bind Mount** (not a Volume) so the files remain editable from the host filesystem. The file paths are checked on each request, so you can update them by editing the files in the mount — no redeploy needed.
+
+Overrides always win, so you can safely combine Mode A with a single-file override (for example, `privacy.md` only) when you are operating a derivative deployment and want to keep the upstream imprint.
+
+### Mode C — Built-in fallback (developer default, not a production configuration)
+
+If `LEGAL_PROFILE` is empty and no overrides are mounted, the webapp serves a clearly-worded placeholder (`_disclaimer/*.md`) that tells visitors no legal content has been configured and asks them to contact the operator directly. A red banner is shown in the UI. This is **not** a valid imprint or privacy statement and must not be used in production — it is intended for local development and for catching misconfigured deployments loudly rather than silently.
+
+## Authoring guidelines for a custom privacy statement
+
+Use Art. 13 GDPR as the outline. Hephaestus processes personal data in at least the following categories, which your privacy statement must cover:
+
+- **Identity and authentication** — Keycloak-federated identity provider (GitHub / LRZ GitLab / anything you enable), associated user ID, login, email, display name.
+- **Repository synchronisation** — for every configured repository: pull/merge requests, issues, reviews, review comments, commit metadata, profile information of the authors.
+- **Account settings and notification email** — user preferences, notification subscriptions, optional self-provided notification email.
+- **AI-assisted features** — if enabled: messages sent to the configured LLM provider, persisted conversations, generated findings.
+- **Server logs** — IP address, request metadata (Art. 6(1)(e) or (f) depending on your legal framing).
+- **Error telemetry** — if you run a Sentry (or equivalent) instance, state so explicitly and link its retention policy.
+
+For German public universities, the legal basis is typically Art. 6(1)(e) GDPR in conjunction with the applicable state higher-education act; Art. 6(1)(f) is not available for tasks carried out in the performance of a statutory public duty (Art. 6(1) Unterabsatz 2 GDPR). Private operators should use Art. 6(1)(b) GDPR (contract) and, for logging / security, Art. 6(1)(f) GDPR (legitimate interest).
+
+Third-country transfers — if you enable the Anthropic or OpenAI LLM providers — must be covered under Chapter V GDPR. All three mainstream providers (OpenAI, Anthropic, Microsoft) are currently DPF-certified; the primary safeguard is the Commission adequacy decision under Art. 45(3) GDPR in relation to the DPF, with Standard Contractual Clauses under Art. 46(2)(c) GDPR contracted as a fall-back for any processing not covered by the recipient's DPF certification.
+
+## Verifying the configuration
+
+After deploying, confirm the correct layer is serving each page. A 200 status is not sufficient — SPA-catchall proxies frequently return `200 text/html` for missing files. Check both the status **and** the content type:
+
+```sh
+curl -sI https://<your-host>/legal-overrides/privacy.md \
+  | grep -E '^(HTTP|Content-Type)'   # expect 200 + text/markdown if overrides are mounted
+curl -sI https://<your-host>/legal/profiles/<profile>/privacy.md \
+  | grep -E '^(HTTP|Content-Type)'
+curl -sI https://<your-host>/legal/_disclaimer/privacy.md \
+  | grep -E '^(HTTP|Content-Type)'   # always 200 + text/markdown
+```
+
+Then fetch the body of the layer you expect to be served and confirm it is your content:
+
+```sh
+curl -s https://<your-host>/imprint | head -c 200   # SPA shell
+curl -s https://<your-host>/legal-overrides/privacy.md | head -n 3   # should start with your heading
+```
+
+Finally, open `/imprint` and `/privacy` in a browser. If the red "not configured" banner appears, the disclaimer is being served and you still owe a configuration.
+
+## Changing the texts over time
+
+Markdown files are static resources. Overrides under `/legal-overrides/` are served with `Cache-Control: no-cache, must-revalidate`, so an edit on the host takes effect on the next page load (browsers revalidate every time). The bundled `/legal/` layer is served with `max-age=300`, so edits to a bundled profile require a rebuild and up to five minutes for caches to clear. When you ship a new bundled profile that replaces a previous one, update the text in place under `webapp/public/legal/profiles/<profile>/` and rebuild the image; there is no extra registry to maintain.
