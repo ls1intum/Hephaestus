@@ -1,7 +1,7 @@
-# syntax=docker/dockerfile:1.4
+# syntax=docker/dockerfile:1.23@sha256:2780b5c3bab67f1f76c781860de469442999ed1a0d7992a5efdf2cffc0e3d769
 # Claude Code agent container image
 # Used by ClaudeCodeAgentAdapter — command set by SandboxSpec, no entrypoint.
-ARG NODE_TAG=22-slim
+ARG NODE_TAG=22-slim@sha256:d415caac2f1f77b98caaf9415c5f807e14bc8d7bdea62561ea2fef4fbd08a73c
 FROM node:${NODE_TAG}
 
 ARG TARGETARCH
