@@ -104,9 +104,13 @@ class DiffNotePoster {
         // Resolve PR node ID via injected comment poster (reuses same GraphQL query)
         String prNodeId = commentPoster.resolveGitHubPrNodeId(scopeId, parts[0], parts[1], prNumber);
 
-        // Build threads array for the review
+        // Build threads array for the review (skip image notes — GitHub doesn't support them)
         List<Map<String, Object>> threads = new ArrayList<>();
         for (DiffNote note : diffNotes) {
+            if (note.isImageNote()) {
+                log.debug("Skipping image diff note on GitHub (unsupported): file={}", note.filePath());
+                continue;
+            }
             String sanitizedBody = PullRequestCommentPoster.sanitize(note.body());
             if (sanitizedBody.isBlank()) {
                 continue;
@@ -223,25 +227,38 @@ class DiffNotePoster {
             }
 
             try {
-                // Build DiffPositionInput
+                // Build position input — different for text vs image notes
                 Map<String, Object> position = new HashMap<>();
                 position.put("headSha", mrInfo.headSha);
                 position.put("startSha", mrInfo.startSha);
                 position.put("baseSha", mrInfo.baseSha);
                 Map<String, String> paths = new HashMap<>();
                 paths.put("newPath", note.filePath());
-                // oldPath required for GitLab to match the note position to the diff
-                // file in the Changes tab. Correct for new and modified files.
-                // For renamed files oldPath should be the pre-rename path, but the
-                // DiffNote record only carries the new path. Renames are rare in
-                // student assignments; if needed, resolve from MR diff metadata.
                 paths.put("oldPath", note.filePath());
                 position.put("paths", paths);
-                position.put("newLine", note.startLine());
+
+                String documentName;
+                String errorsField;
+
+                if (note.isImageNote()) {
+                    // Image diff note — targets pixel coordinates on a PNG
+                    var img = note.imagePosition();
+                    position.put("x", img.x());
+                    position.put("y", img.y());
+                    position.put("width", img.width());
+                    position.put("height", img.height());
+                    documentName = "CreateImageDiffNote";
+                    errorsField = "createImageDiffNote.errors";
+                } else {
+                    // Text diff note — targets a line number
+                    position.put("newLine", note.startLine());
+                    documentName = "CreateDiffNote";
+                    errorsField = "createDiffNote.errors";
+                }
 
                 ClientGraphQlResponse response = gitLabProvider
                     .forScope(scopeId)
-                    .documentName("CreateDiffNote")
+                    .documentName(documentName)
                     .variable("noteableId", mrInfo.globalId)
                     .variable("body", sanitizedBody + "\n" + HEPHAESTUS_MARKER)
                     .variable("position", position)
@@ -254,15 +271,16 @@ class DiffNotePoster {
                     continue;
                 }
 
-                List<String> errors = response.field("createDiffNote.errors").getValue();
+                List<String> errors = response.field(errorsField).getValue();
                 if (errors != null && !errors.isEmpty()) {
-                    // Fallback: if line is outside diff hunk, post as regular MR comment
+                    // Fallback: if position error, post as regular MR comment
                     if (isLineCodeError(errors)) {
                         log.info(
-                            "Diff note line outside diff hunk, falling back to MR comment: jobId={}, file={}, line={}",
+                            "Diff note position error, falling back to MR comment: jobId={}, file={}, type={}, errors={}",
                             job.getId(),
                             note.filePath(),
-                            note.startLine()
+                            note.isImageNote() ? "image" : "line:" + note.startLine(),
+                            errors
                         );
                         if (postFallbackComment(scopeId, mrInfo.globalId, note, sanitizedBody, job)) {
                             posted++;
@@ -273,10 +291,10 @@ class DiffNotePoster {
                     }
                     failed++;
                     log.warn(
-                        "GitLab createDiffNote failed: jobId={}, file={}, line={}, errors={}",
+                        "GitLab diff note failed: jobId={}, file={}, type={}, errors={}",
                         job.getId(),
                         note.filePath(),
-                        note.startLine(),
+                        note.isImageNote() ? "image" : "line:" + note.startLine(),
                         errors
                     );
                     continue;
@@ -437,13 +455,10 @@ class DiffNotePoster {
         AgentJob job
     ) {
         try {
-            String fallbackBody = String.format(
-                "**`%s:%d`**\n\n%s\n%s",
-                note.filePath(),
-                note.startLine(),
-                sanitizedBody,
-                HEPHAESTUS_MARKER
-            );
+            String location = note.isImageNote()
+                ? String.format("`%s` (image annotation)", note.filePath())
+                : String.format("`%s:%d`", note.filePath(), note.startLine());
+            String fallbackBody = String.format("**%s**\n\n%s\n%s", location, sanitizedBody, HEPHAESTUS_MARKER);
             ClientGraphQlResponse response = gitLabProvider
                 .forScope(scopeId)
                 .documentName("CreateMergeRequestNote")

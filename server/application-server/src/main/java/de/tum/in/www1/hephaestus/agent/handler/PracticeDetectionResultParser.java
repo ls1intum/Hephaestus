@@ -335,38 +335,7 @@ public class PracticeDetectionResultParser {
             return null;
         }
 
-        // Required: startLine (positive integer)
-        JsonNode startLineNode = entry.get("startLine");
-        if (startLineNode == null || startLineNode.isNull() || !startLineNode.isNumber()) {
-            log.debug(
-                "Skipping suggestedDiffNote at finding {}, index {}: missing or non-numeric startLine",
-                findingIndex,
-                noteIndex
-            );
-            return null;
-        }
-        int startLine = startLineNode.asInt();
-        if (startLine <= 0) {
-            log.debug(
-                "Skipping suggestedDiffNote at finding {}, index {}: startLine must be positive, got {}",
-                findingIndex,
-                noteIndex,
-                startLine
-            );
-            return null;
-        }
-
-        // Optional: endLine (positive integer, must be >= startLine)
-        Integer endLine = null;
-        JsonNode endLineNode = entry.get("endLine");
-        if (endLineNode != null && !endLineNode.isNull() && endLineNode.isNumber()) {
-            int endLineValue = endLineNode.asInt();
-            if (endLineValue >= startLine) {
-                endLine = endLineValue;
-            }
-        }
-
-        // Required: body
+        // Required: body (shared by both text and image notes)
         JsonNode bodyNode = entry.get("body");
         if (bodyNode == null || bodyNode.isNull() || !bodyNode.isTextual() || bodyNode.asText().isBlank()) {
             log.debug("Skipping suggestedDiffNote at finding {}, index {}: missing body", findingIndex, noteIndex);
@@ -384,7 +353,76 @@ public class PracticeDetectionResultParser {
             body = body.substring(0, MAX_DIFF_NOTE_BODY_LENGTH);
         }
 
-        return new DiffNote(filePath, startLine, endLine, body);
+        // Image note: imagePosition takes precedence over startLine when present
+        JsonNode imgPosNode = entry.get("imagePosition");
+        if (imgPosNode != null && !imgPosNode.isNull() && imgPosNode.isObject()) {
+            Integer ix = intField(imgPosNode, "x");
+            Integer iy = intField(imgPosNode, "y");
+            Integer iw = intField(imgPosNode, "width");
+            Integer ih = intField(imgPosNode, "height");
+            if (
+                ix != null &&
+                iy != null &&
+                iw != null &&
+                ih != null &&
+                iw > 0 &&
+                ih > 0 &&
+                ix >= 0 &&
+                iy >= 0 &&
+                ix <= iw &&
+                iy <= ih
+            ) {
+                return DiffNote.image(filePath, ix, iy, iw, ih, body);
+            }
+            log.debug(
+                "Skipping invalid imagePosition at finding {}, index {}: x={}, y={}, w={}, h={}",
+                findingIndex,
+                noteIndex,
+                ix,
+                iy,
+                iw,
+                ih
+            );
+        }
+
+        // Text note: startLine is required when imagePosition is absent
+        JsonNode startLineNode = entry.get("startLine");
+        if (startLineNode == null || startLineNode.isNull() || !startLineNode.isNumber()) {
+            log.debug(
+                "Skipping suggestedDiffNote at finding {}, index {}: missing startLine and no imagePosition",
+                findingIndex,
+                noteIndex
+            );
+            return null;
+        }
+        int startLine = startLineNode.asInt();
+        if (startLine <= 0) {
+            log.debug(
+                "Skipping suggestedDiffNote at finding {}, index {}: startLine must be positive, got {}",
+                findingIndex,
+                noteIndex,
+                startLine
+            );
+            return null;
+        }
+
+        // Optional: endLine
+        Integer endLine = null;
+        JsonNode endLineNode = entry.get("endLine");
+        if (endLineNode != null && !endLineNode.isNull() && endLineNode.isNumber()) {
+            int endLineValue = endLineNode.asInt();
+            if (endLineValue >= startLine) {
+                endLine = endLineValue;
+            }
+        }
+
+        return DiffNote.text(filePath, startLine, endLine, body);
+    }
+
+    @Nullable
+    private static Integer intField(JsonNode node, String field) {
+        JsonNode n = node.get(field);
+        return (n != null && !n.isNull() && n.isNumber()) ? n.asInt() : null;
     }
 
     // =========================================================================
@@ -633,12 +671,39 @@ public class PracticeDetectionResultParser {
     public record DeliveryContent(@Nullable String mrNote, List<DiffNote> diffNotes) {}
 
     /**
-     * An inline diff note targeting a specific file and line range.
+     * An inline diff note targeting a specific file and line range, or a region on an image.
+     * For text notes: startLine is required, imagePosition is null.
+     * For image notes: imagePosition is non-null, startLine is 0 (unused).
      *
-     * @param filePath  path relative to repo root (new path, not old)
-     * @param startLine first line number (1-based, must be positive)
-     * @param endLine   optional last line number for multi-line (GitHub only; GitLab ignores)
-     * @param body      markdown comment body (sanitized before posting)
+     * @param filePath      path relative to repo root (new path, not old)
+     * @param startLine     first line number (1-based) for text notes; 0 for image notes
+     * @param endLine       optional last line number for multi-line (GitHub only; GitLab ignores)
+     * @param body          markdown comment body (sanitized before posting)
+     * @param imagePosition pixel coordinates for image diff notes (GitLab only), or null for text notes
      */
-    public record DiffNote(String filePath, int startLine, @Nullable Integer endLine, String body) {}
+    public record DiffNote(
+        String filePath,
+        int startLine,
+        @Nullable Integer endLine,
+        String body,
+        @Nullable ImagePosition imagePosition
+    ) {
+        /** Pixel coordinates targeting a region on an image file in the diff. */
+        public record ImagePosition(int x, int y, int width, int height) {}
+
+        /** Is this an image diff note? */
+        public boolean isImageNote() {
+            return imagePosition != null;
+        }
+
+        /** Factory for text diff notes. */
+        public static DiffNote text(String filePath, int startLine, @Nullable Integer endLine, String body) {
+            return new DiffNote(filePath, startLine, endLine, body, null);
+        }
+
+        /** Factory for image diff notes. */
+        public static DiffNote image(String filePath, int x, int y, int width, int height, String body) {
+            return new DiffNote(filePath, 0, null, body, new ImagePosition(x, y, width, height));
+        }
+    }
 }
