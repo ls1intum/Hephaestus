@@ -1,9 +1,7 @@
 // Hephaestus Deployment View
 // Render at https://hylimo.github.io
 //
-// This diagram shows the deployable components and their interfaces.
-// The conceptual practice-aware loop (events -> detection -> findings ->
-// channels) is in `practice-loop.hyl` — keep them paired.
+// The deployable components and their interfaces. Pair with `domain-model.hyl`.
 componentDiagram {
     w = 250
     hdist = 450

@@ -2,16 +2,16 @@
 id: conceptual-model
 sidebar_position: 2
 title: Conceptual Model
-description: Domain entities, four feedback channels, and how it all maps to the codebase.
+description: Domain entities and how they map to the codebase.
 ---
 
 # Conceptual Model
 
-The vocabulary the codebase uses, the channels feedback travels through, and how each maps to the code. The reference if you're working on Hephaestus.
+The vocabulary the codebase uses, and how each piece maps to the code. The reference if you're working on Hephaestus.
 
 ## Domain Model
 
-A workspace owns a list of practices and enrols contributors. Contributors produce artifacts and emit events as they work. Practices are read against the artifacts to produce findings. Findings travel to people through channels. People react to findings — a contestation, recorded.
+A workspace owns a list of practices and enrols contributors. Contributors produce artifacts and emit events as they work. Practices are read against the artifacts to produce findings, and findings are delivered to the contributor.
 
 <img alt="Hephaestus Domain Model" src="/img/diagrams/domain-model.svg" />
 
@@ -19,42 +19,25 @@ A workspace owns a list of practices and enrols contributors. Contributors produ
 
 | Entity | What it is | Key insight |
 |---|---|---|
-| **Workspace** | The tenant. Holds the practice list, members, and feature toggles. | Each workspace decides what "good" means. |
+| **Workspace** | The tenant. Holds the practice list and members. | Each workspace decides what "good" means. |
 | **Contributor** | A person (or agent) in a workspace. | Who Hephaestus is reading and writing to. |
 | **Artifact** | A pull request, issue, review, or comment. | What practices are read against. |
 | **Event** | A record of something that happened — a commit, a comment, a review. | The raw signal Hephaestus reads. |
 | **Practice** | A named pattern with criteria for detecting it. | The list each workspace writes for itself. |
-| **Finding** | A verdict on a practice for an artifact, with evidence and reasoning. | What gets written back to the contributor. |
-| **Channel** | The route a finding takes to a person. | How feedback travels: a comment, a dashboard, a conversation, an overview. |
-| **Contestation** | A reaction to a finding — confirm, dispute, dismiss. | How we know whether a finding landed. |
-
-### Channels
-
-Each finding goes where it can do something useful: beside the work, on a dashboard you visit, in a conversation you start, or on the overview a facilitator reads.
-
-| Channel | How it reaches you | Who reads it | Status |
-|---|---|---|---|
-| **In-context** | Pushed to the work | Author of the change | Today: PR/MR comments and inline diff notes. |
-| **Reflection** | You open it | You alone | Today: your profile (review activity). Planned: a findings reflection surface. |
-| **Conversation** | You start it | You alone | Today: the mentor in the webapp. |
-| **Overview** | A facilitator opens it | A facilitator | Planned. Today the closest surface is the team leaderboard. |
-
-Author-side practices (like *describing your change*) reach the author of the change. Reviewer-side practices (like *leaving an actionable review*) appear on the reviewer's own profile.
+| **Finding** | A verdict on a practice for an artifact, with evidence, reasoning, and guidance. | What gets delivered back to the contributor. |
 
 ### Mapping to Codebase
 
-| Entity | Implementation | Status |
-|---|---|---|
-| Workspace | `Workspace` with `WorkspaceFeatures` | Done |
-| Contributor | `User` and `WorkspaceMembership` | Done |
-| Artifact | `Issue`, `PullRequest`, `PullRequestReview`, `PullRequestReviewComment` | Done |
-| Event | `ActivityEvent` | Done |
-| Practice | `Practice` (per workspace, with detection prompt and category) | Done |
-| Finding | `PracticeFinding` (verdict, severity, evidence, reasoning, guidance) | Done |
-| Channel | Routing in `DiffNotePoster`, mentor handlers, and webapp routes | Coming as a first-class entity |
-| Contestation | `FindingFeedback` (confirm / dispute / dismiss, optionally explained) | Backend done; in-app UI coming |
+| Entity | Implementation |
+|---|---|
+| Workspace | `Workspace` with `WorkspaceFeatures` |
+| Contributor | `User` and `WorkspaceMembership` |
+| Artifact | `Issue`, `PullRequest`, `PullRequestReview`, `PullRequestReviewComment` |
+| Event | `ActivityEvent` |
+| Practice | `Practice` (per workspace, with detection prompt and category) |
+| Finding | `PracticeFinding` (verdict, severity, evidence, reasoning, guidance) |
 
-Older drafts had a separate Guidance entity. We've folded it into Finding (the text and a planned `recommendedAction`) and into Channel (the delivery).
+A finding's `guidance` text is delivered to the contributor as a comment alongside the existing review. A contributor's reaction to a finding (confirm, dispute, dismiss) is recorded by `FindingFeedback`.
 
 ---
 
@@ -75,14 +58,8 @@ What runs, and how a finding gets to a person.
 | **Intelligence Service** | Powers the mentor. |
 | **User Management** | Keycloak. GitHub signs you in. |
 | **Message Broker** | Carries events between ingestion and processing. |
-| **Git Provider** | GitHub today, GitLab in progress. |
+| **Git Provider** | GitHub or GitLab. |
 | **LLM Provider** | Whichever model you choose. The agent and the mentor each connect on their own. |
-
-### How a finding gets to a person
-
-<img alt="Hephaestus Practice-Aware Loop" src="/img/diagrams/practice-loop.svg" />
-
-Activity comes in, the agent reads it against the practice list, findings come out, and they travel through the right channel to the right person. Reactions flow back, and that's how we tell whether a finding landed.
 
 ---
 
@@ -92,4 +69,3 @@ Rendered from [HyLiMo](https://hylimo.github.io). Edit the `.hyl` and run `npm r
 
 - [`docs/diagrams/domain-model.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/domain-model.hyl)
 - [`docs/diagrams/architecture.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/architecture.hyl)
-- [`docs/diagrams/practice-loop.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/practice-loop.hyl)

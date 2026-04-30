@@ -6,17 +6,11 @@
 //   Contributors produce Artifacts and emit Events as they collaborate.
 //   The Workspace defines a Practice catalog.
 //   Practices are evaluated against Artifacts (informed by Events) to produce Findings.
-//   Findings are routed to Channels and may be Contested by the Contributor.
+//   Findings are delivered to Contributors.
 //
-// Notes on fidelity:
-//   - Workspace, Contributor, Artifact, Event, Practice, Finding, Contestation
-//     all map to live JPA entities (Workspace, User+WorkspaceMembership,
-//     Issue/PullRequest/Review/Comment, ActivityEvent, Practice, PracticeFinding,
-//     FindingFeedback respectively).
-//   - Channel is a domain concept that today exists as routing logic, not a
-//     table. It is shown to make the design intent legible. Marked <<planned>>.
-//   - Attributes prefixed `// planned:` are part of the practice-definition
-//     format described in the thesis but not yet columns in the schema.
+// Every entity here maps 1:1 to a JPA entity:
+//   Workspace, User+WorkspaceMembership, Issue/PullRequest/Review/Comment,
+//   ActivityEvent, Practice, PracticeFinding.
 classDiagram {
     vdist = 200
     hdist = 300
@@ -27,7 +21,6 @@ classDiagram {
             slug
             displayName
             status
-            practicesEnabled
         }
         section(
             "enroll()",
@@ -72,8 +65,6 @@ classDiagram {
         default {
             eventType
             occurredAt
-            targetType
-            targetId
         }
         section(
             "record()"
@@ -91,9 +82,6 @@ classDiagram {
             category
             triggerEvents
             detectionPrompt
-            // planned: indicators
-            // planned: difficulty
-            // planned: targetChannels
         }
         section(
             "define()",
@@ -112,35 +100,11 @@ classDiagram {
             confidence
             evidence
             reasoning
-            // planned: recommendedAction
+            guidance
         }
     } layout {
         width = 220
         pos = rpos(Artifact, 0, vdist)
-    }
-
-    // === Row 5: how feedback reaches people, and how they push back ===
-    class("Channel") {
-        default {
-            name
-            direction
-            audience
-            feedbackLevel
-        }
-    } layout {
-        width = 220
-        pos = rpos(Finding, hdist * 4 / 5 + 0, 0)
-    }
-
-    class("Contestation") {
-        default {
-            action
-            explanation
-            createdAt
-        }
-    } layout {
-        width = 220
-        pos = rpos(Event, 0, vdist)
     }
 
     // === Relationships ===
@@ -197,32 +161,14 @@ classDiagram {
         label("*", 0.45, -11.4)
     }
 
-    // Finding is routed to a Channel (Channel is <<planned>> — see legend)
-    Finding ..> Channel with {
-        over = start(0.5).line(end(0))
-        label("routed to", 0.5, -16, 360)
-        label("1", 0.95, 14)
-    }
-
-    // Channel reaches Contributor (closes the loop, replaces old Guidance arrow)
-    Channel ..> Contributor with {
-        over = start(0.51).axisAligned(
+    // Finding is delivered to the Contributor — closes the loop
+    Finding ..> Contributor with {
+        over = start(0.5).axisAligned(
             -1,
             rpos(Event, hdist * -2.5 / 5, 0),
             0,
             end(0.5))
-        label("reaches", 0.5, 22, 270)
+        label("delivered to", 0.5, 22, 270)
         label("*", 0.2, -22)
-    }
-
-    // Contributor may contest a Finding (RQ3 measurement)
-    Contributor -- Contestation with {
-        over = start(0.75).line(end(0.25))
-        label("*", 0.5, -16)
-    }
-
-    Contestation ..> Finding with {
-        over = start(0.5).line(end(1))
-        label("contests", 0.5, -16, 360)
     }
 }
