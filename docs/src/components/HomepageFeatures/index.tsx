@@ -22,8 +22,8 @@ const FeatureList: FeatureItem[] = [
     description:
       'Each workspace owns a versioned, inspectable practice catalog. An AI agent runs in a sandboxed Docker container, reads descriptions, commits, review threads, related issues, and contributor history, and produces structured findings — verdict, severity, evidence, recommended action.',
     bullets: [
-      'Workspace-defined catalog — your standards, not vendor prompts',
-      'Detection reads the whole pull-request lifecycle, not just the diff',
+      'Versioned, inspectable catalog owned by the workspace',
+      'Detection reads the whole pull-request lifecycle',
       'Findings carry evidence and an action; contributors confirm, dispute, or dismiss',
     ],
     cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
@@ -33,24 +33,24 @@ const FeatureList: FeatureItem[] = [
     verb: 'Coach',
     kicker: "Findings adapt to each contributor's history per practice.",
     description:
-      'In-context findings appear on the pull request as comments and inline diff notes. The conversational mentor — a reflection partner, not a coding agent — surfaces your activity, asks what is blocking you, and helps you plan.',
+      'In-context findings appear on the pull request as comments and inline diff notes. The conversational mentor surfaces your activity, asks what is blocking you, and helps you plan.',
     bullets: [
       'In-context channel: PR/MR comments and inline diff notes for the author',
-      'Conversational mentor: reflection, goal-setting, and check-ins grounded in your activity',
+      'Conversational mentor for reflection, goal-setting, and check-ins',
       'Tone shifts with the contributor — examples for newcomers, direct coaching for repeats',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
-    title: 'Private dashboards, never public ranking',
+    title: 'Private surfaces for patterns over time',
     verb: 'Reflect',
-    kicker: 'Reflection surfaces show patterns over time, scoped privately.',
+    kicker: 'Reflection surfaces show practice patterns, scoped privately.',
     description:
-      'Contributors see their own findings and practice history. Facilitators see aggregate practice signals on a coaching dashboard. Workspaces that want a weekly activity recognition surface can opt into one — never the headline.',
+      'Contributors see their own findings and practice history. Facilitators see aggregate practice signals on a coaching dashboard. Workspaces that want a weekly activity recognition surface can enable one.',
     bullets: [
-      'Reflection dashboard: your own findings and practice history, scoped privately',
-      'Facilitator dashboard: aggregate practice signals to support coaching, not grading',
-      'Optional weekly activity recognition — opt-in per workspace',
+      'Reflection dashboard: your own findings and practice history',
+      'Facilitator dashboard: aggregate practice signals that support coaching',
+      'Optional weekly activity recognition where the workspace wants it',
     ],
     cta: {label: 'See the leaderboard', to: '/user/leaderboard'},
   },

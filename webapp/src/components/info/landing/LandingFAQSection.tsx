@@ -12,7 +12,7 @@ const faqItems = [
 	{
 		key: "faq-integration",
 		q: "How does Hephaestus integrate with our existing workflow?",
-		a: "Hephaestus connects to GitHub or GitLab via webhooks. An admin installs the GitHub App (or configures the GitLab integration), contributors sign in, and findings appear on existing pull requests. No workflow changes required, and no new place contributors have to remember to check.",
+		a: "An admin installs the GitHub App (or configures the GitLab integration), contributors sign in, and findings appear on existing pull requests. No workflow changes required, and no new place contributors have to remember to check.",
 	},
 	{
 		key: "faq-good-practice",
@@ -20,29 +20,24 @@ const faqItems = [
 		a: "A practice is a named behavioural pattern with a detection prompt — for example, 'pull request descriptions explain motivation and tradeoffs' or 'reviewers leave actionable change requests, not preferences'. Practices are versioned per workspace, so each project encodes the standards that matter to it. The clearer the prompt, the more reliable the agent's findings.",
 	},
 	{
-		key: "faq-no-leaderboard",
-		q: "Why isn't there a contributor ranking on the front page?",
-		a: "Self-level feedback (rating the worker) and aggregate scoring consistently underperform task- and process-level feedback in the formative-feedback literature. Hephaestus is designed against that model: findings target the practice and the action, never the contributor's worth. Workspaces that want a weekly activity recognition surface can opt into one — but it is never the headline.",
+		key: "faq-adaptive",
+		q: "How does adaptive coaching work?",
+		a: "Each contributor has a track record per practice. The detection agent receives that history alongside the contribution and adapts: concrete examples for newcomers, direct coaching for repeat issues, reflection prompts as people improve. The conversational mentor complements in-context findings with goal-setting and reflection grounded in actual activity.",
 	},
 	{
-		key: "faq-not-a-coding-agent",
-		q: "Is Hephaestus a coding agent or a Cursor competitor?",
-		a: "No. The conversational mentor is a reflection partner — it asks what's blocking you, surfaces your own activity, and helps you plan. It does not write code, merge branches, or take actions on your behalf. Code review and synthesis tools serve a different need.",
-	},
-	{
-		key: "faq-not-a-review-bot",
-		q: "Is this a code review bot like CodeRabbit or Greptile?",
-		a: "Different goal. Diff-level review bots catch defects in the patch. Hephaestus reads the full pull-request lifecycle and produces practice findings — code-level signals are evidence, not the goal. The two stack cleanly: keep your defect bot, and add practice-aware coaching on top.",
-	},
-	{
-		key: "faq-surveillance",
-		q: "How do you avoid creating a surveillance environment?",
-		a: "Channels are scoped asymmetrically. The in-context channel addresses authors only. Reviewer-side practices appear only on private reflection surfaces. Findings are about the work, not the worker. Public ranking is not a default product feature.",
+		key: "faq-channels",
+		q: "Where do findings actually appear?",
+		a: "In-context: as PR/MR comments and inline diff notes for the author. On the reflection dashboard: a contributor's own findings and practice history, scoped privately. In conversation: with the mentor, where the contributor can articulate and reflect. For educators: on the facilitator dashboard, alongside aggregate practice signals.",
 	},
 	{
 		key: "faq-data",
 		q: "What data does Hephaestus send to LLM providers?",
 		a: "Practice detection runs in a sandboxed Docker container with access to the contribution diff, surrounding repository context, and the active practice catalog. Workspace admins control the LLM provider, resource limits, and which repositories are in scope. Self-hosting is supported.",
+	},
+	{
+		key: "faq-team-size",
+		q: "Is Hephaestus suitable for small teams?",
+		a: "Yes — a three-person student project and a forty-person engineering team use the same workspace model. Define as many or as few practices as you need.",
 	},
 ];
 

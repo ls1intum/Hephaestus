@@ -18,18 +18,18 @@ interface Differentiator {
 const DIFFERENTIATORS: Differentiator[] = [
 	{
 		icon: ScanSearch,
-		title: "Lifecycle, not diff",
-		body: "Diff-level review bots see only the patch. Hephaestus reads descriptions, commits, review threads, related issues, and the contributor's prior history — the signals that constitute *practice*, not just defects.",
+		title: "Reads the whole lifecycle",
+		body: "Descriptions, commits, review threads, related issues, and the contributor's prior history all feed detection — the full signal, not just the patch.",
 	},
 	{
 		icon: BookOpenCheck,
-		title: "Versioned definitions, not vendor prompts",
-		body: "Each practice is a first-class artifact with a category, detection criteria, and trigger events. You can read it, fork it, and change it. Detection isn't an opaque prompt buried in a SaaS pipeline.",
+		title: "Practices are first-class",
+		body: "Each practice is a versioned, inspectable artifact with a category, detection criteria, and trigger events. You read it, you fork it, you change it.",
 	},
 	{
 		icon: Radio,
-		title: "Coupled channels, not a single feed",
-		body: "Findings route to where the contributor can act on them: in-context for the moment, on a private dashboard for reflection, in conversation for articulation. Educators get their own surface. No public ranking.",
+		title: "Findings reach people through coupled channels",
+		body: "In-context for the moment, on a private dashboard for reflection, in conversation for articulation. Educators get their own surface.",
 	},
 ];
 
@@ -43,17 +43,15 @@ export function LandingWhyChooseSection({
 			<div className="container px-4 md:px-6">
 				<div className="max-w-3xl mb-10">
 					<Badge className="mb-4" variant="outline">
-						How Hephaestus differs
+						How Hephaestus works
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Practice findings, not scores.
+						Findings tied to evidence and an action.
 					</h2>
 					<p className="text-lg text-muted-foreground">
-						Developer-analytics tools surface aggregate metrics for managers. Diff-level review bots
-						annotate patches for defects. Hephaestus does neither. It detects the{" "}
-						<strong className="text-foreground">practices</strong> that constitute professional
-						contribution and feeds them back to the contributor as actionable findings tied to
-						evidence.
+						The unit of value is a <strong className="text-foreground">finding</strong>: which
+						practice, what verdict, the evidence that supports it, and the action a contributor can
+						take. Findings are about the work, not the worker.
 					</p>
 				</div>
 

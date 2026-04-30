@@ -12,8 +12,8 @@ export function AboutHeroSection() {
 				About <span className="text-provider-done-foreground">Heph</span>aestus
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-				Hephaestus extends mentor presence into the gaps where no human is available — turning
-				review activity into practice-aware feedback contributors actually use.
+				Hephaestus turns review activity into practice-aware feedback — coaching contributors on the
+				practices each project defines.
 			</p>
 		</section>
 	);

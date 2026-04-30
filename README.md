@@ -15,12 +15,6 @@ Hephaestus turns review activity into **practice-aware feedback** contributors a
 
 > Open-source. Self-hostable. Bring your own LLM provider. Integrates with GitHub (full) and GitLab (webhook ingestion + practice detection).
 
-## What this is not
-
-- **Not a leaderboard.** Aggregate scoring underperforms task- and process-level feedback. Findings target the practice and the action — never the contributor's worth.
-- **Not a defect-catching review bot.** Tools like CodeRabbit and Greptile annotate the diff. Hephaestus reads the whole PR lifecycle and produces *practice* findings; the two stack cleanly.
-- **Not a coding agent.** The conversational mentor is a reflection partner. It does not write code, merge branches, or take actions on your behalf.
-
 ## The practice-aware loop
 
 ### Detect
@@ -29,11 +23,11 @@ A versioned, inspectable **practice catalog** belongs to each workspace. An AI a
 
 ### Coach
 
-Findings adapt to each contributor's track record per practice. New contributors get concrete examples; repeat issues get direct coaching; improving contributors get reflection prompts. The **conversational mentor** complements in-context findings as a reflection partner — surfacing your activity, asking what's blocking you, and helping you plan.
+Findings adapt to each contributor's track record per practice. New contributors get concrete examples; repeat issues get direct coaching; improving contributors get reflection prompts. The **conversational mentor** complements in-context findings — surfacing your activity, asking what's blocking you, and helping you plan.
 
 ### Reflect
 
-Reflection surfaces show patterns over time, scoped privately. Contributors see their own findings and practice history. Facilitators see aggregate practice signals on a dashboard built for coaching, not grading. Workspaces that want a weekly activity recognition surface can opt into one — never the headline.
+Reflection surfaces show patterns over time, scoped privately. Contributors see their own findings and practice history. Facilitators see aggregate practice signals on a dashboard built for coaching. Workspaces that want a weekly activity recognition surface can enable one.
 
 ## Architecture
 

@@ -20,13 +20,13 @@ A **Workspace** defines a catalog of **Practices** and enrolls **Contributors**.
 | Entity | What it is | Key insight |
 |---|---|---|
 | **Workspace** | The tenant. Owns a practice catalog, members, and feature toggles. | Practices live here, not on the platform — every workspace decides what "good" means. |
-| **Contributor** | A person (or agent) participating in a workspace. | The subject of observation, the audience of guidance — never the object of ranking. |
+| **Contributor** | A person (or agent) participating in a workspace. | The subject of observation and the audience of guidance. |
 | **Artifact** | A pull request, issue, review, or comment. | What practices are evaluated against. |
 | **Event** | An immutable record of activity (commit pushed, comment posted, review submitted). | Same shape regardless of source platform; the input to detection. |
 | **Practice** | A named, versioned, inspectable behavioural pattern with detection criteria. | The vocabulary for *how* people work — defined per-workspace, not vendor-shipped. |
 | **Finding** | Immutable assessment of an artifact against a practice — verdict, severity, evidence, reasoning. | Findings are about the work, not the worker. |
 | **Channel** | The route a finding takes to a person, with audience and feedback level. | The four channels are the design contribution; routing is structural, not cosmetic. |
-| **Contestation** | A contributor's reaction to a finding (confirm, dispute, dismiss). | Contestation is *measured*, not just stored — disputes signal practice or detection drift. |
+| **Contestation** | A contributor's reaction to a finding (confirm, dispute, dismiss). | First-class signal — disputes surface practice or detection drift. |
 
 ### The Four Channels
 
@@ -39,7 +39,7 @@ Channels are the load-bearing design choice in Hephaestus. Each finding is route
 | **Conversational Mentor** | Dialogic | Contributor | Self-regulation | Webapp mentor surface |
 | **Facilitator Dashboard** | Pull | Facilitator | Decision support | Webapp educator surface |
 
-Routing is asymmetric on purpose. Author-side practices (e.g., *justifies changes with evidence*) push in-context. Reviewer-side practices (e.g., *leaves actionable change requests*) appear only on private reflection surfaces. There is no public ranking, by design.
+Routing is asymmetric on purpose. Author-side practices (e.g., *justifies changes with evidence*) push in-context to the author. Reviewer-side practices (e.g., *leaves actionable change requests*) surface on the reviewer's private reflection dashboard. Facilitators see aggregates that support coaching conversations.
 
 ### Mapping to Codebase
 

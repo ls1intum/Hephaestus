@@ -12,18 +12,18 @@ interface Commitment {
 const COMMITMENTS: Commitment[] = [
 	{
 		icon: BookOpen,
-		title: "Formative, not evaluative",
-		body: "Findings target the practice and the action — never the contributor's worth. Task and process feedback over self-level feedback. Aggregate scoring, leagues, and rankings are not feedback in the formative sense; they are evaluation by another name.",
+		title: "Formative feedback",
+		body: "Findings target a practice and the action a contributor can take. Each carries evidence and a recommended next step, so coaching has somewhere concrete to land.",
 	},
 	{
 		icon: Sparkles,
-		title: "Autonomy-supportive by design",
-		body: "Most channels are pull, not push. The in-context channel is narrow and addresses authors only. Contributors choose when to read the dashboard and when to talk to the mentor. The platform invites engagement; it does not coerce it.",
+		title: "Autonomy-supportive delivery",
+		body: "Most channels are pull, addressed to the contributor on their schedule. The in-context channel is narrow and addresses the author of the contribution. Contributors choose when to read the dashboard and when to talk to the mentor.",
 	},
 	{
 		icon: ShieldCheck,
-		title: "No surveillance dynamics",
-		body: "Author-side practices push to authors. Reviewer-side practices appear only on private reflection surfaces. Findings are about the work, not the worker. Public ranking is not a default product feature.",
+		title: "Asymmetric scoping",
+		body: "Author-side practices reach authors. Reviewer-side practices appear on private reflection surfaces. Facilitators see aggregate signals to support coaching.",
 	},
 ];
 
@@ -33,25 +33,23 @@ export function AboutMissionSection() {
 			{/* The problem */}
 			<section className="space-y-4">
 				<Badge variant="outline" className="w-fit">
-					The problem
+					Why Hephaestus
 				</Badge>
-				<h2 className="text-3xl font-bold">Practices are tacit. Mentorship is scarce.</h2>
+				<h2 className="text-3xl font-bold">Practices grow from feedback. Feedback is scarce.</h2>
 				<div className="space-y-4 text-muted-foreground leading-relaxed">
 					<p>
 						Early-stage software engineers learn the trade twice: once as a body of technical
 						knowledge, and once as a set of{" "}
 						<strong className="text-foreground">professional practices</strong> — justifying
-						changes, scoping work, engaging in review, following through. Industry surveys
-						consistently report graduates underprepared on the second track, even when the first one
-						is solid.
+						changes, scoping work, engaging in review, following through. The second track is
+						learned in the trace of collaboration: by doing the work, getting feedback on it, and
+						watching coaches in action.
 					</p>
 					<p>
-						Practices show up in the trace of collaboration, not in the curriculum. They are learned
-						by doing the work, by getting feedback, and by watching coaches in action. Generative-AI
-						assistants compound the problem: they accelerate prepared contributors and create an
-						illusion of competence in struggling ones. Good coaches close the gap — but coaches are
-						scarce. Bots fill the silence with noise; analytics tools fill it with scores. Neither
-						develops practice.
+						Hephaestus extends that coaching presence into the gaps where no human is available. It
+						observes the full pull-request lifecycle, evaluates each contribution against the
+						practices a project defines, and routes findings — with evidence and a recommended
+						action — to the contributor in the channel that fits the moment.
 					</p>
 				</div>
 			</section>
@@ -63,7 +61,7 @@ export function AboutMissionSection() {
 				<Badge variant="outline" className="w-fit">
 					Our approach
 				</Badge>
-				<h2 className="text-3xl font-bold">A method, not just a platform.</h2>
+				<h2 className="text-3xl font-bold">A method, plus the platform that runs it.</h2>
 				<div className="space-y-4 text-muted-foreground leading-relaxed">
 					<p>
 						Hephaestus contributes a method for{" "}
@@ -92,17 +90,16 @@ export function AboutMissionSection() {
 
 			<Separator />
 
-			{/* Theoretical commitments */}
+			{/* Design commitments */}
 			<section className="space-y-6">
 				<div className="space-y-4">
 					<Badge variant="outline" className="w-fit">
-						What we will not do
+						How we design
 					</Badge>
-					<h2 className="text-3xl font-bold">Three commitments we hold across the platform.</h2>
+					<h2 className="text-3xl font-bold">Three commitments that shape the platform.</h2>
 					<p className="text-muted-foreground leading-relaxed">
-						These constraints shape every product decision — what surfaces exist, what channels push
-						versus pull, what shows up on whose screen. They are easy to articulate and hard to
-						maintain when convenient compromises present themselves.
+						These principles drive every product decision — what surfaces exist, what channels push
+						versus pull, what shows up on whose screen.
 					</p>
 				</div>
 
@@ -124,29 +121,25 @@ export function AboutMissionSection() {
 
 			<Separator />
 
-			{/* Honest limitations */}
+			{/* What's next */}
 			<section className="space-y-4">
 				<Alert>
-					<AlertTitle>Honest limitations</AlertTitle>
+					<AlertTitle>What's next</AlertTitle>
 					<AlertDescription>
 						<ul className="list-disc list-outside ml-5 space-y-1.5">
 							<li>
-								Today's recognition layer surfaces contribution activity volume, not practice
-								mastery. Practice-aware recognition is on the roadmap.
+								Practice-aware recognition: indicators that reflect mastery and growth across the
+								practice catalog.
 							</li>
 							<li>
-								Practice findings are delivered to PR/MR comments today; a contributor-facing
-								dashboard for findings is in development.
+								A contributor-facing findings dashboard for the reflection channel — list, filter,
+								and respond to findings inside the webapp.
 							</li>
 							<li>
-								The conversational mentor is a reflection partner, not a coding agent — and the
-								surface will continue to evolve as we learn how it best supports self-regulated
-								practice growth.
+								Continued evolution of the conversational mentor as a partner for planning and
+								reflection grounded in finding history.
 							</li>
-							<li>
-								GitHub has full integration today; GitLab covers webhook ingestion and practice
-								detection. Closing the gap is on the roadmap.
-							</li>
+							<li>GitHub/GitLab parity across diff notes, approvals, and label sync.</li>
 						</ul>
 					</AlertDescription>
 				</Alert>

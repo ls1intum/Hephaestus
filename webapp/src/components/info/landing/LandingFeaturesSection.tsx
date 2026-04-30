@@ -17,7 +17,7 @@ const STAGES: PipelineStage[] = [
 		title: "Practice catalog + lifecycle detection",
 		description: "Define the practices that matter. Detect them across the full PR lifecycle.",
 		bullets: [
-			"Workspace-defined practice catalog — versioned and inspectable, not a vendor prompt",
+			"Versioned, inspectable practice catalog owned by the workspace",
 			"Detection reads descriptions, commits, review threads, related issues, and contributor history",
 			"Findings include verdict, severity, evidence, and a recommended action",
 		],
@@ -29,20 +29,20 @@ const STAGES: PipelineStage[] = [
 		description: "Findings adapt to each contributor's history per practice.",
 		bullets: [
 			"In-context channel: PR/MR comments and inline diff notes for the author",
-			"Conversational mentor: a reflection partner — not a coding agent — for goal-setting and check-ins",
+			"Conversational mentor for reflection, goal-setting, and check-ins",
 			"Tone shifts with the contributor's track record: examples for newcomers, direct coaching for repeats",
 		],
 	},
 	{
 		verb: "Reflect",
 		icon: ScrollText,
-		title: "Private dashboards, never public ranking",
+		title: "Private surfaces for patterns over time",
 		description:
-			"Reflection surfaces show patterns over time — for the contributor and the facilitator.",
+			"Reflection surfaces show practice patterns — for the contributor and the facilitator.",
 		bullets: [
 			"Reflection dashboard: a contributor's own findings and practice history, scoped privately",
-			"Facilitator dashboard: aggregate practice signals to support coaching, not grading",
-			"Optional weekly activity recognition for workspaces that want it — opt-in, never the headline",
+			"Facilitator dashboard: aggregate practice signals that support coaching",
+			"Optional weekly activity recognition where the workspace wants it",
 		],
 	},
 ];
