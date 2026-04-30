@@ -83,7 +83,7 @@ classDiagram {
         )
     } layout {
         width = 220
-        pos = rpos(Artifact, hdist * 4 / 5 + 0, 0)
+        pos = rpos(Artifact, hdist * 4 / 5 + 32, 1)
     }
 
     // === Row 4: assessment ===
@@ -105,31 +105,34 @@ classDiagram {
     // Project enrols Contributors (m:n via WorkspaceMembership in code)
     Project -- Contributor with {
         over = start(0.5).axisAligned(0.5, end(0))
-        label("enrols", 0.5, -16, 360)
-        label("1..*", 0.85, -22)
-        label("*", 0.1, -22)
+        label("enrols", 0.666, -23.5, 360)
+        label("1..*", 0.871, 7.4)
+        label("*", 0.088, 7.4)
     }
 
     // Project owns Artifacts (composition — repositories belong to the project)
     Project *-- Artifact with {
         over = start(0.25).axisAligned(0.5, end(0.75))
-        label("owns", 0.5, -12, 360)
-        label("1", 0.05, 12)
-        label("*", 0.95, 12)
+        label("owns", 0.469, -25, 270) layout {
+            height = 19.75
+        }
+        label("1", 0.333, 13.7)
+        label("*", 0.554, 12.6)
     }
 
     // Project defines its Practice catalog
     Project -- Practice with {
         over = start(0).axisAligned(1, end(0.75))
-        label("defines", 0.5, -12, 360)
-        label("1", 0.05, 12)
-        label("*", 0.95, 12)
+        label("defines", 0.421, -26.9, 270
+        )
+        label("1", 0.031, 23.5)
+        label("*", 0.606, 11.2)
     }
 
     // Contributor authors Artifacts
     Contributor -- Artifact with {
         over = start(0.183).line(end(0.675))
-        label("authors", 0.5, 22, 20)
+        label("authors", 0.503, 21.2, 28)
         label("*", 0.05, -12, 360)
         label("*", 0.95, 22, 360)
     }
@@ -150,47 +153,44 @@ classDiagram {
         label("*", 0.1, 22, 360)
     }
 
-    // Practice requires certain Contributions (the trigger event types)
-    Practice ..> Contribution with {
-        over = start(0).axisAligned(0.5, end(1))
-        label("requires", 0.5, -16, 360)
-        label("*", 0.05, -16)
-        label("*", 0.95, -16)
-    }
-
     // Practice produces Findings
     Practice -- Finding with {
         over = start(0.25).axisAligned(0, end(0.0))
-        label("produces", 0.5, -16, 360)
-        label("1", 0.05, -22)
+        label("produces", 0.549, -26.9, 270
+        )
+        label("1", 0.344, -12.6)
         label("*", 0.985, -22)
     }
 
     // Finding cites Contributions as evidence
     Finding ..> Contribution with {
-        over = start(0.5).line(end(0.5))
-        label("cites", 0.5, -16, 360)
-        label("1..*", 0.05, -16)
-        label("*", 0.95, -16)
+        over = start(0.625).line(end(0.125))
+        label("cites", 0.475, -22.3, 50)
+        label("1..*", 0.1, 13.4)
+        label("*", 0.866, 11.2)
     }
 
     // Finding is about a Contributor — closes the loop
     Finding ..> Contributor with {
-        over = start(0.5).axisAligned(
+        over = start(0.54).axisAligned(
             -1,
             rpos(Contribution, hdist * -2.5 / 5, 0),
             0,
-            end(0.5))
+            end(0.44))
         label("about", 0.5, 22, 270)
-        label("1", 0.95, -22)
-        label("*", 0.05, -22)
+        label("1", 0.959, -15.5)
+        label("*", 0.173, 3.4)
     }
 
     // Contributor reacts to Findings (RQ3: act on, ignore, contest)
     Contributor ..> Finding with {
-        over = start(0.75).line(end(0.25))
-        label("reacts to", 0.5, -16, 360)
-        label("*", 0.05, -16)
-        label("*", 0.95, -16)
+        over = start(0.54).axisAligned(
+            -1,
+            rpos(Contribution, hdist * -2.5 / 4, 0),
+            0,
+            end(0.44))
+        label("reacts to", 0.5, -30, 270)
+        label("*", 0.19, -19.7)
+        label("*", 0.994, -17.3)
     }
 }
