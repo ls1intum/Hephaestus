@@ -6,19 +6,15 @@ interface Stage {
 const STAGES: Stage[] = [
 	{
 		title: "Your standards, written down.",
-		body: "Each project decides what good contribution looks like — a clear pull-request description, a thoughtful review, a follow-through on commitments. Hephaestus reads from that list. Edit it any time.",
+		body: "Each project decides what good contribution looks like — a clear pull-request description, a thoughtful review, a follow-through on commitments. Yours to define.",
 	},
 	{
 		title: "Comments where the work is.",
-		body: "Findings appear on the pull request, beside the change. The contributor reads them with the rest of the review, applies what fits, and pushes back on what doesn't.",
+		body: "When a contribution comes in, a comment appears on the pull request alongside the existing review. Read it with the rest. Take what fits. Push back on what doesn't.",
 	},
 	{
 		title: "A mentor when you want to think out loud.",
-		body: "Open a conversation. Ask what to focus on this week, talk through what's stuck, plan the next push. The mentor reads the same activity you do.",
-	},
-	{
-		title: "A quiet place to look back.",
-		body: "Your profile shows what you've been working on and how your practices are trending. Private to you. There when you want it.",
+		body: "Open a conversation. Ask what to focus on this week, talk through what's stuck, plan the next push. The mentor has access to your recent activity.",
 	},
 ];
 
@@ -31,7 +27,7 @@ export function LandingFeaturesSection() {
 						How it fits into the day.
 					</h2>
 					<p className="text-lg text-muted-foreground">
-						Hephaestus sits alongside your existing review. Same place, more useful.
+						Hephaestus sits alongside your existing review.
 					</p>
 				</div>
 

@@ -5,8 +5,8 @@ export function AboutHeroSection() {
 				About <span className="text-provider-done-foreground">Heph</span>aestus
 			</h1>
 			<p className="text-xl text-muted-foreground leading-relaxed">
-				Coaching for the practices that make software work — written into the place the work already
-				happens.
+				Practice-aware feedback in software project work — alongside the review you're already
+				doing.
 			</p>
 		</section>
 	);

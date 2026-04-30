@@ -11,27 +11,27 @@ const faqItems = [
 	{
 		key: "faq-setup",
 		q: "What does it take to set up?",
-		a: "An admin connects Hephaestus to GitHub or GitLab. Contributors sign in. From the next pull request, comments appear alongside the existing review.",
+		a: "An admin connects Hephaestus to GitHub or GitLab. Contributors sign in. Once webhooks are wired up, comments appear on the next pull request alongside the existing review.",
 	},
 	{
 		key: "faq-practices",
-		q: "How does Hephaestus know what to look for?",
-		a: "Each project keeps a short list of the practices that matter — a clear pull-request description, an actionable review, a coherent commit history. The list is plain prose. You read it, edit it, and Hephaestus reads from it.",
+		q: "What does Hephaestus actually look at?",
+		a: "Each project keeps a short list of the practices that matter — a clear pull-request description, an actionable review, a coherent commit history. The list is plain prose. The contribution and the list are read together.",
 	},
 	{
 		key: "faq-different",
-		q: "How is the advice different for each contributor?",
-		a: "Hephaestus remembers what's already been said. A first-time issue gets a worked example. A repeat issue gets a sharper note. Steady improvement gets a reflection question instead of another reminder.",
+		q: "How does the advice differ for each contributor?",
+		a: "The shape of the comment draws on the recent history visible to it. A first-time issue might get a worked example. A repeat issue gets a sharper note. Steady improvement gets a reflection question instead of another reminder.",
 	},
 	{
 		key: "faq-mentor",
 		q: "What can I do with the mentor?",
-		a: "Open a thread when you want to think out loud — about what to do this week, what's blocking you, how a recent review went. The mentor sees your activity and helps you make sense of it.",
+		a: "Open a thread when you want to think out loud — about what to do this week, what's blocking you, how a recent review went. The mentor has access to your recent activity.",
 	},
 	{
 		key: "faq-data",
-		q: "What does Hephaestus send to language models?",
-		a: "Each review runs in an isolated container with the diff, surrounding code, and your project's practices. Admins choose the model provider and the repositories in scope. You can host everything yourself.",
+		q: "What does Hephaestus send to AI models?",
+		a: "Each review runs in an isolated environment with the diff, surrounding code, and your project's practices. Admins choose the AI model provider and the repositories in scope. You can host everything yourself.",
 	},
 	{
 		key: "faq-team-size",

@@ -15,20 +15,20 @@ const FeatureList: FeatureItem[] = [
   {
     title: 'Your standards, written down.',
     description:
-      "Each project keeps a short list of the practices that matter. Hephaestus reads each contribution against that list and writes back beside the change — what's working, what to try next, an example when it helps.",
+      "Each project keeps a short list of the practices that matter. When a contribution comes in, that list and the contribution are read together. A comment appears alongside the existing review — with the evidence behind it and a suggested next move.",
     cta: {label: 'See the model', to: '/contributor/conceptual-model'},
   },
   {
-    title: 'Advice that changes with the person.',
+    title: 'A mentor when you want to think out loud.',
     description:
-      "A first-time issue gets a worked example. A repeat issue gets a sharper note. Steady improvement gets a question to think on. Open the mentor when you want to plan, reflect, or talk something through.",
+      "Open a conversation when you want to plan, reflect, or talk through what's stuck. The mentor has access to your recent activity.",
     cta: {label: 'About the mentor', to: '/user/ai-mentor'},
   },
   {
-    title: 'A quiet place to look back.',
+    title: 'Self-hostable, and yours to shape.',
     description:
-      "Your profile shows what you've been working on and how your practices are trending. Private to you. There when you want it.",
-    cta: {label: 'Your profile', to: '/user/leaderboard'},
+      "Open-source. Run it on your own infrastructure, point it at your own AI model, and define the practices that matter to your project.",
+    cta: {label: 'Set it up', to: '/contributor/local-development'},
   },
 ];
 

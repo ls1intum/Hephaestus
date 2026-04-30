@@ -22,11 +22,12 @@ export function LandingHeroSection({
 				<div className="flex flex-col items-center space-y-8 text-center">
 					<div className="space-y-6 max-w-3xl">
 						<h1 className="text-5xl font-semibold tracking-tight sm:text-6xl md:text-7xl">
-							Better feedback on every pull request.
+							Feedback on the practices behind the code.
 						</h1>
 						<p className="mx-auto max-w-[640px] text-xl text-muted-foreground">
-							Hephaestus reviews each contribution against the practices your project cares about,
-							and tells the contributor — clearly, with examples — what to do next.
+							Each project keeps a list of the practices that matter. When a pull request comes in,
+							a comment appears alongside the existing review — with the evidence behind it and a
+							suggested next move.
 						</p>
 					</div>
 					<div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
@@ -62,11 +63,11 @@ function SampleComment() {
 				<p className="text-xs uppercase tracking-wide text-muted-foreground">
 					Hephaestus on pull request #142
 				</p>
-				<p className="font-medium">Add a few sentences explaining why this change.</p>
+				<p className="font-medium">Practice: a clear pull-request description.</p>
 				<p className="text-muted-foreground">
-					Your description says "fixes the bug." Two reviewers asked what bug, and how this
-					addresses it. A short paragraph — what failure you saw, and why this fix gets at the cause
-					— would save them a round trip.
+					Your description reads "fixes the bug" and two reviewers asked what bug. A short paragraph
+					— what failure you saw, and why this fix gets at the cause — would save them a round trip.
+					Worth adding before merge.
 				</p>
 			</CardContent>
 		</Card>

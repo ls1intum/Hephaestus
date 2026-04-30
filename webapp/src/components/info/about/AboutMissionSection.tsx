@@ -16,9 +16,9 @@ export function AboutMissionSection() {
 						pull request. The conversation is rare, even when the work is plentiful.
 					</p>
 					<p>
-						Hephaestus extends that conversation. It reads each contribution, holds it up against
-						the practices the project cares about, and writes back — patient, specific, with
-						examples when they help.
+						Hephaestus extends that conversation. Each contribution is read alongside the practices
+						the project has written down, and a comment appears beside it — with the evidence behind
+						it and a suggested next move.
 					</p>
 				</div>
 			</section>
@@ -29,16 +29,16 @@ export function AboutMissionSection() {
 				<h2 className="text-3xl font-semibold tracking-tight">How it talks to people.</h2>
 				<div className="space-y-4 text-lg text-muted-foreground leading-relaxed">
 					<p>
-						We write Hephaestus the way a thoughtful colleague would. The advice is about the work,
-						with evidence from the work, and it ends with something concrete to try.
+						The advice is about the work, with evidence from the work, and ends with something
+						concrete to try. Take what fits. Push back on what doesn't.
 					</p>
 					<p>
-						The mentor is a thinking partner. It doesn't write code for you. It asks what you're
-						trying to do, looks at what you've actually done, and helps you decide what to do next.
+						The mentor is a thinking partner. It doesn't write code. It's a place to articulate what
+						you're trying to do and look back at what you've done.
 					</p>
 					<p>
-						Reflection is yours alone. Your profile is private. Aggregate views exist for the people
-						coaching a team — to start better conversations, never to rank people.
+						Reflection stays close to you. A reflection dashboard is on the way; today, findings
+						land in the pull request and on your profile.
 					</p>
 				</div>
 			</section>
@@ -57,8 +57,9 @@ export function AboutMissionSection() {
 					>
 						Applied Education Technologies
 					</a>{" "}
-					group at TUM. The code is open. The list of practices is yours to write. Run it on your
-					own infrastructure, point it at your own model. Tell us what you change.
+					group at TUM. The code is open. The list of practices is yours to define — today by
+					editing seed data, soon through an in-app editor. Run it on your own infrastructure, point
+					it at your own AI model.
 				</p>
 			</section>
 		</div>

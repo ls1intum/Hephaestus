@@ -9,36 +9,33 @@
 
 # Hephaestus
 
-Better feedback on every pull request. Hephaestus reviews each contribution against the practices your project cares about, and tells the contributor — clearly, with examples — what to do next.
+Hephaestus is a research instrument and an open-source platform for **practice-aware feedback in software project work**. Each project keeps a short list of the practices that matter — describing a change so it can be reviewed, scoping work into reviewable units, leaving an actionable comment, following through on a commitment. When a pull request comes in, a comment appears alongside the existing review, with evidence and a suggested next move.
 
 <img alt="Hephaestus mascot" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
-Works with GitHub today; GitLab covers ingestion and review while we close the gap. Self-hostable, with the model provider of your choice.
+Works with GitHub and GitLab. Self-hostable, with the AI model provider of your choice.
 
 ## How it works
 
-Each project keeps a short list of the practices that matter — a clear pull-request description, a thoughtful review, a coherent commit history. Hephaestus reads from that list. When a contribution comes in, it reads the description, the diff, the review thread, the related issues, and the contributor's recent history, and writes a comment beside the change.
+A project keeps a list of the practices that matter to it. When a pull request comes in, the contribution and that list are read together — the description, the diff, the review thread, the related issues, the contributor's recent history. A comment appears beside the change, with the evidence behind it and a suggested next move. Take what fits. Push back on what doesn't.
 
-The advice changes with the contributor. A first-time issue gets a worked example. A repeat issue gets a sharper note. Steady improvement gets a question to think on.
-
-Open the mentor when you want to think out loud. Ask what to focus on this week, talk through what's stuck, plan the next push. Your profile is private to you.
+A mentor sits in the app for when you want to think out loud — a place to plan, look back, or talk through what's stuck.
 
 ## Architecture
 
 <img alt="Architecture" src="./docs/diagrams/architecture.svg" width="800">
 
-A Spring Boot server, a TypeScript service for the mentor, and a sandboxed agent runner — fronted by a React webapp and Keycloak. The agent and the mentor each talk to the model provider you choose.
-
 For entities and how they map to the codebase, see the [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributor/conceptual-model).
 
 ## Where we're going
 
-- A place inside Hephaestus to read your findings and respond to them, alongside the comments on the pull request.
-- An editor for the practice list, in the admin UI.
-- Recognition that reflects how you're growing on the practices you care about, replacing the activity-shaped scoring that's there today.
-- Lighter touch as you improve — less repetition, more reflection.
-- Closing the gap between GitHub and GitLab.
-- A mentor that grows with the work — better at planning, better at reflection, grounded in everything you've done.
+- **A reflection dashboard inside Hephaestus** for reading and responding to findings, alongside the comments on the pull request.
+- **In-app contestation.** The API exists today; the UI is next.
+- **A practice-list editor in the admin UI**, so the catalog can be shaped without editing seed data.
+- **Recognition that reflects practice growth**, replacing the activity-shaped scoring that's there today.
+- **Lighter touch as you improve** — less repetition, more reflection.
+- **Closing the gap between GitHub and GitLab** on the small surfaces that still differ.
+- **A mentor that grows with the work** — closer to the work as it accumulates.
 
 ## Documentation
 
@@ -48,4 +45,4 @@ For entities and how they map to the codebase, see the [Conceptual Model](https:
 
 ## Contributing
 
-We welcome contributions from members of our organisation and from outside it. Use a real name and a real photo, follow the [contribution guide](./CONTRIBUTING.md), and we'll meet you in the review.
+We welcome contributions from members of our organisation and from outside it. Use a real name and a real photo, and follow the [contribution guide](./CONTRIBUTING.md).

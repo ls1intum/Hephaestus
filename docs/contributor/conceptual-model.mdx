@@ -30,16 +30,16 @@ A workspace owns a list of practices and enrols contributors. Contributors produ
 
 ### Channels
 
-Each finding goes where it can do something useful: beside the work, on a dashboard you visit, in a conversation you start, or on the overview your facilitator reads.
+Each finding goes where it can do something useful: beside the work, on a dashboard you visit, in a conversation you start, or on the overview a facilitator reads.
 
-| Channel | How it reaches you | Who reads it | Where it lives |
+| Channel | How it reaches you | Who reads it | Status |
 |---|---|---|---|
-| **In-context** | Pushed to the work | The author of the change | PR/MR comments and inline diff notes |
-| **Reflection** | You open it | You alone | Your profile in the webapp |
-| **Conversation** | You start it | You alone | The mentor in the webapp |
-| **Overview** | A facilitator opens it | A facilitator | The facilitator dashboard |
+| **In-context** | Pushed to the work | Author of the change | Today: PR/MR comments and inline diff notes. |
+| **Reflection** | You open it | You alone | Today: your profile (review activity). Planned: a findings reflection surface. |
+| **Conversation** | You start it | You alone | Today: the mentor in the webapp. |
+| **Overview** | A facilitator opens it | A facilitator | Planned. Today the closest surface is the team leaderboard. |
 
-Author-side practices (like *describing your change*) reach the author of the change. Reviewer-side practices (like *leaving an actionable review*) appear on the reviewer's own profile. Facilitators see the picture across a team.
+Author-side practices (like *describing your change*) reach the author of the change. Reviewer-side practices (like *leaving an actionable review*) appear on the reviewer's own profile.
 
 ### Mapping to Codebase
 
@@ -52,7 +52,7 @@ Author-side practices (like *describing your change*) reach the author of the ch
 | Practice | `Practice` (per workspace, with detection prompt and category) | Done |
 | Finding | `PracticeFinding` (verdict, severity, evidence, reasoning, guidance) | Done |
 | Channel | Routing in `DiffNotePoster`, mentor handlers, and webapp routes | Coming as a first-class entity |
-| Contestation | `FindingFeedback` (confirm / dispute / dismiss, optionally explained) | Done |
+| Contestation | `FindingFeedback` (confirm / dispute / dismiss, optionally explained) | Backend done; in-app UI coming |
 
 Older drafts had a separate Guidance entity. We've folded it into Finding (the text and a planned `recommendedAction`) and into Channel (the delivery).
 

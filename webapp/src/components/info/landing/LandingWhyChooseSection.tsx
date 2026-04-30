@@ -17,17 +17,18 @@ export function LandingWhyChooseSection({
 		<section className="w-full py-20 md:py-32 bg-gradient-to-b from-background to-muted/30">
 			<div className="container max-w-3xl px-4 md:px-6 space-y-8">
 				<h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-					Coaching that meets the contributor where they are.
+					Findings tied to evidence and a next move.
 				</h2>
 				<div className="text-lg text-muted-foreground leading-relaxed space-y-5">
 					<p>
-						Most tools point at numbers. Hephaestus points at the work — at this pull request, at
-						this thread, at this commit message — and says what would make it better.
+						The unit of value is a finding: which practice, what was observed in the contribution,
+						the evidence behind it, and one suggested next move. Findings sit on the work — this
+						pull request, this thread, this commit message.
 					</p>
 					<p>
-						The advice changes with the person. Someone new to a practice gets an example. Someone
-						who's seen the note before gets straight to the fix. Someone who's been growing gets a
-						question to think on.
+						The shape of the comment shifts with the contributor. Someone new to a practice sees a
+						worked example. Someone who's seen the note before sees a sharper one. Someone who's
+						been at it gets a question to think on.
 					</p>
 				</div>
 
