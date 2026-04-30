@@ -1,53 +1,43 @@
 ---
 id: overview
 sidebar_position: 1
-title: Welcome to Hephaestus
-description: How Hephaestus turns review activity into practice-aware feedback you can use.
+title: Welcome
+description: A short tour of what Hephaestus does for you.
 ---
 
-Hephaestus evaluates each contribution against the practices your project defines. When something needs attention, it tells you directly — with feedback that adapts to your track record per practice.
+Hephaestus reads each pull request against the practices your project cares about, and writes back — beside the change, with examples, in language you can act on.
 
 ![Hephaestus hero illustration](./img/overview/agile_hephaestus.png)
 
-This guide is for anyone using Hephaestus at [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de) — whether you're a student, mentor, or facilitator.
+This guide is for anyone using Hephaestus at [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de) — students, mentors, course staff.
 
-## The practice-aware loop
+## What you'll see
 
-### Detect — practice findings on every contribution
+**On a pull request.** A comment from Hephaestus, alongside the rest of the review. It points at the change, says what's working or what to try, and ends with a small concrete next step. Mark it as something you've taken on, something you'd push back on, or not relevant.
 
-- Each workspace owns a **practice catalog** — your standards, not generic rules.
-- An AI agent evaluates each contribution against the catalog and produces **structured findings** with a verdict, severity, evidence, and a recommended action.
-- Confirm, dispute, or dismiss any finding. Disputes are signal, not noise — they help us tune detection and the catalog.
+**In the mentor.** A conversation when you want one. Talk through what to focus on this week, where you're stuck, what a recent review made you think about. The mentor knows what you've been working on.
 
-### Coach — adaptive guidance, in context and in conversation
+**On your profile.** A picture of your week — what you've contributed, how your practices are trending. Yours alone.
 
-- Findings appear as **PR/MR comments and inline diff notes** where the work happens.
-- The **conversational mentor (Heph)** is a reflection partner — surfacing your activity, helping you set goals, asking what is blocking you. It does not write code on your behalf.
-- Tone adapts: concrete examples for newcomers, direct coaching for repeats, reflection prompts as you improve.
-
-### Reflect — your own surfaces, scoped privately
-
-- Your **profile** shows the contributions and practice signals scoped to you.
-- A weekly **leaderboard** is available where the workspace has it enabled.
-- Optional **weekly Slack digests** spotlight standout contributors and notable work.
+**In Slack.** An optional weekly note from your workspace, if your admin has it on.
 
 :::info Workspace settings
-Admins choose which repositories are in scope, assign workspace roles, and control what is sent to LLM providers.
+Admins choose which repositories are in scope, who plays which role, and which model provider Hephaestus talks to.
 :::
 
-## Who should use this guide?
+## Who this guide is for
 
-- Students and engineers participating in a Hephaestus-enabled course or project.
-- Teaching assistants and facilitators who watch contributor progress and review practice findings.
+- Students and engineers in a course or project that uses Hephaestus.
+- Teaching assistants and supervisors who watch a team's progress.
 
-:::tip Stay on track
-This section is for end-user workflows. For deployment, architecture, or contribution guidance, jump to the **Contributor Guide** or **Admin Guide**.
+:::tip
+For deployment and contribution, head to the **Contributor Guide** or the **Admin Guide**.
 :::
 
-## Quick start
+## Get started
 
-1. Sign in with your GitHub account at [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de).
-2. Join your course or team workspace. Repositories sync automatically from your organisation's GitHub App installation.
-3. Open the **Mentor** tab to set your goals, then read findings on your pull requests as they appear.
+1. Sign in at [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de) with GitHub.
+2. Land in your workspace. Repositories sync from your organisation automatically.
+3. Read the next finding on a pull request. Open the mentor when you want to think out loud.
 
-Continue with [Getting started](./getting-started) for a hands-on walkthrough of the onboarding journey.
+Read on with [Getting started](./getting-started).

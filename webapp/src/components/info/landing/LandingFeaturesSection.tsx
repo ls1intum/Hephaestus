@@ -1,111 +1,51 @@
-import { ArrowRight, MessageCircle, Radar, ScrollText } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-interface PipelineStage {
-	verb: string;
-	icon: React.ComponentType<{ className?: string }>;
+interface Stage {
 	title: string;
-	description: string;
-	bullets: string[];
+	body: string;
 }
 
-const STAGES: PipelineStage[] = [
+const STAGES: Stage[] = [
 	{
-		verb: "Detect",
-		icon: Radar,
-		title: "Practice catalog + lifecycle detection",
-		description: "Define the practices that matter. Detect them across the full PR lifecycle.",
-		bullets: [
-			"Versioned, inspectable practice catalog owned by the workspace",
-			"Detection reads descriptions, commits, review threads, related issues, and contributor history",
-			"Findings include verdict, severity, evidence, and a recommended action",
-		],
+		title: "Your standards, written down.",
+		body: "Each project decides what good contribution looks like — a clear pull-request description, a thoughtful review, a follow-through on commitments. Hephaestus reads from that list. Edit it any time.",
 	},
 	{
-		verb: "Coach",
-		icon: MessageCircle,
-		title: "Adaptive guidance, in context and in conversation",
-		description: "Findings adapt to each contributor's history per practice.",
-		bullets: [
-			"In-context channel: PR/MR comments and inline diff notes for the author",
-			"Conversational mentor for reflection, goal-setting, and check-ins",
-			"Tone shifts with the contributor's track record: examples for newcomers, direct coaching for repeats",
-		],
+		title: "Comments where the work is.",
+		body: "Findings appear on the pull request, beside the change. The contributor reads them with the rest of the review, applies what fits, and pushes back on what doesn't.",
 	},
 	{
-		verb: "Reflect",
-		icon: ScrollText,
-		title: "Private surfaces for patterns over time",
-		description:
-			"Reflection surfaces show practice patterns — for the contributor and the facilitator.",
-		bullets: [
-			"Reflection dashboard: a contributor's own findings and practice history, scoped privately",
-			"Facilitator dashboard: aggregate practice signals that support coaching",
-			"Optional weekly activity recognition where the workspace wants it",
-		],
+		title: "A mentor when you want to think out loud.",
+		body: "Open a conversation. Ask what to focus on this week, talk through what's stuck, plan the next push. The mentor reads the same activity you do.",
+	},
+	{
+		title: "A quiet place to look back.",
+		body: "Your profile shows what you've been working on and how your practices are trending. Private to you. There when you want it.",
 	},
 ];
 
 export function LandingFeaturesSection() {
 	return (
-		<section id="features" className="w-full py-12 md:py-24 bg-background">
-			<div className="container px-4 md:px-6">
-				<div className="mb-12 text-center max-w-3xl mx-auto">
-					<Badge className="mb-4" variant="outline">
-						The Practice-Aware Loop
-					</Badge>
-					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Detect → Coach → Reflect
+		<section id="features" className="w-full py-20 md:py-32 bg-background">
+			<div className="container max-w-4xl px-4 md:px-6 space-y-16">
+				<div className="space-y-4 max-w-2xl">
+					<h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+						How it fits into the day.
 					</h2>
-					<p className="text-muted-foreground text-lg">
-						Three stages, four channels, one closed loop. Activity becomes findings; findings reach
-						people through the channel that fits the moment; reactions feed back into detection.
+					<p className="text-lg text-muted-foreground">
+						Hephaestus sits alongside your existing review. Same place, more useful.
 					</p>
 				</div>
 
-				<div className="grid gap-6 md:grid-cols-3">
-					{STAGES.map((stage, index) => (
-						<PipelineCard key={stage.verb} stage={stage} isLast={index === STAGES.length - 1} />
+				<div className="space-y-12">
+					{STAGES.map((stage) => (
+						<div key={stage.title} className="space-y-2">
+							<h3 className="text-2xl font-semibold tracking-tight">{stage.title}</h3>
+							<p className="text-lg text-muted-foreground leading-relaxed max-w-2xl">
+								{stage.body}
+							</p>
+						</div>
 					))}
 				</div>
 			</div>
 		</section>
-	);
-}
-
-function PipelineCard({ stage, isLast }: { stage: PipelineStage; isLast: boolean }) {
-	const Icon = stage.icon;
-	return (
-		<div className="relative">
-			<Card className="h-full">
-				<CardHeader>
-					<div className="flex items-center gap-2 mb-2">
-						<Icon className="h-5 w-5 text-primary" />
-						<Badge variant="secondary" className="font-mono text-[10px]">
-							{stage.verb}
-						</Badge>
-					</div>
-					<CardTitle className="text-lg">{stage.title}</CardTitle>
-					<CardDescription>{stage.description}</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<ul className="space-y-2 text-sm">
-						{stage.bullets.map((bullet) => (
-							<li key={bullet} className="flex gap-2">
-								<span className="text-muted-foreground mt-0.5">—</span>
-								<span>{bullet}</span>
-							</li>
-						))}
-					</ul>
-				</CardContent>
-			</Card>
-			{!isLast && (
-				<ArrowRight
-					aria-hidden
-					className="hidden md:block absolute -right-4 top-12 h-6 w-6 text-muted-foreground/40"
-				/>
-			)}
-		</div>
 	);
 }

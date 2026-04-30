@@ -3,9 +3,7 @@ import { fn } from "storybook/test";
 import { LandingHeroSection } from "./LandingHeroSection";
 
 /**
- * Hero section component that introduces Hephaestus with a prominent headline,
- * description, and call-to-action buttons. Features a sample practice finding
- * card that demonstrates the unit of value: practice + verdict + evidence + action.
+ * Landing hero with a sample comment from Hephaestus on a pull request.
  */
 const meta = {
 	component: LandingHeroSection,
@@ -14,7 +12,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"The hero section serves as the main entry point to the landing page, featuring a clear value proposition and preview of the platform's key features.",
+					"The hero: a short pitch and a sample comment Hephaestus might leave on a pull request.",
 			},
 		},
 	},
@@ -48,8 +46,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default hero section for first-time visitors.
- * Features "Sign in with GitHub" CTA and a sample finding card.
+ * Default hero for first-time visitors. Sign-in CTA and a sample comment card.
  */
 export const Default: Story = {
 	args: {

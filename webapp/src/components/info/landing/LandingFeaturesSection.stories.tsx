@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { LandingFeaturesSection } from "./LandingFeaturesSection";
 
 /**
- * Features section component that renders the practice-aware loop as a
- * three-stage pipeline: Detect → Coach → Reflect.
+ * The features section: four short paragraphs describing how Hephaestus
+ * fits into the day.
  */
 const meta = {
 	component: LandingFeaturesSection,
@@ -11,8 +11,7 @@ const meta = {
 		layout: "padded",
 		docs: {
 			description: {
-				component:
-					"The features section renders the practice-aware loop as a three-stage pipeline (Detect → Coach → Reflect) and frames each stage by the channels and surfaces it serves.",
+				component: "Four short paragraphs about how Hephaestus fits into the day.",
 			},
 		},
 	},
@@ -22,7 +21,5 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default features section: Detect → Coach → Reflect.
- */
+/** Default features section. */
 export const Default: Story = {};

@@ -1,9 +1,7 @@
-import { ArrowRight, ChevronDown, FileText, MessageSquareText, Quote } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface LandingHeroSectionProps {
 	onSignIn: () => void;
@@ -22,17 +20,16 @@ export function LandingHeroSection({
 		<section className="w-full bg-gradient-to-b from-background to-muted/30 pt-8 md:pt-16 lg:pt-24 text-foreground">
 			<div className="container mx-auto px-4 md:px-6 mb-12">
 				<div className="flex flex-col items-center space-y-8 text-center">
-					<div className="space-y-4 max-w-3xl">
-						<h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
-							Practice-aware feedback for every contribution.
+					<div className="space-y-6 max-w-3xl">
+						<h1 className="text-5xl font-semibold tracking-tight sm:text-6xl md:text-7xl">
+							Better feedback on every pull request.
 						</h1>
-						<p className="mx-auto max-w-[720px] text-xl text-muted-foreground">
-							Define the practices that matter for your project. Hephaestus reads the full
-							pull-request lifecycle, evaluates each contribution against your catalog, and delivers
-							findings — with evidence and an action — to the contributor.
+						<p className="mx-auto max-w-[640px] text-xl text-muted-foreground">
+							Hephaestus reviews each contribution against the practices your project cares about,
+							and tells the contributor — clearly, with examples — what to do next.
 						</p>
 					</div>
-					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+					<div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
 						{isSignedIn ? (
 							<Button onClick={onGoToDashboard} size="lg" className="gap-2">
 								Go to Dashboard <ArrowRight className="h-4 w-4" />
@@ -44,104 +41,34 @@ export function LandingHeroSection({
 								className="w-full justify-center sm:w-auto"
 							/>
 						)}
-						<Button variant="outline" size="lg" onClick={onLearnMoreClick} className="gap-2">
+						<Button variant="ghost" size="lg" onClick={onLearnMoreClick} className="gap-2">
 							Learn more <ChevronDown className="h-4 w-4" />
 						</Button>
 					</div>
 				</div>
 			</div>
 
-			{/* Sample finding — the unit of value */}
-			<div className="mx-auto max-w-3xl px-4 md:px-6">
-				<SampleFindingCard />
+			<div className="mx-auto max-w-2xl px-4 md:px-6">
+				<SampleComment />
 			</div>
 		</section>
 	);
 }
 
-function SampleFindingCard() {
+function SampleComment() {
 	return (
-		<Card className="shadow-xl border-muted -mb-6 overflow-hidden">
-			<CardHeader className="pb-3">
-				<div className="flex items-center justify-between gap-3">
-					<div className="flex items-center gap-2 min-w-0">
-						<FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-						<span className="truncate text-sm font-medium text-muted-foreground">
-							feat/add-rate-limiter — pull request #142
-						</span>
-					</div>
-					<div className="flex items-center gap-2 shrink-0">
-						<Badge variant="secondary" className="font-mono text-[10px]">
-							in-context
-						</Badge>
-						<SeverityPill level="needs-improvement" />
-					</div>
-				</div>
-				<CardTitle className="text-lg">
-					Practice: <span className="text-primary">Justifies changes with evidence</span>
-				</CardTitle>
-			</CardHeader>
-			<CardContent className="space-y-4 text-sm">
-				<FindingRow icon={Quote} label="Evidence">
-					Pull-request description reads <em>"fixes the bug"</em> with no link to an issue, no
-					reproduction, and no rationale for the chosen approach. Two reviewers asked for context in
-					the thread.
-				</FindingRow>
-				<FindingRow icon={MessageSquareText} label="Recommended action">
-					Add a one-paragraph <em>"Why this change?"</em> section: what failure mode you observed,
-					what reproduces it, and why the chosen fix addresses the cause rather than its symptom.
-				</FindingRow>
-				<div className="flex flex-wrap items-center gap-2 pt-2 border-t">
-					<span className="text-xs uppercase tracking-wide text-muted-foreground">React</span>
-					<Badge variant="outline" className="font-mono text-[10px]">
-						confirm
-					</Badge>
-					<Badge variant="outline" className="font-mono text-[10px]">
-						dispute
-					</Badge>
-					<Badge variant="outline" className="font-mono text-[10px]">
-						not applicable
-					</Badge>
-				</div>
+		<Card className="shadow-xl border-muted -mb-6 overflow-hidden text-left">
+			<CardContent className="space-y-3 p-6 text-sm leading-relaxed">
+				<p className="text-xs uppercase tracking-wide text-muted-foreground">
+					Hephaestus on pull request #142
+				</p>
+				<p className="font-medium">Add a few sentences explaining why this change.</p>
+				<p className="text-muted-foreground">
+					Your description says "fixes the bug." Two reviewers asked what bug, and how this
+					addresses it. A short paragraph — what failure you saw, and why this fix gets at the cause
+					— would save them a round trip.
+				</p>
 			</CardContent>
 		</Card>
-	);
-}
-
-function SeverityPill({ level }: { level: "looks-good" | "minor" | "needs-improvement" }) {
-	const styles = {
-		"looks-good": "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-		minor: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-		"needs-improvement": "bg-orange-500/10 text-orange-700 dark:text-orange-400",
-	};
-	const labels = {
-		"looks-good": "Looks good",
-		minor: "Minor",
-		"needs-improvement": "Needs improvement",
-	};
-	return (
-		<span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", styles[level])}>
-			{labels[level]}
-		</span>
-	);
-}
-
-interface FindingRowProps {
-	icon: React.ComponentType<{ className?: string }>;
-	label: string;
-	children: React.ReactNode;
-}
-
-function FindingRow({ icon: Icon, label, children }: FindingRowProps) {
-	return (
-		<div className="flex gap-3">
-			<Icon className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
-			<div className="space-y-1 text-left">
-				<div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-					{label}
-				</div>
-				<p className="leading-relaxed">{children}</p>
-			</div>
-		</div>
 	);
 }
