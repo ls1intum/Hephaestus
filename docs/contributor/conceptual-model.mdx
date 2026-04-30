@@ -7,24 +7,42 @@ description: Domain entities and how they map to the codebase.
 
 # Conceptual Model
 
-The vocabulary the codebase uses, and how each piece maps to the code. The reference if you're working on Hephaestus.
+The vocabulary the platform uses, and how each piece maps to the code. The reference if you're working on Hephaestus.
 
 ## Domain Model
 
-A project owns a list of practices and enrols contributors. Contributors produce artifacts and make contributions as they work. Practices are read against the artifacts to produce findings, and findings are delivered to the contributor.
+A project enrols contributors and defines a practice catalog. Contributors author artifacts and make contributions on them. A practice requires certain contributions and produces findings. A finding is about a contributor, cites the contributions that supply its evidence, and the contributor reacts to it.
 
 <img alt="Hephaestus Domain Model" src="/img/diagrams/domain-model.svg" />
 
 ### Entities
 
-| Entity | What it is | Key insight |
+| Entity | What it is | Responsibilities |
 |---|---|---|
-| **Project** | The endeavor itself. Holds the practice list and members. | Each project decides what "good" means. |
-| **Contributor** | A person (or agent) in the project. | Who Hephaestus is reading and writing to. |
-| **Artifact** | A pull request, issue, review, or comment. | What practices are read against. |
-| **Contribution** | An act of contributing — a commit, a comment, a review. | The raw signal Hephaestus reads. |
-| **Practice** | A named pattern with criteria for detecting it. | The list each project writes for itself. |
-| **Finding** | A verdict on a practice for an artifact, with evidence, reasoning, and guidance. | What gets delivered back to the contributor. |
+| **Project** | The endeavour. Holds the practice catalog and members. | Enrol contributors; define and retire practices. |
+| **Contributor** | A person (or agent) in the project. | Make contributions; react to findings. |
+| **Artifact** | A pull request, issue, review, or comment. | The site of contributions. |
+| **Contribution** | An act of contributing — a commit, a comment, a review. | The raw signal. |
+| **Practice** | A named pattern with criteria for detecting it. | Detect findings; explain itself. |
+| **Finding** | A verdict on a contributor's practice, with evidence and guidance. | What gets delivered back. |
+
+### Relationships
+
+| From | To | Verb | Cardinality |
+|---|---|---|---|
+| Project | Contributor | enrols | `1..* — *` |
+| Project | Artifact | owns | `1 — *` |
+| Project | Practice | defines | `1 — *` |
+| Contributor | Artifact | authors | `* — *` |
+| Contributor | Contribution | makes | `1 — *` |
+| Contribution | Artifact | on | `0..1 — *` |
+| Practice | Contribution | requires | `* — *` |
+| Practice | Finding | produces | `1 — *` |
+| Finding | Contribution | cites | `1..* — *` |
+| Finding | Contributor | about | `* — 1` |
+| Contributor | Finding | reacts to | `* — *` |
+
+A finding is *about* the contributor whose practice it assesses — not about the artifact. The artifact is the substrate on which contributions happen; findings reach an artifact transitively, through the contributions they cite.
 
 ### Mapping to Codebase
 
@@ -39,7 +57,7 @@ The diagram uses conceptual names; the schema uses Hephaestus-specific names. Th
 | Practice | `Practice` (per workspace, with detection prompt and category) |
 | Finding | `PracticeFinding` (verdict, severity, evidence, reasoning, guidance) |
 
-A finding's `guidance` text is delivered to the contributor as a comment alongside the existing review. A contributor's reaction to a finding (confirm, dispute, dismiss) is recorded by `FindingFeedback`.
+A finding's `guidance` text is delivered to the contributor as a comment alongside the existing review. A contributor's reaction (confirm, dispute, dismiss) is recorded by `FindingFeedback`.
 
 ---
 

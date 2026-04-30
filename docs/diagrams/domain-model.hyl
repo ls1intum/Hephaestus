@@ -2,11 +2,11 @@
 // Render at https://hylimo.github.io
 //
 // Reading order:
-//   Project + Contributor enroll the participants.
-//   Contributors produce Artifacts and make Contributions as they collaborate.
-//   The Project defines a Practice catalog.
-//   Practices are evaluated against Artifacts (informed by Contributions) to produce Findings.
-//   Findings are delivered to Contributors.
+//   A Project enrols Contributors and defines a Practice catalog.
+//   Contributors author Artifacts and make Contributions on them.
+//   A Practice requires certain Contributions and produces Findings.
+//   A Finding is about a Contributor, cites the Contributions that supply
+//   its evidence, and the Contributor reacts to it.
 //
 // Conceptual ↔ code names:
 //   Project       → Workspace (+ Repository)
@@ -14,7 +14,7 @@
 //   Artifact      → Issue / PullRequest / Review / Comment
 //   Contribution  → ActivityEvent
 //   Practice      → Practice
-//   Finding       → PracticeFinding
+//   Finding       → PracticeFinding (with FindingFeedback for reactions)
 classDiagram {
     vdist = 200
     hdist = 300
@@ -24,11 +24,11 @@ classDiagram {
         default {
             slug
             displayName
-            status
         }
         section(
-            "enroll()",
-            "definePractice()"
+            "enrol(contributor)",
+            "definePractice(practice)",
+            "retirePractice(practice)"
         )
     } layout {
         width = 220
@@ -42,7 +42,7 @@ classDiagram {
         }
         section(
             "contribute()",
-            "react()"
+            "react(finding)"
         )
     } layout {
         width = 220
@@ -54,12 +54,7 @@ classDiagram {
         default {
             kind
             title
-            lifecycleState
         }
-        section(
-            "submit()",
-            "revise()"
-        )
     } layout {
         width = 220
         pos = rpos(Project, 0, vdist)
@@ -70,9 +65,6 @@ classDiagram {
             kind
             occurredAt
         }
-        section(
-            "record()"
-        )
     } layout {
         width = 220
         pos = rpos(Contributor, 0, vdist)
@@ -84,12 +76,10 @@ classDiagram {
             slug
             name
             category
-            triggerEvents
-            detectionPrompt
         }
         section(
-            "define()",
-            "detect()"
+            "detect(contributions)",
+            "explain()"
         )
     } layout {
         width = 220
@@ -103,7 +93,6 @@ classDiagram {
             severity
             confidence
             evidence
-            reasoning
             guidance
         }
     } layout {
@@ -113,9 +102,10 @@ classDiagram {
 
     // === Relationships ===
 
-    // Project enrolls Contributors (m:n via WorkspaceMembership in code)
+    // Project enrols Contributors (m:n via WorkspaceMembership in code)
     Project -- Contributor with {
         over = start(0.5).axisAligned(0.5, end(0))
+        label("enrols", 0.5, -16, 360)
         label("1..*", 0.85, -22)
         label("*", 0.1, -22)
     }
@@ -123,56 +113,84 @@ classDiagram {
     // Project owns Artifacts (composition — repositories belong to the project)
     Project *-- Artifact with {
         over = start(0.25).axisAligned(0.5, end(0.75))
-        label("*", 0.45, 12)
+        label("owns", 0.5, -12, 360)
+        label("1", 0.05, 12)
+        label("*", 0.95, 12)
     }
 
     // Project defines its Practice catalog
     Project -- Practice with {
         over = start(0).axisAligned(1, end(0.75))
-        label("*", 0.6, 15.8)
+        label("defines", 0.5, -12, 360)
+        label("1", 0.05, 12)
+        label("*", 0.95, 12)
     }
 
     // Contributor authors Artifacts
     Contributor -- Artifact with {
         over = start(0.183).line(end(0.675))
         label("authors", 0.5, 22, 20)
-        label("1..*", 0.01, -12, 360)
+        label("*", 0.05, -12, 360)
         label("*", 0.95, 22, 360)
     }
 
     // Contributor makes Contributions
     Contributor -- Contribution with {
         over = start(0.25).axisAligned(0.5, end(0.75))
-        label("*", 0.575, 12)
+        label("makes", 0.5, -12, 360)
+        label("1", 0.05, 12)
+        label("*", 0.95, 12)
     }
 
-    // Contribution shapes an Artifact (loose link via target_type / target_id)
+    // Contribution on Artifact (loose link via target_type / target_id)
     Contribution -- Artifact with {
         over = start(0).axisAligned(0.5, end(0.5))
+        label("on", 0.5, -12, 360)
         label("0..1", 0.85, 22, 360)
         label("*", 0.1, 22, 360)
+    }
+
+    // Practice requires certain Contributions (the trigger event types)
+    Practice ..> Contribution with {
+        over = start(0).axisAligned(0.5, end(1))
+        label("requires", 0.5, -16, 360)
+        label("*", 0.05, -16)
+        label("*", 0.95, -16)
     }
 
     // Practice produces Findings
     Practice -- Finding with {
         over = start(0.25).axisAligned(0, end(0.0))
+        label("produces", 0.5, -16, 360)
+        label("1", 0.05, -22)
         label("*", 0.985, -22)
     }
 
-    // Finding evaluates Artifact
-    Finding -- Artifact with {
-        over = start(0.75).axisAligned(0.3, end(0.25))
-        label("*", 0.45, -11.4)
+    // Finding cites Contributions as evidence
+    Finding ..> Contribution with {
+        over = start(0.5).line(end(0.5))
+        label("cites", 0.5, -16, 360)
+        label("1..*", 0.05, -16)
+        label("*", 0.95, -16)
     }
 
-    // Finding is delivered to the Contributor — closes the loop
+    // Finding is about a Contributor — closes the loop
     Finding ..> Contributor with {
         over = start(0.5).axisAligned(
             -1,
             rpos(Contribution, hdist * -2.5 / 5, 0),
             0,
             end(0.5))
-        label("delivered to", 0.5, 22, 270)
-        label("*", 0.2, -22)
+        label("about", 0.5, 22, 270)
+        label("1", 0.95, -22)
+        label("*", 0.05, -22)
+    }
+
+    // Contributor reacts to Findings (RQ3: act on, ignore, contest)
+    Contributor ..> Finding with {
+        over = start(0.75).line(end(0.25))
+        label("reacts to", 0.5, -16, 360)
+        label("*", 0.05, -16)
+        label("*", 0.95, -16)
     }
 }
