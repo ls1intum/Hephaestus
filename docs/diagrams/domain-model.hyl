@@ -2,21 +2,25 @@
 // Render at https://hylimo.github.io
 //
 // Reading order:
-//   Workspace + Contributor enroll the participants.
-//   Contributors produce Artifacts and emit Events as they collaborate.
-//   The Workspace defines a Practice catalog.
-//   Practices are evaluated against Artifacts (informed by Events) to produce Findings.
+//   Project + Contributor enroll the participants.
+//   Contributors produce Artifacts and make Contributions as they collaborate.
+//   The Project defines a Practice catalog.
+//   Practices are evaluated against Artifacts (informed by Contributions) to produce Findings.
 //   Findings are delivered to Contributors.
 //
-// Every entity here maps 1:1 to a JPA entity:
-//   Workspace, User+WorkspaceMembership, Issue/PullRequest/Review/Comment,
-//   ActivityEvent, Practice, PracticeFinding.
+// Conceptual ↔ code names:
+//   Project       → Workspace (+ Repository)
+//   Contributor   → User + WorkspaceMembership
+//   Artifact      → Issue / PullRequest / Review / Comment
+//   Contribution  → ActivityEvent
+//   Practice      → Practice
+//   Finding       → PracticeFinding
 classDiagram {
     vdist = 200
     hdist = 300
 
-    // === Row 1: tenant + people ===
-    class("Workspace") {
+    // === Row 1: project + people ===
+    class("Project") {
         default {
             slug
             displayName
@@ -42,7 +46,7 @@ classDiagram {
         )
     } layout {
         width = 220
-        pos = rpos(Workspace, hdist * -1, 0)
+        pos = rpos(Project, hdist * -1, 0)
     }
 
     // === Row 2: things contributors produce ===
@@ -58,12 +62,12 @@ classDiagram {
         )
     } layout {
         width = 220
-        pos = rpos(Workspace, 0, vdist)
+        pos = rpos(Project, 0, vdist)
     }
 
-    class("Event") {
+    class("Contribution") {
         default {
-            eventType
+            kind
             occurredAt
         }
         section(
@@ -109,21 +113,21 @@ classDiagram {
 
     // === Relationships ===
 
-    // Workspace enrolls Contributors (m:n via WorkspaceMembership in code)
-    Workspace -- Contributor with {
+    // Project enrolls Contributors (m:n via WorkspaceMembership in code)
+    Project -- Contributor with {
         over = start(0.5).axisAligned(0.5, end(0))
         label("1..*", 0.85, -22)
         label("*", 0.1, -22)
     }
 
-    // Workspace owns Artifacts (composition — repos belong to the tenant)
-    Workspace *-- Artifact with {
+    // Project owns Artifacts (composition — repositories belong to the project)
+    Project *-- Artifact with {
         over = start(0.25).axisAligned(0.5, end(0.75))
         label("*", 0.45, 12)
     }
 
-    // Workspace defines its Practice catalog
-    Workspace -- Practice with {
+    // Project defines its Practice catalog
+    Project -- Practice with {
         over = start(0).axisAligned(1, end(0.75))
         label("*", 0.6, 15.8)
     }
@@ -136,14 +140,14 @@ classDiagram {
         label("*", 0.95, 22, 360)
     }
 
-    // Contributor performs Events
-    Contributor -- Event with {
+    // Contributor makes Contributions
+    Contributor -- Contribution with {
         over = start(0.25).axisAligned(0.5, end(0.75))
         label("*", 0.575, 12)
     }
 
-    // Event references Artifact (loose link via target_type / target_id)
-    Event -- Artifact with {
+    // Contribution shapes an Artifact (loose link via target_type / target_id)
+    Contribution -- Artifact with {
         over = start(0).axisAligned(0.5, end(0.5))
         label("0..1", 0.85, 22, 360)
         label("*", 0.1, 22, 360)
@@ -165,7 +169,7 @@ classDiagram {
     Finding ..> Contributor with {
         over = start(0.5).axisAligned(
             -1,
-            rpos(Event, hdist * -2.5 / 5, 0),
+            rpos(Contribution, hdist * -2.5 / 5, 0),
             0,
             end(0.5))
         label("delivered to", 0.5, 22, 270)

@@ -11,7 +11,7 @@ The vocabulary the codebase uses, and how each piece maps to the code. The refer
 
 ## Domain Model
 
-A workspace owns a list of practices and enrols contributors. Contributors produce artifacts and emit events as they work. Practices are read against the artifacts to produce findings, and findings are delivered to the contributor.
+A project owns a list of practices and enrols contributors. Contributors produce artifacts and make contributions as they work. Practices are read against the artifacts to produce findings, and findings are delivered to the contributor.
 
 <img alt="Hephaestus Domain Model" src="/img/diagrams/domain-model.svg" />
 
@@ -19,21 +19,23 @@ A workspace owns a list of practices and enrols contributors. Contributors produ
 
 | Entity | What it is | Key insight |
 |---|---|---|
-| **Workspace** | The tenant. Holds the practice list and members. | Each workspace decides what "good" means. |
-| **Contributor** | A person (or agent) in a workspace. | Who Hephaestus is reading and writing to. |
+| **Project** | The endeavor itself. Holds the practice list and members. | Each project decides what "good" means. |
+| **Contributor** | A person (or agent) in the project. | Who Hephaestus is reading and writing to. |
 | **Artifact** | A pull request, issue, review, or comment. | What practices are read against. |
-| **Event** | A record of something that happened — a commit, a comment, a review. | The raw signal Hephaestus reads. |
-| **Practice** | A named pattern with criteria for detecting it. | The list each workspace writes for itself. |
+| **Contribution** | An act of contributing — a commit, a comment, a review. | The raw signal Hephaestus reads. |
+| **Practice** | A named pattern with criteria for detecting it. | The list each project writes for itself. |
 | **Finding** | A verdict on a practice for an artifact, with evidence, reasoning, and guidance. | What gets delivered back to the contributor. |
 
 ### Mapping to Codebase
 
-| Entity | Implementation |
+The diagram uses conceptual names; the schema uses Hephaestus-specific names. They map 1:1.
+
+| Conceptual | Implementation |
 |---|---|
-| Workspace | `Workspace` with `WorkspaceFeatures` |
+| Project | `Workspace` (with `WorkspaceFeatures`) — a `Workspace` may contain one or more `Repository` rows |
 | Contributor | `User` and `WorkspaceMembership` |
 | Artifact | `Issue`, `PullRequest`, `PullRequestReview`, `PullRequestReviewComment` |
-| Event | `ActivityEvent` |
+| Contribution | `ActivityEvent` |
 | Practice | `Practice` (per workspace, with detection prompt and category) |
 | Finding | `PracticeFinding` (verdict, severity, evidence, reasoning, guidance) |
 
