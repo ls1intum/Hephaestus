@@ -10,8 +10,15 @@ export function AboutHeroSection() {
 				About <span className="text-provider-done-foreground">Heph</span>aestus
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-				A research project from TUM's Applied Education Technologies group, building practice-aware
-				guidance for software projects.
+				An open-source research project from TUM's Applied Education Technologies group, building
+				practice-aware guidance for software projects.{" "}
+				<a
+					href="https://ls1intum.github.io/Hephaestus/contributor/conceptual-model"
+					className="underline underline-offset-4 hover:text-foreground"
+				>
+					See the conceptual model
+				</a>
+				.
 			</p>
 		</section>
 	);

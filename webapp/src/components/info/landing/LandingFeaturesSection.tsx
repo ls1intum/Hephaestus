@@ -70,7 +70,7 @@ export function LandingFeaturesSection() {
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>AI mentor (Heph) for reflection, goal-setting, and session summaries</span>
+									<span>Heph, the AI mentor, supports reflection, goal-setting, and summaries</span>
 								</li>
 							</ul>
 						</CardContent>
@@ -82,17 +82,17 @@ export function LandingFeaturesSection() {
 								<TrendingUp className="h-5 w-5 text-green-500" />
 							</div>
 							<CardTitle>Engagement & Recognition</CardTitle>
-							<CardDescription>Make good practices visible across the team</CardDescription>
+							<CardDescription>Surface contribution activity over time</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Leaderboards and leagues track contribution activity over time</span>
+									<span>Weekly leaderboard with leagues and achievements</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Achievements recognize consistent contribution activity</span>
+									<span>Profile timeline grouped by repository and contribution type</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />

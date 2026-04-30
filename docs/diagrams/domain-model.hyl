@@ -1,6 +1,6 @@
 // Hephaestus Domain Model — 7 Entities
 // Render at https://hylimo.github.io
-// Pipeline: Observe → Detect → Guide → Grow
+// Lifecycle: Project + Contributor → Artifact + Event → Practice → Finding → Guidance
 classDiagram {
     vdist = 200
     hdist = 300

@@ -9,7 +9,7 @@
 
 # Hephaestus — Practice-Aware Guidance for Software Projects
 
-Hephaestus is an open-source platform for **practice-aware guidance**. You define the practices that matter for your project, and Hephaestus evaluates every contribution against them. When something needs attention, it tells the contributor directly, with guidance that adapts based on their track record.
+Hephaestus is an open-source platform for **practice-aware guidance**. You define the practices that matter for your project; Hephaestus evaluates every contribution against them and coaches each contributor directly, with guidance that adapts based on their track record.
 
 <img alt="Hephaestus mascot" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
@@ -29,30 +29,26 @@ Hephaestus is an open-source platform for **practice-aware guidance**. You defin
 
 ### Practice Detection
 
-The core of the platform. An AI agent evaluates each contribution against your workspace's practice catalog and produces structured findings — with guidance adapted to each contributor's experience level.
+An AI agent evaluates each contribution against your workspace's practice catalog and produces structured findings: verdict, severity, evidence, guidance. Findings appear as PR comments and inline code annotations. Contributors stay in control — mark any finding as applied, disputed, or not applicable.
 
-Findings appear as PR comments and inline code annotations — contextual coaching where the work happens. Contributors stay in control: mark any finding as applied, disputed, or not applicable.
+### Adaptive Coaching
 
-### AI Mentor (Heph)
-
-A conversational AI mentor grounded in your actual project activity. Heph helps contributors reflect on their work, set goals, and plan next steps. Generates session summaries that can be shared with mentors.
+Guidance adapts to each contributor's track record per practice — concrete examples for new contributors, direct coaching for repeat issues, reflection prompts as people improve. **Heph**, the conversational AI mentor, complements in-context findings with goal-setting and reflection grounded in actual project activity.
 
 ### Engagement & Recognition
 
-Leaderboards, leagues, and achievements make good practices visible across the team. Weekly Slack digests highlight standout contributors.
+A weekly leaderboard, leagues, and achievements surface contribution activity over time. Today these track activity volume; deepening recognition to reflect practice mastery is on the roadmap.
 
-### Agent Orchestration
+## Implementation notes
 
-Run AI agents (Claude Code, OpenCode) in sandboxed Docker containers with configurable LLM providers, resource limits, and concurrency caps.
+AI agents (Claude Code, OpenCode) run in sandboxed Docker containers with configurable LLM providers, resource limits, and concurrency caps. Practice detection, agent orchestration, and delivery are independently testable — see the [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributor/conceptual-model) for the architecture.
 
 ## Roadmap
 
-- **Practice Detection**: Broaden coverage to review depth, workflow patterns, and task management
-- **Good Practice Recognition**: Detect and reinforce beneficial patterns, not just flag problems
-- **Project Health**: Track practice adherence across multiple dimensions per project
-- **Guidance Fading**: Reduce guidance automatically as contributors improve over time (partially implemented — agent already receives contributor history per practice)
-- **Cross-Platform**: Full parity across GitHub, GitLab, and other code platforms
-- **Beyond Software**: Explore applicability to design, research, and course projects
+- **Practice-aware recognition** — replace activity-shaped scoring with indicators that reflect practice mastery and growth.
+- **Broader practice catalog** — expand beyond review and code hygiene to workflow patterns and task management.
+- **Cross-platform parity** — close the GitHub/GitLab gap; today GitLab covers webhook ingestion and practice detection.
+- **Guidance fading** — reduce guidance automatically as contributors improve (partially implemented; agent already receives contributor history per practice).
 
 ## Documentation
 

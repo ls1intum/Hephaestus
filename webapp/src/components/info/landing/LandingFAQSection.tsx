@@ -12,22 +12,27 @@ const faqItems = [
 	{
 		key: "faq-item-1",
 		q: "How does Hephaestus integrate with our existing workflow?",
-		a: "Hephaestus connects to GitHub and GitLab via webhooks. Your admin installs the GitHub App (or configures the GitLab integration), and contributors just sign in — no workflow changes required.",
+		a: "Hephaestus connects to GitHub and GitLab via webhooks. An admin installs the GitHub App (or configures the GitLab integration), contributors sign in, and feedback appears on existing pull requests — no workflow changes required.",
 	},
 	{
 		key: "faq-item-2",
-		q: "Is Hephaestus suitable for small teams?",
-		a: "Yes. Hephaestus works for teams of any size. Define as many or as few practices as you need — a three-person student project and a forty-person engineering team use the same workspace model.",
+		q: "What makes a good practice?",
+		a: "A practice is a named behavioural pattern with a detection prompt — for example, 'pull request descriptions explain motivation and tradeoffs' or 'reviewers leave actionable change requests, not preferences'. The clearer the prompt, the more reliable the AI's findings. The practice catalog is workspace-scoped so each project can encode the standards that matter to them.",
 	},
 	{
 		key: "faq-item-3",
-		q: "How does the AI Mentor work?",
-		a: "The AI Mentor (Heph) runs structured coaching sessions grounded in your actual project activity — pull requests, reviews, and practice detection findings. It helps you set goals, reflect on progress, and generates shareable session summaries.",
+		q: "How does adaptive coaching work?",
+		a: "Each contributor has a track record per practice. The agent receives that history alongside the contribution and adapts its tone: concrete examples for new contributors, direct coaching for repeat issues, reflection prompts as people improve. Heph, the AI mentor, complements in-context findings with goal-setting and reflection conversations.",
 	},
 	{
 		key: "faq-item-4",
-		q: "Do we need to change how we use our code platform?",
-		a: "No changes to your workflow. Hephaestus observes via webhooks and posts findings as PR comments. The only visible difference is that contributors receive inline guidance on their contributions.",
+		q: "What data does Hephaestus send to LLM providers?",
+		a: "Practice detection runs in a sandboxed Docker container with access to the contribution diff, surrounding repository context, and the active practice catalog. Workspace admins control the LLM provider, resource limits, and which repositories are in scope. No data is sent before the GitHub App or GitLab integration is installed.",
+	},
+	{
+		key: "faq-item-5",
+		q: "Is Hephaestus suitable for small teams?",
+		a: "Yes — a three-person student project and a forty-person engineering team use the same workspace model. Define as many or as few practices as you need.",
 	},
 ];
 

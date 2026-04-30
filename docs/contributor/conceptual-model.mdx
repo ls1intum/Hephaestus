@@ -7,11 +7,11 @@ description: Domain model, architecture, and codebase mapping of Hephaestus.
 
 # Conceptual Model
 
-This page describes the core domain concepts, their relationships, the system architecture, and how they map to the codebase.
+This page describes the core domain concepts, their relationships, the system architecture, and how each maps to the codebase.
 
 ## Domain Model
 
-The domain model captures the core concepts Hephaestus works with. Seven entities form a pipeline: **Observe → Detect → Guide → Grow**.
+The domain model captures the lifecycle of practice-aware feedback. A **Project** sets the **Practices** that matter; **Contributors** produce **Artifacts** and emit **Events**; the platform **detects** Findings against those Practices and routes **Guidance** back to the Contributor.
 
 <img alt="Hephaestus Domain Model" src="/img/diagrams/domain-model.svg" />
 
@@ -19,17 +19,33 @@ The domain model captures the core concepts Hephaestus works with. Seven entitie
 
 | # | Entity | What it is | Key insight |
 |---|--------|-----------|-------------|
-| 1 | **Project** | Bounded endeavor with goals, timeline, and enrolled contributors | Sets the practice catalog that gives findings meaning |
-| 2 | **Contributor** | Person (or AI agent) developing professional practice | The subject of observation and guidance |
-| 3 | **Artifact** | Any evaluable output of a contributor's work | Currently: pull requests, issues, reviews, comments. Extensible to other artifact types. |
-| 4 | **Event** | Lightweight trigger recording that something happened | Same structure regardless of source platform |
-| 5 | **Practice** | Named behavioral pattern with detection criteria | The vocabulary for talking about *how* people work |
-| 6 | **Finding** | Immutable assessment result from evaluating an artifact against a practice | Verdict, severity, evidence, reasoning — separates assessment from coaching |
-| 7 | **Guidance** | Adaptive coaching response grounded in findings | Closes the loop: Finding → Guidance → Contributor |
+| 1 | **Project** | Bounded endeavor with goals, timeline, and enrolled contributors | Owns the practice catalog that gives findings meaning |
+| 2 | **Contributor** | Person (or AI agent) developing professional practice | Subject of observation and guidance |
+| 3 | **Artifact** | An evaluable output of a contributor's work | Today: pull requests, issues, reviews, comments |
+| 4 | **Event** | Lightweight record that something happened | Uniform structure regardless of source platform |
+| 5 | **Practice** | Named behavioural pattern with detection criteria | Vocabulary for talking about *how* people work |
+| 6 | **Finding** | Immutable assessment of an artifact against a practice | Carries verdict, severity, evidence, reasoning — assessment is separate from coaching |
+| 7 | **Guidance** | Adaptive coaching response grounded in findings | Closes the loop from Finding back to Contributor |
 
-### Beyond Software Engineering (Future)
+### Mapping to Codebase
 
-These examples illustrate how the entities *could* map to other domains — none have been validated yet:
+| Domain Entity | Current Implementation | Status |
+|---|---|---|
+| Project | `Workspace` + `Repository` | Implemented |
+| Contributor | `User` + `WorkspaceMembership` | Implemented |
+| Artifact | `Issue`, `PullRequest`, `PullRequestReview`, `PullRequestReviewComment` | Implemented |
+| Event | `ActivityEvent` (immutable ledger of activity event types) | Implemented |
+| Practice | `Practice` (workspace-scoped, with detection prompt and category) | Implemented |
+| Finding | `PracticeFinding` with verdict, severity, evidence, reasoning | Implemented |
+| Guidance | Guidance text on findings; AI-mentor messages; inline review comments | Planned as standalone entity — currently embedded in `PracticeFinding` and `ChatMessage` |
+
+### Engagement & Recognition
+
+The model deliberately stops at **Finding → Guidance**. Engagement and recognition surfaces (leaderboard, leagues, achievements, profile XP) are *projections* over the Event ledger, not first-class domain entities. They are activity-shaped today; making them practice-shaped — for example, recognising mastery progress per practice — is on the roadmap.
+
+### Beyond Software Engineering
+
+The seven-entity vocabulary is generic. The mappings below sketch how it *could* extend to adjacent domains; none have been validated yet, and the implementation today is software-engineering only.
 
 | Entity | Software Engineering | Design | Research | Course Project |
 |--------|---------------------|--------|----------|----------------|
@@ -39,19 +55,7 @@ These examples illustrate how the entities *could* map to other domains — none
 | Event | "submitted pull request #42" | "uploaded mockup v3" | "submitted revision §4" | "gave peer feedback" |
 | Practice | "Gives substantive reviews" | "Tests with users" | "Pre-registers hypotheses" | "Incorporates feedback" |
 | Finding | Review lacks substance (severity: medium) | Mockup untested (severity: high) | Missing power analysis (severity: high) | Feedback not incorporated (severity: low) |
-| Guidance | "Consider breaking this into smaller changes" | "How might color-blind users experience this?" | "Methods section lacks power analysis" | "What did you learn from the peer feedback?" |
-
-### Mapping to Codebase
-
-| Domain Entity | Current Implementation | Status |
-|---|---|---|
-| Project | `Workspace` + `Repository` | Implemented |
-| Contributor | `User` + `WorkspaceMembership` | Implemented |
-| Artifact | `Issue`, `PullRequest`, `PullRequestReview`, `PullRequestReviewComment` | Implemented |
-| Event | `ActivityEvent` (immutable ledger, 55 event types) | Implemented |
-| Practice | `Practice` (workspace-scoped, with detection prompts and category) | Implemented |
-| Finding | `PracticeFinding` with `Verdict`, `Severity`, evidence, and reasoning fields | Implemented |
-| Guidance | AI mentor messages, inline comments, finding guidance text | Partial (no standalone Guidance entity or status lifecycle yet) |
+| Guidance | "Consider breaking this into smaller changes" | "How might colour-blind users experience this?" | "Methods section lacks power analysis" | "What did you learn from the peer feedback?" |
 
 ---
 
@@ -61,18 +65,19 @@ These examples illustrate how the entities *could* map to other domains — none
 
 ### Data Flows
 
-1. **Observe**: Artifact Environment → Webhook Ingest → Message Broker → Application Server → PostgreSQL
-2. **Detect (Practices)**: Application Server → Agent Sandbox → LLM Provider → PostgreSQL
-3. **Guide (AI Mentor)**: Contributor → Webapp → Application Server → Intelligence Service → LLM Provider
-4. **Interact**: Contributor → Webapp → Application Server (via User Management)
+1. **Observe** — Artifact Environment → Webhook Ingest → Message Broker → Application Server → PostgreSQL
+2. **Detect** — Application Server → Agent Sandbox → LLM Provider → PostgreSQL (writes findings)
+3. **Guide (in-context)** — Application Server posts findings as comments and inline annotations on the originating artifact
+4. **Guide (mentor)** — Contributor → Webapp → Application Server → Intelligence Service → LLM Provider
+5. **Authenticate** — Webapp → User Management → Application Server
 
 ---
 
 ## Canonical Diagrams
 
-The canonical versions of these diagrams are maintained as [HyLiMo](https://hylimo.github.io) files:
+The canonical sources are [HyLiMo](https://hylimo.github.io) files:
 
-- **Domain Model**: [`docs/diagrams/domain-model.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/domain-model.hyl)
-- **Architecture**: [`docs/diagrams/architecture.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/architecture.hyl)
+- **Domain Model** — [`docs/diagrams/domain-model.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/domain-model.hyl)
+- **Architecture** — [`docs/diagrams/architecture.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/architecture.hyl)
 
-Render these at [hylimo.github.io](https://hylimo.github.io) by pasting the file contents, or run `npm run docs:render-diagrams` to regenerate SVGs.
+Render at [hylimo.github.io](https://hylimo.github.io) by pasting the source, or run `npm run docs:render-diagrams` to regenerate the SVGs.

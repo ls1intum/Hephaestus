@@ -47,7 +47,7 @@ export const AdaptiveCoaching: Story = {
 			title: "Adaptive Coaching",
 			description: "Guidance adapts to each contributor's track record",
 			content:
-				"The system tracks each contributor's history per practice and instructs the agent to adapt accordingly. New contributors are guided toward concrete examples. Repeat issues prompt direct coaching. Improving contributors get prompts for reflection.",
+				"The system tracks each contributor's history per practice and instructs the agent to adapt accordingly. New contributors are guided toward concrete examples; repeat issues prompt direct coaching; improving contributors get prompts for reflection. Heph, the AI mentor, complements in-context findings with goal-setting and reflection.",
 		},
 	},
 };
@@ -61,9 +61,9 @@ export const EngagementRecognition: Story = {
 			icon: TrendingUp,
 			badge: "Grow",
 			title: "Engagement & Recognition",
-			description: "Make good practices visible across the team",
+			description: "Surface contribution activity over time",
 			content:
-				"Leaderboards, leagues, and achievements track engagement over time. Weekly Slack digests highlight standout contributors. The AI mentor (Heph) supports reflection and goal-setting.",
+				"A weekly leaderboard, leagues, and achievements surface contribution activity over time. Weekly Slack digests highlight standout contributors. Practice-aware recognition is on the roadmap.",
 		},
 	},
 };

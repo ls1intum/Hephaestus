@@ -30,22 +30,22 @@ const FeatureList: FeatureItem[] = [
     title: 'Adaptive Coaching',
     kicker: 'Guidance adapts to each contributor\'s track record.',
     description:
-      'The system tracks each contributor\'s history per practice and instructs the agent to adapt accordingly. New contributors are guided toward concrete examples. Repeat issues prompt direct coaching. Improving contributors get prompts for reflection.',
+      'The system tracks each contributor\'s history per practice and instructs the agent to adapt accordingly. New contributors are guided toward concrete examples; repeat issues prompt direct coaching; improving contributors get prompts for reflection.',
     bullets: [
-      'Each contributor\'s history with a practice shapes what kind of feedback they get',
+      'Each contributor\'s history with a practice shapes the feedback they get',
       'Findings appear in context, where the work happens',
-      'AI mentor (Heph) for reflection, goal-setting, and session summaries',
+      'Heph, the AI mentor, supports reflection, goal-setting, and summaries',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
     title: 'Engagement & Recognition',
-    kicker: 'Make good practices visible across the team.',
+    kicker: 'Surface contribution activity over time.',
     description:
-      'Leaderboards, leagues, and achievements track engagement over time. Weekly Slack digests highlight standout contributors.',
+      'A weekly leaderboard, leagues, and achievements surface contribution activity. Weekly Slack digests highlight standout contributors. Practice-aware recognition is on the roadmap.',
     bullets: [
-      'Leaderboards and leagues track contribution activity over time',
-      'Achievements recognize consistent contribution activity',
+      'Weekly leaderboard with leagues and achievements',
+      'Profile timeline grouped by repository and contribution type',
       'Weekly Slack digests highlight standout contributors',
     ],
     cta: {label: 'See the leaderboard', to: '/user/leaderboard'},
