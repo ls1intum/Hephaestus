@@ -2,52 +2,52 @@
 id: overview
 sidebar_position: 1
 title: Welcome to Hephaestus
-description: Overview of Hephaestus — practice detection, adaptive coaching, and engagement.
+description: How Hephaestus turns review activity into practice-aware feedback you can use.
 ---
 
-Hephaestus evaluates contributions against the practices your team defines. When something needs attention, it tells the contributor directly — with guidance that adapts based on their track record.
+Hephaestus evaluates each contribution against the practices your project defines. When something needs attention, it tells you directly — with feedback that adapts to your track record per practice.
 
 ![Hephaestus hero illustration](./img/overview/agile_hephaestus.png)
 
-This guide is for anyone using Hephaestus at [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de) — whether you're a student, mentor, or course staff.
+This guide is for anyone using Hephaestus at [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de) — whether you're a student, mentor, or facilitator.
 
-## What Hephaestus offers
+## The practice-aware loop
 
-### Practice detection
+### Detect — practice findings on every contribution
 
-- Admins define a **practice catalog** per workspace — your standards, not generic rules.
-- An AI agent evaluates each contribution against those practices and produces **structured findings** with a verdict, severity, evidence, and tailored guidance.
-- Mark findings as **applied**, **disputed**, or **not applicable** to close the loop.
+- Each workspace owns a **practice catalog** — your standards, not generic rules.
+- An AI agent evaluates each contribution against the catalog and produces **structured findings** with a verdict, severity, evidence, and a recommended action.
+- Confirm, dispute, or dismiss any finding. Disputes are signal, not noise — they help us tune detection and the catalog.
 
-### Adaptive coaching (AI mentor)
+### Coach — adaptive guidance, in context and in conversation
 
-- Structured coaching sessions with **Heph** that guide you through goal-setting, progress review, and reflection.
-- Grounded in your actual activity data — Heph surfaces relevant work, reviews, and action items.
-- Generates session summaries that can be shared with mentors or brought to team standups.
+- Findings appear as **PR/MR comments and inline diff notes** where the work happens.
+- The **conversational mentor (Heph)** is a reflection partner — surfacing your activity, helping you set goals, asking what is blocking you. It does not write code on your behalf.
+- Tone adapts: concrete examples for newcomers, direct coaching for repeats, reflection prompts as you improve.
 
-### Engagement & recognition
+### Reflect — your own dashboards, never public ranking
 
-- **Weekly leaderboard** updated as activity syncs from your code platform.
-- **Leagues and achievements** track consistent contribution activity over time.
-- **Weekly Slack digests** spotlight top contributors and notable work each week.
+- Your **profile** shows the contributions and practice signals scoped to you.
+- A weekly **leaderboard** is available where the workspace has it enabled — opt-in per workspace; activity-shaped today.
+- Optional **weekly Slack digests** spotlight standout contributors and notable work.
 
-:::info Workspace management
-Workspace settings let admins choose which repositories to monitor, assign workspace roles, and control what data is sent to LLM providers.
+:::info Workspace settings
+Admins choose which repositories are in scope, assign workspace roles, and control what is sent to LLM providers.
 :::
 
 ## Who should use this guide?
 
 - Students and engineers participating in a Hephaestus-enabled course or project.
-- Teaching assistants and supervisors who monitor contributor progress and review practice detection results.
+- Teaching assistants and facilitators who watch contributor progress and review practice findings.
 
 :::tip Stay on track
-This section is exclusively for end-user workflows. For deployment, architecture, or contribution guidance, jump to the **Contributor Guide** or **Admin Guide** instead.
+This section is for end-user workflows. For deployment, architecture, or contribution guidance, jump to the **Contributor Guide** or **Admin Guide**.
 :::
 
 ## Quick start
 
 1. Sign in with your GitHub account at [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de).
-2. Join your course or team workspace. Repositories are synced automatically from your organisation's GitHub App installation.
-3. Open the **Mentor** tab to set your goals, then track progress on the **Leaderboard** each week.
+2. Join your course or team workspace. Repositories sync automatically from your organisation's GitHub App installation.
+3. Open the **Mentor** tab to set your goals, then read findings on your pull requests as they appear.
 
 Continue with [Getting started](./getting-started) for a hands-on walkthrough of the onboarding journey.

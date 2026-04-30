@@ -1,5 +1,4 @@
-import { ArrowRight, Layers, MessageCircle, ScanSearch } from "lucide-react";
-import agileHephaestus from "@/assets/agile_hephaestus.png";
+import { ArrowRight, BookOpenCheck, Radio, ScanSearch } from "lucide-react";
 import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,89 +9,80 @@ interface LandingWhyChooseSectionProps {
 	isSignedIn: boolean;
 }
 
+interface Differentiator {
+	icon: React.ComponentType<{ className?: string }>;
+	title: string;
+	body: string;
+}
+
+const DIFFERENTIATORS: Differentiator[] = [
+	{
+		icon: ScanSearch,
+		title: "Lifecycle, not diff",
+		body: "Diff-level review bots see only the patch. Hephaestus reads descriptions, commits, review threads, related issues, and the contributor's prior history — the signals that constitute *practice*, not just defects.",
+	},
+	{
+		icon: BookOpenCheck,
+		title: "Versioned definitions, not vendor prompts",
+		body: "Each practice is a first-class artifact with a category, detection criteria, and trigger events. You can read it, fork it, and change it. Detection isn't an opaque prompt buried in a SaaS pipeline.",
+	},
+	{
+		icon: Radio,
+		title: "Coupled channels, not a single feed",
+		body: "Findings route to where the contributor can act on them: in-context for the moment, on a private dashboard for reflection, in conversation for articulation. Educators get their own surface. No public ranking.",
+	},
+];
+
 export function LandingWhyChooseSection({
 	onSignIn,
 	onGoToDashboard,
 	isSignedIn,
 }: LandingWhyChooseSectionProps) {
 	return (
-		<section className="w-full py-8 md:py-16 bg-gradient-to-b from-background to-muted/30">
+		<section className="w-full py-12 md:py-20 bg-gradient-to-b from-background to-muted/30">
 			<div className="container px-4 md:px-6">
-				<div className="grid gap-10 lg:grid-cols-[1fr_500px] lg:gap-12">
-					<img
-						src={agileHephaestus}
-						alt="Hephaestus mascot"
-						width="500"
-						height="350"
-						className="mx-auto rounded-lg aspect-auto object-cover lg:order-last"
-					/>
-					<div className="flex flex-col justify-center space-y-5">
-						<Badge className="w-fit" variant="outline">
-							What's Different
-						</Badge>
-						<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
-							Practices, Not Just Metrics
-						</h2>
-						<p className="text-lg text-muted-foreground">
-							Most analytics tools show managers what happened. Hephaestus tells contributors what
-							to do differently — evaluated against practices your team actually defined, with
-							guidance that adapts as people improve.
-						</p>
+				<div className="max-w-3xl mb-10">
+					<Badge className="mb-4" variant="outline">
+						How Hephaestus differs
+					</Badge>
+					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
+						Practice findings, not scores.
+					</h2>
+					<p className="text-lg text-muted-foreground">
+						Developer-analytics tools surface aggregate metrics for managers. Diff-level review bots
+						annotate patches for defects. Hephaestus does neither. It detects the{" "}
+						<strong className="text-foreground">practices</strong> that constitute professional
+						contribution and feeds them back to the contributor as actionable findings tied to
+						evidence.
+					</p>
+				</div>
 
-						<ul className="grid gap-4 mt-4">
-							<li className="flex items-start gap-3">
-								<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-									<ScanSearch className="h-4 w-4 text-primary" />
+				<div className="grid gap-6 md:grid-cols-3 mb-10">
+					{DIFFERENTIATORS.map((d) => {
+						const Icon = d.icon;
+						return (
+							<div key={d.title} className="space-y-2">
+								<div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+									<Icon className="h-5 w-5 text-primary" />
 								</div>
-								<div>
-									<p className="font-medium">Your practices, not generic rules</p>
-									<p className="text-sm text-muted-foreground">
-										Admins define a practice catalog per workspace. The AI evaluates each
-										contribution against those specific standards — not a one-size-fits-all
-										checklist.
-									</p>
-								</div>
-							</li>
-							<li className="flex items-start gap-3">
-								<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-									<Layers className="h-4 w-4 text-primary" />
-								</div>
-								<div>
-									<p className="font-medium">Guidance that adapts</p>
-									<p className="text-sm text-muted-foreground">
-										The system tracks each contributor's history per practice. First time? Concrete
-										examples. Repeat issue? Direct coaching. Consistent improvement? Reflection
-										prompts.
-									</p>
-								</div>
-							</li>
-							<li className="flex items-start gap-3">
-								<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-									<MessageCircle className="h-4 w-4 text-primary" />
-								</div>
-								<div>
-									<p className="font-medium">Feedback where the work happens</p>
-									<p className="text-sm text-muted-foreground">
-										Findings appear as PR comments and inline code annotations. Contributors can
-										mark them as applied, disputed, or not applicable.
-									</p>
-								</div>
-							</li>
-						</ul>
+								<h3 className="font-semibold">{d.title}</h3>
+								<p className="text-sm text-muted-foreground">{d.body}</p>
+							</div>
+						);
+					})}
+				</div>
 
-						<div className="pt-4">
-							{isSignedIn ? (
-								<Button onClick={onGoToDashboard} className="gap-2">
-									Go to Dashboard <ArrowRight className="h-4 w-4" />
-								</Button>
-							) : (
-								<GitHubSignInButton
-									onClick={onSignIn}
-									className="w-full justify-center sm:w-auto"
-								/>
-							)}
-						</div>
-					</div>
+				<div className="flex flex-col sm:flex-row sm:items-center gap-4">
+					{isSignedIn ? (
+						<Button onClick={onGoToDashboard} className="gap-2">
+							Go to Dashboard <ArrowRight className="h-4 w-4" />
+						</Button>
+					) : (
+						<GitHubSignInButton onClick={onSignIn} className="w-full justify-center sm:w-auto" />
+					)}
+					<p className="text-sm text-muted-foreground">
+						Open-source. Self-hostable. Bring your own LLM provider.
+					</p>
 				</div>
 			</div>
 		</section>

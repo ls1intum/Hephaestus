@@ -2,82 +2,94 @@
 id: conceptual-model
 sidebar_position: 2
 title: Conceptual Model
-description: Domain model, architecture, and codebase mapping of Hephaestus.
+description: Domain entities, four feedback channels, and how it all maps to the codebase.
 ---
 
 # Conceptual Model
 
-This page describes the core domain concepts, their relationships, the system architecture, and how each maps to the codebase.
+This page describes the domain entities Hephaestus reasons about, the four channels through which feedback reaches people, the deployment architecture, and how each maps to the codebase. It is the canonical reference for anyone working on the platform.
 
 ## Domain Model
 
-The domain model captures the lifecycle of practice-aware feedback. A **Project** sets the **Practices** that matter; **Contributors** produce **Artifacts** and emit **Events**; the platform **detects** Findings against those Practices and routes **Guidance** back to the Contributor.
+A **Workspace** defines a catalog of **Practices** and enrolls **Contributors**. Contributors produce **Artifacts** and emit **Events**. Practices are evaluated against artifacts (informed by events) to produce **Findings**. Findings are routed through **Channels** to the right audience. Contributors may **Contest** any finding — a first-class signal, not an afterthought.
 
 <img alt="Hephaestus Domain Model" src="/img/diagrams/domain-model.svg" />
 
-### The Seven Entities
+### Entities
 
-| # | Entity | What it is | Key insight |
-|---|--------|-----------|-------------|
-| 1 | **Project** | Bounded endeavor with goals, timeline, and enrolled contributors | Owns the practice catalog that gives findings meaning |
-| 2 | **Contributor** | Person (or AI agent) developing professional practice | Subject of observation and guidance |
-| 3 | **Artifact** | An evaluable output of a contributor's work | Today: pull requests, issues, reviews, comments |
-| 4 | **Event** | Lightweight record that something happened | Uniform structure regardless of source platform |
-| 5 | **Practice** | Named behavioural pattern with detection criteria | Vocabulary for talking about *how* people work |
-| 6 | **Finding** | Immutable assessment of an artifact against a practice | Carries verdict, severity, evidence, reasoning — assessment is separate from coaching |
-| 7 | **Guidance** | Adaptive coaching response grounded in findings | Closes the loop from Finding back to Contributor |
+| Entity | What it is | Key insight |
+|---|---|---|
+| **Workspace** | The tenant. Owns a practice catalog, members, and feature toggles. | Practices live here, not on the platform — every workspace decides what "good" means. |
+| **Contributor** | A person (or agent) participating in a workspace. | The subject of observation, the audience of guidance — never the object of ranking. |
+| **Artifact** | A pull request, issue, review, or comment. | What practices are evaluated against. |
+| **Event** | An immutable record of activity (commit pushed, comment posted, review submitted). | Same shape regardless of source platform; the input to detection. |
+| **Practice** | A named, versioned, inspectable behavioural pattern with detection criteria. | The vocabulary for *how* people work — defined per-workspace, not vendor-shipped. |
+| **Finding** | Immutable assessment of an artifact against a practice — verdict, severity, evidence, reasoning. | Findings are about the work, not the worker. |
+| **Channel** | The route a finding takes to a person, with audience and feedback level. | The four channels are the design contribution; routing is structural, not cosmetic. |
+| **Contestation** | A contributor's reaction to a finding (confirm, dispute, dismiss). | Contestation is *measured*, not just stored — disputes signal practice or detection drift. |
+
+### The Four Channels
+
+Channels are the load-bearing design choice in Hephaestus. Each finding is routed to the channel that fits the practice and the moment. Channels are aligned to feedback levels from the Hattie & Timperley taxonomy and direction is derived from self-determination theory (push limits autonomy; pull preserves it).
+
+| Channel | Direction | Audience | Feedback level | Where it lives |
+|---|---|---|---|---|
+| **In-Context** | Push | Author of the artifact | Task | PR/MR comments and inline diff notes |
+| **Reflection Dashboard** | Pull | Any contributor (private) | Process | Webapp profile/findings surface |
+| **Conversational Mentor** | Dialogic | Contributor | Self-regulation | Webapp mentor surface |
+| **Facilitator Dashboard** | Pull | Facilitator | Decision support | Webapp educator surface |
+
+Routing is asymmetric on purpose. Author-side practices (e.g., *justifies changes with evidence*) push in-context. Reviewer-side practices (e.g., *leaves actionable change requests*) appear only on private reflection surfaces. There is no public ranking, by design.
 
 ### Mapping to Codebase
 
-| Domain Entity | Current Implementation | Status |
+| Entity | Implementation | Status |
 |---|---|---|
-| Project | `Workspace` + `Repository` | Implemented |
+| Workspace | `Workspace` (with `WorkspaceFeatures`) | Implemented |
 | Contributor | `User` + `WorkspaceMembership` | Implemented |
 | Artifact | `Issue`, `PullRequest`, `PullRequestReview`, `PullRequestReviewComment` | Implemented |
-| Event | `ActivityEvent` (immutable ledger of activity event types) | Implemented |
-| Practice | `Practice` (workspace-scoped, with detection prompt and category) | Implemented |
-| Finding | `PracticeFinding` with verdict, severity, evidence, reasoning | Implemented |
-| Guidance | Guidance text on findings; AI-mentor messages; inline review comments | Planned as standalone entity — currently embedded in `PracticeFinding` and `ChatMessage` |
+| Event | `ActivityEvent` (immutable ledger) | Implemented |
+| Practice | `Practice` (workspace-scoped catalog with detection prompt and category) | Implemented |
+| Finding | `PracticeFinding` (verdict, severity, evidence, reasoning, guidance) | Implemented |
+| Channel | Routing logic in `DiffNotePoster`, mentor handlers, and webapp routes | **Planned as first-class entity** |
+| Contestation | `FindingFeedback` (confirm / dispute / dismiss with optional explanation) | Implemented |
 
-### Engagement & Recognition
-
-The model deliberately stops at **Finding → Guidance**. Engagement and recognition surfaces (leaderboard, leagues, achievements, profile XP) are *projections* over the Event ledger, not first-class domain entities. They are activity-shaped today; making them practice-shaped — for example, recognising mastery progress per practice — is on the roadmap.
-
-### Beyond Software Engineering
-
-The seven-entity vocabulary is generic. The mappings below sketch how it *could* extend to adjacent domains; none have been validated yet, and the implementation today is software-engineering only.
-
-| Entity | Software Engineering | Design | Research | Course Project |
-|--------|---------------------|--------|----------|----------------|
-| Project | Repository + Milestone | Design Brief | Study | Capstone |
-| Contributor | Developer | Designer | Researcher | Student |
-| Artifact | Pull request, review, issue | Mockup, critique, spec | Paper, experiment | Report, presentation |
-| Event | "submitted pull request #42" | "uploaded mockup v3" | "submitted revision §4" | "gave peer feedback" |
-| Practice | "Gives substantive reviews" | "Tests with users" | "Pre-registers hypotheses" | "Incorporates feedback" |
-| Finding | Review lacks substance (severity: medium) | Mockup untested (severity: high) | Missing power analysis (severity: high) | Feedback not incorporated (severity: low) |
-| Guidance | "Consider breaking this into smaller changes" | "How might colour-blind users experience this?" | "Methods section lacks power analysis" | "What did you learn from the peer feedback?" |
+Earlier revisions of this model treated Guidance as a co-equal entity. It is now folded into Finding (as the `guidance` text and a planned `recommendedAction` field) and into Channel (which carries the delivery semantics).
 
 ---
 
 ## Architecture
 
+The deployment view shows the components that actually run; the practice-aware loop below shows the conceptual path from event to person.
+
+### Deployment view
+
 <img alt="Hephaestus Architecture" src="/img/diagrams/architecture.svg" />
 
-### Data Flows
+| Component | Role |
+|---|---|
+| **Webapp** | Hosts the Reflection Dashboard, Conversational Mentor, and Facilitator Dashboard channels. |
+| **Application Server** | Spring Boot. Owns the practice catalog, finding store, and routing. |
+| **Webhook Ingest** | Adapts GitHub/GitLab webhooks into the activity event stream. |
+| **Agent Sandbox** | Runs the practice-detection agent (Claude Code, OpenCode) in an isolated Docker container. |
+| **Intelligence Service** | Powers the Conversational Mentor channel. |
+| **User Management** | Keycloak realm with GitHub as identity provider. |
+| **Message Broker** | Decouples webhook ingestion from downstream processing. |
+| **Git Provider** | GitHub (primary) or GitLab (webhook ingestion + practice detection). |
+| **LLM Provider** | Workspace-configurable. The Agent Sandbox and Intelligence Service each connect independently. |
 
-1. **Observe** — Artifact Environment → Webhook Ingest → Message Broker → Application Server → PostgreSQL
-2. **Detect** — Application Server → Agent Sandbox → LLM Provider → PostgreSQL (writes findings)
-3. **Guide (in-context)** — Application Server posts findings as comments and inline annotations on the originating artifact
-4. **Guide (mentor)** — Contributor → Webapp → Application Server → Intelligence Service → LLM Provider
-5. **Authenticate** — Webapp → User Management → Application Server
+### Practice-aware loop
+
+<img alt="Hephaestus Practice-Aware Loop" src="/img/diagrams/practice-loop.svg" />
+
+The loop the deployment diagram doesn't show: how activity becomes findings, and how findings reach people through the four channels. Contestation flows back from contributor to routing — a closed loop that supplies the data for measuring detection accuracy and practice-definition quality.
 
 ---
 
-## Canonical Diagrams
+## Canonical Sources
 
-The canonical sources are [HyLiMo](https://hylimo.github.io) files:
+The diagrams above are rendered from [HyLiMo](https://hylimo.github.io) sources. Edit the `.hyl` and run `npm run docs:render-diagrams` to regenerate.
 
-- **Domain Model** — [`docs/diagrams/domain-model.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/domain-model.hyl)
-- **Architecture** — [`docs/diagrams/architecture.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/architecture.hyl)
-
-Render at [hylimo.github.io](https://hylimo.github.io) by pasting the source, or run `npm run docs:render-diagrams` to regenerate the SVGs.
+- Domain model — [`docs/diagrams/domain-model.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/domain-model.hyl)
+- Deployment architecture — [`docs/diagrams/architecture.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/architecture.hyl)
+- Practice-aware loop — [`docs/diagrams/practice-loop.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/practice-loop.hyl)

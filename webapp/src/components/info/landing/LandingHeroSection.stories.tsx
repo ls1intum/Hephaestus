@@ -4,8 +4,8 @@ import { LandingHeroSection } from "./LandingHeroSection";
 
 /**
  * Hero section component that introduces Hephaestus with a prominent headline,
- * description, and call-to-action buttons. Features a preview of the leaderboard
- * to showcase the platform's core functionality.
+ * description, and call-to-action buttons. Features a sample practice finding
+ * card that demonstrates the unit of value: practice + verdict + evidence + action.
  */
 const meta = {
 	component: LandingHeroSection,
@@ -49,7 +49,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default hero section for first-time visitors.
- * Features "Get Started" CTA and leaderboard preview.
+ * Features "Sign in with GitHub" CTA and a sample finding card.
  */
 export const Default: Story = {
 	args: {

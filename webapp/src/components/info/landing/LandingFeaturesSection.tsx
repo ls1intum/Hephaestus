@@ -1,6 +1,51 @@
-import { CheckCheck, MessageCircle, ScanSearch, TrendingUp } from "lucide-react";
+import { ArrowRight, MessageCircle, Radar, ScrollText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+interface PipelineStage {
+	verb: string;
+	icon: React.ComponentType<{ className?: string }>;
+	title: string;
+	description: string;
+	bullets: string[];
+}
+
+const STAGES: PipelineStage[] = [
+	{
+		verb: "Detect",
+		icon: Radar,
+		title: "Practice catalog + lifecycle detection",
+		description: "Define the practices that matter. Detect them across the full PR lifecycle.",
+		bullets: [
+			"Workspace-defined practice catalog — versioned and inspectable, not a vendor prompt",
+			"Detection reads descriptions, commits, review threads, related issues, and contributor history",
+			"Findings include verdict, severity, evidence, and a recommended action",
+		],
+	},
+	{
+		verb: "Coach",
+		icon: MessageCircle,
+		title: "Adaptive guidance, in context and in conversation",
+		description: "Findings adapt to each contributor's history per practice.",
+		bullets: [
+			"In-context channel: PR/MR comments and inline diff notes for the author",
+			"Conversational mentor: a reflection partner — not a coding agent — for goal-setting and check-ins",
+			"Tone shifts with the contributor's track record: examples for newcomers, direct coaching for repeats",
+		],
+	},
+	{
+		verb: "Reflect",
+		icon: ScrollText,
+		title: "Private dashboards, never public ranking",
+		description:
+			"Reflection surfaces show patterns over time — for the contributor and the facilitator.",
+		bullets: [
+			"Reflection dashboard: a contributor's own findings and practice history, scoped privately",
+			"Facilitator dashboard: aggregate practice signals to support coaching, not grading",
+			"Optional weekly activity recognition for workspaces that want it — opt-in, never the headline",
+		],
+	},
+];
 
 export function LandingFeaturesSection() {
 	return (
@@ -8,101 +53,59 @@ export function LandingFeaturesSection() {
 			<div className="container px-4 md:px-6">
 				<div className="mb-12 text-center max-w-3xl mx-auto">
 					<Badge className="mb-4" variant="outline">
-						Key Features
+						The Practice-Aware Loop
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Practice-Aware Guidance
+						Detect → Coach → Reflect
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						You define what good looks like. Hephaestus evaluates every contribution against your
-						practices and gives each contributor personalized feedback.
+						Three stages, four channels, one closed loop. Activity becomes findings; findings reach
+						people through the channel that fits the moment; reactions feed back into detection.
 					</p>
 				</div>
 
-				<div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-					<Card>
-						<CardHeader>
-							<div className="flex items-center gap-2 mb-2">
-								<ScanSearch className="h-5 w-5 text-blue-500" />
-							</div>
-							<CardTitle>Practice Detection</CardTitle>
-							<CardDescription>
-								Evaluate contributions against your project's practice catalog
-							</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<ul className="space-y-2">
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>AI agent evaluates each PR against workspace-defined practices</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Structured findings with verdict, severity, evidence, and guidance</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>You stay in control — mark findings as applied, disputed, or N/A</span>
-								</li>
-							</ul>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardHeader>
-							<div className="flex items-center gap-2 mb-2">
-								<MessageCircle className="h-5 w-5 text-primary" />
-							</div>
-							<CardTitle>Adaptive Coaching</CardTitle>
-							<CardDescription>Guidance adapts to each contributor's track record</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<ul className="space-y-2">
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										New to a practice? Get concrete examples. Repeat issue? Direct coaching.
-									</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Findings appear as PR comments and inline code annotations</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Heph, the AI mentor, supports reflection, goal-setting, and summaries</span>
-								</li>
-							</ul>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardHeader>
-							<div className="flex items-center gap-2 mb-2">
-								<TrendingUp className="h-5 w-5 text-green-500" />
-							</div>
-							<CardTitle>Engagement & Recognition</CardTitle>
-							<CardDescription>Surface contribution activity over time</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<ul className="space-y-2">
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Weekly leaderboard with leagues and achievements</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Profile timeline grouped by repository and contribution type</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Weekly Slack digests highlight standout contributors</span>
-								</li>
-							</ul>
-						</CardContent>
-					</Card>
+				<div className="grid gap-6 md:grid-cols-3">
+					{STAGES.map((stage, index) => (
+						<PipelineCard key={stage.verb} stage={stage} isLast={index === STAGES.length - 1} />
+					))}
 				</div>
 			</div>
 		</section>
+	);
+}
+
+function PipelineCard({ stage, isLast }: { stage: PipelineStage; isLast: boolean }) {
+	const Icon = stage.icon;
+	return (
+		<div className="relative">
+			<Card className="h-full">
+				<CardHeader>
+					<div className="flex items-center gap-2 mb-2">
+						<Icon className="h-5 w-5 text-primary" />
+						<Badge variant="secondary" className="font-mono text-[10px]">
+							{stage.verb}
+						</Badge>
+					</div>
+					<CardTitle className="text-lg">{stage.title}</CardTitle>
+					<CardDescription>{stage.description}</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<ul className="space-y-2 text-sm">
+						{stage.bullets.map((bullet) => (
+							<li key={bullet} className="flex gap-2">
+								<span className="text-muted-foreground mt-0.5">—</span>
+								<span>{bullet}</span>
+							</li>
+						))}
+					</ul>
+				</CardContent>
+			</Card>
+			{!isLast && (
+				<ArrowRight
+					aria-hidden
+					className="hidden md:block absolute -right-4 top-12 h-6 w-6 text-muted-foreground/40"
+				/>
+			)}
+		</div>
 	);
 }

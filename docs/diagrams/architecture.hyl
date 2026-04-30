@@ -1,3 +1,9 @@
+// Hephaestus Deployment View
+// Render at https://hylimo.github.io
+//
+// This diagram shows the deployable components and their interfaces.
+// The conceptual practice-aware loop (events -> detection -> findings ->
+// channels) is in `practice-loop.hyl` — keep them paired.
 componentDiagram {
     w = 250
     hdist = 450
@@ -43,7 +49,7 @@ componentDiagram {
             pos = rpos(`Application Server`, 0, vdist)
         }
 
-        component("Artifact Environment") layout {
+        component("Git Provider") layout {
             width = w
             pos = rpos(`User Management`, 0, vdist * 3.75)
         }
@@ -67,7 +73,7 @@ componentDiagram {
     }
 
     PostgreSQL.provides("Data", 0.205, dist = 50, namePos = [50, -10])
-    `Application Server`.requires(0.795,Data)
+    `Application Server`.requires(0.795, Data)
 
     `User Management`.provides("Auth", 0.5, dist = 50, namePos = [0, 25])
     `User Management`.provides("User Data", dist = 50, namePos = [0, 25])
@@ -90,7 +96,7 @@ componentDiagram {
         over = start(0).axisAligned(0, end(0.5))
     }
 
-    `Webhook Ingest`.provides("Artifact Events", 0.25, dist = 94.7, namePos = [80, -10])
+    `Webhook Ingest`.provides("Activity Events", 0.25, dist = 94.7, namePos = [80, -10])
 
     `Message Broker`.provides("Message", 0.501, dist = 100, namePos = [50, 13])
     `Webhook Ingest`.requires(0, Message) with {
@@ -100,12 +106,12 @@ componentDiagram {
         over = start(0).axisAligned(-0.431, end(0.5))
     }
 
-    `Artifact Environment`.provides("Artifact Data", 0.75, dist = 46.3, namePos = [-75, -10])
-    `Artifact Environment`.requires(0, `Artifact Events`, dist = 80) with {
+    `Git Provider`.provides("Repository Data", 0.75, dist = 46.3, namePos = [-75, -10])
+    `Git Provider`.requires(0, `Activity Events`, dist = 80) with {
         over = start(0).axisAligned(-1, end(0.5))
     }
 
-    `Application Server`.requires(0.33, `Artifact Data`, dist = 250) with {
+    `Application Server`.requires(0.33, `Repository Data`, dist = 250) with {
         over = start(0).axisAligned(-0.827, end(0.5))
     }
 }

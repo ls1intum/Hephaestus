@@ -1,135 +1,170 @@
-// Hephaestus Domain Model — 7 Entities
+// Hephaestus Domain Model — practice-aware feedback
 // Render at https://hylimo.github.io
-// Lifecycle: Project + Contributor → Artifact + Event → Practice → Finding → Guidance
+//
+// Reading order:
+//   Workspace + Contributor enroll the participants.
+//   Contributors produce Artifacts and emit Events as they collaborate.
+//   The Workspace defines a Practice catalog.
+//   Practices are evaluated against Artifacts (informed by Events) to produce Findings.
+//   Findings are routed to Channels and may be Contested by the Contributor.
+//
+// Notes on fidelity:
+//   - Workspace, Contributor, Artifact, Event, Practice, Finding, Contestation
+//     all map to live JPA entities (Workspace, User+WorkspaceMembership,
+//     Issue/PullRequest/Review/Comment, ActivityEvent, Practice, PracticeFinding,
+//     FindingFeedback respectively).
+//   - Channel is a domain concept that today exists as routing logic, not a
+//     table. It is shown to make the design intent legible. Marked <<planned>>.
+//   - Attributes prefixed `// planned:` are part of the practice-definition
+//     format described in the thesis but not yet columns in the schema.
 classDiagram {
     vdist = 200
     hdist = 300
 
-    class("Project") {
+    // === Row 1: tenant + people ===
+    class("Workspace") {
         default {
-            name
-            goals
-            timeline
+            slug
+            displayName
+            status
+            practicesEnabled
         }
         section(
-            "enroll()"
+            "enroll()",
+            "definePractice()"
         )
     } layout {
-        width = 200
+        width = 220
         pos = apos(614, -198)
     }
 
     class("Contributor") {
         default {
-            role
+            login
+            name
         }
         section(
             "contribute()",
             "react()"
         )
     } layout {
-        width = 200
-        pos = rpos(Project, hdist * -1, 0)
+        width = 220
+        pos = rpos(Workspace, hdist * -1, 0)
     }
 
+    // === Row 2: things contributors produce ===
     class("Artifact") {
         default {
             kind
             title
-            state
+            lifecycleState
         }
         section(
             "submit()",
             "revise()"
         )
     } layout {
-        width = 200
-        pos = rpos(Project, 0, vdist)
+        width = 220
+        pos = rpos(Workspace, 0, vdist)
     }
 
-    // === Row 3: Event + Practice ===
     class("Event") {
         default {
-            action
-            timestamp
+            eventType
+            occurredAt
+            targetType
+            targetId
         }
         section(
             "record()"
         )
     } layout {
-        width = 200
+        width = 220
         pos = rpos(Contributor, 0, vdist)
     }
 
+    // === Row 3: catalog ===
     class("Practice") {
         default {
+            slug
             name
             category
-            criteria
-            description
+            triggerEvents
+            detectionPrompt
+            // planned: indicators
+            // planned: difficulty
+            // planned: targetChannels
         }
         section(
             "define()",
-            "detect()",
-            "explain()"
+            "detect()"
         )
     } layout {
-        width = 200
+        width = 220
         pos = rpos(Artifact, hdist * 4 / 5 + 0, 0)
     }
 
-    // === Row 4: Finding ===
+    // === Row 4: assessment ===
     class("Finding") {
         default {
             verdict
             severity
+            confidence
             evidence
             reasoning
+            // planned: recommendedAction
         }
     } layout {
-        width = 200
+        width = 220
         pos = rpos(Artifact, 0, vdist)
     }
 
-    // === Row 5: Guidance ===
-    class("Guidance") {
+    // === Row 5: how feedback reaches people, and how they push back ===
+    class("Channel") {
         default {
-            approach
-            content
-            channel
-            status
+            name
+            direction
+            audience
+            feedbackLevel
         }
-        section(
-            "compose()",
-            "deliver()"
-        )
     } layout {
-        width = 200
+        width = 220
+        pos = rpos(Finding, hdist * 4 / 5 + 0, 0)
+    }
+
+    class("Contestation") {
+        default {
+            action
+            explanation
+            createdAt
+        }
+    } layout {
+        width = 220
         pos = rpos(Event, 0, vdist)
     }
 
     // === Relationships ===
 
-    // Project enrolls Contributors
-    Project -- Contributor with {
+    // Workspace enrolls Contributors (m:n via WorkspaceMembership in code)
+    Workspace -- Contributor with {
         over = start(0.5).axisAligned(0.5, end(0))
         label("1..*", 0.85, -22)
         label("*", 0.1, -22)
     }
 
-    // Project contains Artifacts (composition)
-    Project *-- Artifact with {
+    // Workspace owns Artifacts (composition — repos belong to the tenant)
+    Workspace *-- Artifact with {
         over = start(0.25).axisAligned(0.5, end(0.75))
         label("*", 0.45, 12)
     }
 
-    // Project defines Practices
-    Project -- Practice with {
+    // Workspace defines its Practice catalog
+    Workspace -- Practice with {
         over = start(0).axisAligned(1, end(0.75))
         label("*", 0.6, 15.8)
     }
 
-    // Contributor authors Artifact
+    // Contributor authors Artifacts
     Contributor -- Artifact with {
         over = start(0.183).line(end(0.675))
         label("authors", 0.5, 22, 20)
@@ -137,20 +172,20 @@ classDiagram {
         label("*", 0.95, 22, 360)
     }
 
-    // Contributor performs Event
+    // Contributor performs Events
     Contributor -- Event with {
         over = start(0.25).axisAligned(0.5, end(0.75))
         label("*", 0.575, 12)
     }
 
-    // Event targets Artifact
+    // Event references Artifact (loose link via target_type / target_id)
     Event -- Artifact with {
         over = start(0).axisAligned(0.5, end(0.5))
         label("0..1", 0.85, 22, 360)
         label("*", 0.1, 22, 360)
     }
 
-    // Practice produces Finding
+    // Practice produces Findings
     Practice -- Finding with {
         over = start(0.25).axisAligned(0, end(0.0))
         label("*", 0.985, -22)
@@ -162,21 +197,32 @@ classDiagram {
         label("*", 0.45, -11.4)
     }
 
-    // Finding informs Guidance
-    Finding -- Guidance with {
+    // Finding is routed to a Channel (Channel is <<planned>> — see legend)
+    Finding ..> Channel with {
         over = start(0.5).line(end(0))
-        label("*", 0.15, -22)
-        label("0..1", 0.8, -22)
+        label("routed to", 0.5, -16, 360)
+        label("1", 0.95, 14)
     }
 
-    // Guidance targets Contributor (closes the loop)
-    Guidance ..> Contributor with {
+    // Channel reaches Contributor (closes the loop, replaces old Guidance arrow)
+    Channel ..> Contributor with {
         over = start(0.51).axisAligned(
             -1,
             rpos(Event, hdist * -2.5 / 5, 0),
             0,
             end(0.5))
-        label("targets", 0.5, 22, 270)
+        label("reaches", 0.5, 22, 270)
         label("*", 0.2, -22)
+    }
+
+    // Contributor may contest a Finding (RQ3 measurement)
+    Contributor -- Contestation with {
+        over = start(0.75).line(end(0.25))
+        label("*", 0.5, -16)
+    }
+
+    Contestation ..> Finding with {
+        over = start(0.5).line(end(1))
+        label("contests", 0.5, -16, 360)
     }
 }

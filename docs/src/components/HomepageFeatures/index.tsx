@@ -7,6 +7,7 @@ import styles from './styles.module.css';
 
 type FeatureItem = {
   title: string;
+  verb: string;
   kicker: string;
   description: string;
   bullets: string[];
@@ -15,47 +16,51 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Practice Detection',
-    kicker: 'Define practices. Evaluate every contribution against them.',
+    title: 'Practice catalog + lifecycle detection',
+    verb: 'Detect',
+    kicker: 'Define the practices that matter. Detect them across the full PR lifecycle.',
     description:
-      'Admins curate a practice catalog per workspace. An AI agent evaluates each contribution against those practices and produces structured findings with a verdict, severity, evidence, and tailored guidance.',
+      'Each workspace owns a versioned, inspectable practice catalog. An AI agent runs in a sandboxed Docker container, reads descriptions, commits, review threads, related issues, and contributor history, and produces structured findings — verdict, severity, evidence, recommended action.',
     bullets: [
-      'Workspace-defined practices — your standards, not generic rules',
-      'Structured findings: verdict, severity, evidence, and guidance',
-      'Contributors mark findings as applied, disputed, or not applicable',
+      'Workspace-defined catalog — your standards, not vendor prompts',
+      'Detection reads the whole pull-request lifecycle, not just the diff',
+      'Findings carry evidence and an action; contributors confirm, dispute, or dismiss',
     ],
     cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
   },
   {
-    title: 'Adaptive Coaching',
-    kicker: 'Guidance adapts to each contributor\'s track record.',
+    title: 'Adaptive guidance, in context and in conversation',
+    verb: 'Coach',
+    kicker: "Findings adapt to each contributor's history per practice.",
     description:
-      'The system tracks each contributor\'s history per practice and instructs the agent to adapt accordingly. New contributors are guided toward concrete examples; repeat issues prompt direct coaching; improving contributors get prompts for reflection.',
+      'In-context findings appear on the pull request as comments and inline diff notes. The conversational mentor — a reflection partner, not a coding agent — surfaces your activity, asks what is blocking you, and helps you plan.',
     bullets: [
-      'Each contributor\'s history with a practice shapes the feedback they get',
-      'Findings appear in context, where the work happens',
-      'Heph, the AI mentor, supports reflection, goal-setting, and summaries',
+      'In-context channel: PR/MR comments and inline diff notes for the author',
+      'Conversational mentor: reflection, goal-setting, and check-ins grounded in your activity',
+      'Tone shifts with the contributor — examples for newcomers, direct coaching for repeats',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
-    title: 'Engagement & Recognition',
-    kicker: 'Surface contribution activity over time.',
+    title: 'Private dashboards, never public ranking',
+    verb: 'Reflect',
+    kicker: 'Reflection surfaces show patterns over time, scoped privately.',
     description:
-      'A weekly leaderboard, leagues, and achievements surface contribution activity. Weekly Slack digests highlight standout contributors. Practice-aware recognition is on the roadmap.',
+      'Contributors see their own findings and practice history. Facilitators see aggregate practice signals on a coaching dashboard. Workspaces that want a weekly activity recognition surface can opt into one — never the headline.',
     bullets: [
-      'Weekly leaderboard with leagues and achievements',
-      'Profile timeline grouped by repository and contribution type',
-      'Weekly Slack digests highlight standout contributors',
+      'Reflection dashboard: your own findings and practice history, scoped privately',
+      'Facilitator dashboard: aggregate practice signals to support coaching, not grading',
+      'Optional weekly activity recognition — opt-in per workspace',
     ],
     cta: {label: 'See the leaderboard', to: '/user/leaderboard'},
   },
 ];
 
-function Feature({title, kicker, description, bullets, cta}: FeatureItem) {
+function Feature({title, verb, kicker, description, bullets, cta}: FeatureItem) {
   return (
     <div className={clsx('col col--4', styles.featureColumn)}>
       <div className={styles.featureCard}>
+        <span className={styles.kicker}>{verb}</span>
         <p className={styles.kicker}>{kicker}</p>
         <Heading as="h3">{title}</Heading>
         <p className={styles.description}>{description}</p>

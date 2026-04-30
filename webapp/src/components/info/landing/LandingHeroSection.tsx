@@ -1,101 +1,9 @@
-import { ArrowRight, ChevronDown } from "lucide-react";
-import type { LeaderboardEntry, PullRequestInfo } from "@/api/types.gen";
-import aliceAvatar from "@/assets/alice_developer.jpg";
-import bobAvatar from "@/assets/bob_builder.jpg";
-import charlieAvatar from "@/assets/charlie_coder.jpg";
+import { ArrowRight, ChevronDown, FileText, MessageSquareText, Quote } from "lucide-react";
 import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
-import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
-import { MentorIcon } from "@/components/mentor/MentorIcon";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-function createMockReviewedPullRequest(amount: number) {
-	return Array.from(
-		{ length: amount },
-		() =>
-			({
-				id: 1,
-				title: "Fix bug in user authentication",
-				number: 42,
-				htmlUrl: "https://example.com/pull/42",
-				state: "CLOSED",
-				isDraft: false,
-				isMerged: true,
-				commentsCount: 5,
-				createdAt: new Date("2023-01-01T00:00:00Z"),
-				updatedAt: new Date("2023-01-02T00:00:00Z"),
-				additions: 10,
-				deletions: 2,
-				repository: {
-					id: 1,
-					name: "example/repo",
-					nameWithOwner: "example/repo",
-					htmlUrl: "https://example.com/repo",
-					hiddenFromContributions: false,
-				},
-			}) satisfies PullRequestInfo,
-	);
-}
-
-// Sample data for the leaderboard preview
-const SAMPLE_LEADERBOARD_ENTRIES: LeaderboardEntry[] = [
-	{
-		rank: 1,
-		score: 520,
-		user: {
-			id: 0,
-			leaguePoints: 2000,
-			login: "codeMaster",
-			avatarUrl: aliceAvatar,
-			name: "Alice Developer",
-			htmlUrl: "https://example.com/alice",
-		},
-		numberOfReviewedPRs: 15,
-		numberOfApprovals: 8,
-		numberOfChangeRequests: 3,
-		numberOfComments: 4,
-		numberOfCodeComments: 6,
-		numberOfUnknowns: 0,
-		reviewedPullRequests: createMockReviewedPullRequest(12),
-	},
-	{
-		rank: 2,
-		score: 431,
-		user: {
-			id: 1,
-			leaguePoints: 1000,
-			login: "devWizard",
-			avatarUrl: bobAvatar,
-			name: "Bob Builder",
-			htmlUrl: "https://example.com/bob",
-		},
-		numberOfReviewedPRs: 12,
-		numberOfApprovals: 5,
-		numberOfChangeRequests: 2,
-		numberOfComments: 5,
-		numberOfCodeComments: 3,
-		numberOfUnknowns: 0,
-		reviewedPullRequests: createMockReviewedPullRequest(5),
-	},
-	{
-		rank: 3,
-		score: 302,
-		user: {
-			id: 2,
-			leaguePoints: 1500,
-			login: "codeNinja",
-			avatarUrl: charlieAvatar,
-			name: "Charlie Coder",
-			htmlUrl: "https://example.com/charlie",
-		},
-		numberOfReviewedPRs: 9,
-		numberOfApprovals: 4,
-		numberOfChangeRequests: 1,
-		numberOfComments: 4,
-		numberOfCodeComments: 2,
-		numberOfUnknowns: 0,
-		reviewedPullRequests: createMockReviewedPullRequest(2),
-	},
-];
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface LandingHeroSectionProps {
 	onSignIn: () => void;
@@ -114,13 +22,17 @@ export function LandingHeroSection({
 		<section className="w-full bg-gradient-to-b from-background to-muted/30 pt-8 md:pt-16 lg:pt-24 text-foreground">
 			<div className="container mx-auto px-4 md:px-6 mb-12">
 				<div className="flex flex-col items-center space-y-8 text-center">
+					<Badge className="w-fit" variant="outline">
+						Practice-aware feedback for software project work
+					</Badge>
 					<div className="space-y-4 max-w-3xl">
 						<h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
-							Practice-Aware Guidance for Software Projects
+							Coach contributors, not metrics.
 						</h1>
-						<p className="mx-auto max-w-[700px] text-xl text-muted-foreground">
-							Define the practices that matter for your project. Hephaestus evaluates every
-							contribution against them and coaches each contributor based on their track record.
+						<p className="mx-auto max-w-[720px] text-xl text-muted-foreground">
+							Define the practices that matter for your project. Hephaestus reads the full
+							pull-request lifecycle, evaluates each contribution against your catalog, and routes
+							findings — with evidence and an action — to the right channel.
 						</p>
 					</div>
 					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
@@ -136,35 +48,109 @@ export function LandingHeroSection({
 							/>
 						)}
 						<Button variant="outline" size="lg" onClick={onLearnMoreClick} className="gap-2">
-							Learn More <ChevronDown className="h-4 w-4" />
+							Learn more <ChevronDown className="h-4 w-4" />
 						</Button>
 					</div>
-					<div className="flex items-center gap-2 text-muted-foreground">
-						<MentorIcon size={36} className="text-primary" />
-						<span className="text-sm">
-							Meet <span className="text-provider-done-foreground">Heph</span>, the AI mentor
-						</span>
-					</div>
+					<p className="text-sm text-muted-foreground max-w-xl">
+						Not a leaderboard. Not a defect-catching review bot. A coaching layer that turns review
+						activity into feedback contributors actually use.
+					</p>
 				</div>
 			</div>
 
-			{/* Leaderboard Preview */}
-			<div className="mx-auto max-w-4xl px-4 md:px-6">
-				<div className="shadow-xl border border-muted rounded-md overflow-hidden -mb-3">
-					<div
-						className="overflow-auto pointer-events-none"
-						style={{
-							maskImage: "linear-gradient(to bottom, rgba(0, 0, 0, 1) 50%, rgba(0, 0, 0, 0))",
-						}}
-					>
-						<LeaderboardTable
-							leaderboard={SAMPLE_LEADERBOARD_ENTRIES}
-							isLoading={false}
-							variant="INDIVIDUAL"
-						/>
-					</div>
-				</div>
+			{/* Sample finding — the unit of value */}
+			<div className="mx-auto max-w-3xl px-4 md:px-6">
+				<SampleFindingCard />
 			</div>
 		</section>
+	);
+}
+
+function SampleFindingCard() {
+	return (
+		<Card className="shadow-xl border-muted -mb-6 overflow-hidden">
+			<CardHeader className="pb-3">
+				<div className="flex items-center justify-between gap-3">
+					<div className="flex items-center gap-2 min-w-0">
+						<FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+						<span className="truncate text-sm font-medium text-muted-foreground">
+							feat/add-rate-limiter — pull request #142
+						</span>
+					</div>
+					<div className="flex items-center gap-2 shrink-0">
+						<Badge variant="secondary" className="font-mono text-[10px]">
+							in-context
+						</Badge>
+						<SeverityPill level="needs-improvement" />
+					</div>
+				</div>
+				<CardTitle className="text-lg">
+					Practice: <span className="text-primary">Justifies changes with evidence</span>
+				</CardTitle>
+			</CardHeader>
+			<CardContent className="space-y-4 text-sm">
+				<FindingRow icon={Quote} label="Evidence">
+					Pull-request description reads <em>"fixes the bug"</em> with no link to an issue, no
+					reproduction, and no rationale for the chosen approach. Two reviewers asked for context in
+					the thread.
+				</FindingRow>
+				<FindingRow icon={MessageSquareText} label="Recommended action">
+					Add a one-paragraph <em>"Why this change?"</em> section: what failure mode you observed,
+					what reproduces it, and why the chosen fix addresses the cause rather than its symptom.
+				</FindingRow>
+				<div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+					<Badge variant="outline" className="font-mono text-[10px]">
+						confirm
+					</Badge>
+					<Badge variant="outline" className="font-mono text-[10px]">
+						dispute
+					</Badge>
+					<Badge variant="outline" className="font-mono text-[10px]">
+						not applicable
+					</Badge>
+					<span className="ml-auto text-xs text-muted-foreground">
+						Findings are about the work, not the worker.
+					</span>
+				</div>
+			</CardContent>
+		</Card>
+	);
+}
+
+function SeverityPill({ level }: { level: "looks-good" | "minor" | "needs-improvement" }) {
+	const styles = {
+		"looks-good": "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+		minor: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+		"needs-improvement": "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+	};
+	const labels = {
+		"looks-good": "Looks good",
+		minor: "Minor",
+		"needs-improvement": "Needs improvement",
+	};
+	return (
+		<span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", styles[level])}>
+			{labels[level]}
+		</span>
+	);
+}
+
+interface FindingRowProps {
+	icon: React.ComponentType<{ className?: string }>;
+	label: string;
+	children: React.ReactNode;
+}
+
+function FindingRow({ icon: Icon, label, children }: FindingRowProps) {
+	return (
+		<div className="flex gap-3">
+			<Icon className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+			<div className="space-y-1 text-left">
+				<div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					{label}
+				</div>
+				<p className="leading-relaxed">{children}</p>
+			</div>
+		</div>
 	);
 }
