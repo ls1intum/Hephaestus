@@ -82,7 +82,7 @@ See `05-avv-checklist.md` for the full table. In summary, engaged processors (or
 - **OpenAI, L.P.** — alternative LLM provider configurable per workspace. AVV as above.
 - **Salesforce, Inc. / Slack Technologies, LLC** — workspace notifications and engagement digests when the workspace administrator has enabled Slack. AVV in place at TUM/AET level.
 
-The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation: inter-public-body transmission under Art. 4 Abs. 2 BayDSG, with LRZ operating under the BAdW-Satzung. LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-avv-checklist.md` for the full EDPB 07/2020 analysis.
+The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation: inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG, with LRZ operating under the BAdW-Satzung. LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-avv-checklist.md` for the full EDPB 07/2020 analysis.
 
 ### 4. Data Protection Officer
 
