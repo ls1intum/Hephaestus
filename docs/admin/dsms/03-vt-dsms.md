@@ -4,7 +4,7 @@ title: DSMS Verzeichnis von Verarbeitungstätigkeiten (VVT)
 description: Copy-paste answers for the DSMS follow-up questionnaire.
 ---
 
-_Last updated: 2026-04-20._
+_Last updated: 2026-05-04._
 
 Copy-paste ready. Ordered to match the DSMS "Create new PA" form and follow-up questionnaire. Submit at: [https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/).
 
@@ -82,7 +82,7 @@ See `05-avv-checklist.md` for the full table. In summary, engaged processors (or
 - **OpenAI, L.P.** — alternative LLM provider configurable per workspace. AVV as above.
 - **Salesforce, Inc. / Slack Technologies, LLC** — workspace notifications and engagement digests when the workspace administrator has enabled Slack. AVV in place at TUM/AET level.
 
-The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation framework (BAdW-Satzung). LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-avv-checklist.md` for the full EDPB 07/2020 analysis.
+The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation: inter-public-body transmission under Art. 4 Abs. 2 BayDSG, with LRZ operating under the BAdW-Satzung. LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-avv-checklist.md` for the full EDPB 07/2020 analysis.
 
 ### 4. Data Protection Officer
 
@@ -107,7 +107,7 @@ Hephaestus (https://hephaestus.aet.cit.tum.de)
 Stack:
   - Browser SPA:        React 19 / Vite / TanStack Router (TypeScript)
   - Application server: Spring Boot 3.5 / Java 21 / PostgreSQL
-  - Intelligence:       Node 22 / Hono service for AI-assisted features
+  - Intelligence:       Node.js service (Hono) for AI-assisted features
   - Identity:           Self-hosted Keycloak (GitHub OAuth + gitlab.lrz.de OIDC)
   - Review sandbox:     Isolated Docker containers with per-job LLM proxy
   - Reverse proxy:      Traefik v3 / Let's Encrypt
@@ -195,9 +195,9 @@ Both are versioned in the repository under `webapp/public/legal/profiles/tumaet/
 
 See `02-dsfa-prescreen.md`. Conclusion: **DPIA-light posture.** The AI-assisted feature surface is on the "elevated risk" side of the BayLfD innovative-technology criterion; mitigations in §5 of the pre-screen (no-training enterprise API terms, per-job LLM proxy, Art. 21 objection switch, shared-responsibility disclosure, bounded server-log retention) replace a full DPIA at the current scope. The pre-screen lists the trigger conditions under which a full DPIA must be opened.
 
-### 18. Personalrat involvement (Art. 75 BayPVG)
+### 18. Personalrat involvement (Art. 75a BayPVG)
 
-**Not triggered.** Hephaestus does not monitor TUM staff performance or behaviour. Staff who use the platform as mentors, lecturers, or administrators do so on the same footing as any other Contributor. Leaderboards and league signals are student-facing engagement features, opt-in per workspace, and not consumed by any HR process.
+**Not triggered at the platform level.** Hephaestus is *suitable* for displaying contributor activity, but is not deployed by AET as a personnel-evaluation, performance-management, or behaviour-monitoring instrument. The platform is contributor-facing — no Dienststelle-segmented dashboard, no HR export, no manager-facing roll-up — and TUM staff appear in a workspace in their role as Contributors alongside students under the same scheme. Art. 75a BayPVG's *Eignungsrechtsprechung* is the capability test for monitoring **employee** behaviour or performance; on a contributor-facing teaching platform with these properties, it does not engage.
 
 ### 19. IT-Sicherheitsformular (TUM wiki)
 

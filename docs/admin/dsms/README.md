@@ -5,7 +5,7 @@ title: DSMS Submission Package
 description: Art. 30 GDPR / Verarbeitungstätigkeit record for the TUM-operated Hephaestus deployment.
 ---
 
-_Last updated: 2026-04-20._
+_Last updated: 2026-05-04._
 
 This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis von Verarbeitungstätigkeiten", VVT) package for the TUM-operated Hephaestus deployment at `https://hephaestus.aet.cit.tum.de`. Submit it through the TUM DSMS at **[https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/)** (reachable from MWN / eduVPN with TUM login).
 

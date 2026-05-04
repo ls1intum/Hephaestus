@@ -4,7 +4,7 @@ title: Technical and Organizational Measures
 description: Art. 32 GDPR TOMs for the TUM-operated Hephaestus deployment.
 ---
 
-_Last updated: 2026-04-20._
+_Last updated: 2026-05-04._
 
 Documents the measures taken pursuant to Art. 32 GDPR. Structured along the categories of the BayLfD / DSK TOM-Leitfaden so every Muss-Liste category is addressed on its own line.
 
@@ -111,4 +111,4 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 | Microsoft Corporation (Azure OpenAI Service)   | Default LLM provider (per workspace) for the TUM-operated deployment | AVV at TUM/AET level for TUM-operated tenancy; at workspace administrator's institution when that institution supplies credentials   | Default, per-workspace                    |
 | OpenAI, L.P.                                   | Alternative LLM provider (per workspace)                             | AVV as above                                                                                                                         | Per-workspace, opt-in                     |
 | Salesforce, Inc. / Slack Technologies, LLC     | Workspace notifications (when enabled by the workspace admin)        | AVV at TUM/AET level                                                                                                                 | Per-workspace, opt-in                     |
-| Leibniz-Rechenzentrum der BAdW (gitlab.lrz.de) | Source system and OIDC identity provider                             | **Not Art. 28** — separate controller under the BAdW-Satzung (public-body cooperation; EDPB 07/2020 § 22) | Per-workspace, opt-in                     |
+| Leibniz-Rechenzentrum der BAdW (gitlab.lrz.de) | Source system and OIDC identity provider                             | **Not Art. 28** — separate controller; inter-public-body transmission under Art. 4 Abs. 2 BayDSG, LRZ operating under the BAdW-Satzung (EDPB 07/2020 § 22) | Per-workspace, opt-in                     |

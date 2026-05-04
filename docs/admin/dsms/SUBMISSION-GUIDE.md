@@ -4,7 +4,7 @@ title: DSMS Submission Guide
 description: Step-by-step procedure for submitting the Hephaestus VVT through the TUM DSMS.
 ---
 
-_Last updated: 2026-04-20._
+_Last updated: 2026-05-04._
 
 Follow these steps in order. Target: [https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/) (log in via Shibboleth on MWN / eduVPN).
 

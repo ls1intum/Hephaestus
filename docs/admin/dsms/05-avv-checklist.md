@@ -4,13 +4,13 @@ title: Art. 28 Processor Checklist
 description: Per-processor AVV status for the TUM-operated Hephaestus deployment.
 ---
 
-*Last updated: 2026-04-19.*
+*Last updated: 2026-05-04.*
 
 Documents every entity that might qualify as a processor (Art. 28 GDPR) and the status of the required contract (Auftragsverarbeitungsvertrag, AVV). Internal (AET-operated) recipients and the LRZ public-body counterpart are listed for completeness so the record is self-contained.
 
 ## Summary
 
-Hephaestus engages a processor chain of: GitHub (identity + source-system API), the per-workspace LLM provider (Azure OpenAI by default on the TUM-operated deployment, or OpenAI, selected via the deployment-level `MODEL_NAME` env variable and the workspace-level credential binding), and Slack (per-workspace opt-in). The LRZ (gitlab.lrz.de) is **not** a processor; it is a separate controller under the public-body cooperation framework. The webapp image also ships integration clients for Sentry (self-hostable) and PostHog (product analytics); both are **disabled in the current production deployment** (`SENTRY_DSN` empty, `POSTHOG_ENABLED=false`). They are not on this checklist at the moment and will only be added once a future deployment activates them — see the follow-up trigger list below.
+Hephaestus engages a processor chain of: GitHub (identity + source-system API), the per-workspace LLM provider (Azure OpenAI by default on the TUM-operated deployment, or OpenAI, selected via the deployment-level `MODEL_NAME` env variable and the workspace-level credential binding), and Slack (per-workspace opt-in). The LRZ (gitlab.lrz.de) is **not** a processor; it is a separate controller, with the inter-public-body transmission anchored in Art. 4 Abs. 2 BayDSG and LRZ operating under the BAdW-Satzung. The webapp image also ships integration clients for Sentry (self-hostable) and PostHog (product analytics); both are **disabled in the current production deployment** (`SENTRY_DSN` empty, `POSTHOG_ENABLED=false`). They are not on this checklist at the moment and will only be added once a future deployment activates them — see the follow-up trigger list below.
 
 ## Detailed check
 
@@ -27,14 +27,14 @@ Hephaestus engages a processor chain of: GitHub (identity + source-system API), 
 | **Microsoft Corporation (Azure OpenAI Service)** | Default LLM provider for the TUM-operated deployment; region-configurable, EU deployments process in-region | **Yes** | DPA at TUM/AET level for the TUM-operated tenancy; at the workspace administrator's institution level when that institution supplies credentials (shared-responsibility model, privacy §3.2); enterprise API no-training terms; Microsoft DPF certification; SCCs Module 2 as fall-back |
 | **OpenAI, L.P.** | Alternative LLM provider configurable per workspace | **Yes, when engaged** | DPA as above; enterprise API no-training terms; DPF-certified (active; re-verify annually); SCCs Module 2 as fall-back |
 | **Salesforce, Inc. / Slack Technologies, LLC** | Workspace notifications and engagement digests when Slack is enabled by the workspace administrator | **Yes, when engaged** | DPA in place at TUM/AET level; DPF-certified (active; re-verify annually); SCCs Module 2 as fall-back |
-| **Leibniz-Rechenzentrum (LRZ) der BAdW (gitlab.lrz.de)** | Source system and OIDC identity provider | **Not Art. 28** | Separate controller under the BAdW-Satzung (public-body cooperation); LRZ applies its own TOMs on its own infrastructure |
+| **Leibniz-Rechenzentrum (LRZ) der BAdW (gitlab.lrz.de)** | Source system and OIDC identity provider | **Not Art. 28** | Separate controller; inter-public-body transmission under Art. 4 Abs. 2 BayDSG, LRZ operating under the BAdW-Satzung; LRZ applies its own TOMs on its own infrastructure |
 | GitHub / GHCR (for CI, image hosting) | Stores Docker images and CI logs; does not receive end-user personal data of the Hephaestus service | No (controller-to-controller on AET-staff data; end-user Hephaestus data is not transferred) | Covered by TUM's general agreements with GitHub Enterprise |
 
 ## Why the LRZ relationship is not Art. 28
 
 An Art. 28 processor is engaged to process personal data on behalf of the controller, under the controller's documented instructions. Under the EDPB Guidelines 07/2020 on the concepts of controller and processor in the GDPR (adopted 7 July 2021), Section 1.1 (§§ 14–33), the decisive criterion is who determines the "essential means" of the processing — i.e. the purposes, which data, which subjects, how long, what access.
 
-For gitlab.lrz.de the LRZ operates its own GitLab instance for the entire Bavarian academic-computing community under its own mandate as the regular IT service provider for TUM and LMU (BAdW-Satzung). LRZ determines the service's purpose, the onboarding rules, the retention windows, the backup regime, the TOMs, and the terms of use. TUM does not instruct LRZ on how to operate gitlab.lrz.de; TUM consumes the service as one eligible public body among many under its BAdW mandate. This is the textbook scenario of **two separate controllers each processing on its own infrastructure for its own purpose**, and is incompatible with Art. 28 processor status under EDPB 07/2020.
+For gitlab.lrz.de, LRZ operates its own GitLab instance for the Bavarian academic-computing community under its BAdW-embedded mandate as the Bavarian academic computing centre. LRZ determines the service's purpose, the onboarding rules, the retention windows, the backup regime, the TOMs, and the terms of use. TUM does not instruct LRZ on how to operate gitlab.lrz.de; TUM consumes the service as one eligible Bavarian public body among many, with the inter-public-body transmission anchored in Art. 4 Abs. 2 BayDSG. This is the textbook scenario of **two separate controllers each processing on its own infrastructure for its own purpose**, and is incompatible with Art. 28 processor status under EDPB 07/2020.
 
 Art. 26 GDPR (joint controllership) is equally absent: EDPB 07/2020 § 50–65 require a **joint determination of purposes and means**, which is not present here — TUM and LRZ each pursue their own distinct purpose, and neither determines the other's processing parameters. The relationship is a public-body cooperation, consistent with the BayLfD's published guidance on public-body cooperation among Bavarian state institutions.
 
