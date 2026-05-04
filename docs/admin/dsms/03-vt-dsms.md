@@ -82,7 +82,7 @@ See `05-avv-checklist.md` for the full table. In summary, engaged processors (or
 - **OpenAI, L.P.** — alternative LLM provider configurable per workspace. AVV as above.
 - **Salesforce, Inc. / Slack Technologies, LLC** — workspace notifications and engagement digests when the workspace administrator has enabled Slack. AVV in place at TUM/AET level.
 
-The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation framework (Art. 16 Abs. 1 Satz 2 BayHIG in conjunction with the BAdW-Satzung). LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-avv-checklist.md` for the full EDPB 07/2020 analysis.
+The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation framework (BAdW-Satzung). LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-avv-checklist.md` for the full EDPB 07/2020 analysis.
 
 ### 4. Data Protection Officer
 
@@ -107,7 +107,7 @@ Hephaestus (https://hephaestus.aet.cit.tum.de)
 Stack:
   - Browser SPA:        React 19 / Vite / TanStack Router (TypeScript)
   - Application server: Spring Boot 3.5 / Java 21 / PostgreSQL
-  - Intelligence:       Python FastAPI for AI-assisted features
+  - Intelligence:       Node 22 / Hono service for AI-assisted features
   - Identity:           Self-hosted Keycloak (GitHub OAuth + gitlab.lrz.de OIDC)
   - Review sandbox:     Isolated Docker containers with per-job LLM proxy
   - Reverse proxy:      Traefik v3 / Let's Encrypt
@@ -119,10 +119,10 @@ Source (MIT): github.com/ls1intum/Hephaestus
 
 | Processing                                                                                            | Legal basis                                                                                                                                                                                             |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core service (authentication, repository sync, practice detection, guidance) for TUM Contributors     | **Art. 6(1)(e) GDPR** i.V.m. **Art. 4 Satz 1 BayHIG** and **Art. 25 Abs. 1 BayDSG** (public-interest task: teaching and operation of university IT services)                                            |
+| Core service (authentication, repository sync, practice detection, guidance) for TUM Contributors     | **Art. 6(1)(e) GDPR** i.V.m. **Art. 2 BayHIG** and **Art. 4 Abs. 1 BayDSG** (public-interest task: teaching and operation of university IT services)                                            |
 | Core service for non-TUM Contributors (external open-source contributors, partner-university members) | **Art. 6(1)(b) GDPR** (performance of the service the Contributor requested by signing in)                                                                                                              |
 | AI-assisted features (guidance assistant, practice review)                                            | Same as the row above; Contributors may object under **Art. 21 GDPR** via the "AI review comments" profile toggle (stops future transmissions; does not by itself delete previously generated Findings) |
-| Application-server security logs                                                                      | **Art. 6(1)(e) GDPR** i.V.m. **Art. 4 Satz 1 BayHIG**, **Art. 25 Abs. 1 BayDSG**, **Art. 8 BayDiG** (operation and security of a university IT service)                                                 |
+| Application-server security logs                                                                      | **Art. 6(1)(e) GDPR** i.V.m. **Art. 2 BayHIG**, **Art. 4 Abs. 1 BayDSG**, **Art. 8 BayDiG** (operation and security of a university IT service)                                                 |
 | Keycloak session cookies and theme-preference localStorage                                            | **§ 25 Abs. 2 Nr. 2 TDDDG** (technisch unbedingt erforderlich für einen vom Nutzer ausdrücklich gewünschten Telemediendienst) i.V.m. **Art. 6(1)(e) GDPR**                                              |
 
 ### 8. Categories of data subjects (Art. 30(1)(c))

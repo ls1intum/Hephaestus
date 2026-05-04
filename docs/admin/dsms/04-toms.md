@@ -97,7 +97,7 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 
 ## 7. Organisational measures
 
-- Operators are TUM / AET employees or authorised contributors; they act under Art. 4 Satz 1 BayHIG public-duty mandates and TUM-internal security policies.
+- Operators are TUM / AET employees or authorised contributors; they act under Art. 2 BayHIG public-duty mandates and TUM-internal security policies.
 - The DPO ([beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)) reviews incidents. Data-subject requests follow the process in `docs/admin/legal-pages` + the live `/privacy` page.
 - Incidents are recorded in GitHub Issues against the `ls1intum/Hephaestus` repository and, if they affect personal data, reported to the TUM DPO within 72 h (Art. 33 GDPR).
 - Workspace administrators are instructed on the shared-responsibility model (§3.2 of the privacy statement) before the workspace is provisioned; the workspace-configurable surface (LLM provider, Slack, leaderboards, practice catalog, auto-trigger) is not enabled by default.
@@ -111,4 +111,4 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 | Microsoft Corporation (Azure OpenAI Service)   | Default LLM provider (per workspace) for the TUM-operated deployment | AVV at TUM/AET level for TUM-operated tenancy; at workspace administrator's institution when that institution supplies credentials   | Default, per-workspace                    |
 | OpenAI, L.P.                                   | Alternative LLM provider (per workspace)                             | AVV as above                                                                                                                         | Per-workspace, opt-in                     |
 | Salesforce, Inc. / Slack Technologies, LLC     | Workspace notifications (when enabled by the workspace admin)        | AVV at TUM/AET level                                                                                                                 | Per-workspace, opt-in                     |
-| Leibniz-Rechenzentrum der BAdW (gitlab.lrz.de) | Source system and OIDC identity provider                             | **Not Art. 28** — separate controller under Art. 16 Abs. 1 Satz 2 BayHIG + BAdW-Satzung (public-body cooperation; EDPB 07/2020 § 22) | Per-workspace, opt-in                     |
+| Leibniz-Rechenzentrum der BAdW (gitlab.lrz.de) | Source system and OIDC identity provider                             | **Not Art. 28** — separate controller under the BAdW-Satzung (public-body cooperation; EDPB 07/2020 § 22) | Per-workspace, opt-in                     |

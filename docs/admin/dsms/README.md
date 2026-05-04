@@ -54,7 +54,7 @@ Re-review the VVT once per year:
 
 The DSB may comment in DSMS. Typical follow-ups and responses:
 
-- _"Rechtsgrundlage zu konkretisieren"_ → §7 of the VVT cites Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG for TUM Contributors, and Art. 6(1)(b) GDPR for non-TUM Contributors. Point them there.
+- _"Rechtsgrundlage zu konkretisieren"_ → §7 of the VVT cites Art. 6(1)(e) GDPR + Art. 2 BayHIG + Art. 4 Abs. 1 BayDSG for TUM Contributors, and Art. 6(1)(b) GDPR for non-TUM Contributors. Point them there.
 - _"Löschkonzept fehlt"_ → §13 of the VVT lists retention per category, including the account-deletion flow and the 14-day application-server access-log retention enforced by the application server itself.
 - _"AVV fehlt für X"_ → see [`05-avv-checklist.md`](./05-avv-checklist.md) for the per-processor DPA status.
 - _"DSFA erforderlich"_ → upgrade [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate.

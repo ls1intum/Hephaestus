@@ -27,12 +27,12 @@ The live privacy page is at [https://hephaestus.aet.cit.tum.de/privacy](https://
 
 - Controller identified as **TUM + Prof. Krusche (AET)**, with operational contact `ls1.admin@in.tum.de`.
 - DPO: **[beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)**.
-- §3.1 names **gitlab.lrz.de / Leibniz-Rechenzentrum der BAdW** as a separate controller under the Art. 16 Abs. 1 Satz 2 BayHIG public-body cooperation framing, **not** an Art. 28 processor.
+- §3.1 names **gitlab.lrz.de / Leibniz-Rechenzentrum der BAdW** as a separate controller under the public-body cooperation framing, **not** an Art. 28 processor.
 - §3.2 documents the shared-responsibility model (workspace admin configures LLM credentials, Slack, leaderboards, practice catalog, auto-trigger) with the Art. 26(2) Satz 1 duty allocation.
 - §4 lists: identity + authentication, development activity (GitHub + gitlab.lrz.de), account settings + recognition + the "AI review comments" Art. 21 objection switch, AI-assisted features, and server logs (minimal application-server web access log, retained 14 days, then deleted automatically). It does **not** claim active Sentry or PostHog processing — both integrations are disabled in production.
 - §6 lists every recipient: GitHub, the LLM provider per workspace (OpenAI or Azure OpenAI), and Slack.
 - §7 covers third-country transfers under DPF + SCCs Module 2 fall-back.
-- Legal basis table: **Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG** for TUM Contributors; **Art. 6(1)(b) GDPR** for non-TUM Contributors.
+- Legal basis table: **Art. 6(1)(e) GDPR + Art. 2 BayHIG + Art. 4 Abs. 1 BayDSG** for TUM Contributors; **Art. 6(1)(b) GDPR** for non-TUM Contributors.
 - Cookies section names only Keycloak session cookies and the theme-preference localStorage key under **§ 25 Abs. 2 Nr. 2 TDDDG**.
 - Complaint authority: **Der Bayerische Landesbeauftragte für den Datenschutz (BayLfD)**.
 
@@ -86,7 +86,7 @@ If any of the above is wrong, fix the Markdown source in `webapp/public/legal/pr
 
 The DSB reviews and may leave comments. Typical follow-ups:
 
-- _"Rechtsgrundlage zu konkretisieren"_ — §7 already cites Art. 6(1)(e) GDPR + Art. 4 Satz 1 BayHIG + Art. 25 Abs. 1 BayDSG for TUM Contributors and Art. 6(1)(b) for external Contributors. Point the reviewer there.
+- _"Rechtsgrundlage zu konkretisieren"_ — §7 already cites Art. 6(1)(e) GDPR + Art. 2 BayHIG + Art. 4 Abs. 1 BayDSG for TUM Contributors and Art. 6(1)(b) for external Contributors. Point the reviewer there.
 - _"Löschkonzept fehlt"_ — §13 plus the 14-day application-server access-log retention, the account-deletion flow, and the per-provider retention windows together form the deletion concept. Off-host backups are not currently in place, so no separate backup-deletion flow is required; if backups are introduced later, the application-level deletion log must be re-applied on restore.
 - _"Ist § 25 TDDDG relevant?"_ — the privacy page already states that only Keycloak session cookies and the theme-preference localStorage key are used, both under § 25 Abs. 2 Nr. 2 TDDDG.
 - _"DSFA erforderlich"_ — upgrade `02-dsfa-prescreen.md` to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate and names the conditions under which a full DPIA must be opened (see §6 of the pre-screen).
