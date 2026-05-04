@@ -75,7 +75,7 @@ The essence of the Art. 26(2) Satz 2 arrangement is made available to data subje
 
 ### 3. Processors (Art. 28 GDPR) — each with AVV status
 
-See `05-avv-checklist.md` for the full table. In summary, engaged processors (ordered internal → platform-wide → per-workspace) are:
+See `05-avv-checklist.md` for the full table. Engaged processors:
 
 - **GitHub, Inc. / Microsoft Corporation** — identity provider (OAuth) and source-system API (pull requests, issues, reviews, commits synchronised on behalf of the controller via the workspace-configured GitHub App installation or access token). AVV in place at TUM/AET level.
 - **Microsoft Corporation (Azure OpenAI Service)** — default LLM provider for the TUM-operated deployment. Region-configurable; EU-region deployments process within the EU. AVV at TUM/AET level for the TUM-operated tenancy; AVV at the workspace administrator's institution level when that institution supplies the API credentials (shared-responsibility model, §3.2).
@@ -197,7 +197,7 @@ See `02-dsfa-prescreen.md`. Conclusion: **DPIA-light posture.** The AI-assisted 
 
 ### 18. Personalrat involvement (Art. 75a BayPVG)
 
-**Not triggered at the platform level.** Hephaestus is *suitable* for displaying contributor activity, but is not deployed by AET as a personnel-evaluation, performance-management, or behaviour-monitoring instrument. The platform is contributor-facing — no Dienststelle-segmented dashboard, no HR export, no manager-facing roll-up — and TUM staff appear in a workspace in their role as Contributors alongside students under the same scheme. Art. 75a BayPVG's *Eignungsrechtsprechung* is the capability test for monitoring **employee** behaviour or performance; on a contributor-facing teaching platform with these properties, it does not engage.
+**Not triggered at the platform level.** Hephaestus is *suitable* for displaying contributor activity, but is not deployed by AET as a personnel-evaluation, performance-management, or behaviour-monitoring instrument. The platform is contributor-facing: it exposes no Dienststelle-segmented dashboard, no HR export, and no manager-facing roll-up. TUM staff appear in a workspace in their role as Contributors alongside students under the same scheme. Art. 75a BayPVG's *Eignungsrechtsprechung* is the capability test for monitoring **employee** behaviour or performance. On a contributor-facing teaching platform with these properties, it does not engage.
 
 ### 19. IT-Sicherheitsformular (TUM wiki)
 
