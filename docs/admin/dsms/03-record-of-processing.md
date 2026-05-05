@@ -69,23 +69,15 @@ Set to **Stephan Krusche (krusche@tum.de)** — head of the chair and Verantwort
 ### Description and Purpose of Processing Activity
 
 ```text
-Hephaestus is a self-hosted web platform operated by AET on TUM infrastructure at https://hephaestus.aet.cit.tum.de. It supports project-based software-engineering teaching at TUM and the development work of AET research projects by giving contributors feedback on their activity in connected Git repositories. The processing happens in the following steps.
+Hephaestus is a self-hosted web platform operated by AET on TUM infrastructure at https://hephaestus.aet.cit.tum.de. It supports project-based software-engineering teaching at TUM and the development work of AET research projects by giving contributors feedback on their activity in connected Git repositories.
 
-1. Workspace setup. A workspace administrator (typically a TUM chair, lecturer, or research-group lead) creates a workspace and connects one or more Git repositories from github.com or gitlab.lrz.de. No contributor data is processed at this step.
+A workspace administrator (typically a TUM chair, lecturer, or research-group lead) connects one or more Git repositories from github.com or gitlab.lrz.de. Hephaestus synchronises the pull/merge requests, issues, code reviews, review comments, and commit metadata authored in those repositories. Activity is ingested for everyone who has authored in a connected repository, including contributors who have not signed in to Hephaestus.
 
-2. Repository synchronisation. Hephaestus synchronises pull/merge requests, issues, code reviews, review comments, and commit metadata from the connected repositories using the workspace-configured GitHub App installation or gitlab.lrz.de access token. Activity authored by anyone in the repository is ingested, including contributors who have not signed in to Hephaestus.
+Contributors who want to receive feedback sign in with their GitHub or LRZ-GitLab account, from which Hephaestus receives a federated user identifier, username, display name, email, and avatar URL. The synchronised activity is analysed against a workspace-configured catalog of practices to produce findings about each contributor. Two parts of the analysis use an external LLM provider configured per workspace: automated practice review of pull/merge requests, and an in-app conversational mentor for follow-up questions. The platform forwards the relevant code, discussion, and chat messages to that provider.
 
-3. Contributor sign-in. Contributors who want to receive feedback sign in through a self-hosted Keycloak that federates GitHub (OAuth) and gitlab.lrz.de (OIDC). Hephaestus receives the federated user identifier, username, display name, email, and avatar URL. A Hephaestus account may link multiple federated identities.
+Findings and activity are shown on workspace dashboards visible to the contributor and the workspace administrator. The administrator can additionally enable a workspace leaderboard, league assignment, and achievements (off by default) and route notifications to Slack.
 
-4. Storage. The platform stores the synchronised activity, derived analyses (see step 5), account preferences, workspace memberships, and the state of the in-app "AI review comments" Art. 21 GDPR objection toggle (default on, opt-out).
-
-5. AI-assisted analysis. Two AI features may be active for a workspace. (a) Automated practice review of a pull/merge request: the platform may run the diff in an isolated, network-restricted Docker sandbox on AET infrastructure to derive structural signals, then forwards the diff and relevant context to the workspace-configured external LLM provider. The result is stored as a Finding (verdict, severity, evidence) and posted as a comment on the pull request. (b) Guidance-assistant chat: contributors can ask the in-app conversational mentor follow-up questions. Their messages and relevant context are forwarded to the same LLM provider, and the conversation history with their helpful/not-helpful ratings is persisted. The default LLM provider on the TUM-operated deployment is Microsoft Azure OpenAI in an EU region under enterprise no-training terms. A workspace can instead be configured to use OpenAI's enterprise API.
-
-6. Surfacing. Findings and synchronised activity populate workspace dashboards used by contributors and the workspace administrator. The administrator can additionally enable a leaderboard, league assignment, and achievements (off by default) ranking contributors by activity inside the same workspace, and route notifications and digests to Slack.
-
-7. Operational logging. The application server retains a security access log (IP, timestamp, method, path, status, size, processing time) for up to 14 days for incident response.
-
-Hephaestus performs no automated decisions within the meaning of Art. 22 GDPR and feeds no grading, HR, or access-control pipeline. The leaderboard and recognition features are motivational and visible only to other contributors of the same workspace; workspace dashboards are used by instructors and coaches to support contributors, not to grade them.
+Hephaestus performs no automated decisions in the sense of Art. 22 GDPR and feeds no grading, HR, or access-control pipeline. Contributors can disable AI-assisted feedback at any time through the in-app "AI review comments" toggle (Art. 21 GDPR).
 ```
 
 ### Categories of data subjects of this processing
