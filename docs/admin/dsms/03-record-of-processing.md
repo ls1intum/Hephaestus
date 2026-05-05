@@ -280,6 +280,23 @@ Read-only. Filled by the DSB after submission.
 
 ---
 
+## Documents
+
+The form's Documents section lists six categories of potentially-uploadable artefacts. Hephaestus uploads **none** — every relevant artefact either lives at a public URL the form already references, or pastes into a corresponding form field. Per-line stance:
+
+| Form item | Stance |
+|---|---|
+| Joint Controller Agreement (Art. 26) | No upload. The Art. 26(2) Satz 2 publication of the essence is the privacy statement at §3.2 ([https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy)). The configuration acceptance flow when a workspace administrator first connects a repository is the operative agreement; there is no separate per-workspace signed JCA document to upload. |
+| Data Processing Agreement (DPA) — LRZ | No upload (form explicitly says "this agreement exists centrally and does not need to be uploaded"). |
+| Data Processing Agreement (DPA) — GitHub / Microsoft / OpenAI / Slack | No upload. These are AET-pool processors with AVVs at TUM/AET central level. The vendor-pool registration request is in *Other Remarks*. |
+| Consent form | N/A. Processing is on Art. 6(1)(e) and 6(1)(b), not 6(1)(a). |
+| Privacy information for data subjects | No upload. Public URL referenced in the form's *URLs* field: [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy). |
+| Data flow diagram | No upload. The processing flow is described inline in *Description and Purpose* and *Recipient Categories*. The published privacy statement §3 elaborates further. |
+| Ethics committee opinion | N/A. The TUM-operated deployment is an operational service, not a study; capstone-course data collection has separate ethics approval which is recorded against the *research project* PA, not this operational PA. |
+| DPIA / risk assessment draft | No upload. DPIA-light posture documented in [`02-dpia-prescreen.md`](./02-dpia-prescreen.md); the §6 conclusion is referenced in this VVT and is available for the DSB to read in the repo. Upload only if the DSB explicitly requests it. |
+
+---
+
 ## Submit
 
 - **New State** dropdown → **Submitted**.
