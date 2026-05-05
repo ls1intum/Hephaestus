@@ -10,10 +10,10 @@ const sidebars: SidebarsConfig = {
       link: {type: 'doc', id: 'dsms/dsms'},
       items: [
         {type: 'doc', id: 'dsms/submission-guide', label: 'Submission Guide'},
-        {type: 'doc', id: 'dsms/dsfa-prescreen', label: 'DPIA Pre-Screen'},
-        {type: 'doc', id: 'dsms/vt-dsms', label: 'Verarbeitungstätigkeit'},
+        {type: 'doc', id: 'dsms/dpia-prescreen', label: 'DPIA Pre-Screen'},
+        {type: 'doc', id: 'dsms/record-of-processing', label: 'Record of Processing (VVT)'},
         {type: 'doc', id: 'dsms/toms', label: 'TOMs'},
-        {type: 'doc', id: 'dsms/avv-checklist', label: 'AVV Checklist'},
+        {type: 'doc', id: 'dsms/processor-checklist', label: 'Processor Checklist (AVV)'},
       ],
     },
   ],
