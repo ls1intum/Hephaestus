@@ -201,7 +201,7 @@ Tick:
 ### Where is this data located and how is it stored?
 
 ```text
-Self-hosted by AET on TUM infrastructure (VM provided by the TUM ITO) at https://hephaestus.aet.cit.tum.de. Application data in PostgreSQL on the same host; authentication state in a self-hosted Keycloak; application-server access logs on the host (14-day retention); container stdout rotated by the host runtime.
+Self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM. Application data in PostgreSQL; authentication state in a self-hosted Keycloak. Container stdout is rotated by the container runtime (Docker json-file driver, 50 MiB per file × 5 files retained per service). Application-server access logs are retained for at most 14 days.
 
 All primary data resides on TUM infrastructure within the EU. AI-assisted features additionally transmit relevant code snippets and discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region).
 ```
@@ -216,10 +216,10 @@ Leave the multi-select empty — no preset matches the per-category retention mo
 Mixed retention by category:
 
 - Account-bound data (identity, profile, settings, recognition signals, AI conversations, practice findings): retained for the lifetime of the account; removed on user-triggered account deletion.
-- Repository activity synchronised from GitHub / gitlab.lrz.de: retained while the repository remains configured for the workspace; deletion in Hephaestus does not affect the source-side content on GitHub or gitlab.lrz.de.
-- LLM-provider-side prompts: up to 30 days under the provider's enterprise abuse-monitoring window; shorter where Zero Data Retention is contracted for the workspace.
+- Repository activity synchronised from GitHub / gitlab.lrz.de: retained while the repository remains configured for the workspace. Deletion in Hephaestus does not affect the source-side content on GitHub or gitlab.lrz.de.
+- LLM-provider-side prompts: per the workspace's chosen provider's terms. For the TUM-operated default (Microsoft Azure OpenAI in an EU region), up to 30 days under the enterprise abuse-monitoring window.
 - Application-server access logs: at most 14 days; longer only for the duration of an ongoing security incident, then deleted at closure.
-- Container stdout: rotated by size by the host's container runtime (50 MiB × 5 files per service).
+- Container stdout: rotated by size by the container runtime (50 MiB × 5 files per service).
 ```
 
 ### What is your reasoning for the erasure time above?
@@ -237,21 +237,18 @@ AET operations team, ls1.admin@in.tum.de. User-initiated account deletion is pro
 ### How is deletion guaranteed?
 
 ```text
-Account deletion removes the user record from the application database and from Keycloak; cascaded relationships remove dependent records (workspace memberships, AI conversations, recognition signals). Repository-activity records authored by the deleted user are anonymised in place (author reference removed) since they remain part of the historical workspace artefact set. Container stdout rotates automatically by size; access logs are pruned by the application server's native retention policy. No long-term off-host backups are in place at the time of submission, so deletion does not need to propagate to backup media.
+User-triggered account deletion removes the user record from the application database and from Keycloak. Dependent records (workspace memberships, AI conversations, recognition signals) are removed in cascade. Source-side content on GitHub or gitlab.lrz.de is not affected by deletion in Hephaestus. Container stdout rotates automatically by size; application-server access logs are pruned by the native retention. No long-term off-host backups are in place at the time of submission, so deletion does not need to propagate to backup media.
 ```
 
 ### Specific Technical and Organisational Measures
 
 ```text
-- Hosting and isolation: self-hosted by AET on TUM infrastructure inside the AET tenancy of the TUM ITO; outbound traffic restricted to documented endpoints (federated IdPs, source-system APIs, the workspace-configured LLM provider, Slack when enabled).
+- Hosting: self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM.
 - Authentication and access control: federated identity via Keycloak (GitHub OAuth, gitlab.lrz.de OIDC); workspace-scoped membership and role checks; least-privilege source-system access via per-workspace GitHub App installation or scoped access token.
 - Encryption in transit: TLS 1.2+ on all external endpoints; outbound calls to GitHub, gitlab.lrz.de, the LLM provider, and Slack over HTTPS.
-- Logging and incident response: 14-day application-server access-log retention; container stdout rotated by host runtime (50 MiB × 5 per service); incidents reported to the TUM DPO under Art. 33 / 34 GDPR; documented breach-notification path.
-- Sandboxing of code-executing AI features: practice-review code execution runs inside per-job Docker sandboxes behind a per-job LLM proxy; off by default (workspace opt-in).
-- Data minimisation in AI calls: only the relevant code snippets and discussion are forwarded to the LLM provider; enterprise no-training terms in place; Zero Data Retention contractable per workspace.
+- Logging and incident response: application-server access logs retained for at most 14 days; container stdout rotated by the container runtime (50 MiB × 5 per service); incidents reported to the TUM DPO under Art. 33 / 34 GDPR.
+- AI features: practice-review code execution can run inside per-job Docker sandboxes (off by default; workspace opt-in). Only the relevant code snippets and discussion are forwarded to the LLM provider. For OpenAI / Azure OpenAI providers, enterprise no-training terms apply.
 - Source: github.com/ls1intum/Hephaestus (MIT). Supply-chain hygiene via Dependabot and CodeQL on the upstream repository.
-
-Full per-category detail in 04-toms.md.
 ```
 
 ---
