@@ -194,16 +194,16 @@ Tick:
 ### Other data sources
 
 ```text
-- From the GitHub API and the gitlab.lrz.de API (federated via OAuth / OIDC at sign-in; via the workspace-configured installation or access token for repository synchronisation).
+- From GitHub and gitlab.lrz.de: identity at sign-in (GitHub OAuth, gitlab.lrz.de OIDC, brokered through Keycloak); repository activity via the GitHub App installation or workspace-configured access token; webhook events delivered to the platform's /webhooks endpoint.
 - From the HTTP connection: IP address and request metadata captured in the application server's access log.
 ```
 
 ### Where is this data located and how is it stored?
 
 ```text
-Self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM. Application data in PostgreSQL; authentication state in a self-hosted Keycloak. Container stdout is rotated by the container runtime (Docker json-file driver, 50 MiB per file × 5 files retained per service). Application-server access logs are retained for at most 14 days.
+Self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM. Application data in PostgreSQL; authentication state in a self-hosted Keycloak (separate PostgreSQL); webhook events and the practice-review job queue in NATS JetStream. Local working copies of monitored repositories may be stored on the host filesystem when practice-review code execution is enabled. Container stdout is rotated by the container runtime (Docker json-file driver, 50 MiB per file × 5 files retained per service). The application-server access log is retained for at most 14 days.
 
-All primary data resides on TUM infrastructure within the EU. AI-assisted features additionally transmit relevant code snippets and discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region).
+All primary data resides on TUM infrastructure within the EU. AI-assisted features additionally transmit the relevant code snippets and discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region).
 ```
 
 ### What is your envisaged time for deletion / erasure of the data for this processing activity?
@@ -215,10 +215,10 @@ Leave the multi-select empty — no preset matches the per-category retention mo
 ```text
 Mixed retention by category:
 
-- Account-bound data (identity, profile, settings, recognition signals, AI conversations, practice findings): retained for the lifetime of the account; removed on user-triggered account deletion.
-- Repository activity synchronised from GitHub / gitlab.lrz.de: retained while the repository remains configured for the workspace. Deletion in Hephaestus does not affect the source-side content on GitHub or gitlab.lrz.de.
+- Account-bound data (Keycloak account, federated identity links, analytics identity): removed on user-triggered account deletion via the in-app control.
+- Contributor profile and activity data synchronised from GitHub / gitlab.lrz.de (login, name, email, avatar, authored issues / pull requests / comments / reviews, AI conversations, recognition signals, practice findings): retained while at least one workspace continues to track the contributor's repositories. Removed when the last workspace stops monitoring the source repository, or on operator-executed deletion against the production database on receipt of a verified erasure request.
 - LLM-provider-side prompts: per the workspace's chosen provider's terms. For the TUM-operated default (Microsoft Azure OpenAI in an EU region), up to 30 days under the enterprise abuse-monitoring window.
-- Application-server access logs: at most 14 days; longer only for the duration of an ongoing security incident, then deleted at closure.
+- Application-server access log: at most 14 days; longer only for the duration of an active security incident, then deleted on closure.
 - Container stdout: rotated by size by the container runtime (50 MiB × 5 files per service).
 ```
 
@@ -237,18 +237,18 @@ AET operations team, ls1.admin@in.tum.de. User-initiated account deletion is pro
 ### How is deletion guaranteed?
 
 ```text
-User-triggered account deletion removes the user record from the application database and from Keycloak. Dependent records (workspace memberships, AI conversations, recognition signals) are removed in cascade. Source-side content on GitHub or gitlab.lrz.de is not affected by deletion in Hephaestus. Container stdout rotates automatically by size; application-server access logs are pruned by the native retention. No long-term off-host backups are in place at the time of submission, so deletion does not need to propagate to backup media.
+The in-app account-deletion control removes the user's Keycloak account, federated identity links, and analytics identity in PostHog. Erasure of the contributor profile row in the application database and its dependent records (workspace memberships, AI conversations, practice-finding feedback, recognition signals) is performed manually by AET operators against the production database. Source-side content on GitHub or gitlab.lrz.de is not modified by deletion in Hephaestus. Container stdout rotates automatically by size; the application-server access log is pruned by Tomcat's native 14-day retention. No long-term off-host backups are configured in the application repository at the time of submission; if the underlying VM is snapshotted by AET infrastructure operations, the operations team applies the standard snapshot retention.
 ```
 
 ### Specific Technical and Organisational Measures
 
 ```text
 - Hosting: self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM.
-- Authentication and access control: federated identity via Keycloak (GitHub OAuth, gitlab.lrz.de OIDC); workspace-scoped membership and role checks; least-privilege source-system access via per-workspace GitHub App installation or scoped access token.
-- Encryption in transit: TLS 1.2+ on all external endpoints; outbound calls to GitHub, gitlab.lrz.de, the LLM provider, and Slack over HTTPS.
-- Logging and incident response: application-server access logs retained for at most 14 days; container stdout rotated by the container runtime (50 MiB × 5 per service); incidents reported to the TUM DPO under Art. 33 / 34 GDPR.
-- AI features: practice-review code execution can run inside per-job Docker sandboxes (off by default; workspace opt-in). Only the relevant code snippets and discussion are forwarded to the LLM provider. For OpenAI / Azure OpenAI providers, enterprise no-training terms apply.
-- Source: github.com/ls1intum/Hephaestus (MIT). Supply-chain hygiene via Dependabot and CodeQL on the upstream repository.
+- Authentication and access control: federated identity via self-hosted Keycloak (GitHub OAuth, gitlab.lrz.de OIDC); workspace-scoped membership and role checks enforced at the application layer; least-privilege source-system access via per-workspace GitHub App installation or scoped access token.
+- Encryption in transit: TLS-terminated at Traefik with Let's Encrypt; outbound calls to GitHub, gitlab.lrz.de, the LLM provider, and Slack are HTTPS-only.
+- Logging and incident response: Tomcat access logs retained for at most 14 days with a minimised pattern; container stdout rotated by the Docker json-file driver (50 MiB × 5 per service); incidents affecting personal data reported to the TUM DPO within 72 h under Art. 33 / 34 GDPR.
+- AI features: practice-review code execution runs inside per-job Docker sandboxes on internal-only Docker networks with no general egress; the only outbound path is a per-job, token-authenticated LLM proxy. Sandbox is off by default (`SANDBOX_ENABLED=false`) and is workspace opt-in. For OpenAI / Azure OpenAI providers, enterprise no-training terms apply at the AET tenancy level.
+- Supply chain and source: source at github.com/ls1intum/Hephaestus (MIT). CI runs CodeQL (GitHub Default Setup), Trivy (filesystem and container image), TruffleHog secret detection, and Renovate dependency updates. Production images are cosign-signed and pulled from GHCR.
 ```
 
 ---
