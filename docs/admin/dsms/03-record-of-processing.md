@@ -15,7 +15,7 @@ Copy-paste ready. Ordered to match the DSMS "Create new PA" form and follow-up q
 ### Title
 
 ```text
-Hephaestus – Coaching Platform for Student Software Projects
+Hephaestus – Practice-Aware Feedback for Software Projects
 ```
 
 ### Description and Purpose (min. 200 characters)
