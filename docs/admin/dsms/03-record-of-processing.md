@@ -144,8 +144,9 @@ https://hephaestus.aet.cit.tum.de
 
 Tick:
 
-- [x] Art. 6.1b GDPR (request from / contract with data subject) — for non-TUM contributors signing in
-- [x] Art. 6.1e GDPR (performance of task carried out in public interest) — for the TUM teaching task
+- [x] Art. 6.1a GDPR (consent from data subject) — for workspaces where the workspace administrator collects explicit consent from participants (for example, the AET capstone course's application-phase consent form).
+- [x] Art. 6.1b GDPR (request from / contract with data subject) — for genuinely voluntary sign-in by non-TUM contributors to access the personal dashboard, conversational mentor, or account preferences.
+- [x] Art. 6.1e GDPR (performance of task carried out in public interest) — for TUM/AET operation of the platform as part of university teaching and research-project work.
 
 Do **not** tick 6.1f. Bavarian public bodies cannot rely on legitimate interest for tasks carried out in the performance of a statutory public duty (Art. 6(1) Unterabsatz 2 GDPR).
 
@@ -156,11 +157,16 @@ Field hidden unless 6.1f is ticked. Leave empty.
 ### Other legal basis (textarea)
 
 ```text
-Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (Aufgaben der Hochschule: Forschung, Lehre, Wissens- und Technologietransfer) and Art. 4 Abs. 1 BayDSG (Rechtmäßigkeit der Verarbeitung im Bereich der bayerischen öffentlichen Stellen). The same basis covers application-server security logs (operation and security of a university IT service).
+TUM/AET as platform operator: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (Aufgaben der Hochschule: Forschung, Lehre, Wissens- und Technologietransfer) and Art. 4 Abs. 1 BayDSG (Rechtmäßigkeit der Verarbeitung im Bereich der bayerischen öffentlichen Stellen). This covers the operation of the platform for TUM courses and AET research-project repositories, including application-server security logs.
 
-Art. 6(1)(b) GDPR for non-TUM contributors (performance of the service requested by signing in).
+Per-workspace lawful basis: under the Art. 26 GDPR joint-controller arrangement, the workspace administrator decides which Git repositories Hephaestus ingests and is responsible for the lawful basis applicable to the contributors of that workspace. The applicable basis depends on the workspace context:
 
-Contributors may object under Art. 21 GDPR to the AI-assisted feedback channel via the in-app "AI review comments" toggle; objection stops future transmissions but does not by itself delete previously generated findings.
+- Closed teaching cohorts (for example, the AET capstone course running on a workspace-private gitlab.lrz.de organisation): Art. 6(1)(a) GDPR — explicit consent obtained from participants during the application phase, before any data flows into Hephaestus.
+- AET-operated public open-source repositories (for example, ls1intum/Artemis): Art. 6(1)(e) GDPR continues to apply (Wissens- und Technologietransfer task under Art. 2 BayHIG). The contributor's repository activity is already published on the source platform; the additional processing Hephaestus performs is proportionate and limited to giving the contributor practice feedback. Public availability does not by itself supply a basis (Art. 4(1) GDPR), but it does support the proportionality and necessity analysis.
+
+Voluntary sign-in by non-TUM contributors to access the personal dashboard, conversational mentor, or account preferences: Art. 6(1)(b) GDPR — performance of the service requested when the contributor signs in.
+
+Contributors may object under Art. 21 GDPR to AI-assisted feedback via the in-app "AI review comments" toggle. Objection stops future transmissions but does not by itself delete previously generated findings.
 
 Keycloak session cookies and theme-preference localStorage: § 25 Abs. 2 Nr. 2 TDDDG (technisch unbedingt erforderlich) i.V.m. Art. 6(1)(e) GDPR.
 ```
