@@ -15,10 +15,10 @@ This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | [`README.md`](./README.md)                       | This file                                                                                                        |
 | [`01-submission-guide.md`](./01-submission-guide.md)   | Ordered submission procedure                                                                                     |
-| [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) | DPIA pre-check (Art. 35 GDPR) — records the DPIA-light posture and the conditions that would require a full DPIA |
-| [`03-vvt.md`](./03-vvt.md)               | Copy-paste VVT answers for the DSMS form                                                                         |
+| [`02-dpia-prescreen.md`](./02-dpia-prescreen.md) | DPIA pre-check (Art. 35 GDPR) — records the DPIA-light posture and the conditions that would require a full DPIA |
+| [`03-record-of-processing.md`](./03-record-of-processing.md)               | Copy-paste VVT answers for the DSMS form                                                                         |
 | [`04-toms.md`](./04-toms.md)                     | Technical and Organizational Measures (Art. 32 GDPR)                                                             |
-| [`05-avv-checklist.md`](./05-avv-checklist.md)   | Art. 28 processor checklist — every external and internal recipient and its AVV status                           |
+| [`05-processor-checklist.md`](./05-processor-checklist.md)   | Art. 28 processor checklist — every external and internal recipient and its AVV status                           |
 
 The live imprint and privacy pages are served at:
 
@@ -34,11 +34,11 @@ Markdown source lives under [`webapp/public/legal/profiles/tumaet/`](https://git
 - AI-assisted guidance and automated practice review calling a workspace-configured LLM provider under enterprise no-training terms.
 - Engagement and recognition features (leaderboards, leagues, achievements) gated per workspace.
 - No special-category data (Art. 9 GDPR). No Art. 22 automated decision-making.
-- Residual elevated risk on the AI-assisted feature surface is covered by the BayLfD innovative-technology criterion and the mitigations documented in `02-dsfa-prescreen.md` §5.
+- Residual elevated risk on the AI-assisted feature surface is covered by the BayLfD innovative-technology criterion and the mitigations documented in `02-dpia-prescreen.md` §5.
 
 ## Maintenance
 
-The VVT is re-reviewed annually and whenever the processing surface changes (new processor, new data category, new retention window, new identity provider, or activation of an integration that is currently disabled). The triggers that require an amendment before go-live are listed in [`05-avv-checklist.md`](./05-avv-checklist.md) and [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) §6.
+The VVT is re-reviewed annually and whenever the processing surface changes (new processor, new data category, new retention window, new identity provider, or activation of an integration that is currently disabled). The triggers that require an amendment before go-live are listed in [`05-processor-checklist.md`](./05-processor-checklist.md) and [`02-dpia-prescreen.md`](./02-dpia-prescreen.md) §6.
 
 ## DSB feedback
 

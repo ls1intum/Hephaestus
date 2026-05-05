@@ -42,7 +42,7 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 - All external traffic is TLS-terminated at Traefik (Let's Encrypt). HTTP redirects to HTTPS with HSTS `max-age=63072000; includeSubdomains; preload`.
 - Internal service-to-service traffic stays within the Docker network (application server, intelligence service, PostgreSQL, Keycloak, sandbox orchestrator).
 - WebSocket traffic uses `wss://` (TLS) in production.
-- Outbound transfers to processors (GitHub API, LLM providers, Slack) are TLS-only. Transfer safeguards for U.S. recipients: EU-U.S. DPF adequacy decision + SCCs Module 2 fall-back (see `05-avv-checklist.md`).
+- Outbound transfers to processors (GitHub API, LLM providers, Slack) are TLS-only. Transfer safeguards for U.S. recipients: EU-U.S. DPF adequacy decision + SCCs Module 2 fall-back (see `05-processor-checklist.md`).
 
 ### 2.2 Input control (Eingabekontrolle)
 

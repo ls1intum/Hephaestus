@@ -1,5 +1,5 @@
 ---
-id: avv-checklist
+id: processor-checklist
 title: Art. 28 Processor Checklist
 description: Per-processor AVV status for the TUM-operated Hephaestus deployment.
 ---
@@ -52,4 +52,4 @@ If a future Hephaestus deployment adds any of the following, amend this file **a
 - Activating the bundled Sentry client. A self-hosted Sentry on TUM infrastructure is an in-house recipient; a SaaS Sentry tenant is an Art. 28 U.S. processor that needs a DPA, a privacy §4 entry, and a DPIA re-assessment.
 - Activating the bundled PostHog client. PostHog is an Art. 28 U.S. processor and requires a DPA, a privacy §4 / §6 entry, an Art. 6(1)(a) consent flow, and a DPIA re-assessment.
 - Any external storage (S3, CDN) or any third-party font, script, image, or embed served from the application: requires an AVV and a privacy-statement entry.
-- Any widening of the practice-review sandbox network posture beyond the per-job LLM proxy — triggers a re-audit under §5 of `02-dsfa-prescreen.md`.
+- Any widening of the practice-review sandbox network posture beyond the per-job LLM proxy — triggers a re-audit under §5 of `02-dpia-prescreen.md`.

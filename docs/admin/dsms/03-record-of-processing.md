@@ -1,6 +1,6 @@
 ---
-id: vvt
-title: Verzeichnis von Verarbeitungstätigkeiten (VVT)
+id: record-of-processing
+title: Record of Processing Activities (VVT)
 description: Copy-paste answers for the DSMS follow-up questionnaire.
 ---
 
@@ -75,14 +75,14 @@ The essence of the Art. 26(2) Satz 2 arrangement is made available to data subje
 
 ### 3. Processors (Art. 28 GDPR) — each with AVV status
 
-See `05-avv-checklist.md` for the full table. Engaged processors:
+See `05-processor-checklist.md` for the full table. Engaged processors:
 
 - **GitHub, Inc. / Microsoft Corporation** — identity provider (OAuth) and source-system API (pull requests, issues, reviews, commits synchronised on behalf of the controller via the workspace-configured GitHub App installation or access token). AVV in place at TUM/AET level.
 - **Microsoft Corporation (Azure OpenAI Service)** — default LLM provider for the TUM-operated deployment. Region-configurable; EU-region deployments process within the EU. AVV at TUM/AET level for the TUM-operated tenancy; AVV at the workspace administrator's institution level when that institution supplies the API credentials (shared-responsibility model, §3.2).
 - **OpenAI, L.P.** — alternative LLM provider configurable per workspace. AVV as above.
 - **Salesforce, Inc. / Slack Technologies, LLC** — workspace notifications and engagement digests when the workspace administrator has enabled Slack. AVV in place at TUM/AET level.
 
-The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation: inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG, with LRZ operating under the BAdW-Satzung. LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-avv-checklist.md` for the full EDPB 07/2020 analysis.
+The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation: inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG, with LRZ operating under the BAdW-Satzung. LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-processor-checklist.md` for the full EDPB 07/2020 analysis.
 
 ### 4. Data Protection Officer
 
@@ -188,7 +188,7 @@ Both are versioned in the repository under `webapp/public/legal/profiles/tumaet/
 
 ### 17. DPIA pre-check (Art. 35 GDPR)
 
-See `02-dsfa-prescreen.md`. Conclusion: **DPIA-light posture.** The AI-assisted feature surface is on the "elevated risk" side of the BayLfD innovative-technology criterion; mitigations in §5 of the pre-screen (no-training enterprise API terms, per-job LLM proxy, Art. 21 objection switch, shared-responsibility disclosure, bounded server-log retention) replace a full DPIA at the current scope. The pre-screen lists the trigger conditions under which a full DPIA must be opened.
+See `02-dpia-prescreen.md`. Conclusion: **DPIA-light posture.** The AI-assisted feature surface is on the "elevated risk" side of the BayLfD innovative-technology criterion; mitigations in §5 of the pre-screen (no-training enterprise API terms, per-job LLM proxy, Art. 21 objection switch, shared-responsibility disclosure, bounded server-log retention) replace a full DPIA at the current scope. The pre-screen lists the trigger conditions under which a full DPIA must be opened.
 
 ### 18. Personalrat involvement (Art. 75a BayPVG)
 
@@ -211,7 +211,7 @@ Primary: [beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.d
 
 ### 22. Attachments
 
-No file uploads. The TOMs (§14), DPIA pre-screen (§17), and AVV status (§3 plus the table in `05-avv-checklist.md`) are pasted directly into the corresponding DSMS form fields. The published privacy statement at [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy) is the canonical Art. 13/14 record; the URL is referenced in §15.
+No file uploads. The TOMs (§14), DPIA pre-screen (§17), and AVV status (§3 plus the table in `05-processor-checklist.md`) are pasted directly into the corresponding DSMS form fields. The published privacy statement at [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy) is the canonical Art. 13/14 record; the URL is referenced in §15.
 
 ### 23. Status
 

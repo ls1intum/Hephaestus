@@ -1,5 +1,5 @@
 ---
-id: dsfa-prescreen
+id: dpia-prescreen
 title: DPIA Pre-Screen
 description: Art. 35 GDPR pre-check for the TUM-operated Hephaestus deployment.
 ---
@@ -55,11 +55,11 @@ In lieu of a full DPIA, the following mitigations are documented and must remain
 - **Art. 21 objection switch** in Contributor profile settings ("AI review comments"). Disabling or hiding the switch is a material change.
 - **Workspace-administrator joint-controllership notice** in the privacy statement (§3.2). Structural changes to the shared-responsibility split trigger an amended VVT.
 - **Bounded server-log retention** via the application server's native 14-day access-log retention and a data-minimised access-log pattern. Extending the retention window, widening the logged fields, or retaining access logs elsewhere beyond that window is a material change.
-- **Error telemetry and product analytics remain disabled.** The webapp image ships a Sentry integration and a PostHog integration, both disabled in the current production deployment. Activating either (self-hosted Sentry, SaaS Sentry, or PostHog) is a material change and requires amending the VVT, the AVV checklist (`05-avv-checklist.md`), the privacy statement, and this pre-screen before go-live.
+- **Error telemetry and product analytics remain disabled.** The webapp image ships a Sentry integration and a PostHog integration, both disabled in the current production deployment. Activating either (self-hosted Sentry, SaaS Sentry, or PostHog) is a material change and requires amending the VVT, the AVV checklist (`05-processor-checklist.md`), the privacy statement, and this pre-screen before go-live.
 
 ## 6. Conclusion
 
-**No full DPIA required at the current scope.** Hephaestus operates within the DSK white-list profile with documented mitigations for the elevated-risk AI surface. Submit the VVT with the DPIA-light attachments (`02-dsfa-prescreen.md`, `04-toms.md`, `05-avv-checklist.md`) without a full DPIA template.
+**No full DPIA required at the current scope.** Hephaestus operates within the DSK white-list profile with documented mitigations for the elevated-risk AI surface. Submit the VVT with the DPIA-light attachments (`02-dpia-prescreen.md`, `04-toms.md`, `05-processor-checklist.md`) without a full DPIA template.
 
 A full DPIA must be opened before any of the following takes effect:
 
