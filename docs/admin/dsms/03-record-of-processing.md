@@ -21,11 +21,11 @@ Hephaestus – Practice-Aware Feedback for Software Projects
 ### Description and Purpose (min. 200 characters)
 
 ```text
-Hephaestus is a feedback platform for early-career software engineers. It is used by facilitators — typically course instructors or open-source maintainers — to give the contributors of a software project timely, formative feedback on common software-engineering practices.
+Hephaestus gives early-stage software engineers in-process feedback on professional software-engineering practices — practices like reviewability, citing evidence, review dialogue, and follow-through on commitments. It is used by facilitators (course instructors, open-source maintainers, coaches) who want to support the contributors of a software project as they work, not after they finish.
 
-A facilitator configures a workspace and connects one or more Git repositories on github.com or gitlab.lrz.de. Contributors of those repositories sign in with their GitHub or LRZ-GitLab account, and Hephaestus reads what each signed-in contributor has already published in the connected repositories — pull/merge requests, issues, code reviews, review comments, commit metadata, and the associated author profile fields. That activity is processed to deliver feedback to the contributor through dashboards and an in-app assistant.
+A facilitator configures a workspace and connects one or more Git repositories on github.com or gitlab.lrz.de. Contributors sign in with their GitHub or LRZ-GitLab account, and Hephaestus reads what they have already published in the connected repositories — pull/merge requests, issues, code reviews, review comments, commit metadata, and the associated author profile fields — to produce practice findings backed by evidence and a recommended next action. Findings reach the contributor inside their own pull requests as the request moves toward merge, and on personal surfaces the contributor consults on their own initiative (a reflection dashboard and an in-app conversational mentor); a separate facilitator dashboard summarises the same findings for workspace instructors and coaches.
 
-The facilitator can additionally enable, per workspace, leaderboards and gamification (visible to other contributors of the same workspace), Slack notifications, and AI-assisted feedback that sends the relevant code snippets and discussion to a workspace-configured LLM provider. Hephaestus is contributor-facing and is not used as a personnel-monitoring or grading instrument.
+Per workspace, the facilitator can additionally enable leaderboards and gamification (visible to other contributors of the same workspace), Slack notifications, and AI-assisted feedback that sends the relevant code snippets and discussion to a workspace-configured LLM provider. Hephaestus is contributor-facing; it is not used as a personnel-monitoring or grading instrument, and the signals inform facilitator judgement, they do not replace it.
 ```
 
 ### Category
