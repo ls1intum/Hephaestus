@@ -117,16 +117,17 @@ Repository-activity artefacts authored by the contributor in the connected Git r
 ### Recipient Categories
 
 ```text
-External processors engaged by TUM/AET as controller:
-- GitHub, Inc. / Microsoft Corporation (USA) — identity provider and source-system API for GitHub-side repositories.
-- Microsoft Corporation, Azure OpenAI Service (USA / EU) — default LLM provider for the TUM-operated deployment, EU-region tenancy.
-- OpenAI, L.P. (USA) — alternative LLM provider, configurable per workspace.
-- Salesforce, Inc. / Slack Technologies, LLC (USA) — workspace notifications when the facilitator has enabled Slack.
+External processors engaged by TUM/AET as controller. AVVs are in place at TUM/AET level for the AET-pool processors. Where a workspace administrator configures a different LLM endpoint (see below), the AVV is at that administrator's institution. Third-country transfers to U.S. recipients are covered by the EU-US Data Privacy Framework where the recipient is on the active DPF list, with SCCs Module 2 as fall-back.
 
-Separate controller (not Art. 28 processor):
-- Leibniz-Rechenzentrum (LRZ) der BAdW — operator of gitlab.lrz.de; inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG.
+- GitHub, Inc. / Microsoft Corporation (USA) — identity provider for GitHub sign-in and source-system API for connected GitHub repositories.
 
-AVV status, DPF/SCC framing, and the LRZ EDPB 07/2020 analysis are in 05-processor-checklist.md.
+- An external LLM provider, chosen per workspace by the workspace administrator from any OpenAI-API-compatible HTTPS endpoint (configured by a baseURL, an API token, and a model name). The choice is a joint-controller decision under Art. 26 GDPR. The TUM-operated deployment uses Microsoft Azure OpenAI in an EU region under enterprise no-training terms by default. A workspace administrator may configure a different endpoint instead, such as OpenAI L.P. directly, an institution-level enterprise gateway, or a self-hosted model server.
+
+- Salesforce, Inc. / Slack Technologies, LLC (USA) — workspace notifications when a workspace administrator has enabled Slack for that workspace.
+
+Separate controller (not an Art. 28 processor):
+
+- Leibniz-Rechenzentrum (LRZ) der BAdW — operator of gitlab.lrz.de. The platform receives the contributor's identity from gitlab.lrz.de OIDC and synchronises connected gitlab.lrz.de repositories. Inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG.
 ```
 
 ### URLs
