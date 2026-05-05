@@ -15,16 +15,14 @@ Copy-paste ready. Ordered to match the DSMS "Create new PA" form and follow-up q
 ### Title
 
 ```text
-Hephaestus – Practice-Aware Guidance Platform for Software Projects
+Hephaestus – Coaching Platform for Student Software Projects
 ```
 
 ### Description and Purpose (min. 200 characters)
 
 ```text
-Hephaestus is a practice-aware guidance platform for software projects, operated by the Research Group for Applied Education Technologies (AET, Prof. Krusche) at the Technical University of Munich. It supports project-based software-engineering teaching at TUM and the software-development work of AET research projects. For each Project (a workspace and its configured Git repositories), the platform observes repository Events, detects workspace-defined Practices in the Artifacts produced by Contributors (pull/merge requests, issues, reviews, comments), records immutable advisory Findings, and delivers adaptive Guidance back to the Contributor. Optional features include dashboards, workspace engagement and recognition signals (leaderboards, leagues, achievements), a conversational guidance assistant, and automated practice reviews that call an external LLM provider configured per workspace. Authentication is federated through Keycloak (GitHub OAuth + gitlab.lrz.de OpenID Connect). Personal data is processed only to provide the service, ensure reliable and secure operation, and troubleshoot incidents.
+Hephaestus is a teaching tool. Students and external contributors sign in with their GitHub or LRZ-GitLab account, and the platform reads what they have already published in the connected Git repositories — pull/merge requests, issues, code reviews, comments, and the associated author profile fields — to give each contributor formative feedback on common software-engineering practices through dashboards and an in-app assistant. Lecturers can enable per workspace: leaderboards and gamification, Slack notifications, and AI-assisted feedback that sends relevant code snippets and discussion to a workspace-configured LLM provider. Hephaestus is contributor-facing and is not used as a personnel-monitoring or grading system.
 ```
-
-Length check: at least 200 characters.
 
 ### Category
 
