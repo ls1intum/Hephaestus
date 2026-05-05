@@ -18,7 +18,7 @@ None of the three Art. 35(3) triggers is present.
 
 | Criterion | Present? | Reasoning |
 |---|---|---|
-| Vulnerable data subjects on a large scale | **No** | Users are primarily TUM members and invited external open-source contributors. No BayLfD-vulnerable group is processed systematically. |
+| Vulnerable data subjects on a large scale | **No** | Users sign in via federated identity providers (GitHub, LRZ-GitLab); typical use is TUM courses and AET research-project repositories. No BayLfD-vulnerable group is processed systematically. |
 | Employee performance / behaviour monitoring | **No** | Art. 75a BayPVG's _Eignungsrechtsprechung_ is the capability test for monitoring employee behaviour or performance. Hephaestus is _suitable_ for displaying contributor activity but is not deployed as a personnel-evaluation, performance-management, or HR-consuming instrument; staff appear as contributors on the same footing as students. The platform exposes no Dienststelle-segmented dashboard, no HR export, and no manager-facing roll-up. |
 | Innovative technology with unclear DP impact | **Partly (AI-assisted features)** | AI-assisted guidance and automated practice review call an external LLM provider per workspace. This is a commonly understood class of processing under enterprise no-training terms with DPF / SCC safeguards, but falls on the elevated-risk side of the BayLfD innovative-technology criterion and warrants the documented mitigations in §5 below. |
 | Dataset-matching from different sources | **No** | Hephaestus does not cross-match contributor data with external profiles beyond the federated identity attributes the IdP itself discloses. |
@@ -61,4 +61,4 @@ A full DPIA must be opened before any of the following takes effect:
 - Practice-review sandbox gains outbound connectivity beyond the per-job LLM proxy.
 - Findings begin to drive any automated decision within Hephaestus (grading, recognition caps, feature access).
 - The bundled Sentry integration is activated against a SaaS tenant, or the bundled PostHog integration is activated.
-- The processing population broadens beyond TUM members and invited external contributors into a category covered by the BayLfD vulnerable-data-subjects criterion.
+- The processing population starts to include data subjects in a category covered by the BayLfD vulnerable-data-subjects criterion.
