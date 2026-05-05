@@ -21,7 +21,11 @@ Hephaestus – Practice-Aware Feedback for Software Projects
 ### Description and Purpose (min. 200 characters)
 
 ```text
-Hephaestus is a teaching tool. Students and external contributors sign in with their GitHub or LRZ-GitLab account, and the platform reads what they have already published in the connected Git repositories — pull/merge requests, issues, code reviews, comments, and the associated author profile fields — to give each contributor formative feedback on common software-engineering practices through dashboards and an in-app assistant. Lecturers can enable per workspace: leaderboards and gamification, Slack notifications, and AI-assisted feedback that sends relevant code snippets and discussion to a workspace-configured LLM provider. Hephaestus is contributor-facing and is not used as a personnel-monitoring or grading system.
+Hephaestus is a feedback platform for early-career software engineers. It is used by facilitators — typically course instructors or open-source maintainers — to give the contributors of a software project timely, formative feedback on common software-engineering practices.
+
+A facilitator configures a workspace and connects one or more Git repositories on github.com or gitlab.lrz.de. Contributors of those repositories sign in with their GitHub or LRZ-GitLab account, and Hephaestus reads what each signed-in contributor has already published in the connected repositories — pull/merge requests, issues, code reviews, review comments, commit metadata, and the associated author profile fields. That activity is processed to deliver feedback to the contributor through dashboards and an in-app assistant.
+
+The facilitator can additionally enable, per workspace, leaderboards and gamification (visible to other contributors of the same workspace), Slack notifications, and AI-assisted feedback that sends the relevant code snippets and discussion to a workspace-configured LLM provider. Hephaestus is contributor-facing and is not used as a personnel-monitoring or grading instrument.
 ```
 
 ### Category
