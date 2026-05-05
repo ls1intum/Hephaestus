@@ -107,31 +107,22 @@ Do **not** tick `Examination and academic performance` — practice findings are
 ### Other data categories
 
 ```text
-Repository-activity artefacts authored by the contributor in the connected Git repositories: pull/merge requests, issues, code reviews, review comments, commit metadata. AI guidance-assistant messages and the AI-generated responses. Practice-review findings (verdict, severity, evidence cues, reasoning, recommended next action). Recognition signals (leaderboard rank, league assignment, achievement progress). Account preferences, including the in-app "AI review comments" Art. 21 objection toggle.
+Repository-activity artefacts authored by the contributor in the connected Git repositories (pull/merge requests, issues, code reviews, review comments, commit metadata) and AI guidance-assistant conversations.
 ```
 
 ### Recipient Categories
 
 ```text
 External processors engaged by TUM/AET as controller:
-
-- GitHub, Inc. / Microsoft Corporation (USA) — identity provider (OAuth) and source-system API for GitHub-side repositories. AVV at TUM/AET level. EU–U.S. Data Privacy Framework (active list); Standard Contractual Clauses Module 2 as fall-back.
-
-- Microsoft Corporation, Azure OpenAI Service (USA / EU region) — default LLM provider for the TUM-operated deployment under enterprise no-training terms. EU-region tenancies process within the EU. AVV at TUM/AET level for the TUM-operated tenancy; AVV at the workspace administrator's institution where that institution supplies the API credentials. DPF-active; SCCs Module 2 as fall-back.
-
-- OpenAI, L.P. (USA) — alternative workspace-configurable LLM provider. AVV as above. DPF-active; SCCs Module 2 as fall-back.
-
-- Salesforce, Inc. / Slack Technologies, LLC (USA) — workspace notifications and engagement digests when the workspace administrator has enabled Slack. AVV at TUM/AET level. DPF-active; SCCs Module 2 as fall-back.
+- GitHub, Inc. / Microsoft Corporation (USA) — identity provider and source-system API for GitHub-side repositories.
+- Microsoft Corporation, Azure OpenAI Service (USA / EU) — default LLM provider for the TUM-operated deployment, EU-region tenancy.
+- OpenAI, L.P. (USA) — alternative LLM provider, configurable per workspace.
+- Salesforce, Inc. / Slack Technologies, LLC (USA) — workspace notifications when the facilitator has enabled Slack.
 
 Separate controller (not Art. 28 processor):
+- Leibniz-Rechenzentrum (LRZ) der BAdW — operator of gitlab.lrz.de; inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG.
 
-- Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften — operator of gitlab.lrz.de, the source system for GitLab-side repositories. Inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG; LRZ operates under the BAdW-Satzung. LRZ and TUM/AET are separate controllers under Art. 4(7) GDPR for the data each body processes on its own infrastructure.
-
-Internal recipients: AET administrators and developers (operation, maintenance, support); workspace members (workspace-level findings and dashboards as described in §6 of the privacy statement at https://hephaestus.aet.cit.tum.de/privacy).
-
-Anonymous open web: the upstream open-source project's GitHub contributor list at /contributors, and any workspace whose administrator has explicitly marked it publicly viewable.
-
-No sale, no advertising recipients, no brokers.
+AVV status, DPF/SCC framing, and the LRZ EDPB 07/2020 analysis are in 05-processor-checklist.md.
 ```
 
 ### URLs
@@ -193,21 +184,16 @@ Tick:
 ### Other data sources
 
 ```text
-Data received from third parties means: from federated identity providers (GitHub, gitlab.lrz.de) via OAuth / OIDC during sign-in, and from the source-system APIs (GitHub, gitlab.lrz.de) using the workspace-configured installation or access token (repository events and artefacts authored by the contributor).
-
-Directly from the data subject means: profile settings, notification preferences, AI-assistant messages, the Art. 21 objection switch.
-
-Plus from the underlying HTTP connection: IP address and request metadata captured in the application server's native access log.
+- From the GitHub API and the gitlab.lrz.de API (federated via OAuth / OIDC at sign-in; via the workspace-configured installation or access token for repository synchronisation).
+- From the HTTP connection: IP address and request metadata captured in the application server's access log.
 ```
 
 ### Where is this data located and how is it stored?
 
 ```text
-Self-hosted by AET on TUM infrastructure (VM provided by the TUM ITO) at https://hephaestus.aet.cit.tum.de. Application data resides in PostgreSQL on the same host. Authentication state in self-hosted Keycloak federating GitHub OAuth and gitlab.lrz.de OIDC. Application-server access logs on the host with 14-day retention. Container stdout rotated by the host's container runtime (50 MiB per file × 5 files retained per service).
+Self-hosted by AET on TUM infrastructure (VM provided by the TUM ITO) at https://hephaestus.aet.cit.tum.de. Application data in PostgreSQL on the same host; authentication state in a self-hosted Keycloak; application-server access logs on the host (14-day retention); container stdout rotated by the host runtime.
 
-All primary data resides on TUM infrastructure within the EU. AI-assisted features additionally transmit relevant code snippets and discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region under enterprise no-training terms).
-
-No scheduled off-host backups are in place at the time of submission. Establishing a scheduled backup regime with a documented restore drill is an open AET-operations item under Art. 32(1)(c) GDPR resilience.
+All primary data resides on TUM infrastructure within the EU. AI-assisted features additionally transmit relevant code snippets and discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region).
 ```
 
 ### What is your envisaged time for deletion / erasure of the data for this processing activity?
