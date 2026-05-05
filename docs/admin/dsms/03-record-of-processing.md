@@ -159,10 +159,10 @@ Field hidden unless 6.1f is ticked. Leave empty.
 ```text
 TUM/AET as platform operator: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (Aufgaben der Hochschule: Forschung, Lehre, Wissens- und Technologietransfer) and Art. 4 Abs. 1 BayDSG.
 
-Per-workspace lawful basis (the workspace administrator's joint-controller responsibility under Art. 26 GDPR):
+Per-workspace lawful basis: any TUM unit can run a workspace on this platform. The workspace administrator (typically a TUM chair, lecturer, or research-group lead) and TUM/AET are joint controllers under Art. 26 GDPR for the workspace's processing. The basis applicable to a workspace's contributors depends on the workspace context:
 
-- Workspaces where the workspace administrator collects explicit consent from participants (e.g., the AET capstone course's application phase): Art. 6(1)(a) GDPR.
-- Public open-source repositories operated by AET (e.g., ls1intum/Artemis): Art. 6(1)(e) GDPR — Wissens- und Technologietransfer task under Art. 2 BayHIG.
+- Workspaces collecting explicit consent from participants (e.g., the AET capstone course's application phase): Art. 6(1)(a) GDPR.
+- Workspaces operated as part of a TUM unit's public-task activity (teaching, research, or Wissens-/Technologietransfer; for example, regular courses or public open-source repositories such as ls1intum/Artemis): Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG.
 
 Voluntary sign-in by non-TUM contributors to use personal features: Art. 6(1)(b) GDPR.
 
