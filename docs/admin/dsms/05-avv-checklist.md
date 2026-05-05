@@ -46,12 +46,10 @@ Workspace administrators (TUM chairs, lecturers, research-group leads) are **joi
 
 If a future Hephaestus deployment adds any of the following, amend this file **and** the VVT **and** the privacy notice before deploying:
 
-- A new LLM provider (e.g. activating Anthropic support by extending the intelligence-service provider registry) — requires adding the provider to §11 of the VVT, to this checklist, and to §6 of the privacy statement.
-- **Activating Keycloak email** — if `smtpServer` in the Keycloak realm is ever populated (e.g. to turn on `verifyEmail` or `resetPasswordAllowed`), the chosen SMTP host becomes a recipient of personal data. Add the SMTP host to this checklist (in-house AET/TUM relay → TUM-internal framework; any external relay → Art. 28 DPA) and to §6 of the privacy statement before activation.
-- A new identity provider beyond GitHub and gitlab.lrz.de — amend §4.1 of the privacy statement and §9 of the VVT.
-- **Activating the built-in Sentry client** — setting `SENTRY_DSN` to a non-empty value enables the webapp Sentry SDK. If the DSN points to the AET-operated self-hosted Sentry at `sentry.ase.in.tum.de`, this is an in-house recipient governed by the TUM-internal framework. If the DSN points to a SaaS Sentry tenant, this is an Art. 28 (potentially U.S.) processor and requires a DPA, a §4 privacy-statement entry, and a DPIA re-assessment. Either case requires re-adding Sentry to this checklist and the VVT before activation goes live.
-- **Activating the built-in PostHog client** — setting `POSTHOG_ENABLED=true` (plus credentials) enables the product-analytics SDK. PostHog Inc. is an Art. 28 U.S. processor and requires a DPA, a §4/§6 privacy-statement entry, an Art. 6(1)(a) consent flow (already implemented behind the "Participate in research" switch in profile settings), and a DPIA re-assessment. This checklist and the VVT must be amended before activation goes live.
-- Any additional analytics beyond the items above — requires a DPA and a matching §6 entry.
-- Any external storage (S3, CDN) — would require an AVV.
-- Any third-party font, script, image, or embed — would expose the user's IP to the provider.
+- A new LLM provider (e.g. enabling Anthropic). Add the provider to VVT §11, to this checklist, and to privacy §6.
+- A new identity provider beyond GitHub and gitlab.lrz.de. Amend privacy §4.1 and VVT §9.
+- Activating Keycloak's SMTP integration (account verification, password reset). The chosen SMTP host becomes a recipient of personal data: a TUM-internal relay falls under the TUM-internal framework; any external relay needs an Art. 28 DPA. Add to privacy §6.
+- Activating the bundled Sentry client. A self-hosted Sentry on TUM infrastructure is an in-house recipient; a SaaS Sentry tenant is an Art. 28 U.S. processor that needs a DPA, a privacy §4 entry, and a DPIA re-assessment.
+- Activating the bundled PostHog client. PostHog is an Art. 28 U.S. processor and requires a DPA, a privacy §4 / §6 entry, an Art. 6(1)(a) consent flow, and a DPIA re-assessment.
+- Any external storage (S3, CDN) or any third-party font, script, image, or embed served from the application: requires an AVV and a privacy-statement entry.
 - Any widening of the practice-review sandbox network posture beyond the per-job LLM proxy — triggers a re-audit under §5 of `02-dsfa-prescreen.md`.

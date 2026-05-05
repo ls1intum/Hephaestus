@@ -98,8 +98,8 @@ Documents the measures taken pursuant to Art. 32 GDPR. Structured along the cate
 
 ## 7. Organisational measures
 
-- Operators are TUM / AET employees or authorised contributors; they act under Art. 2 BayHIG public-duty mandates and TUM-internal security policies.
-- The DPO ([beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)) reviews incidents. Data-subject requests follow the process in `docs/admin/legal-pages` + the live `/privacy` page.
+- Operators are TUM / AET employees or authorised contributors and act under TUM-internal security policies.
+- The DPO ([beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)) reviews incidents. Data-subject requests follow the process documented in the live privacy statement (§9 of the privacy page).
 - Incidents are recorded in GitHub Issues against the `ls1intum/Hephaestus` repository and, if they affect personal data, reported to the TUM DPO within 72 h (Art. 33 GDPR).
 - Workspace administrators are instructed on the shared-responsibility model (§3.2 of the privacy statement) before the workspace is provisioned; the workspace-configurable surface (LLM provider, Slack, leaderboards, practice catalog, auto-trigger) is not enabled by default.
 - Operator onboarding includes a written Art. 28 / Art. 29 confidentiality undertaking at the AET-internal level.

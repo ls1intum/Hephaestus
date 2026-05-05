@@ -11,15 +11,8 @@ Follow these steps in order. Target: [https://dsms.datenschutz.tum.de/](https://
 ## Phase 0 — Prep (15 min)
 
 1. Open `03-vt-dsms.md` alongside this guide.
-2. Re-confirm the deployment-dependent figures against production before submission. Each of these is already pinned in `03-vt-dsms.md` §13 — the phase-0 check is that the deployment has not drifted:
-   - Application-server web access logs are retained for **14 days** with the embedded server's native retention. Two checks before submission:
-     1. Confirm the native settings are still present in `server/application-server/src/main/resources/application-prod.yml`: `server.tomcat.accesslog.enabled=true`, `server.tomcat.accesslog.max-days=14`, and the minimal access-log pattern.
-     2. Confirm the log volume still contains date-stamped access logs under `/var/log/hephaestus/access/` on the production host or in the running container, and that files older than 14 days are absent.
-   - Off-host PostgreSQL / Keycloak backups are **not in place** at the time this template was written (see `04-toms.md` §3.3). If a scheduled backup regime has since been deployed, update `04-toms.md` §3.3 and `03-vt-dsms.md` §13.
-   - LLM providers enabled in production and, for each, whether Zero Data Retention is in effect. The TUM-operated deployment defaults to Azure OpenAI; OpenAI is an alternative per workspace.
-   - `SENTRY_DSN` is still empty and `POSTHOG_ENABLED=false` in production. If either has been activated, the VVT, privacy statement, and AVV checklist must be amended first (see `05-avv-checklist.md`, "Follow-up if the VVT surface changes").
-   - The Keycloak realm's `smtpServer` is still empty (no email is sent for account verification or password reset). If SMTP has since been configured, the VVT + privacy page + AVV checklist must be amended first.
-3. Have at hand: TUM login + edit access on the Hephaestus repo (for privacy-page updates).
+2. Confirm the deployed configuration still matches the figures pinned in `03-vt-dsms.md` §13 (access-log retention, off-host-backup state, LLM-provider list, the disabled state of the Sentry / PostHog / Keycloak-SMTP integrations). Any drift triggers an amendment to the corresponding section before submission. The full amendment-trigger list is in [`05-avv-checklist.md`](./05-avv-checklist.md), "Follow-up if the VVT surface changes".
+3. Have at hand: TUM login and edit access on the Hephaestus repo (for any privacy-page updates).
 
 ## Phase 1 — Ship the privacy page
 
