@@ -11,7 +11,7 @@ This file is the Art. 30 record for the TUM-operated Hephaestus deployment at ht
 - Joint Controller: tick (workspace administrators are joint controllers under Art. 26 GDPR — see "Legal basis" below).
 - Relevant for Subject Rights Request (SRR): tick.
 - Responsible department: TUM School of Computation, Information and Technology.
-- Associated TUM Org identifier: TODO before submitting (lookup in TUMonline; the field accepts a value like `TUVBDSB`).
+- Associated TUM Org identifier: `CIT-I1`.
 
 ## Controller and contact (Art. 30(1)(a))
 
