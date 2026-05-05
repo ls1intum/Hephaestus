@@ -1,6 +1,6 @@
 Privacy Statement for Hephaestus in accordance with Art. 13 and 14 GDPR.
 
-_Last updated: 2026-05-04._
+_Last updated: 2026-05-05._
 
 The Technical University of Munich (TUM), through the Research Group for Applied Education Technologies (AET), operates the Hephaestus platform ("Hephaestus" or "the platform"). Personal data collected through Hephaestus is processed in accordance with the General Data Protection Regulation (GDPR / DSGVO), the Bavarian Data Protection Act (BayDSG), the Bavarian Higher Education Innovation Act (BayHIG), and the German Telecommunications Digital Services Data Protection Act (TDDDG).
 
@@ -177,6 +177,7 @@ Hephaestus uses only technically necessary browser-side storage:
 Your personal data may be accessible to the following recipients in connection with the purposes described in Section 4:
 
 - **AET team members** — platform administrators and developers (operation, maintenance, support).
+- **Anyone on the open web** — for the upstream open-source project's GitHub contributor list at `/contributors` (which lists the project's GitHub contributors, not deployment-tenant users) and for any workspace whose administrator has explicitly marked it publicly viewable. Anonymous reads are scoped to GET methods.
 - **Workspace members** — other members of workspaces you belong to can see your username, avatar, the _Findings_ attached to pull/merge requests you authored within that workspace, per-practice _Finding_ rollups about you on workspace dashboards, and workspace engagement and recognition signals (rank, league, achievements) where those features are enabled for the workspace. Workspace administrators, team leads, and teaching staff in the same workspace see the same information for the Contributors they work with.
 - **Leibniz-Rechenzentrum (LRZ) der BAdW** — when a workspace synchronises from gitlab.lrz.de, or when a Contributor signs in via the gitlab.lrz.de OIDC identity provider, personal data is exchanged with LRZ infrastructure in Garching. LRZ and TUM are separate controllers (Art. 4(7) GDPR); see §3.1 for the inter-public-body cooperation framing under Art. 5 Abs. 1 Nr. 1 BayDSG. LRZ privacy information: [doku.lrz.de/display/PUBLIC/Datenschutzerklaerung](https://doku.lrz.de/display/PUBLIC/Datenschutzerklaerung). LRZ GitLab terms of use: [doku.lrz.de/gitlab-nutzungsrichtlinien-10746021.html](https://doku.lrz.de/gitlab-nutzungsrichtlinien-10746021.html).
 

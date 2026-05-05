@@ -5,7 +5,7 @@ title: DSMS Submission Package
 description: Art. 30 GDPR / Verarbeitungstätigkeit record for the TUM-operated Hephaestus deployment.
 ---
 
-_Last updated: 2026-05-04._
+_Last updated: 2026-05-05._
 
 This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis von Verarbeitungstätigkeiten", VVT) package for the TUM-operated Hephaestus deployment at `https://hephaestus.aet.cit.tum.de`. Submit it through the TUM DSMS at **[https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/)** (reachable from MWN / eduVPN with TUM login).
 
@@ -50,16 +50,9 @@ Re-review the VVT once per year:
 - Has the deployment activated any of the optional integrations that are _currently disabled_ (e.g. the built-in Sentry client, the built-in PostHog client)? If yes, amend the VVT, the AVV checklist, and the privacy statement before the activation goes live.
 - Has the scope of AI-assisted features grown to the point that the DPIA pre-screen in `02-dsfa-prescreen.md` must be upgraded to a full DPIA under the BayLfD template?
 
-## Emergency — DSB rejection
+## DSB feedback
 
-The DSB may comment in DSMS. Typical follow-ups and responses:
-
-- _"Rechtsgrundlage zu konkretisieren"_ → §7 of the VVT cites Art. 6(1)(e) GDPR + Art. 2 BayHIG + Art. 4 Abs. 1 BayDSG for TUM Contributors, and Art. 6(1)(b) GDPR for non-TUM Contributors. Point them there.
-- _"Löschkonzept fehlt"_ → §13 of the VVT lists retention per category, including the account-deletion flow and the 14-day application-server access-log retention enforced by the application server itself.
-- _"AVV fehlt für X"_ → see [`05-avv-checklist.md`](./05-avv-checklist.md) for the per-processor DPA status.
-- _"DSFA erforderlich"_ → upgrade [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) to the BayLfD DPIA template; the pre-screen already captures the residual-risk structure a full DPIA would elaborate.
-
-Export DSB comments, update the relevant file, and re-submit.
+If the DSB leaves comments after submission, see Phase 3 of [`SUBMISSION-GUIDE.md`](./SUBMISSION-GUIDE.md).
 
 ## Contacts
 

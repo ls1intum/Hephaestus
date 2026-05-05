@@ -4,7 +4,7 @@ title: DSMS Submission Guide
 description: Step-by-step procedure for submitting the Hephaestus VVT through the TUM DSMS.
 ---
 
-_Last updated: 2026-05-04._
+_Last updated: 2026-05-05._
 
 Follow these steps in order. Target: [https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/) (log in via Shibboleth on MWN / eduVPN).
 
@@ -62,25 +62,20 @@ If any of the above is wrong, fix the Markdown source in `webapp/public/legal/pr
    | Empfänger                          | §11                                                       |
    | Drittländer                        | §12                                                       |
    | Löschfristen                       | §13                                                       |
-   | TOMs                               | §14 (upload `04-toms.md`)                                 |
+   | TOMs                               | §14 (paste from `04-toms.md`)                             |
    | Informationspflicht                | §15                                                       |
    | Automatisierte Entscheidung        | §16                                                       |
-   | DSFA                               | §17 (upload `02-dsfa-prescreen.md`)                       |
+   | DSFA                               | §17 (paste DPIA-light conclusion; full record in `02-dsfa-prescreen.md`) |
    | Personalrat                        | §18                                                       |
    | IT-Sicherheit                      | §19                                                       |
    | Datenquelle                        | §20                                                       |
    | Kontakt Betroffenenrechte          | §21                                                       |
-   | Anlagen                            | §22 (upload privacy PDF, pre-screen, TOMs, AVV checklist) |
+   | Anlagen                            | §22 (no uploads — see §22 of the VVT)                     |
    | Status                             | §23 (set to Submitted)                                    |
 
-7. Upload attachments listed in §22:
-   - Privacy statement snapshot (export [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy) as PDF).
-   - DPIA pre-screen — this repo: `02-dsfa-prescreen.md`.
-   - TOMs — this repo: `04-toms.md`.
-   - AVV checklist — this repo: `05-avv-checklist.md`.
-8. Set **Tags**: `Webdienst`, `Lehre`, `KI-gestützt`, `pot. verallgemeinerbar`.
-9. Review the DSMS-generated PDF preview if offered.
-10. Set **Status → Submitted**.
+7. Set **Tags**: `Webdienst`, `Lehre`, `KI-gestützt`, `pot. verallgemeinerbar`.
+8. Review the DSMS-generated PDF preview if offered.
+9. Set **Status → Submitted**.
 
 ## Phase 3 — After submission (async, 1–3 weeks)
 

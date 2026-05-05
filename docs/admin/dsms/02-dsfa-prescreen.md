@@ -4,7 +4,7 @@ title: DPIA Pre-Screen
 description: Art. 35 GDPR pre-check for the TUM-operated Hephaestus deployment.
 ---
 
-_Last updated: 2026-05-04._
+_Last updated: 2026-05-05._
 
 Documents whether a full Data Protection Impact Assessment (Datenschutz-Folgenabschätzung) is required. The pre-screen applies the threshold in Art. 35(3) GDPR, the BayLfD "Muss-Liste" for Bavarian public bodies, and the DSK white-list.
 
@@ -54,8 +54,8 @@ In lieu of a full DPIA, the following mitigations are documented and must remain
 - **Per-job LLM proxy** enforced by the practice-review sandbox. DNS disabled inside the sandbox; outbound traffic limited to a per-job, token-authenticated proxy. Any widening of this network posture is a material change.
 - **Art. 21 objection switch** in Contributor profile settings ("AI review comments"). Disabling or hiding the switch is a material change.
 - **Workspace-administrator joint-controllership notice** in the privacy statement (§3.2). Structural changes to the shared-responsibility split trigger an amended VVT.
-- **Bounded server-log retention** via the application server's native access-log retention (`server.tomcat.accesslog.max-days=14`) and a data-minimised access-log pattern. Extending the retention window, widening the logged fields, or retaining access logs elsewhere beyond that window is a material change.
-- **Error telemetry and product analytics remain disabled.** The webapp image ships a Sentry integration and a PostHog integration, both disabled in the current production deployment (`SENTRY_DSN` empty, `POSTHOG_ENABLED=false`). Activating either (self-hosted Sentry, SaaS Sentry, or PostHog) is a material change and requires amending the VVT, the AVV checklist (`05-avv-checklist.md`), the privacy statement, and this pre-screen before go-live.
+- **Bounded server-log retention** via the application server's native 14-day access-log retention and a data-minimised access-log pattern. Extending the retention window, widening the logged fields, or retaining access logs elsewhere beyond that window is a material change.
+- **Error telemetry and product analytics remain disabled.** The webapp image ships a Sentry integration and a PostHog integration, both disabled in the current production deployment. Activating either (self-hosted Sentry, SaaS Sentry, or PostHog) is a material change and requires amending the VVT, the AVV checklist (`05-avv-checklist.md`), the privacy statement, and this pre-screen before go-live.
 
 ## 6. Conclusion
 

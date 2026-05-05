@@ -1,6 +1,6 @@
 Information in accordance with § 5 DDG (Digitale-Dienste-Gesetz — German Digital Services Act).
 
-*Last updated: 2026-05-04.*
+*Last updated: 2026-05-05.*
 
 ## Publisher
 

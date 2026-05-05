@@ -4,7 +4,7 @@ title: Art. 28 Processor Checklist
 description: Per-processor AVV status for the TUM-operated Hephaestus deployment.
 ---
 
-*Last updated: 2026-05-04.*
+*Last updated: 2026-05-05.*
 
 Documents every entity that might qualify as a processor (Art. 28 GDPR) and the status of the required contract (Auftragsverarbeitungsvertrag, AVV). Internal (AET-operated) recipients and the LRZ public-body counterpart are listed for completeness so the record is self-contained.
 

@@ -4,7 +4,7 @@ title: DSMS Verzeichnis von Verarbeitungstätigkeiten (VVT)
 description: Copy-paste answers for the DSMS follow-up questionnaire.
 ---
 
-_Last updated: 2026-05-04._
+_Last updated: 2026-05-05._
 
 Copy-paste ready. Ordered to match the DSMS "Create new PA" form and follow-up questionnaire. Submit at: [https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/).
 
@@ -103,27 +103,20 @@ Pre-populated by DSMS. Verify:
 ### 6. Name of IT system / procedure
 
 ```text
-Hephaestus (https://hephaestus.aet.cit.tum.de)
-Stack:
-  - Browser SPA:        React 19 / Vite / TanStack Router (TypeScript)
-  - Application server: Spring Boot 3.5 / Java 21 / PostgreSQL
-  - Intelligence:       Node.js service (Hono) for AI-assisted features
-  - Identity:           Self-hosted Keycloak (GitHub OAuth + gitlab.lrz.de OIDC)
-  - Review sandbox:     Isolated Docker containers with per-job LLM proxy
-  - Reverse proxy:      Traefik v3 / Let's Encrypt
-  - Deployment:         Docker Compose on AET servers at TUM
-Source (MIT): github.com/ls1intum/Hephaestus
+Hephaestus, self-hosted by AET on TUM infrastructure at https://hephaestus.aet.cit.tum.de.
+Source under MIT licence: github.com/ls1intum/Hephaestus.
+Authentication via self-hosted Keycloak federating GitHub OAuth and gitlab.lrz.de OIDC.
+AI-assisted features call an external LLM provider configured per workspace; code-executing
+practice reviews run inside isolated per-job Docker sandboxes behind a per-job LLM proxy.
 ```
 
 ### 7. Legal basis (cite GDPR article + national norm)
 
-| Processing                                                                                            | Legal basis                                                                                                                                                                                             |
-| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core service (authentication, repository sync, practice detection, guidance) for TUM Contributors     | **Art. 6(1)(e) GDPR** i.V.m. **Art. 2 BayHIG** and **Art. 4 Abs. 1 BayDSG** (public-interest task: teaching and operation of university IT services)                                            |
-| Core service for non-TUM Contributors (external open-source contributors, partner-university members) | **Art. 6(1)(b) GDPR** (performance of the service the Contributor requested by signing in)                                                                                                              |
-| AI-assisted features (guidance assistant, practice review)                                            | Same as the row above; Contributors may object under **Art. 21 GDPR** via the "AI review comments" profile toggle (stops future transmissions; does not by itself delete previously generated Findings) |
-| Application-server security logs                                                                      | **Art. 6(1)(e) GDPR** i.V.m. **Art. 2 BayHIG**, **Art. 4 Abs. 1 BayDSG**, **Art. 8 BayDiG** (operation and security of a university IT service)                                                 |
-| Keycloak session cookies and theme-preference localStorage                                            | **§ 25 Abs. 2 Nr. 2 TDDDG** (technisch unbedingt erforderlich für einen vom Nutzer ausdrücklich gewünschten Telemediendienst) i.V.m. **Art. 6(1)(e) GDPR**                                              |
+- **Core service for TUM Contributors** (authentication, repository sync, practice detection, guidance): Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG and Art. 4 Abs. 1 BayDSG (public-interest task: teaching and operation of university IT services).
+- **Core service for non-TUM Contributors** (external open-source, partner-university members): Art. 6(1)(b) GDPR (performance of the service requested by signing in).
+- **AI-assisted features** (guidance assistant, practice review): same basis as the core service. Contributors may object under Art. 21 GDPR via the "AI review comments" profile toggle. Objection stops future transmissions; it does not by itself delete previously generated Findings.
+- **Application-server security logs**: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG, Art. 4 Abs. 1 BayDSG, Art. 8 BayDiG (operation and security of a university IT service).
+- **Keycloak session cookies and theme-preference localStorage**: § 25 Abs. 2 Nr. 2 TDDDG (technisch unbedingt erforderlich) i.V.m. Art. 6(1)(e) GDPR.
 
 ### 8. Categories of data subjects (Art. 30(1)(c))
 
@@ -149,7 +142,8 @@ Tick in DSMS:
 
 ### 11. Categories of recipients (Art. 30(1)(d))
 
-- **Internal:** AET administrators / developers (operation, maintenance, support); workspace members (see workspace-level Findings and dashboards as described in §6 of the privacy statement).
+- **Internal:** AET administrators and developers (operation, maintenance, support); workspace members (see workspace-level Findings and dashboards as described in §6 of the privacy statement).
+- **Anonymous open web:** the upstream open-source project's GitHub contributor list at `/contributors`, and any workspace whose administrator has explicitly marked it publicly viewable.
 - **External (Art. 28 processors), as configured per workspace:** GitHub / Microsoft; the LLM provider configured for the workspace (Azure OpenAI by default on the TUM-operated deployment, or OpenAI); Slack (when enabled).
 - **External (separate controllers, not Art. 28):** Leibniz-Rechenzentrum der BAdW for gitlab.lrz.de integration.
 - **No sale, no advertising recipients, no brokers.**
@@ -172,13 +166,14 @@ All U.S.-based recipients are certified under the EU–U.S. Data Privacy Framewo
 | Guidance-assistant conversations                                                    | Account lifetime; deletable on request                                                                                                                                                                                                                                                                                                                                               |
 | Practice-review Findings                                                            | Workspace lifetime; deletable on request                                                                                                                                                                                                                                                                                                                                             |
 | LLM-provider-side prompts                                                           | Up to 30 days (enterprise default abuse-monitoring); shorter where Zero Data Retention has been negotiated per workspace                                                                                                                                                                                                                                                             |
-| Server access logs (application server)                                             | Native embedded-Tomcat web access log, retained for **14 days** via `server.tomcat.accesslog.max-days=14`. Logged fields are intentionally limited to timestamp, client IP, HTTP method, request path, protocol, status, response size, and processing time. Access logs are retained longer only where strictly necessary for an ongoing security incident, then deleted at closure |
+| Server access logs (application server)                                             | Retained for at most **14 days** under the application server's native access-log retention. Logged fields are limited to timestamp, client IP, HTTP method, request path, protocol, status, response size, and processing time. Access logs are kept longer only where strictly necessary for an ongoing security incident, and deleted at closure. |
+| Container stdout (application services)                                             | Rotated by size (50 MiB per file, 5 files retained per service) by the host's container runtime. No personal data by design; access restricted to AET operators with container-host SSH. |
 | Backups — PostgreSQL + Keycloak                                                     | **No scheduled off-host backups are in place at the time of submission.** Establishing a scheduled backup regime with a documented restore drill is an open AET-ops item under Art. 32(1)(c) GDPR resilience (see `04-toms.md` §3.3). The dataset has no Art. 9 content, and no statutory retention duty compels a backup today                                                      |
 | Backups — gitlab.lrz.de (LRZ-side, for deleted content)                             | LRZ retains its own backup window of up to 6 months for content already removed on the LRZ side, independent of Hephaestus                                                                                                                                                                                                                                                           |
 
 ### 14. Technical and Organizational Measures (Art. 30(1)(g) + Art. 32)
 
-See `04-toms.md`. Paste into the DSMS TOMs field or upload as an attachment.
+Paste the TOMs summary from `04-toms.md` into the DSMS TOMs field. Per-category controls are in §1–§7 of that document.
 
 ### 15. Information-duty fulfilled (Art. 13/14)
 
@@ -214,13 +209,10 @@ Not applicable as a separate upload; Hephaestus is self-hosted by AET on TUM inf
 
 Primary: [beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de) (TUM DPO). Operational queries: [ls1.admin@in.tum.de](mailto:ls1.admin@in.tum.de) (AET admins). Data subjects may additionally address the workspace administrator directly for questions about the workspace-specific configuration (§3.2 of the privacy statement).
 
-### 22. Attachments to upload in DSMS
+### 22. Attachments
 
-- Privacy statement snapshot (export of [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy), PDF).
-- `02-dsfa-prescreen.md` (DPIA pre-check / DPIA-light documentation).
-- `04-toms.md` (TOMs).
-- `05-avv-checklist.md` (Art. 28 checklist; every external and internal recipient and the status of its DPA).
+No file uploads. The TOMs (§14), DPIA pre-screen (§17), and AVV status (§3 plus the table in `05-avv-checklist.md`) are pasted directly into the corresponding DSMS form fields. The published privacy statement at [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy) is the canonical Art. 13/14 record; the URL is referenced in §15.
 
 ### 23. Status
 
-Set to **Submitted** after all fields are filled and attachments uploaded.
+Set to **Submitted** after all fields are filled.
