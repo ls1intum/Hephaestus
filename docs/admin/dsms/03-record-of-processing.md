@@ -33,7 +33,6 @@ Tick:
 - `Webdienst`
 - `Lehre`
 - `Forschungsprojekt` (Hephaestus is also used in AET research projects)
-- `pot. verallgemeinerbar`
 
 ---
 
@@ -46,21 +45,22 @@ Select: **TUM School of Computation, Information and Technology**
 ### Contact info of the person in charge
 
 ```text
-Felix Dietrich
-AET — Research Group for Applied Education Technologies
-TUM School of Computation, Information and Technology, Department of Computer Science
-Boltzmannstraße 3, 85748 Garching bei München
-felixtj.dietrich@tum.de
-Operational contact: ls1.admin@in.tum.de
+Prof. Dr. Stephan Krusche, Head of AET
+Research Group for Applied Education Technologies
+TUM School of Computation, Information and Technology
+Department of Computer Science
+Boltzmannstraße 3, 85748 Garching b. München
+
+Operational technical contact: ls1.admin@in.tum.de
 ```
 
 ### Responsible Person
 
-Pre-populated as the form-creator (Felix Dietrich, felixtj.dietrich@tum.de). Leave as-is.
+Set to **Stephan Krusche (krusche@tum.de)** — head of the chair and Verantwortlicher for this PA. The field is auto-populated to the form-creator; reassign to Krusche.
 
 ### Additional responsible persons
 
-Optional. Suggested: **Stephan Krusche (krusche@tum.de)** as group lead.
+**Felix Dietrich (felixtj.dietrich@tum.de)** — operational maintainer, retains edit access to the PA.
 
 ### Associated TUM Org identifier
 
