@@ -1,16 +1,18 @@
 ---
 id: record-of-processing
 title: Record of Processing Activities (VVT)
-description: Copy-paste answers for the DSMS follow-up questionnaire.
+description: Field-by-field paste-ready answers for the TUM DSMS form.
 ---
 
 _Last updated: 2026-05-05._
 
-Copy-paste ready. Ordered to match the DSMS "Create new PA" form and follow-up questionnaire. Submit at: [https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/).
+Field-ordered to match the TUM DSMS "Create new PA" form at [https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/). Each heading below is the exact form-field label. Copy from the fenced block under it.
+
+The audit context behind these answers (joint-controller analysis, processor list, DPIA pre-screen pointer, Personalrat posture) is at the end of the document, not in the form.
 
 ---
 
-## Step 1 — "Create a new processing activity"
+## Top of form
 
 ### Title
 
@@ -18,7 +20,53 @@ Copy-paste ready. Ordered to match the DSMS "Create new PA" form and follow-up q
 Hephaestus – Practice-Aware Feedback for Software Projects
 ```
 
-### Description and Purpose (min. 200 characters)
+### Checkboxes
+
+- [ ] Processing on Behalf — leave unticked. TUM/AET is the controller, not a processor.
+- [x] Joint Controller — tick. Workspace administrators are joint controllers under Art. 26 GDPR (see audit context, §A).
+- [x] Relevant for Subject Rights Request (SRR) — tick.
+
+### Tags
+
+Tick:
+
+- `Webdienst`
+- `Lehre`
+- `Forschungsprojekt` (Hephaestus is also used in AET research projects)
+- `pot. verallgemeinerbar`
+
+---
+
+## Basics
+
+### Responsible Department
+
+Select: **TUM School of Computation, Information and Technology**
+
+### Contact info of the person in charge
+
+```text
+Felix Dietrich
+AET — Research Group for Applied Education Technologies
+TUM School of Computation, Information and Technology, Department of Computer Science
+Boltzmannstraße 3, 85748 Garching bei München
+felixtj.dietrich@tum.de
+Operational contact: ls1.admin@in.tum.de
+```
+
+### Responsible Person
+
+Pre-populated as the form-creator (Felix Dietrich, felixtj.dietrich@tum.de). Leave as-is.
+
+### Additional responsible persons
+
+Optional. Suggested: **Stephan Krusche (krusche@tum.de)** as group lead.
+
+### Associated TUM Org identifier
+
+**TODO before submitting** — look up the AET chair's TUM Org identifier in TUMonline (the field accepts a value like `TUVBDSB`). Not stored in the repo; ask the AET secretariat if unsure.
+
+### Description and Purpose of Processing Activity
 
 ```text
 Hephaestus gives early-stage software engineers in-process feedback on professional software-engineering practices — practices like reviewability, citing evidence, review dialogue, and follow-through on commitments. It is used by facilitators (course instructors, open-source maintainers, coaches) who want to support the contributors of a software project as they work, not after they finish.
@@ -28,193 +76,247 @@ A facilitator configures a workspace and connects one or more Git repositories o
 Per workspace, the facilitator can additionally enable leaderboards and gamification (visible to other contributors of the same workspace), Slack notifications, and AI-assisted feedback that sends the relevant code snippets and discussion to a workspace-configured LLM provider. Hephaestus is contributor-facing; it is not used as a personnel-monitoring or grading instrument, and the signals inform facilitator judgement, they do not replace it.
 ```
 
-### Category
+### Categories of data subjects of this processing
 
-Select: **Administration / Teaching / Other** (`other`).
+Tick all of:
 
-### Tags
+- Students (TUM)
+- Students (extern)
+- Employees (TUM)
+- Employees (extern)
+- Other Website Visitors
 
-- `Webdienst`
-- `Lehre`
-- `KI-gestützt`
-- `pot. verallgemeinerbar`
+### Other Data Subject Categories
+
+Leave empty.
+
+### Data Categories Description
+
+Tick all of:
+
+- Name(s)
+- Contact details: email
+- Image data
+- Indicators of Behaviour
+- IP address
+- Social network data
+- User IDs and Passwords
+
+Do **not** tick `Examination and academic performance` — practice findings are advisory, not graded; ticking this field would misclassify Hephaestus as an examination system.
+
+### Other data categories
+
+```text
+Repository-activity artefacts authored by the contributor in the connected Git repositories: pull/merge requests, issues, code reviews, review comments, commit metadata. AI guidance-assistant messages and the AI-generated responses. Practice-review findings (verdict, severity, evidence cues, reasoning, recommended next action). Recognition signals (leaderboard rank, league assignment, achievement progress). Account preferences, including the in-app "AI review comments" Art. 21 objection toggle.
+```
+
+### Recipient Categories
+
+```text
+External processors engaged by TUM/AET as controller:
+
+- GitHub, Inc. / Microsoft Corporation (USA) — identity provider (OAuth) and source-system API for GitHub-side repositories. AVV at TUM/AET level. EU–U.S. Data Privacy Framework (active list); Standard Contractual Clauses Module 2 as fall-back.
+
+- Microsoft Corporation, Azure OpenAI Service (USA / EU region) — default LLM provider for the TUM-operated deployment under enterprise no-training terms. EU-region tenancies process within the EU. AVV at TUM/AET level for the TUM-operated tenancy; AVV at the workspace administrator's institution where that institution supplies the API credentials. DPF-active; SCCs Module 2 as fall-back.
+
+- OpenAI, L.P. (USA) — alternative workspace-configurable LLM provider. AVV as above. DPF-active; SCCs Module 2 as fall-back.
+
+- Salesforce, Inc. / Slack Technologies, LLC (USA) — workspace notifications and engagement digests when the workspace administrator has enabled Slack. AVV at TUM/AET level. DPF-active; SCCs Module 2 as fall-back.
+
+Separate controller (not Art. 28 processor):
+
+- Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften — operator of gitlab.lrz.de, the source system for GitLab-side repositories. Inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG; LRZ operates under the BAdW-Satzung. LRZ and TUM/AET are separate controllers under Art. 4(7) GDPR for the data each body processes on its own infrastructure.
+
+Internal recipients: AET administrators and developers (operation, maintenance, support); workspace members (workspace-level findings and dashboards as described in §6 of the privacy statement at https://hephaestus.aet.cit.tum.de/privacy).
+
+Anonymous open web: the upstream open-source project's GitHub contributor list at /contributors, and any workspace whose administrator has explicitly marked it publicly viewable.
+
+No sale, no advertising recipients, no brokers.
+```
+
+### URLs
+
+```text
+https://hephaestus.aet.cit.tum.de
+```
 
 ---
 
-## Step 2 — Follow-up questions
+## Legal Basis
 
-### 1. Name & contact of the responsible unit (Art. 30(1)(a))
+### What is the legal basis of processing this activity? (Art. 6.1 GDPR)
 
-```text
-Responsible unit:   Research Group for Applied Education Technologies (AET)
-                    TUM School of Computation, Information and Technology
-                    Department of Computer Science
-                    Boltzmannstraße 3, 85748 Garching bei München
+Tick:
 
-Head of unit:       Prof. Dr. Stephan Krusche
-Hephaestus support: GitHub Issues at https://github.com/ls1intum/Hephaestus/issues
-                    Operational contact: ls1.admin@in.tum.de
-                    Data-protection requests: beauftragter@datenschutz.tum.de (TUM DPO)
-```
+- [x] Art. 6.1b GDPR (request from / contract with data subject) — for non-TUM contributors signing in
+- [x] Art. 6.1e GDPR (performance of task carried out in public interest) — for the TUM teaching task
 
-### 2. Joint controllers (Art. 26 GDPR)
+Do **not** tick 6.1f. Bavarian public bodies cannot rely on legitimate interest for tasks carried out in the performance of a statutory public duty (Art. 6(1) Unterabsatz 2 GDPR).
 
-**Workspace administrators** (typically TUM chairs, lecturers, or research-group leads) are joint controllers with TUM/AET for the six workspace-configurable decisions documented in §3.2 of the privacy statement:
+### Legitimate Interest Assessment
 
-1. which Git repositories are synchronised into the workspace;
-2. which LLM provider and which credentials are used by the workspace's AI-assisted features;
-3. whether workspace notifications are routed to Slack;
-4. whether leaderboards, leagues, and achievements are enabled for peer visibility;
-5. the workspace's Practice catalog;
-6. whether practice reviews are auto-triggered on new pull/merge requests.
+Field hidden unless 6.1f is ticked. Leave empty.
 
-**Allocation of data-protection duties pursuant to Art. 26(2) Satz 1 GDPR:**
-
-- **TUM/AET** is responsible for information duties under Art. 13/14 GDPR (via the privacy statement), platform-level TOMs under Art. 32 GDPR, breach notification under Art. 33/34 GDPR, the DPIA posture under Art. 35 GDPR, and this VVT under Art. 30 GDPR. TUM/AET is the single point of contact for data-subject rights.
-- **The workspace administrator** is responsible for ensuring that the source-system authorisation (GitHub App installation, GitHub personal-access token, or gitlab.lrz.de personal-access token plus webhook shared secret) is in place and has been obtained lawfully, that Contributors of the workspace have been informed that their repository Artifacts are being ingested into Hephaestus, that any LLM provider credentials supplied by their own institution are backed by a processing agreement with that provider at the institution's level, and for the substantive scoping of Practices, recognition features, Slack routing and auto-trigger in their workspace.
-
-The essence of the Art. 26(2) Satz 2 arrangement is made available to data subjects via §3.2 of the privacy statement. TUM/AET is the single point of contact for data-subject rights; data subjects may nevertheless also address the workspace administrator directly for workspace-specific questions.
-
-### 3. Processors (Art. 28 GDPR) — each with AVV status
-
-See `05-processor-checklist.md` for the full table. Engaged processors:
-
-- **GitHub, Inc. / Microsoft Corporation** — identity provider (OAuth) and source-system API (pull requests, issues, reviews, commits synchronised on behalf of the controller via the workspace-configured GitHub App installation or access token). AVV in place at TUM/AET level.
-- **Microsoft Corporation (Azure OpenAI Service)** — default LLM provider for the TUM-operated deployment. Region-configurable; EU-region deployments process within the EU. AVV at TUM/AET level for the TUM-operated tenancy; AVV at the workspace administrator's institution level when that institution supplies the API credentials (shared-responsibility model, §3.2).
-- **OpenAI, L.P.** — alternative LLM provider configurable per workspace. AVV as above.
-- **Salesforce, Inc. / Slack Technologies, LLC** — workspace notifications and engagement digests when the workspace administrator has enabled Slack. AVV in place at TUM/AET level.
-
-The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** is **not** an Art. 28 processor; gitlab.lrz.de runs on LRZ infrastructure under a public-body cooperation: inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG, with LRZ operating under the BAdW-Satzung. LRZ and TUM each act as separate controllers (Art. 4(7) GDPR) for the data each body processes on its own infrastructure; their purposes and means are not jointly determined (Art. 26 GDPR also does not apply). See `05-processor-checklist.md` for the full EDPB 07/2020 analysis.
-
-### 4. Data Protection Officer
-
-Pre-populated by DSMS. Verify:
-
-- TUM DPO office: **[beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)**.
-
-### 5. Purposes of processing (Art. 30(1)(b))
-
-1. Authenticate Contributors and establish an authenticated session (Keycloak + federated IdPs).
-2. Synchronise repository Events and Artifacts from configured source systems (GitHub, gitlab.lrz.de) to populate the workspace.
-3. Detect workspace-defined Practices in synchronised Artifacts and produce advisory Findings.
-4. Deliver adaptive Guidance back to Contributors via dashboards, the conversational guidance assistant, and automated practice-review comments on pull/merge requests.
-5. Surface workspace engagement and recognition features (leaderboards, leagues, achievements) where the workspace administrator has enabled them.
-6. Deliver workspace notifications — where the workspace administrator has enabled it — over Slack.
-7. Operate the service reliably and securely (server logs) and troubleshoot incidents.
-
-### 6. Name of IT system / procedure
+### Other legal basis (textarea)
 
 ```text
-Hephaestus, self-hosted by AET on TUM infrastructure at https://hephaestus.aet.cit.tum.de.
-Source under MIT licence: github.com/ls1intum/Hephaestus.
-Authentication via self-hosted Keycloak federating GitHub OAuth and gitlab.lrz.de OIDC.
-AI-assisted features call an external LLM provider configured per workspace; code-executing
-practice reviews run inside isolated per-job Docker sandboxes behind a per-job LLM proxy.
+Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (Aufgaben der Hochschule: Forschung, Lehre, Wissens- und Technologietransfer) and Art. 4 Abs. 1 BayDSG (Rechtmäßigkeit der Verarbeitung im Bereich der bayerischen öffentlichen Stellen). The same basis covers application-server security logs (operation and security of a university IT service).
+
+Art. 6(1)(b) GDPR for non-TUM contributors (performance of the service requested by signing in).
+
+Contributors may object under Art. 21 GDPR to the AI-assisted feedback channel via the in-app "AI review comments" toggle; objection stops future transmissions but does not by itself delete previously generated findings.
+
+Keycloak session cookies and theme-preference localStorage: § 25 Abs. 2 Nr. 2 TDDDG (technisch unbedingt erforderlich) i.V.m. Art. 6(1)(e) GDPR.
 ```
 
-### 7. Legal basis (cite GDPR article + national norm)
+### What is the legal basis for processing special data categories of personal data? (Art. 9.2 GDPR)
 
-- **Core service for TUM Contributors** (authentication, repository sync, practice detection, guidance): Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG and Art. 4 Abs. 1 BayDSG (public-interest task: teaching and operation of university IT services).
-- **Core service for non-TUM Contributors** (external open-source, partner-university members): Art. 6(1)(b) GDPR (performance of the service requested by signing in).
-- **AI-assisted features** (guidance assistant, practice review): same basis as the core service. Contributors may object under Art. 21 GDPR via the "AI review comments" profile toggle. Objection stops future transmissions; it does not by itself delete previously generated Findings.
-- **Application-server security logs**: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG and Art. 4 Abs. 1 BayDSG (operation and security of a university IT service).
-- **Keycloak session cookies and theme-preference localStorage**: § 25 Abs. 2 Nr. 2 TDDDG (technisch unbedingt erforderlich) i.V.m. Art. 6(1)(e) GDPR.
+Leave empty. Hephaestus processes no Art. 9 special-category data.
 
-### 8. Categories of data subjects (Art. 30(1)(c))
+### Other legal basis (multi-select)
 
-Tick in DSMS:
+Tick:
 
-- Students (TUM)
-- Employees (TUM) — lecturers, tutors, AET staff, workspace administrators
-- Students (extern) — from partner universities contributing to shared projects
-- Other Website Visitors — unauthenticated visitors of public pages (imprint, privacy)
+- [x] Art. 4.1 BayDSG (Bavarian data protection act)
 
-### 9. Categories of personal data
+---
 
-- **Identity & authentication (Keycloak):** external user ID at the identity provider (GitHub user ID or `sub` claim from gitlab.lrz.de), username / login, email, full name, avatar URL, profile URL.
-- **Development activity (synchronised from source systems):** pull/merge requests, issues, code reviews, review comments, commit metadata, repository collaborator and team-membership metadata, and profile information of authors of these artifacts.
-- **Account settings & recognition:** notification preferences, UI display options, workspace memberships and roles, leaderboard rank, league assignment, achievement progress, the "AI review comments" Art. 21 objection switch.
-- **AI-assisted features:** guidance-assistant messages + AI-generated responses, conversation threads, feedback (helpful / not helpful), practice-review findings (verdict, severity, evidence, reasoning), guidance text delivered back to the Contributor.
-- **Server logs (per-service storage cap, oldest entries dropped automatically once exceeded; see §13):** IP address, timestamp, HTTP method, URL, status code, bytes transferred, user-agent, referrer.
-- **Browser-side storage:** Keycloak session cookies; theme preference in localStorage. No identifying data in localStorage.
+## Data and Deletion
 
-### 10. Special categories (Art. 9 / Art. 10)
+### How was this data collected? What was the data source?
 
-**None.** Hephaestus does not process health, biometric, genetic, racial, religious, political, trade-union, sex-life, sexual-orientation, or criminal-conviction data. Contributors are warned in the privacy statement not to enter third-party personal data into commits, reviews, or practice-review diffs.
+Tick:
 
-### 11. Categories of recipients (Art. 30(1)(d))
+- [x] Data received from third parties
+- [x] Directly from the data subject
 
-- **Internal:** AET administrators and developers (operation, maintenance, support); workspace members (see workspace-level Findings and dashboards as described in §6 of the privacy statement).
-- **Anonymous open web:** the upstream open-source project's GitHub contributor list at `/contributors`, and any workspace whose administrator has explicitly marked it publicly viewable.
-- **External (Art. 28 processors), as configured per workspace:** GitHub / Microsoft; the LLM provider configured for the workspace (Azure OpenAI by default on the TUM-operated deployment, or OpenAI); Slack (when enabled).
-- **External (separate controllers, not Art. 28):** Leibniz-Rechenzentrum der BAdW for gitlab.lrz.de integration.
-- **No sale, no advertising recipients, no brokers.**
+### Other data sources
 
-### 12. Third-country transfers (Art. 30(1)(e))
+```text
+Data received from third parties means: from federated identity providers (GitHub, gitlab.lrz.de) via OAuth / OIDC during sign-in, and from the source-system APIs (GitHub, gitlab.lrz.de) using the workspace-configured installation or access token (repository events and artefacts authored by the contributor).
 
-All U.S.-based recipients are certified under the EU–U.S. Data Privacy Framework (DPF); the primary safeguard is the Commission adequacy decision under Art. 45(3) GDPR in relation to the DPF (Commission Implementing Decision of 10 July 2023 on the EU-U.S. Data Privacy Framework). Standard Contractual Clauses under Art. 46(2)(c) GDPR pursuant to Commission Implementing Decision (EU) 2021/914 — **Module 2 (controller → processor)** — are contracted as a fall-back for any processing not covered by the recipient's DPF certification. DPF certification must be re-verified against the U.S. Department of Commerce list before each annual VVT refresh.
+Directly from the data subject means: profile settings, notification preferences, AI-assistant messages, the Art. 21 objection switch.
 
-- **GitHub, Inc. / Microsoft Corporation** — DPF-certified (active; to be re-verified). Azure OpenAI in a European region processes data within the EU.
-- **OpenAI, L.P.** — DPF-certified (active; to be re-verified). SCCs Module 2 as fall-back.
-- **Salesforce, Inc. (Slack)** — DPF-certified (active; to be re-verified). SCCs Module 2 as fall-back.
+Plus from the underlying HTTP connection: IP address and request metadata captured in the application server's native access log.
+```
 
-### 13. Retention periods per data category (Art. 30(1)(f))
+### Where is this data located and how is it stored?
 
-| Category                                                                            | Retention                                                                                                                                                                                                                                                                                                                                                                            |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Identity data in Keycloak + Hephaestus DB                                           | Account lifetime; removed on user-triggered account deletion                                                                                                                                                                                                                                                                                                                         |
-| Development activity synchronised from GitHub / gitlab.lrz.de                       | For as long as the repository and workspace are configured; source-side content on GitHub / gitlab.lrz.de is not affected by deletions inside Hephaestus                                                                                                                                                                                                                             |
-| Account settings, notification prefs, recognition signals, Art. 21 objection switch | Account lifetime                                                                                                                                                                                                                                                                                                                                                                     |
-| Guidance-assistant conversations                                                    | Account lifetime; deletable on request                                                                                                                                                                                                                                                                                                                                               |
-| Practice-review Findings                                                            | Workspace lifetime; deletable on request                                                                                                                                                                                                                                                                                                                                             |
-| LLM-provider-side prompts                                                           | Up to 30 days (enterprise default abuse-monitoring); shorter where Zero Data Retention has been negotiated per workspace                                                                                                                                                                                                                                                             |
-| Server access logs (application server)                                             | Retained for at most **14 days** under the application server's native access-log retention. Logged fields are limited to timestamp, client IP, HTTP method, request path, protocol, status, response size, and processing time. Access logs are kept longer only where strictly necessary for an ongoing security incident, and deleted at closure. |
-| Container stdout (application services)                                             | Rotated by size (50 MiB per file, 5 files retained per service) by the host's container runtime. No personal data by design; access restricted to AET operators with container-host SSH. |
-| Backups — PostgreSQL + Keycloak                                                     | **No scheduled off-host backups are in place at the time of submission.** Establishing a scheduled backup regime with a documented restore drill is an open AET-ops item under Art. 32(1)(c) GDPR resilience (see `04-toms.md` §3.3). The dataset has no Art. 9 content, and no statutory retention duty compels a backup today                                                      |
-| Backups — gitlab.lrz.de (LRZ-side, for deleted content)                             | LRZ retains its own backup window of up to 6 months for content already removed on the LRZ side, independent of Hephaestus                                                                                                                                                                                                                                                           |
+```text
+Self-hosted by AET on TUM infrastructure (VM provided by the TUM ITO) at https://hephaestus.aet.cit.tum.de. Application data resides in PostgreSQL on the same host. Authentication state in self-hosted Keycloak federating GitHub OAuth and gitlab.lrz.de OIDC. Application-server access logs on the host with 14-day retention. Container stdout rotated by the host's container runtime (50 MiB per file × 5 files retained per service).
 
-### 14. Technical and Organizational Measures (Art. 30(1)(g) + Art. 32)
+All primary data resides on TUM infrastructure within the EU. AI-assisted features additionally transmit relevant code snippets and discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region under enterprise no-training terms).
 
-Paste the TOMs summary from `04-toms.md` into the DSMS TOMs field. Per-category controls are in §1–§7 of that document.
+No scheduled off-host backups are in place at the time of submission. Establishing a scheduled backup regime with a documented restore drill is an open AET-operations item under Art. 32(1)(c) GDPR resilience.
+```
 
-### 15. Information-duty fulfilled (Art. 13/14)
+### What is your envisaged time for deletion / erasure of the data for this processing activity?
 
-Privacy statement at: [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy)
-Imprint at: [https://hephaestus.aet.cit.tum.de/imprint](https://hephaestus.aet.cit.tum.de/imprint)
+Leave the multi-select empty — no preset matches the per-category retention model. Use the Custom Erasure Time field below.
 
-Both are versioned in the repository under `webapp/public/legal/profiles/tumaet/`.
+### Custom Erasure Time
 
-### 16. Automated decision-making / profiling (Art. 22)
+```text
+Mixed retention by category:
 
-**No Art. 22 decisions.** AI-assisted features produce advisory Findings and Guidance only. They are not consumed by any automated grading, assessment, HR, or access-control pipeline operated by Hephaestus. A human instructor acting on information from Hephaestus dashboards remains accountable for that decision under their own process, outside Hephaestus.
+- Account-bound data (identity, profile, settings, recognition signals, AI conversations, practice findings): retained for the lifetime of the account; removed on user-triggered account deletion.
+- Repository activity synchronised from GitHub / gitlab.lrz.de: retained while the repository remains configured for the workspace; deletion in Hephaestus does not affect the source-side content on GitHub or gitlab.lrz.de.
+- LLM-provider-side prompts: up to 30 days under the provider's enterprise abuse-monitoring window; shorter where Zero Data Retention is contracted for the workspace.
+- Application-server access logs: at most 14 days; longer only for the duration of an ongoing security incident, then deleted at closure.
+- Container stdout: rotated by size by the host's container runtime (50 MiB × 5 files per service).
+```
 
-### 17. DPIA pre-check (Art. 35 GDPR)
+### What is your reasoning for the erasure time above?
 
-See `02-dpia-prescreen.md`. Conclusion: **DPIA-light posture.** The AI-assisted feature surface is on the "elevated risk" side of the BayLfD innovative-technology criterion; mitigations in §5 of the pre-screen (no-training enterprise API terms, per-job LLM proxy, Art. 21 objection switch, shared-responsibility disclosure, bounded server-log retention) replace a full DPIA at the current scope. The pre-screen lists the trigger conditions under which a full DPIA must be opened.
+```text
+Hephaestus is contributor-facing. Account-bound data exists to give the data subject continuity of feedback over the lifetime of their participation, and is removed the moment they decide to leave. Server-side logs and container stdout are bounded to the shortest period that still allows incident investigation under Art. 32(1) GDPR.
+```
 
-### 18. Personalrat involvement (Art. 75a BayPVG)
+### Who is responsible for the deletion?
 
-**Not triggered at the platform level.** Hephaestus is _suitable_ for displaying contributor activity, but is not deployed by AET as a personnel-evaluation, performance-management, or behaviour-monitoring instrument. The platform is contributor-facing: it exposes no Dienststelle-segmented dashboard, no HR export, and no manager-facing roll-up. TUM staff appear in a workspace in their role as Contributors alongside students under the same scheme. Art. 75a BayPVG's _Eignungsrechtsprechung_ is the capability test for monitoring **employee** behaviour or performance. On a contributor-facing teaching platform with these properties, it does not engage.
+```text
+AET operations team, ls1.admin@in.tum.de. User-initiated account deletion is processed via the in-app account-deletion control. Admin-initiated deletion on behalf of a data subject is processed by AET operators on receipt of a verified request through the TUM DPO (beauftragter@datenschutz.tum.de).
+```
 
-### 19. IT-Sicherheitsformular (TUM wiki)
+### How is deletion guaranteed?
 
-Not applicable as a separate upload; Hephaestus is self-hosted by AET on TUM infrastructure under the AET operational security baseline. See `04-toms.md` for the per-category detail.
+```text
+Account deletion removes the user record from the application database and from Keycloak; cascaded relationships remove dependent records (workspace memberships, AI conversations, recognition signals). Repository-activity records authored by the deleted user are anonymised in place (author reference removed) since they remain part of the historical workspace artefact set. Container stdout rotates automatically by size; access logs are pruned by the application server's native retention policy. No long-term off-host backups are in place at the time of submission, so deletion does not need to propagate to backup media.
+```
 
-### 20. Source of data
+### Specific Technical and Organisational Measures
 
-- Directly from the data subject: profile settings, notification preferences, guidance-assistant messages, feedback, the Art. 21 objection switch.
-- From federated identity providers (GitHub, gitlab.lrz.de) via OAuth / OIDC during sign-in.
-- From source-system APIs (GitHub, gitlab.lrz.de) via the workspace-configured installation / access token: repository Events and Artifacts authored by the Contributor.
-- From the underlying HTTP connection: IP address and request metadata captured in the application server's native access log (see §13).
+```text
+- Hosting and isolation: self-hosted by AET on TUM infrastructure inside the AET tenancy of the TUM ITO; outbound traffic restricted to documented endpoints (federated IdPs, source-system APIs, the workspace-configured LLM provider, Slack when enabled).
+- Authentication and access control: federated identity via Keycloak (GitHub OAuth, gitlab.lrz.de OIDC); workspace-scoped membership and role checks; least-privilege source-system access via per-workspace GitHub App installation or scoped access token.
+- Encryption in transit: TLS 1.2+ on all external endpoints; outbound calls to GitHub, gitlab.lrz.de, the LLM provider, and Slack over HTTPS.
+- Logging and incident response: 14-day application-server access-log retention; container stdout rotated by host runtime (50 MiB × 5 per service); incidents reported to the TUM DPO under Art. 33 / 34 GDPR; documented breach-notification path.
+- Sandboxing of code-executing AI features: practice-review code execution runs inside per-job Docker sandboxes behind a per-job LLM proxy; off by default (workspace opt-in).
+- Data minimisation in AI calls: only the relevant code snippets and discussion are forwarded to the LLM provider; enterprise no-training terms in place; Zero Data Retention contractable per workspace.
+- Source: github.com/ls1intum/Hephaestus (MIT). Supply-chain hygiene via Dependabot and CodeQL on the upstream repository.
 
-### 21. Data-subject rights contact
+Full per-category detail in 04-toms.md.
+```
 
-Primary: [beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de) (TUM DPO). Operational queries: [ls1.admin@in.tum.de](mailto:ls1.admin@in.tum.de) (AET admins). Data subjects may additionally address the workspace administrator directly for questions about the workspace-specific configuration (§3.2 of the privacy statement).
+---
 
-### 22. Attachments
+## Vendors / Applications
 
-No file uploads. The TOMs (§14), DPIA pre-screen (§17), and AVV status (§3 plus the table in `05-processor-checklist.md`) are pasted directly into the corresponding DSMS form fields. The published privacy statement at [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy) is the canonical Art. 13/14 record; the URL is referenced in §15.
+The form will say "no external processors" because GitHub / Microsoft / OpenAI / Slack aren't yet registered to this PA in the AET vendor pool. **Don't fix this in the Vendors section** — use the Other Remarks field below to ask the DPO to add them. The full list with AVV status is in the *Recipient Categories* paste above and in `05-processor-checklist.md`.
 
-### 23. Status
+---
 
-Set to **Submitted** after all fields are filled.
+## Others
+
+### Other Remarks
+
+```text
+Bitte folgende Auftragsverarbeiter zum AET-Pool hinzufügen, soweit noch nicht vorhanden: GitHub Inc. / Microsoft Corp. (USA), Microsoft Corp. (Azure OpenAI Service, USA/EU), OpenAI, L.P. (USA), Salesforce / Slack Technologies, LLC (USA). Beschreibungen unter "Recipient Categories"; Drittlandtransfers durch das EU–US Data Privacy Framework und Standardvertragsklauseln Modul 2 (jeweils im Rahmen des einschlägigen Enterprise-AVV) abgedeckt.
+```
+
+### Comment from the official data protection officer
+
+Read-only. Filled by the DSB after submission.
+
+---
+
+## Submit
+
+- **New State** dropdown → **Submitted**.
+- Click **Save**.
+
+Save before navigating between sections — the form does not auto-save.
+
+---
+
+## Audit context (not pasted into the form)
+
+### A. Joint controllers (Art. 26 GDPR)
+
+**Workspace administrators** (typically TUM chairs, lecturers, research-group leads, or — for AET research-project workspaces — facilitators of those projects) are joint controllers with TUM/AET for six workspace-configurable decisions documented in §3.2 of the privacy statement: which Git repositories are synchronised; which LLM provider and credentials the workspace uses; whether Slack notifications are routed; whether leaderboards / leagues / achievements are enabled; the workspace's Practice catalog; and whether practice reviews are auto-triggered on new pull/merge requests.
+
+**Allocation of duties (Art. 26(2) Satz 1 GDPR):** TUM/AET is responsible for Art. 13/14 information duties (via the privacy statement), platform-level TOMs (Art. 32), breach notification (Art. 33/34), the DPIA posture (Art. 35), and this VVT. The workspace administrator is responsible for the lawfulness of the source-system authorisation, for informing the workspace's contributors that their repository artefacts are ingested, and for any LLM-provider credentials supplied by their own institution being backed by a processing agreement at that institution's level. The essence of the arrangement is published at §3.2 of the privacy statement (Art. 26(2) Satz 2). TUM/AET is the single point of contact for data-subject rights.
+
+### B. Processors and recipients
+
+Full per-processor AVV status, sub-processor exposure, and EDPB 07/2020 analysis for LRZ in [`05-processor-checklist.md`](./05-processor-checklist.md).
+
+### C. DPIA posture
+
+DPIA-light. Trigger conditions for opening a full DPIA are listed in [`02-dpia-prescreen.md`](./02-dpia-prescreen.md) §6.
+
+### D. Personalrat (Art. 75a BayPVG)
+
+Not triggered at the platform level. Hephaestus is suitable for displaying contributor activity but is not deployed by AET as a personnel-evaluation, performance-management, or behaviour-monitoring instrument. The platform is contributor-facing: no Dienststelle-segmented dashboard, no HR export, no manager-facing roll-up.
+
+### E. Special categories (Art. 9 / Art. 10) and Art. 22
+
+None. No special-category data is processed. No Art. 22 automated decisions: AI-assisted features produce advisory findings only and feed no automated grading, assessment, HR, or access-control pipeline.
+
+### F. Information duty (Art. 13 / 14)
+
+Privacy statement: [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy). Imprint: [https://hephaestus.aet.cit.tum.de/imprint](https://hephaestus.aet.cit.tum.de/imprint). Markdown source under [`webapp/public/legal/profiles/tumaet/`](https://github.com/ls1intum/Hephaestus/tree/main/webapp/public/legal/profiles/tumaet).
+
+### G. Data-subject rights
+
+Primary contact: [beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de) (TUM DPO). Operational queries: [ls1.admin@in.tum.de](mailto:ls1.admin@in.tum.de). Workspace-specific questions can additionally be addressed to the workspace administrator (privacy statement §3.2).
