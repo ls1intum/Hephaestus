@@ -14,9 +14,9 @@ This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis
 | File                                             | Purpose                                                                                                          |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | [`README.md`](./README.md)                       | This file                                                                                                        |
-| [`SUBMISSION-GUIDE.md`](./SUBMISSION-GUIDE.md)   | Ordered submission procedure                                                                                     |
+| [`01-submission-guide.md`](./01-submission-guide.md)   | Ordered submission procedure                                                                                     |
 | [`02-dsfa-prescreen.md`](./02-dsfa-prescreen.md) | DPIA pre-check (Art. 35 GDPR) — records the DPIA-light posture and the conditions that would require a full DPIA |
-| [`03-vt-dsms.md`](./03-vt-dsms.md)               | Copy-paste VVT answers for the DSMS form                                                                         |
+| [`03-vvt.md`](./03-vvt.md)               | Copy-paste VVT answers for the DSMS form                                                                         |
 | [`04-toms.md`](./04-toms.md)                     | Technical and Organizational Measures (Art. 32 GDPR)                                                             |
 | [`05-avv-checklist.md`](./05-avv-checklist.md)   | Art. 28 processor checklist — every external and internal recipient and its AVV status                           |
 
@@ -42,7 +42,7 @@ The VVT is re-reviewed annually and whenever the processing surface changes (new
 
 ## DSB feedback
 
-If the DSB leaves comments after submission, see Phase 3 of [`SUBMISSION-GUIDE.md`](./SUBMISSION-GUIDE.md).
+If the DSB leaves comments after submission, see Phase 3 of [`01-submission-guide.md`](./01-submission-guide.md).
 
 ## Contacts
 

@@ -1,6 +1,6 @@
 ---
-id: vt-dsms
-title: DSMS Verzeichnis von Verarbeitungstätigkeiten (VVT)
+id: vvt
+title: Verzeichnis von Verarbeitungstätigkeiten (VVT)
 description: Copy-paste answers for the DSMS follow-up questionnaire.
 ---
 

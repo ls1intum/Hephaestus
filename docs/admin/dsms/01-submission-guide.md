@@ -10,8 +10,8 @@ Follow these steps in order. Target: [https://dsms.datenschutz.tum.de/](https://
 
 ## Phase 0 — Prep (15 min)
 
-1. Open `03-vt-dsms.md` alongside this guide.
-2. Confirm the deployed configuration still matches the figures pinned in `03-vt-dsms.md` §13 (access-log retention, off-host-backup state, LLM-provider list, the disabled state of the Sentry / PostHog / Keycloak-SMTP integrations). Any drift triggers an amendment to the corresponding section before submission. The full amendment-trigger list is in [`05-avv-checklist.md`](./05-avv-checklist.md), "Follow-up if the VVT surface changes".
+1. Open `03-vvt.md` alongside this guide.
+2. Confirm the deployed configuration still matches the figures pinned in `03-vvt.md` §13 (access-log retention, off-host-backup state, LLM-provider list, the disabled state of the Sentry / PostHog / Keycloak-SMTP integrations). Any drift triggers an amendment to the corresponding section before submission. The full amendment-trigger list is in [`05-avv-checklist.md`](./05-avv-checklist.md), "Follow-up if the VVT surface changes".
 3. Have at hand: TUM login and edit access on the Hephaestus repo (for any privacy-page updates).
 
 ## Phase 1 — Ship the privacy page
@@ -35,10 +35,10 @@ If any of the above is wrong, fix the Markdown source in `webapp/public/legal/pr
 
 1. Log in at [https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/).
 2. Click **Create new PA**.
-3. Copy **Title** and **Description and Purpose** from `03-vt-dsms.md` ("Step 1" block).
+3. Copy **Title** and **Description and Purpose** from `03-vvt.md` ("Step 1" block).
 4. Select **Category**: `Administration / Teaching / Other`.
 5. Click **Save**. DSMS redirects to the follow-up questionnaire.
-6. Fill each follow-up field by copy-pasting from `03-vt-dsms.md` ("Step 2" block, §1 – §23). DSMS-label mapping:
+6. Fill each follow-up field by copy-pasting from `03-vvt.md` ("Step 2" block, §1 – §23). DSMS-label mapping:
 
    | DSMS field                         | VVT section                                               |
    | ---------------------------------- | --------------------------------------------------------- |
@@ -97,7 +97,7 @@ Check yearly:
 If the DSB rejects the VVT:
 
 1. Export their DSMS comments.
-2. Update `03-vt-dsms.md` and — if the substance changed — the privacy-page Markdown under `webapp/public/legal/profiles/tumaet/`.
+2. Update `03-vvt.md` and — if the substance changed — the privacy-page Markdown under `webapp/public/legal/profiles/tumaet/`.
 3. Re-submit.
 
 ## Contacts
