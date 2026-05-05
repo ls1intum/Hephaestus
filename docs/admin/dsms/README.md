@@ -1,52 +1,32 @@
 ---
 id: dsms
 sidebar_position: 3
-title: DSMS Submission Package
-description: Art. 30 GDPR / Verarbeitungstätigkeit record for the TUM-operated Hephaestus deployment.
+title: Data-Protection Documentation
+description: Art. 30 / Art. 35 / Art. 28 records for the TUM-operated Hephaestus deployment.
 ---
 
-_Last updated: 2026-05-05._
+# Hephaestus — Data-Protection Documentation
 
-This directory is the complete record-of-processing (Art. 30 GDPR / "Verzeichnis von Verarbeitungstätigkeiten", VVT) package for the TUM-operated Hephaestus deployment at `https://hephaestus.aet.cit.tum.de`. Submit it through the TUM DSMS at **[https://dsms.datenschutz.tum.de/](https://dsms.datenschutz.tum.de/)** (reachable from MWN / eduVPN with TUM login).
+This folder is the data-protection package for the TUM-operated Hephaestus deployment at https://hephaestus.aet.cit.tum.de. Files are named after the GDPR articles they answer to, not after the TUM DSMS portal field labels. The portal supplies its own field prompts; submit by pasting from the fenced code blocks in `record-of-processing.md` into the corresponding form fields.
 
-## Contents
+A different operator forking Hephaestus must amend, before opening their deployment to users: the controller block in `record-of-processing.md`, the operational-contact email, the Art. 28 row for any processor they engage that is not on the AET pool, the consent / public-task framing in `record-of-processing.md` "Legal basis", and the live privacy notice and imprint under `webapp/public/legal/profiles/`.
 
-| File                                             | Purpose                                                                                                          |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| [`README.md`](./README.md)                       | This file                                                                                                        |
-| [`01-submission-guide.md`](./01-submission-guide.md)   | Ordered submission procedure                                                                                     |
-| [`02-dpia-prescreen.md`](./02-dpia-prescreen.md) | DPIA pre-check (Art. 35 GDPR) — records the DPIA-light posture and the conditions that would require a full DPIA |
-| [`03-record-of-processing.md`](./03-record-of-processing.md)               | Copy-paste VVT answers for the DSMS form                                                                         |
-| [`04-toms.md`](./04-toms.md)                     | Technical and Organizational Measures (Art. 32 GDPR)                                                             |
-| [`05-processor-checklist.md`](./05-processor-checklist.md)   | Art. 28 processor checklist — every external and internal recipient and its AVV status                           |
+## Files
 
-The live imprint and privacy pages are served at:
+| File | Purpose |
+|---|---|
+| [`record-of-processing.md`](./record-of-processing.md) | Art. 30 record. TOMs (Art. 32) folded in under Art. 30(1)(g). Fenced blocks paste-ready into the TUM DSMS form. |
+| [`dpia-prescreen.md`](./dpia-prescreen.md) | Art. 35 pre-screen. Documents the DPIA-light posture and the conditions that would require a full DPIA. |
+| [`processor-checklist.md`](./processor-checklist.md) | Art. 28 checklist. Per-processor AVV status; LRZ-as-separate-controller analysis. |
 
-- [https://hephaestus.aet.cit.tum.de/imprint](https://hephaestus.aet.cit.tum.de/imprint)
-- [https://hephaestus.aet.cit.tum.de/privacy](https://hephaestus.aet.cit.tum.de/privacy)
-
-Markdown source lives under [`webapp/public/legal/profiles/tumaet/`](https://github.com/ls1intum/Hephaestus/tree/main/webapp/public/legal/profiles/tumaet).
-
-## Summary of the processing surface
-
-- Federated identities via Keycloak (GitHub OAuth + gitlab.lrz.de OIDC).
-- Repository synchronisation from GitHub and gitlab.lrz.de into workspace-scoped datasets.
-- AI-assisted guidance and automated practice review calling a workspace-configured LLM provider under enterprise no-training terms.
-- Engagement and recognition features (leaderboards, leagues, achievements) gated per workspace.
-- No special-category data (Art. 9 GDPR). No Art. 22 automated decision-making.
-- Residual elevated risk on the AI-assisted feature surface is covered by the BayLfD innovative-technology criterion and the mitigations documented in `02-dpia-prescreen.md` §5.
+The live imprint and privacy pages are at https://hephaestus.aet.cit.tum.de/imprint and https://hephaestus.aet.cit.tum.de/privacy. Markdown source: [`webapp/public/legal/profiles/tumaet/`](https://github.com/ls1intum/Hephaestus/tree/main/webapp/public/legal/profiles/tumaet).
 
 ## Maintenance
 
-The VVT is re-reviewed annually and whenever the processing surface changes (new processor, new data category, new retention window, new identity provider, or activation of an integration that is currently disabled). The triggers that require an amendment before go-live are listed in [`05-processor-checklist.md`](./05-processor-checklist.md) and [`02-dpia-prescreen.md`](./02-dpia-prescreen.md) §6.
-
-## DSB feedback
-
-If the DSB leaves comments after submission, see Phase 3 of [`01-submission-guide.md`](./01-submission-guide.md).
+Re-review annually and on any material change to the processing surface (new processor, new data category, new retention window, new identity provider, activation of an integration that is currently disabled). The triggers that require an amendment before go-live are listed in `processor-checklist.md` and `dpia-prescreen.md` §5–§6.
 
 ## Contacts
 
-- TUM DPO: [beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de)
-- DSMS tool support: [support@datenschutz.tum.de](mailto:support@datenschutz.tum.de)
-- TUM DSMS overview: [https://www.datenschutz.tum.de/datenschutz/verarbeitungstaetigkeit/](https://www.datenschutz.tum.de/datenschutz/verarbeitungstaetigkeit/)
-- Hephaestus operational contact: [ls1.admin@in.tum.de](mailto:ls1.admin@in.tum.de)
+- TUM DPO: [beauftragter@datenschutz.tum.de](mailto:beauftragter@datenschutz.tum.de).
+- Hephaestus operational contact: [ls1.admin@in.tum.de](mailto:ls1.admin@in.tum.de).
+- TUM DSMS portal: https://dsms.datenschutz.tum.de/ (reachable from MWN / eduVPN with TUM login).
