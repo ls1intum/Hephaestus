@@ -115,7 +115,7 @@ practice reviews run inside isolated per-job Docker sandboxes behind a per-job L
 - **Core service for TUM Contributors** (authentication, repository sync, practice detection, guidance): Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG and Art. 4 Abs. 1 BayDSG (public-interest task: teaching and operation of university IT services).
 - **Core service for non-TUM Contributors** (external open-source, partner-university members): Art. 6(1)(b) GDPR (performance of the service requested by signing in).
 - **AI-assisted features** (guidance assistant, practice review): same basis as the core service. Contributors may object under Art. 21 GDPR via the "AI review comments" profile toggle. Objection stops future transmissions; it does not by itself delete previously generated Findings.
-- **Application-server security logs**: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG, Art. 4 Abs. 1 BayDSG, Art. 8 BayDiG (operation and security of a university IT service).
+- **Application-server security logs**: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG and Art. 4 Abs. 1 BayDSG (operation and security of a university IT service).
 - **Keycloak session cookies and theme-preference localStorage**: § 25 Abs. 2 Nr. 2 TDDDG (technisch unbedingt erforderlich) i.V.m. Art. 6(1)(e) GDPR.
 
 ### 8. Categories of data subjects (Art. 30(1)(c))
@@ -192,7 +192,7 @@ See `02-dsfa-prescreen.md`. Conclusion: **DPIA-light posture.** The AI-assisted 
 
 ### 18. Personalrat involvement (Art. 75a BayPVG)
 
-**Not triggered at the platform level.** Hephaestus is *suitable* for displaying contributor activity, but is not deployed by AET as a personnel-evaluation, performance-management, or behaviour-monitoring instrument. The platform is contributor-facing: it exposes no Dienststelle-segmented dashboard, no HR export, and no manager-facing roll-up. TUM staff appear in a workspace in their role as Contributors alongside students under the same scheme. Art. 75a BayPVG's *Eignungsrechtsprechung* is the capability test for monitoring **employee** behaviour or performance. On a contributor-facing teaching platform with these properties, it does not engage.
+**Not triggered at the platform level.** Hephaestus is _suitable_ for displaying contributor activity, but is not deployed by AET as a personnel-evaluation, performance-management, or behaviour-monitoring instrument. The platform is contributor-facing: it exposes no Dienststelle-segmented dashboard, no HR export, and no manager-facing roll-up. TUM staff appear in a workspace in their role as Contributors alongside students under the same scheme. Art. 75a BayPVG's _Eignungsrechtsprechung_ is the capability test for monitoring **employee** behaviour or performance. On a contributor-facing teaching platform with these properties, it does not engage.
 
 ### 19. IT-Sicherheitsformular (TUM wiki)
 

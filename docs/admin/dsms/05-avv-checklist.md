@@ -10,7 +10,7 @@ Documents every entity that might qualify as a processor (Art. 28 GDPR) and the 
 
 ## Summary
 
-Hephaestus engages a processor chain of: GitHub (identity + source-system API), the per-workspace LLM provider (Azure OpenAI by default on the TUM-operated deployment, or OpenAI, selected via the deployment-level `MODEL_NAME` env variable and the workspace-level credential binding), and Slack (per-workspace opt-in). The LRZ (gitlab.lrz.de) is **not** a processor; it is a separate controller, with the inter-public-body transmission anchored in Art. 5 Abs. 1 Nr. 1 BayDSG and LRZ operating under the BAdW-Satzung. The webapp image also ships integration clients for Sentry (self-hostable) and PostHog (product analytics); both are **disabled in the current production deployment** (`SENTRY_DSN` empty, `POSTHOG_ENABLED=false`). They are not on this checklist at the moment and will only be added once a future deployment activates them — see the follow-up trigger list below.
+Hephaestus engages a processor chain of: GitHub (identity and source-system API), the per-workspace LLM provider (Azure OpenAI by default on the TUM-operated deployment, or OpenAI, selected per workspace), and Slack (per-workspace opt-in). The LRZ (gitlab.lrz.de) is **not** a processor; it is a separate controller, with the inter-public-body transmission anchored in Art. 5 Abs. 1 Nr. 1 BayDSG and LRZ operating under the BAdW-Satzung. The webapp image also ships integration clients for Sentry (self-hostable) and PostHog (product analytics); both are disabled in the current production deployment. They are not on this checklist at the moment and will only be added once a future deployment activates them — see the follow-up trigger list below.
 
 ## Detailed check
 
@@ -32,7 +32,7 @@ Hephaestus engages a processor chain of: GitHub (identity + source-system API), 
 
 ## Why the LRZ relationship is not Art. 28
 
-An Art. 28 processor is engaged to process personal data on behalf of the controller, under the controller's documented instructions. Under the EDPB Guidelines 07/2020 on the concepts of controller and processor in the GDPR (adopted 7 July 2021), Section 1.1 (§§ 14–33), the decisive criterion is who determines the "essential means" of the processing — i.e. the purposes, which data, which subjects, how long, what access.
+An Art. 28 processor is engaged to process personal data on behalf of the controller, under the controller's documented instructions. Under the EDPB Guidelines 07/2020 on the concepts of controller and processor in the GDPR (adopted 7 July 2021), Section 1.1 (§§ 14–33), the decisive criterion is who determines the "essential means" of the processing: the purposes, which data, which subjects, how long, what access.
 
 For gitlab.lrz.de, LRZ operates its own GitLab instance for the Bavarian academic-computing community under its BAdW-embedded mandate as the Bavarian academic computing centre. LRZ determines the service's purpose, the onboarding rules, the retention windows, the backup regime, the TOMs, and the terms of use. TUM does not instruct LRZ on how to operate gitlab.lrz.de; TUM consumes the service as one eligible Bavarian public body among many, with the inter-public-body transmission anchored in Art. 5 Abs. 1 Nr. 1 BayDSG. Two separate controllers, each processing on its own infrastructure for its own purpose, are incompatible with Art. 28 processor status under EDPB 07/2020.
 
