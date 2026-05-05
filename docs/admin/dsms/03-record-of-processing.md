@@ -159,10 +159,11 @@ Field hidden unless 6.1f is ticked. Leave empty.
 ```text
 TUM/AET as platform operator: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (Aufgaben der Hochschule: Forschung, Lehre, Wissens- und Technologietransfer) and Art. 4 Abs. 1 BayDSG.
 
-Per-workspace lawful basis: any TUM unit can run a workspace on this platform. The workspace administrator (typically a TUM chair, lecturer, or research-group lead) and TUM/AET are joint controllers under Art. 26 GDPR for the workspace's processing. The basis applicable to a workspace's contributors depends on the workspace context:
+Per-workspace lawful basis: anyone with a GitHub or LRZ-GitLab account can create a workspace on this platform. The workspace administrator and TUM/AET are joint controllers under Art. 26 GDPR for the workspace's processing; the workspace administrator invokes and is responsible for the lawful basis applicable to their workspace's contributors. Common bases:
 
-- Workspaces collecting explicit consent from participants (e.g., the AET capstone course's application phase): Art. 6(1)(a) GDPR.
-- Workspaces operated as part of a TUM unit's public-task activity (teaching, research, or Wissens-/Technologietransfer; for example, regular courses or public open-source repositories such as ls1intum/Artemis): Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG.
+- Art. 6(1)(a) GDPR — explicit consent collected by the administrator (e.g., the AET capstone course's application phase).
+- Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG — public-task activity by a TUM unit (e.g., regular courses; public open-source repositories such as ls1intum/Artemis).
+- Workspace administrators outside TUM (e.g., external open-source maintainers, partner-institution researchers) cannot invoke Art. 6(1)(e) BayHIG; they invoke a basis available to them under Art. 6 GDPR — typically Art. 6(1)(a) consent or, where the administrator is a private body, Art. 6(1)(f) GDPR (legitimate interest, with their own LIA).
 
 Voluntary sign-in by non-TUM contributors to use personal features: Art. 6(1)(b) GDPR.
 
