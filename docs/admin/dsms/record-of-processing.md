@@ -66,9 +66,9 @@ No special categories (Art. 9(1) GDPR) and no Art. 10 GDPR data are processed. C
 ```text
 External processors engaged by TUM/AET as controller. AVVs are in place at TUM/AET level for the AET-pool processors. Where a workspace administrator configures a different LLM endpoint (see below), the AVV is at that administrator's institution.
 
-- GitHub, Inc. / Microsoft Corporation (USA) — identity provider for GitHub sign-in and source-system API for connected GitHub repositories.
+- GitHub, Inc. (USA) — identity provider for GitHub sign-in and source-system API for connected GitHub repositories.
 
-- An external LLM provider, chosen per workspace by the workspace administrator from any OpenAI-API-compatible HTTPS endpoint (configured by a baseURL, an API token, and a model name). The choice is a joint-controller decision under Art. 26 GDPR. The TUM-operated deployment uses Microsoft Azure OpenAI in an EU region under enterprise no-training terms by default. A workspace administrator may configure a different endpoint instead, such as OpenAI L.P. directly, an institution-level enterprise gateway, or a self-hosted model server.
+- An external LLM provider, chosen per workspace by the workspace administrator from any OpenAI-API-compatible HTTPS endpoint (configured by a baseURL, an API token, and a model name). The choice is a joint-controller decision under Art. 26 GDPR. The TUM-operated deployment uses Microsoft Corporation, Azure OpenAI Service in an EU region under enterprise no-training terms by default. A workspace administrator may configure a different endpoint instead, such as OpenAI OpCo, LLC (with OpenAI Ireland Ltd. as the EEA contracting party for European institutional credentials), an institution-level enterprise gateway, or a self-hosted model server.
 
 - Salesforce, Inc. / Slack Technologies, LLC (USA) — workspace notifications when a workspace administrator has enabled Slack for that workspace.
 
@@ -100,7 +100,7 @@ Mixed retention by category:
 
 - Account-bound data (Keycloak account, federated identity links, analytics identity): removed on user-triggered account deletion via the in-app control.
 - Contributor profile and activity data synchronised from GitHub / gitlab.lrz.de (login, name, email, avatar, authored issues / pull requests / comments / reviews, AI conversations, recognition signals, practice findings): retained while at least one workspace continues to track the contributor's repositories. Removed when the last workspace stops monitoring the source repository, or on operator-executed deletion against the production database on receipt of a verified erasure request.
-- LLM-provider-side prompts: per the workspace's chosen provider's terms. For the TUM-operated default (Microsoft Azure OpenAI in an EU region), up to 30 days under the enterprise abuse-monitoring window.
+- LLM-provider-side prompts: per the workspace's chosen provider's terms. For the TUM-operated default (Microsoft Azure OpenAI in an EU region), within the enterprise abuse-monitoring window published in Microsoft's Azure OpenAI data-privacy documentation; eligible customers may apply for Microsoft's modified abuse monitoring (Limited Access program) to suppress prompt storage and human review.
 - Application-server access log: at most 14 days; longer only for the duration of an active security incident, then deleted on closure.
 - Container stdout: rotated by size by the container runtime (50 MiB × 5 files per service).
 ```
@@ -164,7 +164,7 @@ Testing and evaluation (Art. 32(1)(d))
 
 Organisational
 - Operators are TUM / AET employees or authorised contributors acting under TUM-internal security policies.
-- Incidents affecting personal data are reported to the TUM DPO within 72 h under Art. 33 / 34 GDPR.
+- Incidents affecting personal data are reported to the TUM DPO under Art. 33(1) GDPR (within 72 hours of awareness); where Art. 34 applies, data subjects are notified without undue delay.
 - Workspace administrators are briefed on the joint-controller / shared-responsibility model (privacy §10) before workspace provisioning.
 
 Source: github.com/ls1intum/Hephaestus (MIT licence).
@@ -183,7 +183,7 @@ Do **not** tick 6.1f. Bavarian public bodies cannot rely on legitimate interest 
 National multi-select: tick `Art. 4.1 BayDSG (Bavarian data protection act)`.
 
 ```text
-TUM/AET as platform operator: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (Aufgaben der Hochschule: Forschung, Lehre, Wissens- und Technologietransfer) and Art. 4(1) BayDSG.
+TUM/AET as platform operator: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (Allgemeine Aufgaben der Hochschule) and Art. 4(1) BayDSG.
 
 Per-workspace lawful basis: anyone with a GitHub or LRZ-GitLab account can create a workspace on this platform. The workspace administrator and TUM/AET are joint controllers under Art. 26 GDPR for the workspace's processing; the workspace administrator invokes and is responsible for the lawful basis applicable to their workspace's contributors. Common bases:
 
@@ -216,5 +216,5 @@ Markdown source under `webapp/public/legal/profiles/tumaet/`.
 ## Other Remarks (DSMS form vendor-pool comment)
 
 ```text
-Bitte folgende Auftragsverarbeiter zum AET-Pool hinzufügen, soweit noch nicht vorhanden: GitHub Inc. / Microsoft Corp. (USA), Microsoft Corp. (Azure OpenAI Service, USA/EU), OpenAI, L.P. (USA), Salesforce / Slack Technologies, LLC (USA). Beschreibungen unter "Recipient Categories"; Drittlandtransfers durch das EU–US Data Privacy Framework und Standardvertragsklauseln Modul 2 (jeweils im Rahmen des einschlägigen Enterprise-AVV) abgedeckt.
+Bitte folgende Auftragsverarbeiter zum AET-Pool hinzufügen, soweit noch nicht vorhanden: GitHub Inc. (USA), Microsoft Corp. (Azure OpenAI Service, USA/EU), OpenAI OpCo, LLC (USA) ggf. mit OpenAI Ireland Ltd. (Irland) als EWR-Vertragspartner, Salesforce / Slack Technologies, LLC (USA). Beschreibungen unter "Recipient Categories"; Drittlandtransfers durch das EU–US Data Privacy Framework und Standardvertragsklauseln Modul 2 (jeweils im Rahmen des einschlägigen Enterprise-AVV) abgedeckt; DPF-Status pro Empfänger vor Anbindung verifizieren.
 ```

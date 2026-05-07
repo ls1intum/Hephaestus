@@ -19,7 +19,7 @@ The Technical University of Munich is a public corporation (Körperschaft des ö
 ## Regulatory Authority
 
 Bayerisches Staatsministerium für Wissenschaft und Kunst  
-Salvatorstraße 2, 80333 Munich, Germany
+Salvatorplatz 2, 80333 Munich, Germany
 
 ## VAT Identification Number
 
