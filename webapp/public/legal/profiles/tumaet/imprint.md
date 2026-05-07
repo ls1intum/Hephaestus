@@ -1,6 +1,6 @@
 Information in accordance with § 5 DDG (Digitale-Dienste-Gesetz — German Digital Services Act).
 
-*Last updated: 2026-04-19.*
+*Last updated: 2026-05-07.*
 
 ## Publisher
 
@@ -19,15 +19,13 @@ The Technical University of Munich is a public corporation (Körperschaft des ö
 ## Regulatory Authority
 
 Bayerisches Staatsministerium für Wissenschaft und Kunst  
-Salvatorstraße 2, 80333 Munich, Germany
+Salvatorplatz 2, 80333 Munich, Germany
 
 ## VAT Identification Number
 
 DE811193231 (in accordance with § 27a UStG — German VAT Act)
 
 ## Responsible for Content
-
-Responsible for the content of this platform in accordance with § 18 Abs. 1 MStV (Medienstaatsvertrag — German Interstate Media Treaty):
 
 Prof. Dr. Stephan Krusche  
 Applied Education Technologies (AET)  
