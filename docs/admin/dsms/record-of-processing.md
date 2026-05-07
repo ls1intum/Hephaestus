@@ -35,11 +35,11 @@ Hephaestus is a self-hosted web platform operated by AET on TUM infrastructure a
 
 A workspace administrator connects one or more Git repositories from github.com or gitlab.lrz.de. Hephaestus then synchronises the pull/merge requests, issues, code reviews, review comments, and commit metadata authored in those repositories. The platform processes the activity of everyone who has authored there, whether or not they have signed in to Hephaestus.
 
-The synchronised activity is analysed against a set of practices configured by the workspace administrator to produce findings about each contributor. Some of these judgements require reading and understanding natural-language text, such as the meaning of a code comment or the substance of a review reply. For those, the analysis uses an external LLM provider chosen by the administrator for the workspace. The automated practice review of a pull/merge request forwards the diff and surrounding discussion to the provider and posts the AI-generated finding as a comment on the pull/merge request. The conversational mentor lets contributors ask follow-up questions through an in-app chat, forwarding their messages and the relevant context to the same provider.
+The synchronised activity is analysed against a set of practices configured by the workspace administrator to produce findings about each contributor. Some of these judgements require reading and understanding natural-language text, such as the meaning of a code comment or the substance of a review reply. For those, the analysis uses an external LLM provider chosen by the administrator for the workspace. The automated practice review of a pull/merge request forwards the diff and surrounding discussion to the provider and posts the AI-generated finding as a comment on the pull/merge request. The conversational mentor is an in-app chat where contributors can ask follow-up questions; their messages and the relevant context are forwarded to the same provider.
 
-Contributors who sign in with their GitHub or LRZ-GitLab account get a personal dashboard summarising their findings and activity, access to the conversational mentor, and their account preferences. Sign-in adds the federated user identifier, username, display name, email, and avatar URL to what Hephaestus holds about that contributor. Workspace administrators can additionally enable a leaderboard, leagues, and achievements (all off by default) ranking contributors by their platform activity, and route notifications to Slack.
+Contributors who sign in with their GitHub or LRZ-GitLab account get a personal dashboard summarising their findings and activity, access to the conversational mentor, and their account preferences. Sign-in adds the federated user identifier, username, display name, email, and avatar URL to what Hephaestus holds about that contributor. Workspace administrators can additionally enable a leaderboard, leagues, and achievements that rank contributors by their workspace activity (all off by default), and Slack notifications for workspace events.
 
-These workspace-level configuration choices are made by the workspace administrator and TUM/AET as joint controllers under Art. 26 GDPR (the choices are enumerated in "Legal basis" below). Hephaestus is built around the contributor's own development: findings serve the contributor and give the workspace administrator a way to deliver targeted feedback during the project. Findings are advisory and contestable; the platform makes no automated decisions within the meaning of Art. 22 GDPR and feeds no grading, assessment, HR, or access-control pipeline. Contributors can disable AI-assisted feedback at any time through the in-app "AI review comments" toggle (Art. 21 GDPR) and contest individual findings via a helpful / not-helpful control.
+These workspace-level configuration choices are made by the workspace administrator and TUM/AET as joint controllers under Art. 26 GDPR (the choices are enumerated in "Legal basis" below). Hephaestus is built around the contributor's own development: findings serve the contributor and give the workspace administrator a way to deliver targeted feedback during the project. Findings are advisory and contestable; the platform makes no automated decisions within the meaning of Art. 22 GDPR and feeds no grading, assessment, HR, or access-control pipeline. Contributors can disable AI-assisted feedback at any time through the in-app "AI review comments" toggle (Art. 21 GDPR), and rate individual findings via a helpful / not-helpful control.
 ```
 
 ## Data subjects (Art. 30(1)(c))
@@ -91,7 +91,7 @@ U.S. recipients are covered by the EU-US Data Privacy Framework (Commission Impl
 ```text
 Self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM. Application data in PostgreSQL; authentication state in a self-hosted Keycloak (separate PostgreSQL); webhook events and the practice-review job queue in NATS JetStream. Local working copies of monitored repositories may be stored on the host filesystem when practice-review code execution is enabled. Container stdout is rotated by the container runtime (Docker json-file driver, 50 MiB per file × 5 files retained per service). The application-server access log is retained for at most 14 days.
 
-All primary data resides on TUM infrastructure within the EU. AI-assisted features additionally transmit the relevant code snippets and discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region).
+Application and authentication data reside on TUM infrastructure within the EU. AI-assisted features additionally forward code snippets and surrounding discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region).
 ```
 
 **Retention**
@@ -100,7 +100,7 @@ All primary data resides on TUM infrastructure within the EU. AI-assisted featur
 Mixed retention by category:
 
 - Account-bound data (Keycloak account, federated identity links, analytics identity): removed on user-triggered account deletion via the in-app control.
-- Contributor profile and activity data synchronised from GitHub / gitlab.lrz.de (login, name, email, avatar, authored issues / pull requests / comments / reviews, AI conversations, recognition signals, practice findings): retained while at least one workspace continues to track the contributor's repositories. Removed when the last workspace stops monitoring the source repository, or on operator-executed deletion against the production database on receipt of a verified erasure request.
+- Contributor profile (login, name, email, avatar) and authored repository artefacts (issues, pull/merge requests, comments, reviews) synchronised from GitHub / gitlab.lrz.de, plus AI conversations, recognition signals, and practice findings generated by the platform: retained while at least one workspace continues to track the contributor's repositories. Removed when the last workspace stops monitoring the source repository, or on operator-executed deletion against the production database on receipt of a verified erasure request.
 - LLM-provider-side prompts: per the workspace's chosen provider's terms. For the TUM-operated default (Microsoft Azure OpenAI in an EU region), within the enterprise abuse-monitoring window published in Microsoft's Azure OpenAI data-privacy documentation; eligible customers may apply for Microsoft's modified abuse monitoring (Limited Access program) to suppress prompt storage and human review.
 - Application-server access log: at most 14 days; longer only for the duration of an active security incident, then deleted on closure.
 - Container stdout: rotated by size by the container runtime (50 MiB × 5 files per service).
@@ -121,7 +121,7 @@ Day-to-day technical deletion: AET operations team, ls1.admin@in.tum.de. Subject
 **Access and portability fulfilment (Art. 15, Art. 20)**
 
 ```text
-Hephaestus exposes no in-app data-export control and no API endpoint for self-service export. Subject access and portability requests are fulfilled by AET operators on a verified request, by compiling the personal data the platform holds about the data subject across Keycloak, the application database, the analytics integration where activated, and access-log entries within the active 14-day retention window, into a single JSON archive delivered to the verified address. Source-side content on GitHub or gitlab.lrz.de is exported by those source platforms, not by Hephaestus. Identity verification, response timeframe, and contact path are the same as for erasure.
+Hephaestus exposes no in-app data-export control and no API endpoint for self-service export. Subject access and portability requests are fulfilled by AET operators on a verified request: the operator compiles the personal data the platform holds about the data subject — from Keycloak, the application database, the analytics integration where activated, and access-log entries within the 14-day retention window — into a single JSON archive and delivers it to the verified address. Source-side content on GitHub or gitlab.lrz.de is exported by those source platforms, not by Hephaestus. Identity verification, response timeframe, and contact path are the same as for erasure.
 ```
 
 **Deletion guarantee**
@@ -132,7 +132,7 @@ Hephaestus exposes no in-app data-export control and no API endpoint for self-se
 - Source-side content on GitHub or gitlab.lrz.de: not modified by deletion in Hephaestus.
 - Container stdout: rotated by size by the container runtime.
 - Application-server access log: pruned by Tomcat's native 14-day retention.
-- Off-host backups: not configured at the time of submission. If the underlying VM is snapshotted by AET infrastructure operations, the operations team applies the standard snapshot retention.
+- Off-host backups: not configured at the time of submission. Any VM-level snapshots taken by AET infrastructure operations are governed by their separate retention policy at the infrastructure layer.
 ```
 
 ## Technical and organisational measures (Art. 30(1)(g) + Art. 32)
@@ -143,7 +143,7 @@ Pseudonymisation and encryption (Art. 32(1)(a))
 - Internal service-to-service traffic stays within the Docker network.
 - Outbound calls to GitHub, gitlab.lrz.de, the LLM provider, and Slack are HTTPS-only.
 - Federated identity links to GitHub user ID / gitlab.lrz.de `sub` minimise collected identifiers; surrogate primary keys are used internally.
-- PostgreSQL and Keycloak data at rest are protected by host disk-level controls. Workspace-level secrets (LLM API keys, Slack tokens) are encrypted with a platform-level secret key held only on the application server.
+- PostgreSQL and Keycloak data at rest rely on the host's filesystem and access-control protections; application-level at-rest encryption of these stores is not currently enabled. Workspace-level secrets (LLM API keys, Slack tokens) are encrypted with a platform-level secret key held only on the application server.
 
 Confidentiality (Art. 32(1)(b))
 - SSH key-only host access; password authentication disabled.
