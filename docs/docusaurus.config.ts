@@ -15,7 +15,7 @@ const config: Config = {
     v4: true,
     // Docusaurus Faster: Uses Rspack, SWC, and LightningCSS for 2-4x faster builds
     // https://docusaurus.io/blog/releases/3.6#docusaurus-faster
-    experimental_faster: {
+    faster: {
       swcJsLoader: true,
       swcJsMinimizer: true,
       swcHtmlMinimizer: true,
