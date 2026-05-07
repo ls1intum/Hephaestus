@@ -12,6 +12,7 @@ This file is the Art. 30 record for the TUM-operated Hephaestus deployment at ht
 - Relevant for Subject Rights Request (SRR): tick.
 - Responsible department: TUM School of Computation, Information and Technology.
 - Associated TUM Org identifier: `TUS1322`.
+- DPIA pre-screen: see [`dpia-prescreen.md`](./dpia-prescreen.md) — outcome: no full DPIA required at the current scope; documented mitigations remain in place.
 
 ## Controller and contact (Art. 30(1)(a))
 
@@ -38,7 +39,7 @@ The synchronised activity is analysed against a set of practices configured by t
 
 Contributors who sign in with their GitHub or LRZ-GitLab account get a personal dashboard summarising their findings and activity, access to the conversational mentor, and their account preferences. Sign-in adds the federated user identifier, username, display name, email, and avatar URL to what Hephaestus holds about that contributor. Workspace administrators can additionally enable a leaderboard, leagues, and achievements (all off by default) ranking contributors by their platform activity, and route notifications to Slack.
 
-These workspace-level configuration choices (which repositories to connect, the practice catalog, the LLM provider, whether practice reviews are auto-triggered on new pull/merge requests, the leaderboard / leagues / achievements toggles, Slack notifications) are made by the workspace administrator and TUM/AET as joint controllers under Art. 26 GDPR. Hephaestus is built around the contributor's own development: findings serve the contributor and give the workspace administrator a way to deliver targeted feedback on practices during the project. The platform is designed to defer to human judgment: findings are advisory, contributors can contest them, and the workspace administrator decides what to act on. The platform makes no automated decisions within the meaning of Art. 22 GDPR and feeds no grading, assessment, HR, or access-control pipeline. Contributors can disable AI-assisted feedback at any time through the in-app "AI review comments" toggle (Art. 21 GDPR), and a per-finding helpful / not-helpful control records contestation back to the platform.
+These workspace-level configuration choices are made by the workspace administrator and TUM/AET as joint controllers under Art. 26 GDPR (the choices are enumerated in "Legal basis" below). Hephaestus is built around the contributor's own development: findings serve the contributor and give the workspace administrator a way to deliver targeted feedback during the project. Findings are advisory and contestable; the platform makes no automated decisions within the meaning of Art. 22 GDPR and feeds no grading, assessment, HR, or access-control pipeline. Contributors can disable AI-assisted feedback at any time through the in-app "AI review comments" toggle (Art. 21 GDPR) and contest individual findings via a helpful / not-helpful control.
 ```
 
 ## Data subjects (Art. 30(1)(c))
@@ -77,7 +78,7 @@ Separate controller (not an Art. 28 processor):
 - Leibniz-Rechenzentrum (LRZ) der BAdW — operator of gitlab.lrz.de. The platform receives the contributor's identity from gitlab.lrz.de OIDC and synchronises connected gitlab.lrz.de repositories. Inter-public-body transmission under Art. 5(1) Nr. 1 BayDSG.
 ```
 
-Per-processor AVV detail and the EDPB 07/2020 reasoning for the LRZ relationship are in `processor-checklist.md`.
+Per-processor AVV detail and the EDPB 07/2020 reasoning for the LRZ relationship are in `processor-checklist.md`. PostHog (product analytics) is bundled in the webapp image but disabled in the TUM-operated deployment; activating PostHog would engage it as an Art. 28 U.S. processor with corresponding AVV / DPF / SCC framing, and would trigger an amendment to this record.
 
 ## Third-country transfers (Art. 30(1)(e))
 
@@ -114,19 +115,24 @@ Hephaestus is contributor-facing. Account-bound data exists to give the data sub
 **Deletion responsibility**
 
 ```text
-Day-to-day technical deletion: AET operations team, ls1.admin@in.tum.de. Subject-rights deletion: Prof. Dr. Stephan Krusche (head of AET, responsible for this PA), with technical execution by AET maintainers on receipt of a verified request through the TUM DPO at beauftragter@datenschutz.tum.de. Identity verification of the requester: for signed-in contributors via email confirmation from the account-registered address or in-app re-authentication; for non-signed-in contributors whose repository activity has been ingested, via proof of control of the GitHub or LRZ-GitLab account associated with the contributions. Response timeframe: within one month under Art. 12(3) GDPR, extendable by two further months for complex or numerous requests with notice to the data subject.
+Day-to-day technical deletion: AET operations team, ls1.admin@in.tum.de. Subject-rights deletion: Prof. Dr. Stephan Krusche (head of AET, responsible for this PA), with technical execution by AET maintainers on receipt of a verified request through the TUM DPO at beauftragter@datenschutz.tum.de. Identity-verification procedure and Art. 12(3) GDPR response timeframe (one month, extendable by two further months for complex or numerous requests) are described in §7 of the privacy statement.
 ```
 
 **Access and portability fulfilment (Art. 15, Art. 20)**
 
 ```text
-Hephaestus exposes no in-app data-export control and no API endpoint for self-service export. Subject access and portability requests are fulfilled by AET operators on a verified request, by compiling the personal data the platform holds about the data subject from (i) Keycloak (federated sub, username, email, display name, linked-IdP records), (ii) the application PostgreSQL database (contributor profile, workspace memberships, AI-assistant conversations, practice findings concerning the data subject and per-finding feedback, recognition / leaderboard / league / achievement records, account preferences), (iii) PostHog where that integration is activated for the deployment, and (iv) the application-server access-log entries within the active 14-day retention window where lawful and proportionate, into a single JSON archive delivered to the verified address. Source-side content on GitHub or gitlab.lrz.de is exported by those source platforms, not by Hephaestus. Identity verification, response timeframe, and contact path are the same as for erasure.
+Hephaestus exposes no in-app data-export control and no API endpoint for self-service export. Subject access and portability requests are fulfilled by AET operators on a verified request, by compiling the personal data the platform holds about the data subject across Keycloak, the application database, the analytics integration where activated, and access-log entries within the active 14-day retention window, into a single JSON archive delivered to the verified address. Source-side content on GitHub or gitlab.lrz.de is exported by those source platforms, not by Hephaestus. Identity verification, response timeframe, and contact path are the same as for erasure.
 ```
 
 **Deletion guarantee**
 
 ```text
-The in-app account-deletion control removes the user's Keycloak account, federated identity links, and (where PostHog analytics is activated; off by default in the TUM-operated deployment) the corresponding analytics identity. Erasure of the contributor profile row in the application database and its dependent records (workspace memberships, AI conversations, practice-finding feedback, recognition signals) is performed manually by AET operators against the production database, typically by anonymising the contributor profile (replacing identity fields with sentinel values and severing links to federated identity) so the records cease to be personal data within the meaning of Art. 4(1) GDPR; dependent records are removed where supported by foreign-key constraints. Source-side content on GitHub or gitlab.lrz.de is not modified by deletion in Hephaestus. Container stdout rotates automatically by size; the application-server access log is pruned by Tomcat's native 14-day retention. No long-term off-host backups are configured in the application repository at the time of submission; if the underlying VM is snapshotted by AET infrastructure operations, the operations team applies the standard snapshot retention.
+- Keycloak account, federated identity links, and (where PostHog analytics is activated; off by default in the TUM-operated deployment) the corresponding analytics identity: removed by the in-app account-deletion control.
+- Contributor profile and dependent records (workspace memberships, AI conversations, practice-finding feedback, recognition signals): removed by AET operators against the production database — by row deletion where supported by foreign-key constraints, otherwise by anonymisation that severs the link to federated identity (the records cease to be personal data within the meaning of Art. 4(1) GDPR).
+- Source-side content on GitHub or gitlab.lrz.de: not modified by deletion in Hephaestus.
+- Container stdout: rotated by size by the container runtime.
+- Application-server access log: pruned by Tomcat's native 14-day retention.
+- Off-host backups: not configured at the time of submission. If the underlying VM is snapshotted by AET infrastructure operations, the operations team applies the standard snapshot retention.
 ```
 
 ## Technical and organisational measures (Art. 30(1)(g) + Art. 32)
@@ -165,15 +171,11 @@ Recovery (Art. 32(1)(c))
 
 Testing and evaluation (Art. 32(1)(d))
 - CI runs CodeQL (GitHub Default Setup), Trivy (filesystem and container image), TruffleHog secret detection, and Renovate dependency updates.
-- Unit, integration, and end-to-end tests on every change; the legal-page render path has dedicated tests covering the three-layer cascade and XSS guardrail.
-- This record and its companion files are re-reviewed annually and on any material change to the processing surface.
+- Unit, integration, and end-to-end tests run on every change.
 
 Organisational
 - Operators are TUM / AET employees or authorised contributors acting under TUM-internal security policies.
-- Incidents affecting personal data are reported to the TUM DPO under Art. 33(1) GDPR (within 72 hours of awareness); where Art. 34 applies, data subjects are notified without undue delay.
 - Workspace administrators are briefed on the joint-controller / shared-responsibility model (privacy §10) before workspace provisioning.
-
-Source: github.com/ls1intum/Hephaestus (MIT licence).
 ```
 
 ## Legal basis (Art. 6 GDPR + national norms)
@@ -191,11 +193,7 @@ National multi-select: tick `Art. 4.1 BayDSG (Bavarian data protection act)`.
 ```text
 TUM/AET as platform operator: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (Allgemeine Aufgaben der Hochschule) and Art. 4(1) BayDSG.
 
-Per-workspace lawful basis: anyone with a GitHub or LRZ-GitLab account can create a workspace on this platform. The workspace administrator and TUM/AET are joint controllers under Art. 26 GDPR for the workspace's processing; the workspace administrator invokes and is responsible for the lawful basis applicable to their workspace's contributors. Common bases:
-
-- Art. 6(1)(a) GDPR — explicit consent collected by the administrator (e.g., the AET capstone course's application phase).
-- Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG — public-task activity by a TUM unit (e.g., regular courses; public open-source repositories such as ls1intum/Artemis).
-- Workspace administrators outside TUM (e.g., external open-source maintainers, partner-institution researchers) cannot invoke Art. 6(1)(e) BayHIG; they invoke a basis available to them under Art. 6 GDPR — typically Art. 6(1)(a) consent or, where the administrator is a private body, Art. 6(1)(f) GDPR (legitimate interest, with their own LIA).
+Per-workspace lawful basis: workspace administrator and TUM/AET are joint controllers under Art. 26 GDPR for the workspace's processing. The administrator invokes the basis applicable to their workspace's contributors — typically Art. 6(1)(a) GDPR (consent, e.g. the AET capstone course's application phase) or Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (public-task activity by a TUM unit, e.g. regular courses or public open-source repositories such as ls1intum/Artemis). Administrators outside TUM cannot invoke Art. 6(1)(e) BayHIG and invoke a basis available to them (typically Art. 6(1)(a) consent, or Art. 6(1)(f) for private bodies under their own LIA).
 
 Voluntary sign-in by non-TUM contributors to use personal features: Art. 6(1)(b) GDPR.
 
