@@ -40,7 +40,7 @@ The DSK list of processing operations requiring a DPIA under Art. 35(4) GDPR add
 | Free-text artefact content (PR descriptions, commit messages, review comments) contains personal data of identifiable third parties and is transmitted to the LLM provider | Low-medium | Low-medium | Privacy statement warns contributors not to enter third-party personal data; practice-review sandbox runs on a per-job `--internal` Docker network with no general egress except a per-job, token-authenticated LLM proxy; only the diff and surrounding discussion is forwarded; contributors have an Art. 21 objection toggle ("AI review comments"). |
 | LLM provider retains the prompt beyond the enterprise default retention window | Low | Low-medium | Enterprise no-training terms; abuse-monitoring retention per the provider's published terms (Microsoft Azure OpenAI: enterprise abuse-monitoring window per the published data-privacy documentation; eligible customers can apply for Microsoft's modified abuse monitoring / Limited Access program); Zero Data Retention can be negotiated where the provider supports it; DPF / SCCs Module 2 in place. |
 | Server access logs retain IP addresses | Low | Low | Tomcat AccessLogValve deletes entries after 14 days; pattern minimised to timestamp, IP, method, path, protocol, status, response size, processing time. |
-| gitlab.lrz.de content leaks via the LRZ integration | Low | Low | LRZ is a separate controller; inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG; LRZ applies its own TOMs on its own infrastructure. |
+| gitlab.lrz.de content leaks via the LRZ integration | Low | Low | LRZ is a separate controller; inter-public-body transmission under Art. 5(1) Nr. 1 BayDSG; LRZ applies its own TOMs on its own infrastructure. |
 | Workspace administrator routes personal data through an unexpected channel (Slack digest containing leaderboard snippets, for example) | Low | Low | Joint-controller / shared-responsibility model documented in privacy §10; the administrator invokes the lawful basis for the workspace and accepts the corresponding duties; contributors can see the configuration and raise Art. 21 objections. |
 | Keycloak compromise exposes federated identity tokens | Low | Medium | Self-hosted on AET infrastructure; confidential client; TLS-only ingress; regular patching; incident response under TUM DPO oversight. |
 
@@ -55,7 +55,7 @@ The DSK list of processing operations requiring a DPIA under Art. 35(4) GDPR add
 
 ## 6. Conclusion
 
-**No full DPIA required at the current scope.** Hephaestus operates within the DSK Muss-Liste profile with documented mitigations for the elevated-risk AI surface.
+**No full DPIA required at the current scope.** None of the three Art. 35(3) triggers is present, the Bavarian Blacklist enumerates no constellation that fits Hephaestus, and the DSK cross-check is consistent with this conclusion. The documented mitigations in §5 remain in place for the elevated-risk AI surface.
 
 A full DPIA must be opened before any of the following takes effect:
 

@@ -74,7 +74,7 @@ External processors engaged by TUM/AET as controller. AVVs are in place at TUM/A
 
 Separate controller (not an Art. 28 processor):
 
-- Leibniz-Rechenzentrum (LRZ) der BAdW — operator of gitlab.lrz.de. The platform receives the contributor's identity from gitlab.lrz.de OIDC and synchronises connected gitlab.lrz.de repositories. Inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG.
+- Leibniz-Rechenzentrum (LRZ) der BAdW — operator of gitlab.lrz.de. The platform receives the contributor's identity from gitlab.lrz.de OIDC and synchronises connected gitlab.lrz.de repositories. Inter-public-body transmission under Art. 5(1) Nr. 1 BayDSG.
 ```
 
 Per-processor AVV detail and the EDPB 07/2020 reasoning for the LRZ relationship are in `processor-checklist.md`.
@@ -117,10 +117,16 @@ Hephaestus is contributor-facing. Account-bound data exists to give the data sub
 Day-to-day technical deletion: AET operations team, ls1.admin@in.tum.de. Subject-rights deletion: Prof. Dr. Stephan Krusche (head of AET, responsible for this PA), with technical execution by AET maintainers on receipt of a verified request through the TUM DPO at beauftragter@datenschutz.tum.de. Identity verification of the requester: for signed-in contributors via email confirmation from the account-registered address or in-app re-authentication; for non-signed-in contributors whose repository activity has been ingested, via proof of control of the GitHub or LRZ-GitLab account associated with the contributions. Response timeframe: within one month under Art. 12(3) GDPR, extendable by two further months for complex or numerous requests with notice to the data subject.
 ```
 
+**Access and portability fulfilment (Art. 15, Art. 20)**
+
+```text
+Hephaestus exposes no in-app data-export control and no API endpoint for self-service export. Subject access and portability requests are fulfilled by AET operators on a verified request, by compiling the personal data the platform holds about the data subject from (i) Keycloak (federated sub, username, email, display name, linked-IdP records), (ii) the application PostgreSQL database (contributor profile, workspace memberships, AI-assistant conversations, practice findings concerning the data subject and per-finding feedback, recognition / leaderboard / league / achievement records, account preferences), (iii) PostHog where that integration is activated for the deployment, and (iv) the application-server access-log entries within the active 14-day retention window where lawful and proportionate, into a single JSON archive delivered to the verified address. Source-side content on GitHub or gitlab.lrz.de is exported by those source platforms, not by Hephaestus. Identity verification, response timeframe, and contact path are the same as for erasure.
+```
+
 **Deletion guarantee**
 
 ```text
-The in-app account-deletion control removes the user's Keycloak account, federated identity links, and analytics identity in PostHog. Erasure of the contributor profile row in the application database and its dependent records (workspace memberships, AI conversations, practice-finding feedback, recognition signals) is performed manually by AET operators against the production database, typically by anonymising the contributor profile (replacing identity fields with sentinel values and severing links to federated identity) so the records cease to be personal data within the meaning of Art. 4(1) GDPR; dependent records are removed where supported by foreign-key constraints. Source-side content on GitHub or gitlab.lrz.de is not modified by deletion in Hephaestus. Container stdout rotates automatically by size; the application-server access log is pruned by Tomcat's native 14-day retention. No long-term off-host backups are configured in the application repository at the time of submission; if the underlying VM is snapshotted by AET infrastructure operations, the operations team applies the standard snapshot retention.
+The in-app account-deletion control removes the user's Keycloak account, federated identity links, and (where PostHog analytics is activated; off by default in the TUM-operated deployment) the corresponding analytics identity. Erasure of the contributor profile row in the application database and its dependent records (workspace memberships, AI conversations, practice-finding feedback, recognition signals) is performed manually by AET operators against the production database, typically by anonymising the contributor profile (replacing identity fields with sentinel values and severing links to federated identity) so the records cease to be personal data within the meaning of Art. 4(1) GDPR; dependent records are removed where supported by foreign-key constraints. Source-side content on GitHub or gitlab.lrz.de is not modified by deletion in Hephaestus. Container stdout rotates automatically by size; the application-server access log is pruned by Tomcat's native 14-day retention. No long-term off-host backups are configured in the application repository at the time of submission; if the underlying VM is snapshotted by AET infrastructure operations, the operations team applies the standard snapshot retention.
 ```
 
 ## Technical and organisational measures (Art. 30(1)(g) + Art. 32)
