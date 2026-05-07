@@ -33,7 +33,7 @@ Hephaestus is a self-hosted web platform that gives software-engineering contrib
 
 For each workspace's processing, the workspace administrator and TUM/AET act as **joint controllers under Art. 26 GDPR**. The essence of that arrangement, as required by Art. 26(2) Satz 2 GDPR, is set out in section 10. TUM/AET is the single point of contact for data-subject rights.
 
-The platform synchronises the activity of everyone who has authored in a connected repository, whether or not they have signed in to Hephaestus. AI-generated review comments may therefore be posted to a pull/merge request even when its author has never visited Hephaestus.
+The platform synchronises activity authored in connected repositories, whether or not the author has signed in to Hephaestus. AI-generated review comments may therefore be posted to a pull/merge request even when its author has never visited Hephaestus.
 
 ## 3. What data we process, on what legal basis, and how long we keep it
 
@@ -57,7 +57,7 @@ Hephaestus uses only technically necessary browser-side storage: the Keycloak se
 
 ## 5. Recipients
 
-Within Hephaestus your data is visible to AET operators (platform administration and support) and, depending on the workspace, to other workspace members (your username, avatar, the findings attached to pull/merge requests you authored, per-practice rollups about you, and recognition signals where the workspace has enabled them). Workspaces marked publicly viewable by their administrator can be read by anyone on the open web; the upstream open-source contributor list at `/contributors` is also public.
+Within Hephaestus your data is visible to AET operators (platform administration and support) and, depending on the workspace, to other workspace members (your username, avatar, the findings attached to pull/merge requests you authored, per-practice summaries of your activity, and recognition signals where the workspace has enabled them). Workspaces marked publicly viewable by their administrator can be read by anyone on the open web; the upstream open-source contributor list at `/contributors` is also public.
 
 External recipients, all engaged under data-processing agreements (Auftragsverarbeitungsverträge) at the appropriate level:
 
@@ -97,7 +97,7 @@ Website: [www.datenschutz-bayern.de](https://www.datenschutz-bayern.de)
 
 ## 9. Automated decision-making
 
-Hephaestus does not produce decisions with legal or similarly significant effects within the meaning of Art. 22(1) GDPR. AI-assisted feedback and practice findings are advisory and inform human judgement; they are not consumed by any automated grading, assessment, HR, or access-control pipeline operated by the platform. The platform is designed to defer to human judgment: you can contest findings via the in-app "AI review comments" toggle (which stops future AI-generated review comments) and via a per-finding helpful / not-helpful control, and the workspace administrator decides what to act on.
+Hephaestus does not produce decisions with legal or similarly significant effects within the meaning of Art. 22(1) GDPR. AI-assisted feedback and practice findings are advisory and inform human judgement; they are not consumed by any automated grading, assessment, HR, or access-control pipeline operated by the platform. You can disable AI-assisted feedback via the in-app "AI review comments" toggle (which stops future AI-generated review comments) and rate individual findings via a per-finding helpful / not-helpful control. The workspace administrator decides what to act on.
 
 ## 10. Joint controllership with the workspace administrator (Art. 26(2) Satz 2 GDPR)
 

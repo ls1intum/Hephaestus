@@ -33,9 +33,9 @@ DSMS responsible person: Stephan Krusche (krusche@tum.de). Felix Dietrich (felix
 ```text
 Hephaestus is a self-hosted web platform operated by AET on TUM infrastructure at https://hephaestus.aet.cit.tum.de. Its purpose is to support project-based software-engineering teaching at TUM and the development work of AET research projects by giving each contributor feedback on their collaborative engineering work: for example, whether a pull request is small enough to review well, or whether a review reply addresses the question raised.
 
-A workspace administrator connects one or more Git repositories from github.com or gitlab.lrz.de. Hephaestus then synchronises the pull/merge requests, issues, code reviews, review comments, and commit metadata authored in those repositories. The platform processes the activity of everyone who has authored there, whether or not they have signed in to Hephaestus.
+A workspace administrator connects one or more Git repositories from github.com or gitlab.lrz.de. Hephaestus then synchronises the pull/merge requests, issues, code reviews, review comments, and commit metadata authored in those repositories. The platform processes activity authored in the connected repositories, whether or not the author has signed in to Hephaestus.
 
-The synchronised activity is analysed against a set of practices configured by the workspace administrator to produce findings about each contributor. Some of these judgements require reading and understanding natural-language text, such as the meaning of a code comment or the substance of a review reply. For those, the analysis uses an external LLM provider chosen by the administrator for the workspace. The automated practice review of a pull/merge request forwards the diff and surrounding discussion to the provider and posts the AI-generated finding as a comment on the pull/merge request. The conversational mentor is an in-app chat where contributors can ask follow-up questions; their messages and the relevant context are forwarded to the same provider.
+The synchronised activity is analysed against a set of practices configured by the workspace administrator to produce findings on each contributor's activity. Some of these judgements require reading and understanding natural-language text, such as the meaning of a code comment or the substance of a review reply. For those, the analysis uses an external LLM provider chosen by the administrator for the workspace. The automated practice review of a pull/merge request forwards the diff and surrounding discussion to the provider and posts the AI-generated finding as a comment on the pull/merge request. The conversational mentor is an in-app chat where contributors can ask follow-up questions; their messages and the surrounding context are forwarded to the same provider.
 
 Contributors who sign in with their GitHub or LRZ-GitLab account get a personal dashboard summarising their findings and activity, access to the conversational mentor, and their account preferences. Sign-in adds the federated user identifier, username, display name, email, and avatar URL to what Hephaestus holds about that contributor. Workspace administrators can additionally enable a leaderboard, leagues, and achievements that rank contributors by their workspace activity (all off by default), and Slack notifications for workspace events.
 
@@ -67,11 +67,11 @@ No special categories (Art. 9(1) GDPR) and no Art. 10 GDPR data are processed. C
 ```text
 External processors engaged by TUM/AET as controller. AVVs are in place at TUM/AET level for the AET-pool processors. Where a workspace administrator configures a different LLM endpoint (see below), the AVV is at that administrator's institution.
 
-- GitHub, Inc. (USA) — identity provider for GitHub sign-in and source-system API for connected GitHub repositories.
+- GitHub, Inc. (USA) — identity provider (OAuth) and source-system API for connected repositories on github.com.
 
-- An external LLM provider, chosen per workspace by the workspace administrator from any OpenAI-API-compatible HTTPS endpoint (configured by a baseURL, an API token, and a model name). The choice is a joint-controller decision under Art. 26 GDPR. The TUM-operated deployment uses Microsoft Corporation, Azure OpenAI Service in an EU region under enterprise no-training terms by default. A workspace administrator may configure a different endpoint instead, such as OpenAI OpCo, LLC (with OpenAI Ireland Ltd. as the EEA contracting party for European institutional credentials), an institution-level enterprise gateway, or a self-hosted model server.
+- An external LLM provider, chosen per workspace by the workspace administrator from any OpenAI-API-compatible HTTPS endpoint (configured by a base URL, an API token, and a model name). The choice is a joint-controller decision under Art. 26 GDPR. The TUM-operated deployment uses the Microsoft Azure OpenAI Service in an EU region under enterprise no-training terms by default. A workspace administrator may configure a different endpoint instead, such as OpenAI OpCo, LLC (with OpenAI Ireland Ltd. as the EEA contracting party), an institution-level enterprise gateway, or a self-hosted model server.
 
-- Salesforce, Inc. / Slack Technologies, LLC (USA) — workspace notifications when a workspace administrator has enabled Slack for that workspace.
+- Salesforce, Inc. / Slack Technologies, LLC (USA) — workspace notifications when Slack has been enabled for the workspace.
 
 Separate controller (not an Art. 28 processor):
 
@@ -82,7 +82,7 @@ Per-processor AVV detail and the EDPB 07/2020 reasoning for the LRZ relationship
 
 ## Third-country transfers (Art. 30(1)(e))
 
-U.S. recipients are covered by the EU-US Data Privacy Framework (Commission Implementing Decision (EU) 2023/1795) where on the active DPF list, with Standard Contractual Clauses Module 2 (Commission Implementing Decision (EU) 2021/914) as fall-back. The TUM-operated deployment uses Microsoft Azure OpenAI in an EU region by default, keeping that processing inside the EU.
+U.S. recipients are covered by the EU-US Data Privacy Framework (Commission Implementing Decision (EU) 2023/1795) where the recipient is on the active DPF list, with Standard Contractual Clauses Module 2 (Commission Implementing Decision (EU) 2021/914) as fall-back. The TUM-operated deployment uses Microsoft Azure OpenAI in an EU region by default, keeping that processing inside the EU.
 
 ## Storage location and retention (Art. 30(1)(f))
 
@@ -101,7 +101,7 @@ Mixed retention by category:
 
 - Account-bound data (Keycloak account, federated identity links, analytics identity): removed on user-triggered account deletion via the in-app control.
 - Contributor profile (login, name, email, avatar) and authored repository artefacts (issues, pull/merge requests, comments, reviews) synchronised from GitHub / gitlab.lrz.de, plus AI conversations, recognition signals, and practice findings generated by the platform: retained while at least one workspace continues to track the contributor's repositories. Removed when the last workspace stops monitoring the source repository, or on operator-executed deletion against the production database on receipt of a verified erasure request.
-- LLM-provider-side prompts: per the workspace's chosen provider's terms. For the TUM-operated default (Microsoft Azure OpenAI in an EU region), within the enterprise abuse-monitoring window published in Microsoft's Azure OpenAI data-privacy documentation; eligible customers may apply for Microsoft's modified abuse monitoring (Limited Access program) to suppress prompt storage and human review.
+- LLM-provider-side prompts: according to the chosen provider's terms. For the TUM-operated default (Microsoft Azure OpenAI in an EU region), within the enterprise abuse-monitoring window published in Microsoft's Azure OpenAI data-privacy documentation; eligible customers may apply for Microsoft's modified abuse monitoring (Limited Access program) to suppress prompt storage and human review.
 - Application-server access log: at most 14 days; longer only for the duration of an active security incident, then deleted on closure.
 - Container stdout: rotated by size by the container runtime (50 MiB × 5 files per service).
 ```
@@ -115,7 +115,7 @@ Hephaestus is contributor-facing. Account-bound data exists to give the data sub
 **Deletion responsibility**
 
 ```text
-Day-to-day technical deletion: AET operations team, ls1.admin@in.tum.de. Subject-rights deletion: Prof. Dr. Stephan Krusche (head of AET, responsible for this PA), with technical execution by AET maintainers on receipt of a verified request through the TUM DPO at beauftragter@datenschutz.tum.de. Identity-verification procedure and Art. 12(3) GDPR response timeframe (one month, extendable by two further months for complex or numerous requests) are described in §7 of the privacy statement.
+Routine retention-driven deletion (logs, container stdout): handled automatically by the runtime; ops contact AET operations team, ls1.admin@in.tum.de. Subject-rights deletion: Prof. Dr. Stephan Krusche (head of AET, responsible for this PA), with technical execution by AET maintainers on receipt of a verified request through the TUM DPO at beauftragter@datenschutz.tum.de. Identity-verification procedure and Art. 12(3) GDPR response timeframe (one month, extendable by two further months for complex or numerous requests) are described in §7 of the privacy statement.
 ```
 
 **Access and portability fulfilment (Art. 15, Art. 20)**
@@ -157,12 +157,11 @@ Confidentiality (Art. 32(1)(b))
 Integrity (Art. 32(1)(b))
 - Git is the authoritative source of all application code; signed commits and PR review.
 - Production images are pinned to the source-commit SHA, cosign-signed, and pulled from GHCR.
-- All API writes are authenticated and authorised.
 
 Availability and resilience (Art. 32(1)(b))
 - Containers restart on failure (`restart: unless-stopped`); per-service health checks.
 - Resource limits per container; per-job sandbox concurrency / CPU / memory ceilings.
-- Bounded LLM-call timeouts; practice review degrades gracefully when an LLM provider is unreachable.
+- Bounded LLM-call timeouts; no finding is posted when an LLM provider is unreachable.
 - Ingress rate limits on unauthenticated endpoints.
 - TLS-certificate renewal via Let's Encrypt ACME automated.
 
