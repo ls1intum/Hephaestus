@@ -1,6 +1,6 @@
 Privacy Statement for Hephaestus in accordance with Art. 13 and 14 GDPR.
 
-_Last updated: 2026-05-05._
+_Last updated: 2026-05-07._
 
 The Technical University of Munich (TUM), through the Research Group for Applied Education Technologies (AET), operates Hephaestus at https://hephaestus.aet.cit.tum.de. This statement explains what personal data the platform processes, why, on what legal basis, who receives it, how long it is kept, and the rights you have. Personal data is processed under the GDPR, the Bavarian Data Protection Act (BayDSG), the Bavarian Higher Education Innovation Act (BayHIG), and the German Telecommunications Digital Services Data Protection Act (TDDDG).
 

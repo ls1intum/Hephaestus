@@ -1,6 +1,6 @@
 # Hephaestus — DPIA Pre-Screen (Art. 35 GDPR)
 
-_Last updated: 2026-05-05._
+_Last updated: 2026-05-07._
 
 Records whether a full Data Protection Impact Assessment is required for the TUM-operated Hephaestus deployment. Three independent gates are checked: Art. 35(3) GDPR, the BayLfD Muss-Liste, and the DSK Muss-Liste.
 
@@ -29,7 +29,7 @@ None of the three Art. 35(3) triggers is present.
 
 ## 3. DSK Muss-Liste
 
-The processing fits the profile of a "standard university teaching-support platform with authenticated federated login and an external LLM integration". The DSK Muss-Liste does not require a DPIA for this profile, provided the AI surface is bounded by enterprise no-training terms, the joint-controller model is documented, and the data-subject rights — including the Art. 21 objection against AI-assisted processing — are surfaced in the privacy statement. All three conditions are met (privacy statement §3.2, §4.4, §9). The absent DSK Positivliste is not a positive finding for either side.
+The processing fits the profile of a "standard university teaching-support platform with authenticated federated login and an external LLM integration". The DSK Muss-Liste does not require a DPIA for this profile, provided the AI surface is bounded by enterprise no-training terms, the joint-controller model is documented, and the data-subject rights — including the Art. 21 objection against AI-assisted processing — are surfaced in the privacy statement. All three conditions are met (privacy statement §10, §3, §7). The absent DSK Positivliste is not a positive finding for either side.
 
 ## 4. Residual risk analysis
 
@@ -39,7 +39,7 @@ The processing fits the profile of a "standard university teaching-support platf
 | LLM provider retains the prompt beyond the enterprise default retention window | Low | Low-medium | Enterprise no-training terms; default 30-day abuse-monitoring retention; Zero Data Retention can be negotiated per workspace where the provider supports it; DPF / SCCs Module 2 in place. |
 | Server access logs retain IP addresses | Low | Low | Tomcat AccessLogValve deletes entries after 14 days; pattern minimised to timestamp, IP, method, path, protocol, status, response size, processing time. |
 | gitlab.lrz.de content leaks via the LRZ integration | Low | Low | LRZ is a separate controller; inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG; LRZ applies its own TOMs on its own infrastructure. |
-| Workspace administrator routes personal data through an unexpected channel (Slack digest containing leaderboard snippets, for example) | Low | Low | Joint-controller / shared-responsibility model documented in privacy §3.2; the administrator invokes the lawful basis for the workspace and accepts the corresponding duties; contributors can see the configuration and raise Art. 21 objections. |
+| Workspace administrator routes personal data through an unexpected channel (Slack digest containing leaderboard snippets, for example) | Low | Low | Joint-controller / shared-responsibility model documented in privacy §10; the administrator invokes the lawful basis for the workspace and accepts the corresponding duties; contributors can see the configuration and raise Art. 21 objections. |
 | Keycloak compromise exposes federated identity tokens | Low | Medium | Self-hosted on AET infrastructure; confidential client; TLS-only ingress; regular patching; incident response under TUM DPO oversight. |
 
 ## 5. DPIA-light mitigations that must remain in place

@@ -1,6 +1,6 @@
 # Hephaestus — Art. 28 Processor Checklist
 
-_Last updated: 2026-05-05._
+_Last updated: 2026-05-07._
 
 Records every entity that might qualify as a processor (Art. 28 GDPR) for the TUM-operated Hephaestus deployment and the status of the corresponding Auftragsverarbeitungsvertrag (AVV). Internal AET-operated components and the LRZ public-body counterpart are listed for completeness so the record is self-contained.
 
@@ -20,7 +20,7 @@ Hephaestus engages a processor chain of: GitHub (identity provider and source-sy
 | Traefik v3 reverse proxy (in-house container) | TLS termination, routing | No (self-hosted) | — |
 | Let's Encrypt ACME endpoint | Domain-validation certificates | No — Let's Encrypt receives no personal data; it only checks control over the domain | — |
 | **GitHub, Inc. / Microsoft Corporation** | Identity provider (OAuth) and source-system API for connected GitHub repositories | **Yes** | DPA in place at TUM/AET level; DPF-certified (active; re-verify annually); SCCs Module 2 as fall-back |
-| **Microsoft Corporation (Azure OpenAI Service)** | Default LLM provider for the TUM-operated deployment; EU-region tenancy keeps processing within the EU | **Yes** | DPA at TUM/AET level for the TUM-operated tenancy; at the workspace administrator's institution level when that institution supplies credentials (joint-controller model, privacy §3.2); enterprise API no-training terms; DPF-certified; SCCs Module 2 as fall-back |
+| **Microsoft Corporation (Azure OpenAI Service)** | Default LLM provider for the TUM-operated deployment; EU-region tenancy keeps processing within the EU | **Yes** | DPA at TUM/AET level for the TUM-operated tenancy; at the workspace administrator's institution level when that institution supplies credentials (joint-controller model, privacy §10); enterprise API no-training terms; DPF-certified; SCCs Module 2 as fall-back |
 | **OpenAI, L.P. (or any OpenAI-API-compatible endpoint chosen by a workspace administrator)** | Workspace-configured LLM provider | **Yes, when engaged** | DPA at TUM/AET level for AET-pool processors; at the administrator's institution level for non-pool endpoints; DPF / SCC framing applies recipient-by-recipient |
 | **Salesforce, Inc. / Slack Technologies, LLC** | Workspace notifications when Slack is enabled by the workspace administrator | **Yes, when engaged** | DPA in place at TUM/AET level; DPF-certified; SCCs Module 2 as fall-back |
 | **Leibniz-Rechenzentrum (LRZ) der BAdW (gitlab.lrz.de)** | Source system and OIDC identity provider | **Not Art. 28** | Separate controller; inter-public-body transmission under Art. 5 Abs. 1 Nr. 1 BayDSG, LRZ operating under the BAdW-Satzung; LRZ applies its own TOMs on its own infrastructure |

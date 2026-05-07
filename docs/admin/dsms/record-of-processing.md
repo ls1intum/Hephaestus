@@ -1,6 +1,6 @@
 # Hephaestus — Record of Processing Activities (Art. 30 GDPR)
 
-_Last updated: 2026-05-05._
+_Last updated: 2026-05-07._
 
 This file is the Art. 30 record for the TUM-operated Hephaestus deployment at https://hephaestus.aet.cit.tum.de. Each section maps to a single Art. 30 element. Fenced code blocks are paste-ready into the corresponding TUM DSMS form field at https://dsms.datenschutz.tum.de/; everything outside the fences is contextual.
 
@@ -11,7 +11,7 @@ This file is the Art. 30 record for the TUM-operated Hephaestus deployment at ht
 - Joint Controller: tick (workspace administrators are joint controllers under Art. 26 GDPR — see "Legal basis" below).
 - Relevant for Subject Rights Request (SRR): tick.
 - Responsible department: TUM School of Computation, Information and Technology.
-- Associated TUM Org identifier: `CIT-I1`.
+- Associated TUM Org identifier: `TUS1322`.
 
 ## Controller and contact (Art. 30(1)(a))
 
@@ -165,7 +165,7 @@ Testing and evaluation (Art. 32(1)(d))
 Organisational
 - Operators are TUM / AET employees or authorised contributors acting under TUM-internal security policies.
 - Incidents affecting personal data are reported to the TUM DPO within 72 h under Art. 33 / 34 GDPR.
-- Workspace administrators are briefed on the joint-controller / shared-responsibility model (privacy §3.2) before workspace provisioning.
+- Workspace administrators are briefed on the joint-controller / shared-responsibility model (privacy §10) before workspace provisioning.
 
 Source: github.com/ls1intum/Hephaestus (MIT licence).
 ```
@@ -203,7 +203,7 @@ DSMS multi-select: tick `Data received from third parties` and `Directly from th
 ```text
 - From GitHub and gitlab.lrz.de: identity at sign-in (GitHub OAuth, gitlab.lrz.de OIDC, brokered through Keycloak); repository activity via the GitHub App installation or workspace-configured access token; webhook events delivered to the platform's /webhooks endpoint.
 - Directly from the data subject: account preferences, AI-assistant messages, the Art. 21 objection switch.
-- From the HTTP connection: IP address and request metadata captured in the application server's access log.
+- From the HTTP connection: the application server's access log records IP address, timestamp, HTTP method, URL, HTTP version, status, response size, and processing time. No User-Agent, no Referer, no cookies, no other request headers.
 ```
 
 ## Information duty (Art. 13)
