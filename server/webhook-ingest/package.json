@@ -20,9 +20,9 @@
   },
   "dependencies": {
     "@hono/node-server": "1.19.7",
-    "@nats-io/jetstream": "3.3.0",
-    "@nats-io/nats-core": "3.3.0",
-    "@nats-io/transport-node": "3.3.0",
+    "@nats-io/jetstream": "3.3.1",
+    "@nats-io/nats-core": "3.3.1",
+    "@nats-io/transport-node": "3.3.1",
     "dotenv": "17.2.3",
     "dotenv-expand": "12.0.3",
     "hono": "4.11.7",
@@ -30,9 +30,9 @@
     "zod": "4.2.1"
   },
   "devDependencies": {
-    "@types/node": "22.19.11",
+    "@types/node": "22.19.17",
     "@vitest/coverage-v8": "4.0.16",
-    "tsc-alias": "1.8.16",
+    "tsc-alias": "1.8.17",
     "tsx": "4.21.0",
     "typescript": "5.9.3",
     "vitest": "4.0.16"
