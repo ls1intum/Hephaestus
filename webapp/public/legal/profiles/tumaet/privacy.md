@@ -94,7 +94,7 @@ Website: [www.datenschutz-bayern.de](https://www.datenschutz-bayern.de)
 
 ## 9. Automated decision-making
 
-Hephaestus does not produce decisions with legal or similarly significant effects within the meaning of Art. 22(1) GDPR. AI-assisted feedback and practice findings are advisory and inform human judgement; they are not consumed by any automated grading, assessment, HR, or access-control pipeline operated by the platform.
+Hephaestus does not produce decisions with legal or similarly significant effects within the meaning of Art. 22(1) GDPR. AI-assisted feedback and practice findings are advisory and inform human judgement; they are not consumed by any automated grading, assessment, HR, or access-control pipeline operated by the platform. The platform is designed to defer to human judgment: you can contest findings via the in-app "AI review comments" toggle (which stops future AI-generated review comments) and via a per-finding helpful / not-helpful control, and the workspace administrator decides what to act on.
 
 ## 10. Joint controllership with the workspace administrator (Art. 26(2) Satz 2 GDPR)
 
