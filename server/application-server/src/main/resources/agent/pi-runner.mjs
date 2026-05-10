@@ -1,44 +1,43 @@
-/**
- * Pi Agent Runner — Embedded SDK Mode
- *
- * Uses Pi's SDK (createAgentSession) directly instead of spawning a CLI subprocess.
- * This enables:
- * - Steering messages: inject "wrap up" mid-loop before hard timeout
- * - Proper continuation: session stays in memory, no file replay
- * - Clean abort via AbortSignal instead of SIGTERM
- * - Direct access to agent state for diagnostics
- *
- * Following OpenClaw's best practices for embedded Pi integration.
- */
+// Pi SDK runner — embedded in-process; persists findings via custom tools.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 
-// Pi SDK imports — embedded, not CLI subprocess (following OpenClaw's best practice)
 import {
     createAgentSession,
     SessionManager,
     SettingsManager,
     defineTool,
-    createReadTool,
-    createBashTool,
-    createGrepTool,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 const OUTPUT = "/workspace/.output";
 const CWD = "/workspace";
 const RESULT_PATH = `${OUTPUT}/result.json`;
 const REVIEW_STATE_PATH = `${OUTPUT}/review-state.json`;
-// Single budget from the adapter. Runner owns all splitting.
-// Production: config=600s, buffer=60s → budget=540,000ms.
-const AGENT_BUDGET_MS = __AGENT_BUDGET_MS__;
-const INITIAL_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.75)); // 75% for analysis
-const RETRY1_TIMEOUT_MS = Math.max(30_000, Math.floor(AGENT_BUDGET_MS * 0.15)); // 15% for retry 1
-const RETRY2_TIMEOUT_MS = Math.max(30_000, AGENT_BUDGET_MS - INITIAL_TIMEOUT_MS - RETRY1_TIMEOUT_MS); // 10% for retry 2
-const SOFT_TIMEOUT_MS = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.5)); // nudge at 50% of initial
+const AGENT_BUDGET_MS = Number(process.env.AGENT_BUDGET_MS);
+if (!Number.isFinite(AGENT_BUDGET_MS) || AGENT_BUDGET_MS <= 0) {
+    throw new Error(`AGENT_BUDGET_MS env var is required and must be a positive number, got: ${process.env.AGENT_BUDGET_MS}`);
+}
+// 85% initial / 15% retry; soft nudge at 50% of initial.
+const INITIAL_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.85));
+const RETRY_TIMEOUT_MS = Math.max(30_000, AGENT_BUDGET_MS - INITIAL_TIMEOUT_MS);
+const SOFT_TIMEOUT_MS = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.5));
+
+// Watchdog: hard exit if SDK abort hangs past the budget (pi-mono #2381/#2677/#2119).
+setTimeout(() => {
+    console.error(`[pi-runner] Watchdog: ${AGENT_BUDGET_MS + 30_000}ms elapsed, hard-exiting`);
+    try {
+        writeFileSync(`${OUTPUT}/watchdog-killed.json`, JSON.stringify({
+            budgetMs: AGENT_BUDGET_MS,
+            elapsedMs: AGENT_BUDGET_MS + 30_000,
+            reason: "runtime exceeded budget + 30s grace, hard-killed by watchdog",
+        }));
+    } catch {
+        /* best-effort — already exiting */
+    }
+    process.exit(3);
+}, AGENT_BUDGET_MS + 30_000).unref();
 
 mkdirSync(OUTPUT, { recursive: true });
-
-// ── Usage tracking ───────────────────────────────────────────────
 
 const usageTotals = {
     model: null,
@@ -136,7 +135,6 @@ function redact(text) {
     });
 }
 
-// ── Validation ───────────────────────────────────────────────────
 
 function isValidFinding(f) {
     if (!f || typeof f !== "object") return false;
@@ -144,8 +142,7 @@ function isValidFinding(f) {
     if (typeof f.title !== "string" || !f.title.trim()) return false;
     if (typeof f.verdict !== "string") return false;
     if (typeof f.severity !== "string") return false;
-    // Tolerate confidence as string (LLMs sometimes write "0.85" instead of 0.85)
-    // Guard: Number(null)=0 and Number("")=0 would pass isNaN, so reject nullish/empty first.
+    // Number(null) === 0 — reject nullish before isNaN check.
     if (f.confidence == null || f.confidence === "") return false;
     if (Number.isNaN(Number(f.confidence))) return false;
     return true;
@@ -163,8 +160,7 @@ function isValidFindingsPayload(p) {
 }
 
 function lenientJsonParse(text) {
-    // Strip control characters that LLMs embed in string values (tabs, newlines).
-    // Matches the Java server's ALLOW_UNQUOTED_CONTROL_CHARS behavior.
+    // Strip C0 + DEL control chars (mirrors Java ALLOW_UNQUOTED_CONTROL_CHARS).
     try {
         return JSON.parse(text);
     } catch {}
@@ -275,7 +271,11 @@ function normalizeFinding(finding) {
 }
 
 function dedupeKeyForFinding(finding) {
-    return JSON.stringify(finding);
+    // Dedupe key: practice + title + locations.
+    const locs = finding.evidence.locations
+        .map((l) => `${l.path}:${l.startLine}-${l.endLine}`)
+        .join(",");
+    return `${finding.practiceSlug}|${finding.title}|${locs}`;
 }
 
 function appendFindings(findings) {
@@ -358,7 +358,6 @@ const setReviewSummaryTool = defineTool({
     },
 });
 
-// ── Session usage extraction ─────────────────────────────────────
 
 function extractUsageFromSession(session) {
     const messages = session.messages || [];
@@ -409,7 +408,6 @@ function accumulateUsage(prev, curr) {
     usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls || 0));
 }
 
-// ── Text rescue: extract findings from agent text responses ──────
 
 function extractLastAssistantText(sessionState) {
     const messages = sessionState.messages || [];
@@ -444,12 +442,10 @@ function tryParseJsonFromText(text) {
         } catch {}
         match = jsonBlockPattern.exec(text);
     }
-    // Try to find a JSON object with "findings" — use JSON.parse error position
-    // to progressively find valid JSON instead of naive brace matching
-    // (which breaks on braces inside string values like code snippets)
-    const braceStart = text.indexOf('{"findings"');
-    if (braceStart < 0) return null;
-    // Try progressively longer substrings from braceStart
+    // Find {"findings": ... } object (tolerates whitespace).
+    const findingsMatch = text.match(/\{\s*"findings"/);
+    if (!findingsMatch || findingsMatch.index === undefined) return null;
+    const braceStart = findingsMatch.index;
     for (let end = text.indexOf("}", braceStart); end >= 0; end = text.indexOf("}", end + 1)) {
         try {
             const candidate = text.slice(braceStart, end + 1);
@@ -478,7 +474,6 @@ function tryRescueFromTextResponse(sessionState) {
     return checkResultFile();
 }
 
-// ── Practice slug loader (for retry scaffold) ───────────────────
 
 function loadPracticeSlugs() {
     try {
@@ -504,27 +499,25 @@ function buildRetryScaffold(slugs) {
     );
 }
 
-// ── Main ─────────────────────────────────────────────────────────
 
 const prompt = readFileSync("/workspace/.prompt", "utf-8").trim();
 
 async function main() {
     console.error(`[pi-runner] Embedded SDK mode`);
     console.error(
-        `[pi-runner] Budget: total=${AGENT_BUDGET_MS}ms, initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry1=${RETRY1_TIMEOUT_MS}ms, retry2=${RETRY2_TIMEOUT_MS}ms`,
+        `[pi-runner] Budget: total=${AGENT_BUDGET_MS}ms, initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry=${RETRY_TIMEOUT_MS}ms`,
     );
 
-    // Create tools scoped to /workspace
-    const tools = [createReadTool(CWD), createBashTool(CWD), createGrepTool(CWD)];
-
-    // Create session using Pi SDK — embedded, not CLI subprocess
+    // Pi SDK option `tools` is an allowlist of tool *names*, not constructed tool
+    // instances. Restricting to read/bash/grep prevents the agent from invoking
+    // edit/write — findings are persisted only via the customTools below.
     const settingsManager = SettingsManager.create(CWD, process.env.PI_CODING_AGENT_DIR || "/home/agent/.pi");
     const sessionManager = SessionManager.inMemory();
 
     const { session } = await createAgentSession({
         cwd: CWD,
         agentDir: process.env.PI_CODING_AGENT_DIR || "/home/agent/.pi",
-        tools,
+        tools: ["read", "bash", "grep"],
         customTools: [reportFindingTool, setReviewSummaryTool],
         sessionManager,
         settingsManager,
@@ -536,49 +529,38 @@ async function main() {
     let hardAborted = false;
     let prevUsage = null;
 
-    // Mid-loop nudge: stop analysis early enough to persist durable review state.
-    // Production data: 4/4 success rate when this fires.
+    // Soft nudge: persist before hard timeout (4/4 success in prod).
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
         console.error(`[pi-runner] Soft timeout fired — nudging agent to persist review state`);
-        session.agent.steer({
-            role: "user",
-            content: [
-                {
-                    type: "text",
-                    text:
-                        `Stop analyzing and persist output now. ` +
-                        `Use report_finding immediately for any finding you already have, one finding per call. ` +
-                        `There is no target count and no quota. ` +
-                        `When reading files for initial context, batch independent reads and greps in parallel when the runtime supports it. ` +
-                        `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
-                        `Only keep POSITIVE findings that add real review value. ` +
-                        `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-                        `Then call set_review_summary exactly once. ` +
-                        `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`,
-                },
-            ],
-            timestamp: Date.now(),
-        });
+        const steerMessage =
+            `Stop analyzing and persist output now. ` +
+            `Use report_finding immediately for any finding you already have, one finding per call. ` +
+            `There is no target count and no quota. ` +
+            `When reading files for initial context, batch independent reads and greps in parallel when the runtime supports it. ` +
+            `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be "No change needed." ` +
+            `Only keep POSITIVE findings that add real review value. ` +
+            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
+            `Then call set_review_summary exactly once. ` +
+            `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
+        session.steer(steerMessage).catch((err) => console.error(`[pi-runner] steer failed: ${err.message}`));
     }, SOFT_TIMEOUT_MS);
 
-    // Hard timeout: abort the agent loop
     const hardTimer = setTimeout(() => {
         hardAborted = true;
         console.error(`[pi-runner] Hard timeout — aborting agent`);
-        session.agent.abort();
+        session.abort().catch((err) => console.error(`[pi-runner] abort failed: ${err.message}`));
     }, INITIAL_TIMEOUT_MS);
 
-    // Subscribe to events for diagnostics
     const events = [];
     const unsubscribe = session.subscribe((event) => {
-        if (event.type === "tool_start" || event.type === "toolStart") {
-            console.error(`[pi-runner] tool: ${event.tool?.name || event.name || "?"}`);
+        if (event.type === "tool_execution_start") {
+            console.error(`[pi-runner] tool: ${event.toolName ?? "?"}`);
         }
         if (event.type === "message_end" && event.message?.role === "assistant") {
             const stopReason = event.message.stopReason;
             const types = (event.message.content || []).map((c) => c.type);
-            const toolCalls = types.filter((t) => t === "tool_use" || t === "tool_call" || t === "toolCall").length;
+            const toolCalls = types.filter((t) => t === "tool_use" || t === "tool_call").length;
             console.error(
                 `[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, types=[${types}]`,
             );
@@ -590,13 +572,15 @@ async function main() {
     const startMs = Date.now();
 
     try {
-        await session.prompt(prompt);
-    } catch (err) {
-        console.error(`[pi-runner] Initial prompt error: ${err.message}`);
+        try {
+            await session.prompt(prompt);
+        } catch (err) {
+            console.error(`[pi-runner] Initial prompt error: ${err.message}`);
+        }
+    } finally {
+        clearTimeout(softTimer);
+        clearTimeout(hardTimer);
     }
-
-    clearTimeout(softTimer);
-    clearTimeout(hardTimer);
 
     const initialDurationMs = Date.now() - startMs;
     const initialUsage = extractUsageFromSession(session.state);
@@ -652,7 +636,6 @@ async function main() {
         console.error(
             `[pi-runner] Agent produced text (${agentText.length} chars) but did not persist complete review output`,
         );
-        // Try to rescue valid JSON from the text
         if (tryRescueFromTextResponse(session.state)) {
             console.error(`[pi-runner] SUCCESS: rescued valid JSON from agent text`);
             unsubscribe();
@@ -660,7 +643,6 @@ async function main() {
         }
     }
 
-    // Re-prompt: give the agent a concrete scaffold so it only persists remaining review state.
     console.error(`[pi-runner] Re-prompting agent to persist remaining review output`);
 
     const slugs = loadPracticeSlugs();
@@ -670,14 +652,13 @@ async function main() {
     let retryAborted = false;
     const retryTimer = setTimeout(() => {
         retryAborted = true;
-        console.error(`[pi-runner] Retry 1 hard timeout — aborting`);
-        session.agent.abort();
-    }, RETRY1_TIMEOUT_MS);
+        console.error(`[pi-runner] Retry hard timeout — aborting`);
+        session.abort().catch((err) => console.error(`[pi-runner] retry abort failed: ${err.message}`));
+    }, RETRY_TIMEOUT_MS);
 
     const retryStartMs = Date.now();
 
-    // Build retry prompt based on what actually happened.
-    // Keep diagnostic branches — the recovery strategy differs by failure mode.
+    // Recovery strategy varies by failure mode (timeout vs no-persist vs nothing-said).
     let retryPrompt;
     if (softTimeoutFired || hardAborted) {
         retryPrompt =
@@ -716,12 +697,14 @@ async function main() {
     }
 
     try {
-        await session.prompt(retryPrompt);
-    } catch (err) {
-        console.error(`[pi-runner] Retry error: ${err.message}`);
+        try {
+            await session.prompt(retryPrompt);
+        } catch (err) {
+            console.error(`[pi-runner] Retry error: ${err.message}`);
+        }
+    } finally {
+        clearTimeout(retryTimer);
     }
-
-    clearTimeout(retryTimer);
 
     const retryDurationMs = Date.now() - retryStartMs;
     const retryUsage = extractUsageFromSession(session.state);
@@ -741,79 +724,19 @@ async function main() {
     persistUsage();
 
     console.error(
-        `[pi-runner] Retry 1: ${(retryDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
-    );
-
-    if (checkResultFile()) {
-        console.error(`[pi-runner] SUCCESS: result.json valid after retry 1`);
-        unsubscribe();
-        process.exit(0);
-    }
-
-    maybeWriteResultFile();
-    if (checkResultFile()) {
-        console.error(`[pi-runner] SUCCESS: composed result.json from persisted tool state after retry 1`);
-        unsubscribe();
-        process.exit(0);
-    }
-
-    // ── Retry 2: last chance — even more direct ─────────────────
-
-    console.error(`[pi-runner] Retry 2: final attempt`);
-
-    let retry2Aborted = false;
-    const retry2Timer = setTimeout(() => {
-        retry2Aborted = true;
-        console.error(`[pi-runner] Retry 2 hard timeout — aborting`);
-        session.agent.abort();
-    }, RETRY2_TIMEOUT_MS);
-
-    const retry2StartMs = Date.now();
-
-    try {
-        await session.prompt(
-            `The review will be discarded unless you persist the remaining output RIGHT NOW. ` +
-                `Use report_finding for any findings not yet persisted, one finding per call, and set_review_summary for delivery.mrNote. ` +
-                `There is no target count and no quota. ` +
-                `Do NOT read more files. Use tools only. Do NOT write planning prose or plain-text commentary. ` +
-                `Only keep POSITIVE findings that add real review value. ` +
-                `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-                `Guidance for POSITIVE or NOT_APPLICABLE findings can simply be \"No change needed.\" ` +
-                `${slugs.length ? `Relevant practice slugs: ${slugs.join(", ")}.` : ""}`,
-        );
-    } catch (err) {
-        console.error(`[pi-runner] Retry 2 error: ${err.message}`);
-    }
-
-    clearTimeout(retry2Timer);
-
-    const retry2DurationMs = Date.now() - retry2StartMs;
-    const retry2Usage = extractUsageFromSession(session.state);
-    accumulateUsage(prevUsage, retry2Usage);
-
-    runnerDebug.attempts.push({
-        label: "retry2",
-        durationMs: retry2DurationMs,
-        hardAborted: retry2Aborted,
-        resultFilePresent: existsSync(RESULT_PATH),
-    });
-    persistRunnerDebug();
-    persistUsage();
-
-    console.error(
-        `[pi-runner] Retry 2: ${(retry2DurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
+        `[pi-runner] Retry: ${(retryDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
     );
 
     unsubscribe();
 
     if (checkResultFile()) {
-        console.error(`[pi-runner] SUCCESS: result.json valid after retry 2`);
+        console.error(`[pi-runner] SUCCESS: result.json valid after retry`);
         process.exit(0);
     }
 
     maybeWriteResultFile();
     if (checkResultFile()) {
-        console.error(`[pi-runner] SUCCESS: composed result.json from persisted tool state after retry 2`);
+        console.error(`[pi-runner] SUCCESS: composed result.json from persisted tool state after retry`);
         process.exit(0);
     }
 
@@ -823,9 +746,7 @@ async function main() {
         process.exit(0);
     }
 
-    // ── Failed ───────────────────────────────────────────────────
-
-    console.error(`[pi-runner] FAILED: no complete persisted review output after initial + 2 retries`);
+    console.error(`[pi-runner] FAILED: no complete persisted review output after initial + format retry`);
     process.exit(1);
 }
 

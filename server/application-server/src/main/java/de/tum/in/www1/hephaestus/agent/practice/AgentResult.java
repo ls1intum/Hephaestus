@@ -1,28 +1,19 @@
-package de.tum.in.www1.hephaestus.agent.adapter;
+package de.tum.in.www1.hephaestus.agent.practice;
 
 import java.util.Map;
 import org.springframework.lang.Nullable;
 
-/**
- * Parsed result of an agent execution.
- *
- * @param success whether the agent completed its task successfully
- * @param output  structured output from the agent (agent-specific keys)
- * @param usage   LLM usage reported by the agent itself (null if not available)
- */
+/** Parsed result of an agent execution. */
 public record AgentResult(boolean success, Map<String, Object> output, @Nullable LlmUsage usage) {
     public AgentResult {
         output = output != null ? Map.copyOf(output) : Map.of();
     }
 
-    /** Convenience constructor without usage. */
     public AgentResult(boolean success, Map<String, Object> output) {
         this(success, output, null);
     }
 
-    /**
-     * LLM usage as reported by the agent (OpenCode step-finish, Claude Code result).
-     */
+    /** LLM usage. */
     public record LlmUsage(
         @Nullable String model,
         @Nullable Integer inputTokens,

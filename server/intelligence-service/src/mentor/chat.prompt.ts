@@ -1,40 +1,11 @@
-/**
- * Mentor Chat System Prompt Definition
- *
- * This prompt is synced to Langfuse for management and versioning.
- *
- * IMPORTANT: Langfuse limitations we're working around:
- * 1. Only simple {{variable}} replacement - NO Mustache conditionals
- * 2. Only ONE prompt can be linked per generation (via toJSON())
- * 3. Variables passed to compile() are NOT visible in Langfuse UI
- *
- * Our approach:
- * - Main prompt uses {{greetingSection}} and {{returningUserSection}} variables
- * - Sub-prompts are also managed in Langfuse for version control
- * - Application code selects which sub-prompt to inject based on runtime state
- * - Only the main prompt is linked to the trace (Langfuse limitation)
- * - But the ACTUAL prompt text IS visible in the trace input
- *
- * @see https://langfuse.com/faq/all/conditional-prompt-embedding
- * @see https://langfuse.com/docs/prompt-management/features/config#function-calling
- */
+// Mentor chat system prompt + greeting / returning-user sub-prompts.
 
 import type { PromptDefinition } from "@/prompts/types";
 import { mentorToolDefinitions } from "./tools";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-Prompts (also managed in Langfuse for version control)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Greeting section for FIRST message in a conversation.
- * This is a separate Langfuse prompt so it can be versioned and tested independently.
- */
 export const greetingFirstMessagePrompt: PromptDefinition<"text"> = {
 	name: "mentor-greeting-first",
 	type: "text",
-	labels: ["production"],
-	tags: ["mentor", "greeting", "section"],
 	description: "Greeting instructions for the first message in a conversation.",
 	variables: ["firstName"],
 	prompt: `This is the first message. Greet {{firstName}} by name.
@@ -45,26 +16,16 @@ export const greetingFirstMessagePrompt: PromptDefinition<"text"> = {
 ❌ "You pinged twice" (confusing)`,
 };
 
-/**
- * Greeting section for CONTINUING conversations (not first message).
- */
 export const greetingContinuePrompt: PromptDefinition<"text"> = {
 	name: "mentor-greeting-continue",
 	type: "text",
-	labels: ["production"],
-	tags: ["mentor", "greeting", "section"],
 	description: "Greeting instructions when continuing an existing conversation.",
 	prompt: "You're mid-conversation. Don't re-greet.",
 };
 
-/**
- * Context section for returning users (have used Heph before).
- */
 export const returningUserPrompt: PromptDefinition<"text"> = {
 	name: "mentor-context-returning",
 	type: "text",
-	labels: ["production"],
-	tags: ["mentor", "context", "section"],
 	description: "Additional context when the user has used Heph before.",
 	prompt: "They've used Heph before. You can reference past sessions if relevant.",
 };
@@ -73,12 +34,7 @@ export const returningUserPrompt: PromptDefinition<"text"> = {
 // Template Variables
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Template variables for the mentor chat prompt.
- *
- * greetingSection and returningUserSection are computed at runtime
- * by loading sub-prompts from Langfuse and selecting based on state.
- */
+/** Variables expected by mentorChatPrompt. greetingSection / returningUserSection are precomputed. */
 export interface MentorChatVariables {
 	firstName: string;
 	userLogin: string;
@@ -86,32 +42,13 @@ export interface MentorChatVariables {
 	returningUserSection: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Prompt
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Mentor Chat System Prompt
- *
- * Grounded in learning science research:
- * - Hattie & Timperley (2007): Feed-up → Feed-back → Feed-forward
- * - Zimmerman (2002): Forethought → Performance → Self-Reflection
- * - Nicol & Macfarlane-Dick (2006): Seven principles of good feedback
- * - Deci & Ryan (SDT): Autonomy, Competence, Relatedness
- */
 export const mentorChatPrompt: PromptDefinition<"text"> = {
 	name: "mentor-chat-system",
 	type: "text",
-	labels: ["production"],
-	tags: ["mentor", "chat", "system-prompt", "tools"],
 
 	description:
 		"System prompt for Heph, the AI mentor. Uses variable sections " +
 		"for greeting and returning user context. Sub-prompts are loaded separately.",
-
-	_meta: {
-		toolsDir: "mentor/tools",
-	},
 
 	config: {
 		temperature: 0.7,
@@ -313,18 +250,3 @@ The goal is to help them *reflect* on their strategy (process-level feedback), n
 9. **Use {{firstName}}'s name.** Especially in greetings and emotional moments.
 10. **Match energy.** Excited? Be excited. Frustrated? Validate first.`,
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// All prompts for CLI discovery
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * All mentor-related prompts for CLI sync.
- * The CLI will discover these and sync them to Langfuse.
- */
-export const mentorPrompts = [
-	mentorChatPrompt,
-	greetingFirstMessagePrompt,
-	greetingContinuePrompt,
-	returningUserPrompt,
-] as const;

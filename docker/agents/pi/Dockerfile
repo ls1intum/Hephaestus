@@ -1,6 +1,4 @@
 # syntax=docker/dockerfile:1.4
-# Pi coding agent container image
-# Used by PiAgentAdapter — command set by SandboxSpec, no entrypoint.
 ARG NODE_TAG=22-slim
 FROM node:${NODE_TAG}
 
@@ -9,8 +7,9 @@ ARG TARGETARCH
 RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq curl ca-certificates unzip && \
     rm -rf /var/lib/apt/lists/*
 
-ARG PI_VERSION=0.65.0
-RUN npm install -g @mariozechner/pi-coding-agent@${PI_VERSION} && \
+# renovate: datasource=npm depName=@earendil-works/pi-coding-agent
+ARG PI_VERSION=0.74.0
+RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
     npm cache clean --force && \
     mkdir -p /home/agent/.pi /workspace && \
     chown -R 1000:1000 /home/agent /workspace
@@ -36,8 +35,7 @@ RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
 COPY --chown=1000:1000 precompute/runner.ts /opt/precompute/runner.ts
 COPY --chown=1000:1000 precompute/lib/ /opt/precompute/lib/
 
-# Git security baseline: neutralize common hooks/external-command vectors in the image.
-# Runtime env-based git config in DockerSandboxAdapter provides the hard override layer.
+# Neutralize git hooks/external-command vectors (DockerSandboxAdapter re-enforces at runtime).
 RUN git config --system core.hooksPath /nonexistent && \
     git config --system core.fsmonitor false && \
     git config --system safe.directory /workspace/repo

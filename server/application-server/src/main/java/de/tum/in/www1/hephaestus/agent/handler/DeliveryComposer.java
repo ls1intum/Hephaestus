@@ -48,8 +48,10 @@ class DeliveryComposer {
         ".context/",
         ".practices/",
         ".analysis/",
-        ".opencode/",
-        ".claude/"
+        ".pi/",
+        ".pi-runtime/",
+        ".precompute/",
+        ".precompute-out/"
     );
 
     /**

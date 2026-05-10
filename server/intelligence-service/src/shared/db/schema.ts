@@ -134,7 +134,6 @@ export const agentConfig = pgTable(
 		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
 		name: varchar({ length: 100 }).notNull(),
 		enabled: boolean().default(false).notNull(),
-		agentType: varchar("agent_type", { length: 32 }).notNull(),
 		modelName: varchar("model_name", { length: 128 }),
 		llmApiKey: text("llm_api_key"),
 		llmProvider: varchar("llm_provider", { length: 32 }).notNull(),

@@ -1,8 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.config;
 
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
-import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobStatus;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
@@ -37,8 +35,6 @@ public class AgentConfigService {
 
     @Transactional
     public AgentConfig createConfig(WorkspaceContext workspaceContext, CreateAgentConfigRequestDTO request) {
-        validateProviderCompatibility(request.agentType(), request.llmProvider());
-
         Long workspaceId = workspaceContext.id();
         if (agentConfigRepository.existsByWorkspaceIdAndName(workspaceId, request.name())) {
             throw new AgentConfigNameConflictException(
@@ -53,7 +49,6 @@ public class AgentConfigService {
         AgentConfig config = new AgentConfig();
         config.setWorkspace(workspace);
         config.setName(request.name());
-        config.setAgentType(request.agentType());
         config.setLlmProvider(request.llmProvider());
 
         if (request.enabled() != null) {
@@ -93,14 +88,6 @@ public class AgentConfigService {
             .findByIdAndWorkspaceId(configId, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("AgentConfig", configId.toString()));
 
-        // Validate provider compatibility only when both are being set, or when one is set against the existing value
-        AgentType effectiveType = request.agentType() != null ? request.agentType() : config.getAgentType();
-        LlmProvider effectiveProvider = request.llmProvider() != null ? request.llmProvider() : config.getLlmProvider();
-        validateProviderCompatibility(effectiveType, effectiveProvider);
-
-        if (request.agentType() != null) {
-            config.setAgentType(request.agentType());
-        }
         if (request.llmProvider() != null) {
             config.setLlmProvider(request.llmProvider());
         }
@@ -156,19 +143,6 @@ public class AgentConfigService {
     private void validateCredentialMode(AgentConfig config) {
         if (config.getCredentialMode() != CredentialMode.PROXY && !config.isAllowInternet()) {
             throw new AgentConfigCredentialModeException(config.getCredentialMode());
-        }
-    }
-
-    private void validateProviderCompatibility(AgentType agentType, LlmProvider provider) {
-        switch (agentType) {
-            case CLAUDE_CODE -> {
-                if (provider != LlmProvider.ANTHROPIC) {
-                    throw new AgentConfigProviderMismatchException(agentType, LlmProvider.ANTHROPIC, provider);
-                }
-            }
-            case OPENCODE, PI -> {
-                /* any provider is valid */
-            }
         }
     }
 }

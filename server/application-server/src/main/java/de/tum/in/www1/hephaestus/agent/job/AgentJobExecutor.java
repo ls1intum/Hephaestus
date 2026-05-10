@@ -1,16 +1,15 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.in.www1.hephaestus.agent.adapter.AgentAdapterRegistry;
-import de.tum.in.www1.hephaestus.agent.adapter.AgentResult;
-import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapter;
-import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapterRequest;
-import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.in.www1.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.in.www1.hephaestus.agent.practice.AgentResult;
+import de.tum.in.www1.hephaestus.agent.practice.PiPracticeAgent;
+import de.tum.in.www1.hephaestus.agent.practice.PracticeAgentRequest;
+import de.tum.in.www1.hephaestus.agent.practice.PracticeSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
@@ -88,7 +87,7 @@ public class AgentJobExecutor {
     private final AgentJobRepository jobRepository;
     private final AgentConfigRepository configRepository;
     private final JobTypeHandlerRegistry handlerRegistry;
-    private final AgentAdapterRegistry adapterRegistry;
+    private final PiPracticeAgent practiceAgent;
     private final SandboxManager sandboxManager;
     private final AsyncTaskExecutor sandboxExecutor;
     private final TransactionTemplate transactionTemplate;
@@ -107,7 +106,7 @@ public class AgentJobExecutor {
         AgentJobRepository jobRepository,
         AgentConfigRepository configRepository,
         JobTypeHandlerRegistry handlerRegistry,
-        AgentAdapterRegistry adapterRegistry,
+        PiPracticeAgent practiceAgent,
         SandboxManager sandboxManager,
         @Qualifier("sandboxExecutor") AsyncTaskExecutor sandboxExecutor,
         TransactionTemplate transactionTemplate,
@@ -119,7 +118,7 @@ public class AgentJobExecutor {
         this.jobRepository = jobRepository;
         this.configRepository = configRepository;
         this.handlerRegistry = handlerRegistry;
-        this.adapterRegistry = adapterRegistry;
+        this.practiceAgent = practiceAgent;
         this.sandboxManager = sandboxManager;
         this.sandboxExecutor = sandboxExecutor;
         this.transactionTemplate = transactionTemplate;
@@ -290,7 +289,7 @@ public class AgentJobExecutor {
         try {
             // ── PREPARE + EXECUTE + COMPLETE ──
             SandboxResult result = prepareAndExecute(jobId, job, snapshot);
-            AgentResult agentResult = adapterRegistry.getAdapter(snapshot.agentType()).parseResult(result);
+            AgentResult agentResult = practiceAgent.parseResult(result);
 
             JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
             completeJob(jobId, agentResult, result, handler, job);
@@ -347,7 +346,6 @@ public class AgentJobExecutor {
      */
     private SandboxResult prepareAndExecute(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
-        AgentAdapter adapter = adapterRegistry.getAdapter(snapshot.agentType());
 
         // Wrap in a read-only transaction so prepareInputFiles/buildPrompt can
         // resolve lazy JPA proxies (e.g. PullRequest.author) on this sandbox thread.
@@ -364,8 +362,7 @@ public class AgentJobExecutor {
             return new PrepareResult(files, p, volumes);
         });
 
-        AgentAdapterRequest adapterRequest = new AgentAdapterRequest(
-            snapshot.agentType(),
+        PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
             snapshot.llmProvider(),
             snapshot.credentialMode(),
             snapshot.modelName(),
@@ -376,7 +373,7 @@ public class AgentJobExecutor {
             snapshot.timeoutSeconds()
         );
 
-        AgentSandboxSpec agentSpec = adapter.buildSandboxSpec(adapterRequest);
+        PracticeSandboxSpec agentSpec = practiceAgent.buildSandboxSpec(adapterRequest);
         SandboxSpec sandboxSpec = buildSandboxSpec(
             jobId,
             prepared.files(),
@@ -392,7 +389,7 @@ public class AgentJobExecutor {
         UUID jobId,
         Map<String, byte[]> handlerFiles,
         Map<String, String> handlerVolumeMounts,
-        AgentSandboxSpec agentSpec,
+        PracticeSandboxSpec agentSpec,
         ConfigSnapshot snapshot
     ) {
         // Merge handler + adapter input files (adapter takes precedence on collision)
@@ -657,7 +654,7 @@ public class AgentJobExecutor {
                     // "delivery not attempted yet" from "no delivery needed"
                     freshJob.setDeliveryStatus(DeliveryStatus.PENDING);
                 }
-                // Primary: agent-reported usage (from OpenCode step-finish / Claude Code result)
+                // Primary: agent-reported usage (from the Pi runner's usage.json)
                 var agentUsage = agentResult.usage();
                 if (agentUsage != null && agentUsage.totalCalls() > 0) {
                     freshJob.setLlmTotalCalls(agentUsage.totalCalls());
@@ -667,15 +664,23 @@ public class AgentJobExecutor {
                     freshJob.setLlmCacheReadTokens(agentUsage.cacheReadTokens());
                     freshJob.setLlmCacheWriteTokens(agentUsage.cacheWriteTokens());
                     freshJob.setLlmCostUsd(agentUsage.costUsd());
-                    // Model + version from config snapshot (Azure doesn't expose version in API)
-                    var snapshot = freshJob.getConfigSnapshot();
+                    // Use typed snapshot so a future field rename fails compile rather than writing null.
                     String model = agentUsage.model();
-                    if ((model == null || model.isBlank()) && snapshot != null) {
-                        model = snapshot.path("modelName").asText(null);
+                    ConfigSnapshot snap = null;
+                    var snapshotNode = freshJob.getConfigSnapshot();
+                    if (snapshotNode != null) {
+                        try {
+                            snap = ConfigSnapshot.fromJson(snapshotNode, objectMapper);
+                        } catch (Exception e) {
+                            log.warn("Could not deserialise config snapshot for usage metadata: {}", e.getMessage());
+                        }
+                    }
+                    if ((model == null || model.isBlank()) && snap != null) {
+                        model = snap.modelName();
                     }
                     freshJob.setLlmModel(model);
-                    if (snapshot != null) {
-                        freshJob.setLlmModelVersion(snapshot.path("modelVersion").asText(null));
+                    if (snap != null) {
+                        freshJob.setLlmModelVersion(snap.modelVersion());
                     }
                     log.info(
                         "LLM usage (agent-reported): model={}, calls={}, in={}, out={}, reasoning={}, cost={}, jobId={}",

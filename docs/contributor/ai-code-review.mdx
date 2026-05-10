@@ -50,12 +50,9 @@ sequenceDiagram
 
 ## Agent architecture
 
-The system supports two LLM backends. Claude Code uses a single-pass architecture (one agent evaluates all practices); OpenCode uses a multi-agent orchestrator that dispatches specialist subagents:
+A single backend powers practice detection: the **Pi practice agent** (`PiPracticeAgent`). It uses a single-pass architecture — one agent evaluates all relevant practices for the diff and persists structured findings via custom Pi tools (`report_finding`, `set_review_summary`).
 
-- **Claude Code** (`ClaudeCodeAgentAdapter`) -- Uses `--json-schema` for constrained decoding. Runner script (`.run-claude.mjs`) performs 2-phase self-correction: initial run + up to 2 format retries via `--continue` (same session, full context preserved).
-- **OpenCode** (`OpenCodeAgentAdapter`) -- Uses a self-enforced JSON schema. Runner script (`.run-opencode.mjs`) performs 3-phase self-correction: initial run, format retry, position retry (validates `suggestedDiffNotes` against diff hunks).
-
-Both adapters produce the same output schema. The server is backend-agnostic after the agent returns. The active backend is selected per workspace via the `agent_config` table.
+The runner (`.run-pi.mjs`) drives the Pi SDK in-process: initial analysis with a soft-timeout steering message and a hard-timeout abort, followed by a format retry if the persisted output is incomplete. A top-level watchdog hard-exits the process at `AGENT_BUDGET_MS + 30s` so the orchestrator always observes a terminal state.
 
 ### Workspace layout
 
@@ -77,14 +74,10 @@ Every agent container gets this file structure (agent-specific files noted):
     all-criteria.md                  # All criteria bundled (reduces tool calls)
   .precompute/practices/{slug}.ts    # Precompute scripts (from DB, if present)
   .precompute-out/                   # Precompute output (summary.md + per-practice JSON)
-  orchestrator-protocol.md           # Shared rules and output schema
   .prompt                            # Task prompt for the agent
-  .json-schema                       # Output schema (Claude Code only)
-  .run-claude.mjs                    # Runner script (Claude Code only)
-  .run-opencode.mjs                  # Runner script (OpenCode only)
-  CLAUDE.md                          # Orchestrator instructions (Claude Code only)
-  .opencode/agents/*.md              # Agent definitions (OpenCode only)
-  opencode.json                      # Configuration (OpenCode only)
+  .pi/AGENTS.md                      # Pi orchestrator instructions
+  .pi-runtime/settings.json          # Pi SDK configuration (provider, model, compaction)
+  .run-pi.mjs                        # Runner script
   .analysis/practices/.gitkeep       # Directory for intermediate findings
   .output/                           # Agent writes final results here
 ```
@@ -205,7 +198,7 @@ hephaestus:
 Then trigger with:
 
 ```bash
-curl -X POST "http://localhost:${SERVER_PORT}/api/dev/trigger-review?prId=123&workspaceId=1"
+curl -X POST "http://localhost:${SERVER_PORT}/actuator/dev/trigger-review?prId=123&workspaceId=1"
 ```
 
 The port must match your `SERVER_PORT` environment variable (default: `38080` in `.env`).
@@ -219,8 +212,8 @@ The port must match your `SERVER_PORT` environment variable (default: `38080` in
 
 ## Extending to new languages
 
-The orchestrator protocol (`orchestrator-protocol.md`) contains language-agnostic rules. Language-specific guidance lives in the practice criteria files. To support a new language:
+The Pi orchestrator instructions (`pi-orchestrator.md`, mounted at `.pi/AGENTS.md`) are language-agnostic. Language-specific guidance lives in the practice criteria. To support a new language:
 
 1. Write new practice criteria targeting the language's patterns and insert them in the `practice` table
-2. The orchestrator protocol is language-agnostic -- no changes needed unless the language requires special analysis strategies
-3. The agent prompt files (`CLAUDE.md`, `opencode-orchestrator.md`) may need minor adjustments for language-specific tooling (e.g., build commands, linter integration)
+2. The agent orchestrator file is language-agnostic -- no changes needed unless the language requires special analysis strategies
+3. Practice criteria (in DB) may benefit from language-specific examples; precompute scripts (also in DB) often need per-language regex tweaks

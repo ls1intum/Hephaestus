@@ -84,6 +84,18 @@
     }
   ],
 
+  "customManagers": [
+    {
+      "description": "Track ARG <PKG>_VERSION pins in Dockerfiles via a `# renovate:` magic comment, so Renovate handles bumps for tools installed inside the image (e.g. agent-pi's @earendil-works/pi-coding-agent).",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\s*\\nARG [A-Z_]+_VERSION=(?<currentValue>\\S+)"
+      ],
+      "versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}semver{{/if}}"
+    }
+  ],
+
   "vulnerabilityAlerts": {
     "labels": ["security", "dependencies"],
     "schedule": ["at any time"],

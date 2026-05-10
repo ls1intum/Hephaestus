@@ -10,18 +10,16 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
-import de.tum.in.www1.hephaestus.agent.adapter.AgentAdapterRegistry;
-import de.tum.in.www1.hephaestus.agent.adapter.AgentResult;
-import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapter;
-import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.in.www1.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.in.www1.hephaestus.agent.practice.AgentResult;
+import de.tum.in.www1.hephaestus.agent.practice.PiPracticeAgent;
+import de.tum.in.www1.hephaestus.agent.practice.PracticeSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
@@ -65,7 +63,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Mock
-    private AgentAdapterRegistry adapterRegistry;
+    private PiPracticeAgent practiceAgent;
 
     @Mock
     private SandboxManager sandboxManager;
@@ -110,7 +108,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             jobRepository,
             configRepository,
             handlerRegistry,
-            adapterRegistry,
+            practiceAgent,
             sandboxManager,
             sandboxExecutor,
             transactionTemplate,
@@ -128,7 +126,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             1,
             10L,
             "test-config",
-            AgentType.CLAUDE_CODE,
             LlmProvider.ANTHROPIC,
             CredentialMode.PROXY,
             null,
@@ -409,10 +406,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         when(handler.prepareInputFiles(any())).thenReturn(Map.of("code.py", "print('hi')".getBytes()));
         when(handler.buildPrompt(any())).thenReturn("Review this code");
 
-        AgentAdapter adapter = mock(AgentAdapter.class);
-        when(adapterRegistry.getAdapter(AgentType.CLAUDE_CODE)).thenReturn(adapter);
-
-        AgentSandboxSpec agentSpec = new AgentSandboxSpec(
+        PracticeSandboxSpec agentSpec = new PracticeSandboxSpec(
             "ghcr.io/agent:latest",
             List.of("/bin/agent"),
             Map.of("KEY", "value"),
@@ -422,8 +416,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
             new NetworkPolicy(false, null, "test-token", "anthropic"),
             null
         );
-        when(adapter.buildSandboxSpec(any())).thenReturn(agentSpec);
-        when(adapter.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
+        when(practiceAgent.buildSandboxSpec(any())).thenReturn(agentSpec);
+        when(practiceAgent.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
 
         when(sandboxManager.execute(any())).thenReturn(sandboxResult);
     }
@@ -434,10 +428,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         when(handler.prepareInputFiles(any())).thenReturn(Map.of());
         when(handler.buildPrompt(any())).thenReturn("Review this code");
 
-        AgentAdapter adapter = mock(AgentAdapter.class);
-        when(adapterRegistry.getAdapter(AgentType.CLAUDE_CODE)).thenReturn(adapter);
-
-        AgentSandboxSpec agentSpec = new AgentSandboxSpec(
+        PracticeSandboxSpec agentSpec = new PracticeSandboxSpec(
             "ghcr.io/agent:latest",
             List.of("/bin/agent"),
             Map.of(),
@@ -447,7 +438,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             null,
             null
         );
-        when(adapter.buildSandboxSpec(any())).thenReturn(agentSpec);
+        when(practiceAgent.buildSandboxSpec(any())).thenReturn(agentSpec);
 
         when(sandboxManager.execute(any())).thenThrow(exception);
     }

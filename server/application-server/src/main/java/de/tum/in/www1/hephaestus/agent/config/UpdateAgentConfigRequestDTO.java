@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.config;
 
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,9 +12,8 @@ import jakarta.validation.constraints.Size;
 )
 public record UpdateAgentConfigRequestDTO(
     @Schema(description = "Whether the agent is enabled") Boolean enabled,
-    @Schema(description = "Type of coding agent") AgentType agentType,
     @Size(max = 128, message = "Model name must not exceed 128 characters")
-    @Schema(description = "LLM model name", example = "claude-sonnet-4-20250514")
+    @Schema(description = "LLM model name", example = "gpt-5.4-mini")
     String modelName,
     @Schema(description = "LLM API key (omit or null to keep existing key)") String llmApiKey,
     @Schema(description = "LLM provider") LlmProvider llmProvider,

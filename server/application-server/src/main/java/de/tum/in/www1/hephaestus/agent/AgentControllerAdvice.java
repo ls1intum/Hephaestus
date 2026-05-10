@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.agent;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigCredentialModeException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigHasActiveJobsException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigNameConflictException;
-import de.tum.in.www1.hephaestus.agent.config.AgentConfigProviderMismatchException;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobStateConflictException;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import java.util.Optional;
@@ -30,11 +29,6 @@ public class AgentControllerAdvice {
     @ExceptionHandler(AgentConfigNameConflictException.class)
     ProblemDetail handleAgentConfigNameConflict(AgentConfigNameConflictException exception) {
         return problem(HttpStatus.CONFLICT, "Agent config name conflict", exception.getMessage());
-    }
-
-    @ExceptionHandler(AgentConfigProviderMismatchException.class)
-    ProblemDetail handleAgentConfigProviderMismatch(AgentConfigProviderMismatchException exception) {
-        return problem(HttpStatus.BAD_REQUEST, "Invalid agent configuration", exception.getMessage());
     }
 
     @ExceptionHandler(AgentConfigCredentialModeException.class)

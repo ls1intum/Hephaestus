@@ -3069,13 +3069,6 @@ components:
       type: object
       description: Agent configuration for a workspace (API key redacted)
       properties:
-        agentType:
-          type: string
-          description: Type of coding agent
-          enum:
-          - CLAUDE_CODE
-          - OPENCODE
-          - PI
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -3114,7 +3107,7 @@ components:
         modelName:
           type: string
           description: LLM model name
-          example: claude-sonnet-4-20250514
+          example: gpt-5.4-mini
         name:
           type: string
           description: Unique name within the workspace
@@ -3127,7 +3120,6 @@ components:
           format: date-time
           description: Timestamp when the config was last updated
       required:
-      - agentType
       - allowInternet
       - createdAt
       - credentialMode
@@ -3394,13 +3386,6 @@ components:
       type: object
       description: Request to create a new agent configuration for a workspace
       properties:
-        agentType:
-          type: string
-          description: Type of coding agent
-          enum:
-          - CLAUDE_CODE
-          - OPENCODE
-          - PI
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -3436,13 +3421,13 @@ components:
         modelName:
           type: string
           description: LLM model name
-          example: claude-sonnet-4-20250514
+          example: gpt-5.4-mini
           maxLength: 128
           minLength: 0
         name:
           type: string
           description: Unique name within the workspace
-          example: claude-pr-reviewer
+          example: pi-pr-reviewer
           maxLength: 100
           minLength: 0
         timeoutSeconds:
@@ -3453,7 +3438,6 @@ components:
           maximum: 3600
           minimum: 30
       required:
-      - agentType
       - llmProvider
       - name
     CreateDocumentRequest:
@@ -4866,13 +4850,6 @@ components:
       description: Request to update an existing agent configuration (all fields optional
         — null fields are not changed)
       properties:
-        agentType:
-          type: string
-          description: Type of coding agent
-          enum:
-          - CLAUDE_CODE
-          - OPENCODE
-          - PI
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -4907,7 +4884,7 @@ components:
         modelName:
           type: string
           description: LLM model name
-          example: claude-sonnet-4-20250514
+          example: gpt-5.4-mini
           maxLength: 128
           minLength: 0
         timeoutSeconds:

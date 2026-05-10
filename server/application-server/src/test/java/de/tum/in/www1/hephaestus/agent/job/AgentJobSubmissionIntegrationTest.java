@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
@@ -89,7 +88,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         agentConfig.setWorkspace(workspace);
         agentConfig.setName("test-config");
         agentConfig.setEnabled(true);
-        agentConfig.setAgentType(AgentType.CLAUDE_CODE);
         agentConfig.setLlmProvider(LlmProvider.ANTHROPIC);
         agentConfig.setCredentialMode(CredentialMode.PROXY);
         agentConfig.setTimeoutSeconds(300);
@@ -361,17 +359,14 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
             assertThat(result).isPresent();
             var snapshot = result.get().getConfigSnapshot();
-            assertThat(snapshot.get("agentType").asText()).isEqualTo("CLAUDE_CODE");
             assertThat(snapshot.get("timeoutSeconds").asInt()).isEqualTo(300);
 
             // Change the config after submission
             agentConfig.setTimeoutSeconds(900);
-            agentConfig.setAgentType(AgentType.OPENCODE);
             agentConfigRepository.save(agentConfig);
 
             // Re-load the job from DB — snapshot should still reflect the original
             AgentJob fromDb = agentJobRepository.findById(result.get().getId()).orElseThrow();
-            assertThat(fromDb.getConfigSnapshot().get("agentType").asText()).isEqualTo("CLAUDE_CODE");
             assertThat(fromDb.getConfigSnapshot().get("timeoutSeconds").asInt()).isEqualTo(300);
         }
     }

@@ -23,7 +23,6 @@ import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -45,30 +44,30 @@ import org.springframework.lang.Nullable;
 /**
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
  *
- * <p>Uses a single-pass architecture: one AI agent (Claude Code or OpenCode) reads all
- * context files, evaluates every relevant practice against the diff, and returns structured
- * JSON findings. The server then renders delivery (MR summary + diff notes) via
- * {@link DeliveryComposer} and posts via {@link FeedbackDeliveryService}.
+ * <p>Uses a single-pass architecture: the Pi practice agent reads all context files,
+ * evaluates every relevant practice against the diff, and persists structured JSON findings.
+ * The server then renders delivery (MR summary + diff notes) via {@link DeliveryComposer}
+ * and posts via {@link FeedbackDeliveryService}.
  *
  * <p>Container workspace layout:
  * <pre>
  * /workspace/
- * ├── repo/                              # Pre-prepared local git repo (read-only bind mount)
+ * ├── repo/                              # git repo (read-only bind mount)
  * ├── .context/
- * │   ├── metadata.json                  # Title, body, author, branches, stats
- * │   ├── comments.json                  # Review comments
- * │   ├── diff.patch                     # Pre-computed diff with [L&lt;n&gt;] annotations
- * │   ├── diff_stat.txt                  # Changed files summary
- * │   ├── diff_summary.md                # Per-file diff chunks with index table
- * │   └── contributor_history.json       # Aggregated practice history (optional)
- * ├── .practices/
- * │   ├── index.json                     # Practice registry [{slug, name, category}]
- * │   ├── all-criteria.md                # All practice criteria bundled
- * │   └── {slug}.md                      # Evaluation criteria per practice
- * ├── CLAUDE.md / orchestrator-protocol.md # Agent instructions + shared protocol
- * ├── .prompt                            # Slim task prompt
- * ├── .json-schema                       # Output schema for constrained decoding
- * └── .output/                           # Agent writes final results here
+ * │   ├── metadata.json                  # PR metadata
+ * │   ├── comments.json                  # review comments
+ * │   ├── diff.patch                     # diff with [L&lt;n&gt;] annotations
+ * │   ├── diff_stat.txt                  # changed files
+ * │   ├── diff_summary.md                # per-file diff chunks
+ * │   └── contributor_history.json       # prior findings (optional)
+ * ├── .practices/{index.json, {slug}.md, all-criteria.md}
+ * ├── .precompute/practices/{slug}.ts    # precompute scripts (from DB)
+ * ├── .precompute-out/                   # precompute output
+ * ├── .pi/AGENTS.md                      # Pi orchestrator
+ * ├── .pi-runtime/settings.json          # Pi SDK config
+ * ├── .run-pi.mjs                        # Pi runner
+ * ├── .prompt                            # task prompt
+ * └── .output/                           # agent results
  * </pre>
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
@@ -79,9 +78,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     /** Maximum number of review comments included in context. Most recent are kept on truncation. */
     static final int MAX_COMMENTS = 500;
-
-    /** Classpath prefix for agent resource files (CLAUDE.md, subagent def, practices). */
-    private static final String AGENT_RESOURCE_PREFIX = "agent/";
 
     /** Regex matching unified diff hunk headers: {@code @@ -a,b +c,d @@}. Group 1 captures {@code c}. */
     private static final Pattern HUNK_HEADER = Pattern.compile("^@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@");
@@ -194,8 +190,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // This is structural transformation (splitting on "diff --git" boundaries), not judgment.
         computeAndStoreDiffSummary(files);
 
-        // Inject orchestrator architecture files (CLAUDE.md, subagent def, practice criteria)
-        injectOrchestratorFiles(files, job);
+        injectPracticeContext(files, job);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
@@ -245,9 +240,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             pullRequestNumber +
             " in " +
             repoName +
-            ". Read the context files, evaluate each practice, then write your findings " +
-            "to .output/result.json using the write tool. " +
-            "Follow /workspace/orchestrator-protocol.md for the schema and rules.";
+            ". Read the context files, then persist findings via the report_finding tool " +
+            "and the final MR summary via set_review_summary. " +
+            "Follow .pi/AGENTS.md for the schema and rules.";
         log.info("Built orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
         return prompt;
     }
@@ -258,22 +253,15 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     /**
      * Inject the orchestrator architecture files into the workspace.
-     * These files drive the Claude Code agent's behaviour:
+     * These files drive the Pi practice agent's behaviour:
      * <ul>
-     *   <li>{@code CLAUDE.md} — orchestrator meta-instructions</li>
-     *   <li>{@code .claude/agents/practice-analyzer.md} — subagent definition</li>
+     *   <li>{@code .pi/AGENTS.md} — orchestrator instructions (injected by {@link PiPracticeAgent})</li>
      *   <li>{@code .practices/index.json} — practice registry</li>
      *   <li>{@code .practices/{slug}.md} — evaluation criteria per practice</li>
+     *   <li>{@code .practices/all-criteria.md} — bundled criteria (reduces agent tool calls)</li>
      * </ul>
      */
-    private void injectOrchestratorFiles(Map<String, byte[]> files, AgentJob job) {
-        // 1. Shared orchestrator protocol (referenced by both Claude Code and OpenCode orchestrators)
-        files.put("orchestrator-protocol.md", loadClasspathResource("orchestrator-protocol.md"));
-
-        // Agent-specific orchestrator files (CLAUDE.md, subagent defs) are injected by each adapter.
-        // The handler only injects shared context: protocol, practices, and analysis directory.
-
-        // 2. Practice criteria files from DB
+    private void injectPracticeContext(Map<String, byte[]> files, AgentJob job) {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
@@ -379,19 +367,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         return out.toString();
-    }
-
-    /** Load a classpath resource from the {@code agent/} directory. */
-    private byte[] loadClasspathResource(String relativePath) {
-        String fullPath = AGENT_RESOURCE_PREFIX + relativePath;
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream(fullPath)) {
-            if (is == null) {
-                throw new JobPreparationException("Missing classpath resource: " + fullPath);
-            }
-            return is.readAllBytes();
-        } catch (IOException e) {
-            throw new JobPreparationException("Failed to read classpath resource: " + fullPath, e);
-        }
     }
 
     /** JSON string escaping via Jackson (handles all control characters correctly). */
@@ -729,7 +704,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             String diffStat = runGit(repoPath, "diff", "--stat", rangeSpec);
             String diff = runGit(repoPath, "diff", rangeSpec);
             if (diff != null && !diff.isBlank()) {
-                // Annotate diff with [L<n>] source-file line numbers so subagents
+                // Annotate diff with [L<n>] source-file line numbers so the agent
                 // can reference correct line numbers without computing offsets.
                 String annotatedDiff = annotateDiffWithLineNumbers(diff);
                 files.put(".context/diff.patch", annotatedDiff.getBytes(StandardCharsets.UTF_8));

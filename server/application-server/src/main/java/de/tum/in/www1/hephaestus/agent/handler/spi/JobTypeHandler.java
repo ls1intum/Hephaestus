@@ -56,8 +56,8 @@ public interface JobTypeHandler {
      * Build the prompt text for the agent.
      *
      * <p>The executor passes this string to
-     * {@link de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapterRequest#prompt()}.
-     * The adapter decides how to inject it (file, environment variable, CLI argument).
+     * {@link de.tum.in.www1.hephaestus.agent.practice.PracticeAgentRequest#prompt()}.
+     * The Pi practice agent injects it as a file at {@code /workspace/.prompt}.
      *
      * @param job the persisted job
      * @return prompt text (must not be blank)

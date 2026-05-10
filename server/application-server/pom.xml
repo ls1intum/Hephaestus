@@ -377,11 +377,6 @@
             <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
             <version>8.40.0</version>
         </dependency>
-        <dependency>
-            <groupId>com.langfuse</groupId>
-            <artifactId>langfuse-java</artifactId>
-            <version>0.2.0</version>
-        </dependency>
         <!-- Spring GraphQL Client for GitHub GraphQL API -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

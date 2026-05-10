@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.config;
 
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.core.security.EncryptedStringConverter;
@@ -29,19 +28,13 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Workspace-scoped configuration for the coding agent orchestration system.
+ * Workspace-scoped configuration for the Pi practice-detection agent.
  *
  * <p>A workspace may have multiple {@code AgentConfig} instances, each identified by a unique
- * {@code name} within the workspace. This entity stores the agent runtime type, LLM credentials
+ * {@code name} within the workspace. This entity stores the LLM provider/credentials
  * (encrypted at rest), and resource limits for container execution.
  *
- * <h2>Provider Compatibility</h2>
- * <ul>
- *   <li>{@link AgentType#CLAUDE_CODE} requires {@link LlmProvider#ANTHROPIC}</li>
- *   <li>{@link AgentType#OPENCODE} accepts any provider</li>
- * </ul>
- *
- * @see AgentConfigService for CRUD operations and provider validation
+ * @see AgentConfigService for CRUD operations
  */
 @Entity
 @Table(
@@ -73,10 +66,6 @@ public class AgentConfig {
 
     @Column(name = "enabled", nullable = false)
     private boolean enabled = false;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "agent_type", nullable = false, length = 32)
-    private AgentType agentType;
 
     @Column(name = "model_name", length = 128)
     private String modelName;
