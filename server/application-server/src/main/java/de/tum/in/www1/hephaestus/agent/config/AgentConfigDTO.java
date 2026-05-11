@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.config;
 
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -12,8 +11,7 @@ public record AgentConfigDTO(
     @NonNull @Schema(description = "Configuration ID") Long id,
     @NonNull @Schema(description = "Unique name within the workspace") String name,
     @NonNull @Schema(description = "Whether the agent is enabled") Boolean enabled,
-    @NonNull @Schema(description = "Type of coding agent") AgentType agentType,
-    @Schema(description = "LLM model name", example = "claude-sonnet-4-20250514") String modelName,
+    @Schema(description = "LLM model name", example = "gpt-5.4-mini") String modelName,
     @NonNull @Schema(description = "LLM provider") LlmProvider llmProvider,
     @NonNull @Schema(description = "Whether an LLM API key is configured") Boolean hasLlmApiKey,
     @NonNull @Schema(description = "Job timeout in seconds") Integer timeoutSeconds,
@@ -28,7 +26,6 @@ public record AgentConfigDTO(
             config.getId(),
             config.getName(),
             config.isEnabled(),
-            config.getAgentType(),
             config.getModelName(),
             config.getLlmProvider(),
             config.getLlmApiKey() != null && !config.getLlmApiKey().isEmpty(),

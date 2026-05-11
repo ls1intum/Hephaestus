@@ -563,7 +563,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             assertThat(prompt).contains("Review merge request #42");
             assertThat(prompt).contains("owner/repo");
-            assertThat(prompt).contains("orchestrator-protocol.md");
+            assertThat(prompt).contains(".pi/AGENTS.md");
+            assertThat(prompt).contains("report_finding");
+            assertThat(prompt).contains("set_review_summary");
         }
 
         @Test

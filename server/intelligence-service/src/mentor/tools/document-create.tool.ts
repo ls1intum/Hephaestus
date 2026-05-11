@@ -19,7 +19,6 @@ import { z } from "zod";
 import env from "@/env";
 import { createDocument as createDocumentInDb } from "@/mentor/documents/data";
 import { formatConversationForDocument } from "@/shared/ai/messages";
-import { getTelemetryOptions } from "@/shared/ai/telemetry";
 import { type DocumentKind, DocumentKindEnum } from "@/shared/document";
 import { toolCallIdToUuid } from "@/shared/tool-call-id";
 import { defineToolMeta } from "./define-tool";
@@ -128,22 +127,15 @@ async function streamDocumentContent(params: StreamParams): Promise<string> {
 	const { id, title, dataStream, conversationContext } = params;
 	let content = "";
 
-	// Build a proper user prompt that includes both the request and context
 	const userPrompt = conversationContext
 		? `Create a document titled "${title}" based on this conversation:\n\n${conversationContext}`
 		: `Create a document titled "${title}". No conversation context available - create a template.`;
-
-	// Enable telemetry for document generation
-	const telemetryOptions = getTelemetryOptions({
-		operation: "document:create",
-	});
 
 	const { fullStream } = streamText({
 		model: env.defaultModel,
 		system: DOCUMENT_SYSTEM_PROMPT,
 		prompt: userPrompt,
 		experimental_transform: smoothStream({ chunking: "word" }),
-		...telemetryOptions,
 	});
 
 	for await (const delta of fullStream) {

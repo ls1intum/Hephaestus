@@ -8,7 +8,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
@@ -63,115 +62,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Provider validation")
-    class ProviderValidation {
-
-        @Test
-        @DisplayName("should accept Claude Code with Anthropic provider")
-        void shouldAcceptClaudeCodeWithAnthropic() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test-config")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = new CreateAgentConfigRequestDTO(
-                "test-config",
-                true,
-                AgentType.CLAUDE_CODE,
-                "claude-sonnet-4-20250514",
-                "sk-test",
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                null,
-                null
-            );
-
-            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-            assertThat(result.getAgentType()).isEqualTo(AgentType.CLAUDE_CODE);
-            assertThat(result.getLlmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
-        }
-
-        @Test
-        @DisplayName("should reject Claude Code with OpenAI provider")
-        void shouldRejectClaudeCodeWithOpenai() {
-            var request = new CreateAgentConfigRequestDTO(
-                "test-config",
-                true,
-                AgentType.CLAUDE_CODE,
-                null,
-                null,
-                LlmProvider.OPENAI,
-                null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
-                .isInstanceOf(AgentConfigProviderMismatchException.class)
-                .hasMessageContaining("CLAUDE_CODE")
-                .hasMessageContaining("ANTHROPIC");
-        }
-
-        @Test
-        @DisplayName("should accept OpenCode with any provider")
-        void shouldAcceptOpencodeWithAnyProvider() {
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            for (LlmProvider provider : LlmProvider.values()) {
-                String name = "opencode-" + provider.name().toLowerCase();
-                when(agentConfigRepository.existsByWorkspaceIdAndName(1L, name)).thenReturn(false);
-
-                var request = new CreateAgentConfigRequestDTO(
-                    name,
-                    true,
-                    AgentType.OPENCODE,
-                    null,
-                    null,
-                    provider,
-                    null,
-                    null,
-                    null,
-                    null
-                );
-                AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-                assertThat(result.getLlmProvider()).isEqualTo(provider);
-            }
-        }
-
-        @Test
-        @DisplayName("should validate provider on update")
-        void shouldValidateProviderOnUpdate() {
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setAgentType(AgentType.CLAUDE_CODE);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
-
-            // Try to change only provider to OPENAI — should fail because CLAUDE_CODE requires ANTHROPIC
-            var request = new UpdateAgentConfigRequestDTO(
-                null,
-                null,
-                null,
-                null,
-                LlmProvider.OPENAI,
-                null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
-                .isInstanceOf(AgentConfigProviderMismatchException.class)
-                .hasMessageContaining("CLAUDE_CODE")
-                .hasMessageContaining("ANTHROPIC");
-        }
-    }
-
-    @Nested
     @DisplayName("Credential mode validation")
     class CredentialModeValidation {
 
@@ -184,7 +74,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             var request = new CreateAgentConfigRequestDTO(
                 "test",
                 true,
-                AgentType.CLAUDE_CODE,
                 null,
                 "sk-key",
                 LlmProvider.ANTHROPIC,
@@ -209,7 +98,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             var request = new CreateAgentConfigRequestDTO(
                 "test",
                 true,
-                AgentType.CLAUDE_CODE,
                 null,
                 "oauth-token",
                 LlmProvider.ANTHROPIC,
@@ -235,7 +123,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             var request = new CreateAgentConfigRequestDTO(
                 "test",
                 true,
-                AgentType.CLAUDE_CODE,
                 null,
                 "sk-key",
                 LlmProvider.ANTHROPIC,
@@ -260,7 +147,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             var request = new CreateAgentConfigRequestDTO(
                 "test",
                 true,
-                AgentType.CLAUDE_CODE,
                 null,
                 null,
                 LlmProvider.ANTHROPIC,
@@ -285,7 +171,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             var request = new CreateAgentConfigRequestDTO(
                 "test",
                 true,
-                AgentType.CLAUDE_CODE,
                 null,
                 null,
                 LlmProvider.ANTHROPIC,
@@ -305,7 +190,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             AgentConfig existing = new AgentConfig();
             existing.setId(10L);
             existing.setWorkspace(workspace);
-            existing.setAgentType(AgentType.CLAUDE_CODE);
             existing.setLlmProvider(LlmProvider.ANTHROPIC);
             existing.setAllowInternet(false);
             existing.setCredentialMode(CredentialMode.PROXY);
@@ -313,7 +197,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
 
             var request = new UpdateAgentConfigRequestDTO(
-                null,
                 null,
                 null,
                 null,
@@ -335,14 +218,13 @@ class AgentConfigServiceTest extends BaseUnitTest {
             AgentConfig existing = new AgentConfig();
             existing.setId(10L);
             existing.setWorkspace(workspace);
-            existing.setAgentType(AgentType.CLAUDE_CODE);
             existing.setLlmProvider(LlmProvider.ANTHROPIC);
             existing.setAllowInternet(true);
             existing.setCredentialMode(CredentialMode.API_KEY);
 
             when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
 
-            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, false, null);
+            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, false, null);
 
             assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
                 AgentConfigCredentialModeException.class
@@ -403,7 +285,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             var request = new CreateAgentConfigRequestDTO(
                 "my-agent",
                 true,
-                AgentType.CLAUDE_CODE,
                 "claude-sonnet-4-20250514",
                 "sk-abc",
                 LlmProvider.ANTHROPIC,
@@ -433,7 +314,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             var request = new CreateAgentConfigRequestDTO(
                 "my-agent",
                 true,
-                AgentType.CLAUDE_CODE,
                 null,
                 null,
                 LlmProvider.ANTHROPIC,
@@ -459,7 +339,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             AgentConfig existing = new AgentConfig();
             existing.setId(10L);
             existing.setWorkspace(workspace);
-            existing.setAgentType(AgentType.CLAUDE_CODE);
             existing.setLlmProvider(LlmProvider.ANTHROPIC);
             existing.setLlmApiKey("sk-existing-secret");
 
@@ -468,7 +347,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
             var request = new UpdateAgentConfigRequestDTO(
                 null,
-                AgentType.OPENCODE,
                 "gpt-4o",
                 null,
                 LlmProvider.OPENAI,
@@ -481,7 +359,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
 
             assertThat(result.getId()).isEqualTo(10L);
-            assertThat(result.getAgentType()).isEqualTo(AgentType.OPENCODE);
             assertThat(result.getLlmApiKey()).isEqualTo("sk-existing-secret");
             assertThat(result.getTimeoutSeconds()).isEqualTo(120);
         }
@@ -491,7 +368,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
         void shouldThrowNotFoundWhenUpdatingNonExistentConfig() {
             when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
 
-            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, null, null);
+            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, null);
 
             assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 999L, request)).isInstanceOf(
                 EntityNotFoundException.class

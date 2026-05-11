@@ -82,15 +82,15 @@ class HandlerArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("Handlers should not depend on adapter SPI")
-        void handlersShouldNotDependOnAdapterSpi() {
+        @DisplayName("Handlers should not depend on the Pi practice agent module")
+        void handlersShouldNotDependOnPracticeAgent() {
             noClasses()
                 .that()
                 .resideInAPackage("..agent.handler..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage("..agent.adapter..")
-                .because("Handlers and adapters are independent modules — the executor bridges them")
+                .resideInAPackage("..agent.practice..")
+                .because("Handlers and the practice agent are independent modules — the executor bridges them")
                 .check(classes);
         }
     }

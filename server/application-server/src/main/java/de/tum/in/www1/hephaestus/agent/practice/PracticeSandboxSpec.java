@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.agent.adapter.spi;
+package de.tum.in.www1.hephaestus.agent.practice;
 
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile;
@@ -8,22 +8,12 @@ import java.util.Objects;
 import org.springframework.lang.Nullable;
 
 /**
- * Agent-specific sandbox configuration produced by an {@link AgentAdapter}.
- *
- * <p>The orchestrator combines this with job-level concerns ({@code jobId},
- * {@link de.tum.in.www1.hephaestus.agent.sandbox.spi.ResourceLimits}) to build the final
- * {@link de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxSpec}.
- *
- * @param image           Docker image to run
- * @param command         container command + arguments (Docker exec form)
- * @param environment     agent-specific environment variables
- * @param inputFiles      files to inject into /workspace (relative path → content)
- * @param outputPath      container path to collect results from
- * @param securityProfile security hardening (null = use SecurityProfile.DEFAULT)
- * @param networkPolicy   network access and LLM proxy configuration
- * @param volumeMounts    host bind mounts (host path → container path); mounted read-only
+ * Sandbox configuration produced by {@link PiPracticeAgent#buildSandboxSpec}.
+ * The executor combines it with job-level concerns into a {@link
+ * de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxSpec}. {@code inputFiles} paths are
+ * workspace-relative; {@code volumeMounts} are bind-mounted read-only.
  */
-public record AgentSandboxSpec(
+public record PracticeSandboxSpec(
     String image,
     List<String> command,
     Map<String, String> environment,
@@ -33,7 +23,7 @@ public record AgentSandboxSpec(
     @Nullable NetworkPolicy networkPolicy,
     Map<String, String> volumeMounts
 ) {
-    public AgentSandboxSpec {
+    public PracticeSandboxSpec {
         Objects.requireNonNull(image, "image must not be null");
         if (image.isBlank()) {
             throw new IllegalArgumentException("image must not be blank");

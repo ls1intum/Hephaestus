@@ -1,36 +1,15 @@
-package de.tum.in.www1.hephaestus.agent.adapter.spi;
+package de.tum.in.www1.hephaestus.agent.practice;
 
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import java.util.Objects;
 import org.springframework.lang.Nullable;
 
 /**
- * Input for {@link AgentAdapter#buildSandboxSpec}.
- *
- * <p>All fields come from the job orchestrator. The adapter uses them to configure the
- * agent-specific Docker image, command, environment variables, and input files.
- *
- * <p>Authentication depends on {@link #credentialMode()}:
- * <ul>
- *   <li>{@link CredentialMode#PROXY} — {@code jobToken} required; container uses internal proxy</li>
- *   <li>{@link CredentialMode#API_KEY} — {@code credential} required; direct API key auth</li>
- *   <li>{@link CredentialMode#OAUTH} — {@code credential} required; direct OAuth token auth</li>
- * </ul>
- *
- * @param agentType      the agent runtime
- * @param llmProvider    the LLM provider
- * @param credentialMode authentication mode
- * @param modelName      model name (nullable — uses agent default if absent)
- * @param prompt         the full prompt text
- * @param credential     API key or OAuth token for direct modes (null in PROXY mode)
- * @param jobToken       proxy job token (null in direct modes)
- * @param allowInternet  whether the container may reach the public internet
- * @param timeoutSeconds job timeout
+ * Input for {@link PiPracticeAgent#buildSandboxSpec}. PROXY mode requires {@code jobToken};
+ * API_KEY/OAUTH require {@code credential}.
  */
-public record AgentAdapterRequest(
-    AgentType agentType,
+public record PracticeAgentRequest(
     LlmProvider llmProvider,
     CredentialMode credentialMode,
     @Nullable String modelName,
@@ -40,8 +19,7 @@ public record AgentAdapterRequest(
     boolean allowInternet,
     int timeoutSeconds
 ) {
-    public AgentAdapterRequest {
-        Objects.requireNonNull(agentType, "agentType must not be null");
+    public PracticeAgentRequest {
         Objects.requireNonNull(llmProvider, "llmProvider must not be null");
         Objects.requireNonNull(credentialMode, "credentialMode must not be null");
         Objects.requireNonNull(prompt, "prompt must not be null");

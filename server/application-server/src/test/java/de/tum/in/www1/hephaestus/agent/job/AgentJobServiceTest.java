@@ -16,7 +16,6 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
@@ -108,7 +107,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         enabledConfig.setWorkspace(workspace);
         enabledConfig.setName("test-config");
         enabledConfig.setEnabled(true);
-        enabledConfig.setAgentType(AgentType.CLAUDE_CODE);
         enabledConfig.setLlmProvider(LlmProvider.ANTHROPIC);
         enabledConfig.setCredentialMode(CredentialMode.PROXY);
         enabledConfig.setTimeoutSeconds(600);

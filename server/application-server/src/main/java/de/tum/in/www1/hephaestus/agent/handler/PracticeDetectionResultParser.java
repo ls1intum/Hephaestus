@@ -143,8 +143,8 @@ public class PracticeDetectionResultParser {
         DeliveryContent delivery = parseDeliveryContent(root);
 
         // Step 6: Fallback — if delivery has no diffNotes, collect suggestedDiffNotes from
-        // NEGATIVE findings' raw JSON. OpenCode subagents produce per-finding suggestedDiffNotes
-        // that the orchestrator LLM often fails to aggregate into delivery.diffNotes.
+        // NEGATIVE findings' raw JSON. The Pi runner persists per-finding suggestedDiffNotes
+        // that the agent does not always aggregate into a top-level delivery.diffNotes block.
         if (delivery == null || delivery.diffNotes().isEmpty()) {
             List<DiffNote> fallbackNotes = collectSuggestedDiffNotes(findingsNode, valid);
             if (!fallbackNotes.isEmpty()) {
@@ -232,10 +232,11 @@ public class PracticeDetectionResultParser {
     /**
      * Fallback: collect suggestedDiffNotes from individual NEGATIVE findings when delivery.diffNotes is empty.
      *
-     * <p>OpenCode subagents produce per-finding {@code suggestedDiffNotes} arrays, but the orchestrator
-     * LLM often fails to aggregate them into {@code delivery.diffNotes}. This method scans raw finding
-     * JSON nodes, matches them against validated NEGATIVE findings (by practiceSlug), and collects
-     * their suggested diff notes — prioritizing higher severity findings, capped at {@link #MAX_DELIVERY_DIFF_NOTES}.
+     * <p>The Pi runner persists per-finding {@code suggestedDiffNotes} arrays, but the agent does not
+     * always aggregate them into a top-level {@code delivery.diffNotes} block. This method scans raw
+     * finding JSON nodes, matches them against validated NEGATIVE findings (by practiceSlug), and
+     * collects their suggested diff notes — prioritizing higher severity findings, capped at
+     * {@link #MAX_DELIVERY_DIFF_NOTES}.
      */
     private List<DiffNote> collectSuggestedDiffNotes(JsonNode findingsNode, List<ValidatedFinding> validatedFindings) {
         // Build lookup of NEGATIVE validated findings by slug → severity for filtering and sorting

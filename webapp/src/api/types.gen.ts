@@ -563,10 +563,6 @@ export type UpdatePracticeActiveRequest = {
  */
 export type UpdateAgentConfigRequest = {
     /**
-     * Type of coding agent
-     */
-    agentType?: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
-    /**
      * Whether agent containers have internet access
      */
     allowInternet?: boolean;
@@ -1728,10 +1724,6 @@ export type CreateDocumentRequest = {
  */
 export type CreateAgentConfigRequest = {
     /**
-     * Type of coding agent
-     */
-    agentType: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
-    /**
      * Whether agent containers have internet access
      */
     allowInternet?: boolean;
@@ -1877,10 +1869,6 @@ export type AssignRoleRequest = {
  * Agent configuration for a workspace (API key redacted)
  */
 export type AgentConfig = {
-    /**
-     * Type of coding agent
-     */
-    agentType: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
     /**
      * Whether agent containers have internet access
      */

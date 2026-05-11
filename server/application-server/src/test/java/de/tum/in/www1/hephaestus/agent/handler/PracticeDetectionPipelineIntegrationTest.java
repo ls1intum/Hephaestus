@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
@@ -124,7 +123,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         config.setWorkspace(workspace);
         config.setName("pipeline-config");
         config.setEnabled(true);
-        config.setAgentType(AgentType.CLAUDE_CODE);
         config.setLlmProvider(LlmProvider.ANTHROPIC);
         config.setCredentialMode(CredentialMode.PROXY);
         config.setTimeoutSeconds(300);

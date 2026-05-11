@@ -195,10 +195,6 @@ services:
       # Azure OpenAI
       AZURE_RESOURCE_NAME: ${AZURE_RESOURCE_NAME:-}
       AZURE_API_KEY: ${AZURE_API_KEY:-}
-      # Observability (optional)
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

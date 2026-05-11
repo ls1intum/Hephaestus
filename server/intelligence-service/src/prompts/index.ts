@@ -1,31 +1,20 @@
-/**
- * Centralized prompt management for the intelligence service.
- *
- * Prompts are COLOCATED with their features:
- * - src/mentor/chat.prompt.ts - Mentor chat system prompt
- */
+// Re-exports for prompts (definitions colocated with features).
 
-// Prompt definitions (re-exported from feature modules)
 export {
 	greetingContinuePrompt,
 	greetingFirstMessagePrompt,
 	type MentorChatVariables,
 	mentorChatPrompt,
-	mentorPrompts,
 	returningUserPrompt,
 } from "@/mentor/chat.prompt";
 
-// Loader
 export type { LoadPromptOptions } from "./loader";
 export { loadPrompt } from "./loader";
 
-// Types
 export type {
 	ChatPromptDefinition,
 	ChatPromptMessage,
 	CompileResult,
-	LangfuseResolvedPrompt,
-	LocalResolvedPrompt,
 	PromptChatMessage,
 	PromptConfig,
 	PromptDefinition,

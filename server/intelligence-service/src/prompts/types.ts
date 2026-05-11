@@ -1,24 +1,10 @@
-/**
- * Prompt type definitions for centralized prompt management.
- * @see https://langfuse.com/docs/prompt-management/features/variables
- */
-
-import type { ChatPromptClient, TextPromptClient } from "@langfuse/client";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
+// Prompt types for the static prompt loader.
 
 export const PROMPT_TYPES = { TEXT: "text", CHAT: "chat" } as const;
 export type PromptType = (typeof PROMPT_TYPES)[keyof typeof PROMPT_TYPES];
 
-/** Message roles for chat prompts (not exported - use MessageRole type instead) */
 const MESSAGE_ROLES = { SYSTEM: "system", USER: "user", ASSISTANT: "assistant" } as const;
 export type MessageRole = (typeof MESSAGE_ROLES)[keyof typeof MESSAGE_ROLES];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Message Types
-// ─────────────────────────────────────────────────────────────────────────────
 
 export interface PromptChatMessage {
 	readonly role: MessageRole;
@@ -40,10 +26,6 @@ export function isPlaceholderMessage(msg: ChatPromptMessage): msg is PromptPlace
 	return "type" in msg && msg.type === "placeholder";
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Definitions
-// ─────────────────────────────────────────────────────────────────────────────
-
 export interface PromptToolDefinition {
 	readonly type: "function";
 	readonly function: {
@@ -64,10 +46,6 @@ function isPromptToolDefinition(value: unknown): value is PromptToolDefinition {
 	return typeof (obj.function as Record<string, unknown>).name === "string";
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Prompt Config
-// ─────────────────────────────────────────────────────────────────────────────
-
 export interface PromptConfig {
 	readonly model?: string;
 	readonly temperature?: number;
@@ -85,18 +63,11 @@ export function getToolsFromConfig(config: PromptConfig): readonly PromptToolDef
 	return tools.filter(isPromptToolDefinition);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Prompt Definition
-// ─────────────────────────────────────────────────────────────────────────────
-
 interface PromptDefinitionBase {
 	readonly name: string;
 	readonly description?: string;
 	readonly config?: PromptConfig;
-	readonly labels?: readonly string[];
-	readonly tags?: readonly string[];
 	readonly variables?: readonly string[];
-	readonly _meta?: { readonly toolsDir?: string };
 }
 
 export interface TextPromptDefinition extends PromptDefinitionBase {
@@ -119,19 +90,11 @@ export function isTextPromptDefinition(def: PromptDefinition): def is TextPrompt
 	return def.type === PROMPT_TYPES.TEXT;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Compile Result Types
-// ─────────────────────────────────────────────────────────────────────────────
-
 export type TextCompileResult = string;
 export type ChatCompileResult = readonly PromptChatMessage[];
 export type CompileResult<T extends PromptType> = T extends typeof PROMPT_TYPES.TEXT
 	? TextCompileResult
 	: ChatCompileResult;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Resolved Prompt
-// ─────────────────────────────────────────────────────────────────────────────
 
 export type PromptVariables = Readonly<Record<string, string>>;
 export type PromptPlaceholders = Readonly<Record<string, readonly PromptChatMessage[]>>;
@@ -141,24 +104,8 @@ type CompileFunction<T extends PromptType> = (
 	placeholders?: PromptPlaceholders,
 ) => CompileResult<T>;
 
-interface ResolvedPromptBase<T extends PromptType> {
+export interface ResolvedPrompt<T extends PromptType = PromptType> {
 	readonly definition: PromptDefinition<T>;
 	readonly config: PromptConfig;
 	readonly compile: CompileFunction<T>;
 }
-
-export interface LangfuseResolvedPrompt<T extends PromptType> extends ResolvedPromptBase<T> {
-	readonly source: "langfuse";
-	readonly langfusePrompt: T extends typeof PROMPT_TYPES.TEXT ? TextPromptClient : ChatPromptClient;
-	readonly langfuseVersion: number;
-}
-
-export interface LocalResolvedPrompt<T extends PromptType> extends ResolvedPromptBase<T> {
-	readonly source: "local";
-	readonly langfusePrompt?: undefined;
-	readonly langfuseVersion?: undefined;
-}
-
-export type ResolvedPrompt<T extends PromptType = PromptType> =
-	| LangfuseResolvedPrompt<T>
-	| LocalResolvedPrompt<T>;

@@ -68,88 +68,11 @@ The service is a pure backend API that:
    - `/docs` – Interactive API documentation
    - `/openapi.yaml` – OpenAPI v3.1 specification
 
-## AI Observability with Langfuse
+## AI Observability
 
-The intelligence service integrates with [Langfuse](https://langfuse.com/) for production-grade AI observability. This provides:
+The intelligence service exposes an OpenTelemetry instrumentation hook (`src/instrumentation.ts`) that is currently a no-op stub. A generic OTel exporter will be wired up alongside the same-image mentor migration; until then there is no AI tracing in this service.
 
-- **Trace visualization** – See the full execution flow of AI requests
-- **Token usage tracking** – Monitor costs across providers
-- **Performance metrics** – Response times, latency analysis
-- **Prompt management** – Version and compare prompt effectiveness
-- **Error tracking** – Debug failed AI calls with full context
-
-### Enabling Langfuse
-
-Add the following to your `.env` file:
-
-```bash
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_BASE_URL=https://cloud.langfuse.com  # or self-hosted URL
-```
-
-When these variables are set, the service automatically:
-1. Initializes OpenTelemetry with the Langfuse span processor
-2. Traces all AI SDK calls (streaming, tool calls, generations)
-3. Sends telemetry to your Langfuse project
-
-### Self-Hosted Langfuse
-
-For local development without cloud dependencies, you can run Langfuse locally:
-
-```bash
-docker run -d --name langfuse \
-  -p 3000:3000 \
-  -e DATABASE_URL=postgresql://... \
-  langfuse/langfuse:latest
-```
-
-Then set `LANGFUSE_BASE_URL=http://localhost:3000` in your `.env`.
-
-## Why Not AI SDK DevTools?
-
-[AI SDK DevTools](https://ai-sdk-tools.dev/devtools) (`@ai-sdk-tools/devtools`) is a React component designed for **frontend applications** that use the `useChat` hook. It provides a visual debugging panel similar to React Query DevTools.
-
-Since the intelligence service is a **pure backend API** without a React frontend:
-- AI SDK DevTools cannot be integrated directly
-- The devtools require browser-side React rendering
-- Tool call monitoring happens server-side, not in a browser context
-
-For backend AI observability, **Langfuse is the recommended solution** as it's designed for server-side tracing and provides equivalent (or better) debugging capabilities:
-
-| Feature | AI SDK DevTools | Langfuse |
-|---------|----------------|----------|
-| Tool call monitoring | ✅ | ✅ |
-| Performance metrics | ✅ | ✅ |
-| Streaming visualization | ✅ | ✅ |
-| Token usage tracking | ❌ | ✅ |
-| Cost analysis | ❌ | ✅ |
-| Production traces | ❌ | ✅ |
-| Historical analysis | ❌ | ✅ |
-| Multi-provider support | Limited | ✅ |
-
-### For Frontend Developers
-
-If you're working on the **webapp** and using AI SDK's React hooks (`useChat`, `useCompletion`), you can add AI SDK DevTools to the frontend:
-
-```bash
-npm install @ai-sdk-tools/devtools
-```
-
-```tsx
-import { AIDevTools } from '@ai-sdk-tools/devtools'
-
-function App() {
-  return (
-    <div>
-      {/* Your app content */}
-      {process.env.NODE_ENV === 'development' && <AIDevTools />}
-    </div>
-  )
-}
-```
-
-This would show client-side streaming and tool call activity. However, the Hephaestus webapp currently communicates with the intelligence service via REST API, not AI SDK's streaming protocols, so this integration is not applicable at this time.
+The Langfuse integration was removed in the Pi-only consolidation. Prompts are now defined inline in `src/mentor/chat.prompt.ts` and compiled by the static loader in `src/prompts/loader.ts`.
 
 ## Database Access
 

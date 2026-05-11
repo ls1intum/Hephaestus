@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
@@ -27,7 +26,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         config.setId(42L);
         config.setWorkspace(ws);
         config.setName("my-agent");
-        config.setAgentType(AgentType.CLAUDE_CODE);
         config.setLlmProvider(LlmProvider.ANTHROPIC);
         config.setCredentialMode(CredentialMode.PROXY);
         config.setModelName("claude-sonnet-4-20250514");
@@ -51,7 +49,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
             assertThat(snapshot.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
             assertThat(snapshot.configId()).isEqualTo(42L);
             assertThat(snapshot.configName()).isEqualTo("my-agent");
-            assertThat(snapshot.agentType()).isEqualTo(AgentType.CLAUDE_CODE);
             assertThat(snapshot.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
             assertThat(snapshot.credentialMode()).isEqualTo(CredentialMode.PROXY);
             assertThat(snapshot.modelName()).isEqualTo("claude-sonnet-4-20250514");
@@ -93,7 +90,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
             assertThat(deserialized.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
             assertThat(deserialized.configId()).isEqualTo(42L);
             assertThat(deserialized.configName()).isEqualTo("my-agent");
-            assertThat(deserialized.agentType()).isEqualTo(AgentType.CLAUDE_CODE);
             assertThat(deserialized.timeoutSeconds()).isEqualTo(600);
         }
 
@@ -187,6 +183,46 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
             assertThat(deserialized.modelName()).isNull();
         }
+
+        @Test
+        @DisplayName("should deserialise legacy v2 snapshot containing dropped agentType field")
+        void shouldDeserializeLegacyV2WithAgentType() throws Exception {
+            // Pre-consolidation snapshot shape: schemaVersion=2 + agentType=CLAUDE_CODE.
+            // After the Pi-only consolidation the agentType field is gone from the record;
+            // @JsonIgnoreProperties(ignoreUnknown=true) must let these legacy rows deserialise.
+            String legacy =
+                "{\"schemaVersion\":2,\"configId\":42,\"configName\":\"legacy\"," +
+                "\"agentType\":\"CLAUDE_CODE\",\"llmProvider\":\"ANTHROPIC\"," +
+                "\"credentialMode\":\"PROXY\",\"modelName\":\"claude-sonnet-4-20250514\"," +
+                "\"modelVersion\":null,\"timeoutSeconds\":600,\"allowInternet\":false}";
+            JsonNode node = OBJECT_MAPPER.readTree(legacy);
+
+            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
+
+            assertThat(snapshot.configId()).isEqualTo(42L);
+            assertThat(snapshot.configName()).isEqualTo("legacy");
+            assertThat(snapshot.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
+            assertThat(snapshot.modelName()).isEqualTo("claude-sonnet-4-20250514");
+            assertThat(snapshot.timeoutSeconds()).isEqualTo(600);
+        }
+
+        @Test
+        @DisplayName("should deserialise v1 snapshot lacking schemaVersion field")
+        void shouldDeserializeV1WithoutSchemaVersion() throws Exception {
+            // Earliest snapshot shape predates the schemaVersion guard. fromJson reads
+            // missing schemaVersion as 0 (≤ current), so v1 rows are accepted.
+            String v1 =
+                "{\"configId\":7,\"configName\":\"v1\",\"agentType\":\"OPENCODE\"," +
+                "\"llmProvider\":\"OPENAI\",\"credentialMode\":\"PROXY\"," +
+                "\"modelName\":\"gpt-4o-mini\",\"timeoutSeconds\":300,\"allowInternet\":false}";
+            JsonNode node = OBJECT_MAPPER.readTree(v1);
+
+            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
+
+            assertThat(snapshot.schemaVersion()).isEqualTo(0);
+            assertThat(snapshot.llmProvider()).isEqualTo(LlmProvider.OPENAI);
+            assertThat(snapshot.modelName()).isEqualTo("gpt-4o-mini");
+        }
     }
 
     @Nested
@@ -194,40 +230,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
     class Validation {
 
         @Test
-        @DisplayName("should reject null agentType")
-        void shouldRejectNullAgentType() {
-            assertThatThrownBy(() ->
-                new ConfigSnapshot(
-                    1,
-                    1L,
-                    "name",
-                    null,
-                    LlmProvider.ANTHROPIC,
-                    CredentialMode.PROXY,
-                    null,
-                    null,
-                    600,
-                    false
-                )
-            ).isInstanceOf(NullPointerException.class);
-        }
-
-        @Test
         @DisplayName("should reject null llmProvider")
         void shouldRejectNullLlmProvider() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(
-                    1,
-                    1L,
-                    "name",
-                    AgentType.CLAUDE_CODE,
-                    null,
-                    CredentialMode.PROXY,
-                    null,
-                    null,
-                    600,
-                    false
-                )
+                new ConfigSnapshot(1, 1L, "name", null, CredentialMode.PROXY, null, null, 600, false)
             ).isInstanceOf(NullPointerException.class);
         }
 
@@ -235,18 +241,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @DisplayName("should reject null credentialMode")
         void shouldRejectNullCredentialMode() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(
-                    1,
-                    1L,
-                    "name",
-                    AgentType.CLAUDE_CODE,
-                    LlmProvider.ANTHROPIC,
-                    null,
-                    null,
-                    null,
-                    600,
-                    false
-                )
+                new ConfigSnapshot(1, 1L, "name", LlmProvider.ANTHROPIC, null, null, null, 600, false)
             ).isInstanceOf(NullPointerException.class);
         }
 
@@ -254,18 +249,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @DisplayName("should reject zero timeout")
         void shouldRejectZeroTimeout() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(
-                    1,
-                    1L,
-                    "name",
-                    AgentType.CLAUDE_CODE,
-                    LlmProvider.ANTHROPIC,
-                    CredentialMode.PROXY,
-                    null,
-                    null,
-                    0,
-                    false
-                )
+                new ConfigSnapshot(1, 1L, "name", LlmProvider.ANTHROPIC, CredentialMode.PROXY, null, null, 0, false)
             ).isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -273,18 +257,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @DisplayName("should reject negative timeout")
         void shouldRejectNegativeTimeout() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(
-                    1,
-                    1L,
-                    "name",
-                    AgentType.CLAUDE_CODE,
-                    LlmProvider.ANTHROPIC,
-                    CredentialMode.PROXY,
-                    null,
-                    null,
-                    -1,
-                    false
-                )
+                new ConfigSnapshot(1, 1L, "name", LlmProvider.ANTHROPIC, CredentialMode.PROXY, null, null, -1, false)
             ).isInstanceOf(IllegalArgumentException.class);
         }
     }

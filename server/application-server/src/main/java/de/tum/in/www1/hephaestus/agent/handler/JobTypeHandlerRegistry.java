@@ -14,8 +14,7 @@ import java.util.Objects;
  * construction time that every {@link AgentJobType} has exactly one handler — startup fails fast
  * if a handler is missing or duplicated.
  *
- * <p>Registered as a bean via {@link JobTypeHandlerConfiguration}. Follows the same pattern as
- * {@link de.tum.in.www1.hephaestus.agent.adapter.AgentAdapterRegistry}.
+ * <p>Registered as a bean via {@link JobTypeHandlerConfiguration}.
  */
 public class JobTypeHandlerRegistry {
 

@@ -25,7 +25,7 @@ Default to a high-signal review:
 - Prefer one precise finding about user-visible breakage over a second lower-value finding about logging or style around the same defect.
 - There is no target number of findings and no quota. Never plan around a number like five.
 
-You may also read `.context/diff.patch` for line-number verification, `repo/` for surrounding code context, `.precompute-out/summary.md` for static analysis hints, and `/workspace/orchestrator-protocol.md` for detailed rules.
+You may also read `.context/diff.patch` for line-number verification, `repo/` for surrounding code context, and `.precompute-out/summary.md` for static analysis hints.
 
 ## Workspace
 

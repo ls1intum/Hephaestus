@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
@@ -48,7 +47,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         AgentConfig config = new AgentConfig();
         config.setWorkspace(workspace);
         config.setName(name);
-        config.setAgentType(AgentType.CLAUDE_CODE);
         config.setLlmProvider(LlmProvider.ANTHROPIC);
         return agentConfigRepository.save(config);
     }

@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
@@ -64,7 +63,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             1,
             1L,
             "cfg",
-            AgentType.CLAUDE_CODE,
             LlmProvider.ANTHROPIC,
             CredentialMode.PROXY,
             null,

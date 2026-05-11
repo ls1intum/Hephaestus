@@ -12,7 +12,6 @@ TypeScript/Hono microservice providing AI-powered features: mentor chat.
 | Type check | `npm run typecheck` |
 | Lint + format | `npm run check` |
 | Export OpenAPI | `npm run openapi:export` |
-| Sync prompts | `npm run prompts push` |
 | Introspect DB | `npm run db:introspect` |
 
 ## Boundaries
@@ -44,7 +43,7 @@ Node.js 22 + TypeScript 5.9 (strict mode)
 ├── LLM Providers: OpenAI, Azure OpenAI (via registry)
 ├── Database: PostgreSQL + Drizzle ORM
 ├── Validation: Zod (request/response schemas)
-├── Observability: Langfuse (OpenTelemetry tracing)
+├── Observability: OpenTelemetry stub (no exporter wired yet)
 ├── Testing: Vitest + Testcontainers
 └── Linting: Biome
 ```
@@ -67,7 +66,7 @@ src/
 │   │   ├── pull-requests.tool.ts
 │   │   └── ... (10 tools)
 │   └── vote/             # Message voting
-├── prompts/              # Prompt loader + Langfuse integration
+├── prompts/              # Static prompt loader (LRU-cached)
 └── shared/
     ├── ai/               # Model registry, error handling
     ├── db/               # Drizzle connection + schema
@@ -128,7 +127,7 @@ Register in `src/mentor/tools/registry.ts`.
 
 ## Prompt Management
 
-Prompts follow local-first, sync-to-Langfuse pattern:
+Prompts are defined inline in feature modules and loaded by a static loader:
 
 ```typescript
 // src/mentor/chat.prompt.ts
@@ -140,16 +139,7 @@ export const mentorChatPrompt: PromptDefinition = {
 };
 ```
 
-### Workflow
-
-```bash
-npm run prompts status  # Check sync status
-npm run prompts push    # Push to Langfuse
-npm run prompts pull    # Pull from Langfuse
-npm run prompts diff    # Show differences
-```
-
-At runtime: loads from Langfuse with LRU cache (5 min TTL), falls back to local if unavailable.
+At runtime: `loadPrompt()` compiles `{{variable}}` placeholders and caches the result via an LRU (5 min TTL). The Langfuse-backed loader was removed in the Pi-only consolidation.
 
 ## Database
 
@@ -170,7 +160,6 @@ The service shares the same database as application-server (read-only for activi
 | `OPENAI_API_KEY` | If OpenAI | OpenAI API key |
 | `AZURE_RESOURCE_NAME` | If Azure | Azure resource name |
 | `AZURE_API_KEY` | If Azure | Azure API key |
-| `LANGFUSE_*` | No | Langfuse credentials |
 | `PORT` | No | Server port (default: 8000) |
 
 Model names must be provider-qualified: `openai:gpt-4o-mini`, `azure:gpt-4o`.

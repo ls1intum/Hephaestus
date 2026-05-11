@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.agent.config;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import java.util.Objects;
@@ -28,7 +27,6 @@ public record ConfigSnapshot(
     int schemaVersion,
     Long configId,
     String configName,
-    AgentType agentType,
     LlmProvider llmProvider,
     CredentialMode credentialMode,
     @Nullable String modelName,
@@ -37,10 +35,9 @@ public record ConfigSnapshot(
     boolean allowInternet
 ) {
     /** Current schema version. Bump when adding/removing fields. */
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
 
     public ConfigSnapshot {
-        Objects.requireNonNull(agentType, "agentType must not be null");
         Objects.requireNonNull(llmProvider, "llmProvider must not be null");
         Objects.requireNonNull(credentialMode, "credentialMode must not be null");
         if (timeoutSeconds <= 0) {
@@ -57,7 +54,6 @@ public record ConfigSnapshot(
             SCHEMA_VERSION,
             config.getId(),
             config.getName(),
-            config.getAgentType(),
             config.getLlmProvider(),
             config.getCredentialMode(),
             config.getModelName(),

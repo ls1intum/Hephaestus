@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
@@ -86,7 +85,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         AgentConfig config = new AgentConfig();
         config.setWorkspace(workspace);
         config.setName("test-config-" + System.nanoTime());
-        config.setAgentType(AgentType.CLAUDE_CODE);
         config.setLlmProvider(LlmProvider.ANTHROPIC);
         config = agentConfigRepository.save(config);
 
@@ -149,7 +147,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             AgentConfig config = new AgentConfig();
             config.setWorkspace(workspace);
             config.setName("completed-config");
-            config.setAgentType(AgentType.CLAUDE_CODE);
             config.setLlmProvider(LlmProvider.ANTHROPIC);
             config = agentConfigRepository.save(config);
 
@@ -177,7 +174,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             AgentConfig config = new AgentConfig();
             config.setWorkspace(workspace);
             config.setName("queued-config");
-            config.setAgentType(AgentType.CLAUDE_CODE);
             config.setLlmProvider(LlmProvider.ANTHROPIC);
             config = agentConfigRepository.save(config);
 
@@ -205,7 +201,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             AgentConfig config = new AgentConfig();
             config.setWorkspace(workspace);
             config.setName("failed-config");
-            config.setAgentType(AgentType.CLAUDE_CODE);
             config.setLlmProvider(LlmProvider.ANTHROPIC);
             config = agentConfigRepository.save(config);
 

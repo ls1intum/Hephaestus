@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
-import de.tum.in.www1.hephaestus.agent.AgentType;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
@@ -51,7 +50,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         var request = new CreateAgentConfigRequestDTO(
             name,
             true,
-            AgentType.CLAUDE_CODE,
             "claude-sonnet-4-20250514",
             "sk-test-secret-key-123",
             LlmProvider.ANTHROPIC,
@@ -101,7 +99,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         assertThat(created).isNotNull();
         assertThat(created.name()).isEqualTo("my-agent");
-        assertThat(created.agentType()).isEqualTo(AgentType.CLAUDE_CODE);
         assertThat(created.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
         assertThat(created.modelName()).isEqualTo("claude-sonnet-4-20250514");
         assertThat(created.hasLlmApiKey()).isTrue();
@@ -125,7 +122,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(fetched).isNotNull();
         assertThat(fetched.id()).isEqualTo(created.id());
         assertThat(fetched.name()).isEqualTo("my-agent");
-        assertThat(fetched.agentType()).isEqualTo(AgentType.CLAUDE_CODE);
     }
 
     @Test
@@ -161,7 +157,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         var duplicateRequest = new CreateAgentConfigRequestDTO(
             "duplicate-name",
             true,
-            AgentType.OPENCODE,
             null,
             null,
             LlmProvider.OPENAI,
@@ -197,7 +192,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         // Update — omit llmApiKey (null = keep existing)
         var updateRequest = new UpdateAgentConfigRequestDTO(
             null,
-            AgentType.OPENCODE,
             "gpt-4o",
             null,
             LlmProvider.OPENAI,
@@ -222,49 +216,12 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         assertThat(updated).isNotNull();
         assertThat(updated.name()).isEqualTo("update-test"); // name unchanged
-        assertThat(updated.agentType()).isEqualTo(AgentType.OPENCODE);
         assertThat(updated.llmProvider()).isEqualTo(LlmProvider.OPENAI);
         assertThat(updated.modelName()).isEqualTo("gpt-4o");
         assertThat(updated.hasLlmApiKey()).isTrue(); // preserved from create
         assertThat(updated.timeoutSeconds()).isEqualTo(120);
         assertThat(updated.maxConcurrentJobs()).isEqualTo(1);
         assertThat(updated.allowInternet()).isTrue();
-    }
-
-    @Test
-    @WithAdminUser
-    void postWithInvalidProviderReturns400() {
-        Workspace workspace = setupWorkspace();
-
-        var request = new CreateAgentConfigRequestDTO(
-            "bad-provider",
-            true,
-            AgentType.CLAUDE_CODE,
-            null,
-            null,
-            LlmProvider.OPENAI,
-            null,
-            null,
-            null,
-            null
-        );
-
-        ProblemDetail problem = webTestClient
-            .post()
-            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
-
-        assertThat(problem).isNotNull();
-        assertThat(problem.getDetail()).contains("CLAUDE_CODE");
-        assertThat(problem.getDetail()).contains("ANTHROPIC");
     }
 
     @Test
@@ -351,7 +308,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     void postWithMissingRequiredFieldsReturns400() {
         Workspace workspace = setupWorkspace();
 
-        // Missing agentType and llmProvider (both @NotNull)
+        // Missing llmProvider (@NotNull)
         var request = Map.of("name", "incomplete-config");
 
         webTestClient
@@ -373,7 +330,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         var request = new CreateAgentConfigRequestDTO(
             "",
             true,
-            AgentType.CLAUDE_CODE,
             null,
             null,
             LlmProvider.ANTHROPIC,
@@ -402,7 +358,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         var request = new CreateAgentConfigRequestDTO(
             "bad-timeout",
             true,
-            AgentType.CLAUDE_CODE,
             null,
             null,
             LlmProvider.ANTHROPIC,
@@ -431,7 +386,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         var request = new CreateAgentConfigRequestDTO(
             "location-test",
             true,
-            AgentType.CLAUDE_CODE,
             null,
             null,
             LlmProvider.ANTHROPIC,
@@ -475,7 +429,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         var request = new CreateAgentConfigRequestDTO(
             "secret-test",
             true,
-            AgentType.CLAUDE_CODE,
             null,
             "sk-super-secret-key",
             LlmProvider.ANTHROPIC,

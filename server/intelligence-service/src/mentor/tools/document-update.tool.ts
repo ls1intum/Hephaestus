@@ -18,7 +18,6 @@ import pino from "pino";
 import { z } from "zod";
 import env from "@/env";
 import { formatConversationForDocument } from "@/shared/ai/messages";
-import { getTelemetryOptions } from "@/shared/ai/telemetry";
 import db from "@/shared/db";
 import { document as docTable } from "@/shared/db/schema";
 import { defineToolMeta } from "./define-tool";
@@ -138,11 +137,6 @@ ${currentContent}
 		userPrompt += `\n\n**Recent Conversation (for context):**\n${conversationContext}`;
 	}
 
-	// Enable telemetry for document updates
-	const telemetryOptions = getTelemetryOptions({
-		operation: "document:update",
-	});
-
 	const { fullStream } = streamText({
 		model: env.defaultModel,
 		system: systemPrompt,
@@ -154,7 +148,6 @@ ${currentContent}
 				prediction: { type: "content", content: currentContent },
 			},
 		},
-		...telemetryOptions,
 	});
 
 	for await (const delta of fullStream) {
