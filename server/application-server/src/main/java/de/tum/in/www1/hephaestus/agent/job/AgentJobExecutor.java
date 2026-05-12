@@ -6,10 +6,11 @@ import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.in.www1.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
-import de.tum.in.www1.hephaestus.agent.practice.AgentResult;
-import de.tum.in.www1.hephaestus.agent.practice.PiPracticeAgent;
 import de.tum.in.www1.hephaestus.agent.practice.PracticeAgentRequest;
+import de.tum.in.www1.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.in.www1.hephaestus.agent.practice.PracticeSandboxSpec;
+import de.tum.in.www1.hephaestus.agent.runtime.AgentResult;
+import de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
@@ -87,7 +88,7 @@ public class AgentJobExecutor {
     private final AgentJobRepository jobRepository;
     private final AgentConfigRepository configRepository;
     private final JobTypeHandlerRegistry handlerRegistry;
-    private final PiPracticeAgent practiceAgent;
+    private final PracticePiAdapter practiceAgent;
     private final SandboxManager sandboxManager;
     private final AsyncTaskExecutor sandboxExecutor;
     private final TransactionTemplate transactionTemplate;
@@ -106,7 +107,7 @@ public class AgentJobExecutor {
         AgentJobRepository jobRepository,
         AgentConfigRepository configRepository,
         JobTypeHandlerRegistry handlerRegistry,
-        PiPracticeAgent practiceAgent,
+        PracticePiAdapter practiceAgent,
         SandboxManager sandboxManager,
         @Qualifier("sandboxExecutor") AsyncTaskExecutor sandboxExecutor,
         TransactionTemplate transactionTemplate,
@@ -353,20 +354,18 @@ public class AgentJobExecutor {
         // (the original job object is detached from the claim transaction).
         TransactionTemplate readOnlyTx = new TransactionTemplate(transactionTemplate.getTransactionManager());
         readOnlyTx.setReadOnly(true);
-        record PrepareResult(Map<String, byte[]> files, String prompt, Map<String, String> volumeMounts) {}
+        record PrepareResult(Map<String, byte[]> files, Map<String, String> volumeMounts) {}
         PrepareResult prepared = readOnlyTx.execute(status -> {
             AgentJob managedJob = jobRepository.findByIdWithWorkspace(jobId).orElse(job);
             Map<String, byte[]> files = handler.prepareInputFiles(managedJob);
-            String p = handler.buildPrompt(managedJob);
             Map<String, String> volumes = handler.volumeMounts(managedJob);
-            return new PrepareResult(files, p, volumes);
+            return new PrepareResult(files, volumes);
         });
 
         PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
             snapshot.llmProvider(),
             snapshot.credentialMode(),
             snapshot.modelName(),
-            prepared.prompt(),
             job.getLlmApiKey(),
             job.getJobToken(),
             snapshot.allowInternet(),
@@ -582,6 +581,18 @@ public class AgentJobExecutor {
         }
         if (sandboxResult.exitCode() == 0) {
             return AgentJobStatus.COMPLETED;
+        }
+        // Distinguish envelope drift (exit 42) from generic failure — the runner emits this when
+        // the task.json schemaVersion / kind doesn't match this image. Operators need to see
+        // this distinctly from agent crashes; the secondary metric also alerts on image drift.
+        if (sandboxResult.exitCode() == WorkspaceAbi.EXIT_ENVELOPE_MISMATCH) {
+            log.error(
+                "Pi runner rejected task envelope (exit {}) — server/image schemaVersion or kind drift. " +
+                    "Rebuild the agent-pi image or roll back the server.",
+                WorkspaceAbi.EXIT_ENVELOPE_MISMATCH
+            );
+            meterRegistry.counter("agent.pi.envelope.mismatch").increment();
+            return AgentJobStatus.FAILED;
         }
         // Non-zero exit: check if valid output was still produced.
         // The agent may write result.json but the runner exits 1 due to validation mismatch.

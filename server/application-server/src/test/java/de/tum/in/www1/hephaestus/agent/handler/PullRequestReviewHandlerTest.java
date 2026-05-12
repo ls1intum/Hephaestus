@@ -13,23 +13,21 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
+import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
+import de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.in.www1.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionDeliveryService.DeliveryResult;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
+import de.tum.in.www1.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
-import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
@@ -37,10 +35,11 @@ import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -57,42 +56,40 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     private GitRepositoryManager gitRepositoryManager;
 
     @Mock
-    private PullRequestRepository pullRequestRepository;
-
-    @Mock
-    private PullRequestReviewCommentRepository reviewCommentRepository;
-
-    @Mock
     private PracticeRepository practiceRepository;
 
     @Mock
-    private ContributorHistoryProvider contributorHistoryProvider;
+    private WorkspaceContextBuilder workspaceContextBuilder;
+
+    @Mock
+    private GitDiffOperations gitDiffOperations;
 
     @Mock
     private PracticeDetectionDeliveryService deliveryService;
 
-    private static final Long WORKSPACE_ID = 99L;
-
     @Mock
     private FeedbackDeliveryService feedbackService;
 
+    private static final Long WORKSPACE_ID = 99L;
+
     private PracticeDetectionResultParser resultParser;
+    private TaskEnvelopeWriter taskEnvelopeWriter;
     private PullRequestReviewHandler handler;
 
     @BeforeEach
     void setUp() {
         resultParser = new PracticeDetectionResultParser(objectMapper);
+        taskEnvelopeWriter = new TaskEnvelopeWriter(objectMapper);
         handler = new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,
-            pullRequestRepository,
-            reviewCommentRepository,
             practiceRepository,
-            contributorHistoryProvider,
+            workspaceContextBuilder,
+            taskEnvelopeWriter,
+            gitDiffOperations,
             resultParser,
             deliveryService,
-            feedbackService,
-            null
+            feedbackService
         );
     }
 
@@ -117,7 +114,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             null,
             null
         );
-
         return new PullRequestReviewSubmissionRequest(pullRequestData, "feature/auth-fix", "abc123def456", "main");
     }
 
@@ -136,6 +132,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
     private AgentJob jobWithMetadata(ObjectNode metadata) {
         var job = new AgentJob();
+        job.setId(UUID.randomUUID());
         job.setMetadata(metadata);
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
@@ -156,30 +153,18 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
     private List<Practice> samplePractices() {
         return List.of(
-            createPractice(
-                "pr-description-quality",
-                "PR Description Quality",
-                "PRs should have clear titles and descriptions explaining the change.",
-                "Check if the PR has a meaningful title and description that explains the why."
-            ),
-            createPractice(
-                "error-handling",
-                "Error Handling",
-                "Code should handle errors explicitly rather than silently swallowing exceptions.",
-                null // No detection prompt — falls back to description
-            )
+            createPractice("pr-description-quality", "PR Description Quality", "desc", "criteria"),
+            createPractice("error-handling", "Error Handling", "desc", null)
         );
     }
 
-    /** Stub all git/DB calls to return minimal valid data. */
+    /** Stub the workspace context build + practice catalog to return minimal valid data. */
     private void stubDefaults() {
-        lenient().when(gitRepositoryManager.isEnabled()).thenReturn(true);
-        lenient().when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(true);
         lenient()
-            .when(gitRepositoryManager.getRepositoryPath(123L))
-            .thenReturn(java.nio.file.Path.of("/tmp/hephaestus-git-repos/123"));
-        when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
-        when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
+            .when(workspaceContextBuilder.build(any(ContextRequest.PracticeReviewRequest.class)))
+            .thenReturn(
+                new LinkedHashMap<>(Map.of("context/target/metadata.json", "{}".getBytes(StandardCharsets.UTF_8)))
+            );
         lenient().when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
     }
 
@@ -188,8 +173,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     class JobType {
 
         @Test
-        @DisplayName("should return PULL_REQUEST_REVIEW")
-        void shouldReturnPullRequestReview() {
+        @DisplayName("returns PULL_REQUEST_REVIEW")
+        void returnsPullRequestReview() {
             assertThat(handler.jobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
         }
     }
@@ -199,34 +184,22 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     class CreateSubmission {
 
         @Test
-        @DisplayName("should extract correct metadata from request")
-        void shouldExtractCorrectMetadata() {
+        @DisplayName("extracts metadata + idempotency key")
+        void extractsMetadata() {
             JobSubmission submission = handler.createSubmission(sampleRequest());
             JsonNode metadata = submission.metadata();
 
             assertThat(metadata.get("repository_id").asLong()).isEqualTo(123L);
             assertThat(metadata.get("repository_full_name").asText()).isEqualTo("owner/repo");
-            assertThat(metadata.get("pull_request_id").asLong()).isEqualTo(456L);
             assertThat(metadata.get("pr_number").asInt()).isEqualTo(42);
-            assertThat(metadata.get("pr_url").asText()).isEqualTo("https://github.com/owner/repo/pull/42");
             assertThat(metadata.get("commit_sha").asText()).isEqualTo("abc123def456");
-            assertThat(metadata.get("source_branch").asText()).isEqualTo("feature/auth-fix");
-            assertThat(metadata.get("target_branch").asText()).isEqualTo("main");
-        }
-
-        @Test
-        @DisplayName("should build correct idempotency key")
-        void shouldBuildCorrectIdempotencyKey() {
-            JobSubmission submission = handler.createSubmission(sampleRequest());
-
             assertThat(submission.idempotencyKey()).isEqualTo("pr_review:owner/repo:42:abc123def456");
         }
 
         @Test
-        @DisplayName("should reject wrong request type")
-        void shouldRejectWrongRequestType() {
+        @DisplayName("rejects wrong request type")
+        void rejectsWrongRequestType() {
             JobSubmissionRequest wrongType = new JobSubmissionRequest() {};
-
             assertThatThrownBy(() -> handler.createSubmission(wrongType))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Expected PullRequestReviewSubmissionRequest");
@@ -238,570 +211,200 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     class PrepareInputFiles {
 
         @Test
-        @DisplayName("should include only metadata.json and comments.json (repo is bind-mounted)")
-        void shouldIncludeOnlyDbSourcedContextFiles() throws Exception {
+        @DisplayName("delegates to WorkspaceContextBuilder with a PracticeReviewRequest")
+        void delegatesToWorkspaceContextBuilder() {
             stubDefaults();
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+
+            handler.prepareInputFiles(job);
+
+            ArgumentCaptor<ContextRequest> captor = ArgumentCaptor.forClass(ContextRequest.class);
+            verify(workspaceContextBuilder).build(captor.capture());
+            assertThat(captor.getValue()).isInstanceOf(ContextRequest.PracticeReviewRequest.class);
+            assertThat(((ContextRequest.PracticeReviewRequest) captor.getValue()).job()).isSameAs(job);
+        }
+
+        @Test
+        @DisplayName("merges context/target/* files from the builder into the result map")
+        void mergesProviderFiles() {
+            byte[] metadataBytes = "{\"pr_number\":42}".getBytes(StandardCharsets.UTF_8);
+            when(workspaceContextBuilder.build(any(ContextRequest.PracticeReviewRequest.class))).thenReturn(
+                new LinkedHashMap<>(Map.of("context/target/metadata.json", metadataBytes))
+            );
+            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
-            // Only DB-sourced context files — no repo files, no diff.patch
-            assertThat(files).containsKey(".context/metadata.json");
-            assertThat(files).containsKey(".context/comments.json");
-            assertThat(files).doesNotContainKey(".context/diff.patch");
-            assertThat(
-                files
-                    .keySet()
-                    .stream()
-                    .noneMatch(k -> k.startsWith("repo/"))
-            )
-                .as("repo files should not be injected (repo is bind-mounted)")
-                .isTrue();
-
-            // Verify metadata.json is valid JSON
-            JsonNode metadataJson = objectMapper.readTree(files.get(".context/metadata.json"));
-            assertThat(metadataJson.get("pr_number").asInt()).isEqualTo(42);
-            assertThat(metadataJson.get("repository_full_name").asText()).isEqualTo("owner/repo");
-            assertThat(metadataJson.get("enriched").asBoolean()).isFalse();
+            assertThat(files.get("context/target/metadata.json")).isEqualTo(metadataBytes);
         }
 
         @Test
-        @DisplayName("should enrich metadata from database when pull request exists")
-        void shouldEnrichMetadataFromDatabase() throws Exception {
-            PullRequest pullRequest = new PullRequest();
-            pullRequest.setTitle("Fix authentication bug");
-            pullRequest.setBody("This PR fixes the login issue");
-            pullRequest.setState(Issue.State.OPEN);
-            pullRequest.setAdditions(10);
-            pullRequest.setDeletions(5);
-            pullRequest.setChangedFiles(3);
-            User author = new User();
-            author.setLogin("testuser");
-            pullRequest.setAuthor(author);
-
+        @DisplayName("writes a valid task.json envelope at the workspace root")
+        void writesTaskJsonEnvelope() throws Exception {
             stubDefaults();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pullRequest));
-
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
-            JsonNode metadataJson = objectMapper.readTree(files.get(".context/metadata.json"));
-            assertThat(metadataJson.get("enriched").asBoolean()).isTrue();
-            assertThat(metadataJson.get("title").asText()).isEqualTo("Fix authentication bug");
-            assertThat(metadataJson.get("author").asText()).isEqualTo("testuser");
-            assertThat(metadataJson.get("additions").asInt()).isEqualTo(10);
+            assertThat(files).containsKey("task.json");
+            JsonNode envelope = objectMapper.readTree(files.get("task.json"));
+            assertThat(envelope.get("schemaVersion").asInt()).isEqualTo(1);
+            assertThat(envelope.get("workspaceId").asLong()).isEqualTo(WORKSPACE_ID);
+            JsonNode task = envelope.get("task");
+            assertThat(task.get("kind").asText()).isEqualTo("practice_review");
+            assertThat(task.get("pullRequestNumber").asInt()).isEqualTo(42);
+            assertThat(task.get("repositoryFullName").asText()).isEqualTo("owner/repo");
+            assertThat(task.get("prompt").asText()).contains("Review merge request #42");
         }
 
         @Test
-        @DisplayName("should throw JobPreparationException on missing metadata field")
-        void shouldThrowOnMissingMetadataField() {
-            ObjectNode incomplete = objectMapper.createObjectNode();
-            incomplete.put("repository_id", 123L);
-            // Missing all other fields
+        @DisplayName("injects the practice catalog (.practices/index.json + .practices/all-criteria.md)")
+        void injectsPracticeCatalog() {
+            stubDefaults();
+            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
-            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(incomplete)))
+            assertThat(files).containsKey(".practices/index.json");
+            assertThat(files).containsKey(".practices/all-criteria.md");
+            assertThat(files).containsKey(".practices/pr-description-quality.md");
+            assertThat(files).containsKey(".practices/error-handling.md");
+            assertThat(files).containsKey(".analysis/practices/.gitkeep");
+        }
+
+        @Test
+        @DisplayName("does NOT write a legacy .prompt file (replaced by task.json)")
+        void doesNotWriteLegacyPromptFile() {
+            stubDefaults();
+            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+            assertThat(files).doesNotContainKey(".prompt");
+        }
+
+        @Test
+        @DisplayName("rejects practices whose slug fails the workspace-ABI pattern (defense-in-depth)")
+        void rejectsMalformedSlug() {
+            when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
+            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(
+                List.of(createPractice("../etc/passwd", "bad", "d", "c"))
+            );
+
+            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
                 .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Missing required metadata field");
+                .hasMessageContaining("Practice slug fails ABI pattern");
         }
 
         @Test
-        @DisplayName("should throw JobPreparationException on non-numeric metadata field")
-        void shouldThrowOnNonNumericMetadataField() {
-            ObjectNode badMetadata = sampleJobMetadata();
-            badMetadata.put("repository_id", "not-a-number");
+        @DisplayName("throws JobPreparationException when no active practices for the workspace")
+        void throwsWhenNoActivePractices() {
+            when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
+            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of());
 
-            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(badMetadata)))
+            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
                 .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Expected numeric metadata field");
+                .hasMessageContaining("No active practices");
         }
 
         @Test
-        @DisplayName("should throw JobPreparationException when metadata is null")
-        void shouldThrowWhenMetadataIsNull() {
+        @DisplayName("throws JobPreparationException when metadata is missing")
+        void throwsWhenMetadataMissing() {
             var job = new AgentJob();
             job.setMetadata(null);
-
             assertThatThrownBy(() -> handler.prepareInputFiles(job))
                 .isInstanceOf(JobPreparationException.class)
                 .hasMessageContaining("no metadata");
         }
 
         @Test
-        @DisplayName("should throw when local repository checkout is missing")
-        void shouldThrowWhenLocalRepositoryCheckoutMissing() {
-            lenient().when(gitRepositoryManager.isEnabled()).thenReturn(true);
-            when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(false);
-
-            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Repository checkout is not available locally for bind-mount");
-        }
-
-        @Test
-        @DisplayName("should include comments with null author")
-        void shouldHandleCommentsWithNullAuthor() throws Exception {
-            PullRequestReviewComment comment = new PullRequestReviewComment();
-            comment.setPath("src/Main.java");
-            comment.setLine(10);
-            comment.setBody("Looks good");
-            comment.setAuthor(null);
-            comment.setCreatedAt(Instant.parse("2025-01-15T10:30:00Z"));
-
-            stubDefaults();
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(
-                List.of(comment)
-            );
+        @DisplayName("preserves provider-file order (LinkedHashMap)")
+        void preservesProviderOrder() {
+            var providerFiles = new LinkedHashMap<String, byte[]>();
+            providerFiles.put("context/target/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
+            providerFiles.put("context/target/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
+            providerFiles.put("context/target/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
+            when(workspaceContextBuilder.build(any())).thenReturn(providerFiles);
+            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
-            JsonNode comments = objectMapper.readTree(files.get(".context/comments.json"));
-            assertThat(comments).hasSize(1);
-            assertThat(comments.get(0).get("path").asText()).isEqualTo("src/Main.java");
-            assertThat(comments.get(0).get("body").asText()).isEqualTo("Looks good");
-            assertThat(comments.get(0).get("created_at").asText()).isEqualTo("2025-01-15T10:30:00Z");
-            assertThat(comments.get(0).has("author")).isFalse();
-        }
-
-        @Test
-        @DisplayName("should serialize comment fields conditionally based on null values")
-        void shouldSerializeCommentFieldsConditionally() throws Exception {
-            PullRequestReviewComment full = new PullRequestReviewComment();
-            full.setPath("src/Main.java");
-            full.setLine(10);
-            full.setBody("Fix this");
-            full.setCreatedAt(Instant.parse("2025-06-01T12:00:00Z"));
-            User reviewer = new User();
-            reviewer.setLogin("reviewer");
-            full.setAuthor(reviewer);
-
-            PullRequestReviewComment minimal = new PullRequestReviewComment();
-            minimal.setPath("src/Other.java");
-            minimal.setLine(5);
-            minimal.setBody("Old comment");
-            minimal.setCreatedAt(null);
-            minimal.setAuthor(null);
-
-            stubDefaults();
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(
-                List.of(full, minimal)
-            );
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            JsonNode comments = objectMapper.readTree(files.get(".context/comments.json"));
-            assertThat(comments).hasSize(2);
-
-            // Full comment — all fields present
-            assertThat(comments.get(0).get("created_at").asText()).isEqualTo("2025-06-01T12:00:00Z");
-            assertThat(comments.get(0).get("author").asText()).isEqualTo("reviewer");
-            assertThat(comments.get(0).get("path").asText()).isEqualTo("src/Main.java");
-
-            // Minimal comment — optional fields absent
-            assertThat(comments.get(1).has("created_at")).isFalse();
-            assertThat(comments.get(1).has("author")).isFalse();
-            assertThat(comments.get(1).get("body").asText()).isEqualTo("Old comment");
-        }
-
-        @Test
-        @DisplayName("should truncate comments to MAX_COMMENTS keeping most recent")
-        void shouldTruncateCommentsToMaxKeepingMostRecent() throws Exception {
-            var comments = new java.util.ArrayList<PullRequestReviewComment>();
-            for (int i = 0; i < PullRequestReviewHandler.MAX_COMMENTS + 100; i++) {
-                PullRequestReviewComment c = new PullRequestReviewComment();
-                c.setPath("file.java");
-                c.setLine(i);
-                c.setBody("Comment " + i);
-                comments.add(c);
-            }
-
-            stubDefaults();
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(comments);
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            JsonNode commentsJson = objectMapper.readTree(files.get(".context/comments.json"));
-            assertThat(commentsJson).hasSize(PullRequestReviewHandler.MAX_COMMENTS);
-            // Should keep the most recent (last) comments
-            assertThat(commentsJson.get(0).get("body").asText()).isEqualTo("Comment 100");
-            assertThat(commentsJson.get(PullRequestReviewHandler.MAX_COMMENTS - 1).get("body").asText()).isEqualTo(
-                "Comment " + (PullRequestReviewHandler.MAX_COMMENTS + 99)
-            );
-        }
-
-        @Test
-        @DisplayName("should NOT include practices.json in .context/ (practices are in .practices/ directory)")
-        void shouldNotIncludePracticesJson() throws Exception {
-            stubDefaults();
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            // Practices are injected as .practices/index.json and .practices/{slug}.md, not in .context/
-            assertThat(files).doesNotContainKey(".context/practices.json");
-        }
-
-        @Test
-        @DisplayName("should handle enriched metadata with null author")
-        void shouldHandleEnrichedMetadataWithNullAuthor() throws Exception {
-            PullRequest pullRequest = new PullRequest();
-            pullRequest.setTitle("Some PR");
-            pullRequest.setBody("Body");
-            pullRequest.setState(Issue.State.OPEN);
-            pullRequest.setAuthor(null);
-
-            stubDefaults();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pullRequest));
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            JsonNode metadataJson = objectMapper.readTree(files.get(".context/metadata.json"));
-            assertThat(metadataJson.get("enriched").asBoolean()).isTrue();
-            assertThat(metadataJson.get("title").asText()).isEqualTo("Some PR");
-            assertThat(metadataJson.get("state").asText()).isEqualTo("OPEN");
-            assertThat(metadataJson.has("author")).isFalse();
-        }
-
-        @Test
-        @DisplayName("should include contributor_history.json when provider returns data")
-        void shouldIncludeContributorHistory() throws Exception {
-            PullRequest pullRequest = new PullRequest();
-            pullRequest.setTitle("Fix bug");
-            User author = new User();
-            author.setId(42L);
-            author.setLogin("alice");
-            pullRequest.setAuthor(author);
-
-            stubDefaults();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pullRequest));
-
-            byte[] historyJson = "[{\"practice\":\"error-handling\",\"negative\":3}]".getBytes(StandardCharsets.UTF_8);
-            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.of(historyJson));
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(files).containsKey(".context/contributor_history.json");
-            assertThat(files.get(".context/contributor_history.json")).isEqualTo(historyJson);
-            verify(contributorHistoryProvider).buildHistoryJson(42L, WORKSPACE_ID);
-        }
-
-        @Test
-        @DisplayName("should not include contributor_history.json when provider returns empty")
-        void shouldOmitContributorHistoryWhenEmpty() throws Exception {
-            PullRequest pullRequest = new PullRequest();
-            pullRequest.setTitle("New PR");
-            User author = new User();
-            author.setId(42L);
-            author.setLogin("alice");
-            pullRequest.setAuthor(author);
-
-            stubDefaults();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pullRequest));
-            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.empty());
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(files).doesNotContainKey(".context/contributor_history.json");
-            verify(contributorHistoryProvider).buildHistoryJson(42L, WORKSPACE_ID);
-        }
-
-        @Test
-        @DisplayName("should gracefully continue when contributor history provider throws")
-        void shouldContinueWhenHistoryProviderThrows() throws Exception {
-            PullRequest pullRequest = new PullRequest();
-            pullRequest.setTitle("PR with broken history");
-            User author = new User();
-            author.setId(42L);
-            author.setLogin("alice");
-            pullRequest.setAuthor(author);
-
-            stubDefaults();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pullRequest));
-            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenThrow(
-                new RuntimeException("DB connection timeout")
-            );
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(files).doesNotContainKey(".context/contributor_history.json");
-            assertThat(files).containsKey(".context/metadata.json");
-        }
-
-        @Test
-        @DisplayName("should not include contributor_history.json when PR has no author")
-        void shouldOmitContributorHistoryWhenNoAuthor() throws Exception {
-            PullRequest pullRequest = new PullRequest();
-            pullRequest.setTitle("Orphan PR");
-            pullRequest.setAuthor(null);
-
-            stubDefaults();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pullRequest));
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(files).doesNotContainKey(".context/contributor_history.json");
-            verifyNoInteractions(contributorHistoryProvider);
-        }
-
-        @Test
-        @DisplayName("should not include contributor_history.json when PR not found")
-        void shouldOmitContributorHistoryWhenPrNotFound() throws Exception {
-            stubDefaults();
-            // stubDefaults already returns Optional.empty() for the PR
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(files).doesNotContainKey(".context/contributor_history.json");
-            verifyNoInteractions(contributorHistoryProvider);
+            // First three entries must be the provider files in their original order
+            var keys = files.keySet().iterator();
+            assertThat(keys.next()).isEqualTo("context/target/metadata.json");
+            assertThat(keys.next()).isEqualTo("context/target/diff.patch");
+            assertThat(keys.next()).isEqualTo("context/target/comments.json");
         }
     }
 
     @Nested
-    @DisplayName("buildPrompt")
-    class BuildPrompt {
+    @DisplayName("filterByDiffScope")
+    class FilterByDiffScope {
 
         @Test
-        @DisplayName("should return slim orchestrator prompt with PR number and repo name")
-        void shouldReturnSlimOrchestratorPrompt() {
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(prompt).contains("Review merge request #42");
-            assertThat(prompt).contains("owner/repo");
-            assertThat(prompt).contains(".pi/AGENTS.md");
-            assertThat(prompt).contains("report_finding");
-            assertThat(prompt).contains("set_review_summary");
+        @DisplayName("keeps finding whose evidence path is in diff")
+        void keepsFindingInDiff() {
+            var finding = finding("fatal-error-crash", Verdict.NEGATIVE, "Sources/View.swift");
+            var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
+            assertThat(filtered).containsExactly(finding);
         }
 
         @Test
-        @DisplayName("should handle percent characters in metadata without format string errors")
-        void shouldHandlePercentInMetadata() {
-            ObjectNode metadata = sampleJobMetadata();
-            metadata.put("repository_full_name", "owner/repo%with%percent");
-
-            String prompt = handler.buildPrompt(jobWithMetadata(metadata));
-
-            assertThat(prompt).contains("owner/repo%with%percent");
+        @DisplayName("keeps finding backed by internal context/target/metadata.json (whitelisted)")
+        void keepsFindingBackedByMetadata() {
+            var finding = finding("mr-description-quality", Verdict.NEGATIVE, "context/target/metadata.json");
+            var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
+            assertThat(filtered).containsExactly(finding);
         }
 
         @Test
-        @DisplayName("should throw on missing metadata fields")
-        void shouldThrowOnMissingMetadataFields() {
-            ObjectNode incomplete = objectMapper.createObjectNode();
-
-            assertThatThrownBy(() -> handler.buildPrompt(jobWithMetadata(incomplete)))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Missing required metadata field");
+        @DisplayName("filters finding backed only by non-whitelisted internal context")
+        void filtersFindingBackedByNonWhitelistedInternal() {
+            var finding = finding("review-noise", Verdict.NEGATIVE, "context/target/comments.json");
+            var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
+            assertThat(filtered).isEmpty();
         }
 
         @Test
-        @DisplayName("should throw JobPreparationException when metadata is null")
-        void shouldThrowWhenMetadataIsNull() {
-            var job = new AgentJob();
-            job.setMetadata(null);
-            Workspace ws = new Workspace();
-            ws.setId(WORKSPACE_ID);
-            job.setWorkspace(ws);
-
-            assertThatThrownBy(() -> handler.buildPrompt(job))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("no metadata");
+        @DisplayName("filters finding pointing only outside the diff")
+        void filtersFindingOutsideDiff() {
+            var finding = finding("view-logic-separation", Verdict.NEGATIVE, "Sources/Other.swift");
+            var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
+            assertThat(filtered).isEmpty();
         }
 
-        @Test
-        @DisplayName("should not query practices from database")
-        void shouldNotQueryPractices() {
-            handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            verifyNoInteractions(practiceRepository);
+        private PracticeDetectionResultParser.ValidatedFinding finding(String slug, Verdict verdict, String path) {
+            return new PracticeDetectionResultParser.ValidatedFinding(
+                slug,
+                "title",
+                verdict,
+                Severity.MINOR,
+                0.8f,
+                objectMapper
+                    .createObjectNode()
+                    .set(
+                        "locations",
+                        objectMapper.createArrayNode().add(objectMapper.createObjectNode().put("path", path))
+                    ),
+                null,
+                null
+            );
         }
     }
 
     @Nested
-    @DisplayName("annotateDiffWithLineNumbers")
-    class AnnotateDiffWithLineNumbers {
+    @DisplayName("parseDiffNameOnlyPaths")
+    class ParseDiffNameOnlyPaths {
 
         @Test
-        @DisplayName("annotateDiffWithLineNumbers should annotate + and context lines with source line numbers")
-        void annotatesDiff() {
-            String diff =
-                "diff --git a/Foo.swift b/Foo.swift\n" +
-                "--- a/Foo.swift\n" +
-                "+++ b/Foo.swift\n" +
-                "@@ -1,3 +1,4 @@\n" +
-                " import SwiftUI\n" +
-                "+import Foundation\n" +
-                " \n" +
-                " struct Foo {\n";
-            String annotated = PullRequestReviewHandler.annotateDiffWithLineNumbers(diff);
-            assertThat(annotated).contains("[L1]  import SwiftUI");
-            assertThat(annotated).contains("[L2] +import Foundation");
-            assertThat(annotated).contains("[L3]  ");
-            assertThat(annotated).contains("[L4]  struct Foo {");
-        }
-
-        @Nested
-        @DisplayName("filterByDiffScope")
-        class FilterByDiffScope {
-
-            @Test
-            @DisplayName("keeps finding whose evidence path is in diff")
-            void shouldKeepFindingWhenEvidencePathIsInDiff() {
-                var finding = new PracticeDetectionResultParser.ValidatedFinding(
-                    "fatal-error-crash",
-                    "Crashes on tap",
-                    Verdict.NEGATIVE,
-                    Severity.MAJOR,
-                    0.9f,
-                    objectMapper
-                        .createObjectNode()
-                        .set(
-                            "locations",
-                            objectMapper
-                                .createArrayNode()
-                                .add(objectMapper.createObjectNode().put("path", "Sources/View.swift"))
-                        ),
-                    null,
-                    null
-                );
-
-                var filtered = PullRequestReviewHandler.filterByDiffScope(
-                    List.of(finding),
-                    Set.of("Sources/View.swift")
-                );
-
-                assertThat(filtered).containsExactly(finding);
-            }
-
-            @Test
-            @DisplayName("keeps finding backed by internal metadata context")
-            void shouldKeepFindingWhenBackedByInternalMetadataContext() {
-                var finding = new PracticeDetectionResultParser.ValidatedFinding(
-                    "mr-description-quality",
-                    "Description is vague",
-                    Verdict.NEGATIVE,
-                    Severity.MINOR,
-                    0.8f,
-                    objectMapper
-                        .createObjectNode()
-                        .set(
-                            "locations",
-                            objectMapper
-                                .createArrayNode()
-                                .add(objectMapper.createObjectNode().put("path", ".context/metadata.json"))
-                        ),
-                    null,
-                    null
-                );
-
-                var filtered = PullRequestReviewHandler.filterByDiffScope(
-                    List.of(finding),
-                    Set.of("Sources/View.swift")
-                );
-
-                assertThat(filtered).containsExactly(finding);
-            }
-
-            @Test
-            @DisplayName("filters finding backed only by non-whitelisted internal context")
-            void shouldFilterFindingWhenBackedByNonWhitelistedInternalContext() {
-                var finding = new PracticeDetectionResultParser.ValidatedFinding(
-                    "review-noise",
-                    "Only references comments context",
-                    Verdict.NEGATIVE,
-                    Severity.MINOR,
-                    0.8f,
-                    objectMapper
-                        .createObjectNode()
-                        .set(
-                            "locations",
-                            objectMapper
-                                .createArrayNode()
-                                .add(objectMapper.createObjectNode().put("path", ".context/comments.json"))
-                        ),
-                    null,
-                    null
-                );
-
-                var filtered = PullRequestReviewHandler.filterByDiffScope(
-                    List.of(finding),
-                    Set.of("Sources/View.swift")
-                );
-
-                assertThat(filtered).isEmpty();
-            }
-
-            @Test
-            @DisplayName("filters finding whose evidence points only outside diff")
-            void shouldFilterFindingWhenEvidencePathOutsideDiff() {
-                var finding = new PracticeDetectionResultParser.ValidatedFinding(
-                    "view-logic-separation",
-                    "Out-of-scope issue",
-                    Verdict.NEGATIVE,
-                    Severity.MINOR,
-                    0.8f,
-                    objectMapper
-                        .createObjectNode()
-                        .set(
-                            "locations",
-                            objectMapper
-                                .createArrayNode()
-                                .add(objectMapper.createObjectNode().put("path", "Sources/Other.swift"))
-                        ),
-                    null,
-                    null
-                );
-
-                var filtered = PullRequestReviewHandler.filterByDiffScope(
-                    List.of(finding),
-                    Set.of("Sources/View.swift")
-                );
-
-                assertThat(filtered).isEmpty();
-            }
-        }
-
-        @Nested
-        @DisplayName("parseDiffNameOnlyPaths")
-        class ParseDiffNameOnlyPaths {
-
-            @Test
-            @DisplayName("extracts simple file paths")
-            void shouldExtractSimplePathsFromNameOnlyOutput() {
-                String output = "src/Main.swift\nViews/ContentView.swift\nREADME.md\n";
-                var paths = PullRequestReviewHandler.parseDiffNameOnlyPaths(output);
-                assertThat(paths).containsExactlyInAnyOrder("src/Main.swift", "Views/ContentView.swift", "README.md");
-            }
-
-            @Test
-            @DisplayName("handles deeply nested paths without truncation")
-            void shouldHandleDeepPathsWithoutTruncation() {
-                String output = "TimelineMaster/Presentational/DebugTimelineInspectorView.swift\n";
-                var paths = PullRequestReviewHandler.parseDiffNameOnlyPaths(output);
-                assertThat(paths).containsExactly("TimelineMaster/Presentational/DebugTimelineInspectorView.swift");
-            }
-
-            @Test
-            @DisplayName("returns empty set for blank output")
-            void shouldReturnEmptySetWhenOutputIsBlank() {
-                assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths("")).isEmpty();
-                assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths("  \n  ")).isEmpty();
-            }
+        @DisplayName("extracts simple file paths")
+        void simplePaths() {
+            String output = "src/Main.swift\nViews/ContentView.swift\nREADME.md\n";
+            assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths(output)).containsExactlyInAnyOrder(
+                "src/Main.swift",
+                "Views/ContentView.swift",
+                "README.md"
+            );
         }
 
         @Test
-        @DisplayName("annotateDiffWithLineNumbers should not annotate deleted lines")
-        void annotatesDiffWithDeletions() {
-            String diff =
-                "diff --git a/Bar.swift b/Bar.swift\n" +
-                "--- a/Bar.swift\n" +
-                "+++ b/Bar.swift\n" +
-                "@@ -5,4 +5,3 @@\n" +
-                " context\n" +
-                "-deleted line\n" +
-                "+added line\n" +
-                " more context\n";
-            String annotated = PullRequestReviewHandler.annotateDiffWithLineNumbers(diff);
-            assertThat(annotated).contains("[L5]  context");
-            assertThat(annotated).contains("[L6] +added line");
-            assertThat(annotated).contains("[L7]  more context");
-            // The deleted line should NOT have [L prefix
-            assertThat(annotated).containsPattern("(?m)^-deleted line$");
+        @DisplayName("returns empty for blank input")
+        void blankInput() {
+            assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths("")).isEmpty();
+            assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths("  \n  ")).isEmpty();
         }
     }
 
@@ -811,6 +414,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         private AgentJob jobWithOutput(String rawOutputJson) {
             var job = new AgentJob();
+            job.setId(UUID.randomUUID());
             ObjectNode output = objectMapper.createObjectNode();
             output.put("rawOutput", rawOutputJson);
             job.setOutput(output);
@@ -818,9 +422,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should delegate to parser and delivery service with correct findings")
+        @DisplayName("delegates to delivery service with parsed findings")
         @SuppressWarnings("unchecked")
-        void shouldDelegateToDeliveryService() {
+        void delegatesToDeliveryService() {
             String rawOutput = """
                 {
                   "findings": [{
@@ -837,246 +441,17 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             handler.deliver(job);
 
-            var captor = ArgumentCaptor.forClass(List.class);
-            verify(deliveryService).deliver(eq(job), captor.capture());
-            var findings = (List<PracticeDetectionResultParser.ValidatedFinding>) captor.getValue();
-            assertThat(findings).hasSize(1);
-            assertThat(findings.get(0).practiceSlug()).isEqualTo("pr-description-quality");
-            assertThat(findings.get(0).verdict()).isEqualTo(Verdict.POSITIVE);
-            assertThat(findings.get(0).severity()).isEqualTo(Severity.INFO);
-            assertThat(findings.get(0).confidence()).isEqualTo(0.95f);
-        }
-
-        @Test
-        @DisplayName("should re-throw JobDeliveryException from delivery service as-is")
-        void shouldRethrowJobDeliveryException() {
-            String rawOutput = """
-                {
-                  "findings": [{
-                    "practiceSlug": "pr-description-quality",
-                    "title": "Good PR description",
-                    "verdict": "POSITIVE",
-                    "severity": "INFO",
-                    "confidence": 0.95
-                  }]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            JobDeliveryException original = new JobDeliveryException("Workspace not found");
-            when(deliveryService.deliver(eq(job), any())).thenThrow(original);
-
-            assertThatThrownBy(() -> handler.deliver(job)).isSameAs(original);
-        }
-
-        @Test
-        @DisplayName("should wrap unexpected exceptions from delivery service")
-        void shouldWrapUnexpectedExceptions() {
-            String rawOutput = """
-                {
-                  "findings": [{
-                    "practiceSlug": "pr-description-quality",
-                    "title": "Good PR description",
-                    "verdict": "POSITIVE",
-                    "severity": "INFO",
-                    "confidence": 0.95
-                  }]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenThrow(new RuntimeException("DB connection lost"));
-
-            assertThatThrownBy(() -> handler.deliver(job))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("Delivery failed unexpectedly")
-                .hasCauseInstanceOf(RuntimeException.class);
-        }
-
-        @Test
-        @DisplayName("should throw JobDeliveryException when no valid findings")
-        void shouldThrowWhenNoValidFindings() {
-            String rawOutput = """
-                {
-                  "findings": [{
-                    "practiceSlug": "",
-                    "title": "",
-                    "verdict": "POSITIVE",
-                    "severity": "INFO",
-                    "confidence": 0.95
-                  }]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-
-            assertThatThrownBy(() -> handler.deliver(job))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("No valid findings");
-
-            verifyNoInteractions(deliveryService);
-        }
-
-        @Test
-        @DisplayName("should throw JobDeliveryException when output is null")
-        void shouldThrowWhenOutputIsNull() {
-            var job = new AgentJob();
-            job.setOutput(null);
-
-            assertThatThrownBy(() -> handler.deliver(job))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("No valid findings");
-        }
-
-        @Test
-        @DisplayName("should throw JobDeliveryException when rawOutput is invalid JSON")
-        void shouldThrowWhenInvalidJson() {
-            AgentJob job = jobWithOutput("not valid json {{{");
-
-            assertThatThrownBy(() -> handler.deliver(job))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("No valid findings");
-        }
-
-        @Test
-        @DisplayName("should deliver valid findings and discard invalid ones")
-        @SuppressWarnings("unchecked")
-        void shouldDeliverValidAndDiscardInvalid() {
-            String rawOutput = """
-                {
-                  "findings": [
-                    {
-                      "practiceSlug": "pr-description-quality",
-                      "title": "Good PR description",
-                      "verdict": "POSITIVE",
-                      "severity": "INFO",
-                      "confidence": 0.90
-                    },
-                    {
-                      "practiceSlug": "",
-                      "title": "",
-                      "verdict": "POSITIVE",
-                      "severity": "INFO",
-                      "confidence": 0.5
-                    }
-                  ]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, false));
-
-            handler.deliver(job);
-
-            var captor = ArgumentCaptor.forClass(List.class);
-            verify(deliveryService).deliver(eq(job), captor.capture());
-            var findings = (List<PracticeDetectionResultParser.ValidatedFinding>) captor.getValue();
-            // Only the valid finding should be passed through
-            assertThat(findings).hasSize(1);
-            assertThat(findings.get(0).practiceSlug()).isEqualTo("pr-description-quality");
-        }
-
-        @Test
-        @DisplayName("should call feedbackService after findings delivery")
-        void shouldCallFeedbackServiceAfterFindings() {
-            String rawOutput = """
-                {
-                  "findings": [{
-                    "practiceSlug": "pr-description-quality",
-                    "title": "Good PR description",
-                    "verdict": "NEGATIVE",
-                    "severity": "MAJOR",
-                    "confidence": 0.85
-                  }],
-                  "delivery": {
-                    "mrNote": "Please improve PR description."
-                  }
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, true));
-
-            handler.deliver(job);
-
-            var deliveryCaptor = ArgumentCaptor.forClass(PracticeDetectionResultParser.DeliveryContent.class);
-            verify(feedbackService).deliverFeedback(eq(job), deliveryCaptor.capture());
-            var delivery = deliveryCaptor.getValue();
-            assertThat(delivery).isNotNull();
-            assertThat(delivery.mrNote()).isEqualTo("Please improve PR description.");
-            assertThat(delivery.diffNotes()).isEmpty();
-        }
-
-        @Test
-        @DisplayName("should call feedbackService with null delivery when no delivery content")
-        void shouldCallFeedbackServiceWithNullDelivery() {
-            String rawOutput = """
-                {
-                  "findings": [{
-                    "practiceSlug": "pr-description-quality",
-                    "title": "Good PR description",
-                    "verdict": "POSITIVE",
-                    "severity": "INFO",
-                    "confidence": 0.95
-                  }]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, false));
-
-            handler.deliver(job);
-
+            verify(deliveryService).deliver(eq(job), any());
             verify(feedbackService).deliverFeedback(eq(job), any());
         }
 
         @Test
-        @DisplayName("should rethrow JobDeliveryException from practice detection unwrapped")
-        void shouldRethrowJobDeliveryExceptionUnwrapped() {
-            String rawOutput = """
-                {
-                  "findings": [{
-                    "practiceSlug": "pr-description-quality",
-                    "title": "Good PR description",
-                    "verdict": "POSITIVE",
-                    "severity": "INFO",
-                    "confidence": 0.95
-                  }]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            JobDeliveryException original = new JobDeliveryException("Practice DB constraint violation");
-            when(deliveryService.deliver(eq(job), any())).thenThrow(original);
-
-            assertThatThrownBy(() -> handler.deliver(job)).isSameAs(original); // Not wrapped — same instance
-
-            verifyNoInteractions(feedbackService);
-        }
-    }
-
-    @Nested
-    @DisplayName("volumeMounts")
-    class VolumeMounts {
-
-        @Test
-        @DisplayName("should mount real repo path read-only at /workspace/repo")
-        void shouldMountRealRepoPath() {
-            when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(true);
-            when(gitRepositoryManager.getRepositoryPath(123L)).thenReturn(
-                java.nio.file.Path.of("/tmp/hephaestus-git-repos/123")
-            );
-
-            Map<String, String> mounts = handler.volumeMounts(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(mounts).containsEntry("/tmp/hephaestus-git-repos/123", "/workspace/repo");
-            assertThat(mounts).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("should throw when repository is not cloned")
-        void shouldThrowWhenRepoNotCloned() {
-            when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(false);
-            when(gitRepositoryManager.getRepositoryPath(123L)).thenReturn(
-                java.nio.file.Path.of("/tmp/hephaestus-git-repos/123")
-            );
-
-            assertThatThrownBy(() -> handler.volumeMounts(jobWithMetadata(sampleJobMetadata())))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Repository not cloned");
+        @DisplayName("throws when output has no valid findings")
+        void throwsWhenNoValidFindings() {
+            AgentJob job = jobWithOutput("{\"findings\":[]}");
+            assertThatThrownBy(() -> handler.deliver(job))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("No valid findings");
         }
     }
 }

@@ -8,7 +8,7 @@ import java.util.Objects;
 import org.springframework.lang.Nullable;
 
 /**
- * Sandbox configuration produced by {@link PiPracticeAgent#buildSandboxSpec}.
+ * Sandbox configuration produced by {@link PracticePiAdapter#buildSandboxSpec}.
  * The executor combines it with job-level concerns into a {@link
  * de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxSpec}. {@code inputFiles} paths are
  * workspace-relative; {@code volumeMounts} are bind-mounted read-only.

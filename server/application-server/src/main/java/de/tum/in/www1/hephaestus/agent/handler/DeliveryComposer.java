@@ -45,13 +45,13 @@ class DeliveryComposer {
 
     /** Paths that are internal workspace artifacts, not student code. */
     private static final List<String> INTERNAL_PATH_PREFIXES = List.of(
-        ".context/",
-        ".practices/",
-        ".analysis/",
-        ".pi/",
-        ".pi-runtime/",
-        ".precompute/",
-        ".precompute-out/"
+        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_TARGET_PREFIX,
+        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX,
+        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.ANALYSIS_PREFIX,
+        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PI_AGENT_PREFIX,
+        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PI_RUNTIME_PREFIX,
+        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX,
+        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX
     );
 
     /**

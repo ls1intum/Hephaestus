@@ -1,0 +1,68 @@
+---
+id: agent-workspace-abi
+sidebar_position: 5
+title: Pi Agent Workspace ABI
+description: Reserved paths, task envelope, and exit codes for the Pi sandbox workspace.
+---
+
+The container workspace (`/workspace/`) is shared across all Pi-based agent variants — the
+one-shot practice runner today, the long-lived mentor runner soon. Reserving the directory
+names below is a no-cost commitment that prevents a second rename when the mentor runtime
+lands (#1071) and beyond.
+
+## Layout
+
+```
+/workspace/
+├── repo/                  # Bind-mounted git working tree — READ-ONLY. The real cloned repo.
+├── context/
+│   ├── target/            # System-written, AI-readable. Populated by ContentProvider SPI.
+│   │                      # Files: metadata.json, comments.json, diff.patch, diff_stat.txt,
+│   │                      # diff_summary.md, contributor_history.json
+│   └── user/              # RESERVED (#1071). Mentor-pinned content — user uploads / pins
+│                          # surfaced from the chat. AI-readable; mentor-writable.
+├── scratch/               # RESERVED (#1071). AI-writable scratch area. Survives Pi turns,
+│                          # ephemeral across runs. Never read by the server.
+├── task.json              # TaskEnvelope<…> — runtime contract between handler and runner.
+├── .pi/                   # Pi SDK orchestrator + agent state (AGENTS.md, sessions…).
+├── .pi-runtime/           # settings.json bundle (copied to ~/.pi/settings.json at boot).
+├── .run-pi.mjs            # Runner script entry point.
+├── .practices/            # Practice catalog (index.json, {slug}.md, all-criteria.md).
+├── .precompute/           # Per-practice precompute scripts injected by the server.
+├── .precompute-out/       # Precompute runtime output (logs, structured hints).
+├── .analysis/             # Per-practice analysis output (.gitkeep markers).
+└── .output/               # Sandbox output area — result.json, review-state.json, usage.json,
+                           # runner-debug.json, watchdog-killed.json
+```
+
+## Path conventions
+
+* **`context/target/`** — written by `ContentProvider` implementations under
+  `agent.context.providers.*`. Path prefix is enforced by `WorkspaceContextBuilder`.
+* **`context/user/`** *(reserved, #1071)* — mentor-pinned content scoped to a `(userId,
+  workspaceId)` session. Distinct from `context/target/` because lifecycle differs:
+  `target/` is rebuilt every job, `user/` survives across turns.
+* **`scratch/`** *(reserved, #1071)* — mentor's working area. The Pi agent may use Pi's
+  `edit` / `write` tools here. The server does not read this directory.
+* **`task.json`** — `TaskEnvelope<T extends Task>`. Schema version `1`. The runner asserts
+  `schemaVersion` and `task.kind`, exiting `42` on mismatch (envelope/image drift signal).
+* **`.pi*`** / **`.practices/`** / **`.precompute*`** / **`.analysis/`** / **`.output/`**
+  — internal control surfaces. AI-readable as configured by the orchestrator, but
+  *not* part of the public agent ABI; subject to change without a `schemaVersion` bump.
+
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0    | Success |
+| 1    | Agent runtime failure (Pi SDK or runner error) |
+| 3    | Watchdog hard-kill (budget + grace exceeded) |
+| 42   | Envelope mismatch (unsupported `schemaVersion` or unknown `kind`) — image/server drift |
+
+## Versioning policy
+
+`task.json.schemaVersion` is per-envelope, not per-task variant. Add a new permitted `Task`
+subtype (a new `kind` discriminator) without bumping the version. Add a required field to an
+existing kind, and the version bumps. The Pi runner and the Java server ship in the same
+Docker-image rebuild, so version drift is bounded by deploy cadence; there is no cross-version
+contract.

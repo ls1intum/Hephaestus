@@ -500,7 +500,58 @@ function buildRetryScaffold(slugs) {
 }
 
 
-const prompt = readFileSync("/workspace/.prompt", "utf-8").trim();
+// Task envelope: /workspace/task.json (TaskEnvelope<PracticeReviewTask>).
+// Exit 42 on schema-version mismatch or unknown kind so the executor can log
+// envelope/image drift distinctly from agent failures.
+const ENVELOPE_MISMATCH_EXIT = 42;
+const SUPPORTED_SCHEMA_VERSION = 1;
+const SUPPORTED_KIND = "practice_review";
+const TASK_PATH = "/workspace/task.json";
+
+function readTaskEnvelope() {
+    let raw;
+    try {
+        raw = readFileSync(TASK_PATH, "utf-8");
+    } catch (err) {
+        console.error(`[pi-runner] Failed to read ${TASK_PATH}: ${err.message}`);
+        process.exit(ENVELOPE_MISMATCH_EXIT);
+    }
+    let envelope;
+    try {
+        envelope = JSON.parse(raw);
+    } catch (err) {
+        console.error(`[pi-runner] Failed to parse ${TASK_PATH}: ${err.message}`);
+        process.exit(ENVELOPE_MISMATCH_EXIT);
+    }
+    if (envelope?.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
+        console.error(
+            `[pi-runner] Unsupported schemaVersion: got ${envelope?.schemaVersion}, expected ${SUPPORTED_SCHEMA_VERSION}. ` +
+                `Server/image version drift — rebuild the agent-pi image or roll back the server.`,
+        );
+        process.exit(ENVELOPE_MISMATCH_EXIT);
+    }
+    if (envelope?.task?.kind !== SUPPORTED_KIND) {
+        console.error(
+            `[pi-runner] Unknown task kind: got "${envelope?.task?.kind}", expected "${SUPPORTED_KIND}". ` +
+                `This runner only handles practice_review tasks.`,
+        );
+        process.exit(ENVELOPE_MISMATCH_EXIT);
+    }
+    if (typeof envelope.task.prompt !== "string" || envelope.task.prompt.trim() === "") {
+        console.error(`[pi-runner] task.prompt is missing or blank in ${TASK_PATH}`);
+        process.exit(ENVELOPE_MISMATCH_EXIT);
+    }
+    return envelope;
+}
+
+const taskEnvelope = readTaskEnvelope();
+const prompt = taskEnvelope.task.prompt.trim();
+console.error(
+    `[pi-runner] Task envelope loaded: kind=${taskEnvelope.task.kind}, ` +
+        `jobId=${taskEnvelope.jobId}, workspaceId=${taskEnvelope.workspaceId}, ` +
+        `repository=${taskEnvelope.task.repositoryFullName ?? "?"}, ` +
+        `prNumber=${taskEnvelope.task.pullRequestNumber ?? "?"}`,
+);
 
 async function main() {
     console.error(`[pi-runner] Embedded SDK mode`);

@@ -10,7 +10,7 @@
 
 ## How to work
 
-1. **Read** `.context/diff_summary.md`, `.practices/all-criteria.md`, `.practices/index.json`, and `.context/metadata.json`. Batch independent reads/greps in parallel when your runtime supports it.
+1. **Read** `context/target/diff_summary.md`, `.practices/all-criteria.md`, `.practices/index.json`, and `context/target/metadata.json`. Batch independent reads/greps in parallel when your runtime supports it.
 2. **Analyze** the diff against each practice — only flag changed lines (`+` and `-`). Verify NEGATIVE findings against actual diff lines. Re-examine POSITIVE verdicts for partial violations.
 3. **Persist findings as you go** with `report_finding` whenever you confirm one.
 4. **Persist the final MR summary** with `set_review_summary` once you know what should be posted. Call it once with the final note.
@@ -25,14 +25,14 @@ Default to a high-signal review:
 - Prefer one precise finding about user-visible breakage over a second lower-value finding about logging or style around the same defect.
 - There is no target number of findings and no quota. Never plan around a number like five.
 
-You may also read `.context/diff.patch` for line-number verification, `repo/` for surrounding code context, and `.precompute-out/summary.md` for static analysis hints.
+You may also read `context/target/diff.patch` for line-number verification, `repo/` for surrounding code context, and `.precompute-out/summary.md` for static analysis hints.
 
 ## Workspace
 
-- `.context/diff_summary.md` — per-file diff chunks with index table **(primary — read this first)**
-- `.context/diff.patch` — full unified diff with `[L<n>]` line annotations (for line-number verification)
-- `.context/diff_stat.txt` — changed files summary
-- `.context/metadata.json` — MR/PR title, body, author, commits
+- `context/target/diff_summary.md` — per-file diff chunks with index table **(primary — read this first)**
+- `context/target/diff.patch` — full unified diff with `[L<n>]` line annotations (for line-number verification)
+- `context/target/diff_stat.txt` — changed files summary
+- `context/target/metadata.json` — MR/PR title, body, author, commits
 - `.practices/all-criteria.md` — ALL practice criteria bundled **(read this instead of individual files)**
 - `.practices/index.json` — practice list with slugs
 - `.precompute-out/summary.md` — static analysis hints (optional, may not exist)

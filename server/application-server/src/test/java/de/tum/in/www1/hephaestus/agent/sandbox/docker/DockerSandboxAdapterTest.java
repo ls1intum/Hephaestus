@@ -471,8 +471,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use default output path when spec outputPath is null")
-        void shouldUseDefaultOutputPath() {
+        @DisplayName("collectOutput is called with the spec.outputPath verbatim")
+        void usesSpecOutputPath() {
             setupHappyPath();
 
             SandboxSpec spec = new SandboxSpec(
@@ -484,13 +484,13 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(),
-                null, // null outputPath
+                "/custom/output",
                 null
             );
 
             sandboxAdapter.execute(spec);
 
-            verify(workspaceManager).collectOutput(CONTAINER_ID, "/workspace/.output");
+            verify(workspaceManager).collectOutput(CONTAINER_ID, "/custom/output");
         }
     }
 
