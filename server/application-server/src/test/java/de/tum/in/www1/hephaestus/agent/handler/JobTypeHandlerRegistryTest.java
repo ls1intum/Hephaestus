@@ -7,12 +7,12 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
+import de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.in.www1.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.in.www1.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
-import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -27,16 +27,13 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     private GitRepositoryManager gitRepositoryManager;
 
     @Mock
-    private PullRequestRepository pullRequestRepository;
-
-    @Mock
-    private PullRequestReviewCommentRepository reviewCommentRepository;
-
-    @Mock
     private PracticeRepository practiceRepository;
 
     @Mock
-    private ContributorHistoryProvider contributorHistoryProvider;
+    private WorkspaceContextBuilder workspaceContextBuilder;
+
+    @Mock
+    private GitDiffOperations gitDiffOperations;
 
     @Mock
     private PracticeDetectionDeliveryService deliveryService;
@@ -48,17 +45,17 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
 
     private JobTypeHandler prReviewHandler() {
         var parser = new PracticeDetectionResultParser(objectMapper);
+        var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
         return new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,
-            pullRequestRepository,
-            reviewCommentRepository,
             practiceRepository,
-            contributorHistoryProvider,
+            workspaceContextBuilder,
+            envelopeWriter,
+            gitDiffOperations,
             parser,
             deliveryService,
-            feedbackService,
-            null
+            feedbackService
         );
     }
 

@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Queries {@link PracticeFindingRepository} for verdict counts per practice and
  * produces a compact JSON array suitable for injection into the agent sandbox as
- * {@code .context/contributor_history.json}.
+ * {@code context/target/contributor_history.json}.
  *
  * <p>Output is capped at {@value #MAX_PRACTICES} practices, sorted by NEGATIVE count
  * descending so the most problematic practices are always included when truncation occurs.

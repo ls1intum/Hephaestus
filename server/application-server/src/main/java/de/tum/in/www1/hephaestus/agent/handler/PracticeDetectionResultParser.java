@@ -319,13 +319,14 @@ public class PracticeDetectionResultParser {
         }
         String filePath = filePathNode.asText();
 
-        // Reject internal workspace paths — agent sometimes hallucinates .context/ or .analysis/ paths
+        // Reject internal workspace paths — agent sometimes hallucinates context/target/ or .analysis/ paths
         if (
-            filePath.startsWith(".context/") ||
-            filePath.startsWith(".practices/") ||
-            filePath.startsWith(".analysis/") ||
+            filePath.startsWith(de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_TARGET_PREFIX) ||
+            filePath.startsWith(de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX) ||
+            filePath.startsWith(de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.ANALYSIS_PREFIX) ||
             filePath.startsWith(".output/") ||
-            filePath.startsWith(".precompute")
+            filePath.startsWith(de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX) ||
+            filePath.startsWith(de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX)
         ) {
             log.debug(
                 "Skipping suggestedDiffNote with internal path at finding {}, index {}: {}",

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -17,9 +18,9 @@ import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.in.www1.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
-import de.tum.in.www1.hephaestus.agent.practice.AgentResult;
-import de.tum.in.www1.hephaestus.agent.practice.PiPracticeAgent;
+import de.tum.in.www1.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.in.www1.hephaestus.agent.practice.PracticeSandboxSpec;
+import de.tum.in.www1.hephaestus.agent.runtime.AgentResult;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
@@ -63,7 +64,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Mock
-    private PiPracticeAgent practiceAgent;
+    private PracticePiAdapter practiceAgent;
 
     @Mock
     private SandboxManager sandboxManager;
@@ -294,6 +295,42 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("emits agent.pi.envelope.mismatch counter on exit code 42")
+        void emitsEnvelopeMismatchOnExit42() {
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            SandboxResult envelopeMismatch = new SandboxResult(
+                42,
+                Map.of(),
+                "envelope drift",
+                false,
+                Duration.ofSeconds(5)
+            );
+            setupFullExecution(envelopeMismatch);
+
+            AgentJob freshJob = new AgentJob();
+            freshJob.prePersist();
+            when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
+            when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
+
+            executor.executeJob(msg);
+
+            assertThat(meterRegistry.counter("agent.pi.envelope.mismatch").count()).isEqualTo(1d);
+            verify(jobRepository).transitionStatus(
+                any(),
+                eq(AgentJobStatus.FAILED),
+                any(),
+                any(),
+                eq(Set.of(AgentJobStatus.RUNNING))
+            );
+        }
+
+        @Test
         @DisplayName("should mark TIMED_OUT on timeout")
         void shouldMarkTimedOutOnTimeout() {
             Message msg = createMessage(jobId);
@@ -404,7 +441,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
         when(handler.prepareInputFiles(any())).thenReturn(Map.of("code.py", "print('hi')".getBytes()));
-        when(handler.buildPrompt(any())).thenReturn("Review this code");
 
         PracticeSandboxSpec agentSpec = new PracticeSandboxSpec(
             "ghcr.io/agent:latest",
@@ -426,7 +462,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
         when(handler.prepareInputFiles(any())).thenReturn(Map.of());
-        when(handler.buildPrompt(any())).thenReturn("Review this code");
 
         PracticeSandboxSpec agentSpec = new PracticeSandboxSpec(
             "ghcr.io/agent:latest",

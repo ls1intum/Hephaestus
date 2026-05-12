@@ -50,7 +50,6 @@ public class DockerSandboxAdapter implements SandboxManager {
     private static final Logger log = LoggerFactory.getLogger(DockerSandboxAdapter.class);
     private static final String CONTAINER_USER = "1000:1000";
     private static final String CONTAINER_HOSTNAME = "agent";
-    private static final String OUTPUT_PATH_DEFAULT = "/workspace/.output";
     private static final int LOG_TAIL_LINES = 500;
     private static final String PROXY_URL_PLACEHOLDER = "{appServerIp}";
 
@@ -346,8 +345,7 @@ public class DockerSandboxAdapter implements SandboxManager {
 
             // ── PHASE 3: COLLECT ──
             // Collect output regardless of exit code or timeout — agent may have written partial results
-            String outputPath = spec.outputPath() != null ? spec.outputPath() : OUTPUT_PATH_DEFAULT;
-            Map<String, byte[]> outputFiles = workspaceManager.collectOutput(containerId, outputPath);
+            Map<String, byte[]> outputFiles = workspaceManager.collectOutput(containerId, spec.outputPath());
 
             // Capture logs before cleanup
             String logs = containerManager.getLogs(containerId, LOG_TAIL_LINES);

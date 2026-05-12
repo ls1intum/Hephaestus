@@ -43,8 +43,12 @@ public record SandboxSpec(
         Objects.requireNonNull(jobId, "jobId must not be null");
         Objects.requireNonNull(image, "image must not be null");
         Objects.requireNonNull(resourceLimits, "resourceLimits must not be null");
+        Objects.requireNonNull(outputPath, "outputPath must not be null");
         if (image.isBlank()) {
             throw new IllegalArgumentException("image must not be blank");
+        }
+        if (outputPath.isBlank()) {
+            throw new IllegalArgumentException("outputPath must not be blank");
         }
         // Default nullable collection fields to empty — avoids null-checking in consumers
         command = command != null ? command : List.of();

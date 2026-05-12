@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
  * DockerClient}, translating {@link DockerException} to {@link SandboxException}.
  */
 public class DockerClientOperations
-    implements DockerContainerOperations, DockerNetworkOperations, DockerFileOperations
+    implements DockerContainerOperations, DockerNetworkOperations, DockerFileOperations, DockerImageOperations
 {
 
     private static final Logger log = LoggerFactory.getLogger(DockerClientOperations.class);
@@ -55,6 +55,33 @@ public class DockerClientOperations
             return true;
         } catch (Exception e) {
             log.debug("Docker ping failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
+    public boolean pullImage(String image) {
+        if (image == null || image.isBlank()) {
+            log.warn("pullImage called with blank image reference, skipping");
+            return false;
+        }
+        try {
+            log.info("Pulling Docker image: {}", image);
+            long startMs = System.currentTimeMillis();
+            boolean completed = dockerClient.pullImageCmd(image).start().awaitCompletion(5, TimeUnit.MINUTES);
+            long durationMs = System.currentTimeMillis() - startMs;
+            if (!completed) {
+                log.warn("Docker pull timed out after 5 min: image={}", image);
+                return false;
+            }
+            log.info("Pulled Docker image in {} ms: {}", durationMs, image);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Docker pull interrupted: image={}", image);
+            return false;
+        } catch (Exception e) {
+            log.warn("Docker pull failed (will fall back to cached image): image={}, error={}", image, e.getMessage());
             return false;
         }
     }

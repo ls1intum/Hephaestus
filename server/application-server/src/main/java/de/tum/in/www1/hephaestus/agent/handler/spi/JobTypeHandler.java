@@ -8,18 +8,17 @@ import java.util.Map;
  * Domain-specific handler for a single {@link AgentJobType}.
  *
  * <p>The handler owns ALL domain logic for its job type: extracting submission metadata,
- * preparing workspace context, building the agent prompt, and delivering results. The
- * executor pipeline and sandbox manager remain completely domain-agnostic.
+ * preparing workspace context, and delivering results. The executor pipeline and sandbox
+ * manager remain completely domain-agnostic.
  *
  * <p>Handlers are registered in {@link de.tum.in.www1.hephaestus.agent.handler.JobTypeHandlerRegistry}
  * and looked up by {@link AgentJobType}. Handlers are plain objects with constructor-injected
  * dependencies — no Spring annotations on the interface or its methods.
  *
- * <h2>Lifecycle (called by executor, issue #746)</h2>
+ * <h2>Lifecycle (called by executor)</h2>
  * <ol>
  *   <li>{@link #createSubmission} — event listener extracts metadata + idempotency key</li>
- *   <li>{@link #prepareInputFiles} — populate workspace files before container start</li>
- *   <li>{@link #buildPrompt} — generate the agent prompt</li>
+ *   <li>{@link #prepareInputFiles} — populate workspace files (including {@code task.json}) before container start</li>
  *   <li>{@link #deliver} — post-execution result delivery</li>
  * </ol>
  */
@@ -40,30 +39,17 @@ public interface JobTypeHandler {
     JobSubmission createSubmission(JobSubmissionRequest request);
 
     /**
-     * Prepare all files the agent needs in its workspace.
+     * Prepare all files the agent needs in its workspace, including the
+     * {@link de.tum.in.www1.hephaestus.agent.task.TaskEnvelope} at {@code /workspace/task.json}.
      *
      * <p>Returns a map of relative paths to file contents. These are injected into the
      * container's {@code /workspace} directory via the sandbox's tar injection mechanism.
-     * For code review handlers this includes repository source files, diffs, and metadata.
      *
      * @param job the persisted job (metadata is available via {@link AgentJob#getMetadata()})
      * @return workspace files (relative path → content)
      * @throws JobPreparationException if context preparation fails
      */
     Map<String, byte[]> prepareInputFiles(AgentJob job);
-
-    /**
-     * Build the prompt text for the agent.
-     *
-     * <p>The executor passes this string to
-     * {@link de.tum.in.www1.hephaestus.agent.practice.PracticeAgentRequest#prompt()}.
-     * The Pi practice agent injects it as a file at {@code /workspace/.prompt}.
-     *
-     * @param job the persisted job
-     * @return prompt text (must not be blank)
-     * @throws JobPreparationException if prompt generation fails (e.g. missing practices or metadata)
-     */
-    String buildPrompt(AgentJob job);
 
     /**
      * Deliver results after successful execution.

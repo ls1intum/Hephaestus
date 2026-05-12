@@ -103,7 +103,7 @@ class SandboxSpecTest extends BaseUnitTest {
     @Test
     @DisplayName("should accept valid spec with nullable fields and default collections to empty")
     void shouldAcceptValidSpec() {
-        // networkPolicy, securityProfile, outputPath can be null
+        // networkPolicy, securityProfile can be null
         // command, environment, inputFiles are defaulted to empty collections
         var spec = new SandboxSpec(
             UUID.randomUUID(),
@@ -114,7 +114,7 @@ class SandboxSpecTest extends BaseUnitTest {
             ResourceLimits.DEFAULT,
             null,
             null,
-            null,
+            "/workspace/.output",
             null
         );
         assertThat(spec.jobId()).isNotNull();
@@ -122,6 +122,27 @@ class SandboxSpecTest extends BaseUnitTest {
         assertThat(spec.environment()).isEmpty();
         assertThat(spec.inputFiles()).isEmpty();
         assertThat(spec.volumeMounts()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("rejects null outputPath")
+    void rejectsNullOutputPath() {
+        assertThatThrownBy(() ->
+            new SandboxSpec(
+                UUID.randomUUID(),
+                "alpine:latest",
+                null,
+                null,
+                null,
+                ResourceLimits.DEFAULT,
+                null,
+                null,
+                null,
+                null
+            )
+        )
+            .withFailMessage("outputPath should be required")
+            .isInstanceOf(NullPointerException.class);
     }
 
     @Nested

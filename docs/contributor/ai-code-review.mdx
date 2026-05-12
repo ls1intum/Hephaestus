@@ -50,7 +50,7 @@ sequenceDiagram
 
 ## Agent architecture
 
-A single backend powers practice detection: the **Pi practice agent** (`PiPracticeAgent`). It uses a single-pass architecture — one agent evaluates all relevant practices for the diff and persists structured findings via custom Pi tools (`report_finding`, `set_review_summary`).
+A single backend powers practice detection: the **Pi practice agent**, wired via `PracticePiAdapter` on top of the shared `PiRuntimeFactory`. It uses a single-pass architecture — one agent evaluates all relevant practices for the diff and persists structured findings via custom Pi tools (`report_finding`, `set_review_summary`).
 
 The runner (`.run-pi.mjs`) drives the Pi SDK in-process: initial analysis with a soft-timeout steering message and a hard-timeout abort, followed by a format retry if the persisted output is incomplete. A top-level watchdog hard-exits the process at `AGENT_BUDGET_MS + 30s` so the orchestrator always observes a terminal state.
 
@@ -61,7 +61,7 @@ Every agent container gets this file structure (agent-specific files noted):
 ```
 /workspace/
   repo/                              # Git repository (read-only bind mount)
-  .context/
+  context/target/
     metadata.json                    # PR title, body, author, branches, stats
     comments.json                    # Latest 500 review comments
     diff.patch                       # Unified diff with [L<n>] annotations
@@ -74,7 +74,7 @@ Every agent container gets this file structure (agent-specific files noted):
     all-criteria.md                  # All criteria bundled (reduces tool calls)
   .precompute/practices/{slug}.ts    # Precompute scripts (from DB, if present)
   .precompute-out/                   # Precompute output (summary.md + per-practice JSON)
-  .prompt                            # Task prompt for the agent
+  task.json                          # TaskEnvelope<PracticeReviewTask> — prompt, jobId, workspaceId
   .pi/AGENTS.md                      # Pi orchestrator instructions
   .pi-runtime/settings.json          # Pi SDK configuration (provider, model, compaction)
   .run-pi.mjs                        # Runner script
@@ -139,7 +139,7 @@ After the agent returns findings, the server runs a 6-step delivery pipeline in 
 3. **Persist** -- Validated findings are saved as `PracticeFinding` entities in the database.
 
 4. **Compose** -- `DeliveryComposer` partitions findings into:
-   - **Inlinable** (have file locations, not in internal paths like `.context/`, practice not in `NON_INLINABLE_PRACTICES`) -- compact list in MR summary, full detail in diff notes
+   - **Inlinable** (have file locations, not in internal paths like `context/target/`, practice not in `NON_INLINABLE_PRACTICES`) -- compact list in MR summary, full detail in diff notes
    - **Non-inlinable** (`mr-description-quality`, `commit-discipline`, or no file location) -- full detail in MR summary
    - When all findings are positive, composes a short approval comment naming top positive practices
 
@@ -198,7 +198,7 @@ hephaestus:
 Then trigger with:
 
 ```bash
-curl -X POST "http://localhost:${SERVER_PORT}/actuator/dev/trigger-review?prId=123&workspaceId=1"
+curl -X POST "http://localhost:${SERVER_PORT}/api/dev/trigger-review?prId=123&workspaceId=1"
 ```
 
 The port must match your `SERVER_PORT` environment variable (default: `38080` in `.env`).
