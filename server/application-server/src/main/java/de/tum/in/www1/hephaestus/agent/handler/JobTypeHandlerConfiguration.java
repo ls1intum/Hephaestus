@@ -11,8 +11,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
-import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
-import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -22,13 +20,17 @@ import org.springframework.lang.Nullable;
 
 /**
  * Registers all {@link JobTypeHandler} beans and the {@link JobTypeHandlerRegistry}.
+ *
+ * <p>This class is in the dependency chain of {@link WorkspaceContextBuilder} (via any
+ * {@code ContentProvider} it produces and consumes). Beans produced here that are needed
+ * by a {@code ContentProvider} must be declared as top-level {@code @Component}s instead,
+ * otherwise a circular dependency forms.
  */
 @Configuration
 public class JobTypeHandlerConfiguration {
 
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
-    private final PracticeFindingRepository practiceFindingRepository;
     private final PracticeReviewProperties reviewProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
@@ -36,14 +38,12 @@ public class JobTypeHandlerConfiguration {
     JobTypeHandlerConfiguration(
         ObjectMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
-        PracticeFindingRepository practiceFindingRepository,
         PracticeReviewProperties reviewProperties,
         WorkspaceContextBuilder workspaceContextBuilder,
         TaskEnvelopeWriter taskEnvelopeWriter
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
-        this.practiceFindingRepository = practiceFindingRepository;
         this.reviewProperties = reviewProperties;
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
@@ -52,11 +52,6 @@ public class JobTypeHandlerConfiguration {
     @Bean
     public PracticeDetectionResultParser practiceDetectionResultParser() {
         return new PracticeDetectionResultParser(objectMapper);
-    }
-
-    @Bean
-    ContributorHistoryProvider contributorHistoryProvider() {
-        return new ContributorHistoryProvider(practiceFindingRepository, objectMapper);
     }
 
     @Bean

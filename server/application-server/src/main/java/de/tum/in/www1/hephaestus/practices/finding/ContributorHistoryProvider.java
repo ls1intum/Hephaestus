@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 /**
  * Builds aggregated contributor practice history JSON for the review agent context.
@@ -24,6 +25,7 @@ import org.slf4j.LoggerFactory;
  * <p>Output is capped at {@value #MAX_PRACTICES} practices, sorted by NEGATIVE count
  * descending so the most problematic practices are always included when truncation occurs.
  */
+@Component
 public class ContributorHistoryProvider {
 
     private static final Logger log = LoggerFactory.getLogger(ContributorHistoryProvider.class);
