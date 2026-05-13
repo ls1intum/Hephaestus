@@ -49,6 +49,11 @@ public interface AttachedSandbox extends AutoCloseable {
      */
     void close(Duration graceTimeout);
 
+    /**
+     * {@link AutoCloseable} contract: uses a hardcoded 30-second grace timeout. <b>This is NOT</b>
+     * the registry's configured {@code hephaestus.mentor.grace-timeout-seconds} — callers who
+     * want the configured default must call {@link #close(Duration)} explicitly.
+     */
     @Override
     default void close() {
         close(Duration.ofSeconds(30));

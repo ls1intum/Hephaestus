@@ -104,9 +104,18 @@ final class JsonlStdinWriter {
         }
         CompletableFuture<Void> ack = new CompletableFuture<>();
         WriteEnvelope env = new WriteEnvelope(payload, ack);
-        if (!queue.offer(env)) {
-            rejectedQueueFull.increment();
-            throw new InteractiveSandboxException("Writer queue full (capacity=" + queueCapacity + ")");
+        // Atomic enqueue-vs-terminal: without this, send() could observe terminated==false,
+        // markTerminal() could drain the queue, then send()'s offer would orphan an envelope
+        // whose ack never completes (caller blocks for stdinWriteTimeoutMs).
+        synchronized (this) {
+            if (terminated) {
+                rejectedClosed.increment();
+                throw new InteractiveSandboxException("Session is closed");
+            }
+            if (!queue.offer(env)) {
+                rejectedQueueFull.increment();
+                throw new InteractiveSandboxException("Writer queue full (capacity=" + queueCapacity + ")");
+            }
         }
         try {
             ack.get(stdinWriteTimeoutMs, TimeUnit.MILLISECONDS);

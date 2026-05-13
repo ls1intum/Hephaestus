@@ -334,6 +334,8 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         );
     }
 
+    private static final int PREP_DRAIN_CAP_BYTES = 16 * 1024;
+
     private void runExec(String containerId, String user, String script, String description) {
         ProcessBuilder pb = new ProcessBuilder(dockerCli, "exec", "-u", user, containerId, "sh", "-c", script);
         pb.redirectErrorStream(true);
@@ -344,11 +346,21 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             metrics.attachFailureOther.increment();
             throw new InteractiveSandboxException(description + " failed: " + e.getMessage(), e);
         }
-        // Drain in the background so the pipe doesn't fill while we waitFor; bounded by destroyForcibly.
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        // Bounded drain — a misbehaving exec emitting a megabyte of stdout would otherwise OOM
+        // the app-server. We only need a short preview for the error message.
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(PREP_DRAIN_CAP_BYTES);
         Thread drainer = Thread.ofVirtual().start(() -> {
             try (var in = p.getInputStream()) {
-                in.transferTo(out);
+                byte[] buf = new byte[1024];
+                int read;
+                while ((read = in.read(buf)) >= 0) {
+                    int room = PREP_DRAIN_CAP_BYTES - out.size();
+                    if (room <= 0) {
+                        // Capture is full; keep draining (discard) so the pipe doesn't back-pressure.
+                        continue;
+                    }
+                    out.write(buf, 0, Math.min(read, room));
+                }
             } catch (IOException ignored) {}
         });
         try {

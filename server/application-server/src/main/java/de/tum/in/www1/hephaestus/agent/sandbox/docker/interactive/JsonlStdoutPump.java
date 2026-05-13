@@ -101,7 +101,12 @@ final class JsonlStdoutPump {
                 }
                 buf.append((char) ch);
             }
-            if (!discardRemainder && buf.length() > 0) {
+            if (discardRemainder) {
+                // The line we were discarding never got its terminator — count it as a parse error
+                // so dashboards see the cause even when the runner exits before flushing.
+                parseErrorCounter.increment();
+                log.warn("Oversized JSONL line at EOF (no terminator): sessionId={}, cap={}", sessionId, maxLineChars);
+            } else if (buf.length() > 0) {
                 handleLine(buf);
             }
         } finally {
