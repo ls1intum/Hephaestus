@@ -908,7 +908,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     class EnvVarBlocklist {
 
         static Stream<String> exactBlockedVars() {
-            return DockerSandboxAdapter.BLOCKED_ENV_VARS.stream();
+            return SandboxEnvBlocklist.BLOCKED_NAMES.stream();
         }
 
         static Stream<String> prefixBlockedVars() {
@@ -936,32 +936,32 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         @MethodSource("exactBlockedVars")
         @DisplayName("should block exact env vars")
         void shouldBlockExactVars(String varName) {
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar(varName)).isTrue();
+            assertThat(SandboxEnvBlocklist.isBlocked(varName)).isTrue();
         }
 
         @ParameterizedTest(name = "should block prefix var: {0}")
         @MethodSource("prefixBlockedVars")
         @DisplayName("should block prefix-matched env vars")
         void shouldBlockPrefixVars(String varName) {
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar(varName)).isTrue();
+            assertThat(SandboxEnvBlocklist.isBlocked(varName)).isTrue();
         }
 
         @Test
         @DisplayName("should allow safe env vars")
         void shouldAllowSafeVars() {
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar("MY_APP_KEY")).isFalse();
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar("FOO")).isFalse();
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar("CUSTOM_VAR")).isFalse();
+            assertThat(SandboxEnvBlocklist.isBlocked("MY_APP_KEY")).isFalse();
+            assertThat(SandboxEnvBlocklist.isBlocked("FOO")).isFalse();
+            assertThat(SandboxEnvBlocklist.isBlocked("CUSTOM_VAR")).isFalse();
         }
 
         @Test
         @DisplayName("should block case variants of prefix-matched vars")
         void shouldBlockCaseVariants() {
             // Some tools/shells inject lowercase variants
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar("aws_access_key_id")).isTrue();
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar("docker_host")).isTrue();
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar("Google_Cloud_Project")).isTrue();
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar("Azure_Client_Secret")).isTrue();
+            assertThat(SandboxEnvBlocklist.isBlocked("aws_access_key_id")).isTrue();
+            assertThat(SandboxEnvBlocklist.isBlocked("docker_host")).isTrue();
+            assertThat(SandboxEnvBlocklist.isBlocked("Google_Cloud_Project")).isTrue();
+            assertThat(SandboxEnvBlocklist.isBlocked("Azure_Client_Secret")).isTrue();
         }
     }
 
@@ -1075,9 +1075,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         @DisplayName("should block caller-supplied GIT_CONFIG_* via prefix blocklist")
         void shouldBlockCallerGitConfigVars() {
             // Verify at the unit level that GIT_CONFIG_* vars are prefix-blocked
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar("GIT_CONFIG_COUNT")).isTrue();
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar("GIT_CONFIG_KEY_0")).isTrue();
-            assertThat(DockerSandboxAdapter.isBlockedEnvVar("GIT_CONFIG_VALUE_99")).isTrue();
+            assertThat(SandboxEnvBlocklist.isBlocked("GIT_CONFIG_COUNT")).isTrue();
+            assertThat(SandboxEnvBlocklist.isBlocked("GIT_CONFIG_KEY_0")).isTrue();
+            assertThat(SandboxEnvBlocklist.isBlocked("GIT_CONFIG_VALUE_99")).isTrue();
         }
 
         @Test
