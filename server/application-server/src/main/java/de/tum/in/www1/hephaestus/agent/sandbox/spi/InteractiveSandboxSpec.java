@@ -55,9 +55,15 @@ public record InteractiveSandboxSpec(
                 );
             }
             String value = entry.getValue();
-            if (value != null && value.indexOf('\0') >= 0) {
-                throw new IllegalArgumentException("Env var value contains NUL: " + key);
+            if (value != null && (value.indexOf('\0') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0)) {
+                throw new IllegalArgumentException("Env var value contains NUL/LF/CR: " + key);
             }
         }
+        // Defensive copies: callers must not mutate after validation (otherwise blocklist + key
+        // validation are bypassable post-construction, since adapters iterate at attach() time).
+        command = List.copyOf(command);
+        environment = Map.copyOf(environment);
+        inputFiles = Map.copyOf(inputFiles);
+        volumeMounts = Map.copyOf(volumeMounts);
     }
 }
