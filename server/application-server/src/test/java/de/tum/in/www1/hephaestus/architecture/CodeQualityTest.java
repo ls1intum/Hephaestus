@@ -145,7 +145,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             Set<String> allowedOverloads = Set.of(
                 "ActivityEventService.record", // Has RecordActivityCommand overload for cleaner API
                 // @Bean factory wiring Spring dependencies — not business logic complexity
-                "DockerSandboxConfiguration.dockerSandboxAdapter"
+                "DockerSandboxConfiguration.dockerSandboxAdapter",
+                "DockerSandboxConfiguration.dockerInteractiveSandboxAdapter"
             );
 
             // Repository native SQL methods require individual @Param annotations and cannot use

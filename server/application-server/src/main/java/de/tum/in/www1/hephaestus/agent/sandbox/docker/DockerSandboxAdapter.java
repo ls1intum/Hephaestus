@@ -15,10 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -62,95 +59,6 @@ public class DockerSandboxAdapter implements SandboxManager {
      * upstream <em>collection</em> limit (1 MB).
      */
     private static final int MAX_LOG_EVENT_BYTES = 32 * 1024; // 32 KB
-
-    /**
-     * Exact environment variable names that must never be set by callers. Covers library injection,
-     * path manipulation, proxy hijacking, and git code-execution vectors.
-     *
-     * @see #BLOCKED_ENV_PREFIXES
-     * @see #isBlockedEnvVar(String)
-     */
-    static final Set<String> BLOCKED_ENV_VARS;
-
-    static {
-        TreeSet<String> vars = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        vars.addAll(
-            List.of(
-                // Library injection & path manipulation
-                "LD_PRELOAD",
-                "LD_LIBRARY_PATH",
-                "PATH",
-                "SHELL",
-                "USER",
-                // Proxy hijacking
-                "http_proxy",
-                "https_proxy",
-                "HTTP_PROXY",
-                "HTTPS_PROXY",
-                "no_proxy",
-                "NO_PROXY",
-                // Git env vars that allow arbitrary command execution.
-                // These override git-config equivalents and must be blocked independently.
-                "GIT_SSH",
-                "GIT_SSH_COMMAND",
-                "GIT_ASKPASS",
-                "GIT_EDITOR",
-                "GIT_EXEC_PATH",
-                "GIT_TEMPLATE_DIR",
-                "GIT_EXTERNAL_DIFF",
-                "GIT_PROXY_COMMAND",
-                "GIT_SEQUENCE_EDITOR",
-                "GIT_PAGER",
-                // Git env vars that control security-relevant behaviour
-                "GIT_TERMINAL_PROMPT",
-                "GIT_ATTR_NOSYSTEM"
-            )
-        );
-        BLOCKED_ENV_VARS = vars;
-    }
-
-    /**
-     * Environment variable prefixes that must never be set by callers. Blocks entire credential
-     * families (AWS, GCP, Azure, Docker) rather than individual keys — catches new credential vars
-     * automatically (e.g. {@code AWS_ROLE_ARN}, {@code GOOGLE_CLOUD_PROJECT}). Also blocks
-     * {@code GIT_CONFIG_*} to prevent callers from overriding git security settings.
-     *
-     * @see #BLOCKED_ENV_VARS
-     * @see #ALLOWED_PREFIX_EXCEPTIONS
-     * @see #isBlockedEnvVar(String)
-     */
-    static final List<String> BLOCKED_ENV_PREFIXES = List.of(
-        "AWS_",
-        "GOOGLE_",
-        "GCP_",
-        "AZURE_",
-        "DOCKER_",
-        "ALIBABA_CLOUD_",
-        "GIT_CONFIG_"
-    );
-
-    /**
-     * Exact environment variable names that are allowed even though they match a blocked prefix.
-     * These are set by agent adapters for legitimate SDK configuration (e.g. deployment mapping).
-     *
-     * @see #BLOCKED_ENV_PREFIXES
-     */
-    static final Set<String> ALLOWED_PREFIX_EXCEPTIONS;
-
-    static {
-        TreeSet<String> allowed = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        allowed.addAll(
-            List.of(
-                // Pi SDK needs this to map model names to Azure deployment names
-                "AZURE_OPENAI_DEPLOYMENT_NAME_MAP",
-                // Non-secret SDK configuration — API key is injected via shell export,
-                // never through the env map, to prevent accidental credential leakage.
-                "AZURE_OPENAI_BASE_URL",
-                "AZURE_OPENAI_API_VERSION"
-            )
-        );
-        ALLOWED_PREFIX_EXCEPTIONS = allowed;
-    }
 
     /**
      * Git config key-value pairs injected via {@code GIT_CONFIG_COUNT}/{@code GIT_CONFIG_KEY_*}/
@@ -434,10 +342,10 @@ public class DockerSandboxAdapter implements SandboxManager {
         // ── User environment ──
         // User env vars are copied first; security values are injected below and will
         // overwrite any collisions. This is defense-in-depth — most dangerous vars are
-        // already blocked by isBlockedEnvVar(), but the ordering ensures new security
+        // already blocked by SandboxEnvBlocklist, but the ordering ensures new security
         // vars added below always win even if the blocklist isn't updated simultaneously.
         for (var entry : spec.environment().entrySet()) {
-            if (isBlockedEnvVar(entry.getKey())) {
+            if (SandboxEnvBlocklist.isBlocked(entry.getKey())) {
                 log.warn("Blocked dangerous environment variable: {}", entry.getKey());
             } else {
                 env.put(entry.getKey(), entry.getValue());
@@ -518,30 +426,6 @@ public class DockerSandboxAdapter implements SandboxManager {
         } catch (Exception e) {
             log.debug("Could not capture container logs on error path: {}", e.getMessage());
         }
-    }
-
-    /**
-     * Check if an environment variable name is blocked (exact match or prefix match).
-     *
-     * <p>Package-private for testing.
-     */
-    static boolean isBlockedEnvVar(String name) {
-        if (BLOCKED_ENV_VARS.contains(name)) {
-            return true;
-        }
-        // Allow specific vars that match blocked prefixes but are needed by agent adapters
-        if (ALLOWED_PREFIX_EXCEPTIONS.contains(name)) {
-            return false;
-        }
-        // Prefix matching uses uppercase comparison — catches case variants
-        // like "aws_access_key_id" that some tools/shells might inject
-        String upper = name.toUpperCase(Locale.ROOT);
-        for (String prefix : BLOCKED_ENV_PREFIXES) {
-            if (upper.startsWith(prefix)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void checkCancelled(AtomicBoolean flag, UUID jobId) {

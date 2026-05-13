@@ -1,11 +1,18 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
+import de.tum.in.www1.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.in.www1.hephaestus.agent.sandbox.SandboxProperties;
+import de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive.DockerInteractiveSandboxAdapter;
+import de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive.InteractiveSandboxMetrics;
+import de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive.InteractiveSandboxRegistry;
+import de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive.StdinWriteWatchdog;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -37,7 +44,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @Configuration
 @ConditionalOnProperty(prefix = "hephaestus.sandbox", name = "enabled", havingValue = "true", matchIfMissing = false)
 @ConditionalOnClass(DockerClient.class)
-@EnableConfigurationProperties(SandboxProperties.class)
+@EnableConfigurationProperties({ SandboxProperties.class, InteractiveSandboxProperties.class })
 public class DockerSandboxConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(DockerSandboxConfiguration.class);
@@ -168,6 +175,64 @@ public class DockerSandboxConfiguration {
         SandboxProperties properties
     ) {
         return new DockerHealthIndicator(containerManager, properties);
+    }
+
+    // -------------------------------------------------------------------------
+    // Interactive (mentor) sandbox — sibling of SandboxManager, dark-launched until #1071.
+    // -------------------------------------------------------------------------
+
+    @Bean
+    public InteractiveSandboxMetrics interactiveSandboxMetrics(MeterRegistry meterRegistry) {
+        return new InteractiveSandboxMetrics(meterRegistry);
+    }
+
+    @Bean
+    public StdinWriteWatchdog stdinWriteWatchdog() {
+        return new StdinWriteWatchdog();
+    }
+
+    @Bean
+    public InteractiveSandboxRegistry interactiveSandboxRegistry(
+        InteractiveSandboxProperties properties,
+        SandboxContainerManager containerManager,
+        InteractiveSandboxMetrics metrics,
+        StdinWriteWatchdog watchdog,
+        MeterRegistry meterRegistry
+    ) {
+        return new InteractiveSandboxRegistry(properties, containerManager, metrics, watchdog, meterRegistry);
+    }
+
+    @Bean
+    public InteractiveSandboxService dockerInteractiveSandboxAdapter(
+        InteractiveSandboxProperties interactiveProperties,
+        SandboxProperties sandboxProperties,
+        SandboxNetworkManager networkManager,
+        SandboxWorkspaceManager workspaceManager,
+        SandboxContainerManager containerManager,
+        ContainerSecurityPolicy securityPolicy,
+        InteractiveSandboxRegistry registry,
+        InteractiveSandboxMetrics metrics,
+        ObjectMapper mapper,
+        // Shared platform-thread executor (declared above for the sync sandbox); the interactive
+        // adapter runs runClose() here too — docker-java sync calls pin virtual carriers on JDK 21.
+        ExecutorService dockerWaitExecutor,
+        @Value("${hephaestus.mentor.docker-cli:docker}") String dockerCli,
+        @Value("${server.port:8080}") int serverPort
+    ) {
+        return new DockerInteractiveSandboxAdapter(
+            interactiveProperties,
+            sandboxProperties,
+            networkManager,
+            workspaceManager,
+            containerManager,
+            securityPolicy,
+            registry,
+            metrics,
+            mapper,
+            dockerWaitExecutor,
+            dockerCli,
+            serverPort
+        );
     }
 
     /**

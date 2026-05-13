@@ -9,12 +9,12 @@ import java.util.Map;
  * <p>These records are used by the focused operation interfaces ({@link DockerContainerOperations},
  * {@link DockerNetworkOperations}, {@link DockerFileOperations}) and their implementations.
  */
-final class DockerOperations {
+public final class DockerOperations {
 
     private DockerOperations() {}
 
     /** Specification for creating a container. */
-    record ContainerSpec(
+    public record ContainerSpec(
         String image,
         List<String> command,
         Map<String, String> environment,
@@ -27,7 +27,7 @@ final class DockerOperations {
     ) {}
 
     /** Host configuration for container resource limits and security. */
-    record HostConfigSpec(
+    public record HostConfigSpec(
         long memoryBytes,
         long memorySwapBytes,
         long nanoCpus,
@@ -44,11 +44,11 @@ final class DockerOperations {
         Map<String, UlimitSpec> ulimits
     ) {}
 
-    record UlimitSpec(long soft, long hard) {}
+    public record UlimitSpec(long soft, long hard) {}
 
-    record WaitResult(int exitCode) {}
+    public record WaitResult(int exitCode) {}
 
-    record ContainerInfo(String id, String name, Map<String, String> labels, String state) {}
+    public record ContainerInfo(String id, String name, Map<String, String> labels, String state) {}
 
-    record NetworkInfo(String id, String name) {}
+    public record NetworkInfo(String id, String name) {}
 }
