@@ -21,10 +21,31 @@ class SandboxEnvBlocklistTest extends BaseUnitTest {
             "GIT_PAGER",
             "HTTPS_PROXY",
             "http_proxy",
+            "BASH_ENV",
+            "JAVA_TOOL_OPTIONS",
+            "_JAVA_OPTIONS",
+            "PYTHONPATH",
+            "PYTHONSTARTUP",
+            "PERL5OPT",
+            "RUBYOPT",
+            "OPENSSL_CONF",
+            "CURL_CA_BUNDLE",
+            "SSL_CERT_FILE",
         }
     )
     void blocksExactByName(String name) {
         assertThat(SandboxEnvBlocklist.isBlocked(name)).isTrue();
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("static blocklist sets are unmodifiable")
+    void blocklistIsImmutable() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            SandboxEnvBlocklist.BLOCKED_NAMES.add("INJECT")
+        ).isInstanceOf(UnsupportedOperationException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            SandboxEnvBlocklist.ALLOWED_PREFIX_EXCEPTIONS.add("BYPASS")
+        ).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @ParameterizedTest(name = "blocks prefix: {0}")

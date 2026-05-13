@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -8,7 +9,9 @@ import java.util.TreeSet;
 /**
  * Blocklist of env-var names callers must not inject into a sandbox: library injection,
  * code-execution-via-tooling, proxy hijacking, credential exfiltration. Used by both the sync
- * and interactive adapters. Case-insensitive.
+ * and interactive adapters. ASCII-case-insensitive; depends on
+ * {@code InteractiveSandboxSpec}'s {@code [A-Za-z_][A-Za-z0-9_]*} key regex to keep Unicode
+ * case-folding out of scope.
  */
 public final class SandboxEnvBlocklist {
 
@@ -38,7 +41,25 @@ public final class SandboxEnvBlocklist {
                 "PATH",
                 "SHELL",
                 "USER",
-                "NODE_OPTIONS", // analogous to LD_PRELOAD for the Node runner
+                "NODE_OPTIONS",
+                "BASH_ENV",
+                "ENV",
+                "JAVA_TOOL_OPTIONS",
+                "_JAVA_OPTIONS",
+                "JDK_JAVA_OPTIONS",
+                "PYTHONPATH",
+                "PYTHONSTARTUP",
+                "PYTHONUSERBASE",
+                "PERL5OPT",
+                "PERL5LIB",
+                "RUBYOPT",
+                "RUBYLIB",
+                "OPENSSL_CONF",
+                "OPENSSL_ENGINES",
+                "CURL_CA_BUNDLE",
+                "SSL_CERT_FILE",
+                "SSL_CERT_DIR",
+                "REQUESTS_CA_BUNDLE",
                 // Proxy hijacking.
                 "http_proxy",
                 "https_proxy",
@@ -61,13 +82,13 @@ public final class SandboxEnvBlocklist {
                 "GIT_ATTR_NOSYSTEM"
             )
         );
-        BLOCKED_NAMES = names;
+        BLOCKED_NAMES = Collections.unmodifiableSet(names);
 
         TreeSet<String> allowed = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         allowed.addAll(
             List.of("AZURE_OPENAI_DEPLOYMENT_NAME_MAP", "AZURE_OPENAI_BASE_URL", "AZURE_OPENAI_API_VERSION")
         );
-        ALLOWED_PREFIX_EXCEPTIONS = allowed;
+        ALLOWED_PREFIX_EXCEPTIONS = Collections.unmodifiableSet(allowed);
     }
 
     private SandboxEnvBlocklist() {}
