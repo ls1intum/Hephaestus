@@ -1836,6 +1836,16 @@ export type ChatThreadGroup = {
     threads: Array<ChatThreadSummary>;
 };
 
+/**
+ * Upsert a vote on a mentor assistant message
+ */
+export type ChatMessageVoteRequest = {
+    /**
+     * true = upvote (helpful), false = downvote
+     */
+    isUpvoted: boolean;
+};
+
 export type ChatMessageVote = {
     createdAt: Date;
     isUpvoted: boolean;
@@ -3118,6 +3128,27 @@ export type VoteMessageResponses = {
 
 export type VoteMessageResponse = VoteMessageResponses[keyof VoteMessageResponses];
 
+export type ListThreadsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/threads';
+};
+
+export type ListThreadsResponses = {
+    /**
+     * Threads returned, newest first
+     */
+    200: Array<ChatThreadSummary>;
+};
+
+export type ListThreadsResponse = ListThreadsResponses[keyof ListThreadsResponses];
+
 export type GetGroupedThreadsData = {
     body?: never;
     path: {
@@ -3194,6 +3225,66 @@ export type GetThreadResponses = {
 };
 
 export type GetThreadResponse = GetThreadResponses[keyof GetThreadResponses];
+
+export type RemoveVoteData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        threadId: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/threads/{threadId}/messages/{messageId}/vote';
+};
+
+export type RemoveVoteErrors = {
+    /**
+     * Thread or message not found (or not owned by current user)
+     */
+    404: unknown;
+};
+
+export type RemoveVoteResponses = {
+    /**
+     * Vote removed or did not exist
+     */
+    204: void;
+};
+
+export type RemoveVoteResponse = RemoveVoteResponses[keyof RemoveVoteResponses];
+
+export type VoteData = {
+    body: ChatMessageVoteRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        threadId: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/threads/{threadId}/messages/{messageId}/vote';
+};
+
+export type VoteErrors = {
+    /**
+     * Thread or message not found (or not owned by current user)
+     */
+    404: unknown;
+};
+
+export type VoteResponses = {
+    /**
+     * Vote recorded
+     */
+    200: ChatMessageVote;
+};
+
+export type VoteResponse = VoteResponses[keyof VoteResponses];
 
 export type UpdateNotificationsData = {
     body: UpdateWorkspaceNotificationsRequest;

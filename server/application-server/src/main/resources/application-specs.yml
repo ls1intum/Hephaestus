@@ -53,3 +53,5 @@ hephaestus:
         nats:
             enabled: false
             server: "nats://localhost:4222"
+    mentor:
+        enabled: false

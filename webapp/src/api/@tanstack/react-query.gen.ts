@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, cancelJob, claimIdentity, computeUserLeagueStats, createConfig, createDocument, createPractice, createWorkspace, deleteConfig, deleteDocument, deleteDocumentVersionsAfter, deletePractice, deleteUser, getAllAchievementDefinitions, getAllTeams, getConfig, getConfigs, getCurrentUserMembership, getDocument, getEngagement, getFinding, getFindingsForPullRequest, getGroupedThreads, getIdentityProviders, getJob, getLabelFilters, getLatestFeedback, getLeaderboard, getLinkedAccounts, getMember, getPractice, getProviders, getRepositoriesToMonitor, getRepositorySettings, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getVersion, getWorkspace, gitLabPreflight, listDocuments, listFindings, listGitLabGroups, listGlobalContributors, listJobs, listMembers, listPractices, listVersions, listWorkspaces, type Options, purgeWorkspace, recalculateUserAchievements, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, renameSlug, resetAndRecalculateLeagues, retryDelivery, setActive, submitFeedback, unlinkAccount, updateConfig, updateDocument, updateFeatures, updateMemberVisibility, updateNotifications, updatePractice, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackCredentials, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, voteMessage } from '../sdk.gen';
-import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, CancelJobData, CancelJobResponse, ClaimIdentityData, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateConfigData, CreateConfigResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, CreatePracticeData, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeleteDocumentData, DeleteDocumentError, DeleteDocumentResponse, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterError, DeleteDocumentVersionsAfterResponse, DeletePracticeData, DeletePracticeResponse, DeleteUserData, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetEngagementData, GetEngagementResponse, GetFindingData, GetFindingResponse, GetFindingsForPullRequestData, GetFindingsForPullRequestResponse, GetGroupedThreadsData, GetGroupedThreadsError, GetGroupedThreadsResponse, GetIdentityProvidersData, GetIdentityProvidersResponse, GetJobData, GetJobResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestFeedbackData, GetLatestFeedbackResponse, GetLeaderboardData, GetLeaderboardResponse, GetLinkedAccountsData, GetLinkedAccountsResponse, GetMemberData, GetMemberResponse, GetPracticeData, GetPracticeResponse, GetProvidersData, GetProvidersResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadError, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetVersionData, GetVersionError, GetVersionResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListFindingsData, ListFindingsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListJobsData, ListJobsResponse, ListMembersData, ListMembersResponse, ListPracticesData, ListPracticesResponse, ListVersionsData, ListVersionsError, ListVersionsResponse, ListWorkspacesData, ListWorkspacesResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, RecalculateUserAchievementsData, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, RetryDeliveryData, RetryDeliveryResponse, SetActiveData, SetActiveResponse, SubmitFeedbackData, SubmitFeedbackResponse, UnlinkAccountData, UpdateConfigData, UpdateConfigResponse, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateMemberVisibilityData, UpdateMemberVisibilityResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePracticeData, UpdatePracticeResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteMessageData, VoteMessageError, VoteMessageResponse } from '../types.gen';
+import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, cancelJob, claimIdentity, computeUserLeagueStats, createConfig, createDocument, createPractice, createWorkspace, deleteConfig, deleteDocument, deleteDocumentVersionsAfter, deletePractice, deleteUser, getAllAchievementDefinitions, getAllTeams, getConfig, getConfigs, getCurrentUserMembership, getDocument, getEngagement, getFinding, getFindingsForPullRequest, getGroupedThreads, getIdentityProviders, getJob, getLabelFilters, getLatestFeedback, getLeaderboard, getLinkedAccounts, getMember, getPractice, getProviders, getRepositoriesToMonitor, getRepositorySettings, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getVersion, getWorkspace, gitLabPreflight, listDocuments, listFindings, listGitLabGroups, listGlobalContributors, listJobs, listMembers, listPractices, listThreads, listVersions, listWorkspaces, type Options, purgeWorkspace, recalculateUserAchievements, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, removeVote, renameSlug, resetAndRecalculateLeagues, retryDelivery, setActive, submitFeedback, unlinkAccount, updateConfig, updateDocument, updateFeatures, updateMemberVisibility, updateNotifications, updatePractice, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackCredentials, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, vote, voteMessage } from '../sdk.gen';
+import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, CancelJobData, CancelJobResponse, ClaimIdentityData, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateConfigData, CreateConfigResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, CreatePracticeData, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeleteDocumentData, DeleteDocumentError, DeleteDocumentResponse, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterError, DeleteDocumentVersionsAfterResponse, DeletePracticeData, DeletePracticeResponse, DeleteUserData, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetEngagementData, GetEngagementResponse, GetFindingData, GetFindingResponse, GetFindingsForPullRequestData, GetFindingsForPullRequestResponse, GetGroupedThreadsData, GetGroupedThreadsError, GetGroupedThreadsResponse, GetIdentityProvidersData, GetIdentityProvidersResponse, GetJobData, GetJobResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestFeedbackData, GetLatestFeedbackResponse, GetLeaderboardData, GetLeaderboardResponse, GetLinkedAccountsData, GetLinkedAccountsResponse, GetMemberData, GetMemberResponse, GetPracticeData, GetPracticeResponse, GetProvidersData, GetProvidersResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadError, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetVersionData, GetVersionError, GetVersionResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListFindingsData, ListFindingsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListJobsData, ListJobsResponse, ListMembersData, ListMembersResponse, ListPracticesData, ListPracticesResponse, ListThreadsData, ListThreadsResponse, ListVersionsData, ListVersionsError, ListVersionsResponse, ListWorkspacesData, ListWorkspacesResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, RecalculateUserAchievementsData, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RemoveVoteData, RemoveVoteResponse, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, RetryDeliveryData, RetryDeliveryResponse, SetActiveData, SetActiveResponse, SubmitFeedbackData, SubmitFeedbackResponse, UnlinkAccountData, UpdateConfigData, UpdateConfigResponse, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateMemberVisibilityData, UpdateMemberVisibilityResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePracticeData, UpdatePracticeResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteData, VoteMessageData, VoteMessageError, VoteMessageResponse, VoteResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -1051,6 +1051,24 @@ export const voteMessageMutation = (options?: Partial<Options<VoteMessageData>>)
     return mutationOptions;
 };
 
+export const listThreadsQueryKey = (options: Options<ListThreadsData>) => createQueryKey('listThreads', options);
+
+/**
+ * List the current user's mentor threads in this workspace
+ */
+export const listThreadsOptions = (options: Options<ListThreadsData>) => queryOptions<ListThreadsResponse, DefaultError, ListThreadsResponse, ReturnType<typeof listThreadsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listThreads({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listThreadsQueryKey(options)
+});
+
 export const getGroupedThreadsQueryKey = (options: Options<GetGroupedThreadsData>) => createQueryKey('getGroupedThreads', options);
 
 /**
@@ -1086,6 +1104,40 @@ export const getThreadOptions = (options: Options<GetThreadData>) => queryOption
     },
     queryKey: getThreadQueryKey(options)
 });
+
+/**
+ * Remove a vote on an assistant message (idempotent)
+ */
+export const removeVoteMutation = (options?: Partial<Options<RemoveVoteData>>): UseMutationOptions<RemoveVoteResponse, DefaultError, Options<RemoveVoteData>> => {
+    const mutationOptions: UseMutationOptions<RemoveVoteResponse, DefaultError, Options<RemoveVoteData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await removeVote({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Upsert a vote on an assistant message
+ */
+export const voteMutation = (options?: Partial<Options<VoteData>>): UseMutationOptions<VoteResponse, DefaultError, Options<VoteData>> => {
+    const mutationOptions: UseMutationOptions<VoteResponse, DefaultError, Options<VoteData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await vote({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 /**
  * Update leaderboard notification preferences

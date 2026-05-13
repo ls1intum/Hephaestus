@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -54,6 +55,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * submitted to the virtual-thread executor; all blocking work happens off the request thread.
  */
 @Service
+@ConditionalOnProperty(name = "hephaestus.mentor.enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class MentorChatService {
 

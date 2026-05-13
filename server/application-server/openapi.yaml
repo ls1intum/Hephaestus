@@ -28,6 +28,10 @@ tags:
   name: Practice Findings
 - description: Workspace-scoped agent configuration management
   name: Agent Config
+- description: Workspace-scoped mentor chat threads
+  name: Mentor Threads
+- description: Up/down votes on mentor assistant messages
+  name: Mentor Votes
 - description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
@@ -1561,6 +1565,29 @@ paths:
       - exported
       x-hephaestus:
         export: true
+  /workspaces/{workspaceSlug}/mentor/threads:
+    get:
+      operationId: listThreads
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadSummary"
+          description: "Threads returned, newest first"
+      summary: List the current user's mentor threads in this workspace
+      tags:
+      - Mentor Threads
   /workspaces/{workspaceSlug}/mentor/threads/grouped:
     get:
       operationId: getGroupedThreads
@@ -1655,6 +1682,77 @@ paths:
       - exported
       x-hephaestus:
         export: true
+  /workspaces/{workspaceSlug}/mentor/threads/{threadId}/messages/{messageId}/vote:
+    delete:
+      operationId: removeVote
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: threadId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Vote removed or did not exist
+        "404":
+          description: Thread or message not found (or not owned by current user)
+      summary: Remove a vote on an assistant message (idempotent)
+      tags:
+      - Mentor Votes
+    post:
+      operationId: vote
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: threadId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageVoteRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Vote recorded
+        "404":
+          description: Thread or message not found (or not owned by current user)
+      summary: Upsert a vote on an assistant message
+      tags:
+      - Mentor Votes
   /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
@@ -3265,6 +3363,26 @@ components:
       description: Binary progress indicating unlocked state
       required:
       - unlocked
+    ChatMessage:
+      type: object
+      description: Mentor chat message in AI SDK UIMessage shape.
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        metadata:
+          description: "Per-turn metadata: status, model, costUsd, usage, …"
+        parentMessageId:
+          type: string
+          format: uuid
+        parts:
+          type: string
+          description: AI SDK UIMessage parts array.
+        role:
+          type: string
     ChatMessageVote:
       type: object
       properties:
@@ -3286,6 +3404,34 @@ components:
       - updatedAt
       x-hephaestus:
         export: true
+    ChatMessageVoteRequest:
+      type: object
+      description: Upsert a vote on a mentor assistant message
+      properties:
+        isUpvoted:
+          type: boolean
+          description: "true = upvote (helpful), false = downvote"
+      required:
+      - isUpvoted
+    ChatThreadDetail:
+      type: object
+      description: Mentor chat thread with all messages.
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+        selectedLeafMessageId:
+          type: string
+          format: uuid
+        title:
+          type: string
     ChatThreadGroup:
       type: object
       properties:

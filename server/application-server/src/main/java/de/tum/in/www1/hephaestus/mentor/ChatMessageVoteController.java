@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -31,9 +31,6 @@ public class ChatMessageVoteController {
     private final ChatThreadService chatThreadService;
     private final ChatMessageVoteService chatMessageVoteService;
 
-    /** POST body: {@code {"isUpvoted": true}}. */
-    public record VoteRequest(@NotNull Boolean isUpvoted) {}
-
     @PostMapping
     @Operation(summary = "Upsert a vote on an assistant message")
     @ApiResponse(responseCode = "200", description = "Vote recorded")
@@ -47,11 +44,15 @@ public class ChatMessageVoteController {
         WorkspaceContext workspaceContext,
         @PathVariable UUID threadId,
         @PathVariable UUID messageId,
-        @RequestBody VoteRequest body
+        @Valid @RequestBody ChatMessageVoteRequestDTO body
     ) {
         // Ownership: thread must be owned by current user before any vote write is permitted.
         chatThreadService.getOwnedThread(workspaceContext.id(), threadId);
-        ChatMessageVote vote = chatMessageVoteService.upsert(threadId, messageId, Boolean.TRUE.equals(body.isUpvoted));
+        ChatMessageVote vote = chatMessageVoteService.upsert(
+            threadId,
+            messageId,
+            Boolean.TRUE.equals(body.isUpvoted())
+        );
         return ResponseEntity.ok(ChatMessageVoteDTO.from(vote));
     }
 

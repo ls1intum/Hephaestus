@@ -9,14 +9,16 @@ import org.springframework.lang.Nullable;
 /**
  * AI SDK UIMessage shape served to the webapp. Parts are the JSONB array (or the legacy
  * fallback reconstruction); metadata is the per-turn {status, model, costUsd, …} object.
+ * {@code parts} and {@code metadata} are open JSON ({@link JsonNode} on the wire,
+ * {@code Object} in the OpenAPI spec) to keep the AI SDK chunk schema authoritative.
  */
 @Schema(description = "Mentor chat message in AI SDK UIMessage shape.")
 public record ChatMessageDTO(
     UUID id,
     @Nullable UUID parentMessageId,
     String role,
-    JsonNode parts,
-    @Nullable JsonNode metadata,
+    @Schema(description = "AI SDK UIMessage parts array.", type = "array") Object parts,
+    @Nullable @Schema(description = "Per-turn metadata: status, model, costUsd, usage, …") Object metadata,
     Instant createdAt
 ) {
     public static ChatMessageDTO from(ChatMessage message, JsonNode effectiveParts) {
