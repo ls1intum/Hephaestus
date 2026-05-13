@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.node.IntNode;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -31,7 +30,8 @@ class SubscribeOrderingPropertyTest extends BaseUnitTest {
             ring.offer(IntNode.valueOf(i));
         }
 
-        List<Integer> received = new ArrayList<>();
+        // CopyOnWriteArrayList: dispatcher thread writes, main thread reads at end without re-sync.
+        CopyOnWriteArrayList<Integer> received = new CopyOnWriteArrayList<>();
         CountDownLatch listenerCalledOnce = new CountDownLatch(1);
         FrameSubscription[] holder = new FrameSubscription[1];
         FrameSubscription sub = new FrameSubscription(

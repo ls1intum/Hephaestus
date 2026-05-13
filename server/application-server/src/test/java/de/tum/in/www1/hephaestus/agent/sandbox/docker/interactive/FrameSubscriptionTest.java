@@ -12,7 +12,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -138,9 +137,12 @@ class FrameSubscriptionTest extends BaseUnitTest {
         sub.dispose();
         sub.dispose();
         sub.dispose();
-        TimeUnit.MILLISECONDS.sleep(100);
-        assertThat(sub.isDisposed()).isTrue();
-        assertThat(onDisposeFires).hasValue(1);
+        await()
+            .atMost(Duration.ofSeconds(2))
+            .untilAsserted(() -> {
+                assertThat(sub.isDisposed()).isTrue();
+                assertThat(onDisposeFires).hasValue(1);
+            });
     }
 
     @Test

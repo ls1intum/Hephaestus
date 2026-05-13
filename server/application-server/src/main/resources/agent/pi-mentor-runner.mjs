@@ -39,11 +39,12 @@ rl.on("line", (line) => {
             writeFrame({ type: "echo_back", payload: frame.payload });
             break;
         case "emit": {
-            const count = Number(frame.count);
-            if (!Number.isFinite(count) || count <= 0) {
+            // Strict: protocol calls for a positive integer; reject floats / NaN / negatives.
+            if (!Number.isInteger(frame.count) || frame.count <= 0) {
                 err.write(`[pi-mentor-runner] emit requires positive integer count\n`);
                 break;
             }
+            const count = frame.count;
             const tag = typeof frame.tag === "string" ? frame.tag : "burst";
             for (let i = 0; i < count; i++) {
                 writeFrame({ type: "tick", n: i, tag });

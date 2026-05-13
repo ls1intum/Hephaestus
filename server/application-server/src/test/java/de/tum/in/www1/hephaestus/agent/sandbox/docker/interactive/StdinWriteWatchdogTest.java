@@ -105,7 +105,8 @@ class StdinWriteWatchdogTest extends BaseUnitTest {
             }
         );
         wd.tick();
-        // Order is unspecified, but at least one healthy onWriteTimeout fires
-        assertThat(goodHits.get()).isGreaterThanOrEqualTo(1);
+        // Exactly one — the healthy target is stalled and we registered one. Strict assertion so a
+        // regression that double-fires the callback (idempotency lost) is caught.
+        assertThat(goodHits).hasValue(1);
     }
 }
