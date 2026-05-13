@@ -400,6 +400,13 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         } catch (Throwable t) {
             log.error("Unexpected error during sandbox close", t);
             state.set(AttachedSandboxState.CLOSED);
+            // Must still run onClosed: otherwise registry + watchdog hold this sandbox forever
+            // and any future attach for (userId, workspaceId) gets a permanent DUPLICATE.
+            try {
+                onClosed.accept(this);
+            } catch (Throwable cb) {
+                log.warn("Registry onClosed callback threw during error path: {}", cb.getMessage());
+            }
             closed.completeExceptionally(t);
         } finally {
             MDC.clear();

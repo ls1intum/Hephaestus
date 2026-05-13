@@ -41,6 +41,7 @@ public class InteractiveSandboxRegistry {
 
     private final ConcurrentHashMap<SessionKey, DockerAttachedSandboxAdapter> sessions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicInteger> sessionsPerUser = new ConcurrentHashMap<>();
+    private volatile boolean shuttingDown = false;
 
     public InteractiveSandboxRegistry(
         InteractiveSandboxProperties properties,
@@ -69,23 +70,47 @@ public class InteractiveSandboxRegistry {
         return sandbox != null && sandbox.state() == AttachedSandboxState.ATTACHED ? sandbox : null;
     }
 
-    /** On non-{@code REGISTERED}, the caller tears down the sandbox. */
+    /**
+     * On non-{@code REGISTERED}, the caller tears down the sandbox. Caps are enforced atomically:
+     * the per-user counter is incremented inside a {@code compute()} block (per-key lock), and a
+     * global rollback runs if {@code putIfAbsent} or the post-check fails.
+     */
     public RegistrationOutcome tryRegister(DockerAttachedSandboxAdapter sandbox) {
         Objects.requireNonNull(sandbox, "sandbox");
         SessionKey key = new SessionKey(sandbox.userId(), sandbox.workspaceId());
 
+        // Per-user atomic reservation: increment only when a slot is available.
+        java.util.concurrent.atomic.AtomicReference<RegistrationOutcome> userResult =
+            new java.util.concurrent.atomic.AtomicReference<>();
+        sessionsPerUser.compute(sandbox.userId(), (u, prev) -> {
+            AtomicInteger c = prev != null ? prev : new AtomicInteger();
+            if (c.get() >= properties.maxSessionsPerUser()) {
+                userResult.set(RegistrationOutcome.MAX_SESSIONS_PER_USER);
+                // Don't materialise an empty counter purely to reject.
+                return prev;
+            }
+            c.incrementAndGet();
+            return c;
+        });
+        if (userResult.get() != null) {
+            return userResult.get();
+        }
+        AtomicInteger userCount = sessionsPerUser.get(sandbox.userId());
+
         if (sessions.size() >= properties.maxSessionsTotal()) {
+            decrementUser(sandbox.userId(), userCount);
             return RegistrationOutcome.MAX_SESSIONS_TOTAL;
         }
-        AtomicInteger userCount = sessionsPerUser.computeIfAbsent(sandbox.userId(), u -> new AtomicInteger());
-        if (userCount.get() >= properties.maxSessionsPerUser()) {
-            return RegistrationOutcome.MAX_SESSIONS_PER_USER;
-        }
-
         if (sessions.putIfAbsent(key, sandbox) != null) {
+            decrementUser(sandbox.userId(), userCount);
             return RegistrationOutcome.DUPLICATE;
         }
-        userCount.incrementAndGet();
+        // Race: concurrent putIfAbsent calls may have pushed total over the cap. Roll back if so.
+        if (sessions.size() > properties.maxSessionsTotal()) {
+            sessions.remove(key, sandbox);
+            decrementUser(sandbox.userId(), userCount);
+            return RegistrationOutcome.MAX_SESSIONS_TOTAL;
+        }
         watchdog.register(sandbox.sessionId(), sandbox);
         return RegistrationOutcome.REGISTERED;
     }
@@ -93,17 +118,30 @@ public class InteractiveSandboxRegistry {
     /** Identity-based remove avoids races with re-register. */
     void onSandboxClosed(DockerAttachedSandboxAdapter sandbox) {
         SessionKey key = new SessionKey(sandbox.userId(), sandbox.workspaceId());
-        sessions.remove(key, sandbox);
-        AtomicInteger userCount = sessionsPerUser.get(sandbox.userId());
-        if (userCount != null && userCount.decrementAndGet() <= 0) {
-            sessionsPerUser.remove(sandbox.userId(), userCount);
+        boolean removed = sessions.remove(key, sandbox);
+        if (removed) {
+            AtomicInteger userCount = sessionsPerUser.get(sandbox.userId());
+            if (userCount != null) {
+                decrementUser(sandbox.userId(), userCount);
+            }
         }
         watchdog.unregister(sandbox.sessionId());
     }
 
+    /** Atomic decrement-and-conditional-remove (compute holds the per-key lock). */
+    private void decrementUser(String userId, AtomicInteger userCount) {
+        sessionsPerUser.compute(userId, (u, cur) -> {
+            if (cur == null) return null;
+            int v = cur.decrementAndGet();
+            return v <= 0 ? null : cur;
+        });
+    }
+
     @Scheduled(fixedDelayString = "${hephaestus.mentor.reap-interval-seconds:30}", timeUnit = TimeUnit.SECONDS)
     public void reap() {
-        if (!properties.enabled()) {
+        if (!properties.enabled() || shuttingDown) {
+            // During @PreDestroy the scheduler can still fire; closeExecutor may already be down
+            // and we'd run runClose inline on the scheduler thread, stalling the watchdog.
             return;
         }
         Duration ttl = Duration.ofSeconds(properties.idleTtlSeconds());
@@ -126,7 +164,7 @@ public class InteractiveSandboxRegistry {
 
     @Scheduled(fixedDelay = 1, timeUnit = TimeUnit.SECONDS)
     public void tickWatchdog() {
-        if (!properties.enabled()) {
+        if (!properties.enabled() || shuttingDown) {
             return;
         }
         watchdog.tick();
@@ -168,6 +206,7 @@ public class InteractiveSandboxRegistry {
     /** Parallel close; grace + 5 s total deadline matches the per-session waitForClose budget. */
     @PreDestroy
     public void shutdown() {
+        shuttingDown = true;
         if (sessions.isEmpty()) {
             return;
         }
