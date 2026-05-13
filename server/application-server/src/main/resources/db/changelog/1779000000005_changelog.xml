@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        PiMentorAgent #1071: model_pricing lookup table.
+
+        LiteLLM does NOT return per-request cost in streaming responses (litellm#12689).
+        Mentor cost accounting therefore multiplies the Pi `agent_end` token usage
+        by per-1k-token pricing stored in this table at write time. The valid_from /
+        valid_to window keeps a price-history audit trail when vendors bump rates.
+
+        Unknown models intentionally return `Optional.empty()` from the service so the
+        column stays NULL in `chat_message.metadata.costUsd` rather than recording
+        a zero (which would be indistinguishable from a free model). Seed rows are
+        best-effort vendor list prices as of 2026-05; ops adjusts via direct SQL.
+    -->
+    <changeSet id="1779000000005-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="model_pricing table already exists">
+            <not>
+                <tableExists tableName="model_pricing"/>
+            </not>
+        </preConditions>
+        <comment>Create model_pricing for mentor cost computation</comment>
+        <createTable tableName="model_pricing">
+            <column name="model_id" type="VARCHAR(128)">
+                <constraints primaryKey="true" primaryKeyName="pk_model_pricing"/>
+            </column>
+            <column name="per_1k_input_usd" type="DECIMAL(12,6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="per_1k_output_usd" type="DECIMAL(12,6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="per_1k_cache_read_usd" type="DECIMAL(12,6)" defaultValueNumeric="0"/>
+            <column name="per_1k_cache_write_usd" type="DECIMAL(12,6)" defaultValueNumeric="0"/>
+            <column name="valid_from" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="valid_to" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <rollback>
+            <dropTable tableName="model_pricing"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1779000000005-2" author="hephaestus">
+        <comment>Seed common model prices (vendor list prices as of 2026-05; ops may adjust)</comment>
+        <insert tableName="model_pricing">
+            <column name="model_id" value="gpt-4o-mini"/>
+            <column name="per_1k_input_usd" valueNumeric="0.000150"/>
+            <column name="per_1k_output_usd" valueNumeric="0.000600"/>
+            <column name="per_1k_cache_read_usd" valueNumeric="0.000075"/>
+            <column name="per_1k_cache_write_usd" valueNumeric="0.000000"/>
+        </insert>
+        <insert tableName="model_pricing">
+            <column name="model_id" value="gpt-4o"/>
+            <column name="per_1k_input_usd" valueNumeric="0.002500"/>
+            <column name="per_1k_output_usd" valueNumeric="0.010000"/>
+            <column name="per_1k_cache_read_usd" valueNumeric="0.001250"/>
+            <column name="per_1k_cache_write_usd" valueNumeric="0.000000"/>
+        </insert>
+        <insert tableName="model_pricing">
+            <column name="model_id" value="claude-3-5-sonnet"/>
+            <column name="per_1k_input_usd" valueNumeric="0.003000"/>
+            <column name="per_1k_output_usd" valueNumeric="0.015000"/>
+            <column name="per_1k_cache_read_usd" valueNumeric="0.000300"/>
+            <column name="per_1k_cache_write_usd" valueNumeric="0.003750"/>
+        </insert>
+        <insert tableName="model_pricing">
+            <column name="model_id" value="claude-3-5-haiku"/>
+            <column name="per_1k_input_usd" valueNumeric="0.000800"/>
+            <column name="per_1k_output_usd" valueNumeric="0.004000"/>
+            <column name="per_1k_cache_read_usd" valueNumeric="0.000080"/>
+            <column name="per_1k_cache_write_usd" valueNumeric="0.001000"/>
+        </insert>
+        <insert tableName="model_pricing">
+            <column name="model_id" value="claude-opus-4"/>
+            <column name="per_1k_input_usd" valueNumeric="0.015000"/>
+            <column name="per_1k_output_usd" valueNumeric="0.075000"/>
+            <column name="per_1k_cache_read_usd" valueNumeric="0.001500"/>
+            <column name="per_1k_cache_write_usd" valueNumeric="0.018750"/>
+        </insert>
+        <rollback>
+            <sql>DELETE FROM model_pricing WHERE model_id IN ('gpt-4o-mini', 'gpt-4o', 'claude-3-5-sonnet', 'claude-3-5-haiku', 'claude-opus-4');</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

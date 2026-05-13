@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.mentor;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
-import io.micrometer.common.lang.Nullable;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -14,9 +13,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Type;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 /**
  * Message in a conversation tree structure that maps to AI SDK UI Message format.
@@ -83,8 +84,11 @@ public class ChatMessage {
     private Role role;
 
     /**
-     * Optional message metadata in JSON format
-     * Can contain any structure as defined in UIMessage<METADATA>
+     * Message metadata as a JSON object. Conventional keys (written by MentorChatService):
+     * {@code status} ∈ {in_flight, completed, interrupted}, {@code model}, {@code inputTokens},
+     * {@code outputTokens}, {@code cacheReadTokens}, {@code cacheWriteTokens}, {@code costUsd},
+     * {@code finishReason}, {@code durationMs}, {@code toolCalls}. Shape is enforced by the
+     * {@code chk_chat_message_metadata_shape} CHECK constraint (must be NULL or object).
      */
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
@@ -96,14 +100,27 @@ public class ChatMessage {
     private Instant createdAt;
 
     /**
-     * Message parts - handles complex multi-part content
-     * Each part corresponds to a UIMessagePart type
+     * AI SDK UIMessage parts as a JSONB array. Written verbatim by MentorChatService. Reads go
+     * through {@code ChatThreadService.effectiveParts}, which falls back to {@link #legacyParts}
+     * during the dual-write window. The fallback collapses once {@code chat_message_part} drops
+     * in #1074.
      */
+    @Type(JsonType.class)
+    @Column(name = "parts", columnDefinition = "jsonb")
+    private JsonNode parts;
+
+    /**
+     * Legacy normalised parts rows. Retained for backward-compatible reads during the
+     * intelligence-service shutdown window; new writers go via the {@link #parts} JSONB.
+     * The {@code chat_message_part} table is dropped in #1074.
+     */
+    @Deprecated(forRemoval = true)
     @OneToMany(mappedBy = "message", cascade = CascadeType.REMOVE, fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("id.orderIndex ASC")
+    @BatchSize(size = 50)
     @ToString.Exclude
     @JsonIgnore
-    private List<ChatMessagePart> parts = new ArrayList<>();
+    private List<ChatMessagePart> legacyParts = new ArrayList<>();
 
     public enum Role {
         USER("user"),

@@ -12,6 +12,7 @@ import de.tum.in.www1.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.in.www1.hephaestus.testconfig.LiveDockerTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.URI;
 import java.time.Duration;
@@ -25,7 +26,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 
@@ -37,7 +37,7 @@ import org.testcontainers.DockerClientFactory;
  *
  * <p>Each test creates real containers that are cleaned up in {@code @AfterEach}.
  */
-@Tag("live")
+@LiveDockerTest
 @DisplayName("Docker Sandbox Live")
 class DockerSandboxLiveTest {
 

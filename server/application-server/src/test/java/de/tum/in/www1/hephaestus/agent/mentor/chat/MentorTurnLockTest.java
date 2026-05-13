@@ -1,0 +1,108 @@
+package de.tum.in.www1.hephaestus.agent.mentor.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Concurrency invariants for the per-thread turn mutex. The lock map MUST stay bounded as
+ * threads come and go (otherwise multi-tenant servers leak memory).
+ */
+@DisplayName("MentorTurnLock")
+class MentorTurnLockTest extends BaseUnitTest {
+
+    @Test
+    @DisplayName("Two parallel callers on the same key — exactly one wins")
+    void exactlyOneAcquiresUnderContention() throws Exception {
+        MentorTurnLock lock = new MentorTurnLock();
+        MentorTurnLock.ThreadKey key = new MentorTurnLock.ThreadKey(1L, UUID.randomUUID());
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch holding = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger acquired = new AtomicInteger();
+        try {
+            var firstFuture = pool.submit(() -> {
+                start.await();
+                return lock.withLockOr409(key, () -> {
+                    acquired.incrementAndGet();
+                    holding.countDown();
+                    try {
+                        release.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return Boolean.TRUE;
+                });
+            });
+            var secondFuture = pool.submit(() -> {
+                start.await();
+                holding.await(5, TimeUnit.SECONDS);
+                // First caller is holding the lock — we expect tryLock() to fail.
+                return lock.withLockOr409(key, () -> {
+                    acquired.incrementAndGet();
+                    return Boolean.TRUE;
+                });
+            });
+            start.countDown();
+            // Wait for second caller to attempt; then release the first.
+            // Polling avoids the test ordering ambiguity: second caller must observe failure.
+            while (!holding.await(50, TimeUnit.MILLISECONDS)) {}
+            Thread.sleep(50); // small grace so second caller has scheduled its tryLock
+            Optional<Boolean> secondResult = secondFuture.get(5, TimeUnit.SECONDS);
+            assertThat(secondResult).isEmpty(); // 409 conflict
+            release.countDown();
+            Optional<Boolean> firstResult = firstFuture.get(5, TimeUnit.SECONDS);
+            assertThat(firstResult).contains(Boolean.TRUE);
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(acquired.get()).isEqualTo(1);
+        // Both holders gone → map empties.
+        assertThat(lock.activeKeys()).isZero();
+    }
+
+    @Test
+    @DisplayName("Independent keys do not serialise — both succeed")
+    void independentKeysRunInParallel() {
+        MentorTurnLock lock = new MentorTurnLock();
+        MentorTurnLock.ThreadKey a = new MentorTurnLock.ThreadKey(1L, UUID.randomUUID());
+        MentorTurnLock.ThreadKey b = new MentorTurnLock.ThreadKey(1L, UUID.randomUUID());
+
+        Optional<String> resultA = lock.withLockOr409(a, () -> "A");
+        Optional<String> resultB = lock.withLockOr409(b, () -> "B");
+
+        assertThat(resultA).contains("A");
+        assertThat(resultB).contains("B");
+        assertThat(lock.activeKeys()).isZero(); // entries reaped after release
+    }
+
+    @Test
+    @DisplayName("Exception in action releases the lock (no permanent leak)")
+    void exceptionStillReleasesLock() {
+        MentorTurnLock lock = new MentorTurnLock();
+        MentorTurnLock.ThreadKey key = new MentorTurnLock.ThreadKey(1L, UUID.randomUUID());
+
+        try {
+            lock.withLockOr409(key, () -> {
+                throw new IllegalStateException("boom");
+            });
+        } catch (IllegalStateException expected) {
+            // pass-through
+        }
+        // After the exception we must be able to re-acquire.
+        Optional<String> second = lock.withLockOr409(key, () -> "second");
+        assertThat(second).contains("second");
+        assertThat(lock.activeKeys()).isZero();
+    }
+}

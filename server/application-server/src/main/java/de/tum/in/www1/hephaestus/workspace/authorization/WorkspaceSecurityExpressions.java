@@ -42,6 +42,16 @@ public class WorkspaceSecurityExpressions {
     }
 
     /**
+     * Check if user is authenticated and has at least MEMBER role in the workspace.
+     * Use in SpEL: {@code @PreAuthorize("@workspaceSecure.isMember()")}.
+     *
+     * @return true if user has any workspace role (MEMBER, ADMIN, or OWNER)
+     */
+    public boolean isMember() {
+        return accessService.isMember();
+    }
+
+    /**
      * Check if user has permission to manage the specified role.
      * OWNER can manage all roles, ADMIN can manage ADMIN and MEMBER.
      * Can be used in SpEL: @PreAuthorize("@workspaceSecure.canManageRole(#role)")

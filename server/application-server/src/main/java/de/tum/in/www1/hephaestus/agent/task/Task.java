@@ -5,11 +5,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.util.Objects;
 
 /**
- * Sealed root of all agent task variants. The Pi runner reads a serialised {@link TaskEnvelope}
- * from {@code /workspace/task.json} and dispatches on the {@code kind} discriminator.
- *
- * <p>Adding a new task kind: extend the {@code permits} clause AND list the record in
- * {@link JsonSubTypes} below. {@code javac} enforces sealed-switch exhaustiveness.
+ * Sealed root of all agent task variants serialised to {@code /workspace/task.json}. Mentor chat
+ * is interactive (stdin JSON-RPC) and lives outside this hierarchy.
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
 @JsonSubTypes({ @JsonSubTypes.Type(value = Task.PracticeReview.class, name = Task.PracticeReview.KIND) })

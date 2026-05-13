@@ -113,13 +113,18 @@ public class SecurityConfig {
             requests.requestMatchers(HttpMethod.GET, "/auth/identity-providers").permitAll();
             // Public workspace provider discovery (workspace creation UI)
             requests.requestMatchers(HttpMethod.GET, "/workspaces/providers").permitAll();
+            // Mentor endpoints (both workspace-scoped Pi path and the legacy global proxy) are
+            // gated by the MENTOR_ACCESS realm role. The workspace-scoped matcher MUST come
+            // BEFORE the generic `/workspaces/*/**` permitAll below, otherwise the public-GET
+            // rule wins and mentor reads become unauthenticated (feature-flag bypass — see #1071).
+            requests.requestMatchers("/workspaces/*/mentor/**").hasAuthority(FeatureFlag.MENTOR_ACCESS.key());
+            requests.requestMatchers("/mentor/**").hasAuthority(FeatureFlag.MENTOR_ACCESS.key());
             // Public read for slugged workspace paths (filter enforces membership/public visibility).
             requests.requestMatchers(HttpMethod.GET, "/workspaces/*/**").permitAll();
             // Registry/listing stays authenticated to avoid leaking tenant directory.
             requests.requestMatchers(HttpMethod.GET, "/workspaces", "/workspaces/").authenticated();
             // Non-GET workspace operations still require authentication.
             requests.requestMatchers("/workspaces/**").authenticated();
-            requests.requestMatchers("/mentor/**").hasAuthority(FeatureFlag.MENTOR_ACCESS.key());
             // Public endpoints
             requests.requestMatchers(HttpMethod.GET, "/contributors").permitAll();
             // User account management requires authentication

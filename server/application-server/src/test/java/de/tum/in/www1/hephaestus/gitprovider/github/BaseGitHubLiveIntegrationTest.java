@@ -1,15 +1,13 @@
 package de.tum.in.www1.hephaestus.gitprovider.github;
 
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.testconfig.LiveGitHubTest;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.parallel.Execution;
-import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ResourceLoader;
@@ -40,8 +38,7 @@ import org.springframework.test.context.ActiveProfiles;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ActiveProfiles(value = "live", inheritProfiles = true)
-@Execution(ExecutionMode.SAME_THREAD)
-@Tag("live")
+@LiveGitHubTest
 public abstract class BaseGitHubLiveIntegrationTest extends BaseIntegrationTest {
 
     private static final DateTimeFormatter SUFFIX_FORMATTER = DateTimeFormatter.ofPattern(

@@ -49,12 +49,31 @@ public class PiRuntimeFactory {
     public PiPlan build(PiPlanSpec spec) {
         Map<String, String> env = new HashMap<>();
         Map<String, byte[]> inputFiles = new LinkedHashMap<>();
-        String authSetup = LlmProxyAuthShell.build(spec.credentialMode(), spec.provider(), spec.credential(), env);
+        String authSetup = LlmProxyAuthShell.build(
+            spec.credentialMode(),
+            spec.provider(),
+            spec.credential(),
+            spec.baseUrl(),
+            spec.modelName(),
+            env
+        );
+
+        // The custom-provider extension is only emitted when the caller pinned a baseUrl on a
+        // non-Azure provider in API_KEY/OAUTH mode (production keeps baseUrl null → built-in
+        // provider; live tests set it → custom hephaestus provider). PROXY mode never needs the
+        // extension because the proxy is already on the standard OPENAI_BASE_URL.
+        boolean useCustomProvider = shouldRegisterHephaestusProvider(spec);
+        if (useCustomProvider) {
+            inputFiles.put(
+                WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts",
+                buildExtensionFile(spec)
+            );
+        }
 
         // Settings live outside .pi/ so Pi's settings lock file lands on a writable mount.
         inputFiles.put(
             WorkspaceAbi.PI_RUNTIME_PREFIX + "settings.json",
-            buildPracticeSettingsJson(spec.provider(), spec.modelName())
+            buildPiSettingsJson(spec.provider(), spec.modelName(), useCustomProvider)
         );
         inputFiles.put(WorkspaceAbi.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
         inputFiles.put(WorkspaceAbi.RUNNER_SCRIPT_FILENAME, loadClasspathResource(spec.runnerScript()));
@@ -81,6 +100,13 @@ public class PiRuntimeFactory {
         }
 
         String workspaceRoot = WorkspaceAbi.WORKSPACE_ROOT;
+        String extensionCopyStep = useCustomProvider
+            ? "mkdir -p /home/agent/.pi/extensions && cp " +
+              workspaceRoot +
+              "/" +
+              WorkspaceAbi.PI_RUNTIME_PREFIX +
+              "extensions/hephaestus-provider.ts /home/agent/.pi/extensions/hephaestus-provider.ts && "
+            : "";
         String command =
             authSetup +
             "mkdir -p " +
@@ -102,6 +128,7 @@ public class PiRuntimeFactory {
             " /home/agent/.pi/" +
             WorkspaceAbi.ORCHESTRATOR_FILENAME +
             " && " +
+            extensionCopyStep +
             spec.precomputeStep() +
             "node " +
             workspaceRoot +
@@ -138,10 +165,29 @@ public class PiRuntimeFactory {
         };
     }
 
-    /** Build settings JSON for a practice-review agent run. */
-    byte[] buildPracticeSettingsJson(LlmProvider provider, @Nullable String modelName) {
+    /**
+     * Build settings JSON shared by every Pi-based agent (practice review and mentor chat alike).
+     * Two-arg overload kept for the test surface that doesn't care about custom provider routing.
+     */
+    byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName) {
+        return buildPiSettingsJson(provider, modelName, false);
+    }
+
+    /**
+     * When {@code useCustomProvider} is true, {@code defaultProvider} routes to the
+     * hephaestus extension (see {@link #buildExtensionFile}). The {@code defaultModel} is then
+     * the configured model id — the extension is registered with exactly that model.
+     *
+     * <p>Public so live tests in {@code agent.mentor.live} can reuse the production bytes
+     * verbatim instead of duplicating the JSON shape.
+     */
+    public byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName, boolean useCustomProvider) {
         Map<String, Object> settings = new LinkedHashMap<>();
-        settings.put("defaultProvider", providerToken(provider));
+        if (useCustomProvider) {
+            settings.put("defaultProvider", "hephaestus");
+        } else {
+            settings.put("defaultProvider", providerToken(provider));
+        }
         if (modelName != null && !modelName.isBlank()) {
             settings.put("defaultModel", modelName);
         }
@@ -155,6 +201,68 @@ public class PiRuntimeFactory {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize Pi practice settings", e);
         }
+    }
+
+    /**
+     * True when the spec needs a custom Pi provider extension: only for non-Azure providers in
+     * API_KEY/OAUTH mode with a non-blank {@code baseUrl}. PROXY mode and Azure both have their
+     * own routing primitives (proxy URL injected at runtime; Azure deployment-name map).
+     */
+    static boolean shouldRegisterHephaestusProvider(PiPlanSpec spec) {
+        if (spec.credentialMode() == CredentialMode.PROXY) return false;
+        if (spec.provider() == LlmProvider.AZURE_OPENAI) return false;
+        return spec.baseUrl() != null && !spec.baseUrl().isBlank();
+    }
+
+    /**
+     * Emit a Pi extension that registers a custom provider named {@code hephaestus}. The
+     * provider reads its base URL, API key, and model id from the env (set by
+     * {@link LlmProxyAuthShell}). Pi auto-discovers extensions in {@code ~/.pi/extensions/} via
+     * jiti at session start — no TypeScript compile step needed.
+     *
+     * <p>{@code api: "openai-completions"} routes to Pi's chat-completions implementation for
+     * OpenAI; {@code anthropic-messages} routes to the Anthropic Messages API. {@code authHeader:
+     * true} attaches {@code Authorization: Bearer $PI_HEPHAESTUS_API_KEY}.
+     */
+    public byte[] buildExtensionFile(PiPlanSpec spec) {
+        String api = spec.provider() == LlmProvider.ANTHROPIC ? "anthropic-messages" : "openai-completions";
+        // Model fields are environment-driven (jiti executes the TS at runtime in Node), so the
+        // model id is whatever PI_HEPHAESTUS_MODEL holds. Defaults are safe for chat-completions
+        // OpenAI-compat providers — cost is zero (server-side pricing layer owns the canonical
+        // numbers), context window is generous, max tokens is the conventional 4096.
+        String ts =
+            "import type { ExtensionAPI } from \"@earendil-works/pi-coding-agent\";\n" +
+            "\n" +
+            "export default function (pi: ExtensionAPI) {\n" +
+            "  const baseUrl = process.env.PI_HEPHAESTUS_BASE_URL;\n" +
+            "  const modelId = process.env.PI_HEPHAESTUS_MODEL ?? \"" +
+            (spec.modelName() != null ? spec.modelName() : "") +
+            "\";\n" +
+            "  if (!baseUrl || !modelId) {\n" +
+            "    throw new Error(\"hephaestus provider needs PI_HEPHAESTUS_BASE_URL + PI_HEPHAESTUS_MODEL\");\n" +
+            "  }\n" +
+            "  pi.registerProvider(\"hephaestus\", {\n" +
+            "    name: \"Hephaestus Gateway\",\n" +
+            "    baseUrl,\n" +
+            "    apiKey: \"PI_HEPHAESTUS_API_KEY\",\n" +
+            "    authHeader: true,\n" +
+            "    api: \"" +
+            api +
+            "\",\n" +
+            "    models: [\n" +
+            "      {\n" +
+            "        id: modelId,\n" +
+            "        name: modelId,\n" +
+            "        reasoning: false,\n" +
+            "        input: [\"text\"],\n" +
+            "        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },\n" +
+            "        contextWindow: 131072,\n" +
+            "        maxTokens: 4096,\n" +
+            "      },\n" +
+            "    ],\n" +
+            "  });\n" +
+            "}\n";
+        return ts.getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /**

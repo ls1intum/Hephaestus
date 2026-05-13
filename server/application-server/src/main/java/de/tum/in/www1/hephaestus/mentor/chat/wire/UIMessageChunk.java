@@ -1,0 +1,138 @@
+package de.tum.in.www1.hephaestus.mentor.chat.wire;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.UUID;
+import org.springframework.lang.Nullable;
+
+/**
+ * Sealed root of every chunk emitted on the mentor SSE stream. Wire-compatible with AI SDK
+ * {@code UIMessageChunk} ({@code vercel/ai} → {@code packages/ai/src/ui-message-stream/ui-message-chunks.ts}).
+ * Round-trip serialisation is locked down by {@code UIMessageChunkSerializationTest}.
+ */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+@JsonSubTypes(
+    {
+        @JsonSubTypes.Type(value = UIMessageChunk.Start.class, name = "start"),
+        @JsonSubTypes.Type(value = UIMessageChunk.StartStep.class, name = "start-step"),
+        @JsonSubTypes.Type(value = UIMessageChunk.FinishStep.class, name = "finish-step"),
+        @JsonSubTypes.Type(value = UIMessageChunk.Finish.class, name = "finish"),
+        @JsonSubTypes.Type(value = UIMessageChunk.TextStart.class, name = "text-start"),
+        @JsonSubTypes.Type(value = UIMessageChunk.TextDelta.class, name = "text-delta"),
+        @JsonSubTypes.Type(value = UIMessageChunk.TextEnd.class, name = "text-end"),
+        @JsonSubTypes.Type(value = UIMessageChunk.ReasoningStart.class, name = "reasoning-start"),
+        @JsonSubTypes.Type(value = UIMessageChunk.ReasoningDelta.class, name = "reasoning-delta"),
+        @JsonSubTypes.Type(value = UIMessageChunk.ReasoningEnd.class, name = "reasoning-end"),
+        @JsonSubTypes.Type(value = UIMessageChunk.ToolInputStart.class, name = "tool-input-start"),
+        @JsonSubTypes.Type(value = UIMessageChunk.ToolInputAvailable.class, name = "tool-input-available"),
+        @JsonSubTypes.Type(value = UIMessageChunk.ToolOutputAvailable.class, name = "tool-output-available"),
+        @JsonSubTypes.Type(value = UIMessageChunk.ToolOutputError.class, name = "tool-output-error"),
+        @JsonSubTypes.Type(value = UIMessageChunk.Error.class, name = "error"),
+        @JsonSubTypes.Type(value = UIMessageChunk.DataMentorStatus.class, name = "data-mentor-status"),
+        @JsonSubTypes.Type(value = UIMessageChunk.DataFinding.class, name = "data-finding"),
+    }
+)
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public sealed interface UIMessageChunk {
+    /**
+     * Spec-correct response header (RFC convention) announcing the AI SDK v1 stream protocol.
+     * Set by the controller; the {@code DefaultChatTransport} on the webapp does NOT enforce it
+     * (verified against ai-sdk default-chat-transport.ts + http-chat-transport.ts).
+     */
+    String RESPONSE_HEADER = "x-vercel-ai-ui-message-stream";
+
+    /** Current AI SDK protocol version that {@link MentorEventTranslator} emits. */
+    String PROTOCOL_VERSION = "v1";
+
+    /**
+     * Lifecycle: first chunk of an assistant message. {@code messageId} should equal the DB
+     * primary key of the persisted {@code chat_message} row so client-side {@code useChat}
+     * reconciliation survives a page refresh.
+     */
+    record Start(@Nullable UUID messageId, @Nullable JsonNode messageMetadata) implements UIMessageChunk {}
+
+    /** Lifecycle: open a step (Pi internal turn boundary). */
+    record StartStep() implements UIMessageChunk {}
+
+    /** Lifecycle: close a step. */
+    record FinishStep() implements UIMessageChunk {}
+
+    /**
+     * Terminal chunk. The optional {@code messageMetadata} carries cost + usage so the webapp
+     * (and downstream observability) can surface them.
+     */
+    record Finish(@Nullable String finishReason, @Nullable JsonNode messageMetadata) implements UIMessageChunk {}
+
+    /**
+     * Open a streaming text block. Subsequent {@link TextDelta}s for this {@code id} append.
+     * AI SDK's {@code readUIMessageStream} merges deltas into a single UIMessage text part.
+     */
+    record TextStart(String id) implements UIMessageChunk {}
+
+    /** Append text fragment to the open block identified by {@code id}. */
+    record TextDelta(String id, String delta) implements UIMessageChunk {}
+
+    /** Close the streaming text block. */
+    record TextEnd(String id) implements UIMessageChunk {}
+
+    /** Open a streaming reasoning (chain-of-thought) block. */
+    record ReasoningStart(String id) implements UIMessageChunk {}
+
+    /** Append reasoning fragment. */
+    record ReasoningDelta(String id, String delta) implements UIMessageChunk {}
+
+    /** Close the reasoning block. */
+    record ReasoningEnd(String id) implements UIMessageChunk {}
+
+    /** Pi tool execution: tool selected; input streaming will begin. */
+    record ToolInputStart(String toolCallId, String toolName) implements UIMessageChunk {}
+
+    /** Pi tool execution: full input is now known. */
+    record ToolInputAvailable(String toolCallId, String toolName, JsonNode input) implements UIMessageChunk {}
+
+    /** Pi tool execution: tool produced an output successfully. */
+    record ToolOutputAvailable(String toolCallId, JsonNode output) implements UIMessageChunk {}
+
+    /** Pi tool execution: tool failed; {@code errorText} surfaces to the client UI. */
+    record ToolOutputError(String toolCallId, String errorText) implements UIMessageChunk {}
+
+    /** Fatal error during the turn; emitter completes after this chunk. */
+    record Error(String errorText) implements UIMessageChunk {}
+
+    /**
+     * Hephaestus-specific data part — cold-start banner, container warming etc. Matches the
+     * AI SDK strict-object schema for {@code data-*} chunks:
+     * {@code {type, id?, data: unknown, transient?: boolean}}. {@code transient:true} hides
+     * it from the persisted UIMessage parts array on the client.
+     */
+    record DataMentorStatus(
+        @JsonProperty("data") DataMentorStatusPayload data,
+        @JsonProperty("transient") @Nullable Boolean transientFlag
+    ) implements UIMessageChunk {
+        public record DataMentorStatusPayload(String state, @Nullable String reason) {}
+
+        public static DataMentorStatus of(String state, @Nullable String reason) {
+            return new DataMentorStatus(new DataMentorStatusPayload(state, reason), Boolean.TRUE);
+        }
+    }
+
+    /**
+     * Hephaestus-specific data part emitted when Pi calls the {@code link_finding} custom tool.
+     * Permanent (NOT transient) — the linked-finding chip is part of the message history.
+     * Carries the finding id both at the top-level {@code id} (for AI SDK deduplication) and
+     * inside the {@code data} envelope.
+     */
+    record DataFinding(
+        @Nullable @JsonProperty("id") UUID id,
+        @JsonProperty("data") DataFindingPayload data
+    ) implements UIMessageChunk {
+        public record DataFindingPayload(UUID findingId) {}
+
+        public static DataFinding of(UUID findingId) {
+            return new DataFinding(findingId, new DataFindingPayload(findingId));
+        }
+    }
+}

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        PiMentorAgent #1071: enforce JSONB object shape for chat_message.metadata.
+
+        Rationale: the metadata column is now load-bearing — MentorChatService writes
+        {status, model, inputTokens, outputTokens, costUsd, ...} per turn. Junk shapes
+        (arrays, scalars) would break the read path. Constraint allows NULL for historical
+        rows that pre-date metadata.
+    -->
+    <changeSet id="1779000000003-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="metadata shape constraint already exists">
+            <not>
+                <sqlCheck expectedResult="1">
+                    SELECT CASE WHEN EXISTS (
+                        SELECT 1 FROM information_schema.constraint_column_usage
+                         WHERE table_name = 'chat_message'
+                           AND constraint_name = 'chk_chat_message_metadata_shape'
+                    ) THEN 1 ELSE 0 END
+                </sqlCheck>
+            </not>
+        </preConditions>
+        <comment>Constrain chat_message.metadata to JSON object shape (or NULL)</comment>
+        <sql splitStatements="false">
+            ALTER TABLE chat_message
+                ADD CONSTRAINT chk_chat_message_metadata_shape
+                CHECK (metadata IS NULL OR jsonb_typeof(metadata) = 'object');
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE chat_message DROP CONSTRAINT IF EXISTS chk_chat_message_metadata_shape;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

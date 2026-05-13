@@ -84,7 +84,14 @@ public class PullRequestContentProvider implements ContentProvider {
 
     @Override
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        AgentJob job = request.job();
+        // Narrowed via supports(); cast is safe and documents the variant precondition.
+        if (!(request instanceof ContextRequest.PracticeReviewRequest practiceReview)) {
+            throw new IllegalStateException(
+                "PullRequestContentProvider.contribute called with unsupported variant: " +
+                    request.getClass().getSimpleName()
+            );
+        }
+        AgentJob job = practiceReview.job();
         JsonNode metadata = job.getMetadata();
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());

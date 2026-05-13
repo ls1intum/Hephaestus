@@ -27,6 +27,7 @@ import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.in.www1.hephaestus.testconfig.LiveDockerTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -45,12 +46,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 
 /** Live integration tests — boots real Docker. Run with {@code -Pgroups=live} or {@code live-tests}. */
-@Tag("live")
+@LiveDockerTest
 @DisplayName("Docker Interactive Sandbox Live")
 class DockerInteractiveSandboxLiveTest {
 

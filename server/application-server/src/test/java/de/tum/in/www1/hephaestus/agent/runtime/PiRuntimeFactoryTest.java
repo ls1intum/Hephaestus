@@ -35,6 +35,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             CredentialMode.PROXY,
             null,
             modelName,
+            null,
             "job-token-123",
             false,
             600,
@@ -49,6 +50,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             provider,
             CredentialMode.API_KEY,
             "sk-test",
+            null,
             null,
             null,
             true,
@@ -102,6 +104,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 "sk-test",
                 null,
                 null,
+                null,
                 true,
                 600,
                 "pi-runner.mjs",
@@ -119,7 +122,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @ParameterizedTest(name = "{0} → defaultProvider {1}")
         @CsvSource({ "AZURE_OPENAI, azure-openai-responses", "OPENAI, openai", "ANTHROPIC, anthropic" })
         void mapsProvider(LlmProvider provider, String expected) throws Exception {
-            byte[] json = factory.buildPracticeSettingsJson(provider, "some-model");
+            byte[] json = factory.buildPiSettingsJson(provider, "some-model");
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
             assertThat(root.path("defaultProvider").asText()).isEqualTo(expected);
             assertThat(root.path("defaultModel").asText()).isEqualTo("some-model");
@@ -129,7 +132,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         @DisplayName("omits defaultModel when null/blank and includes compaction config")
         void omitsModelAndIncludesCompaction() throws Exception {
-            byte[] json = factory.buildPracticeSettingsJson(LlmProvider.OPENAI, null);
+            byte[] json = factory.buildPiSettingsJson(LlmProvider.OPENAI, null);
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
             assertThat(root.has("defaultModel")).isFalse();
             assertThat(root.path("compaction").path("enabled").asBoolean()).isTrue();
@@ -177,6 +180,180 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 "AZURE_OPENAI_DEPLOYMENT_NAME_MAP"
             );
         }
+
+        @Test
+        @DisplayName("baseUrl override exports PI_HEPHAESTUS_* env vars (routes via custom Pi provider)")
+        void baseUrlExported() {
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                "gpt-x",
+                "https://gpu.example.com/api",
+                null,
+                true,
+                600,
+                "pi-runner.mjs",
+                Map.of(),
+                ""
+            );
+            assertThat(factory.build(spec).environment())
+                .containsEntry("OPENAI_API_KEY", "sk-test")
+                .containsEntry("PI_HEPHAESTUS_BASE_URL", "https://gpu.example.com/api")
+                .containsEntry("PI_HEPHAESTUS_API_KEY", "sk-test")
+                .containsEntry("PI_HEPHAESTUS_MODEL", "gpt-x")
+                .doesNotContainKey("OPENAI_BASE_URL");
+        }
+
+        @Test
+        @DisplayName("baseUrl is ignored in PROXY mode (proxy URL comes from $LLM_PROXY_URL)")
+        void baseUrlIgnoredInProxyMode() {
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.PROXY,
+                null,
+                null,
+                "https://gpu.example.com/api",
+                "job-token-123",
+                false,
+                600,
+                "pi-runner.mjs",
+                Map.of(),
+                ""
+            );
+            assertThat(factory.build(spec).environment())
+                .doesNotContainKey("OPENAI_BASE_URL")
+                .doesNotContainKey("PI_HEPHAESTUS_BASE_URL");
+        }
+    }
+
+    @Nested
+    @DisplayName("custom provider extension")
+    class CustomProvider {
+
+        @Test
+        @DisplayName("baseUrl-pinned OPENAI spec emits hephaestus-provider.ts under .pi-runtime/extensions/")
+        void baseUrlOpenaiEmitsExtension() {
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                "gpt-x",
+                "https://gpu.example.com/api",
+                null,
+                true,
+                600,
+                "pi-runner.mjs",
+                Map.of(),
+                ""
+            );
+            var inputs = factory.build(spec).inputFiles();
+            String ts = new String(
+                inputs.get(WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts"),
+                StandardCharsets.UTF_8
+            );
+            assertThat(ts)
+                .contains("pi.registerProvider(\"hephaestus\"")
+                .contains("PI_HEPHAESTUS_BASE_URL")
+                .contains("api: \"openai-completions\"");
+        }
+
+        @Test
+        @DisplayName("baseUrl-pinned ANTHROPIC spec uses anthropic-messages api in the extension")
+        void baseUrlAnthropicUsesAnthropicMessagesApi() {
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.ANTHROPIC,
+                CredentialMode.API_KEY,
+                "sk-test",
+                "claude-x",
+                "https://proxy.example.com",
+                null,
+                true,
+                600,
+                "pi-runner.mjs",
+                Map.of(),
+                ""
+            );
+            String ts = new String(
+                factory
+                    .build(spec)
+                    .inputFiles()
+                    .get(WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts"),
+                StandardCharsets.UTF_8
+            );
+            assertThat(ts).contains("api: \"anthropic-messages\"");
+        }
+
+        @Test
+        @DisplayName("baseUrl-pinned spec writes defaultProvider=hephaestus in settings.json")
+        void baseUrlPinnedSpecSetsHephaestusDefault() throws Exception {
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                "gpt-x",
+                "https://gpu.example.com/api",
+                null,
+                true,
+                600,
+                "pi-runner.mjs",
+                Map.of(),
+                ""
+            );
+            JsonNode settings = objectMapper.readTree(
+                new String(
+                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_RUNTIME_PREFIX + "settings.json"),
+                    StandardCharsets.UTF_8
+                )
+            );
+            assertThat(settings.path("defaultProvider").asText()).isEqualTo("hephaestus");
+            assertThat(settings.path("defaultModel").asText()).isEqualTo("gpt-x");
+        }
+
+        @Test
+        @DisplayName("no baseUrl → defaultProvider=openai, no extension file written")
+        void noBaseUrlNoExtension() throws Exception {
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                "gpt-x",
+                null,
+                null,
+                true,
+                600,
+                "pi-runner.mjs",
+                Map.of(),
+                ""
+            );
+            var inputs = factory.build(spec).inputFiles();
+            assertThat(inputs).doesNotContainKey(WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts");
+            JsonNode settings = objectMapper.readTree(
+                new String(inputs.get(WorkspaceAbi.PI_RUNTIME_PREFIX + "settings.json"), StandardCharsets.UTF_8)
+            );
+            assertThat(settings.path("defaultProvider").asText()).isEqualTo("openai");
+        }
+
+        @Test
+        @DisplayName("AZURE_OPENAI with baseUrl never writes the extension (Azure has its own routing)")
+        void azureNeverUsesExtension() {
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.AZURE_OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                "gpt-x",
+                "https://gpu.example.com/api",
+                null,
+                true,
+                600,
+                "pi-runner.mjs",
+                Map.of(),
+                ""
+            );
+            assertThat(factory.build(spec).inputFiles()).doesNotContainKey(
+                WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts"
+            );
+        }
     }
 
     @Nested
@@ -190,6 +367,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
                 "sk-test",
+                null,
                 null,
                 null,
                 true,
@@ -220,6 +398,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     null,
                     null,
                     null,
+                    null,
                     false,
                     600,
                     "pi-runner.mjs",
@@ -238,6 +417,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 new PiPlanSpec(
                     LlmProvider.OPENAI,
                     CredentialMode.API_KEY,
+                    null,
                     null,
                     null,
                     null,
@@ -262,6 +442,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     "sk",
                     null,
                     null,
+                    null,
                     true,
                     PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
                     "pi-runner.mjs",
@@ -281,6 +462,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     LlmProvider.OPENAI,
                     CredentialMode.API_KEY,
                     "sk",
+                    null,
                     null,
                     null,
                     true,

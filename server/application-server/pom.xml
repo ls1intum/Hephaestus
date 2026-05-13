@@ -1039,6 +1039,13 @@
                 <surefire.includedGroups>live</surefire.includedGroups>
                 <failsafe.excludedGroups></failsafe.excludedGroups>
                 <failsafe.includedGroups></failsafe.includedGroups>
+                <!--
+                  A single-test invocation (`-Dtest=…LiveLlmTest`) can match zero classes when
+                  the gating env var is unset. Without these flags Maven fails the build on
+                  "no tests matched", which masks the real "gate skipped" outcome.
+                -->
+                <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
+                <failsafe.failIfNoSpecifiedTests>false</failsafe.failIfNoSpecifiedTests>
             </properties>
         </profile>
 

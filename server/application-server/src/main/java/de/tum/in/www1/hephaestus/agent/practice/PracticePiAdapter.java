@@ -39,6 +39,7 @@ public class PracticePiAdapter {
                 request.credentialMode(),
                 request.credential(),
                 request.modelName(),
+                request.baseUrl(),
                 request.jobToken(),
                 request.allowInternet(),
                 request.timeoutSeconds(),

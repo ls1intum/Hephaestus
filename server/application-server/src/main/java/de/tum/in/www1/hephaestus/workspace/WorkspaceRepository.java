@@ -4,6 +4,8 @@ import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -29,4 +31,22 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     List<Workspace> findByStatus(Workspace.WorkspaceStatus status);
 
     List<Workspace> findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus status);
+
+    /**
+     * Resolves the workspace id from a repository id via the {@code RepositoryToMonitor} join.
+     * Used by mentor-cache invalidation: domain events carry {@code repositoryId} but mentor
+     * caches key on {@code workspaceId}.
+     *
+     * @return at most one workspace per repository (a monitored repo lives in exactly one
+     *         workspace; {@code Optional.empty()} if the repository is not monitored anywhere)
+     */
+    @Query(
+        """
+        SELECT m.workspace.id
+        FROM RepositoryToMonitor m
+        JOIN Repository r ON r.nameWithOwner = m.nameWithOwner
+        WHERE r.id = :repositoryId
+        """
+    )
+    Optional<Long> findWorkspaceIdByRepositoryId(@Param("repositoryId") Long repositoryId);
 }

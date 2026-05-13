@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        PiMentorAgent #1071: at most one in-flight assistant message per thread.
+
+        Durable backstop against duplicate /mentor/chat submissions for the same thread
+        (controller-side ConcurrentHashMap is in-memory; this index survives replica
+        boundaries until #1077 ships sticky sessions). Pi's AgentSession.prompt() throws
+        when called mid-turn — without this guard a webapp double-click would poison the
+        thread with two in-flight rows.
+
+        CREATE INDEX CONCURRENTLY because chat_message is a hot table on busy tenants;
+        a non-concurrent build acquires a SHARE lock that blocks writes for the duration
+        of the scan. `runInTransaction="false"` is mandatory here — CONCURRENTLY refuses
+        to run inside a transaction (PG docs §SQL-CREATEINDEX).
+    -->
+    <changeSet id="1779000000004-1" author="hephaestus" runInTransaction="false">
+        <preConditions onFail="MARK_RAN" onFailMessage="in-flight unique index already exists">
+            <not>
+                <indexExists indexName="ux_chat_message_in_flight"/>
+            </not>
+        </preConditions>
+        <comment>One in-flight assistant message per thread (durable concurrency guard)</comment>
+        <sql splitStatements="false">
+            CREATE UNIQUE INDEX CONCURRENTLY ux_chat_message_in_flight
+                ON chat_message (thread_id)
+                WHERE (metadata ->> 'status') = 'in_flight';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS ux_chat_message_in_flight;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

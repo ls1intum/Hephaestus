@@ -96,5 +96,85 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
             String quoted = LlmProxyAuthShell.shellQuote("hello'world");
             assertThat(quoted).isEqualTo("'hello'\\''world'");
         }
+
+        @Test
+        @DisplayName("OPENAI baseUrl override exports PI_HEPHAESTUS_* env vars (routes via custom provider)")
+        void openaiBaseUrlExported() {
+            // Pi does NOT read OPENAI_BASE_URL natively. The base URL is consumed by the
+            // hephaestus provider extension via PI_HEPHAESTUS_BASE_URL / PI_HEPHAESTUS_API_KEY.
+            Map<String, String> env = new HashMap<>();
+            LlmProxyAuthShell.build(
+                CredentialMode.API_KEY,
+                LlmProvider.OPENAI,
+                "sk-test",
+                "https://gpu.example.com/api",
+                "gpt-test",
+                env
+            );
+            assertThat(env)
+                .containsEntry("OPENAI_API_KEY", "sk-test")
+                .containsEntry("PI_HEPHAESTUS_BASE_URL", "https://gpu.example.com/api")
+                .containsEntry("PI_HEPHAESTUS_API_KEY", "sk-test")
+                .containsEntry("PI_HEPHAESTUS_MODEL", "gpt-test");
+        }
+
+        @Test
+        @DisplayName("ANTHROPIC baseUrl override exports PI_HEPHAESTUS_* env vars")
+        void anthropicBaseUrlExported() {
+            Map<String, String> env = new HashMap<>();
+            LlmProxyAuthShell.build(
+                CredentialMode.API_KEY,
+                LlmProvider.ANTHROPIC,
+                "sk-test",
+                "https://proxy.example.com",
+                "claude-test",
+                env
+            );
+            assertThat(env)
+                .containsEntry("ANTHROPIC_API_KEY", "sk-test")
+                .containsEntry("PI_HEPHAESTUS_BASE_URL", "https://proxy.example.com")
+                .containsEntry("PI_HEPHAESTUS_API_KEY", "sk-test")
+                .containsEntry("PI_HEPHAESTUS_MODEL", "claude-test");
+        }
+
+        @Test
+        @DisplayName("blank baseUrl is treated as unset (no PI_HEPHAESTUS_* vars written)")
+        void blankBaseUrlSkipped() {
+            Map<String, String> env = new HashMap<>();
+            LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, "sk-test", "   ", null, env);
+            assertThat(env)
+                .doesNotContainKey("PI_HEPHAESTUS_BASE_URL")
+                .doesNotContainKey("PI_HEPHAESTUS_API_KEY")
+                .doesNotContainKey("PI_HEPHAESTUS_MODEL");
+        }
+
+        @Test
+        @DisplayName("baseUrl null in API_KEY mode does not write any PI_HEPHAESTUS_* var")
+        void nullBaseUrlOmitsHephaestusVars() {
+            Map<String, String> env = new HashMap<>();
+            LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, "sk-test", null, null, env);
+            assertThat(env)
+                .containsEntry("OPENAI_API_KEY", "sk-test")
+                .doesNotContainKey("PI_HEPHAESTUS_BASE_URL")
+                .doesNotContainKey("PI_HEPHAESTUS_API_KEY");
+        }
+
+        @Test
+        @DisplayName("PROXY mode never writes PI_HEPHAESTUS_* — proxy URL comes from $LLM_PROXY_URL")
+        void proxyModeDoesNotWriteHephaestusVars() {
+            Map<String, String> env = new HashMap<>();
+            LlmProxyAuthShell.build(
+                CredentialMode.PROXY,
+                LlmProvider.OPENAI,
+                null,
+                "https://ignored.example.com",
+                "ignored-model",
+                env
+            );
+            assertThat(env)
+                .doesNotContainKey("PI_HEPHAESTUS_BASE_URL")
+                .doesNotContainKey("PI_HEPHAESTUS_API_KEY")
+                .doesNotContainKey("PI_HEPHAESTUS_MODEL");
+        }
     }
 }

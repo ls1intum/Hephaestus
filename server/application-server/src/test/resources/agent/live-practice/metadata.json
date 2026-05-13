@@ -1,0 +1,9 @@
+{
+  "pr_number": 1,
+  "repository_full_name": "test/fixture",
+  "source_branch": "feat/login",
+  "target_branch": "main",
+  "commit_sha": "0000000000000000000000000000000000000000",
+  "title": "Add login service",
+  "body": ""
+}

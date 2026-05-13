@@ -38,6 +38,7 @@ class PracticePiAdapterTest extends BaseUnitTest {
             CredentialMode.PROXY,
             null,
             null,
+            null,
             "job-token-123",
             false,
             600
