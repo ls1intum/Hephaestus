@@ -66,25 +66,22 @@ class FrameSubscriptionTest extends BaseUnitTest {
                 }
                 received.add(frame.intValue());
             },
-            4, // small queue
+            4,
             dropped,
             errors,
             () -> {}
         );
         sub.start();
 
-        // Pump 10 frames while the listener is gated
         for (int i = 0; i < 10; i++) {
             sub.offer(IntNode.valueOf(i));
         }
-        // Drop counter should reflect the surplus over (capacity + 1-in-flight)
-        // capacity=4 → first 5 enter (1 dequeued+running, 4 queued); rest evict.
+        // capacity=4 → 5 enter (1 in-flight + 4 queued); 5 evict.
         await()
             .atMost(Duration.ofSeconds(2))
             .untilAsserted(() -> assertThat(dropped.count()).isGreaterThan(0));
 
         gate.countDown();
-        // After release, some prefix of (newest-N) frames are delivered
         await()
             .atMost(Duration.ofSeconds(2))
             .untilAsserted(() -> assertThat(received).isNotEmpty());
@@ -162,7 +159,6 @@ class FrameSubscriptionTest extends BaseUnitTest {
         sub.dispose();
         sub.offer(IntNode.valueOf(99));
         sub.offer(IntNode.valueOf(100));
-        // No assertion on received — the dispatcher exited. The point is no exception.
         assertThat(received).doesNotContain(99, 100);
     }
 }

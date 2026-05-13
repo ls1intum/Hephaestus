@@ -20,29 +20,17 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 /**
- * Serialised JSONL writer with bounded queueing, per-send timeout, and watchdog-driven recovery.
- *
- * <p>{@link #send} enqueues a frame on a bounded queue, blocks the caller on a future, and either
- * receives an ack from the writer thread or fails after {@code stdinWriteTimeoutMs}. Queue full →
- * immediate {@code QUEUE_FULL} rejection: this is the only honest backpressure signal to upstream
- * HTTP callers; a timeout alone permits unbounded growth.
- *
- * <h2>Why the watchdog?</h2>
- *
- * <p>A Java thread parked inside {@code OutputStream.write()} on a kernel pipe cannot be
- * interrupted — {@code Thread.interrupt()} does not unblock the syscall on Linux (Java bug
- * <a href="https://bugs.openjdk.org/browse/JDK-4514257">JDK-4514257</a>). The only reliable
- * escape is to close the underlying FD, which {@link Process#destroyForcibly()} achieves. The
- * shared {@link StdinWriteWatchdog} polls {@link #writeStartedNanos} and invokes
- * {@link #onWriteTimeout()} when an in-flight write has aged past the threshold; that delegates
- * back to the owning session's terminal-state transition (process kill happens via the session,
- * not directly here).
+ * Serialised JSONL writer with bounded queueing and watchdog-driven recovery. {@link #send}
+ * rejects immediately when the queue is full — the only honest backpressure signal (a timeout
+ * alone allows unbounded growth). A thread parked in {@code OutputStream.write()} on a kernel
+ * pipe cannot be interrupted on Linux (see <a href="https://bugs.openjdk.org/browse/JDK-4514257">
+ * JDK-4514257</a>), so the {@link StdinWriteWatchdog} polls {@link #writeStartedNanos} and
+ * delegates to the owning session to {@code destroyForcibly} the exec subprocess.
  */
 final class JsonlStdinWriter {
 
     private static final Logger log = LoggerFactory.getLogger(JsonlStdinWriter.class);
 
-    /** Sentinel: writer not currently performing a write. */
     private static final long IDLE = -1L;
 
     private final UUID sessionId;
@@ -124,8 +112,7 @@ final class JsonlStdinWriter {
             ack.get(stdinWriteTimeoutMs, TimeUnit.MILLISECONDS);
             framesBytesIn.increment(payload.length + 1L);
         } catch (TimeoutException te) {
-            // Writer is still blocked inside write(). The watchdog will see writeStartedNanos
-            // and call destroyForcibly() on the exec subprocess to close the FD.
+            // Writer is still blocked inside write(); the watchdog will destroyForcibly.
             rejectedWriteTimeout.increment();
             markTerminal();
             throw new InteractiveSandboxException("Stdin write timed out after " + stdinWriteTimeoutMs + " ms", te);
@@ -143,7 +130,6 @@ final class JsonlStdinWriter {
         }
     }
 
-    /** Invoked by the watchdog when an in-flight write has aged past the configured threshold. */
     void onWriteTimeout() {
         markTerminal();
     }
@@ -153,7 +139,6 @@ final class JsonlStdinWriter {
         return started != IDLE && nowNanos - started > TimeUnit.MILLISECONDS.toNanos(stdinWriteTimeoutMs);
     }
 
-    /** Mark terminal AND unblock the writer thread (if currently waiting on {@link BlockingQueue#take}). */
     void close() {
         markTerminal();
         Thread t = writerThread;
@@ -207,8 +192,6 @@ final class JsonlStdinWriter {
                 }
             }
         } finally {
-            // Late offers will see terminated=true and be rejected; in-flight offers are drained
-            // by markTerminal under the monitor lock so we don't lose acks.
             MDC.clear();
         }
     }

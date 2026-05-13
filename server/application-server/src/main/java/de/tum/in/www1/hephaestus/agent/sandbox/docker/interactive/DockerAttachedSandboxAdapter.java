@@ -26,17 +26,8 @@ import org.slf4j.MDC;
 import reactor.core.Disposable;
 
 /**
- * Docker-backed {@link AttachedSandbox}: owns the {@link PiProcessHandle}, JSONL pump, JSONL
- * writer, frame ring buffer, and per-subscriber fan-out for one session.
- *
- * <p>State transitions are forward-only: {@code ATTACHED → CLOSING → CLOSED}. Every transition
- * is CAS-guarded; the loser observes the winner's eviction reason and waits on
- * {@link #closed}. {@code close(grace)} and {@code terminate(reason)} are the two entry points,
- * differing only in their default reason and grace value.
- *
- * <p>The close sequence stops the container with the caller-supplied grace, drains the exec
- * subprocess with a bounded {@code waitFor} (no FD leak on a hung docker exec), tears down
- * resources, completes {@link #closed}, and invokes the registry callback that decrements caps.
+ * Per-session adapter: owns the docker-exec subprocess, JSONL pump + writer, ring buffer, and
+ * subscriber fan-out. State transitions {@code ATTACHED → CLOSING → CLOSED} are CAS-guarded.
  */
 public final class DockerAttachedSandboxAdapter implements AttachedSandbox, StdinWriteWatchdog.StallTarget {
 
@@ -67,17 +58,13 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     private volatile Instant lastActivityAt;
     private final Instant attachedAt;
 
-    /** Serialises (a) ring.offer + subscriber fan-out from the pump and (b) snapshot + add from {@link #subscribe}. Guarantees subscribers never see live frames before their snapshot replay. */
+    /** Serialises pump fan-out with subscribe(): guarantees snapshot replay precedes live frames. */
     private final Object subscriberLock = new Object();
 
     private final Consumer<DockerAttachedSandboxAdapter> onClosed;
     private final LifecycleOps lifecycle;
     private final int subscriberQueueCapacity;
-    /**
-     * Executor used to run {@link #runClose}. Must be a platform-thread pool because the close
-     * path invokes docker-java sync APIs whose {@code synchronized} blocks pin virtual threads on
-     * JDK 21 (same reason {@code SandboxContainerManager} uses {@code dockerWaitExecutor}).
-     */
+    /** Platform-thread executor: docker-java sync calls pin virtual carriers on JDK 21. */
     private final Executor closeExecutor;
 
     DockerAttachedSandboxAdapter(
@@ -163,7 +150,6 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         return workspaceId;
     }
 
-    /** Current lifecycle state. Not on the SPI — consumers observe state via thrown {@link #send} exceptions or {@link Disposable#isDisposed()}. */
     public AttachedSandboxState state() {
         return state.get();
     }
@@ -190,9 +176,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
 
     @Override
     public Disposable subscribe(Consumer<JsonNode> listener) {
-        // Reject during CLOSING too. Letting a subscribe through during CLOSING would spawn a
-        // dispatcher virtual thread that no one ever wakes — `runClose` already cleared the
-        // subscriptions list, so the late entry isn't disposed by the close path.
+        // CLOSING: late add would leak its dispatcher — runClose has already drained subscriptions.
         AttachedSandboxState s = state.get();
         if (s != AttachedSandboxState.ATTACHED) {
             FrameSubscription disposed = new FrameSubscription(
@@ -215,12 +199,8 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         );
         holder[0] = sub;
 
-        // Under the subscriber lock: take the snapshot AND add to the subscriptions list as one
-        // atomic act, in that order. The pump's onFrame also takes this lock before
-        // ring.offer + subscriber iteration, so we can never miss a live frame nor receive a
-        // live frame before its snapshot replay.
+        // Snapshot+add atomic against pump fan-out → snapshot replay strictly precedes live frames.
         synchronized (subscriberLock) {
-            // Race with concurrent close: state may have transitioned since the outer check.
             if (state.get() != AttachedSandboxState.ATTACHED) {
                 sub.dispose();
                 return sub;
@@ -253,15 +233,11 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     @Override
     public void onWriteTimeout() {
         terminate(EvictionReason.ERROR);
-        // Unblock the writer thread by killing the exec subprocess (closes stdin FD on Linux).
+        // Closes stdin FD; interrupt() does not unblock OutputStream.write on Linux.
         process.destroyForcibly();
     }
 
-    /**
-     * Forced close with a specific reason and the registry-supplied default grace. Idempotent.
-     * Invoked from: the pump's EOF handler (NATURAL_EXIT / ERROR), the writer on broken-pipe or
-     * stdin timeout (ERROR), the reaper on idle (IDLE), the attach-failure cleanup (ERROR).
-     */
+    /** Forced close with a specific reason and the configured default grace. Idempotent. */
     void terminate(EvictionReason reason) {
         if (!state.compareAndSet(AttachedSandboxState.ATTACHED, AttachedSandboxState.CLOSING)) {
             return;
@@ -273,19 +249,13 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         runCloseAsync(defaultGrace);
     }
 
-    /** Block up to {@code timeout} for full close. Used by the registry on shutdown / by attach() teardown. */
     void awaitClosed(Duration timeout) {
         waitForClose(timeout);
     }
 
     /**
-     * Block up to {@code timeout} for the first stdout frame.
-     *
-     * @return {@code true} if a frame was observed, {@code false} if the timeout elapsed with no
-     *     frame
-     * @throws InteractiveSandboxException if the pump/writer terminated the session before any
-     *     frame arrived (runner crashed, broken pipe, daemon died). Distinguishing this from a
-     *     pure timeout lets the adapter charge the right {@code mentor.attach.failure} reason.
+     * @return {@code true} on first frame, {@code false} on pure timeout
+     * @throws InteractiveSandboxException if the pump/writer terminated before any frame
      */
     boolean awaitFirstFrame(Duration timeout) {
         try {
@@ -336,35 +306,23 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         }
     }
 
-    /** Wait this long for the exec subprocess to publish its exit code after EOF on stdout. */
+    // The exec FD can close briefly before Process.exitValue() becomes available.
     private static final Duration EOF_EXIT_WAIT = Duration.ofSeconds(2);
 
-    /**
-     * Pump-EOF handler. Determines NATURAL_EXIT vs ERROR by waiting briefly for the exec
-     * subprocess to publish its exit code — the exec FD can close a few millis (sometimes longer
-     * under load) before {@code Process.exitValue()} becomes available. If the exec subprocess is
-     * STILL alive after the wait, the daemon is misbehaving — classify as ERROR.
-     */
     private void onEof(int initialExitCode) {
         int exit = initialExitCode;
         if (exit < 0) {
             process.waitFor(EOF_EXIT_WAIT);
             exit = process.exitValueOrAlive();
         }
-        EvictionReason reason = exit == 0 ? EvictionReason.NATURAL_EXIT : EvictionReason.ERROR;
-        terminate(reason);
+        terminate(exit == 0 ? EvictionReason.NATURAL_EXIT : EvictionReason.ERROR);
     }
 
     private void runCloseAsync(Duration graceTimeout) {
-        // Platform-thread executor on purpose: runClose calls docker-java sync APIs that pin
-        // virtual carriers on JDK 21 (Apache HttpClient5 synchronized internals). The sync
-        // sandbox solved this with `dockerWaitExecutor`; we re-use that bean here.
         try {
             closeExecutor.execute(() -> runClose(graceTimeout));
         } catch (java.util.concurrent.RejectedExecutionException ree) {
-            // The executor was shut down between CAS and submit — happens if a @Scheduled tick
-            // (reaper / watchdog) fires during Spring's bean destruction. Run inline as fallback;
-            // the calling thread is already on shutdown's critical path.
+            // Executor shut down (e.g. by a @Scheduled tick during Spring destruction).
             log.warn("closeExecutor rejected runClose for sessionId={} — running inline", sessionId);
             runClose(graceTimeout);
         }
@@ -376,32 +334,26 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
             int graceSeconds = (int) Math.max(0, graceTimeout.toSeconds());
             log.info("Closing attached sandbox: reason={}, graceSeconds={}", terminalReason.get(), graceSeconds);
 
-            // 1. Mark the writer terminal first so queued envelopes fail fast and any subsequent
-            //    send() throws CLOSED rather than getting through the door to a stdin we're about
-            //    to close. close() is idempotent against later destroyForcibly.
             try {
                 writer.close();
             } catch (Exception e) {
                 log.debug("writer.close() during sandbox close threw: {}", e.getMessage());
             }
 
-            // 2. Ask Docker to stop the container with our grace. SIGTERM → wait → SIGKILL.
             try {
                 lifecycle.stopContainer(containerId, graceSeconds);
             } catch (Exception e) {
                 log.warn("stopContainer failed during close: {}", e.getMessage());
             }
 
-            // 3. Bounded wait for the exec subprocess to notice and exit. Container stop closes
-            //    the docker exec stream; if for any reason it doesn't, destroyForcibly the
-            //    subprocess so we never leak a virtual thread waiting forever.
+            // destroyForcibly if docker stop didn't propagate to the exec subprocess — prevents
+            // the close virtual thread from waiting forever on a hung docker daemon.
             Duration waitBudget = graceTimeout.plusSeconds(5);
             if (!process.waitFor(waitBudget)) {
                 log.warn("Exec subprocess still alive after stop + grace; destroyForcibly");
                 process.destroyForcibly();
             }
 
-            // 4. Dispose subscribers — pump's EOF may already have completed; cleanup either way.
             int subscriberCount = subscriptions.size();
             for (FrameSubscription sub : subscriptions) {
                 try {
@@ -410,7 +362,6 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
             }
             subscriptions.clear();
 
-            // 5. Tear down container + network. forceRemove is idempotent against a missing container.
             try {
                 lifecycle.removeContainer(containerId);
             } catch (Exception e) {
@@ -424,12 +375,10 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
                 }
             }
 
-            // 6. Close FDs with a bounded wait (the docker exec subprocess is already exited or destroyed).
             try {
                 process.awaitExitAndClose(Duration.ofSeconds(2));
             } catch (Exception ignored) {}
 
-            // 7. Metrics + state.
             metrics.lifetime.record(Duration.between(attachedAt, Instant.now()));
             metrics.subscribersAtClose.record(subscriberCount);
             EvictionReason reason = terminalReason.get();

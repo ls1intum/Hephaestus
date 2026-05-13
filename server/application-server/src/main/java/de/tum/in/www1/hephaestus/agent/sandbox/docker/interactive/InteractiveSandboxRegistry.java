@@ -26,12 +26,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 
 /**
- * In-memory registry of live {@link DockerAttachedSandboxAdapter} sessions keyed by
- * {@code (userId, workspaceId)}.
- *
- * <p>Owns four cross-cutting concerns that don't fit on a single session: capacity caps (DOS
- * guard), idle reaper, stdin-write watchdog tick, and post-restart orphan sweep. State is
- * in-process — see #1077 for the eventual multi-replica story.
+ * In-memory registry of live sessions keyed by {@code (userId, workspaceId)}. Owns capacity caps,
+ * idle reaper, watchdog tick, and post-restart orphan sweep.
  */
 @WorkspaceAgnostic("Interactive sandbox registry keys by user+workspace, not by workspace-iteration semantics")
 public class InteractiveSandboxRegistry {
@@ -63,28 +59,17 @@ public class InteractiveSandboxRegistry {
         meterRegistry.gauge("mentor.watchdog.targets", Tags.empty(), watchdog, StdinWriteWatchdog::activeTargets);
     }
 
-    /** @return the registered session for this key, or {@code null}. May be in any lifecycle state. */
     DockerAttachedSandboxAdapter find(String userId, String workspaceId) {
         return sessions.get(new SessionKey(userId, workspaceId));
     }
 
-    /**
-     * Like {@link #find} but filters out sessions that aren't {@link AttachedSandboxState#ATTACHED}.
-     * The race between this check and a subsequent {@code send()} is still possible (the session
-     * can transition to {@code CLOSING} a nanosecond later) — callers must accept that
-     * {@code send()} after CLOSING throws cleanly. Used by {@code attach()}'s share-semantics
-     * fast path.
-     */
+    /** Like {@link #find}, but {@code null} unless state is {@link AttachedSandboxState#ATTACHED}. */
     public DockerAttachedSandboxAdapter findLive(String userId, String workspaceId) {
         DockerAttachedSandboxAdapter sandbox = sessions.get(new SessionKey(userId, workspaceId));
         return sandbox != null && sandbox.state() == AttachedSandboxState.ATTACHED ? sandbox : null;
     }
 
-    /**
-     * Atomically check capacity and register a freshly constructed sandbox.
-     *
-     * @return outcome; on non-{@code REGISTERED}, the caller is responsible for teardown.
-     */
+    /** On non-{@code REGISTERED}, the caller tears down the sandbox. */
     public RegistrationOutcome tryRegister(DockerAttachedSandboxAdapter sandbox) {
         Objects.requireNonNull(sandbox, "sandbox");
         SessionKey key = new SessionKey(sandbox.userId(), sandbox.workspaceId());
@@ -105,7 +90,7 @@ public class InteractiveSandboxRegistry {
         return RegistrationOutcome.REGISTERED;
     }
 
-    /** Callback fired by each sandbox on full close. Identity-based remove avoids races with re-register. */
+    /** Identity-based remove avoids races with re-register. */
     void onSandboxClosed(DockerAttachedSandboxAdapter sandbox) {
         SessionKey key = new SessionKey(sandbox.userId(), sandbox.workspaceId());
         sessions.remove(key, sandbox);
@@ -116,7 +101,6 @@ public class InteractiveSandboxRegistry {
         watchdog.unregister(sandbox.sessionId());
     }
 
-    /** Idle reaper. Runs on Spring's default {@code @Scheduled} executor. */
     @Scheduled(fixedDelayString = "${hephaestus.mentor.reap-interval-seconds:30}", timeUnit = TimeUnit.SECONDS)
     public void reap() {
         if (!properties.enabled()) {
@@ -133,16 +117,13 @@ public class InteractiveSandboxRegistry {
                     sandbox.sessionId(),
                     sandbox.idleFor().toSeconds()
                 );
+                // Fire and forget: the reaper shares Spring's single-thread scheduler with the
+                // watchdog, so blocking here would stall it.
                 sandbox.terminate(EvictionReason.IDLE);
-                // Don't wait on the close here — the reaper runs on Spring's single-threaded
-                // scheduler that also drives the watchdog tick. Blocking here would stall the
-                // watchdog and stretch close latency under load. Cleanup completes asynchronously
-                // on the sandbox's own close thread; metrics settle one tick later.
             }
         }
     }
 
-    /** Watchdog tick. {@link StdinWriteWatchdog#tick} is non-blocking — fine to share the reaper's scheduler. */
     @Scheduled(fixedDelay = 1, timeUnit = TimeUnit.SECONDS)
     public void tickWatchdog() {
         if (!properties.enabled()) {
@@ -151,11 +132,7 @@ public class InteractiveSandboxRegistry {
         watchdog.tick();
     }
 
-    /**
-     * Post-restart sweep: in-memory registry is gone, so any {@code KIND=interactive} container
-     * inherited from a previous run is orphan. The sync sandbox's reconciler ignores them
-     * (different label key — {@code JOB_ID} vs {@code SESSION_ID}).
-     */
+    /** After a restart the in-memory registry is gone; any {@code KIND=interactive} container is orphan. */
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
         if (!properties.enabled()) {
@@ -188,15 +165,7 @@ public class InteractiveSandboxRegistry {
         }
     }
 
-    /**
-     * Close every live session in parallel. Serial close × {@code maxSessionsTotal} would blow
-     * past Spring's per-phase shutdown timeout
-     * ({@code spring.lifecycle.timeout-per-shutdown-phase}, default 30 s).
-     *
-     * <p>The total deadline is {@code graceTimeoutSeconds + 5 s} — the per-session
-     * {@code waitForClose} budget plus a tiny scheduling slop. Operators choosing a grace larger
-     * than Spring's phase timeout must coordinate both knobs.
-     */
+    /** Parallel close; grace + 5 s total deadline matches the per-session waitForClose budget. */
     @PreDestroy
     public void shutdown() {
         if (sessions.isEmpty()) {
@@ -230,7 +199,6 @@ public class InteractiveSandboxRegistry {
         return sessions.size();
     }
 
-    /** Registry key. */
     public record SessionKey(String userId, String workspaceId) {}
 
     public enum RegistrationOutcome {

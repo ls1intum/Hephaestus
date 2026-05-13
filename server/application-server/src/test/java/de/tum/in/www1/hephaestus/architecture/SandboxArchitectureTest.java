@@ -15,17 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/**
- * Architecture tests for the sandbox module.
- *
- * <p>Enforces module boundaries:
- *
- * <ul>
- *   <li>SPI package has no Docker or Spring dependencies
- *   <li>Docker implementation is not imported outside sandbox package
- *   <li>DockerClient is only used in the docker subpackage
- * </ul>
- */
+/** Architecture tests for the sandbox module boundaries. */
 @DisplayName("Sandbox Architecture")
 class SandboxArchitectureTest extends HephaestusArchitectureTest {
 
@@ -105,12 +95,8 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
     }
 
     /**
-     * Behavioural rules for the {@link InteractiveSandboxService} SPI introduced in #1069.
-     *
-     * <p>The {@code agent.mentor.**} and {@code agent.practice.**} packages may not exist yet (the
-     * mentor package lands in #1071, and practice already exists at a sibling path). The rules
-     * pass trivially when the matching package set is empty — the positive fixture test below
-     * proves that the rules actually catch violations when they exist.
+     * Rules pass trivially when the matched package is empty; the positive fixture tests below prove the rules
+     * actually catch violations.
      */
     @Nested
     @DisplayName("Interactive sandbox isolation")
@@ -143,16 +129,10 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
                 .check(classes);
         }
 
-        /**
-         * Positive fixture: ensure the {@code callMethod} rule actually catches a violation. Guards
-         * against ArchUnit #324, where {@code callMethod} silently passes if the parameter signature
-         * does not match an existing method (e.g. a typo in the parameter class).
-         */
+        /** Guards against ArchUnit #324: callMethod silently passes when the parameter signature mismatches. */
         @Test
         @DisplayName("[positive fixture] mentor-must-not-call-execute rule actually catches violators")
         void mentorPositiveFixtureCatchesViolation() {
-            // Include the deliberate-violation test fixture under agent.mentor.
-            // Production import excludes tests, so the rule's main .check(classes) does not see this fixture.
             JavaClasses fixtureClasses = importTestFixture("de.tum.in.www1.hephaestus.agent.mentor");
 
             ArchRule rule = noClasses()

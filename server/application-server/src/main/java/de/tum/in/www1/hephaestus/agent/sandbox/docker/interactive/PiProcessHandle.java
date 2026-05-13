@@ -16,18 +16,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Wraps a {@code docker exec -i <container> <runner...>} subprocess.
- *
- * <p>Owns the {@link Process} returned by {@link ProcessBuilder#start()}. Exposes a UTF-8
- * {@link Reader} over stdout (raw read — {@link JsonlStdoutPump} does the framing because
- * {@code readLine()} would mis-split on bare {@code \r}), a raw stdin {@link OutputStream}, and
- * the destruction hooks the session needs. Stderr is drained on a separate virtual thread so the
- * kernel-side pipe (≈64 KB on Linux) never fills and back-pressures the runner.
- *
- * <p>Termination uses {@link Process#destroyForcibly()} for grace-deadline expiry. The graceful
- * path goes through {@code docker stop} on the container in
- * {@code DockerAttachedSandboxAdapter.close()} — destroying the exec subprocess alone does not
- * stop the container.
+ * Wraps a {@code docker exec -i} subprocess. Exposes the runner's stdout as a UTF-8 {@link Reader}
+ * (raw — framing is the caller's job) and stdin as an {@link OutputStream}. Stderr is drained on
+ * a separate virtual thread so its pipe never fills and back-pressures the runner.
  */
 final class PiProcessHandle {
 
@@ -53,13 +44,9 @@ final class PiProcessHandle {
     }
 
     /**
-     * Spawn {@code docker exec -i -u 1000:1000 <containerId> <command...>}.
-     *
-     * <p>Explicit {@code -u} guards against the container's {@code USER} setting being overridden
-     * by a later refactor — the runner must never have host-equivalent privileges inside its
-     * namespace. Env keys are validated by {@link de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec},
-     * so we materialise them as {@code -e KEY=VALUE} without escaping; {@code docker exec}'s
-     * argv parser treats each token after {@code -e} as opaque.
+     * Spawns {@code docker exec -i -u <containerUser>}. Explicit {@code -u} guards against USER
+     * drift in a future refactor; env keys are pre-validated by
+     * {@link de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec}.
      */
     static PiProcessHandle spawn(
         String dockerCli,
@@ -71,9 +58,7 @@ final class PiProcessHandle {
         List<String> argv = new ArrayList<>();
         argv.add(dockerCli);
         argv.add("exec");
-        argv.add("-i");
-        // -i (interactive) but never -t (no TTY): TIOCSTI injection is a kernel-level concern
-        // that doesn't apply when there is no controlling terminal.
+        argv.add("-i"); // never -t: no TTY → no TIOCSTI injection vector
         argv.add("-u");
         argv.add(containerUser);
         for (Map.Entry<String, String> e : environment.entrySet()) {
@@ -97,7 +82,6 @@ final class PiProcessHandle {
         }
     }
 
-    /** Character reader over the runner's stdout in UTF-8. Framing is the caller's responsibility. */
     Reader stdout() {
         return stdout;
     }
@@ -114,11 +98,7 @@ final class PiProcessHandle {
         return process.isAlive();
     }
 
-    /**
-     * Forcefully terminate the exec subprocess. Closes the underlying FDs, which is the only
-     * reliable way to unblock a Java thread parked in {@code OutputStream.write()} on a kernel
-     * pipe (interrupt() does not return from that syscall on Linux). The container is unaffected.
-     */
+    /** Closes the underlying FDs — the only way to unblock a thread parked in write() on Linux. */
     void destroyForcibly() {
         if (process.isAlive()) {
             process.destroyForcibly();
@@ -134,7 +114,7 @@ final class PiProcessHandle {
         }
     }
 
-    /** @return exit value if exited, {@code -1} if still alive (no overlap with real exit codes 0-255). */
+    /** @return exit value, or {@code -1} if still alive (no overlap with real exit codes 0-255). */
     int exitValueOrAlive() {
         if (process.isAlive()) {
             return -1;
@@ -142,11 +122,7 @@ final class PiProcessHandle {
         return process.exitValue();
     }
 
-    /**
-     * Wait up to {@code timeout} for the subprocess to exit, then close stdin/stdout and stop
-     * draining stderr. Must be bounded — an unbounded wait risks blocking the close virtual
-     * thread indefinitely against a hung exec subprocess.
-     */
+    /** Bounded wait then close FDs — unbounded wait risks blocking against a hung docker exec. */
     void awaitExitAndClose(Duration timeout) {
         if (!waitFor(timeout)) {
             log.warn("Exec subprocess did not exit within {}ms; closing FDs anyway", timeout.toMillis());

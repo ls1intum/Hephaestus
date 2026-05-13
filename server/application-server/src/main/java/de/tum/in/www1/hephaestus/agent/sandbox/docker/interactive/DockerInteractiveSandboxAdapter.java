@@ -28,11 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-/**
- * {@link InteractiveSandboxService} implementation backed by docker-java for container lifecycle
- * and a subprocess {@code docker exec -i} for stdin/stdout streaming. See {@code package-info} for
- * the rationale on the subprocess vs docker-java exec choice.
- */
 public class DockerInteractiveSandboxAdapter implements InteractiveSandboxService {
 
     private static final Logger log = LoggerFactory.getLogger(DockerInteractiveSandboxAdapter.class);
@@ -45,30 +40,19 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
 
     private static final List<String> SLEEPER_CMD = List.of("tail", "-f", "/dev/null");
 
-    /**
-     * Prep run as root: {@code mkdir /workspace/*} on images that ship no {@code WORKDIR} layer
-     * (e.g. {@code node:22-slim}). Permissions use mode bits ({@code 1777} / {@code 1755}) rather
-     * than ownership because the container's security policy drops {@code CAP_CHOWN}, so even
-     * uid 0 inside the namespace cannot {@code chown}. Tar injection (next phase) preserves its
-     * own 1000:1000 ownership for each entry.
-     */
+    // CAP_CHOWN is dropped by the security policy, so we use mode bits (1777/1755) rather than
+    // chown to set permissions. Subsequent tar injection preserves its own 1000:1000 ownership.
     private static final String PREP_MKDIR_CMD =
         "mkdir -p /workspace/.runner /workspace/context/target /workspace/context/user /workspace/scratch && " +
         "chmod 1777 /workspace /workspace/.runner /workspace/context/user /workspace/scratch && " +
         "chmod 1755 /workspace/context /workspace/context/target";
 
-    /** Post-injection chmod on the RO side of context. Per-dir rather than {@code -R} so {@code context/user} stays writable. */
+    // Per-dir, not -R: context/user must stay writable.
     private static final String PREP_CHMOD_CMD =
         "chmod -R a-w /workspace/context/target 2>/dev/null || true; " +
         "chmod a-w /workspace/context 2>/dev/null || true";
 
-    /** Truncation cap for {@code docker exec} stderr surfaced via {@code InteractiveSandboxException}. */
     private static final int PREP_OUTPUT_PREVIEW_CAP = 512;
-
-    /**
-     * Upper bound on a single workspace-prep {@code docker exec}. Stops a hung Docker daemon from
-     * pinning every attach() caller indefinitely. mkdir + chmod is fast in healthy steady state.
-     */
     private static final Duration PREP_EXEC_TIMEOUT = Duration.ofSeconds(30);
 
     private final InteractiveSandboxProperties properties;
@@ -121,19 +105,12 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             );
         }
 
-        // Share-semantics fast path: an existing alive session for this (userId, workspaceId) wins.
-        // The registry's tryRegister CAS below is the authoritative race resolver — this check is
-        // an optimisation that avoids spawning a container we'd immediately throw away.
+        // tryRegister below is the authoritative race resolver; this fast path just avoids
+        // spawning a container that would immediately lose the race.
         DockerAttachedSandboxAdapter existing = registry.findLive(spec.userId(), spec.workspaceId());
         if (existing != null) {
-            log.debug("attach() returning existing sandbox: sessionId={}", existing.sessionId());
             return existing;
         }
-        log.debug(
-            "attach() spawning new sandbox: userId={}, workspaceId={}",
-            LogSafe.sanitise(spec.userId()),
-            LogSafe.sanitise(spec.workspaceId())
-        );
 
         MDC.put(MDC_SESSION_ID, spec.sessionId().toString());
         Timer.Sample sample = Timer.start();
@@ -143,7 +120,6 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         DockerAttachedSandboxAdapter sandbox = null;
         boolean registered = false;
         try {
-            // ── 1. NETWORK ──
             boolean allowInternet = spec.networkPolicy() != null && spec.networkPolicy().internetAccess();
             networkId = networkManager.createJobNetwork(spec.sessionId(), allowInternet);
             String appServerIp = networkManager.connectAppServer(networkId);
@@ -158,7 +134,6 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 extraHosts = List.of("host.docker.internal:host-gateway");
             }
 
-            // ── 2. HOST CONFIG ── (same hardening floor as sync)
             SecurityProfile secProfile =
                 spec.securityProfile() != null ? spec.securityProfile() : SecurityProfile.DEFAULT;
             DockerOperations.HostConfigSpec hostConfig = securityPolicy.buildHostConfig(
@@ -174,11 +149,8 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 SandboxLabels.SESSION_ID,
                 spec.sessionId().toString()
             );
-
-            // ── 3. ENVIRONMENT ── (filter via blocklist; substitute LLM-proxy placeholder)
             Map<String, String> runnerEnv = buildRunnerEnvironment(spec, appServerIp);
 
-            // ── 4. CREATE + START ──
             DockerOperations.ContainerSpec containerSpec = new DockerOperations.ContainerSpec(
                 spec.image(),
                 SLEEPER_CMD,
@@ -205,21 +177,16 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 throw new InteractiveSandboxException("startContainer failed: " + e.getMessage(), e);
             }
 
-            // ── 5. WORKSPACE PREP ── (root for mkdir on imageless /workspace; mode-bit perms because CAP_CHOWN is dropped)
+            // Root user for mkdir: images without a WORKDIR layer don't have /workspace yet.
             runExec(containerId, CONTAINER_ROOT_USER, PREP_MKDIR_CMD, "workspace mkdir");
-
-            // ── 6. INJECT FILES / DIRS ── (tar entries carry 1000:1000 ownership)
             if (!spec.inputFiles().isEmpty()) {
                 workspaceManager.injectFiles(containerId, spec.inputFiles());
             }
             if (!spec.volumeMounts().isEmpty()) {
                 workspaceManager.injectDirectories(containerId, spec.volumeMounts());
             }
-
-            // ── 7. ENFORCE RO ON context/target ──
             runExec(containerId, CONTAINER_USER, PREP_CHMOD_CMD, "workspace chmod");
 
-            // ── 8. EXEC THE RUNNER ── (explicit -u 1000:1000 to harden against future USER drift)
             try {
                 process = PiProcessHandle.spawn(dockerCli, containerId, CONTAINER_USER, spec.command(), runnerEnv);
             } catch (InteractiveSandboxException e) {
@@ -227,11 +194,10 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 throw e;
             }
 
-            // ── 9. CONSTRUCT SANDBOX (off-registry; capacity check + register happens AFTER first frame) ──
+            // Build + await first frame BEFORE register: a stillborn runner never becomes visible.
             sandbox = buildSandbox(spec, containerId, networkId, process);
             sandbox.start();
 
-            // ── 10. AWAIT FIRST FRAME ── (still off-registry — a stillborn runner never becomes user-visible)
             Duration firstFrameTimeout = Duration.ofSeconds(properties.attachFirstFrameTimeoutSeconds());
             try {
                 if (!sandbox.awaitFirstFrame(firstFrameTimeout)) {
@@ -241,18 +207,14 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                     );
                 }
             } catch (InteractiveSandboxException terminated) {
-                // The pump or writer terminated the session before any frame (broken pipe, runner
-                // crash, daemon death). Charge a distinct reason — not first_frame_timeout — so
-                // operators can tell flow-control issues from runner-side regressions.
+                // Distinct from timeout: pump/writer terminated before any frame.
                 metrics.attachFailureFirstFrameFailed.increment();
                 throw terminated;
             }
 
-            // ── 11. REGISTER ── (atomic capacity check + slot claim)
             InteractiveSandboxRegistry.RegistrationOutcome outcome = registry.tryRegister(sandbox);
             switch (outcome) {
                 case DUPLICATE -> {
-                    // A concurrent attach() raced and won — return their sandbox, tear ours down.
                     log.debug("Concurrent attach lost the race; returning existing sandbox");
                     DockerAttachedSandboxAdapter winner = registry.findLive(spec.userId(), spec.workspaceId());
                     if (winner != null) {
@@ -369,12 +331,6 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         );
     }
 
-    /**
-     * Synchronous {@code docker exec -u USER CONTAINER sh -c SCRIPT}, bounded by
-     * {@link #PREP_EXEC_TIMEOUT}. Output is drained on a background thread to keep the pipe
-     * from filling while we wait. Throws if the exec returns non-zero, times out, or fails to
-     * start so callers see a typed failure.
-     */
     private void runExec(String containerId, String user, String script, String description) {
         ProcessBuilder pb = new ProcessBuilder(dockerCli, "exec", "-u", user, containerId, "sh", "-c", script);
         pb.redirectErrorStream(true);
@@ -385,13 +341,12 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             metrics.attachFailureOther.increment();
             throw new InteractiveSandboxException(description + " failed: " + e.getMessage(), e);
         }
+        // Drain in the background so the pipe doesn't fill while we waitFor; bounded by destroyForcibly.
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
         Thread drainer = Thread.ofVirtual().start(() -> {
             try (var in = p.getInputStream()) {
                 in.transferTo(out);
-            } catch (IOException ignored) {
-                // Stream closed because process was destroyed — fine.
-            }
+            } catch (IOException ignored) {}
         });
         try {
             boolean exited = p.waitFor(PREP_EXEC_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
@@ -427,8 +382,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         String networkId,
         String containerId
     ) {
-        // If we built the sandbox but haven't registered, the pump/writer/dispatcher threads
-        // may already be running. terminate() drives the full close path, which closes them.
+        // Pump/writer threads may already be running; terminate() drives the full close path.
         if (sandbox != null) {
             sandbox.terminate(EvictionReason.ERROR);
             sandbox.awaitClosed(Duration.ofSeconds(properties.graceTimeoutSeconds() + 5L));

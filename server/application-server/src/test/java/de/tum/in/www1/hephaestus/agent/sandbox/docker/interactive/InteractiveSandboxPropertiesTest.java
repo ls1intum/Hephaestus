@@ -55,7 +55,6 @@ class InteractiveSandboxPropertiesTest extends BaseUnitTest {
         assertThat(p.enabled()).isTrue();
         assertThat(p.idleTtlSeconds()).isEqualTo(60);
         assertThat(p.maxFrameChars()).isEqualTo(16_384);
-        // Untouched fields keep their documented defaults.
         assertThat(p.ringBufferFrames()).isEqualTo(512);
     }
 }

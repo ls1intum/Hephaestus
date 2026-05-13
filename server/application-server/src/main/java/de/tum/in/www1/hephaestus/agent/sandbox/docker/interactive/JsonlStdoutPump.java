@@ -16,19 +16,10 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 /**
- * Reads JSONL frames from a runner's stdout on a dedicated virtual thread.
- *
- * <p>Frames are delimited by ASCII {@code \n} only — never {@code \r\n} or bare {@code \r}, and
- * never U+2028/U+2029. This matches Pi's {@code docs/rpc.md:28-37} guidance: those code points
- * are legal inside JSON string values and must survive framing intact.
- * {@link java.io.BufferedReader#readLine()} would treat {@code \r} as a terminator, so we read
- * characters directly and split on {@code \n} ourselves.
- *
- * <p>Each line is capped at {@code maxLineChars} characters. A runner that emits a line longer
- * than the cap is treated as a stream-level fault: the pump discards the line, increments the
- * parse-error counter, and exits — the session's EOF handler then classifies the cause as
- * {@link de.tum.in.www1.hephaestus.agent.sandbox.spi.EvictionReason#ERROR}. Without this bound,
- * a buggy or hostile runner could OOM the app-server with a single unterminated megabyte line.
+ * Reads JSONL frames from a runner's stdout. Frames are delimited by ASCII {@code \n} ONLY;
+ * {@code \r} and U+2028/U+2029 are legal inside JSON string values and must survive framing —
+ * {@link java.io.BufferedReader#readLine} would mis-split. Lines longer than {@code maxLineChars}
+ * are dropped and terminate the pump.
  */
 final class JsonlStdoutPump {
 
@@ -56,9 +47,7 @@ final class JsonlStdoutPump {
         Map<String, String> mdcSnapshot
     ) {
         this.sessionId = sessionId;
-        // Always wrap in BufferedReader: character-by-character read() against a raw stream is
-        // one syscall per byte. Idempotent — if the caller already passed a BufferedReader,
-        // this is a no-op wrap with 8 KB pre-allocation, still cheap.
+        // 1 read() per byte against a raw stream is 1 syscall per byte; wrap unless already buffered.
         this.source = source instanceof BufferedReader br ? br : new BufferedReader(source);
         this.mapper = mapper;
         this.sink = sink;
@@ -140,10 +129,7 @@ final class JsonlStdoutPump {
             parseErrorCounter.increment();
             return;
         }
-        // Exact UTF-8 byte length of the wire line plus its newline terminator. We compute it
-        // from the CharSequence rather than re-encoding because the source is decoded already;
-        // a single pass over the chars stays cheap.
-        int wireBytes = utf8Length(text) + 1;
+        int wireBytes = utf8Length(text) + 1; // + \n terminator
         try {
             sink.acceptFrame(frame, wireBytes);
         } catch (Throwable t) {
@@ -151,7 +137,7 @@ final class JsonlStdoutPump {
         }
     }
 
-    /** Exact UTF-8 byte length of a CharSequence. RFC 3629 encoding: 1/2/3/4-byte sequences. */
+    /** Exact UTF-8 byte length (RFC 3629). */
     static int utf8Length(CharSequence s) {
         int bytes = 0;
         for (int i = 0; i < s.length(); i++) {
@@ -176,7 +162,6 @@ final class JsonlStdoutPump {
         }
     }
 
-    /** Decouples pump from sandbox so the sandbox can construct/wire without a circular reference. */
     interface FrameSink {
         void acceptFrame(JsonNode frame, int wireBytes);
     }

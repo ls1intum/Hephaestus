@@ -56,7 +56,6 @@ class FrameRingBufferTest extends BaseUnitTest {
                 buffer.offer(IntNode.valueOf(i));
             }
             assertThat(buffer.size()).isEqualTo(3);
-            // 2 frames evicted (the first two)
             assertThat(dropped.count()).isEqualTo(2.0);
             List<JsonNode> snap = buffer.snapshotSince(-1L);
             assertThat(snap).extracting(JsonNode::intValue).containsExactly(3, 4, 5);

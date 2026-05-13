@@ -9,11 +9,8 @@ import java.util.EnumMap;
 import java.util.Map;
 
 /**
- * Registry of Micrometer instruments for the interactive sandbox. Stable counter / tag names
- * (already exposed via Prometheus) — do not rename without dashboard coordination.
- *
- * <p>Cardinality is bounded: no per-session, per-user, or per-workspace labels; reason labels
- * come from fixed enums.
+ * Micrometer instruments for the interactive sandbox. Stable names — do not rename without
+ * dashboard coordination. Bounded cardinality: no per-session/user/workspace labels.
  */
 public final class InteractiveSandboxMetrics {
 
@@ -51,9 +48,7 @@ public final class InteractiveSandboxMetrics {
         this.attachFailureImage = attachFailure(registry, "image_pull_failed");
         this.attachFailureStart = attachFailure(registry, "container_start_failed");
         this.attachFailureStdin = attachFailure(registry, "stdin_open_failed");
-        // Distinct from first_frame_timeout: timeout means the runner was silent; failed means
-        // the pump/writer terminated the session (broken pipe, runner crash, daemon died) before
-        // any frame arrived. Conflating them masks runner-side regressions as flow-control bugs.
+        // _timeout = runner went silent; _failed = pump/writer terminated before any frame.
         this.attachFailureFirstFrameTimeout = attachFailure(registry, "first_frame_timeout");
         this.attachFailureFirstFrameFailed = attachFailure(registry, "first_frame_failed");
         this.attachFailureMaxSessions = attachFailure(registry, "max_sessions");
@@ -93,8 +88,7 @@ public final class InteractiveSandboxMetrics {
             .description("JSONL frames that failed to parse (skipped, session continues)")
             .register(registry);
 
-        // Naming convention: every per-session counter / timer uses the `mentor.session.*` stem
-        // (eviction, lifetime). Aggregate gauges use `mentor.session.*` too (active).
+        // Per-session counters / timers / gauges share the mentor.session.* stem.
         this.lifetime = Timer.builder("mentor.session.lifetime")
             .description("End-to-end session lifetime (attach to close)")
             .register(registry);
@@ -105,14 +99,11 @@ public final class InteractiveSandboxMetrics {
 
         this.evictionsByReason = new EnumMap<>(EvictionReason.class);
         for (EvictionReason r : EvictionReason.values()) {
-            // Covers ALL session terminations (idle, manual, error, natural exit, daemon dead).
-            // Named "session.eviction" rather than "idle.eviction" so dashboards don't infer
-            // an idle-specific semantic from a counter that ticks on every close path.
             evictionsByReason.put(
                 r,
                 Counter.builder("mentor.session.eviction")
                     .tag("reason", r.tag())
-                    .description("Session evictions by reason")
+                    .description("Session evictions by reason (covers all termination causes)")
                     .register(registry)
             );
         }

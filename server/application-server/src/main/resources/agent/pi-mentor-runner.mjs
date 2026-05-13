@@ -1,22 +1,14 @@
-// Pi mentor runner — JSONL stdin/stdout echo skeleton for #1069 (dark-launched).
-//
-// Final shape lands in #1071 with createAgentSessionRuntime from
-// @earendil-works/pi-coding-agent (mirroring pi-runner.mjs:5-10). This skeleton
-// validates the Hephaestus-defined JSONL framing transport layer ONLY — we do
-// NOT use Pi's `pi --mode rpc` CLI protocol.
+// JSONL stdin/stdout echo skeleton — validates the Hephaestus transport layer only (no Pi SDK).
 //
 // Frame protocol (one JSON object per line, terminated by \n):
-//   {"type":"ping"}                          → {"type":"pong"}
-//   {"type":"echo","payload":<any>}          → {"type":"echo_back","payload":<any>}
-//   {"type":"emit","count":<int>,...}        → emits `count` `{"type":"tick","n":i,...}` frames
-//                                              (used by the ring-buffer-overflow live test)
+//   {"type":"ping"}                   → {"type":"pong"}
+//   {"type":"echo","payload":<any>}   → {"type":"echo_back","payload":<any>}
+//   {"type":"emit","count":<int>,...} → emits `count` `{"type":"tick","n":i,...}` frames
 //   any other / malformed line → logged to stderr, no response
 //
-// `readline` with `crlfDelay: Infinity` splits on \n / \r\n / \r only. Per Pi's
-// docs/rpc.md:28-37, U+2028 and U+2029 are legal inside JSON string values; they
-// are three-byte UTF-8 sequences containing none of \n/\r, so they survive
-// framing intact. Do not replace readline with `Scanner` or a generic Unicode
-// line iterator — those would mis-split.
+// `readline` with `crlfDelay: Infinity` splits on \n / \r\n / \r only — U+2028/U+2029 are 3-byte
+// UTF-8 sequences containing no \n/\r and survive framing intact. Don't substitute a Scanner or
+// generic Unicode line iterator: those would mis-split.
 
 import { createInterface } from "node:readline";
 

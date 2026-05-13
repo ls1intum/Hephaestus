@@ -12,22 +12,14 @@ import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
 
 /**
- * One subscriber's state: a bounded queue of frames + a dedicated virtual-thread dispatcher.
- *
- * <p>Decouples the per-session stdout pump from arbitrary listener latency. Slow listeners drop
- * their own frames (counted via {@code mentor_subscriber_dropped_total}); a listener that throws
- * is logged once at WARN and downgraded thereafter, but never propagates to the pump.
- *
- * <p>The returned {@link Disposable#dispose()} is idempotent and CAS-guarded: the first call
- * flips the disposed flag, enqueues a sentinel to wake the dispatcher, removes the subscription
- * from the parent sandbox, and waits at most {@code DISPATCHER_JOIN_TIMEOUT_MS} for the
- * dispatcher thread to drain and exit. Subsequent calls are no-ops.
+ * Per-subscriber bounded queue + virtual-thread dispatcher. Slow listeners drop their own frames
+ * (drop-oldest); a throwing listener is logged once and downgraded — the pump is never affected.
  */
 final class FrameSubscription implements Disposable {
 
     private static final Logger log = LoggerFactory.getLogger(FrameSubscription.class);
 
-    /** Sentinel object enqueued on dispose to wake a blocked {@code queue.take()}. */
+    // Identity-checked sentinel to wake a blocked queue.take() on dispose.
     private static final JsonNode TERMINAL_SENTINEL = com.fasterxml.jackson.databind.node.NullNode.getInstance();
 
     private static final long DISPATCHER_JOIN_TIMEOUT_MS = 250L;
@@ -56,7 +48,6 @@ final class FrameSubscription implements Disposable {
         this.onDispose = onDispose;
     }
 
-    /** Spawn the dispatcher virtual thread. Must be called exactly once after construction. */
     void start() {
         Thread t = Thread.ofVirtual()
             .name("mentor-sub-" + subscriptionId)
@@ -65,20 +56,12 @@ final class FrameSubscription implements Disposable {
         this.dispatcherThread = t;
     }
 
-    /**
-     * Offer a frame for delivery.
-     *
-     * <p>If the queue is full, the head (oldest) frame is dropped to make room — preserves the
-     * "what just happened" window. Increments the dropped counter on overflow.
-     *
-     * <p>No-op when disposed.
-     */
+    /** Drop-oldest on overflow. No-op when disposed. */
     void offer(JsonNode frame) {
         if (disposed.get()) {
             return;
         }
         if (!queue.offer(frame)) {
-            // Drop oldest to keep recent — same policy as the session ring buffer
             queue.poll();
             droppedCounter.increment();
             queue.offer(frame);
@@ -95,7 +78,6 @@ final class FrameSubscription implements Disposable {
         if (!disposed.compareAndSet(false, true)) {
             return;
         }
-        // Wake a blocked take() — the sentinel is identity-checked, not data-checked
         queue.offer(TERMINAL_SENTINEL);
         try {
             onDispose.run();

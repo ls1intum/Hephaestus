@@ -75,7 +75,6 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         writer.send(TextNode.valueOf("hello"));
         writer.send(IntNode.valueOf(42));
 
-        // Wait for the writer thread to flush
         await()
             .atMost(Duration.ofSeconds(2))
             .untilAsserted(() ->
@@ -92,8 +91,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
     void queueFullRejects() throws Exception {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         TestCounters c = TestCounters.of(reg);
-        // Stream that signals the moment it enters the FIRST write (so we know the writer thread
-        // has popped envelope #1 off the queue) and then blocks until released.
+        // Latch signals the writer has popped envelope #1; we can then test queue-full deterministically.
         CountDownLatch writerEnteredWrite = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         OutputStream blocking = new OutputStream() {
@@ -131,7 +129,6 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         );
         writer.start();
 
-        // Fire one async send and wait deterministically for the writer to begin the write.
         Thread firstSender = new Thread(() -> {
             try {
                 writer.send(TextNode.valueOf("first"));
@@ -142,9 +139,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
             .as("writer thread must enter the blocking write before we test queue-full")
             .isTrue();
 
-        // The writer is now blocked inside write(). Queue capacity = 2. Two further async senders
-        // will fill the queue and park on their acks. The fourth synchronous send must be rejected
-        // — either at offer-time (queue_full) or after the 500 ms write timeout.
+        // Queue capacity = 2. Two more queued sends; the fourth must reject — queue_full or timeout.
         Thread secondSender = new Thread(() -> {
             try {
                 writer.send(TextNode.valueOf("second"));
@@ -158,14 +153,12 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         secondSender.start();
         thirdSender.start();
 
-        // Poll until either rejection mechanism fires — bounded, deterministic.
         await()
             .atMost(Duration.ofSeconds(5))
             .untilAsserted(() -> {
                 try {
                     writer.send(TextNode.valueOf("fourth"));
                 } catch (InteractiveSandboxException expected) {
-                    // Either queue_full (no slot) or write_timeout (slot, but ack never came).
                     assertThat(c.queueFull().count() + c.writeTimeout().count()).isGreaterThan(0.0);
                     return;
                 }
@@ -235,7 +228,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
             blocking,
             MAPPER,
             8,
-            50L, // very tight threshold
+            50L,
             c.queueFull(),
             c.writeTimeout(),
             c.brokenPipe(),
@@ -254,7 +247,6 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         TimeUnit.MILLISECONDS.sleep(150);
         long now = System.nanoTime();
         assertThat(writer.writeStalled(now)).isTrue();
-        // Trigger handleTimeout — marks writer terminal and fires the callback
         writer.onWriteTimeout();
         assertThat(writer.isTerminated()).isTrue();
         assertThat(terminalFires).hasValueGreaterThanOrEqualTo(1);
@@ -283,10 +275,9 @@ class JsonlStdinWriterTest extends BaseUnitTest {
             java.util.Map.of()
         );
         writer.start();
-        JsonNode node = MAPPER.createObjectNode().put("payload", "a\nb"); // contains a real LF in the string value
+        // Real LF in the value must be escaped, not emitted raw; only the trailing \n is real.
+        JsonNode node = MAPPER.createObjectNode().put("payload", "a\nb");
         writer.send(node);
-        // Jackson escapes the real LF inside the string as backslash-n, then the writer appends ONE LF.
-        // Final wire bytes: {"payload":"a\nb"}<LF>
         await()
             .atMost(Duration.ofSeconds(2))
             .untilAsserted(() -> {
@@ -294,7 +285,6 @@ class JsonlStdinWriterTest extends BaseUnitTest {
                 assertThat(actual).contains("\"payload\":\"a\\nb\"}");
                 assertThat(actual).endsWith("\n");
             });
-        // Exactly one real LF (the frame terminator); the embedded LF was escaped, not emitted raw.
         String result = sink.toString(StandardCharsets.UTF_8);
         long newlineCount = result
             .chars()

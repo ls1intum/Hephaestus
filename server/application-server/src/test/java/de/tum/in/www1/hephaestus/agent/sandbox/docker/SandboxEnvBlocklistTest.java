@@ -7,11 +7,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * Shared blocklist used by both the sync and interactive adapters. Owning a single source of
- * truth was the C1 security fix from the PE audit (issue #1069 review) — the interactive
- * adapter used to bypass these checks entirely.
- */
 @DisplayName("SandboxEnvBlocklist")
 class SandboxEnvBlocklistTest extends BaseUnitTest {
 
@@ -21,7 +16,7 @@ class SandboxEnvBlocklistTest extends BaseUnitTest {
             "LD_PRELOAD",
             "LD_LIBRARY_PATH",
             "PATH",
-            "NODE_OPTIONS", // matters specifically for the Node mentor runner
+            "NODE_OPTIONS",
             "GIT_SSH_COMMAND",
             "GIT_PAGER",
             "HTTPS_PROXY",
@@ -61,7 +56,7 @@ class SandboxEnvBlocklistTest extends BaseUnitTest {
     }
 
     @org.junit.jupiter.api.Test
-    @DisplayName("null is not blocked (caller's responsibility to validate)")
+    @DisplayName("null returns false — caller validates")
     void nullIsNotBlocked() {
         assertThat(SandboxEnvBlocklist.isBlocked(null)).isFalse();
     }

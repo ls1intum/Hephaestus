@@ -23,10 +23,7 @@ import org.junit.jupiter.api.Test;
 class JsonlStdoutPumpTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    // Constructed at runtime. Java processes unicode-escape sequences (the six-character
-    // backslash-u-2-0-2-8 form) BEFORE lexing, so writing the escape inside a string literal
-    // would translate it into the actual codepoint and end the literal \u2014 fails to compile.
-    // Code-point-via-Character.toString avoids the pre-lexer entirely.
+    // Built at runtime \u2014 Java's pre-lexer would translate a \\u2028 escape into a real line terminator and break the source.
     private static final String LINE_SEP = Character.toString(0x2028);
     private static final String PARA_SEP = Character.toString(0x2029);
     private static final int LINE_CAP = 1024;
@@ -76,14 +73,12 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
     @Test
     @DisplayName("U+2028 / U+2029 inside JSON string values do NOT split the frame")
     void unicodeSeparatorsSurvive() {
-        // ONE JSONL line containing both U+2028 and U+2029 inside a JSON string value.
-        // BufferedReader.readLine() would mis-split on these; our \n-only pump must not.
+        // BufferedReader.readLine would split on U+2028/U+2029; our \n-only pump must keep this as one frame.
         String line = "{\"t\":\"echo\",\"p\":\"x" + LINE_SEP + "y" + PARA_SEP + "z\"}\n";
         Captured c = runPump(line);
         assertThat(c.frames()).hasSize(1);
         String decoded = c.frames().get(0).get("p").asText();
         assertThat(decoded).contains(LINE_SEP).contains(PARA_SEP);
-        // UTF-8 sanity: U+2028 / U+2029 are 3 bytes each
         assertThat(LINE_SEP.getBytes(StandardCharsets.UTF_8)).hasSize(3);
         assertThat(PARA_SEP.getBytes(StandardCharsets.UTF_8)).hasSize(3);
     }
@@ -126,22 +121,17 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
     void oversizedLineRejected() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         Counter parseErrors = reg.counter("test.parse.error");
-        // 200-char line is bigger than the 64-char cap; the pump should drop it and exit.
         String big = "{\"t\":\"" + "x".repeat(200) + "\"}\n{\"t\":\"after\"}\n";
         Captured c = runPump(big, parseErrors, 64);
         assertThat(parseErrors.count()).isGreaterThanOrEqualTo(1.0);
-        // The pump exits on oversize — "after" is NOT delivered.
         assertThat(c.frames()).noneMatch(f -> "after".equals(f.get("t").asText()));
     }
 
     @Test
     @DisplayName("raw \\r bytes between would-be frames do NOT split: only \\n is a terminator")
     void rawCarriageReturnBetweenFramesIsNotASplitter() {
-        // Stream: frame1 <CR> frame2 <LF>. BufferedReader.readLine() would split on the CR and
-        // surface "frame2" separately. Our \n-only pump must instead treat the whole thing as
-        // ONE line. The "b" frame must never be visible as its own emission — that's the bug
-        // we're guarding against. (Jackson's readTree is lenient about trailing content after
-        // the first complete value, so up to one frame may parse; never two.)
+        // BufferedReader.readLine splits on CR; our \n-only pump must not. (Jackson is lenient with trailing
+        // content after the first complete value — up to one frame may parse, but never two.)
         Captured c = runPump("{\"a\":1}\r{\"b\":2}\n");
         long bFrames = c
             .frames()

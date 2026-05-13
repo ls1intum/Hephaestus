@@ -7,30 +7,8 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * Complete specification for an interactive (long-lived attached) sandbox.
- *
- * <p>Mirrors {@link SandboxSpec} but for streamable JSONL IO over {@code docker exec -i}. The
- * implementation creates a sleeper container ({@code tail -f /dev/null} as CMD), injects {@code
- * inputFiles} / {@code volumeMounts} via the same tar pipeline as the sync sandbox, then execs the
- * runner inside the container.
- *
- * <p><strong>Registry key.</strong> {@code (userId, workspaceId)} uniquely identifies a session.
- * Concurrent {@code attach()} calls with the same key share the returned {@code AttachedSandbox}
- * instance — this matches the user-facing model of "one mentor session per workspace at a time".
- *
- * @param sessionId unique session identifier (used for container labels, network naming, logging)
- * @param userId opaque user identifier; one half of the registry key
- * @param workspaceId opaque workspace identifier; second half of the registry key
- * @param image Docker image (e.g. {@code ghcr.io/ls1intum/hephaestus/agent-pi:latest})
- * @param command runner command + args (e.g. {@code ["node", "/workspace/.runner/pi-mentor-runner.mjs"]})
- * @param environment env vars passed to the runner via {@code docker exec}
- * @param networkPolicy network access and LLM proxy configuration
- * @param resourceLimits CPU, memory, PID constraints (maxRuntime is the container hard-cap, not the
- *     session idle TTL — idle TTL is configured globally via {@code hephaestus.mentor.idle-ttl-seconds})
- * @param securityProfile container hardening flags
- * @param inputFiles files injected into {@code /workspace} before container start (relative path →
- *     content); chowned to {@code 1000:1000} by the tar pipeline
- * @param volumeMounts host directories injected via tar (host path → container path)
+ * Specification for an interactive sandbox. {@code (userId, workspaceId)} is the registry key;
+ * concurrent {@link InteractiveSandboxService#attach} calls with the same key share the handle.
  */
 public record InteractiveSandboxSpec(
     UUID sessionId,

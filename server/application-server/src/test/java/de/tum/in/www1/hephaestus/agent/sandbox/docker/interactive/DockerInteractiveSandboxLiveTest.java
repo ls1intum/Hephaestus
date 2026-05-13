@@ -49,16 +49,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 
-/**
- * Live integration tests for the interactive sandbox.
- *
- * <p>Boots real Docker containers and runs {@code pi-mentor-runner.mjs} inside them. Tagged
- * {@code live} so the default test suite skips it; run with {@code -Dgroups=live} or via the
- * {@code live-tests} Maven profile.
- *
- * <p>Each test uses a fresh sandbox stack — adapter, registry, watchdog, container manager — to
- * keep state isolated. Cleanup forcibly removes any lingering interactive containers + networks.
- */
+/** Live integration tests — boots real Docker. Run with {@code -Pgroups=live} or {@code live-tests}. */
 @Tag("live")
 @DisplayName("Docker Interactive Sandbox Live")
 class DockerInteractiveSandboxLiveTest {
@@ -102,7 +93,7 @@ class DockerInteractiveSandboxLiveTest {
             500_000,
             null
         );
-        // Tight TTL so the idle-eviction test doesn't have to wait minutes
+        // Tight TTL so idle eviction tests don't have to wait minutes.
         InteractiveSandboxProperties interactiveProperties = new InteractiveSandboxProperties(
             true,
             /* idleTtlSeconds */ 2,
@@ -155,7 +146,6 @@ class DockerInteractiveSandboxLiveTest {
             8080
         );
 
-        // Load the runner script from the classpath (same one shipped with the server)
         runnerBytes = Files.readAllBytes(Path.of("src/main/resources/agent/pi-mentor-runner.mjs"));
     }
 
@@ -164,7 +154,7 @@ class DockerInteractiveSandboxLiveTest {
         if (registry != null) {
             registry.shutdown();
         }
-        // Belt-and-braces: remove any containers/networks with our managed label that survived
+        // Belt-and-braces: clean up anything a failing test left behind.
         try {
             containerManager
                 .listManagedContainers()
@@ -201,7 +191,7 @@ class DockerInteractiveSandboxLiveTest {
             NODE_IMAGE,
             List.of("node", "/workspace/.runner/pi-mentor-runner.mjs"),
             Map.of(),
-            new NetworkPolicy(true, null, null, null), // internet on for simplicity (LLM proxy unused)
+            new NetworkPolicy(true, null, null, null),
             new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
             sec,
             Map.of(".runner/pi-mentor-runner.mjs", runnerBytes),
@@ -246,9 +236,7 @@ class DockerInteractiveSandboxLiveTest {
     @DisplayName("Unicode safety")
     class UnicodeSafety {
 
-        /** Constructed at runtime because Java's unicode-escape pre-lexer would translate the
-         * six-char backslash-u escape into the codepoint itself, which IS a line terminator
-         * and would prematurely end the surrounding string literal. */
+        // Built at runtime: the U+2028/U+2029 escapes are pre-lexer line terminators in Java.
         private static final String LINE_SEP = Character.toString(0x2028);
         private static final String PARA_SEP = Character.toString(0x2029);
 
@@ -258,8 +246,6 @@ class DockerInteractiveSandboxLiveTest {
             AttachedSandbox sb = adapter.attach(buildSpec("u2", "w2"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
             sb.subscribe(frames::add);
-            // Embed U+2028 and U+2029 (line/paragraph separators) plus literal \n and \r
-            // inside the JSON string value the runner will echo back to us verbatim.
             String payload = "a" + LINE_SEP + "b" + PARA_SEP + "c\nd\re";
             sb.send(echo(payload));
 
@@ -272,11 +258,9 @@ class DockerInteractiveSandboxLiveTest {
                         .findFirst()
                         .orElse(null);
                     assertThat(echoBack).isNotNull();
-                    // The decoded payload must match the input exactly — proves U+2028/U+2029 are
-                    // not treated as line terminators and \n / \r escapes round-trip cleanly.
                     assertThat(echoBack.path("payload").asText()).isEqualTo(payload);
                 });
-            // UTF-8 encoding of U+2028 / U+2029 is 3 bytes each (catches encoding regressions).
+            // 3-byte UTF-8 sequences; catches encoding regressions.
             assertThat(LINE_SEP.getBytes(StandardCharsets.UTF_8)).hasSize(3);
             assertThat(PARA_SEP.getBytes(StandardCharsets.UTF_8)).hasSize(3);
             sb.close(Duration.ofSeconds(2));
@@ -295,8 +279,7 @@ class DockerInteractiveSandboxLiveTest {
             int burst = 64;
             int ringCapacity = 16;
             sb.send(emit(burst, "burst"));
-            // The runner emits exactly `burst` tick frames plus one "ready" frame on startup.
-            // Expected drops = (1 + burst) - ringCapacity = 49.
+            // 1 startup "ready" + burst ticks - ring capacity = drops.
             int expectedDrops = (1 + burst) - ringCapacity;
 
             await()
@@ -305,8 +288,7 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(metrics.ringBufferDropped.count() - before).isEqualTo((double) expectedDrops)
                 );
 
-            // After the dust settles, a fresh subscriber observes the snapshot — which must contain
-            // the LAST `ringCapacity` ticks (drop-OLDEST policy), not any prefix.
+            // Late subscriber's snapshot must hold the NEWEST ringCapacity ticks, not any prefix.
             CopyOnWriteArrayList<JsonNode> snapshot = new CopyOnWriteArrayList<>();
             sb.subscribe(snapshot::add);
             await()
@@ -319,7 +301,6 @@ class DockerInteractiveSandboxLiveTest {
                             .count()
                     ).isEqualTo(ringCapacity)
                 );
-            // The newest tick is the largest n; the oldest retained tick is (burst - ringCapacity).
             int oldestRetainedN = burst - ringCapacity;
             int newestN = burst - 1;
             assertThat(
@@ -348,8 +329,7 @@ class DockerInteractiveSandboxLiveTest {
             AttachedSandbox sb = adapter.attach(buildSpec("u4", "w4"));
             assertThat(((DockerAttachedSandboxAdapter) sb).state()).isEqualTo(AttachedSandboxState.ATTACHED);
 
-            // idleTtlSeconds=2: poll registry.reap() instead of sleeping so the test passes
-            // as soon as the TTL elapses and the reaper observes idle.
+            // Poll reap() rather than sleep so the test exits as soon as TTL elapses.
             await()
                 .atMost(Duration.ofSeconds(20))
                 .pollInterval(Duration.ofMillis(200))
@@ -383,7 +363,6 @@ class DockerInteractiveSandboxLiveTest {
         @DisplayName("interactive containers carry KIND=interactive + SESSION_ID")
         void labelsPresent() {
             AttachedSandbox sb = adapter.attach(buildSpec("u6", "w6"));
-            // Find our container in listManagedContainers
             String sessionId = sb.sessionId().toString();
             var match = containerManager
                 .listManagedContainers()
@@ -404,13 +383,8 @@ class DockerInteractiveSandboxLiveTest {
         @Test
         @DisplayName("uid 1000 can write to scratch + context/user but not context/target")
         void mountPermissions() {
-            // We do NOT use bind mounts (PE-recommended departure from the issue text — see
-            // DockerInteractiveSandboxAdapter package-info). CAP_CHOWN is dropped by the security
-            // policy, so we cannot chown to 1000:1000 inside the container. Functional requirement
-            // is what matters: uid 1000 can write to scratch + context/user, NOT to context/target.
             AttachedSandbox sb = adapter.attach(buildSpec("u7", "w7"));
             String containerId = ((DockerAttachedSandboxAdapter) sb).containerId();
-            // Run as uid 1000:1000 (the runner's identity)
             ProcessBuilder pb = new ProcessBuilder(
                 "docker",
                 "exec",
@@ -452,9 +426,7 @@ class DockerInteractiveSandboxLiveTest {
         void runnerCrashesBeforeFirstFrame() {
             double timeoutBefore = metrics.attachFailureFirstFrameTimeout.count();
             double failedBefore = metrics.attachFailureFirstFrameFailed.count();
-            // Identical to the other live specs, except the runner is `sh -c 'exit 1'` instead of
-            // the JSONL-emitting Pi mentor skeleton. The runner exits before any frame, so the
-            // pump observes EOF and terminate(ERROR) completes `firstFrame` exceptionally.
+            // sh -c 'exit 1' instead of the JSONL runner: pump sees EOF before any frame.
             InteractiveSandboxSpec base = buildSpec("u_crash", "w_crash");
             InteractiveSandboxSpec brokenSpec = new InteractiveSandboxSpec(
                 base.sessionId(),
@@ -472,8 +444,7 @@ class DockerInteractiveSandboxLiveTest {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.attach(brokenSpec)).isInstanceOf(
                 InteractiveSandboxException.class
             );
-            // Distinct from first_frame_timeout: dashboards must be able to tell runner-side
-            // regressions from flow-control issues.
+            // Must distinguish runner-crash from flow-control timeout for dashboards.
             assertThat(metrics.attachFailureFirstFrameFailed.count() - failedBefore).isEqualTo(1.0);
             assertThat(metrics.attachFailureFirstFrameTimeout.count() - timeoutBefore).isZero();
         }
@@ -490,7 +461,6 @@ class DockerInteractiveSandboxLiveTest {
             String containerId = ((DockerAttachedSandboxAdapter) sb).containerId();
             sb.close(Duration.ofSeconds(2));
             assertThat(((DockerAttachedSandboxAdapter) sb).state()).isEqualTo(AttachedSandboxState.CLOSED);
-            // Container should be gone
             assertThat(
                 containerManager
                     .listManagedContainers()
