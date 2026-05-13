@@ -134,6 +134,11 @@ final class PiProcessHandle {
         try {
             stdin.close();
         } catch (IOException ignored) {}
+        // Closes the stderr pipe FD on the kernel side — only way to unblock the drainer VT if the
+        // process did not exit and destroyForcibly was a no-op (zombie docker-cli relay).
+        try {
+            process.getErrorStream().close();
+        } catch (IOException ignored) {}
     }
 
     private void drainStderr() {
@@ -145,8 +150,9 @@ final class PiProcessHandle {
             String line;
             while ((line = err.readLine()) != null) {
                 if (line.isEmpty()) continue;
-                String truncated = line.length() > STDERR_LINE_CAP ? line.substring(0, STDERR_LINE_CAP) + "…" : line;
-                log.debug("[runner-stderr containerId={}] {}", containerId, truncated);
+                // Sanitise: a hostile runner can emit CR/LF/ANSI/BiDi to forge log records.
+                String safe = LogSafe.sanitise(line, STDERR_LINE_CAP);
+                log.debug("[runner-stderr containerId={}] {}", LogSafe.sanitise(containerId), safe);
             }
         } catch (IOException e) {
             if (process.isAlive()) {
