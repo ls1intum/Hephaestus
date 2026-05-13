@@ -353,6 +353,56 @@ class DockerInteractiveSandboxLiveTest {
             assertThat(b).isSameAs(a);
             a.close(Duration.ofSeconds(2));
         }
+
+        @Test
+        @DisplayName("parallel attach race: loser's container/network are reclaimed (no leak)")
+        void duplicateBranchTearsDownLoser() throws Exception {
+            // Both callers race past the fast-path findLive and both spawn containers; the registry
+            // resolves the race via tryRegister. Pre-fix the loser leaked its container + network.
+            int containersBefore = managedInteractiveCount();
+            java.util.concurrent.CyclicBarrier gate = new java.util.concurrent.CyclicBarrier(2);
+            java.util.concurrent.atomic.AtomicReference<AttachedSandbox> r1 =
+                new java.util.concurrent.atomic.AtomicReference<>();
+            java.util.concurrent.atomic.AtomicReference<AttachedSandbox> r2 =
+                new java.util.concurrent.atomic.AtomicReference<>();
+            java.util.concurrent.atomic.AtomicReference<Throwable> err =
+                new java.util.concurrent.atomic.AtomicReference<>();
+            Thread t1 = Thread.ofVirtual().start(() -> {
+                try {
+                    gate.await();
+                    r1.set(adapter.attach(buildSpec("u_race", "w_race")));
+                } catch (Throwable e) {
+                    err.compareAndSet(null, e);
+                }
+            });
+            Thread t2 = Thread.ofVirtual().start(() -> {
+                try {
+                    gate.await();
+                    r2.set(adapter.attach(buildSpec("u_race", "w_race")));
+                } catch (Throwable e) {
+                    err.compareAndSet(null, e);
+                }
+            });
+            t1.join();
+            t2.join();
+            assertThat(err.get()).isNull();
+            assertThat(r1.get()).isSameAs(r2.get());
+
+            // Reclaim of loser is fire-and-forget; wait for the close future then assert one container.
+            await()
+                .atMost(Duration.ofSeconds(15))
+                .untilAsserted(() -> assertThat(managedInteractiveCount() - containersBefore).isEqualTo(1));
+
+            r1.get().close(Duration.ofSeconds(2));
+        }
+
+        private int managedInteractiveCount() {
+            return (int) containerManager
+                .listManagedContainers()
+                .stream()
+                .filter(c -> SandboxLabels.KIND_INTERACTIVE.equals(c.labels().get(SandboxLabels.KIND)))
+                .count();
+        }
     }
 
     @Nested

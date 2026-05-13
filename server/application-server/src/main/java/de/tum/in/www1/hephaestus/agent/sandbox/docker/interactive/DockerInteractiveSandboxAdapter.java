@@ -218,6 +218,9 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                     log.debug("Concurrent attach lost the race; returning existing sandbox");
                     DockerAttachedSandboxAdapter winner = registry.findLive(spec.userId(), spec.workspaceId());
                     if (winner != null) {
+                        // Loser leaks container/network/process/pump/writer VTs unless we tear it down.
+                        // Fire-and-forget: don't block the caller for grace+5s.
+                        sandbox.terminate(EvictionReason.ERROR);
                         return winner;
                     }
                     throw new InteractiveSandboxException("Race lost but no winner found in registry");
