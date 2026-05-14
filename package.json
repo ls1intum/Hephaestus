@@ -3,7 +3,8 @@
 	"private": true,
 	"workspaces": [
 		"webapp",
-		"server/webhook-ingest"
+		"server/webhook-ingest",
+		"server/application-server/agent-extensions"
 	],
 	"scripts": {
 		"generate:api:application-server:clean": "shx rm -rf webapp/src/api",

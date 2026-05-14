@@ -1,0 +1,14 @@
+{
+    "name": "@hephaestus/agent-extensions",
+    "version": "0.0.0-development",
+    "private": true,
+    "description": "Type-checks the Pi provider extension TypeScript shipped as classpath resources by the application server. Lockstep with MentorLiveLlmTest.PI_SDK_VERSION.",
+    "scripts": {
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "@earendil-works/pi-coding-agent": "0.74.0",
+        "@types/node": "22.10.5",
+        "typescript": "5.9.3"
+    }
+}

@@ -94,25 +94,16 @@ public class UserAspectProvider implements ContentProvider {
         Instant weekAgo = now.minus(7, ChronoUnit.DAYS);
         Instant twoWeeksAgo = now.minus(14, ChronoUnit.DAYS);
 
-        long openPRs = queryRepository.countOpenPullRequests(workspaceId, contributorId);
-        long mergedThisWeek = queryRepository.countMergedPullRequestsInWindow(workspaceId, contributorId, weekAgo, now);
-        long mergedLastWeek = queryRepository.countMergedPullRequestsInWindow(
-            workspaceId,
-            contributorId,
-            twoWeeksAgo,
-            weekAgo
-        );
-        long openIssues = queryRepository.countOpenAuthoredIssues(workspaceId, contributorId);
-        long reviewsGivenThisWeek = queryRepository.countReviewsGivenInWindow(workspaceId, contributorId, weekAgo, now);
-        long reviewsGivenLastWeek = queryRepository.countReviewsGivenInWindow(
-            workspaceId,
-            contributorId,
-            twoWeeksAgo,
-            weekAgo
-        );
-        long reviewsReceivedThisWeek = queryRepository.countReviewsReceivedSince(workspaceId, contributorId, weekAgo);
-        long pendingReviewRequests = queryRepository.countPendingReviewRequests(workspaceId, contributorId);
-        long unresolvedThreads = queryRepository.countUnresolvedThreadsOnAuthoredPrs(workspaceId, contributorId);
+        MentorUserCounts c = queryRepository.fetchUserCounts(workspaceId, contributorId, twoWeeksAgo, weekAgo, now);
+        long openPRs = c.openPRs();
+        long mergedThisWeek = c.mergedThisWeek();
+        long mergedLastWeek = c.mergedLastWeek();
+        long openIssues = c.openIssues();
+        long reviewsGivenThisWeek = c.reviewsGivenThisWeek();
+        long reviewsGivenLastWeek = c.reviewsGivenLastWeek();
+        long reviewsReceivedThisWeek = c.reviewsReceivedThisWeek();
+        long pendingReviewRequests = c.pendingReviewRequests();
+        long unresolvedThreads = c.unresolvedThreads();
 
         ObjectNode root = objectMapper.createObjectNode();
 

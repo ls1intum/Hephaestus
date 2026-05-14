@@ -47,17 +47,21 @@ class UserAspectProviderTest extends BaseUnitTest {
         user.setLogin("octo");
         user.setName("Octo Cat");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
-        when(queryRepository.countOpenPullRequests(eq(1L), eq(2L))).thenReturn(2L);
-        when(queryRepository.countMergedPullRequestsInWindow(eq(1L), eq(2L), any(Instant.class), any(Instant.class)))
-            .thenReturn(5L)
-            .thenReturn(3L);
-        when(queryRepository.countOpenAuthoredIssues(eq(1L), eq(2L))).thenReturn(1L);
-        when(queryRepository.countReviewsGivenInWindow(eq(1L), eq(2L), any(Instant.class), any(Instant.class)))
-            .thenReturn(8L)
-            .thenReturn(4L);
-        when(queryRepository.countReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class))).thenReturn(7L);
-        when(queryRepository.countPendingReviewRequests(eq(1L), eq(2L))).thenReturn(2L);
-        when(queryRepository.countUnresolvedThreadsOnAuthoredPrs(eq(1L), eq(2L))).thenReturn(1L);
+        when(
+            queryRepository.fetchUserCounts(eq(1L), eq(2L), any(Instant.class), any(Instant.class), any(Instant.class))
+        ).thenReturn(
+            new MentorUserCounts(
+                /* openPRs */ 2L,
+                /* mergedThisWeek */ 5L,
+                /* mergedLastWeek */ 3L,
+                /* openIssues */ 1L,
+                /* reviewsGivenThisWeek */ 8L,
+                /* reviewsGivenLastWeek */ 4L,
+                /* reviewsReceivedThisWeek */ 7L,
+                /* pendingReviewRequests */ 2L,
+                /* unresolvedThreads */ 1L
+            )
+        );
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);

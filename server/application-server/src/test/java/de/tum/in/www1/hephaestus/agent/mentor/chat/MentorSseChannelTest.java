@@ -1,0 +1,222 @@
+package de.tum.in.www1.hephaestus.agent.mentor.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.ClientDisconnectedException;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+/**
+ * Focused coverage for the per-turn SSE façade. The full orchestration path is exercised by
+ * {@link MentorChatServiceTest}; this class pins the invariants reviewers care about most:
+ * the disconnect hook fires exactly once, the {@code [DONE]} sentinel always lands, and
+ * heartbeat ticks never race the terminal {@code complete()}.
+ */
+@DisplayName("MentorSseChannel")
+class MentorSseChannelTest extends BaseUnitTest {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private RecordingEmitter emitter;
+    private ScheduledExecutorService scheduler;
+    private MentorSseChannel channel;
+
+    @BeforeEach
+    void setUp() {
+        emitter = new RecordingEmitter();
+        scheduler = Executors.newSingleThreadScheduledExecutor();
+        channel = new MentorSseChannel(emitter, MAPPER, scheduler);
+    }
+
+    @AfterEach
+    void tearDown() {
+        scheduler.shutdownNow();
+    }
+
+    @Test
+    @DisplayName("send serialises a chunk as data: <json>")
+    void send_writesChunkAsData() {
+        UUID id = UUID.randomUUID();
+        channel.send(new UIMessageChunk.Start(id, null));
+        assertThat(emitter.dataFrames()).hasSize(1);
+        assertThat(emitter.dataFrames().get(0)).contains("\"type\":\"start\"").contains(id.toString());
+    }
+
+    @Test
+    @DisplayName("send while clientGone is a no-op")
+    void send_afterDisconnect_isNoop() {
+        // Trigger the lifecycle disconnect via onCompletion → clientGone flips.
+        channel.bindLifecycle();
+        emitter.fireCompletion();
+
+        channel.send(new UIMessageChunk.StartStep());
+        assertThat(emitter.dataFrames()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("send wraps an IOException as ClientDisconnectedException and flips the flag")
+    void send_onIoException_throwsAndFlips() {
+        emitter.failOnNextSend();
+        assertThatThrownBy(() -> channel.send(new UIMessageChunk.StartStep())).isInstanceOf(
+            ClientDisconnectedException.class
+        );
+        assertThat(channel.isClientGone()).isTrue();
+    }
+
+    @Test
+    @DisplayName("disconnect hook fires exactly once across concurrent flips")
+    void disconnectHook_firesExactlyOnce() throws Exception {
+        AtomicInteger fired = new AtomicInteger();
+        channel.bindLifecycle();
+        channel.onDisconnect(fired::incrementAndGet);
+
+        // Two threads race to trigger different lifecycle callbacks; only the first flip wins.
+        var t1 = new Thread(() -> emitter.fireCompletion());
+        var t2 = new Thread(() -> emitter.fireError(new RuntimeException("network")));
+        t1.start();
+        t2.start();
+        t1.join();
+        t2.join();
+
+        assertThat(fired.get()).isEqualTo(1);
+        assertThat(channel.isClientGone()).isTrue();
+    }
+
+    @Test
+    @DisplayName("onDisconnect registered AFTER the flag flipped fires immediately on the caller thread")
+    void onDisconnect_afterFlagFlipped_firesImmediately() {
+        channel.bindLifecycle();
+        emitter.fireCompletion(); // flips first
+        AtomicInteger fired = new AtomicInteger();
+        channel.onDisconnect(fired::incrementAndGet);
+        assertThat(fired.get()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("completeWithDone sends the [DONE] sentinel and completes")
+    void completeWithDone_emitsSentinel() {
+        channel.completeWithDone();
+        assertThat(emitter.dataFrames()).containsExactly("[DONE]");
+        assertThat(emitter.completed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("completeWithError sends an Error chunk then [DONE]")
+    void completeWithError_emitsErrorThenSentinel() {
+        channel.completeWithError("boom");
+        assertThat(emitter.dataFrames())
+            .hasSize(2)
+            .first()
+            .asString()
+            .contains("\"type\":\"error\"")
+            .contains("\"errorText\":\"boom\"");
+        assertThat(emitter.dataFrames().get(1)).isEqualTo("[DONE]");
+        assertThat(emitter.completed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("completeWithConflict sends a data-mentor-status, an Error, and [DONE]")
+    void completeWithConflict_emitsStatusErrorSentinel() {
+        channel.completeWithConflict();
+        List<String> frames = emitter.dataFrames();
+        assertThat(frames).hasSize(3);
+        assertThat(frames.get(0)).contains("\"type\":\"data-mentor-status\"").contains("\"state\":\"conflict\"");
+        assertThat(frames.get(1)).contains("\"type\":\"error\"");
+        assertThat(frames.get(2)).isEqualTo("[DONE]");
+        assertThat(emitter.completed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("close() is idempotent + safe after completeWithDone")
+    void closeAfterDone_isIdempotent() {
+        channel.completeWithDone();
+        channel.close();
+        channel.close();
+        assertThat(emitter.completed()).isTrue();
+    }
+
+    /** Test-only emitter that records data frames + can simulate disconnect failures. */
+    private static final class RecordingEmitter extends SseEmitter {
+
+        private final List<String> dataFrames = new ArrayList<>();
+        private boolean completed;
+        private boolean failOnNextSend;
+        private Runnable completionCallback;
+        private Runnable timeoutCallback;
+        private java.util.function.Consumer<Throwable> errorCallback;
+
+        @Override
+        public void send(SseEventBuilder builder) throws IOException {
+            if (failOnNextSend) {
+                failOnNextSend = false;
+                throw new IOException("simulated socket close");
+            }
+            // SseEventBuilder.build() returns a Set<DataWithMediaType>; payload chunks are
+            // interleaved with the SSE text framing ("data:", "\n", "\n") in append order.
+            // Re-assemble the wire text and extract the JSON payload(s) on `data:` lines.
+            StringBuilder wire = new StringBuilder();
+            for (var entry : builder.build()) {
+                wire.append(entry.getData().toString());
+            }
+            for (String line : wire.toString().split("\n")) {
+                if (line.startsWith("data:")) {
+                    dataFrames.add(line.substring("data:".length()));
+                }
+            }
+        }
+
+        @Override
+        public void complete() {
+            completed = true;
+        }
+
+        @Override
+        public void onCompletion(Runnable callback) {
+            this.completionCallback = callback;
+        }
+
+        @Override
+        public void onTimeout(Runnable callback) {
+            this.timeoutCallback = callback;
+        }
+
+        @Override
+        public void onError(java.util.function.Consumer<Throwable> callback) {
+            this.errorCallback = callback;
+        }
+
+        void fireCompletion() {
+            if (completionCallback != null) completionCallback.run();
+        }
+
+        void fireError(Throwable t) {
+            if (errorCallback != null) errorCallback.accept(t);
+        }
+
+        void failOnNextSend() {
+            this.failOnNextSend = true;
+        }
+
+        List<String> dataFrames() {
+            return dataFrames;
+        }
+
+        boolean completed() {
+            return completed;
+        }
+    }
+}

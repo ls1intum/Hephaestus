@@ -19,116 +19,91 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
-    /** Open PRs authored by user within workspace. */
+    /**
+     * Single-round-trip snapshot of every counter {@code UserAspectProvider} needs. The JPQL
+     * anchors on {@code User} so the constructor expression evaluates exactly once (one row
+     * by PK); each bucket is a {@code COALESCE((SELECT …), 0L)} so the projected longs are
+     * never null. Collapses what used to be nine separate {@code SELECT COUNT(...)}
+     * round-trips (one per metric) into one statement.
+     */
     @Query(
         """
-        SELECT COUNT(p)
-        FROM PullRequest p
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
-        WHERE p.author.id = :userId
-          AND rtm.workspace.id = :workspaceId
-          AND p.state = de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN
+        SELECT new de.tum.in.www1.hephaestus.agent.context.providers.mentor.MentorUserCounts(
+            COALESCE((SELECT COUNT(p1)
+                FROM PullRequest p1
+                JOIN RepositoryToMonitor rtm1 ON rtm1.nameWithOwner = p1.repository.nameWithOwner
+                WHERE p1.author.id = :userId
+                  AND rtm1.workspace.id = :workspaceId
+                  AND p1.state = de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN), 0L),
+            COALESCE((SELECT COUNT(p2)
+                FROM PullRequest p2
+                JOIN RepositoryToMonitor rtm2 ON rtm2.nameWithOwner = p2.repository.nameWithOwner
+                WHERE p2.author.id = :userId
+                  AND rtm2.workspace.id = :workspaceId
+                  AND p2.isMerged = true
+                  AND p2.mergedAt > :weekAgo
+                  AND p2.mergedAt <= :now), 0L),
+            COALESCE((SELECT COUNT(p3)
+                FROM PullRequest p3
+                JOIN RepositoryToMonitor rtm3 ON rtm3.nameWithOwner = p3.repository.nameWithOwner
+                WHERE p3.author.id = :userId
+                  AND rtm3.workspace.id = :workspaceId
+                  AND p3.isMerged = true
+                  AND p3.mergedAt > :twoWeeksAgo
+                  AND p3.mergedAt <= :weekAgo), 0L),
+            COALESCE((SELECT COUNT(i)
+                FROM Issue i
+                JOIN RepositoryToMonitor rtmi ON rtmi.nameWithOwner = i.repository.nameWithOwner
+                WHERE TYPE(i) = Issue
+                  AND i.author.id = :userId
+                  AND rtmi.workspace.id = :workspaceId
+                  AND i.state = de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN), 0L),
+            COALESCE((SELECT COUNT(r1)
+                FROM PullRequestReview r1
+                JOIN RepositoryToMonitor rtmr1 ON rtmr1.nameWithOwner = r1.pullRequest.repository.nameWithOwner
+                WHERE r1.author.id = :userId
+                  AND rtmr1.workspace.id = :workspaceId
+                  AND r1.submittedAt > :weekAgo
+                  AND r1.submittedAt <= :now), 0L),
+            COALESCE((SELECT COUNT(r2)
+                FROM PullRequestReview r2
+                JOIN RepositoryToMonitor rtmr2 ON rtmr2.nameWithOwner = r2.pullRequest.repository.nameWithOwner
+                WHERE r2.author.id = :userId
+                  AND rtmr2.workspace.id = :workspaceId
+                  AND r2.submittedAt > :twoWeeksAgo
+                  AND r2.submittedAt <= :weekAgo), 0L),
+            COALESCE((SELECT COUNT(r3)
+                FROM PullRequestReview r3
+                JOIN RepositoryToMonitor rtmr3 ON rtmr3.nameWithOwner = r3.pullRequest.repository.nameWithOwner
+                WHERE r3.pullRequest.author.id = :userId
+                  AND rtmr3.workspace.id = :workspaceId
+                  AND r3.submittedAt > :weekAgo), 0L),
+            COALESCE((SELECT COUNT(prr)
+                FROM PullRequest prr
+                JOIN RepositoryToMonitor rtmpr ON rtmpr.nameWithOwner = prr.repository.nameWithOwner
+                JOIN prr.requestedReviewers reviewer
+                WHERE reviewer.id = :userId
+                  AND rtmpr.workspace.id = :workspaceId
+                  AND prr.state = de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN), 0L),
+            COALESCE((SELECT COUNT(t)
+                FROM PullRequestReviewThread t
+                JOIN RepositoryToMonitor rtmt ON rtmt.nameWithOwner = t.pullRequest.repository.nameWithOwner
+                WHERE t.pullRequest.author.id = :userId
+                  AND rtmt.workspace.id = :workspaceId
+                  AND t.pullRequest.state = de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN
+                  AND t.state = de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED), 0L)
+        )
+        FROM User u
+        WHERE u.id = :userId
         """
     )
-    long countOpenPullRequests(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
-
-    /** PRs merged by author within a time window. */
-    @Query(
-        """
-        SELECT COUNT(p)
-        FROM PullRequest p
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
-        WHERE p.author.id = :userId
-          AND rtm.workspace.id = :workspaceId
-          AND p.isMerged = true
-          AND p.mergedAt > :since
-          AND p.mergedAt <= :until
-        """
-    )
-    long countMergedPullRequestsInWindow(
+    MentorUserCounts fetchUserCounts(
         @Param("workspaceId") Long workspaceId,
         @Param("userId") Long userId,
-        @Param("since") Instant since,
-        @Param("until") Instant until
+        @Param("twoWeeksAgo") Instant twoWeeksAgo,
+        @Param("weekAgo") Instant weekAgo,
+        @Param("now") Instant now
     );
-
-    /** Open authored issues (not PRs) for the user within workspace. */
-    @Query(
-        """
-        SELECT COUNT(i)
-        FROM Issue i
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = i.repository.nameWithOwner
-        WHERE TYPE(i) = Issue
-          AND i.author.id = :userId
-          AND rtm.workspace.id = :workspaceId
-          AND i.state = de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN
-        """
-    )
-    long countOpenAuthoredIssues(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
-
-    /** Reviews submitted by user in a time window, scoped to workspace via PR repository. */
-    @Query(
-        """
-        SELECT COUNT(prr)
-        FROM PullRequestReview prr
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = prr.pullRequest.repository.nameWithOwner
-        WHERE prr.author.id = :userId
-          AND rtm.workspace.id = :workspaceId
-          AND prr.submittedAt > :since
-          AND prr.submittedAt <= :until
-        """
-    )
-    long countReviewsGivenInWindow(
-        @Param("workspaceId") Long workspaceId,
-        @Param("userId") Long userId,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
-
-    /** Reviews received on PRs the user authored within a time window. */
-    @Query(
-        """
-        SELECT COUNT(prr)
-        FROM PullRequestReview prr
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = prr.pullRequest.repository.nameWithOwner
-        WHERE prr.pullRequest.author.id = :userId
-          AND rtm.workspace.id = :workspaceId
-          AND prr.submittedAt > :since
-        """
-    )
-    long countReviewsReceivedSince(
-        @Param("workspaceId") Long workspaceId,
-        @Param("userId") Long userId,
-        @Param("since") Instant since
-    );
-
-    /** Pending review requests on still-open PRs targeting user, scoped to workspace. */
-    @Query(
-        """
-        SELECT COUNT(p)
-        FROM PullRequest p
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
-        JOIN p.requestedReviewers reviewer
-        WHERE reviewer.id = :userId
-          AND rtm.workspace.id = :workspaceId
-          AND p.state = de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN
-        """
-    )
-    long countPendingReviewRequests(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
-
-    /** Unresolved review threads on the user's own open PRs (an "actionable feedback" signal). */
-    @Query(
-        """
-        SELECT COUNT(t)
-        FROM PullRequestReviewThread t
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = t.pullRequest.repository.nameWithOwner
-        WHERE t.pullRequest.author.id = :userId
-          AND rtm.workspace.id = :workspaceId
-          AND t.pullRequest.state = de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN
-          AND t.state = de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED
-        """
-    )
-    long countUnresolvedThreadsOnAuthoredPrs(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 
     /** Open issues assigned to user, ordered most recent first, scoped to workspace. */
     @Query(

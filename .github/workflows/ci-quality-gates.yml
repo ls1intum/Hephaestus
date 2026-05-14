@@ -97,16 +97,25 @@ jobs:
           cache-type: ${{ matrix.check }}
           os: ${{ runner.os }}
 
-      - name: Application-server formatting
+      - name: Application-server formatting + Pi extension typecheck
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
           npm ci --prefer-offline --no-audit
-          if ! npm run format:java:check; then
-            echo "::error::Java formatting failed. Run: npm run format:java"
+
+          ISSUES_FOUND=()
+          FMT_OK=true; TS_OK=true
+
+          npm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: npm run format:java"); }
+          npm -w server/application-server/agent-extensions run typecheck \
+            || { TS_OK=false; ISSUES_FOUND+=("Pi extension TS failed typecheck against @earendil-works/pi-coding-agent. Run: npm -w server/application-server/agent-extensions run typecheck"); }
+
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            echo "| Java formatting | :x: Failed | \`npm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`npm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TS_OK" == "false" ]] && echo "| Pi extension TS | :x: Failed | \`npm -w server/application-server/agent-extensions run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
 

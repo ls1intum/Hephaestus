@@ -225,44 +225,15 @@ public class PiRuntimeFactory {
      * true} attaches {@code Authorization: Bearer $PI_HEPHAESTUS_API_KEY}.
      */
     public byte[] buildExtensionFile(PiPlanSpec spec) {
-        String api = spec.provider() == LlmProvider.ANTHROPIC ? "anthropic-messages" : "openai-completions";
-        // Model fields are environment-driven (jiti executes the TS at runtime in Node), so the
-        // model id is whatever PI_HEPHAESTUS_MODEL holds. Defaults are safe for chat-completions
-        // OpenAI-compat providers — cost is zero (server-side pricing layer owns the canonical
-        // numbers), context window is generous, max tokens is the conventional 4096.
-        String ts =
-            "import type { ExtensionAPI } from \"@earendil-works/pi-coding-agent\";\n" +
-            "\n" +
-            "export default function (pi: ExtensionAPI) {\n" +
-            "  const baseUrl = process.env.PI_HEPHAESTUS_BASE_URL;\n" +
-            "  const modelId = process.env.PI_HEPHAESTUS_MODEL ?? \"" +
-            (spec.modelName() != null ? spec.modelName() : "") +
-            "\";\n" +
-            "  if (!baseUrl || !modelId) {\n" +
-            "    throw new Error(\"hephaestus provider needs PI_HEPHAESTUS_BASE_URL + PI_HEPHAESTUS_MODEL\");\n" +
-            "  }\n" +
-            "  pi.registerProvider(\"hephaestus\", {\n" +
-            "    name: \"Hephaestus Gateway\",\n" +
-            "    baseUrl,\n" +
-            "    apiKey: \"PI_HEPHAESTUS_API_KEY\",\n" +
-            "    authHeader: true,\n" +
-            "    api: \"" +
-            api +
-            "\",\n" +
-            "    models: [\n" +
-            "      {\n" +
-            "        id: modelId,\n" +
-            "        name: modelId,\n" +
-            "        reasoning: false,\n" +
-            "        input: [\"text\"],\n" +
-            "        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },\n" +
-            "        contextWindow: 131072,\n" +
-            "        maxTokens: 4096,\n" +
-            "      },\n" +
-            "    ],\n" +
-            "  });\n" +
-            "}\n";
-        return ts.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        // The TS source lives at server/application-server/src/main/resources/agent/extensions/.
+        // It is typechecked at CI time against @earendil-works/pi-coding-agent@0.74.0 via the
+        // sibling npm workspace `agent-extensions` (npm -w server/application-server/agent-extensions
+        // run typecheck). Bump in lockstep with MentorLiveLlmTest.PI_SDK_VERSION.
+        String resource =
+            spec.provider() == LlmProvider.ANTHROPIC
+                ? "extensions/provider-anthropic.ts"
+                : "extensions/provider-openai.ts";
+        return loadClasspathResource(resource);
     }
 
     /**
