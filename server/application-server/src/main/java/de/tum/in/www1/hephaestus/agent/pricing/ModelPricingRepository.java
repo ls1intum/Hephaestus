@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.agent.mentor.pricing;
+package de.tum.in.www1.hephaestus.agent.pricing;
 
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.Optional;

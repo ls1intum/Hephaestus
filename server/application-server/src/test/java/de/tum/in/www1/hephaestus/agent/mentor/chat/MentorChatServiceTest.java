@@ -17,7 +17,8 @@ import de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorPiAdapter;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
-import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.MentorEventTranslator;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
@@ -27,7 +28,6 @@ import de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
-import de.tum.in.www1.hephaestus.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.io.IOException;
@@ -93,7 +93,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     MentorTurnPersistence persistence;
 
     private MentorTurnLock turnLock;
-    private MentorEventTranslator translator;
+    private PiEventToUiChunkTranslator translator;
     private ScheduledExecutorService scheduler;
     private ExecutorService turnExec;
     private FakeSandbox sandbox;
@@ -103,7 +103,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() throws Exception {
         turnLock = new MentorTurnLock();
-        translator = new MentorEventTranslator();
+        translator = new PiEventToUiChunkTranslator();
         scheduler = Executors.newSingleThreadScheduledExecutor();
         // Direct executor so the test runs on the caller thread — no race between dispatch and assertion.
         turnExec = directExecutor();

@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.agent.mentor.pricing;
+package de.tum.in.www1.hephaestus.agent.pricing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;

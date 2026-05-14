@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.agent.mentor.pricing;
+package de.tum.in.www1.hephaestus.agent.pricing;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

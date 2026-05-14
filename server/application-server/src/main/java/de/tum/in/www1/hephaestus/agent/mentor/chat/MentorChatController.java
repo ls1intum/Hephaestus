@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.in.www1.hephaestus.mentor.chat.wire.UIMessageChunk;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Hidden;

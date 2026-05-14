@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import de.tum.in.www1.hephaestus.mentor.chat.wire.UIMessageChunk;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Real-shape coverage for {@link MentorEventTranslator}. Every test loads a fixture file from
+ * Real-shape coverage for {@link PiEventToUiChunkTranslator}. Every test loads a fixture file from
  * {@code src/test/resources/agent/mentor/pi-events/} that mirrors the on-the-wire JSON Pi emits
  * — verified against {@code @earendil-works/pi-coding-agent} dist .d.ts shapes. We intentionally
  * do NOT shape the fixtures from what the runner's protocol-only stub produces; doing that is
@@ -26,19 +26,19 @@ import org.junit.jupiter.api.Test;
  * <p>If you change a Pi event mapping, change the fixture too. Stub-only shapes (the synthetic
  * {@code pi_error} / {@code turn_watchdog_fired} the runner itself emits) are exercised inline.
  */
-@DisplayName("MentorEventTranslator (real Pi shapes)")
-class MentorEventTranslatorTest extends BaseUnitTest {
+@DisplayName("PiEventToUiChunkTranslator (real Pi shapes)")
+class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
     private static final String FIXTURE_DIR = "agent/mentor/pi-events/";
 
     private final ObjectMapper mapper = new ObjectMapper();
-    private MentorEventTranslator translator;
+    private PiEventToUiChunkTranslator translator;
     private TranslatorState state;
     private final UUID assistantMessageId = UUID.fromString("11111111-2222-3333-4444-555555555555");
 
     @BeforeEach
     void setUp() {
-        translator = new MentorEventTranslator();
+        translator = new PiEventToUiChunkTranslator();
         state = new TranslatorState(assistantMessageId);
     }
 
@@ -283,14 +283,20 @@ class MentorEventTranslatorTest extends BaseUnitTest {
         // Pi StopReason union: stop | length | toolUse | error | aborted (pi-ai/src/types.ts:269)
         // AI SDK union: stop | length | content-filter | tool-calls | error | other (ui-message-chunks.ts)
         // Anything raw-Pi reaching the wire would be a strict-zod rejection at the client.
-        assertThat(MentorEventTranslator.mapStopReason("stop")).isSameAs(UIMessageChunk.FinishReason.STOP);
-        assertThat(MentorEventTranslator.mapStopReason("length")).isSameAs(UIMessageChunk.FinishReason.LENGTH);
-        assertThat(MentorEventTranslator.mapStopReason("toolUse")).isSameAs(UIMessageChunk.FinishReason.TOOL_CALLS);
-        assertThat(MentorEventTranslator.mapStopReason("tool_use")).isSameAs(UIMessageChunk.FinishReason.TOOL_CALLS);
-        assertThat(MentorEventTranslator.mapStopReason("error")).isSameAs(UIMessageChunk.FinishReason.ERROR);
-        assertThat(MentorEventTranslator.mapStopReason("aborted")).isSameAs(UIMessageChunk.FinishReason.ERROR);
-        assertThat(MentorEventTranslator.mapStopReason("future-pi-reason")).isSameAs(UIMessageChunk.FinishReason.OTHER);
-        assertThat(MentorEventTranslator.mapStopReason(null)).isNull();
+        assertThat(PiEventToUiChunkTranslator.mapStopReason("stop")).isSameAs(UIMessageChunk.FinishReason.STOP);
+        assertThat(PiEventToUiChunkTranslator.mapStopReason("length")).isSameAs(UIMessageChunk.FinishReason.LENGTH);
+        assertThat(PiEventToUiChunkTranslator.mapStopReason("toolUse")).isSameAs(
+            UIMessageChunk.FinishReason.TOOL_CALLS
+        );
+        assertThat(PiEventToUiChunkTranslator.mapStopReason("tool_use")).isSameAs(
+            UIMessageChunk.FinishReason.TOOL_CALLS
+        );
+        assertThat(PiEventToUiChunkTranslator.mapStopReason("error")).isSameAs(UIMessageChunk.FinishReason.ERROR);
+        assertThat(PiEventToUiChunkTranslator.mapStopReason("aborted")).isSameAs(UIMessageChunk.FinishReason.ERROR);
+        assertThat(PiEventToUiChunkTranslator.mapStopReason("future-pi-reason")).isSameAs(
+            UIMessageChunk.FinishReason.OTHER
+        );
+        assertThat(PiEventToUiChunkTranslator.mapStopReason(null)).isNull();
     }
 
     @Test

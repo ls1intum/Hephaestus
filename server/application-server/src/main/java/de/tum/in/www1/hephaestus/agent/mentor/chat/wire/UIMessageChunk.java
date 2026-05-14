@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.mentor.chat.wire;
+package de.tum.in.www1.hephaestus.agent.mentor.chat.wire;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -47,7 +47,7 @@ public sealed interface UIMessageChunk {
      */
     String RESPONSE_HEADER = "x-vercel-ai-ui-message-stream";
 
-    /** Current AI SDK protocol version that {@link MentorEventTranslator} emits. */
+    /** Current AI SDK protocol version that {@link PiEventToUiChunkTranslator} emits. */
     String PROTOCOL_VERSION = "v1";
 
     /**

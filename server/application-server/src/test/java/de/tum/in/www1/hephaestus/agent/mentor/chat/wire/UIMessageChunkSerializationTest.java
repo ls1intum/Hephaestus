@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.mentor.chat.wire;
+package de.tum.in.www1.hephaestus.agent.mentor.chat.wire;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,7 +35,7 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
     /**
      * Each row pins the JSON shape of one chunk variant. Covers every chunk the translator emits
      * (one representative per discriminator). The single test is a smoke-screen against schema
-     * drift; deeper per-chunk semantics live in {@code MentorEventTranslatorTest}.
+     * drift; deeper per-chunk semantics live in {@code PiEventToUiChunkTranslatorTest}.
      */
     static List<Object[]> chunkFixtures() {
         UUID messageId = UUID.fromString("11111111-2222-3333-4444-555555555555");

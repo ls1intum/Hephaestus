@@ -8,12 +8,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
-import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.MentorEventTranslator;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.TranslatorState;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
-import de.tum.in.www1.hephaestus.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.in.www1.hephaestus.testconfig.LiveLlmTest;
 import java.io.IOException;
@@ -41,7 +41,7 @@ import org.junit.jupiter.api.Test;
  *       {@code OPENAI_API_KEY}.</li>
  *   <li>Drives the JSON-RPC protocol the same way {@code MentorRunnerClient} drives it in prod
  *       (hello → open_thread → prompt) and translates every emitted event through the real
- *       {@link MentorEventTranslator} so the test exercises the production stream-merge logic.</li>
+ *       {@link PiEventToUiChunkTranslator} so the test exercises the production stream-merge logic.</li>
  * </ol>
  *
  * <p>The runner only honours a custom model registry through extensions. To exercise the
@@ -167,7 +167,7 @@ class MentorLiveLlmTest {
 
         // Translate every event through the real production translator so we test the
         // streaming-merge invariant, not a parallel implementation.
-        MentorEventTranslator translator = new MentorEventTranslator();
+        PiEventToUiChunkTranslator translator = new PiEventToUiChunkTranslator();
         TranslatorState state = new TranslatorState(assistantMessageId);
         List<UIMessageChunk> chunks = new ArrayList<>();
         var translationDone = new java.util.concurrent.CompletableFuture<Void>();

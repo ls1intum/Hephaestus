@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.agent.mentor.pricing;
+package de.tum.in.www1.hephaestus.agent.pricing;
 
 import java.math.BigDecimal;
 import java.math.MathContext;

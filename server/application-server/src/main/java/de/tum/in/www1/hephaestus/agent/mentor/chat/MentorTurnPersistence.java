@@ -6,7 +6,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorReplayMessage;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.TranslatorState;
-import de.tum.in.www1.hephaestus.agent.mentor.pricing.ModelPricingService;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.in.www1.hephaestus.agent.pricing.ModelPricingService;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.mentor.ChatMessage;
@@ -14,7 +15,6 @@ import de.tum.in.www1.hephaestus.mentor.ChatMessageRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
 import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThreadService;
-import de.tum.in.www1.hephaestus.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
@@ -78,13 +78,6 @@ public class MentorTurnPersistence {
         if (prompt == null) return null;
         String s = prompt.strip().replaceAll("\\s+", " ");
         return s.length() > 80 ? s.substring(0, 77) + "…" : s;
-    }
-
-    /**
-     * 3-arg overload: server mints the user id. Tests and back-compat call sites.
-     */
-    public TurnPersistenceCookie persistInFlight(ChatThread thread, String userText, UUID assistantMessageId) {
-        return persistInFlight(thread, userText, assistantMessageId, null);
     }
 
     /**

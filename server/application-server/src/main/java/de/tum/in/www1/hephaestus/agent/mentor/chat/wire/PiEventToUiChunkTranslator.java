@@ -3,7 +3,7 @@ package de.tum.in.www1.hephaestus.agent.mentor.chat.wire;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import de.tum.in.www1.hephaestus.mentor.chat.wire.UIMessageChunk;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,9 +19,9 @@ import org.springframework.stereotype.Component;
  * types yield an empty list (do not throw — one bad frame must not poison the turn).
  */
 @Component
-public class MentorEventTranslator {
+public class PiEventToUiChunkTranslator {
 
-    private static final Logger log = LoggerFactory.getLogger(MentorEventTranslator.class);
+    private static final Logger log = LoggerFactory.getLogger(PiEventToUiChunkTranslator.class);
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
     /**

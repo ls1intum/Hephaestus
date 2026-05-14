@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.TranslatorState;
+import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
@@ -19,7 +20,6 @@ import de.tum.in.www1.hephaestus.mentor.ChatMessage;
 import de.tum.in.www1.hephaestus.mentor.ChatMessageRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
 import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
-import de.tum.in.www1.hephaestus.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -169,7 +169,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
             thread,
             "hello mentor",
-            assistantId
+            assistantId,
+            null
         );
         assertThat(cookie.assistantMessageId()).isEqualTo(assistantId);
 
@@ -202,8 +203,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @DisplayName("persistInFlight throws TurnAlreadyInFlightException on the DB unique partial index")
     void persistInFlight_secondCallThrows() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
-        persistence.persistInFlight(thread, "first", UUID.randomUUID());
-        assertThatThrownBy(() -> persistence.persistInFlight(thread, "second", UUID.randomUUID())).isInstanceOf(
+        persistence.persistInFlight(thread, "first", UUID.randomUUID(), null);
+        assertThatThrownBy(() -> persistence.persistInFlight(thread, "second", UUID.randomUUID(), null)).isInstanceOf(
             TurnAlreadyInFlightException.class
         );
     }
@@ -226,7 +227,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                 ready.countDown();
                 fire.await(5, java.util.concurrent.TimeUnit.SECONDS);
                 try {
-                    return persistence.persistInFlight(thread, "race", UUID.randomUUID());
+                    return persistence.persistInFlight(thread, "race", UUID.randomUUID(), null);
                 } catch (RuntimeException ex) {
                     return ex; // surface to caller for classification
                 }
@@ -272,7 +273,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     void finalise_writesCompletedRow() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
-        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(thread, "hello", assistantId);
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null
+        );
 
         TranslatorState state = new TranslatorState(assistantId);
         state.observeModel("openai/gpt-oss-120b");
@@ -309,7 +315,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     void interrupt_writesInterruptedRow() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
-        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(thread, "hello", assistantId);
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null
+        );
 
         persistence.interrupt(cookie, new TranslatorState(assistantId), new IllegalStateException("upstream timeout"));
 
@@ -324,7 +335,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     void reaper_flipsStaleInFlightRows() throws Exception {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "stuck");
         UUID assistantId = UUID.randomUUID();
-        persistence.persistInFlight(thread, "stuck", assistantId);
+        persistence.persistInFlight(thread, "stuck", assistantId, null);
 
         // The cutoff is "older than now" — fresh rows are NOT reaped.
         int updated = chatMessageRepository.reapStaleInFlight(Instant.now().minusSeconds(60));
