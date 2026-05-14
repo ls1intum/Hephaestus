@@ -782,16 +782,16 @@ describe("useMentorChat", () => {
 			);
 		});
 
-		it("should use throttling for smoother streaming", () => {
+		it("should NOT pass experimental_throttle — Pi's text-delta cadence is already LLM-bound", () => {
+			// Throttling re-renders on top of an already-LLM-bound stream batches deltas in
+			// chunks of 1-3, breaking the live-typing UX. The hook deliberately omits the option.
 			renderHook(() => useMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
-			expect(mockUseChat).toHaveBeenCalledWith(
-				expect.objectContaining({
-					experimental_throttle: 100,
-				}),
-			);
+			const config = mockUseChat.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
+			expect(config).toBeDefined();
+			expect(config).not.toHaveProperty("experimental_throttle");
 		});
 	});
 
