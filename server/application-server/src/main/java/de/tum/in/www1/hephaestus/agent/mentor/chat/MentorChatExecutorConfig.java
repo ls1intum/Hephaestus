@@ -13,6 +13,7 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
 
 /**
  * Executors for the mentor chat turn pipeline. Each one is owned by Spring and shut down on
@@ -36,7 +37,11 @@ public class MentorChatExecutorConfig {
 
     @Bean(destroyMethod = "")
     MentorTurnExecutor mentorTurnExecutor() {
-        return new MentorTurnExecutor();
+        // Production wrapping: the vthread executor is decorated with
+        // DelegatingSecurityContextExecutorService so the request thread's authentication
+        // is available inside `runTurn` (and any future call from this executor that needs
+        // SecurityContextHolder).
+        return new MentorTurnExecutor(Executors.newVirtualThreadPerTaskExecutor(), true);
     }
 
     @Bean(destroyMethod = "")
@@ -44,18 +49,44 @@ public class MentorChatExecutorConfig {
         return new MentorRunnerTimeoutScheduler();
     }
 
-    /** Virtual-thread executor for mentor turns. Wrapped so {@link DisposableBean} can shut it down. */
+    /**
+     * Virtual-thread executor for mentor turns, wrapped with
+     * {@link DelegatingSecurityContextExecutorService} so the request thread's
+     * {@code SecurityContext} propagates to the vthread. Without the wrapper,
+     * {@code SecurityContextHolder} (MODE_THREADLOCAL) returns an empty context on every
+     * vthread, and {@code userRepository.getCurrentUserElseThrow()} masks as a turn failure.
+     *
+     * <p>Implements {@link DisposableBean} so Spring shuts the underlying raw executor down
+     * gracefully on context refresh / app stop — the wrapper itself doesn't expose lifecycle.
+     */
     static final class MentorTurnExecutor implements DisposableBean {
 
+        private final ExecutorService rawDelegate;
         private final ExecutorService delegate;
 
         MentorTurnExecutor() {
             this(Executors.newVirtualThreadPerTaskExecutor());
         }
 
-        /** Package-private test seam — let tests inject a synchronous executor without reflection. */
+        /**
+         * Package-private test seam — let tests inject a synchronous executor without
+         * reflection. Tests run on the main thread which already carries the test
+         * {@code SecurityContext}, so we deliberately skip the propagation wrapper there to
+         * keep the test surface simple.
+         */
         MentorTurnExecutor(ExecutorService delegate) {
+            this.rawDelegate = delegate;
             this.delegate = delegate;
+        }
+
+        /**
+         * Production-only secondary constructor: wraps the raw executor with the Spring
+         * Security propagation decorator. Kept separate from the default constructor so the
+         * test seam above remains a bare delegate.
+         */
+        private MentorTurnExecutor(ExecutorService raw, boolean propagateSecurityContext) {
+            this.rawDelegate = raw;
+            this.delegate = propagateSecurityContext ? new DelegatingSecurityContextExecutorService(raw) : raw;
         }
 
         public ExecutorService executor() {
@@ -65,15 +96,18 @@ public class MentorChatExecutorConfig {
         @PreDestroy
         @Override
         public void destroy() {
-            delegate.shutdown();
+            // Shut down the RAW executor directly — DelegatingSecurityContextExecutorService
+            // delegates lifecycle, but going through the raw reference makes ownership
+            // explicit and removes a layer of indirection from shutdown reasoning.
+            rawDelegate.shutdown();
             try {
-                if (!delegate.awaitTermination(10, TimeUnit.SECONDS)) {
+                if (!rawDelegate.awaitTermination(10, TimeUnit.SECONDS)) {
                     log.warn("mentorTurnExecutor did not terminate within 10s; forcing shutdown");
-                    delegate.shutdownNow();
+                    rawDelegate.shutdownNow();
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                delegate.shutdownNow();
+                rawDelegate.shutdownNow();
             }
         }
     }

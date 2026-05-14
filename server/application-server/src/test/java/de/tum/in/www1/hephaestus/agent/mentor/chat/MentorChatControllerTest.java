@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
@@ -49,6 +50,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 class MentorChatControllerTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final MentorAgentProperties TEST_PROPERTIES = new MentorAgentProperties(
+        "ghcr.io/ls1intum/hephaestus/agent-pi-mentor:latest",
+        "pi-mentor-runner.mjs",
+        100_000
+    );
 
     @Mock
     MentorChatService mentorChatService;
@@ -59,7 +65,7 @@ class MentorChatControllerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        controller = new MentorChatController(mentorChatService, MAPPER);
+        controller = new MentorChatController(mentorChatService, MAPPER, TEST_PROPERTIES);
         response = new MockHttpServletResponse();
     }
 
@@ -128,7 +134,7 @@ class MentorChatControllerTest extends BaseUnitTest {
     @Test
     @DisplayName("oversize user message (> MAX_PROMPT_CHARS) short-circuits with an error chunk")
     void oversizeUserMessage_shortCircuits() {
-        String hugeText = "x".repeat(MentorChatController.MAX_PROMPT_CHARS + 1);
+        String hugeText = "x".repeat(TEST_PROPERTIES.maxPromptChars() + 1);
         MentorChatRequestBody body = body(UUID.randomUUID(), null, hugeText);
         SseEmitter emitter = controller.chat(stubContext(), body, response);
         verify(mentorChatService, never()).start(any(), any());
@@ -139,7 +145,7 @@ class MentorChatControllerTest extends BaseUnitTest {
     @Test
     @DisplayName("user message exactly MAX_PROMPT_CHARS is accepted and dispatched")
     void boundarySizedUserMessage_dispatches() {
-        String exactlyAtCap = "x".repeat(MentorChatController.MAX_PROMPT_CHARS);
+        String exactlyAtCap = "x".repeat(TEST_PROPERTIES.maxPromptChars());
         MentorChatRequestBody body = body(UUID.randomUUID(), null, exactlyAtCap);
         controller.chat(stubContext(), body, response);
         verify(mentorChatService).start(any(), any());

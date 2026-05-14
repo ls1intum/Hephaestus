@@ -190,4 +190,25 @@
         </rollback>
     </changeSet>
 
+    <!-- 7. Optimistic-lock column. Replaces the read-before-write `isStillInFlight` TOCTOU
+         check on finalise/interrupt with Hibernate's @Version handling: a concurrent reaper
+         flip bumps the version, the late writer's stale snapshot fails the version predicate,
+         and persistence's caller logs + skips so the reaper's verdict survives. The reaper
+         SQL bumps the version explicitly because @Modifying queries bypass Hibernate's
+         automatic increment. -->
+    <changeSet id="mentor-1071-add-version-column" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message.version already exists">
+            <not><columnExists tableName="chat_message" columnName="version"/></not>
+        </preConditions>
+        <comment>Add chat_message.version BIGINT NOT NULL DEFAULT 0 for Hibernate @Version optimistic locking</comment>
+        <addColumn tableName="chat_message">
+            <column name="version" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="chat_message" columnName="version"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

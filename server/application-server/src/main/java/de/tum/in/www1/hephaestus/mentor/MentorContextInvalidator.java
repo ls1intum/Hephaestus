@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,12 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * Evicts mentor aspect caches after committed domain events. Surgical point-key eviction
  * (per {@code workspaceId + ":" + userId} or per {@code workspaceId}) so a single CRUD does
  * not amplify into a thundering herd across active users.
+ *
+ * <p>Every listener is {@link Async} so commit-callback latency does not block the publishing
+ * transaction's caller. Matches the {@code ActivityEventListener} / {@code AchievementEventListener}
+ * sibling pattern; ALL @Async work runs on the bounded {@code applicationTaskExecutor} configured
+ * by {@code SpringAsyncConfig} (core 10 / max 50 / queue 500 / graceful shutdown), so a review-
+ * event burst (label-spam, mass-approve) buffers cleanly without unbounded thread growth.
  */
 @Component
 @RequiredArgsConstructor
@@ -42,6 +49,7 @@ public class MentorContextInvalidator {
      * threads, review states, etc. We invalidate per-user aspects for both the author and
      * (since the PR may have just been merged) the mergedBy user.
      */
+    @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestUpdated(DomainEvent.PullRequestUpdated event) {
         Long workspaceId = resolveWorkspaceId(event.context());
@@ -60,6 +68,7 @@ public class MentorContextInvalidator {
      * Issue updates affect the assigned-work surface. Invalidate the workspace aspect for the
      * author (who sees their work list change).
      */
+    @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onIssueUpdated(DomainEvent.IssueUpdated event) {
         Long workspaceId = resolveWorkspaceId(event.context());
@@ -78,23 +87,22 @@ public class MentorContextInvalidator {
      * originating transaction has closed, so the {@code findById} below needs its own session
      * to materialise {@code pr.getAuthor()} without a {@code LazyInitializationException}.
      *
-     * <p>Unlike sibling listeners ({@code ActivityEventListener}, {@code AchievementEventListener})
-     * we don't decorate with {@code @Async}: the per-event work is a single indexed find + a
-     * handful of {@code Cache.evict} calls (each O(1) on Caffeine). Running synchronously on
-     * the publisher's commit thread is bounded and avoids needing an event-listener executor.
      */
+    @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
         evictForReview(event.context(), event.review());
     }
 
+    @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public void onReviewEdited(DomainEvent.ReviewEdited event) {
         evictForReview(event.context(), event.review());
     }
 
+    @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public void onReviewDismissed(DomainEvent.ReviewDismissed event) {

@@ -24,7 +24,10 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -38,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class MentorTurnPersistence {
 
+    private static final Logger log = LoggerFactory.getLogger(MentorTurnPersistence.class);
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
     private final ChatThreadRepository chatThreadRepository;
@@ -182,18 +186,26 @@ public class MentorTurnPersistence {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void finalise(TurnPersistenceCookie cookie, TranslatorState state, UIMessageChunk.Finish finish) {
+        try {
+            doFinalise(cookie, state, finish);
+        } catch (OptimisticLockingFailureException stale) {
+            // A concurrent writer (typically the in-flight reaper flipping the row to
+            // `interrupted`) bumped the @Version after we loaded the snapshot. Their verdict
+            // is the source of truth — we leave the row alone. The wire's Finish chunk was
+            // already sent by the orchestrator; the client just sees a row whose persisted
+            // status diverges from the streamed terminal state, which the webapp's refresh
+            // reconciles.
+            log.info(
+                "finalise lost optimistic-lock race for assistantMessageId={} — leaving prior verdict in place",
+                cookie.assistantMessageId()
+            );
+        }
+    }
+
+    private void doFinalise(TurnPersistenceCookie cookie, TranslatorState state, UIMessageChunk.Finish finish) {
         ChatMessage assistant = chatMessageRepository
             .findById(cookie.assistantMessageId())
             .orElseThrow(() -> new EntityNotFoundException("ChatMessage", cookie.assistantMessageId().toString()));
-        // If the in-flight reaper (MentorInFlightReaper) flipped this row to `interrupted` while
-        // the runner was still streaming, a late finalise would overwrite back to `completed` —
-        // which the unique partial index now permits because the row is out of the index. Two
-        // legitimate completed rows for the same logical turn would then race to render in the
-        // webapp. Guard: only finalise rows still tagged `in_flight`. If we lost the race, leave
-        // the reaper's `interrupted` verdict in place.
-        if (!isStillInFlight(assistant)) {
-            return;
-        }
         assistant.setParts(state.partsSnapshot());
         ObjectNode meta = newOrCopyMeta(assistant);
         meta.put("status", "completed");
@@ -235,13 +247,23 @@ public class MentorTurnPersistence {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void interrupt(TurnPersistenceCookie cookie, TranslatorState state, Throwable cause) {
+        try {
+            doInterrupt(cookie, state, cause);
+        } catch (OptimisticLockingFailureException stale) {
+            // Another writer (a successful finalise or reaper sweep) bumped the row's version
+            // after our snapshot. Their verdict wins; we don't downgrade a `completed` row to
+            // `interrupted` or stomp the reaper's `interrupted`-with-context.
+            log.info(
+                "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior verdict in place",
+                cookie.assistantMessageId()
+            );
+        }
+    }
+
+    private void doInterrupt(TurnPersistenceCookie cookie, TranslatorState state, Throwable cause) {
         chatMessageRepository
             .findById(cookie.assistantMessageId())
             .ifPresent(assistant -> {
-                // Same race guard as finalise: don't clobber a terminal verdict (completed or a
-                // reaper-written interrupted) — only set our own interrupted on rows still
-                // in_flight.
-                if (!isStillInFlight(assistant)) return;
                 assistant.setParts(state.partsSnapshot());
                 ObjectNode meta = newOrCopyMeta(assistant);
                 meta.put("status", "interrupted");
@@ -250,14 +272,6 @@ public class MentorTurnPersistence {
                 assistant.setMetadata(meta);
                 chatMessageRepository.save(assistant);
             });
-    }
-
-    /** True iff the assistant row's metadata still has {@code status = "in_flight"}. */
-    private static boolean isStillInFlight(ChatMessage assistant) {
-        JsonNode meta = assistant.getMetadata();
-        if (meta == null || !meta.isObject()) return false;
-        JsonNode status = meta.get("status");
-        return status != null && status.isTextual() && "in_flight".equals(status.asText());
     }
 
     /**

@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
@@ -37,16 +38,9 @@ public class MentorChatController {
     private static final Logger log = LoggerFactory.getLogger(MentorChatController.class);
     private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(10).toMillis();
 
-    /**
-     * Hard cap on a single user prompt. {@link MentorRunnerClient}'s stdio frame is unbounded
-     * but a 100k-char prompt is ~25k input tokens — well above any pedagogically meaningful
-     * mentor question, and well below provider context windows. We reject above the cap with a
-     * synthetic error chunk so the controller never even attaches a sandbox for the abuse case.
-     */
-    static final int MAX_PROMPT_CHARS = 100_000;
-
     private final MentorChatService mentorChatService;
     private final ObjectMapper objectMapperBean;
+    private final MentorAgentProperties mentorAgentProperties;
 
     @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Send one mentor-chat turn; stream the response as AI SDK UIMessage chunks")
@@ -68,9 +62,10 @@ public class MentorChatController {
             shortCircuitError(emitter, "User message text is empty.");
             return emitter;
         }
-        if (userMessage.length() > MAX_PROMPT_CHARS) {
+        int maxPromptChars = mentorAgentProperties.maxPromptChars();
+        if (userMessage.length() > maxPromptChars) {
             SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
-            shortCircuitError(emitter, "User message is too long (max " + MAX_PROMPT_CHARS + " characters).");
+            shortCircuitError(emitter, "User message is too long (max " + maxPromptChars + " characters).");
             return emitter;
         }
 

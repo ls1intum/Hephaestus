@@ -52,7 +52,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
                    '{error}',
                    '"server restart"'::jsonb,
                    true
-               )
+               ),
+               version = version + 1
          WHERE (metadata ->> 'status') = 'in_flight'
            AND created_at < :cutoff
         """,

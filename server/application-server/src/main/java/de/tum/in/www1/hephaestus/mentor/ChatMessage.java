@@ -126,6 +126,26 @@ public class ChatMessage {
     @JsonIgnore
     private List<ChatMessagePart> legacyParts = new ArrayList<>();
 
+    /**
+     * Optimistic-lock version. Bumped by Hibernate on every managed write; a
+     * {@code @Modifying} UPDATE (e.g. {@link ChatMessageRepository#reapStaleInFlight}) bumps it
+     * explicitly. Race scenarios covered:
+     * <ul>
+     *   <li><b>Reaper-vs-finalise</b>: reaper flips a stuck row to {@code interrupted} at
+     *       version=N; meanwhile the runner's late {@code finalise} re-saves the same row from
+     *       a stale (version=N-1) snapshot. Hibernate detects the version mismatch and throws
+     *       {@code OptimisticLockingFailureException}; the orchestrator logs and skips so the
+     *       reaper's verdict survives.</li>
+     *   <li><b>Finalise-vs-interrupt</b>: a successful finalise (version=N+1) is followed by a
+     *       stale-handler interrupt; same exception, same skip — no downgrade.</li>
+     * </ul>
+     * Replaces the prior {@code isStillInFlight} read-before-write TOCTOU check.
+     */
+    @org.hibernate.annotations.ColumnDefault("0")
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private Long version;
+
     public enum Role {
         USER("user"),
         ASSISTANT("assistant"),

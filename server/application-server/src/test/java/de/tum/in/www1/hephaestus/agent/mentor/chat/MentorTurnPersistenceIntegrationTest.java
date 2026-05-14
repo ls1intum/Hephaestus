@@ -332,78 +332,41 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("finalise: race guard — reaped (interrupted) row is NOT clobbered by a late finalise")
-    void finalise_doesNotClobberReapedInterrupted() {
-        // Setup: assistant row written as in_flight, then reaper flips it to interrupted
-        // BEFORE the runner finally streams agent_end. Late finalise must leave the
-        // reaper's verdict in place — otherwise a single user turn yields two completed-
-        // looking rows fighting to render.
+    @DisplayName("@Version: reaper bumps version, then a stale-snapshot save throws OptimisticLockingFailureException")
+    void optimisticLocking_staleSnapshotSaveFails() {
+        // Root-cause protection against the reaper-vs-late-finalise data corruption: a
+        // writer that loaded the entity at version=N can no longer overwrite a row the
+        // reaper bumped to N+1. Hibernate detects the version mismatch on the SQL UPDATE
+        // predicate (`WHERE id = ? AND version = ?`) and throws — the persistence service
+        // catches and skips, so the reaper's verdict survives.
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
-        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
-            thread,
-            "hello",
-            assistantId,
-            null
-        );
+        persistence.persistInFlight(thread, "hello", assistantId, null);
 
-        // Simulate reaper sweep flipping the row to interrupted.
+        // Simulate the in-flight runner: load a managed snapshot at the current version.
+        ChatMessage stale = chatMessageRepository.findById(assistantId).orElseThrow();
+        Long versionBefore = stale.getVersion();
+        assertThat(versionBefore).isNotNull();
+
+        // Reaper sweeps, bumps version explicitly via @Modifying SQL.
         chatMessageRepository.reapStaleInFlight(Instant.now().plusSeconds(60));
-        assertThat(
-            chatMessageRepository.findById(assistantId).orElseThrow().getMetadata().path("status").asText()
-        ).isEqualTo("interrupted");
+        ChatMessage afterReaper = chatMessageRepository.findById(assistantId).orElseThrow();
+        assertThat(afterReaper.getVersion()).isEqualTo(versionBefore + 1L);
+        assertThat(afterReaper.getMetadata().path("status").asText()).isEqualTo("interrupted");
 
-        // Late finalise on the same cookie — must be a no-op.
-        TranslatorState state = new TranslatorState(assistantId);
-        state.observeModel("openai/gpt-oss-120b");
-        ObjectNode usage = NODES.objectNode();
-        usage.put("input", 100).put("output", 50);
-        state.observeUsage(usage);
-        state.openTextBlock("t");
-        state.appendText("late finish");
-        state.closeTextBlock();
-        UIMessageChunk.FinishMetadata fm = new UIMessageChunk.FinishMetadata(
-            "openai/gpt-oss-120b",
-            new UIMessageChunk.FinishMetadata.Usage(100, 50, null, null, 150),
-            null
-        );
-        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, fm));
+        // Stale-snapshot save attempt: Hibernate's UPDATE predicate fails on the version,
+        // surfaces as OptimisticLockingFailureException. The wave-16 band-aid was a
+        // read-before-write `isStillInFlight` check; this is the proper DB-enforced
+        // protection.
+        stale.setMetadata(NODES.objectNode().put("status", "completed"));
+        assertThatThrownBy(() -> {
+            chatMessageRepository.saveAndFlush(stale);
+        }).isInstanceOf(org.springframework.dao.OptimisticLockingFailureException.class);
 
-        ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
-        // Status STAYS interrupted; finalise did not clobber.
-        assertThat(assistant.getMetadata().path("status").asText()).isEqualTo("interrupted");
-        // Reaper's error sentinel is preserved.
-        assertThat(assistant.getMetadata().path("error").asText()).isEqualTo("server restart");
-    }
-
-    @Test
-    @DisplayName("interrupt: race guard — already-completed row is NOT clobbered by a late interrupt")
-    void interrupt_doesNotClobberCompletedRow() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
-        UUID assistantId = UUID.randomUUID();
-        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
-            thread,
-            "hello",
-            assistantId,
-            null
-        );
-
-        // Happy-path finalise first.
-        TranslatorState state = new TranslatorState(assistantId);
-        state.openTextBlock("t");
-        state.appendText("done");
-        state.closeTextBlock();
-        UIMessageChunk.FinishMetadata fm = new UIMessageChunk.FinishMetadata(null, null, null);
-        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, fm));
-        assertThat(
-            chatMessageRepository.findById(assistantId).orElseThrow().getMetadata().path("status").asText()
-        ).isEqualTo("completed");
-
-        // Late interrupt — must NOT downgrade the row from completed.
-        persistence.interrupt(cookie, state, new IllegalStateException("stale handler"));
-
-        ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
-        assertThat(assistant.getMetadata().path("status").asText()).isEqualTo("completed");
+        // After the failed save attempt, the row in the DB still reflects the reaper's verdict.
+        ChatMessage finalState = chatMessageRepository.findById(assistantId).orElseThrow();
+        assertThat(finalState.getMetadata().path("status").asText()).isEqualTo("interrupted");
+        assertThat(finalState.getMetadata().path("error").asText()).isEqualTo("server restart");
     }
 
     @Test

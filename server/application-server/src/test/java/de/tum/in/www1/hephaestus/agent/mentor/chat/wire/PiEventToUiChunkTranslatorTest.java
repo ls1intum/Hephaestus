@@ -78,6 +78,36 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(state.isStarted()).isFalse();
     }
 
+    @Test
+    @DisplayName("message_start when orchestrator already markStarted: emits StartStep only (no duplicate Start)")
+    void messageStart_afterOrchestratorMarkedStarted_emitsStartStepOnly() throws Exception {
+        // Orchestrator pre-emits Start at turn open, then markStarted() to suppress duplicate.
+        state.markStarted();
+        JsonNode event = fixture("message_start_assistant.json");
+
+        List<UIMessageChunk> out = translator.translate(event, state);
+
+        assertThat(out)
+            .extracting(c -> c.getClass().getSimpleName())
+            .containsExactly("StartStep");
+    }
+
+    @Test
+    @DisplayName("message_start fired twice in one turn (multi-step turn): Start once, StartStep per step")
+    void messageStart_multipleAssistantMessages_secondEmitsStartStepOnly() throws Exception {
+        JsonNode event = fixture("message_start_assistant.json");
+
+        List<UIMessageChunk> first = translator.translate(event, state);
+        List<UIMessageChunk> second = translator.translate(event, state);
+
+        assertThat(first)
+            .extracting(c -> c.getClass().getSimpleName())
+            .containsExactly("Start", "StartStep");
+        assertThat(second)
+            .extracting(c -> c.getClass().getSimpleName())
+            .containsExactly("StartStep");
+    }
+
     // ─── message_update (Pi's authoritative shape) ───────────────────────────────────────
 
     @Test

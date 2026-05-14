@@ -93,15 +93,12 @@ public class MentorChatService {
      * turn has naturally completed is harmless.
      */
     public void start(MentorTurnRequest request, SseEmitter emitter) {
-        // Resolve the authenticated user on the REQUEST thread, before submitting to the
-        // virtual-thread executor. SecurityContextHolder uses MODE_THREADLOCAL by default and
-        // Spring Boot does NOT propagate SecurityContext into a bare
-        // `Executors.newVirtualThreadPerTaskExecutor()` — a `getCurrentUserElseThrow()` on the
-        // vthread would return Optional.empty() and surface as a masked "Mentor turn failed: User
-        // not found" error chunk. Authorization has already happened at @PreAuthorize; we just
-        // need the principal, so resolve here and pass it through.
-        User user = userRepository.getCurrentUserElseThrow();
-
+        // SecurityContext propagates to the vthread executor via
+        // {@link MentorChatExecutorConfig.MentorTurnExecutor}'s
+        // {@link DelegatingSecurityContextExecutorService} wrapper, so
+        // {@code userRepository.getCurrentUserElseThrow()} called inside {@code runTurn} sees
+        // the same authentication the controller's @PreAuthorize verified. No explicit
+        // capture-and-pass needed.
         MentorSseChannel channel = new MentorSseChannel(emitter, objectMapper, runnerTimeoutScheduler.scheduler());
         channel.bindLifecycle();
         AtomicReference<MentorRunnerClient> clientHolder = new AtomicReference<>();
@@ -117,7 +114,7 @@ public class MentorChatService {
         metrics.recordStarted();
         ExecutorService executor = turnExecutor.executor();
         try {
-            executor.execute(() -> dispatchTurn(request, user, channel, clientHolder));
+            executor.execute(() -> dispatchTurn(request, channel, clientHolder));
         } catch (RejectedExecutionException rejected) {
             // Executor shut down (PreDestroy / context refresh) — we already wrote the
             // SSE response headers, so the only honest move is to send a clean Error chunk
@@ -130,7 +127,6 @@ public class MentorChatService {
 
     private void dispatchTurn(
         MentorTurnRequest request,
-        User user,
         MentorSseChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
@@ -143,7 +139,7 @@ public class MentorChatService {
             Optional<Boolean> acquired = turnLock.withLockOr409(key, () -> {
                 Timer.Sample sample = metrics.startTimer();
                 try {
-                    MentorChatMetrics.Outcome outcome = runTurn(request, user, channel, clientHolder);
+                    MentorChatMetrics.Outcome outcome = runTurn(request, channel, clientHolder);
                     metrics.recordCompleted(outcome);
                     return Boolean.TRUE;
                 } catch (TurnAlreadyInFlightException dup) {
@@ -196,10 +192,12 @@ public class MentorChatService {
 
     private MentorChatMetrics.Outcome runTurn(
         MentorTurnRequest request,
-        User user,
         MentorSseChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
+        // SecurityContext propagates from the request thread via the executor's
+        // DelegatingSecurityContextExecutorService wrapper.
+        User user = userRepository.getCurrentUserElseThrow();
         ChatThread thread = persistence.ensureThread(
             request.workspaceId(),
             request.threadId(),
@@ -226,14 +224,13 @@ public class MentorChatService {
         MentorChatMetrics.Outcome outcome = MentorChatMetrics.Outcome.ERROR;
         try {
             // Emit Start (with assistantMessageId) BEFORE sandbox.attach so the AI-SDK
-            // reducer creates the placeholder message immediately — sandbox cold start can take
-            // several seconds and the user otherwise stares at a blank screen. The translator
-            // later emits a second Start on Pi's first message_start event (same
-            // assistantMessageId); AI-SDK's `useChat` reducer dedupes by id, so the duplicate is
-            // a no-op on the client. Suppressing the translator's emit instead would require
-            // splitting the started/step-start flags (translator currently couples them in
-            // handleMessageStart) — not worth the surface for what is purely wire noise.
+            // reducer creates the placeholder message immediately — sandbox cold start can
+            // take several seconds and the user otherwise stares at a blank screen. Mark the
+            // translator started here so it suppresses the duplicate Start it would otherwise
+            // emit on Pi's first message_start; the translator still fires StartStep per
+            // assistant message (translator now decouples the two — see handleMessageStart).
             channel.send(new UIMessageChunk.Start(assistantMessageId, null));
+            state.markStarted();
             channel.send(UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"));
 
             Map<String, byte[]> aspectInputs = buildAspectContext(request, user);

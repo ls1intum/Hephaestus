@@ -78,17 +78,24 @@ public class PiEventToUiChunkTranslator {
         }
         // Capture model + any opening usage snapshot on the assistant message header.
         capturePartialUsage(event.path("message"), state);
-        if (state.isStarted()) {
-            // Defensive: a runner glitch that double-emits message_start. We already opened the
-            // top-level Start chunk; re-emitting it would confuse useChat's reconciliation.
-            return List.of();
+        // Decoupled Start vs StartStep: if the orchestrator pre-emitted the Start chunk (so the
+        // webapp's useChat reducer can show a placeholder during sandbox cold-start), the
+        // translator must NOT re-emit Start — AI-SDK dedupes by message id but the duplicate is
+        // wire-noise. The StartStep, however, is per-Pi-message and must always fire because
+        // useChat's reducer pushes a {type: "step-start"} part for each one. Pi may emit
+        // multiple message_start events across a single turn (one per assistant message in a
+        // multi-step tool-using turn), each of which gets its own step.
+        boolean firstStart = !state.isStarted();
+        if (firstStart) {
+            state.markStarted();
         }
-        state.markStarted();
         state.incrementStep();
-        List<UIMessageChunk> out = new ArrayList<>(2);
-        out.add(new UIMessageChunk.Start(state.assistantMessageId(), null));
-        out.add(new UIMessageChunk.StartStep());
-        return out;
+        if (firstStart) {
+            return List.of(new UIMessageChunk.Start(state.assistantMessageId(), null), new UIMessageChunk.StartStep());
+        }
+        // Subsequent assistant message in the same turn (e.g. after a tool execution) — keep
+        // the existing top-level Start the client already has, fire a fresh StartStep.
+        return List.of(new UIMessageChunk.StartStep());
     }
 
     // ─── message_update: text_delta + thinking_delta ──────────────────────────────────────

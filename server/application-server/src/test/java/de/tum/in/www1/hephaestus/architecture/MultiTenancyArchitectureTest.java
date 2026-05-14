@@ -648,7 +648,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             // AgentJobSubmitter handles AgentJobCreatedEvent which directly carries workspaceId
             "AgentJobSubmitter",
             // AgentJobEventListener handles AgentJobCreatedEvent which directly carries workspaceId
-            "AgentJobEventListener"
+            "AgentJobEventListener",
+            // MentorContextInvalidator handles DomainEvent.{PullRequest,Issue,Review}* whose
+            // EventContext carries the originating repository → workspaceId is resolved per-event
+            "MentorContextInvalidator"
         );
 
         /**
