@@ -5,7 +5,6 @@
  * - Thread management (loading, hydration, grouped threads)
  * - Greeting functionality
  * - Vote management
- * - Document/artifact streaming
  * - Query invalidation on message completion
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -34,26 +33,6 @@ vi.mock("@/environment", () => ({
 	},
 }));
 
-vi.mock("@/stores/artifact-store", () => ({
-	useArtifactStore: {
-		getState: vi.fn(() => ({
-			openArtifact: vi.fn(),
-			closeArtifact: vi.fn(),
-		})),
-	},
-}));
-
-vi.mock("@/stores/document-store", () => ({
-	useDocumentsStore: {
-		getState: vi.fn(() => ({
-			setEmptyDraft: vi.fn(),
-			appendDraftDelta: vi.fn(),
-			finishDraft: vi.fn(),
-			documents: {},
-		})),
-	},
-}));
-
 vi.mock("uuid", () => ({
 	v4: vi.fn(() => "mock-uuid-123"),
 }));
@@ -62,8 +41,6 @@ vi.mock("uuid", () => ({
 import { useChat } from "@ai-sdk/react";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { ChatMessage } from "@/lib/types";
-import { useArtifactStore } from "@/stores/artifact-store";
-import { useDocumentsStore } from "@/stores/document-store";
 import { useMentorChat } from "./useMentorChat";
 
 // Type the mocks for better intellisense
@@ -786,105 +763,6 @@ describe("useMentorChat", () => {
 
 			await waitFor(() => {
 				expect(invalidateSpy).toHaveBeenCalled();
-			});
-		});
-	});
-
-	describe("artifact/document handling", () => {
-		it("should expose openArtifactForDocument", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(typeof result.current.openArtifactForDocument).toBe("function");
-		});
-
-		it("should call artifact store when opening artifact", () => {
-			const mockOpenArtifact = vi.fn();
-			(useArtifactStore.getState as Mock).mockReturnValue({
-				openArtifact: mockOpenArtifact,
-				closeArtifact: vi.fn(),
-			});
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			const mockDocument = { id: "doc-123", title: "Test Doc" };
-			const mockRect = { top: 0, left: 0, width: 100, height: 100 } as DOMRect;
-
-			act(() => {
-				result.current.openArtifactForDocument(mockDocument as never, mockRect);
-			});
-
-			expect(mockOpenArtifact).toHaveBeenCalledWith("text:doc-123", mockRect, "Test Doc");
-		});
-
-		it("should expose closeArtifact", () => {
-			const mockCloseArtifact = vi.fn();
-			(useArtifactStore.getState as Mock).mockReturnValue({
-				openArtifact: vi.fn(),
-				closeArtifact: mockCloseArtifact,
-			});
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			act(() => {
-				result.current.closeArtifact();
-			});
-
-			expect(mockCloseArtifact).toHaveBeenCalled();
-		});
-
-		it("should handle document data parts via onData callback", () => {
-			const mockSetEmptyDraft = vi.fn();
-			const mockAppendDraftDelta = vi.fn();
-			const mockFinishDraft = vi.fn();
-
-			(useDocumentsStore.getState as Mock).mockReturnValue({
-				setEmptyDraft: mockSetEmptyDraft,
-				appendDraftDelta: mockAppendDraftDelta,
-				finishDraft: mockFinishDraft,
-				documents: {},
-			});
-
-			// Capture the onData callback
-			let capturedOnData: ((dataPart: { type: string; data?: unknown }) => void) | undefined;
-			mockUseChat.mockImplementation((options) => {
-				capturedOnData = options.onData;
-				return {
-					id: "mock-uuid-123",
-					messages: [],
-					status: "ready",
-					error: undefined,
-					sendMessage: mockSendMessage,
-					setMessages: mockSetMessages,
-					stop: mockStop,
-					regenerate: mockRegenerate,
-					clearError: mockClearError,
-					resumeStream: vi.fn(),
-					addToolResult: vi.fn(),
-					addToolOutput: vi.fn(),
-					addToolApprovalResponse: vi.fn(),
-				};
-			});
-
-			renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			// Simulate document creation data part
-			act(() => {
-				capturedOnData?.({
-					type: "data-document-create",
-					data: { id: "doc-1", title: "New Document" },
-				});
-			});
-
-			expect(mockSetEmptyDraft).toHaveBeenCalledWith("doc-1", {
-				title: "New Document",
 			});
 		});
 	});

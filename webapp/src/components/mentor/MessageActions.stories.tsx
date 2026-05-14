@@ -104,7 +104,6 @@ export const AssistantUpvoted: Story = {
 		vote: {
 			messageId: "msg-1",
 			isUpvoted: true,
-			createdAt: new Date(),
 			updatedAt: new Date(),
 		},
 	},
@@ -118,7 +117,6 @@ export const AssistantDownvoted: Story = {
 		vote: {
 			messageId: "msg-1",
 			isUpvoted: false,
-			createdAt: new Date(),
 			updatedAt: new Date(),
 		},
 	},

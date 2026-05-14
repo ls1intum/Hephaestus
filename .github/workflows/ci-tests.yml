@@ -19,11 +19,6 @@ on:
         required: false
         type: string
         default: "true"
-      intelligence_service_changed:
-        description: "Whether intelligence-service files changed"
-        required: false
-        type: string
-        default: "true"
       webhook_ingest_changed:
         description: "Whether webhook-ingest files changed"
         required: false
@@ -54,10 +49,6 @@ jobs:
             display-name: "Webapp: Storybook"
           - test-type: webapp-visual
             display-name: "Webapp: Visual"
-          - test-type: intelligence-service-unit-arch
-            display-name: "Intelligence: Unit + Arch"
-          - test-type: intelligence-service-integration
-            display-name: "Intelligence: Integration"
           - test-type: webhook-ingest-unit
             display-name: "Webhook: Unit"
 
@@ -71,9 +62,6 @@ jobs:
               ;;
             "application-server-unit-arch"|"application-server-integration")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
-              ;;
-            "intelligence-service-unit-arch"|"intelligence-service-integration")
-              echo "run=${{ inputs.intelligence_service_changed }}" >> $GITHUB_OUTPUT
               ;;
             "webhook-ingest-unit")
               echo "run=${{ inputs.webhook_ingest_changed }}" >> $GITHUB_OUTPUT
@@ -150,36 +138,6 @@ jobs:
             "webapp-visual")
               npm run build-storybook
               ;;
-          esac
-
-      - name: Run tests
-        if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'intelligence-service-')
-        run: |
-          # Use npm ci - automatically handles node_modules when lock file changed
-          npm ci --no-audit --progress=false
-          node scripts/install-platform-binaries.mjs
-          cd server/intelligence-service
-
-          case "${{ matrix.test-type }}" in
-            "intelligence-service-unit-arch")
-              FAILURES=()
-              npm run test:unit || FAILURES+=("Unit tests failed. Run: cd server/intelligence-service && npm run test:unit")
-              npm run test:arch || FAILURES+=("Architecture tests failed. Run: cd server/intelligence-service && npm run test:arch")
-
-              if [ ${#FAILURES[@]} -gt 0 ]; then
-                echo "### Intelligence Service Tests" >> $GITHUB_STEP_SUMMARY
-                echo "| Suite | Status | Fix |" >> $GITHUB_STEP_SUMMARY
-                echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-                for f in "${FAILURES[@]}"; do
-                  echo "::error::$f"
-                  if [[ "$f" == *"Run:"* ]]; then
-                    echo "| ${f%%.*} | :x: Failed | \`${f##*Run: }\` |" >> $GITHUB_STEP_SUMMARY
-                  fi
-                done
-                exit 1
-              fi
-              ;;
-            "intelligence-service-integration") npm run test:integration ;;
           esac
 
       - name: Run tests
@@ -270,15 +228,6 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-      - name: Upload intelligence-service test results
-        if: steps.should_run.outputs.run == 'true' && always() && startsWith(matrix.test-type, 'intelligence-service-')
-        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
-        with:
-          name: "Test Results - ${{ matrix.test-type }}"
-          path: "server/intelligence-service/test-results/junit-*.xml"
-          reporter: java-junit
-          fail-on-error: false
-
       - name: Upload webhook-ingest test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webhook-ingest-unit'
         uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
@@ -307,11 +256,6 @@ jobs:
               ;;
             webapp-*)
               echo "✅ Webapp tests completed." >> $GITHUB_STEP_SUMMARY
-              ;;
-            intelligence-service-*)
-              if [ -d "server/intelligence-service/test-results" ]; then
-                echo "✅ Intelligence service tests completed." >> $GITHUB_STEP_SUMMARY
-              fi
               ;;
             webhook-ingest-*)
               echo "✅ Webhook ingest tests completed." >> $GITHUB_STEP_SUMMARY

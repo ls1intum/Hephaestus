@@ -22,13 +22,9 @@ git diff --name-only HEAD
 Map paths to components (mirrors CI's dorny/paths-filter config):
 - `webapp/**` → webapp changed
 - `server/application-server/**` OR `scripts/db-utils.sh` → app-server changed
-- `server/intelligence-service/**` OR `scripts/install-platform-binaries.mjs` OR `scripts/generate-mermaid-erd.ts` OR `scripts/postprocess-openapi-java.ts` → intelligence changed
 - `server/webhook-ingest/**` → webhook changed
-- `package.json` OR `package-lock.json` OR `.node-version` → webapp + intelligence + webhook changed
+- `package.json` OR `package-lock.json` OR `.node-version` → webapp + webhook changed
 - `docs/**` → docs-only (skip all validation if nothing else changed)
-
-**Transitive dependency**: If app-server changed, also mark intelligence as changed
-(intelligence-service depends on app-server schema for DB models).
 
 ## 3. Format
 
@@ -63,20 +59,7 @@ npm run db:draft-changelog
 npm run db:generate-erd-docs
 ```
 
-**Intelligence-service API changed:**
-
-```bash
-MODEL_NAME=fake:model npm run generate:api:intelligence-service:specs
-npm run generate:api:intelligence-service:client
-```
-
 ## 6. Build Affected TS Services
-
-If intelligence changed:
-
-```bash
-npm run build:intelligence-service
-```
 
 If webhook changed:
 
@@ -102,12 +85,6 @@ If webapp changed:
 npm run test:webapp
 ```
 
-If intelligence changed:
-
-```bash
-npm run test:intelligence-service:unit
-```
-
 If app-server changed (and mvn available):
 
 ```bash
@@ -118,7 +95,7 @@ ALL tests must pass before proceeding.
 
 ## 8. OpenAPI Sync Check
 
-If app-server or intelligence changed:
+If app-server changed:
 
 ```bash
 npm run generate:api

@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, cancelJob, claimIdentity, computeUserLeagueStats, createConfig, createDocument, createPractice, createWorkspace, deleteConfig, deleteDocument, deleteDocumentVersionsAfter, deletePractice, deleteUser, getAllAchievementDefinitions, getAllTeams, getConfig, getConfigs, getCurrentUserMembership, getDocument, getEngagement, getFinding, getFindingsForPullRequest, getGroupedThreads, getIdentityProviders, getJob, getLabelFilters, getLatestFeedback, getLeaderboard, getLinkedAccounts, getMember, getPractice, getProviders, getRepositoriesToMonitor, getRepositorySettings, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getVersion, getWorkspace, gitLabPreflight, listDocuments, listFindings, listGitLabGroups, listGlobalContributors, listJobs, listMembers, listPractices, listThreads, listVersions, listWorkspaces, type Options, purgeWorkspace, recalculateUserAchievements, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, removeVote, renameSlug, resetAndRecalculateLeagues, retryDelivery, setActive, submitFeedback, unlinkAccount, updateConfig, updateDocument, updateFeatures, updateMemberVisibility, updateNotifications, updatePractice, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackCredentials, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, vote, voteMessage } from '../sdk.gen';
-import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, CancelJobData, CancelJobResponse, ClaimIdentityData, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateConfigData, CreateConfigResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, CreatePracticeData, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeleteDocumentData, DeleteDocumentError, DeleteDocumentResponse, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterError, DeleteDocumentVersionsAfterResponse, DeletePracticeData, DeletePracticeResponse, DeleteUserData, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetEngagementData, GetEngagementResponse, GetFindingData, GetFindingResponse, GetFindingsForPullRequestData, GetFindingsForPullRequestResponse, GetGroupedThreadsData, GetGroupedThreadsError, GetGroupedThreadsResponse, GetIdentityProvidersData, GetIdentityProvidersResponse, GetJobData, GetJobResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestFeedbackData, GetLatestFeedbackResponse, GetLeaderboardData, GetLeaderboardResponse, GetLinkedAccountsData, GetLinkedAccountsResponse, GetMemberData, GetMemberResponse, GetPracticeData, GetPracticeResponse, GetProvidersData, GetProvidersResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadError, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetVersionData, GetVersionError, GetVersionResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListFindingsData, ListFindingsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListJobsData, ListJobsResponse, ListMembersData, ListMembersResponse, ListPracticesData, ListPracticesResponse, ListThreadsData, ListThreadsResponse, ListVersionsData, ListVersionsError, ListVersionsResponse, ListWorkspacesData, ListWorkspacesResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, RecalculateUserAchievementsData, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RemoveVoteData, RemoveVoteResponse, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, RetryDeliveryData, RetryDeliveryResponse, SetActiveData, SetActiveResponse, SubmitFeedbackData, SubmitFeedbackResponse, UnlinkAccountData, UpdateConfigData, UpdateConfigResponse, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateMemberVisibilityData, UpdateMemberVisibilityResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePracticeData, UpdatePracticeResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteData, VoteMessageData, VoteMessageError, VoteMessageResponse, VoteResponse } from '../types.gen';
+import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, cancelJob, claimIdentity, computeUserLeagueStats, createConfig, createPractice, createWorkspace, deleteConfig, deletePractice, deleteThread, deleteUser, getAllAchievementDefinitions, getAllTeams, getConfig, getConfigs, getCurrentUserMembership, getEngagement, getFinding, getFindingsForPullRequest, getIdentityProviders, getJob, getLabelFilters, getLatestFeedback, getLeaderboard, getLinkedAccounts, getMember, getPractice, getProviders, getRepositoriesToMonitor, getRepositorySettings, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getWorkspace, gitLabPreflight, listFindings, listGitLabGroups, listGlobalContributors, listJobs, listMembers, listPractices, listThreads, listWorkspaces, type Options, purgeWorkspace, recalculateUserAchievements, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, removeVote, renameSlug, resetAndRecalculateLeagues, retryDelivery, setActive, submitFeedback, unlinkAccount, updateConfig, updateFeatures, updateMemberVisibility, updateNotifications, updatePractice, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackCredentials, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, vote } from '../sdk.gen';
+import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, CancelJobData, CancelJobResponse, ClaimIdentityData, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateConfigData, CreateConfigResponse, CreatePracticeData, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeletePracticeData, DeletePracticeResponse, DeleteThreadData, DeleteThreadResponse, DeleteUserData, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetEngagementData, GetEngagementResponse, GetFindingData, GetFindingResponse, GetFindingsForPullRequestData, GetFindingsForPullRequestResponse, GetIdentityProvidersData, GetIdentityProvidersResponse, GetJobData, GetJobResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestFeedbackData, GetLatestFeedbackResponse, GetLeaderboardData, GetLeaderboardResponse, GetLinkedAccountsData, GetLinkedAccountsResponse, GetMemberData, GetMemberResponse, GetPracticeData, GetPracticeResponse, GetProvidersData, GetProvidersResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ListFindingsData, ListFindingsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListJobsData, ListJobsResponse, ListMembersData, ListMembersResponse, ListPracticesData, ListPracticesResponse, ListThreadsData, ListThreadsResponse, ListWorkspacesData, ListWorkspacesResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, RecalculateUserAchievementsData, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RemoveVoteData, RemoveVoteResponse, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, RetryDeliveryData, RetryDeliveryResponse, SetActiveData, SetActiveResponse, SubmitFeedbackData, SubmitFeedbackResponse, UnlinkAccountData, UpdateConfigData, UpdateConfigResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateMemberVisibilityData, UpdateMemberVisibilityResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePracticeData, UpdatePracticeResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteData, VoteResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -840,217 +840,6 @@ export const updateMemberVisibilityMutation = (options?: Partial<Options<UpdateM
     return mutationOptions;
 };
 
-export const listDocumentsQueryKey = (options: Options<ListDocumentsData>) => createQueryKey('listDocuments', options);
-
-/**
- * List documents owned by the authenticated user
- */
-export const listDocumentsOptions = (options: Options<ListDocumentsData>) => queryOptions<ListDocumentsResponse, ListDocumentsError, ListDocumentsResponse, ReturnType<typeof listDocumentsQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await listDocuments({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: listDocumentsQueryKey(options)
-});
-
-export const listDocumentsInfiniteQueryKey = (options: Options<ListDocumentsData>): QueryKey<Options<ListDocumentsData>> => createQueryKey('listDocuments', options, true);
-
-/**
- * List documents owned by the authenticated user
- */
-export const listDocumentsInfiniteOptions = (options: Options<ListDocumentsData>) => infiniteQueryOptions<ListDocumentsResponse, ListDocumentsError, InfiniteData<ListDocumentsResponse>, QueryKey<Options<ListDocumentsData>>, number | null | Pick<QueryKey<Options<ListDocumentsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
-// @ts-ignore
-{
-    queryFn: async ({ pageParam, queryKey, signal }) => {
-        // @ts-ignore
-        const page: Pick<QueryKey<Options<ListDocumentsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
-            query: {
-                page: pageParam
-            }
-        };
-        const params = createInfiniteParams(queryKey, page);
-        const { data } = await listDocuments({
-            ...options,
-            ...params,
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: listDocumentsInfiniteQueryKey(options)
-});
-
-/**
- * Create a new document
- */
-export const createDocumentMutation = (options?: Partial<Options<CreateDocumentData>>): UseMutationOptions<CreateDocumentResponse, CreateDocumentError, Options<CreateDocumentData>> => {
-    const mutationOptions: UseMutationOptions<CreateDocumentResponse, CreateDocumentError, Options<CreateDocumentData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await createDocument({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-/**
- * Delete a document and all versions
- */
-export const deleteDocumentMutation = (options?: Partial<Options<DeleteDocumentData>>): UseMutationOptions<DeleteDocumentResponse, DeleteDocumentError, Options<DeleteDocumentData>> => {
-    const mutationOptions: UseMutationOptions<DeleteDocumentResponse, DeleteDocumentError, Options<DeleteDocumentData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await deleteDocument({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const getDocumentQueryKey = (options: Options<GetDocumentData>) => createQueryKey('getDocument', options);
-
-/**
- * Get latest version of a document
- */
-export const getDocumentOptions = (options: Options<GetDocumentData>) => queryOptions<GetDocumentResponse, GetDocumentError, GetDocumentResponse, ReturnType<typeof getDocumentQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getDocument({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getDocumentQueryKey(options)
-});
-
-/**
- * Update a document (creates new version)
- */
-export const updateDocumentMutation = (options?: Partial<Options<UpdateDocumentData>>): UseMutationOptions<UpdateDocumentResponse, UpdateDocumentError, Options<UpdateDocumentData>> => {
-    const mutationOptions: UseMutationOptions<UpdateDocumentResponse, UpdateDocumentError, Options<UpdateDocumentData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await updateDocument({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-/**
- * Delete versions after timestamp
- */
-export const deleteDocumentVersionsAfterMutation = (options?: Partial<Options<DeleteDocumentVersionsAfterData>>): UseMutationOptions<DeleteDocumentVersionsAfterResponse, DeleteDocumentVersionsAfterError, Options<DeleteDocumentVersionsAfterData>> => {
-    const mutationOptions: UseMutationOptions<DeleteDocumentVersionsAfterResponse, DeleteDocumentVersionsAfterError, Options<DeleteDocumentVersionsAfterData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await deleteDocumentVersionsAfter({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const listVersionsQueryKey = (options: Options<ListVersionsData>) => createQueryKey('listVersions', options);
-
-/**
- * List versions of a document
- */
-export const listVersionsOptions = (options: Options<ListVersionsData>) => queryOptions<ListVersionsResponse, ListVersionsError, ListVersionsResponse, ReturnType<typeof listVersionsQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await listVersions({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: listVersionsQueryKey(options)
-});
-
-export const listVersionsInfiniteQueryKey = (options: Options<ListVersionsData>): QueryKey<Options<ListVersionsData>> => createQueryKey('listVersions', options, true);
-
-/**
- * List versions of a document
- */
-export const listVersionsInfiniteOptions = (options: Options<ListVersionsData>) => infiniteQueryOptions<ListVersionsResponse, ListVersionsError, InfiniteData<ListVersionsResponse>, QueryKey<Options<ListVersionsData>>, number | null | Pick<QueryKey<Options<ListVersionsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
-// @ts-ignore
-{
-    queryFn: async ({ pageParam, queryKey, signal }) => {
-        // @ts-ignore
-        const page: Pick<QueryKey<Options<ListVersionsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
-            query: {
-                page: pageParam
-            }
-        };
-        const params = createInfiniteParams(queryKey, page);
-        const { data } = await listVersions({
-            ...options,
-            ...params,
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: listVersionsInfiniteQueryKey(options)
-});
-
-export const getVersionQueryKey = (options: Options<GetVersionData>) => createQueryKey('getVersion', options);
-
-/**
- * Get specific version
- */
-export const getVersionOptions = (options: Options<GetVersionData>) => queryOptions<GetVersionResponse, GetVersionError, GetVersionResponse, ReturnType<typeof getVersionQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getVersion({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getVersionQueryKey(options)
-});
-
-/**
- * Vote on a chat message (upvote/downvote) - idempotent upsert
- */
-export const voteMessageMutation = (options?: Partial<Options<VoteMessageData>>): UseMutationOptions<VoteMessageResponse, VoteMessageError, Options<VoteMessageData>> => {
-    const mutationOptions: UseMutationOptions<VoteMessageResponse, VoteMessageError, Options<VoteMessageData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await voteMessage({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
 export const listThreadsQueryKey = (options: Options<ListThreadsData>) => createQueryKey('listThreads', options);
 
 /**
@@ -1069,30 +858,29 @@ export const listThreadsOptions = (options: Options<ListThreadsData>) => queryOp
     queryKey: listThreadsQueryKey(options)
 });
 
-export const getGroupedThreadsQueryKey = (options: Options<GetGroupedThreadsData>) => createQueryKey('getGroupedThreads', options);
-
 /**
- * List chat threads grouped by time buckets
+ * Delete a mentor thread (cascades to messages, votes, parts)
  */
-export const getGroupedThreadsOptions = (options: Options<GetGroupedThreadsData>) => queryOptions<GetGroupedThreadsResponse, GetGroupedThreadsError, GetGroupedThreadsResponse, ReturnType<typeof getGroupedThreadsQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getGroupedThreads({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getGroupedThreadsQueryKey(options)
-});
+export const deleteThreadMutation = (options?: Partial<Options<DeleteThreadData>>): UseMutationOptions<DeleteThreadResponse, DefaultError, Options<DeleteThreadData>> => {
+    const mutationOptions: UseMutationOptions<DeleteThreadResponse, DefaultError, Options<DeleteThreadData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteThread({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const getThreadQueryKey = (options: Options<GetThreadData>) => createQueryKey('getThread', options);
 
 /**
- * Get mentor chat thread detail
+ * Get a mentor thread with its full message history
  */
-export const getThreadOptions = (options: Options<GetThreadData>) => queryOptions<GetThreadResponse, GetThreadError, GetThreadResponse, ReturnType<typeof getThreadQueryKey>>({
+export const getThreadOptions = (options: Options<GetThreadData>) => queryOptions<GetThreadResponse, DefaultError, GetThreadResponse, ReturnType<typeof getThreadQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getThread({
             ...options,

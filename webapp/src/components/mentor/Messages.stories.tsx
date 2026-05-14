@@ -175,13 +175,11 @@ const sampleVotes: ChatMessageVote[] = [
 	{
 		messageId: "msg-2",
 		isUpvoted: true,
-		createdAt: new Date("2024-01-15T10:05:00Z"),
 		updatedAt: new Date("2024-01-15T10:05:00Z"),
 	},
 	{
 		messageId: "msg-4",
 		isUpvoted: true,
-		createdAt: new Date("2024-01-15T10:05:00Z"),
 		updatedAt: new Date("2024-01-15T10:05:00Z"),
 	},
 ];

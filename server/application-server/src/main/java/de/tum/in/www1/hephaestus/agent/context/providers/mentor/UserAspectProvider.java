@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 /**
  * Materialises {@code context/target/user.json} for {@link MentorChatRequest}.
  *
- * <p>Port of {@code intelligence-service/src/mentor/tools/activity-summary.tool.ts}: same
+ * <p>Replaces the legacy intelligence-service {@code activity-summary} tool: same
  * fields, same heuristics for {@code insights} and {@code suggestedReflectionTopics}. The
  * provider does NOT decide whether a piece of data is relevant — the agent does, given the
  * full week/last-week numbers and a small set of pre-generated insight strings.

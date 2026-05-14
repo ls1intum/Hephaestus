@@ -50,9 +50,6 @@ hephaestus:
     workspace:
         init-default: false
 
-    intelligence-service:
-        url: ${INTELLIGENCE_SERVICE_URL}
-
     posthog:
         enabled: ${POSTHOG_ENABLED:false}
         api-host: ${POSTHOG_API_HOST:https://app.posthog.com}

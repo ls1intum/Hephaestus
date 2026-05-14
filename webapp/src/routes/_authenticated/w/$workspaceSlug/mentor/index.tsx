@@ -3,8 +3,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 
-import { getGroupedThreadsQueryKey, getThreadQueryKey } from "@/api/@tanstack/react-query.gen";
-import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
+import { getThreadQueryKey, listThreadsQueryKey } from "@/api/@tanstack/react-query.gen";
+import type { ChatThreadSummary } from "@/api/types.gen";
 import { Greeting } from "@/components/mentor/Greeting";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -32,28 +32,18 @@ function MentorContainer() {
 			messages: [],
 		});
 
-		// Add to thread list
-		queryClient.setQueryData<Array<ChatThreadGroup>>(
-			getGroupedThreadsQueryKey({ path: { workspaceSlug: slug } }),
+		// Add to thread list (flat list; NavMentorThreads buckets by createdAt)
+		queryClient.setQueryData<Array<ChatThreadSummary>>(
+			listThreadsQueryKey({ path: { workspaceSlug: slug } }),
 			(prev) => {
-				const threadGroups = prev ?? [];
+				const threads = prev ?? [];
+				if (threads.some((t) => t.id === threadId)) return threads;
 				const newSummary: ChatThreadSummary = {
 					id: threadId,
 					title: "New chat",
 					createdAt: new Date(),
 				};
-				const idx = threadGroups.findIndex((g) => g.groupName.toLowerCase() === "today");
-				if (idx >= 0) {
-					const group = threadGroups[idx];
-					const exists = group.threads.some((t) => t.id === threadId);
-					if (exists) return threadGroups;
-					const updatedGroup: ChatThreadGroup = {
-						groupName: group.groupName,
-						threads: [newSummary, ...group.threads],
-					};
-					return [...threadGroups.slice(0, idx), updatedGroup, ...threadGroups.slice(idx + 1)];
-				}
-				return [{ groupName: "Today", threads: [newSummary] }, ...threadGroups];
+				return [newSummary, ...threads];
 			},
 		);
 

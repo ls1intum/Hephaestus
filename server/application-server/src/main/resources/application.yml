@@ -247,7 +247,7 @@ hephaestus:
     # LOCAL GIT REPOSITORY STORAGE
     # ═══════════════════════════════════════════════════════════════════════════
     # When enabled, repositories are cloned as bare git repos for file-level
-    # commit analysis. The intelligence-service can read these repos directly.
+    # commit analysis. The Pi agent reads these repos directly inside the sandbox.
     git:
         # Whether local git checkout is enabled (default: false)
         enabled: ${GIT_CHECKOUT_ENABLED:false}
@@ -320,9 +320,6 @@ hephaestus:
             token: ${GITLAB_PAT:}
             # Custom server URL for self-hosted GitLab (optional, defaults to https://gitlab.com)
             server-url: ${GITLAB_SERVER_URL:}
-
-    intelligence-service:
-        url: http://localhost:${INTELLIGENCE_SERVICE_PORT:8000}
 
     cache:
         contributors:
@@ -524,7 +521,3 @@ resilience4j:
                 baseConfig: default
             gitlabGraphQl:
                 baseConfig: default
-            intelligence-service:
-                baseConfig: default
-                slowCallDurationThreshold: 30s
-                waitDurationInOpenState: 60s

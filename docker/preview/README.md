@@ -29,7 +29,7 @@ Uses the **main (non-PR) postgres data volume** via Docker socket: seed-loader w
 3. **seed-loader uses docker socket** to run `pg_dump` from a running base container or a temporary container started with the base volume (no `-pr-*`).
 4. **seed-loader restores dump** via `psql` into preview postgres using `docker exec -i <preview-postgres-container>` (prefers `$SERVICE_NAME_POSTGRES`, otherwise uses the fallback order above).
 5. **seed-loader exits** (success or failure doesn't matter).
-6. **application-server and intelligence-service wait for seed-loader to finish**.
+6. **application-server waits for seed-loader to finish**.
 7. **Rest of stack runs** with seeded data (or empty DB fallback).
 
 ### Why This Works

@@ -347,19 +347,16 @@ const CONVERSATION_VOTES: ChatMessageVote[] = [
 	{
 		messageId: "msg-2",
 		isUpvoted: true,
-		createdAt: new Date(),
 		updatedAt: new Date(),
 	},
 	{
 		messageId: "msg-6",
 		isUpvoted: true,
-		createdAt: new Date(),
 		updatedAt: new Date(),
 	},
 	{
 		messageId: "msg-8",
 		isUpvoted: true,
-		createdAt: new Date(),
 		updatedAt: new Date(),
 	},
 ];

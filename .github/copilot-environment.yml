@@ -35,7 +35,7 @@ preinstall: |
   echo "🐳 Checking Docker availability..."
   docker --version || echo "⚠️ Docker not available, some database operations may fail"
   
-  # Install project npm dependencies (includes all workspaces: webapp, intelligence-service, webhook-ingest)
+  # Install project npm dependencies (includes all workspaces: webapp, webhook-ingest)
   echo "📦 Installing npm dependencies..."
   # Always remove node_modules to ensure a clean install
   if [ -d "node_modules" ]; then
@@ -81,9 +81,6 @@ environment:
   SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/hephaestus
   SPRING_DATASOURCE_USERNAME: root
   SPRING_DATASOURCE_PASSWORD: root
-  
-  # Intelligence service model configuration (fake provider for tooling/generation)
-  MODEL_NAME: fake:model
   
   # Add Java 21 to PATH
   PATH: /usr/lib/jvm/temurin-21-jdk-amd64/bin:$PATH

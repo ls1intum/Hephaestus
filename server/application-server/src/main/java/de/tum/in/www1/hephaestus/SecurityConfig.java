@@ -118,7 +118,6 @@ public class SecurityConfig {
             // BEFORE the generic `/workspaces/*/**` permitAll below, otherwise the public-GET
             // rule wins and mentor reads become unauthenticated (feature-flag bypass — see #1071).
             requests.requestMatchers("/workspaces/*/mentor/**").hasAuthority(FeatureFlag.MENTOR_ACCESS.key());
-            requests.requestMatchers("/mentor/**").hasAuthority(FeatureFlag.MENTOR_ACCESS.key());
             // Public read for slugged workspace paths (filter enforces membership/public visibility).
             requests.requestMatchers(HttpMethod.GET, "/workspaces/*/**").permitAll();
             // Registry/listing stays authenticated to avoid leaking tenant directory.

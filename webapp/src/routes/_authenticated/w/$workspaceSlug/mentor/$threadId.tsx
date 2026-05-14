@@ -1,6 +1,5 @@
 import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
-import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayContainer";
 import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -167,20 +166,6 @@ function ThreadContainer() {
 				inputPlaceholder="Continue the conversation..."
 				disableAttachments={true}
 				className="h-[calc(100dvh-4rem)]"
-				partRenderers={defaultPartRenderers}
-			/>
-			<ArtifactOverlayContainer
-				messages={mentorChat.messages as unknown as ChatMessage[]}
-				votes={mentorChat.votes}
-				status={mentorChat.status}
-				attachments={[]}
-				readonly={false}
-				onMessageSubmit={handleMessageSubmit}
-				onStop={mentorChat.stop}
-				onFileUpload={() => Promise.resolve([])}
-				onMessageEdit={handleMessageEdit}
-				onCopy={handleCopy}
-				onVote={handleVote}
 				partRenderers={defaultPartRenderers}
 			/>
 		</div>

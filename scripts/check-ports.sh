@@ -6,7 +6,7 @@
 #   ./scripts/check-ports.sh --quiet  # Exit code only (0 = all free, 1 = conflicts found)
 #
 # Reads the same environment variables as the rest of the stack:
-#   POSTGRES_PORT, KEYCLOAK_PORT, SERVER_PORT, INTELLIGENCE_SERVICE_PORT, WEBAPP_PORT
+#   POSTGRES_PORT, KEYCLOAK_PORT, SERVER_PORT, WEBAPP_PORT
 
 set -euo pipefail
 
@@ -33,7 +33,6 @@ fi
 SERVICES="PostgreSQL|${POSTGRES_PORT:-5432}
 Keycloak|${KEYCLOAK_PORT:-8081}
 Application server|${SERVER_PORT:-8080}
-Intelligence service|${INTELLIGENCE_SERVICE_PORT:-8000}
 Webapp (Vite)|${WEBAPP_PORT:-4200}"
 
 RED='\033[0;31m'

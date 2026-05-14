@@ -79,26 +79,14 @@ export default defineConfig(({ command }) => {
 		resolve: {
 			alias: {
 				"@": resolve(__dirname, "./src"),
-				// Alias to share TS sources from the intelligence-service project
-				"@intelligence-service": resolve(
-					__dirname,
-					"../server/intelligence-service/src/mentor",
-				),
-				"@intelligence-service-utils": resolve(
-					__dirname,
-					"../server/intelligence-service/src/shared",
-				),
 			},
 		},
 		server: {
 			port: parseInt(process.env.WEBAPP_PORT ?? "", 10) || 4200,
 			strictPort: true,
 			fs: {
-				// Allow serving files from the monorepo root and sibling server directory
-				allow: [
-					resolve(__dirname, ".."),
-					resolve(__dirname, "../server/intelligence-service"),
-				],
+				// Allow serving files from the monorepo root
+				allow: [resolve(__dirname, "..")],
 			},
 		},
 	};

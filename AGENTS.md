@@ -6,25 +6,21 @@ This file governs the entire repository. Each service has its own `AGENTS.md` wi
 
 - `webapp/AGENTS.md` — React, TanStack, Tailwind patterns
 - `server/application-server/AGENTS.md` — Spring Boot, JPA, testing
-- `server/intelligence-service/AGENTS.md` — AI/Hono service patterns
 - `server/webhook-ingest/AGENTS.md` — Webhook processing, NATS
 
 ## 1. Architecture map
 
-- `server/application-server/`: Spring Boot 3.5, Liquibase-managed PostgreSQL schema, synchronous + reactive APIs, generated OpenAPI spec in `openapi.yaml`.
+- `server/application-server/`: Spring Boot 3.5, Liquibase-managed PostgreSQL schema, synchronous + reactive APIs, generated OpenAPI spec in `openapi.yaml`. Hosts the Pi mentor agent in-process.
 - `webapp/`: React 19 + TanStack Router/Query, Tailwind 4 UI kit (`src/components/ui`), generated API client in `src/api/**`.
-- `server/intelligence-service/`: TypeScript/Hono service orchestrating AI models via Vercel AI SDK. OpenAPI spec is exported and mirrored into the Java client under the application server.
 - `server/webhook-ingest/`: Hono/TypeScript webhook intake that forwards events into NATS JetStream.
 - `docs/`: Contributor docs (including the ERD that `db:generate-erd-docs` regenerates).
 
 ## 2. Toolchain & environment prerequisites
 
-- **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces. The intelligence-service and webhook-ingest are TypeScript services that use npm.
+- **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces. The webapp and webhook-ingest are TypeScript packages that use npm.
 - **Java**: JDK 21 (see `pom.xml`). Run builds with `mvn` from `server/application-server/`.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
-- **Environment variables**: When generating intelligence service OpenAPI specs locally, set `MODEL_NAME=fake:model` (the service settings expect a provider-qualified model name).
-
 ## 3. Quality gates & routine commands
 
 Run the relevant commands locally before opening a PR:
@@ -45,7 +41,6 @@ Run the relevant commands locally before opening a PR:
 | ------------------------ | ------------------------------------- | ------------------------------------------- | ----------------------------------- | ------------------------------------ |
 | **Webapp**               | `npm run format:webapp`               | `npm run format:webapp:check`               | `npm run lint:webapp`               | `npm run check:webapp`               |
 | **Java**                 | `npm run format:java`                 | `npm run format:java:check`                 | —                                   | —                                    |
-| **Intelligence Service** | `npm run format:intelligence-service` | `npm run format:intelligence-service:check` | `npm run lint:intelligence-service` | `npm run check:intelligence-service` |
 | **Webhook Ingest**       | `npm run format:webhook-ingest`       | `npm run format:webhook-ingest:check`       | `npm run lint:webhook-ingest`       | `npm run check:webhook-ingest`       |
 
 ### Additional commands
@@ -78,9 +73,6 @@ We rely heavily on generated artifacts. Never hand-edit these directories—rege
 | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `server/application-server/openapi.yaml`                                                                                            | `npm run generate:api:application-server:specs` (runs `mvn verify -DskipTests=true -Dapp.profiles=specs`).        |
 | `webapp/src/api/**/*`, `webapp/src/api/@tanstack/react-query.gen.ts`, `webapp/src/api/client.gen.ts`, `webapp/src/api/types.gen.ts` | `npm run generate:api:application-server:client` (wraps `npm -w webapp run openapi-ts`).                          |
-| `server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**`                                          | `npm run generate:api:intelligence-service:client` (OpenAPI Generator CLI).                                       |
-| `server/intelligence-service/openapi.yaml`                                                                                          | `npm run generate:api:intelligence-service:specs` (runs `npm -w server/intelligence-service run openapi:export`). |
-| `server/intelligence-service/src/shared/db/schema.ts`                                                                               | `npm run db:generate-models:intelligence-service` (requires the application-server database to be reachable).     |
 | `docs/contributor/erd/schema.mmd`                                                                                                   | `npm run db:generate-erd-docs` (connects to the same Postgres instance).                                          |
 
 Regeneration is destructive; stash local edits before running these commands. Check diffs carefully—generated clients must be committed alongside API changes.
@@ -93,7 +85,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
   2. Snapshot the schema, run Liquibase diff, and create a timestamped changelog file.
   3. Tear down the temporary container.
 - Trim the generated changelog to only the real schema deltas (e.g., new columns). Never commit the raw diff wholesale—prune back to the minimal change set before renaming it into `db/changelog/`.
-- After drafting a changelog, run `npm run db:generate-erd-docs` and `npm run db:generate-models:intelligence-service` to keep ERD docs and Drizzle schema in sync.
+- After drafting a changelog, run `npm run db:generate-erd-docs` to keep ERD docs in sync.
 - Never manually edit generated Liquibase diff sections unless you fully understand the implications. Prefer creating a follow-up changelog to fix mistakes.
 
 ## 6. Frontend (webapp) expectations
@@ -125,7 +117,6 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Annotate record components in DTOs with `org.springframework.lang.NonNull` when the API requires a value; leave optional fields bare so the OpenAPI spec stays minimal without extra schema annotations.
 - Prefer resource-oriented workspace endpoints: express lifecycle transitions via HTTP methods (for example `PATCH /workspaces/{workspaceSlug}/status`) instead of RPC-style verbs and return consistent `ProblemDetail` payloads for errors.
 - When adding or changing REST endpoints, follow the centralized exception-handling rules in `docs/contributor/api-error-handling.md` so every controller returns RFC-7807 `ProblemDetail` responses via `@RestControllerAdvice`.
-- When integrating with the intelligence-service client, always regenerate (`npm run generate:api:intelligence-service:client`) after touching the spec and commit the updated Java files.
 - Controller-level integration tests should extend `AbstractWorkspaceIntegrationTest` (or an equivalent domain-specific base), exercise access control through `WebTestClient` + `TestAuthUtils`, and follow the contributor testing guide's checklist. This keeps authentication, validation, and persistence assertions consistent across new endpoints.
 
 ## 8. Intelligence service expectations (TypeScript)

@@ -25,10 +25,7 @@ module.exports = async ({ github, context }) => {
     /^webapp\/src\/routeTree\.gen\.ts$/, // TanStack Router generated
 
     // Server generated
-    /^server\/application-server\/src\/main\/java\/de\/tum\/in\/www1\/hephaestus\/intelligenceservice\//, // Generated Java client
-    /^server\/intelligence-service\/src\/shared\/db\/schema\.ts$/, // Drizzle generated schema
     /^server\/application-server\/openapi\.yaml$/, // Generated OpenAPI spec
-    /^server\/intelligence-service\/openapi\.yaml$/, // Generated OpenAPI spec
 
     // Docs generated
     /^docs\/contributor\/erd\/.*\.mmd$/, // Generated Mermaid ERD diagrams

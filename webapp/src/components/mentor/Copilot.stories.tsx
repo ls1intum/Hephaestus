@@ -223,13 +223,11 @@ export const WithConversation: Story = {
 							{
 								messageId: "msg-2",
 								isUpvoted: true,
-								createdAt: new Date(),
 								updatedAt: new Date(),
 							},
 							{
 								messageId: "msg-4",
 								isUpvoted: true,
-								createdAt: new Date(),
 								updatedAt: new Date(),
 							},
 						] satisfies ChatMessageVote[]

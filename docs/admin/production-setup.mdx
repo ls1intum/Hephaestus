@@ -103,16 +103,7 @@ Staging and production both use the production compose files. The difference sho
 
 ### AI model configuration
 
-The intelligence-service model selection and the sandboxed practice-review proxy are two different paths.
-
-For the intelligence-service:
-
-| Variable | Purpose |
-| --- | --- |
-| `MODEL_NAME` | Provider-qualified model name such as `openai:gpt-4o` or `azure:gpt-5.4-mini` |
-| `OPENAI_API_KEY` | Required when `MODEL_NAME` starts with `openai:` |
-| `AZURE_RESOURCE_NAME` | Required when `MODEL_NAME` starts with `azure:` |
-| `AZURE_API_KEY` | Required when `MODEL_NAME` starts with `azure:` |
+The mentor (Pi agent run in-process) and the sandboxed practice-review proxy both flow through the application server's LLM proxy routes. There is no separate intelligence service to configure.
 
 For Azure-backed practice review in the application server:
 

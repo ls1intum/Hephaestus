@@ -14,23 +14,22 @@ runs:
   steps:
     # Node.js caching
     - name: Setup Node.js
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "openapi-validation", "intelligence-service-quality", "intelligence-service-unit-arch", "intelligence-service-integration", "webhook-ingest-quality", "webhook-ingest-unit", "database-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "openapi-validation", "webhook-ingest-quality", "webhook-ingest-unit", "database-validation"]'), inputs.cache-type)
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version-file: ".node-version"
         cache: "npm"
 
     - name: Cache Node.js dependencies
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "openapi-validation", "webhook-ingest-quality", "webhook-ingest-unit", "intelligence-service-quality", "intelligence-service-unit-arch", "intelligence-service-integration", "database-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "openapi-validation", "webhook-ingest-quality", "webhook-ingest-unit", "database-validation"]'), inputs.cache-type)
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: |
           ~/.npm
           webapp/node_modules
           server/webhook-ingest/node_modules
-          server/intelligence-service/node_modules
           node_modules
-        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package.json', 'server/webhook-ingest/package.json', 'server/intelligence-service/package.json') }}
+        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package.json', 'server/webhook-ingest/package.json') }}
         restore-keys: |
           ${{ inputs.os }}-node-${{ hashFiles('package-lock.json') }}-
           ${{ inputs.os }}-node-
@@ -76,7 +75,7 @@ runs:
     # We cache them in ~/.cache/platform-binaries and restore after npm ci wipes node_modules.
     - name: Cache platform binaries
       id: platform-cache
-      if: contains(fromJSON('["webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "intelligence-service-quality", "intelligence-service-unit-arch", "intelligence-service-integration", "webhook-ingest-quality", "webhook-ingest-unit", "database-validation"]'), inputs.cache-type) && runner.os == 'Linux'
+      if: contains(fromJSON('["webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "webhook-ingest-quality", "webhook-ingest-unit", "database-validation"]'), inputs.cache-type) && runner.os == 'Linux'
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ~/.cache/platform-binaries

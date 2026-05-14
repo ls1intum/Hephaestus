@@ -43,8 +43,6 @@ hephaestus:
     mail:
         enabled: false
         sender: noreply@example.com
-    intelligence-service:
-        url: http://localhost:8000
     sync:
         nats:
             enabled: false

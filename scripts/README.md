@@ -15,7 +15,6 @@ All database-related commands are accessed via `db-utils.sh` which handles datab
 ```bash
 npm run db:generate-erd-docs                    # Generate Mermaid ERD diagram
 npm run db:draft-changelog                       # Generate Liquibase changelog diff
-npm run db:generate-models:intelligence-service  # Drizzle schema introspection
 ```
 
 **ERD Generation Environment Variables:**

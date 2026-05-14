@@ -6,7 +6,6 @@
 # Commands:
 #   generate-erd                         - Generate ERD documentation only
 #   draft-changelog                      - Generate changelog diff only
-#   generate-models-intelligence-service - Introspect existing DB and generate Drizzle schema for intelligence service
 
 set -eo pipefail  # Exit on any error, including pipeline failures
 
@@ -269,14 +268,6 @@ generate_erd() {
     log_success "ERD documentation updated at 'docs/contributor/erd/schema.mmd'"
 }
 
-# Generate Drizzle schema for intelligence service
-generate_intelligence_service_models() {
-    log_info "Generating Drizzle schema for intelligence service..."
-    cd "$PROJECT_ROOT"
-    npm run db:generate-models:intelligence-service
-    log_success "Drizzle schema generated for intelligence service (see server/intelligence-service/src/shared/db)"
-}
-
 # Generate changelog diff with database backup/restore
 generate_changelog_diff() {
     log_info "Generating changelog diff..."
@@ -432,13 +423,11 @@ Usage: $0 [command]
 Commands:
   generate-erd                      Generate ERD documentation only (requires running database)
   draft-changelog                   Generate changelog diff only
-  generate-models-intelligence-service  Generate Drizzle schema for intelligence service
   help                             Show this help message
 
 Examples:
   $0 generate-erd                        # Quick ERD generation during development
   $0 draft-changelog                     # Generate migration before PR
-  $0 generate-models-intelligence-service  # Generate Drizzle schema from current DB
 
 EOF
 }
@@ -451,10 +440,6 @@ main() {
             ;;
         "draft-changelog")
             cmd_draft_changelog
-            ;;
-        "generate-models-intelligence-service")
-            # Use the dedicated command function for consistency
-            cmd_generate_db_models_intelligence_service
             ;;
         "help"|"-h"|"--help")
             show_usage

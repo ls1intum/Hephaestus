@@ -13,10 +13,6 @@
 			"path": "./server/application-server"
 		},
 		{
-			"name": "server/intelligence-service",
-			"path": "./server/intelligence-service"
-		},
-		{
 			"name": "server/webhook-ingest",
 			"path": "./server/webhook-ingest"
 		},

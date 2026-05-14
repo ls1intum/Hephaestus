@@ -162,7 +162,6 @@ CI only runs jobs for components that actually changed:
 | -------------------- | ------------------------------------------------------------- |
 | Webapp               | `webapp/**`, `package.json`, `package-lock.json`              |
 | Application Server   | `server/application-server/**`, `scripts/db-utils.sh`         |
-| Intelligence Service | `server/intelligence-service/**`, scripts, root package files |
 | Webhook Ingest       | `server/webhook-ingest/**`, root package files                |
 | CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
 
@@ -180,7 +179,6 @@ Docker builds use **registry-based caching** to store intermediate layers in `gh
 | -------------------- | ----------- | ------------ | ---------- |
 | Application Server   | ~7 min      | ~30 sec      | ~500 MB    |
 | Webapp               | ~5 min      | ~30 sec      | ~200 MB    |
-| Intelligence Service | ~4 min      | ~30 sec      | ~150 MB    |
 | Webhook Ingest       | ~3 min      | ~30 sec      | ~100 MB    |
 
 **How it works:**
@@ -211,7 +209,7 @@ The Docker build workflow will automatically use these credentials if present, f
 
 ### Parallel Execution
 
-- 10 test types run in parallel (3 app-server, 3 webapp, 3 intelligence-service, 1 webhook-ingest)
+- 7 test types run in parallel (3 app-server, 3 webapp, 1 webhook-ingest)
 - 8 quality gate checks run in parallel
 - 4 Docker builds × 2 architectures (amd64 + arm64)
 - `fail-fast: false` ensures all jobs complete for full feedback
@@ -242,10 +240,6 @@ npm run test:webapp           # Unit tests
 # Application Server (Java)
 npm run format:java:check     # Check formatting
 cd server/application-server && ./mvnw test -Dgroups="unit"  # Unit tests
-
-# Intelligence Service
-npm run check:intelligence-service
-cd server/intelligence-service && npm run test:unit
 
 # Webhook Ingest
 npm run check:webhook-ingest

@@ -110,9 +110,9 @@ public class ChatMessage {
     private JsonNode parts;
 
     /**
-     * Legacy normalised parts rows. Retained for backward-compatible reads during the
-     * intelligence-service shutdown window; new writers go via the {@link #parts} JSONB.
-     * The {@code chat_message_part} table is dropped in #1074.
+     * Legacy normalised parts rows from the pre-Pi mentor era. Retained for read-path
+     * back-compat; new writers go via the {@link #parts} JSONB. The
+     * {@code chat_message_part} table is dropped in #1074.
      */
     @Deprecated(forRemoval = true)
     @OneToMany(mappedBy = "message", cascade = CascadeType.REMOVE, fetch = FetchType.LAZY, orphanRemoval = true)

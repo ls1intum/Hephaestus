@@ -58,15 +58,13 @@ Before fixing anything, categorize every failure into this table.
 | 1 | Formatting | "Formatting failed", biome/prettier diff | `npm run format` |
 | 2 | Lint | Biome lint errors | `npm run check:fix` |
 | 3 | TypeScript | TS2xxx errors, type mismatch | Fix the type error in source |
-| 4 | Build failure | Compilation errors, missing exports | Fix imports/exports, verify with `npm run build:intelligence-service` or `npm run build:webhook-ingest` |
+| 4 | Build failure | Compilation errors, missing exports | Fix imports/exports, verify with `npm run build:webhook-ingest` |
 | 5 | Webapp tests | "FAIL" in webapp test output | Fix test or source, verify with `npm run test:webapp` |
 | 5 | App server tests | Maven test failures, assertion errors | Fix test or source, verify with `cd server/application-server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q` |
-| 5 | Intelligence tests | Vitest failures in intelligence-service | Fix test or source, verify with `npm run test:intelligence-service:unit` |
 | 5 | Webhook tests | Vitest failures in webhook-ingest | Fix test or source, verify with `npm run test:webhook-ingest` |
 | 6 | OpenAPI sync | "OpenAPI out of sync" | `npm run generate:api` |
 | 6 | DB schema | "Schema drift detected" | `npm run db:draft-changelog` |
 | 6 | DB ERD | "ERD outdated" | `npm run db:generate-erd-docs` |
-| 6 | DB models | "DB models out of sync" | `npm run db:generate-models:intelligence-service` |
 
 ## 5. Fix ALL Issues
 
@@ -92,9 +90,6 @@ npm run test:webapp
 
 # If webhook-ingest tests failed:
 npm run test:webhook-ingest
-
-# If intelligence-service tests failed:
-npm run test:intelligence-service:unit
 
 # If app-server tests failed:
 cd server/application-server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q && cd ../..
