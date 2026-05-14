@@ -47,11 +47,11 @@ function MentorContainer() {
 			},
 		);
 
-		// Navigate to thread page - it will trigger the greeting via autoGreeting
+		// Navigate to thread page — the static <Greeting /> there renders on empty messages,
+		// then the user's first message starts the real chat turn.
 		navigate({
 			to: "/w/$workspaceSlug/mentor/$threadId",
 			params: { workspaceSlug: slug, threadId },
-			state: { autoGreeting: true },
 			replace: true,
 		});
 	}, [workspaceSlug, slug, queryClient, navigate]);

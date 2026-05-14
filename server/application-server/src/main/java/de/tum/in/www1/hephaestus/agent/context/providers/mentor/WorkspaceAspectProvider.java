@@ -74,18 +74,10 @@ public class WorkspaceAspectProvider implements ContentProvider {
         MentorChatRequest req = (MentorChatRequest) request;
         String key = req.workspaceId() + ":" + req.contributorId();
         Cache cache = cacheManager != null ? cacheManager.getCache(CACHE_NAME) : null;
-        ObjectNode payload;
-        if (cache != null) {
-            ObjectNode cached = cache.get(key, ObjectNode.class);
-            if (cached != null) {
-                payload = cached;
-            } else {
-                payload = buildPayload(req.workspaceId(), req.contributorId());
-                cache.put(key, payload);
-            }
-        } else {
-            payload = buildPayload(req.workspaceId(), req.contributorId());
-        }
+        // Atomic compute-if-absent closes the get/build/put race on invalidation events.
+        ObjectNode payload = (cache != null)
+            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.contributorId()))
+            : buildPayload(req.workspaceId(), req.contributorId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JsonProcessingException e) {

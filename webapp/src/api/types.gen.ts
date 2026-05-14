@@ -1801,12 +1801,9 @@ export type ChatMessage = {
     /**
      * Per-turn metadata: status, model, costUsd, usage, …
      */
-    metadata?: unknown;
+    metadata?: string;
     parentMessageId?: string;
-    /**
-     * AI SDK UIMessage parts array.
-     */
-    parts?: string;
+    parts?: Array<unknown>;
     role?: string;
 };
 

@@ -125,40 +125,62 @@ public class MentorChatService {
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
         MentorTurnLock.ThreadKey key = new MentorTurnLock.ThreadKey(request.workspaceId(), request.threadId());
-        Optional<Boolean> acquired = turnLock.withLockOr409(key, () -> {
-            Timer.Sample sample = metrics.startTimer();
-            try {
-                MentorChatMetrics.Outcome outcome = runTurn(request, channel, clientHolder);
-                metrics.recordCompleted(outcome);
-                return Boolean.TRUE;
-            } catch (TurnAlreadyInFlightException dup) {
-                log.info("Mentor turn rejected (DB in-flight index): {}", dup.getMessage());
+        // Outer try/catch covers *any* unchecked throwable that can escape `turnLock.withLockOr409`
+        // itself (e.g. a future ConcurrentHashMap.compute that throws an OOME or any code path
+        // outside the lambda). Without it, an uncaught throwable would leave `started` incremented,
+        // `completed` not, and the SseEmitter dangling until EMITTER_TIMEOUT_MS (10 min) fires.
+        try {
+            Optional<Boolean> acquired = turnLock.withLockOr409(key, () -> {
+                Timer.Sample sample = metrics.startTimer();
+                try {
+                    MentorChatMetrics.Outcome outcome = runTurn(request, channel, clientHolder);
+                    metrics.recordCompleted(outcome);
+                    return Boolean.TRUE;
+                } catch (TurnAlreadyInFlightException dup) {
+                    log.info("Mentor turn rejected (DB in-flight index): {}", dup.getMessage());
+                    metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT);
+                    channel.completeWithConflict();
+                    return Boolean.FALSE;
+                } catch (RuntimeException e) {
+                    log.warn(
+                        "Mentor turn failed: workspaceId={}, threadId={}: {}",
+                        key.workspaceId(),
+                        key.threadId(),
+                        e.getMessage(),
+                        e
+                    );
+                    metrics.recordCompleted(MentorChatMetrics.Outcome.ERROR);
+                    channel.completeWithError("Mentor turn failed: " + e.getMessage());
+                    return Boolean.FALSE;
+                } finally {
+                    metrics.stopTimer(sample);
+                }
+            });
+            if (acquired.isEmpty()) {
+                log.info(
+                    "Mentor turn rejected (in flight): workspaceId={}, threadId={}",
+                    key.workspaceId(),
+                    key.threadId()
+                );
                 metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT);
                 channel.completeWithConflict();
-                return Boolean.FALSE;
-            } catch (RuntimeException e) {
-                log.warn(
-                    "Mentor turn failed: workspaceId={}, threadId={}: {}",
-                    key.workspaceId(),
-                    key.threadId(),
-                    e.getMessage(),
-                    e
-                );
-                metrics.recordCompleted(MentorChatMetrics.Outcome.ERROR);
-                channel.completeWithError("Mentor turn failed: " + e.getMessage());
-                return Boolean.FALSE;
-            } finally {
-                metrics.stopTimer(sample);
             }
-        });
-        if (acquired.isEmpty()) {
-            log.info(
-                "Mentor turn rejected (in flight): workspaceId={}, threadId={}",
+        } catch (Throwable t) {
+            log.error(
+                "Mentor dispatchTurn escaped: workspaceId={}, threadId={}: {}",
                 key.workspaceId(),
-                key.threadId()
+                key.threadId(),
+                t.getMessage(),
+                t
             );
-            metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT);
-            channel.completeWithConflict();
+            metrics.recordCompleted(MentorChatMetrics.Outcome.ERROR);
+            try {
+                channel.completeWithError("Mentor turn failed unexpectedly.");
+            } catch (RuntimeException ignored) {
+                // Best-effort: the channel may already be closed.
+            }
+            // Re-throw Error subclasses (OOME, StackOverflowError) — JVM stability over metrics tidy-up.
+            if (t instanceof Error err) throw err;
         }
     }
 
@@ -342,13 +364,23 @@ public class MentorChatService {
             List<UIMessageChunk> chunks = translator.translate(piEvent, state);
             for (UIMessageChunk chunk : chunks) {
                 if (chunk instanceof UIMessageChunk.Finish finish) {
-                    // Compute cost BEFORE sending the Finish chunk so the client sees the same
-                    // value the DB persists; otherwise the wire Finish would carry null costUsd
-                    // and the client would have to refresh to discover it.
-                    UIMessageChunk.Finish augmented = persistence.augmentFinishWithCost(finish, state);
-                    channel.send(augmented);
-                    persistence.finalise(cookie, state, augmented);
-                    Double costUsd = augmented.messageMetadata() != null ? augmented.messageMetadata().costUsd() : null;
+                    // Cost augmentation must not block the wire Finish: a pricing-row miss, DB
+                    // blip, or token-math overflow would otherwise propagate up `handleEvent`,
+                    // turn-complete the future exceptionally, and surface as an interrupted row
+                    // + generic error chunk even though Pi finished cleanly. Send the raw Finish
+                    // on failure; cost can be backfilled out-of-band.
+                    UIMessageChunk.Finish toSend = finish;
+                    try {
+                        toSend = persistence.augmentFinishWithCost(finish, state);
+                    } catch (RuntimeException costEx) {
+                        log.warn(
+                            "Cost augmentation failed for Finish chunk — sending raw Finish: {}",
+                            costEx.toString()
+                        );
+                    }
+                    channel.send(toSend);
+                    persistence.finalise(cookie, state, toSend);
+                    Double costUsd = toSend.messageMetadata() != null ? toSend.messageMetadata().costUsd() : null;
                     if (costUsd != null) metrics.recordCostUsd(costUsd);
                     turnComplete.complete(null);
                 } else if (chunk instanceof UIMessageChunk.Error err) {

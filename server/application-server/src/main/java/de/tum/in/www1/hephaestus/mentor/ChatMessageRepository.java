@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -18,6 +19,14 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
      * shipping to the runner (see {@code MentorChatService.RECENT_MESSAGES_CAP}).
      */
     List<ChatMessage> findByThreadIdOrderByCreatedAtAsc(UUID threadId);
+
+    /**
+     * Newest-first slice for the replay window. Callers pass a {@code PageRequest.of(0, N)} and
+     * reverse the result in memory to get the trailing chronological tail without loading and
+     * trimming the full thread (matches the DB-side LIMIT pattern used by
+     * {@code ChatThreadRepository.findRecentThreads}).
+     */
+    List<ChatMessage> findByThreadIdOrderByCreatedAtDesc(UUID threadId, Pageable pageable);
 
     /**
      * Flip assistant rows still {@code in_flight} past {@code cutoff} to {@code interrupted},

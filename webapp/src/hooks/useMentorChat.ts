@@ -1,12 +1,7 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-	DefaultChatTransport,
-	parseJsonEventStream,
-	readUIMessageStream,
-	uiMessageChunkSchema,
-} from "ai";
+import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -20,24 +15,18 @@ import type { ChatMessageVote, ChatThreadDetail, ChatThreadSummary } from "@/api
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { keycloakService } from "@/integrations/auth";
-import {
-	extractVotesFromThreadDetail,
-	parseSingleMessage,
-	parseThreadMessages,
-} from "@/lib/chat-validation";
+import { extractVotesFromThreadDetail, parseThreadMessages } from "@/lib/chat-validation";
 import type { ChatMessage } from "@/lib/types";
 
 interface UseMentorChatOptions {
 	threadId?: string;
 	initialMessages?: ChatMessage[];
-	autoGreeting?: boolean; // If true, trigger greeting on mount for new threads
 	onFinish?: () => void;
 	onError?: (error: Error) => void;
 }
 
 interface UseMentorChatReturn extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
 	sendMessage: (text: string) => void;
-	triggerGreeting: () => Promise<void>; // Manually trigger a greeting
 	threadDetail: ChatThreadDetail | undefined;
 	isThreadLoading: boolean;
 	threadError: Error | null;
@@ -52,7 +41,6 @@ interface UseMentorChatReturn extends Omit<UseChatHelpers<ChatMessage>, "sendMes
 export function useMentorChat({
 	threadId,
 	initialMessages = [],
-	autoGreeting = false,
 	onFinish,
 	onError,
 }: UseMentorChatOptions): UseMentorChatReturn {
@@ -125,10 +113,11 @@ export function useMentorChat({
 				prepareSendMessagesRequest: ({ id, messages }) => {
 					const effectiveId = id || stableThreadId;
 					// Only send the latest message; backend reconstructs context from thread id.
+					// Parent-message linkage lives on the server via the chat_message tree, so we
+					// don't ship a `previousMessageId` (it would be a no-op the server ignores).
 					const lastMessage = messages.at(-1);
-					const prev = messages.length > 1 ? messages[messages.length - 2]?.id : undefined;
 					return {
-						body: { id: effectiveId, message: lastMessage, previousMessageId: prev },
+						body: { id: effectiveId, message: lastMessage },
 						headers: { Authorization: `Bearer ${keycloakService.getToken()}` },
 					};
 				},
@@ -234,80 +223,11 @@ export function useMentorChat({
 		originalSendMessage({ text });
 	};
 
-	// Trigger greeting from the mentor (no user message required)
-	// Uses the same /chat endpoint with greeting=true flag
-	// React Compiler handles memoization automatically - no useCallback needed
-	const greetingTriggeredRef = useRef(false);
-	const triggerGreeting = async () => {
-		if (!hasWorkspace || greetingTriggeredRef.current) {
-			return;
-		}
-		greetingTriggeredRef.current = true;
-
-		// Use the same chat endpoint with greeting flag
-		const chatApi = `${environment.serverUrl}/workspaces/${slug}/mentor/chat`;
-
-		try {
-			const response = await fetch(chatApi, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${keycloakService.getToken()}`,
-				},
-				body: JSON.stringify({
-					id: stableThreadId,
-					greeting: true,
-					// No message - greeting mode
-				}),
-			});
-
-			if (!response.ok || !response.body) {
-				throw new Error("Failed to fetch greeting");
-			}
-
-			// Parse the SSE stream into UIMessageChunks
-			const chunkStream = parseJsonEventStream({
-				stream: response.body,
-				schema: uiMessageChunkSchema,
-			}).pipeThrough(
-				new TransformStream({
-					transform(chunk, controller) {
-						if (!chunk.success) {
-							throw chunk.error;
-						}
-						controller.enqueue(chunk.value);
-					},
-				}),
-			);
-
-			// Read the stream and update messages in real-time
-			const messageStream = readUIMessageStream({ stream: chunkStream });
-
-			for await (const message of messageStream) {
-				// Validate and update messages with the streaming greeting
-				const validatedMessage = parseSingleMessage(message);
-				if (validatedMessage) {
-					setMessages([validatedMessage]);
-				}
-			}
-
-			// Invalidate queries to refresh sidebar
-			queryClient.invalidateQueries({
-				queryKey: listThreadsQueryKey({ path: { workspaceSlug: slug } }),
-			});
-		} catch (err) {
-			console.error("Greeting error:", err);
-			onError?.(err instanceof Error ? err : new Error(String(err)));
-		}
-	};
-
-	// Auto-trigger greeting on mount if enabled
-	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler ensures triggerGreeting is stable - no useCallback needed
-	useEffect(() => {
-		if (autoGreeting && hasWorkspace && messages.length === 0) {
-			triggerGreeting();
-		}
-	}, [autoGreeting, hasWorkspace, messages.length]);
+	// The new-thread "Hi! I'm your mentor" greeting is rendered statically by the route
+	// component when `messages.length === 0` (see Greeting.tsx). The previous implementation
+	// did a separate POST to /mentor/chat with `{greeting: true}` to stream a server-generated
+	// greeting; the server has no greeting flag, so the round-trip silently short-circuited as
+	// "User message text is empty." The static greeting matches the UX without an API call.
 
 	// Vote message function
 	const voteMessage = (messageId: string, isUpvoted: boolean) => {
@@ -388,9 +308,6 @@ export function useMentorChat({
 
 		// Loading state
 		isLoading,
-
-		// Greeting
-		triggerGreeting,
 	};
 
 	return result;

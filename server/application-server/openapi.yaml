@@ -2736,13 +2736,15 @@ components:
           type: string
           format: uuid
         metadata:
+          type: string
           description: "Per-turn metadata: status, model, costUsd, usage, …"
         parentMessageId:
           type: string
           format: uuid
         parts:
-          type: string
-          description: AI SDK UIMessage parts array.
+          type: array
+          items:
+            description: AI SDK UIMessage part (text / reasoning / tool / data-finding).
         role:
           type: string
     ChatMessageVote:

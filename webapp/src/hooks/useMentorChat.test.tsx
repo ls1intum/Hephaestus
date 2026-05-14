@@ -329,125 +329,6 @@ describe("useMentorChat", () => {
 		});
 	});
 
-	describe("greeting functionality", () => {
-		it("should trigger greeting when autoGreeting=true and no messages exist", async () => {
-			const mockFetch = vi.fn().mockResolvedValue({
-				ok: true,
-				body: createMockSSEStream([
-					'data: {"type":"start"}\n\n',
-					'data: {"type":"text-start","id":"0"}\n\n',
-					'data: {"type":"text-delta","id":"0","delta":"Hello!"}\n\n',
-					'data: {"type":"text-end","id":"0"}\n\n',
-					'data: {"type":"finish","finishReason":"stop"}\n\n',
-				]),
-			});
-			global.fetch = mockFetch;
-
-			renderHook(() => useMentorChat({ autoGreeting: true }), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await waitFor(() => {
-				expect(mockFetch).toHaveBeenCalledWith(
-					"http://localhost:8080/workspaces/test-workspace/mentor/chat",
-					expect.objectContaining({
-						method: "POST",
-						body: expect.stringContaining('"greeting":true'),
-					}),
-				);
-			});
-		});
-
-		it("should not trigger greeting when messages already exist", async () => {
-			const mockFetch = vi.fn();
-			global.fetch = mockFetch;
-
-			mockUseChat.mockReturnValue({
-				id: "mock-uuid-123",
-				messages: [createMockMessage("user", "Existing message")],
-				status: "ready",
-				error: undefined,
-				sendMessage: mockSendMessage,
-				setMessages: mockSetMessages,
-				stop: mockStop,
-				regenerate: mockRegenerate,
-				clearError: mockClearError,
-				resumeStream: vi.fn(),
-				addToolResult: vi.fn(),
-				addToolOutput: vi.fn(),
-				addToolApprovalResponse: vi.fn(),
-			});
-
-			renderHook(() => useMentorChat({ autoGreeting: true }), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			// Wait a bit to ensure the effect would have run
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			expect(mockFetch).not.toHaveBeenCalled();
-		});
-
-		it("should not trigger greeting when autoGreeting=false", async () => {
-			const mockFetch = vi.fn();
-			global.fetch = mockFetch;
-
-			renderHook(() => useMentorChat({ autoGreeting: false }), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			expect(mockFetch).not.toHaveBeenCalled();
-		});
-
-		it("should call triggerGreeting manually", async () => {
-			const mockFetch = vi.fn().mockResolvedValue({
-				ok: true,
-				body: createMockSSEStream([
-					'data: {"type":"start"}\n\n',
-					'data: {"type":"finish","finishReason":"stop"}\n\n',
-				]),
-			});
-			global.fetch = mockFetch;
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await act(async () => {
-				await result.current.triggerGreeting();
-			});
-
-			expect(mockFetch).toHaveBeenCalledWith(
-				expect.stringContaining("/mentor/chat"),
-				expect.objectContaining({
-					body: expect.stringContaining('"greeting":true'),
-				}),
-			);
-		});
-
-		it("should only trigger greeting once even if called multiple times", async () => {
-			const mockFetch = vi.fn().mockResolvedValue({
-				ok: true,
-				body: createMockSSEStream(['data: {"type":"finish","finishReason":"stop"}\n\n']),
-			});
-			global.fetch = mockFetch;
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await act(async () => {
-				await result.current.triggerGreeting();
-				await result.current.triggerGreeting();
-				await result.current.triggerGreeting();
-			});
-
-			expect(mockFetch).toHaveBeenCalledTimes(1);
-		});
-	});
-
 	describe("error handling", () => {
 		it("should expose error from useChat", () => {
 			const testError = new Error("Test error");
@@ -511,25 +392,6 @@ describe("useMentorChat", () => {
 					onError: expect.any(Function),
 				}),
 			);
-		});
-
-		it("should handle greeting fetch errors gracefully", async () => {
-			const onError = vi.fn();
-			const mockFetch = vi.fn().mockResolvedValue({
-				ok: false,
-				status: 500,
-			});
-			global.fetch = mockFetch;
-
-			const { result } = renderHook(() => useMentorChat({ onError }), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await act(async () => {
-				await result.current.triggerGreeting();
-			});
-
-			expect(onError).toHaveBeenCalledWith(expect.any(Error));
 		});
 
 		it("should expose clearError function", () => {
@@ -821,20 +683,3 @@ describe("useMentorChat", () => {
 		});
 	});
 });
-
-// Helper function for creating mock SSE streams
-function createMockSSEStream(chunks: string[]): ReadableStream<Uint8Array> {
-	const encoder = new TextEncoder();
-	let index = 0;
-
-	return new ReadableStream({
-		pull(controller) {
-			if (index < chunks.length) {
-				controller.enqueue(encoder.encode(chunks[index]));
-				index++;
-			} else {
-				controller.close();
-			}
-		},
-	});
-}

@@ -4,15 +4,11 @@
 //   1. U+2028/U+2029 framing — the single highest-bang-for-buck test per the audit
 //   2. Hello handshake roundtrip
 //   3. Concurrent prompt rejection (-32001 turn_already_in_flight)
-//   4. fetch_context callback round-trip (Pi tool call → Java callback → resolved response)
 //
-// Run manually:
+// Wired into CI via `.github/workflows/ci-quality-gates.yml` (application-server-quality
+// step). Non-zero exit fails the gate, so a regression to framing or concurrent-prompt
+// rejection logic blocks merge. Run locally with:
 //   node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs
-//
-// CI wiring is intentionally NOT done in this PR — the Maven build doesn't yet have a Node
-// hook for `src/test/resources/agent/*.spec.mjs`. Add an `exec-maven-plugin` invocation when
-// the rest of Session B/C lands. Documented in the handoff. For now this is a developer-run
-// smoke test that catches the failure modes that matter.
 
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";

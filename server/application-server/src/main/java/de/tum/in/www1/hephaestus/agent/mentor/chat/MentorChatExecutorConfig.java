@@ -22,8 +22,10 @@ import org.springframework.context.annotation.Configuration;
  *   <li>{@code mentorTurnExecutor}: virtual-thread-per-task. The MVC dispatcher returns the
  *       emitter immediately; turn work runs here so Tomcat worker threads stay free.</li>
  *   <li>{@code mentorRunnerTimeoutScheduler}: shared scheduled pool for runner JSON-RPC
- *       deadlines. One thread per replica is plenty — every fire either races a fast path
- *       or completes the future exceptionally; no blocking work runs here.</li>
+ *       deadlines. Sized at 2 daemon threads — one is enough for the JSON-RPC deadline
+ *       firings (sub-microsecond CompletableFuture completes, no blocking work), the second
+ *       services {@code MentorSseChannel}'s comment-only heartbeat ticks without head-of-line
+ *       blocking when a deadline fires at the same instant.</li>
  * </ul>
  */
 @Configuration

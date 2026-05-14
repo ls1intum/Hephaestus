@@ -78,7 +78,7 @@ public class ChatThreadService {
         List<ChatMessageDTO> messages = thread
             .getAllMessages()
             .stream()
-            .map(msg -> ChatMessageDTO.from(msg, effectiveParts(msg)))
+            .map(msg -> ChatMessageDTO.from(msg, effectiveParts(msg), objectMapper))
             .toList();
         UUID leafId = thread.getSelectedLeafMessage() != null ? thread.getSelectedLeafMessage().getId() : null;
         return new ThreadDetail(thread.getId(), thread.getTitle(), leafId, thread.getCreatedAt(), messages);
@@ -95,16 +95,21 @@ public class ChatThreadService {
 
     /**
      * Linear history for a thread, oldest first, capped at {@link #RECENT_MESSAGES_CAP}.
-     * Returns the trailing N messages (the chronological tail), not the leading ones —
-     * recency matters more than depth for an LLM replay.
+     * Pulls the trailing N rows via DB-side {@code LIMIT}-{@code ORDER BY DESC} and reverses
+     * in memory, so a 500-turn power-user thread does not pull the full {@code parts} JSONB
+     * payload just to drop 480 rows. Same DB-side-LIMIT pattern as
+     * {@code ChatThreadRepository.findRecentThreads}.
      */
     @Transactional(readOnly = true)
     public List<ChatMessage> recentMessagesForReplay(UUID threadId) {
-        List<ChatMessage> all = chatMessageRepository.findByThreadIdOrderByCreatedAtAsc(threadId);
-        if (all.size() <= RECENT_MESSAGES_CAP) {
-            return all;
-        }
-        return all.subList(all.size() - RECENT_MESSAGES_CAP, all.size());
+        List<ChatMessage> tailDesc = chatMessageRepository.findByThreadIdOrderByCreatedAtDesc(
+            threadId,
+            org.springframework.data.domain.PageRequest.of(0, RECENT_MESSAGES_CAP)
+        );
+        if (tailDesc.isEmpty()) return tailDesc;
+        // Reverse to ascending (oldest first) — replay order matters to the LLM.
+        java.util.Collections.reverse(tailDesc);
+        return tailDesc;
     }
 
     /**

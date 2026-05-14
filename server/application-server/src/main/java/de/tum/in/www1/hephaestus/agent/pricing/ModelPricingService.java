@@ -15,11 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Unknown models return {@link Optional#empty()}; callers MUST persist a NULL on the
  * assistant message rather than coercing to zero — distinguishing "free model" from
- * "missing-from-table" is operationally important. The {@link ModelPricingRepository} is
- * idempotently cached by JPA's L2 cache, but no Spring-level {@code @Cacheable} layer: a
- * pricing rollover that misses cache invalidation would silently overcharge for the TTL
- * window, and we'd rather take one DB hit per turn than risk that. Hot-path is well within
- * the existing per-turn budget.
+ * "missing-from-table" is operationally important. No Spring-level {@code @Cacheable} layer
+ * is wired: a pricing rollover that missed cache invalidation would silently overcharge for
+ * the TTL window, and we'd rather take one DB hit per turn than risk that. The repository hit
+ * is a single primary-key lookup that lands within the existing per-turn budget.
  */
 @Service
 @RequiredArgsConstructor

@@ -77,8 +77,11 @@ public class MentorContextInvalidator {
      * <p>{@code @Transactional(REQUIRES_NEW)} is mandatory: {@code AFTER_COMMIT} runs after the
      * originating transaction has closed, so the {@code findById} below needs its own session
      * to materialise {@code pr.getAuthor()} without a {@code LazyInitializationException}.
-     * Pattern matches the rest of the codebase's {@code @TransactionalEventListener(AFTER_COMMIT)}
-     * usages (e.g. {@code ActivityEventListener}).
+     *
+     * <p>Unlike sibling listeners ({@code ActivityEventListener}, {@code AchievementEventListener})
+     * we don't decorate with {@code @Async}: the per-event work is a single indexed find + a
+     * handful of {@code Cache.evict} calls (each O(1) on Caffeine). Running synchronously on
+     * the publisher's commit thread is bounded and avoids needing an event-listener executor.
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)

@@ -56,18 +56,10 @@ public class PracticeCatalogAspectProvider implements ContentProvider {
         MentorChatRequest req = (MentorChatRequest) request;
         Long key = req.workspaceId();
         Cache cache = cacheManager != null ? cacheManager.getCache(CACHE_NAME) : null;
-        ObjectNode payload;
-        if (cache != null) {
-            ObjectNode cached = cache.get(key, ObjectNode.class);
-            if (cached != null) {
-                payload = cached;
-            } else {
-                payload = buildPayload(req.workspaceId());
-                cache.put(key, payload);
-            }
-        } else {
-            payload = buildPayload(req.workspaceId());
-        }
+        // Atomic compute-if-absent closes the get/build/put race on invalidation events.
+        ObjectNode payload = (cache != null)
+            ? cache.get(key, () -> buildPayload(req.workspaceId()))
+            : buildPayload(req.workspaceId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JsonProcessingException e) {

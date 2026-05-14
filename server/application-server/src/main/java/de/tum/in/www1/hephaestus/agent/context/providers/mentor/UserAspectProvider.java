@@ -65,18 +65,12 @@ public class UserAspectProvider implements ContentProvider {
         MentorChatRequest req = (MentorChatRequest) request;
         String key = req.workspaceId() + ":" + req.contributorId();
         Cache cache = cacheManager != null ? cacheManager.getCache(CACHE_NAME) : null;
-        ObjectNode payload;
-        if (cache != null) {
-            ObjectNode cached = cache.get(key, ObjectNode.class);
-            if (cached != null) {
-                payload = cached;
-            } else {
-                payload = buildPayload(req.workspaceId(), req.contributorId());
-                cache.put(key, payload);
-            }
-        } else {
-            payload = buildPayload(req.workspaceId(), req.contributorId());
-        }
+        // Atomic compute-if-absent — closes the get/build/put race: an invalidation event
+        // landing between a separate get-miss and put would otherwise repopulate the cache with
+        // stale data for the full TTL. Caffeine's loader is key-locked.
+        ObjectNode payload = (cache != null)
+            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.contributorId()))
+            : buildPayload(req.workspaceId(), req.contributorId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JsonProcessingException e) {
