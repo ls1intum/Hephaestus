@@ -64,6 +64,11 @@ final class StdioAttachedSandbox implements AttachedSandbox {
         startStderrLogger(process.getErrorStream());
     }
 
+    /** Test-only accessor for sampling {@code /proc/$pid/*} from stress harnesses. */
+    Process process() {
+        return process;
+    }
+
     @Override
     public UUID sessionId() {
         return sessionId;

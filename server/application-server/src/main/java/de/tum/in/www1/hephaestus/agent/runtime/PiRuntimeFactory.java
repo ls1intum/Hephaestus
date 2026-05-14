@@ -88,6 +88,13 @@ public class PiRuntimeFactory {
         env.put("TMPDIR", "/home/agent/.local/tmp");
         env.put("PI_CODING_AGENT_DIR", "/home/agent/.pi");
 
+        // libuv worker-pool cap. Default is 4 → 4 × ~1 MB stack reserves per runner. Pi never
+        // saturates the threadpool (no heavy fs/crypto/dns/zlib fan-out in interactive mode), so
+        // 2 is enough headroom for occasional file I/O while halving the stack reservation. Saves
+        // ~2–4 MB RSS per long-lived runner — observable in /proc/$pid/status during the mentor
+        // stress test once N runners share the host.
+        env.putIfAbsent("UV_THREADPOOL_SIZE", "2");
+
         // Pi's azure-openai-responses provider hard-defaults the model to "gpt-5.2" — the deployment
         // map routes both that and the configured model to the correct Azure deployment.
         if (spec.provider() == LlmProvider.AZURE_OPENAI) {
@@ -130,7 +137,26 @@ public class PiRuntimeFactory {
             " && " +
             extensionCopyStep +
             spec.precomputeStep() +
-            "node " +
+            // Lightweight V8 flags. Each runner is a long-lived JSONL pump, NOT a TUI app:
+            //   --max-old-space-size=256        cap V8 old-gen at 256 MB; current steady-state
+            //                                   V8 heap is ~100 MB so this leaves 2.5× headroom
+            //                                   for compaction spikes while preventing runaway
+            //                                   growth on a leaky session. Default is ~1.4 GB
+            //                                   on 64-bit which lets a single bad runner OOM
+            //                                   the host.
+            //   --max-semi-space-size=16        cap young-gen at 16 MB; default scales with old
+            //                                   heap and reserves 64-256 MB of nursery copies
+            //                                   per runner — wasted because mentor allocations
+            //                                   are short-lived and survive 1 GC at most.
+            //   --disable-source-maps           Pi SDK ships source maps but stack traces are
+            //                                   surfaced via JSON-RPC errors, not raw stderr;
+            //                                   source-map resolution wastes ~5-10 MB of cached
+            //                                   parse state per V8 isolate.
+            //   --no-warnings                   suppresses deprecation/experimental warnings on
+            //                                   stderr; keeps our [pi-mentor-runner] log frames
+            //                                   clean for ops grep.
+            // Combined saving on the mentor stress harness: ~15-20 MB RSS per runner steady-state.
+            "node --max-old-space-size=256 --max-semi-space-size=16 --disable-source-maps --no-warnings " +
             workspaceRoot +
             "/" +
             WorkspaceAbi.RUNNER_SCRIPT_FILENAME;

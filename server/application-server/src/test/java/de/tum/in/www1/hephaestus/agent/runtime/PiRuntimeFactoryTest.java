@@ -172,6 +172,15 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("UV_THREADPOOL_SIZE capped at 2 (libuv stack reservation)")
+        void uvThreadpoolCapped() {
+            // Drops libuv's default 4 worker stacks to 2; Pi is not fs/crypto/dns/zlib heavy in
+            // interactive mode, so we trade unused worker capacity for ~2 MB RSS per runner.
+            var env = factory.build(proxySpec(LlmProvider.OPENAI, null)).environment();
+            assertThat(env).containsEntry("UV_THREADPOOL_SIZE", "2");
+        }
+
+        @Test
         @DisplayName("Azure deployment map is set with explicit model")
         void azureDeploymentMap() {
             var env = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, "gpt-5.4-mini")).environment();
@@ -369,6 +378,26 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class CommandAssembly {
 
         @Test
+        @DisplayName("node invocation carries the lightweight V8 flags ahead of the runner path")
+        void nodeFlagsApplied() {
+            // The exact flag values are part of the runtime contract — each one buys measurable
+            // memory savings on the mentor stress harness. Asserting them here prevents an
+            // accidental revert of the audit fixes.
+            String body = factory.build(apiKeySpec(LlmProvider.OPENAI)).command().get(2);
+            // Find the node-invocation prefix and require all four flags appear before the script.
+            int nodeIdx = body.indexOf("node ");
+            int scriptIdx = body.indexOf(".run-pi.mjs");
+            assertThat(nodeIdx).as("node invocation present").isGreaterThanOrEqualTo(0);
+            assertThat(scriptIdx).as("runner script present").isGreaterThan(nodeIdx);
+            String nodePrefix = body.substring(nodeIdx, scriptIdx);
+            assertThat(nodePrefix)
+                .contains("--max-old-space-size=256")
+                .contains("--max-semi-space-size=16")
+                .contains("--disable-source-maps")
+                .contains("--no-warnings");
+        }
+
+        @Test
         @DisplayName("[sh, -c, <assembled>] with node runner at the end and precompute prepended")
         void shCommandWithPrecomputeOrder() {
             PiPlanSpec spec = new PiPlanSpec(
@@ -388,7 +417,10 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(plan.command()).hasSize(3);
             assertThat(plan.command().get(0)).isEqualTo("sh");
             String body = plan.command().get(2);
-            assertThat(body.indexOf("echo precompute")).isLessThan(body.indexOf("node /workspace/.run-pi.mjs"));
+            // Precompute step must run before the runner. Don't pin the exact `node` invocation —
+            // the command line may carry V8 flags (`--max-old-space-size`, `--disable-source-maps`,
+            // …) between `node` and the script path. Asserting the script path alone is enough.
+            assertThat(body.indexOf("echo precompute")).isLessThan(body.indexOf("/workspace/.run-pi.mjs"));
         }
     }
 
