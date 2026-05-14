@@ -404,6 +404,13 @@ hephaestus:
             cpus: ${SANDBOX_CPUS:2.0}
             pids-limit: ${SANDBOX_PIDS_LIMIT:256}
 
+    # Pi-powered chat mentor (SSE turn pipeline + JPA persistence). Default ON because the
+    # legacy intelligence-service path was deleted in this branch — there is no alternative
+    # runtime. Operators can disable explicitly via MENTOR_ENABLED=false (the specs profile
+    # already does this so OpenAPI generation skips the SSE/sandbox beans).
+    mentor:
+        enabled: ${MENTOR_ENABLED:true}
+
     # Dev-only actuator for manually triggering PR reviews (never enable in production).
     # Layered safety: (1) this flag, (2) not in endpoint exposure list, (3) Spring Security auth.
     dev:

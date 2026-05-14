@@ -27,7 +27,7 @@ import org.springframework.context.annotation.Configuration;
  * </ul>
  */
 @Configuration
-@ConditionalOnProperty(name = "hephaestus.mentor.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.mentor.enabled", havingValue = "true")
 public class MentorChatExecutorConfig {
 
     private static final Logger log = LoggerFactory.getLogger(MentorChatExecutorConfig.class);

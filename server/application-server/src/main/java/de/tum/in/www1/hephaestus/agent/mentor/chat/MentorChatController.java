@@ -27,7 +27,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * mentor virtual-thread executor; the orchestration lives in {@link MentorChatService}.
  */
 @WorkspaceScopedController
-@ConditionalOnProperty(name = "hephaestus.mentor.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.mentor.enabled", havingValue = "true")
 @RequestMapping("/mentor/chat")
 @Tag(name = "Mentor Chat", description = "Mentor chat SSE stream")
 @RequiredArgsConstructor

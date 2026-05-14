@@ -29,11 +29,13 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -55,7 +57,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * submitted to the virtual-thread executor; all blocking work happens off the request thread.
  */
 @Service
-@ConditionalOnProperty(name = "hephaestus.mentor.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.mentor.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class MentorChatService {
 
@@ -87,6 +89,18 @@ public class MentorChatService {
     private final ObjectMapper objectMapper;
     private final MentorChatExecutorConfig.MentorTurnExecutor turnExecutor;
     private final MentorChatExecutorConfig.MentorRunnerTimeoutScheduler runnerTimeoutScheduler;
+
+    /**
+     * Side map of disconnect actions registered per-turn. Keyed by the per-turn
+     * {@code clientGone} flag (identity-based), with values being the "ask Pi to stop"
+     * runnable. The {@link #flagDisconnected} helper pulls + runs the action exactly once.
+     * {@link WeakHashMap} avoids leaking entries if a turn errors out before registering;
+     * {@link Collections#synchronizedMap(Map)} because turns may flip from multiple threads
+     * (request thread via SSE callback, executor thread via sendChunk).
+     */
+    private final Map<AtomicBoolean, Runnable> disconnectActionByGone = Collections.synchronizedMap(
+        new WeakHashMap<>()
+    );
 
     /**
      * Submit a turn to the mentor virtual-thread executor and return immediately. Lifecycle
@@ -429,18 +443,6 @@ public class MentorChatService {
             }
         }
     }
-
-    /**
-     * Side map of disconnect actions registered per-turn. Keyed by the per-turn
-     * {@code clientGone} flag (identity-based), with values being the "ask Pi to stop"
-     * runnable. The {@link #flagDisconnected} helper pulls + runs the action exactly once.
-     * {@link java.util.WeakHashMap} avoids leaking entries if a turn errors out before
-     * registering; {@link java.util.Collections#synchronizedMap} because turns may flip from
-     * multiple threads (request thread via SSE callback, executor thread via sendChunk).
-     */
-    private final java.util.Map<AtomicBoolean, Runnable> disconnectActionByGone = java.util.Collections.synchronizedMap(
-        new java.util.WeakHashMap<>()
-    );
 
     /**
      * Schedule an SSE comment-only keep-alive so Traefik's idleTimeout (300s) cannot kill the
