@@ -49,41 +49,23 @@
 
     <changeSet id="1779000000005-2" author="hephaestus">
         <comment>Seed common model prices (vendor list prices as of 2026-05; ops may adjust)</comment>
-        <insert tableName="model_pricing">
-            <column name="model_id" value="gpt-4o-mini"/>
-            <column name="per_1k_input_usd" valueNumeric="0.000150"/>
-            <column name="per_1k_output_usd" valueNumeric="0.000600"/>
-            <column name="per_1k_cache_read_usd" valueNumeric="0.000075"/>
-            <column name="per_1k_cache_write_usd" valueNumeric="0.000000"/>
-        </insert>
-        <insert tableName="model_pricing">
-            <column name="model_id" value="gpt-4o"/>
-            <column name="per_1k_input_usd" valueNumeric="0.002500"/>
-            <column name="per_1k_output_usd" valueNumeric="0.010000"/>
-            <column name="per_1k_cache_read_usd" valueNumeric="0.001250"/>
-            <column name="per_1k_cache_write_usd" valueNumeric="0.000000"/>
-        </insert>
-        <insert tableName="model_pricing">
-            <column name="model_id" value="claude-3-5-sonnet"/>
-            <column name="per_1k_input_usd" valueNumeric="0.003000"/>
-            <column name="per_1k_output_usd" valueNumeric="0.015000"/>
-            <column name="per_1k_cache_read_usd" valueNumeric="0.000300"/>
-            <column name="per_1k_cache_write_usd" valueNumeric="0.003750"/>
-        </insert>
-        <insert tableName="model_pricing">
-            <column name="model_id" value="claude-3-5-haiku"/>
-            <column name="per_1k_input_usd" valueNumeric="0.000800"/>
-            <column name="per_1k_output_usd" valueNumeric="0.004000"/>
-            <column name="per_1k_cache_read_usd" valueNumeric="0.000080"/>
-            <column name="per_1k_cache_write_usd" valueNumeric="0.001000"/>
-        </insert>
-        <insert tableName="model_pricing">
-            <column name="model_id" value="claude-opus-4"/>
-            <column name="per_1k_input_usd" valueNumeric="0.015000"/>
-            <column name="per_1k_output_usd" valueNumeric="0.075000"/>
-            <column name="per_1k_cache_read_usd" valueNumeric="0.001500"/>
-            <column name="per_1k_cache_write_usd" valueNumeric="0.018750"/>
-        </insert>
+        <!--
+            ON CONFLICT DO NOTHING keeps the seed idempotent under ops state divergence: if
+            an operator manually inserted a price row before this changeset ran (e.g. to fix a
+            typo), the changeset still completes cleanly without overwriting the operator value
+            or aborting partway. Splitting the seed into a single multi-row statement keeps the
+            audit trail (DATABASECHANGELOG.execTime) a single number rather than five.
+        -->
+        <sql>
+            INSERT INTO model_pricing (model_id, per_1k_input_usd, per_1k_output_usd, per_1k_cache_read_usd, per_1k_cache_write_usd)
+            VALUES
+                ('gpt-4o-mini',       0.000150, 0.000600, 0.000075, 0.000000),
+                ('gpt-4o',            0.002500, 0.010000, 0.001250, 0.000000),
+                ('claude-3-5-sonnet', 0.003000, 0.015000, 0.000300, 0.003750),
+                ('claude-3-5-haiku',  0.000800, 0.004000, 0.000080, 0.001000),
+                ('claude-opus-4',     0.015000, 0.075000, 0.001500, 0.018750)
+            ON CONFLICT (model_id) DO NOTHING;
+        </sql>
         <rollback>
             <sql>DELETE FROM model_pricing WHERE model_id IN ('gpt-4o-mini', 'gpt-4o', 'claude-3-5-sonnet', 'claude-3-5-haiku', 'claude-opus-4');</sql>
         </rollback>

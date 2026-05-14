@@ -829,20 +829,30 @@ function announceReady() {
 }
 
 function start() {
-    const splitter = createLineSplitter(async (line) => {
-        let frame;
-        try {
-            frame = JSON.parse(line);
-        } catch (e) {
-            log(`parse error: ${e.message} (line len=${line.length})`);
-            // We can't correlate; just drop.
-            return;
-        }
-        try {
-            await dispatch(frame);
-        } catch (e) {
-            log("dispatch failed:", e);
-        }
+    // Serialize dispatch: `createLineSplitter` calls `onLine` synchronously inside a tight
+    // `while` loop and ignores its return. Without this queue, back-to-back frames (e.g.
+    // open_thread immediately followed by prompt) run their `dispatch(frame)` concurrently,
+    // which means two paths can hit `runtime.switchSession` at the same time and rebind the
+    // single Pi session to whichever resolves last. The queue costs nothing on the common
+    // path (Java sends frames sequentially) and prevents the race entirely.
+    let dispatchQueue = Promise.resolve();
+    const splitter = createLineSplitter((line) => {
+        dispatchQueue = dispatchQueue
+            .then(async () => {
+                let frame;
+                try {
+                    frame = JSON.parse(line);
+                } catch (e) {
+                    log(`parse error: ${e.message} (line len=${line.length})`);
+                    return;
+                }
+                try {
+                    await dispatch(frame);
+                } catch (e) {
+                    log("dispatch failed:", e);
+                }
+            })
+            .catch((e) => log("dispatch queue swallowed unhandled error:", e));
     });
 
     process.stdin.on("data", (chunk) => splitter(chunk));
