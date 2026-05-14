@@ -57,8 +57,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             ArchRule rule = noClasses()
                 .that()
                 .haveSimpleNameEndingWith("Service")
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should()
                 .dependOnClassesThat()
                 .haveSimpleNameEndingWith("Controller")
@@ -125,8 +123,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             ArchRule rule = classes()
                 .that()
                 .haveSimpleNameEndingWith("DTO")
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should()
                 .beRecords()
                 .orShould()
@@ -153,8 +149,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             ArchRule rule = classes()
                 .that()
                 .haveSimpleNameEndingWith("DTO")
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should()
                 .resideInAPackage("..dto..")
                 .orShould()
@@ -472,45 +466,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                 .because("Custom exceptions should be within the application package structure");
             rule.check(classes);
         }
-    }
-
-    // ========================================================================
-    // DEPENDENCY MANAGEMENT - Clean dependency patterns
-    // ========================================================================
-
-    @Nested
-    @DisplayName("Dependency Management")
-    class DependencyManagementTests {
-
-        /**
-         * Generated code should not be depended upon by hand-written code.
-         *
-         * <p>The intelligence service client is generated - we should
-         * wrap it in adapters rather than depending on it directly.
-         */
-        @Test
-        @DisplayName("Limit dependencies on generated code")
-        void limitDependenciesOnGeneratedCode() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideOutsideOfPackage("..intelligenceservice..")
-                .and()
-                .resideOutsideOfPackage("..mentor..")
-                .and()
-                .resideOutsideOfPackage("..activity..")
-                .and()
-                .resideOutsideOfPackage("..practices..") // Code health module uses intelligence service for AI detection
-                .and()
-                .resideOutsideOfPackage("..config..") // Config wires up the client
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..intelligenceservice..")
-                .because("Generated clients should be wrapped in adapters");
-            // Only mentor, activity, practices, and config should use intelligence service
-            rule.check(classes);
-        }
-
-        // NOTE: java.util.logging check moved to ArchitectureTest.noJavaUtilLogging()
     }
 
     // ========================================================================

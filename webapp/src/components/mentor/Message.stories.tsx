@@ -5,7 +5,7 @@ import { PreviewMessage, ThinkingMessage } from "./Message";
 
 /**
  * Message component displays chat messages from both users and assistants with rich content support.
- * Handles text, reasoning, file attachments, tool interactions (weather, documents), voting, and editing functionality.
+ * Handles text, reasoning, file attachments, voting, and editing functionality.
  * Features smooth animations, edit mode for user messages, and comprehensive action handling.
  */
 const meta = {
@@ -253,38 +253,6 @@ export const EditModeMessage: Story = {
 	args: {
 		message: createUserMessage("How do I optimize React performance in large applications?"),
 		initialEditMode: true,
-	},
-};
-
-/**
- * Message demonstrating weather tool integration.
- */
-export const WeatherToolMessage: Story = {
-	args: {
-		message: {
-			id: "msg-weather",
-			role: "assistant",
-			parts: [
-				{
-					type: "tool-getWeather",
-					toolCallId: "weather-1",
-					state: "output-available",
-					input: { location: "San Francisco" },
-					output: {
-						location: "San Francisco, CA",
-						temperature: 72,
-						condition: "Sunny",
-						humidity: 65,
-						windSpeed: 8,
-					},
-				},
-				{
-					type: "text",
-					text: "Here's the current weather for San Francisco. It's a beautiful sunny day with comfortable temperatures!",
-				},
-			],
-			metadata: { createdAt: new Date().toISOString() },
-		} as ChatMessage,
 	},
 };
 

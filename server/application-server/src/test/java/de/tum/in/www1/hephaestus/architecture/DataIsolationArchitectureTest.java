@@ -280,8 +280,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                 .haveSimpleNameEndingWith("Dto")
                 .and()
                 .resideInAPackage(BASE_PACKAGE + "..")
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should(notExposeCrossWorkspaceData)
                 .because("DTOs should use projections to prevent cross-workspace data leakage");
 

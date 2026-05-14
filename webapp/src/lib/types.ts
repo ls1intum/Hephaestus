@@ -3,13 +3,10 @@ import type { UIMessage } from "ai";
 /**
  * Custom UI data types streamed by the Pi mentor.
  *
- * The legacy intelligence-service produced typed document streaming events
- * (data-document-create / -update / -delta / -finish). The Pi mentor does not
- * emit those today — the only custom data part is `data-usage` for token
- * accounting, which the client currently ignores.
- *
- * Keep this open enough to absorb future server-side additions without
- * coupling the webapp to a generated TypeScript schema.
+ * The Pi mentor emits a single custom data part today (`data-usage` for token
+ * accounting, which the client currently ignores). Keep this open enough to
+ * absorb future server-side additions without coupling the webapp to a
+ * generated TypeScript schema.
  */
 export type CustomUIDataTypes = Record<string, unknown>;
 
@@ -42,24 +39,6 @@ export type ChatTools = Record<string, { input: unknown; output: unknown }>;
 export type ChatMessage = UIMessage<MessageMetadata, CustomUIDataTypes, ChatTools>;
 
 export type DataPart = never;
-
-// Artifact typing
-export type ArtifactKind = "text" | (string & {});
-export type ArtifactId<K extends ArtifactKind = ArtifactKind> = `${K}:${string}`;
-
-export function makeArtifactId<K extends ArtifactKind>(kind: K, payload: string): ArtifactId<K> {
-	return `${kind}:${payload}` as ArtifactId<K>;
-}
-
-export function parseArtifactId(id: string | null | undefined): {
-	kind: ArtifactKind | null;
-	payload: string | null;
-} {
-	if (!id) return { kind: null, payload: null };
-	const [k, ...rest] = id.split(":");
-	const payload = rest.length > 0 ? rest.join(":") : null;
-	return { kind: (k as ArtifactKind) ?? null, payload };
-}
 
 export interface Attachment {
 	name: string;

@@ -387,32 +387,6 @@ cmd_draft_changelog() {
     log_success "🎉 Changelog diff process completed!"
 }
 
-# Generate Drizzle schema for intelligence service
-cmd_generate_db_models_intelligence_service() {
-    log_info "🚀 Starting Drizzle schema generation for intelligence service..."
-    check_environment
-    
-    # Ensure PostgreSQL is running and ready
-    cd "$APP_SERVER_DIR"
-    if [[ "${CI:-false}" == "true" ]]; then
-        # In CI, PostgreSQL container is started externally
-        log_info "CI environment detected - using external PostgreSQL container"
-        wait_for_postgres_ready
-        apply_migrations
-    elif ! is_postgres_running; then
-        log_warning "PostgreSQL is not running. Starting it now..."
-        start_postgres
-        apply_migrations
-    elif [[ "$DB_MODE" == "local" ]]; then
-        apply_migrations
-    else
-        log_info "Skipping migrations in local Docker mode (assuming DB is up-to-date)"
-    fi
-    
-    generate_intelligence_service_models
-    log_success "🎉 Drizzle schema generation completed successfully!"
-}
-
 # Show usage information
 show_usage() {
     cat << EOF

@@ -836,9 +836,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                 .and()
                 .areDeclaredInClassesThat()
                 .areAnnotatedWith(org.springframework.stereotype.Service.class)
-                .and()
-                .areDeclaredInClassesThat()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should(beWorkspaceScopedIfReturningList)
                 .because("Services returning lists should be workspace-scoped");
 

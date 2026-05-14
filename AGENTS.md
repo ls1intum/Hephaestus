@@ -119,15 +119,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - When adding or changing REST endpoints, follow the centralized exception-handling rules in `docs/contributor/api-error-handling.md` so every controller returns RFC-7807 `ProblemDetail` responses via `@RestControllerAdvice`.
 - Controller-level integration tests should extend `AbstractWorkspaceIntegrationTest` (or an equivalent domain-specific base), exercise access control through `WebTestClient` + `TestAuthUtils`, and follow the contributor testing guide's checklist. This keeps authentication, validation, and persistence assertions consistent across new endpoints.
 
-## 8. Intelligence service expectations (TypeScript)
-
-- Uses Hono as the HTTP framework with Vercel AI SDK for LLM orchestration.
-- Settings live in `src/env.ts`; `MODEL_NAME` must be provider-qualified (`openai:gpt-5-mini`, `azure:gpt-5-mini`, etc.).
-- Drizzle ORM for database access; schema is auto-generated via `npm run db:introspect` from the application-server's Liquibase-managed PostgreSQL.
-- OpenAPI spec is exported via `npm run openapi:export`.
-- Formatting: run `npm run format:intelligence-service`. Biome handles linting and formatting.
-
-## 9. Webhook ingest service expectations (TypeScript)
+## 8. Webhook ingest service expectations (TypeScript)
 
 - Uses Hono as the HTTP framework with `@nats-io/jetstream` for NATS publishing. Keep NATS subject naming consistent (`github.<owner>.<repo>.<event>`, `gitlab.<namespace>.<project>.<event>`).
 - Security: HMAC-SHA256 signature verification for GitHub, token verification for GitLab. Uses `crypto.timingSafeEqual()` to prevent timing attacks.
@@ -135,13 +127,13 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Uses Biome for linting/formatting. Run `npm run check:webhook-ingest` for full validation.
 - Tests: Run `npm run test:webhook-ingest` (Vitest).
 
-## 10. Documentation & assets
+## 9. Documentation & assets
 
 - ERD diagrams live under `docs/contributor/erd/`. Regenerate via `npm run db:generate-erd-docs` after schema changes.
 - Contributor documentation should stay in `docs/` (GitHub Pages). Keep README/CONTRIBUTING updates concise and actionable.
 - Screenshots or large binary assets belong under `docs/images/` or the Storybook stories, not inside source directories.
 
-## 11. Pull requests
+## 10. Pull requests
 
 Before opening a PR, run `npm run format && npm run check`. The PR template (`.github/PULL_REQUEST_TEMPLATE.md`) guides you through title format and checklists. Key points:
 
@@ -149,10 +141,9 @@ Before opening a PR, run `npm run format && npm run check`. The PR template (`.g
 - **Generated files**: Regenerate and commit OpenAPI specs, clients, and ERD docs when APIs or entities change.
 - **Database changes**: Run `npm run db:draft-changelog` and prune to minimal deltas.
 
-## 12. Known command caveats
+## 11. Known command caveats
 
 - `npm run db:draft-changelog` requires Docker to be installed and available on PATH. In CI we set `CI=true`; locally ensure Docker Desktop/daemon is running before invoking the script.
-- `npm run generate:api:intelligence-service:specs` fails unless `MODEL_NAME` is set (use the `fake:model` provider for tooling).
 - `npm run generate:api:application-server:specs` performs a full Maven `verify` against the specs profile. The initial run downloads the entire Spring Boot dependency tree (~hundreds of MB); expect several minutes on a cold cache.
 
 Stay consistent with the existing patterns and prefer improving the structure rather than introducing ad-hoc shortcuts.

@@ -27,8 +27,7 @@ interface ThreadGroupData {
  * Last 7 days, Last 30 days, Older. Preserves arrival order (newest first
  * within each bucket).
  *
- * The legacy intelligence-service grouped these server-side; the new Pi
- * mentor returns a flat list, so we bucket locally for the same UX.
+ * The Pi mentor returns a flat list, so we bucket locally for the same UX.
  */
 function bucketThreads(threads: ChatThreadSummary[]): ThreadGroupData[] {
 	const buckets: Record<string, ChatThreadSummary[]> = {

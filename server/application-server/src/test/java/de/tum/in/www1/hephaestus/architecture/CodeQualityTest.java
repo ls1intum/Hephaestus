@@ -68,8 +68,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .haveSimpleNameEndingWith("Service")
                 .and()
                 .areAnnotatedWith(org.springframework.stereotype.Service.class)
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should(haveAtMostConstructorParameters(MAX_SERVICE_DEPENDENCIES, orchestratorExceptions))
                 .because("God classes with many dependencies violate SRP and are hard to test");
 
@@ -105,8 +103,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .haveSimpleNameEndingWith("Service")
                 .and()
                 .areAnnotatedWith(org.springframework.stereotype.Service.class)
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should(haveAtMostBusinessMethods(MAX_SERVICE_METHODS))
                 .because("Services with many methods violate SRP and should be split into focused services");
 
@@ -223,8 +219,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .that()
                 .resideInAPackage(BASE_PACKAGE + "..")
                 .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
-                .and()
                 .resideOutsideOfPackage(GENERATED_GRAPHQL_PACKAGE)
                 .and()
                 .areNotAnonymousClasses()
@@ -281,8 +275,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             ArchRule rule = classes()
                 .that()
                 .haveSimpleNameEndingWith("Service")
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should(avoidManyBooleans)
                 .because("Multiple boolean parameters indicate complexity and poor API design");
 
@@ -406,8 +398,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .areInterfaces()
                 .and()
                 .resideInAPackage(BASE_PACKAGE + "..")
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .and()
                 .resideOutsideOfPackage(GENERATED_GRAPHQL_PACKAGE)
                 .should(haveLimitedMethods)
@@ -571,8 +561,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .haveSimpleNameEndingWith("Service")
                 .and()
                 .areAnnotatedWith(org.springframework.stereotype.Service.class)
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should(notDeclareGenericException)
                 .because("LSP: specific exceptions are required for substitutability");
 
@@ -636,8 +624,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .haveSimpleNameEndingWith("Service")
                 .and()
                 .areAnnotatedWith(org.springframework.stereotype.Service.class)
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should(notThrowUnsupportedOperationException)
                 .because("LSP: implementations must honor contracts, not refuse operations");
 

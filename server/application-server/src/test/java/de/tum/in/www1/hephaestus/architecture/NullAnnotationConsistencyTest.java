@@ -41,10 +41,6 @@ class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
      * which is a different concern from documenting nullability. Use
      * {@code org.springframework.lang.NonNull} for consistent nullability semantics
      * and correct OpenAPI spec generation.
-     *
-     * <p><strong>Exclusion:</strong> The generated intelligence-service client
-     * ({@code ..intelligenceservice..}) is excluded because it is auto-generated
-     * code that we do not control.
      */
     @Test
     @DisplayName("No lombok.NonNull usage — use org.springframework.lang.NonNull")
@@ -52,8 +48,6 @@ class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
         ArchRule rule = noClasses()
             .that()
             .resideInAPackage(BASE_PACKAGE + "..")
-            .and()
-            .resideOutsideOfPackage("..intelligenceservice..")
             .should()
             .dependOnClassesThat()
             .haveFullyQualifiedName("lombok.NonNull")
@@ -70,10 +64,6 @@ class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
      * <p>This annotation is not recognized by SpringDoc for OpenAPI generation
      * and introduces inconsistency. Use {@code org.springframework.lang.NonNull}
      * instead.
-     *
-     * <p><strong>Exclusion:</strong> The generated intelligence-service client
-     * ({@code ..intelligenceservice..}) is excluded because it is auto-generated
-     * code that we do not control.
      */
     @Test
     @DisplayName("No jakarta.annotation.Nonnull usage — use org.springframework.lang.NonNull")
@@ -81,8 +71,6 @@ class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
         ArchRule rule = noClasses()
             .that()
             .resideInAPackage(BASE_PACKAGE + "..")
-            .and()
-            .resideOutsideOfPackage("..intelligenceservice..")
             .should()
             .dependOnClassesThat()
             .haveFullyQualifiedName("jakarta.annotation.Nonnull")
