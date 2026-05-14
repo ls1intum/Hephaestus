@@ -64,13 +64,7 @@ public class ChatThreadController {
             threadId
         );
         return ResponseEntity.ok(
-            new ChatThreadDetailDTO(
-                detail.id(),
-                detail.title(),
-                detail.selectedLeafMessageId(),
-                detail.createdAt(),
-                detail.messages()
-            )
+            new ChatThreadDetailDTO(detail.id(), detail.title(), detail.createdAt(), detail.messages())
         );
     }
 

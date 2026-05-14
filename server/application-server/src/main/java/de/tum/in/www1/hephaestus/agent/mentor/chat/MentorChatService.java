@@ -247,7 +247,7 @@ public class MentorChatService {
             // hello timeout. The outer ClientDisconnectedException catch closes the channel
             // and runs the finally — sandbox/client get cleaned up there.
             if (channel.isClientGone()) {
-                throw new ClientDisconnectedException("Client disconnected during sandbox attach", null);
+                throw new ClientDisconnectedException("Client disconnected during sandbox attach");
             }
 
             client = new MentorRunnerClient(

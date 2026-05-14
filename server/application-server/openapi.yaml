@@ -2782,9 +2782,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ChatMessage"
-        selectedLeafMessageId:
-          type: string
-          format: uuid
         title:
           type: string
     ChatThreadSummary:

@@ -1788,7 +1788,6 @@ export type ChatThreadDetail = {
     createdAt?: Date;
     id?: string;
     messages?: Array<ChatMessage>;
-    selectedLeafMessageId?: string;
     title?: string;
 };
 

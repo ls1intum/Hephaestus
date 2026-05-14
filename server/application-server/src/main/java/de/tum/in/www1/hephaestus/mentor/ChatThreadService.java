@@ -80,18 +80,11 @@ public class ChatThreadService {
             .stream()
             .map(msg -> ChatMessageDTO.from(msg, effectiveParts(msg), objectMapper))
             .toList();
-        UUID leafId = thread.getSelectedLeafMessage() != null ? thread.getSelectedLeafMessage().getId() : null;
-        return new ThreadDetail(thread.getId(), thread.getTitle(), leafId, thread.getCreatedAt(), messages);
+        return new ThreadDetail(thread.getId(), thread.getTitle(), thread.getCreatedAt(), messages);
     }
 
     /** Snapshot of a thread + messages in DTO form. */
-    public record ThreadDetail(
-        UUID id,
-        String title,
-        UUID selectedLeafMessageId,
-        java.time.Instant createdAt,
-        List<ChatMessageDTO> messages
-    ) {}
+    public record ThreadDetail(UUID id, String title, java.time.Instant createdAt, List<ChatMessageDTO> messages) {}
 
     /**
      * Linear history for a thread, oldest first, capped at {@link #RECENT_MESSAGES_CAP}.

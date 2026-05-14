@@ -52,16 +52,6 @@ public class ChatThread {
     @JsonIgnore
     private List<ChatMessage> allMessages = new ArrayList<>();
 
-    /**
-     * Currently selected leaf message - represents the end of the active conversation path
-     * The full selected path is computed by traversing parent relationships from this message
-     */
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "selected_leaf_message_id")
-    @ToString.Exclude
-    @JsonIgnore
-    private ChatMessage selectedLeafMessage;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @ToString.Exclude

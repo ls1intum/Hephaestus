@@ -211,4 +211,52 @@
         </rollback>
     </changeSet>
 
+    <!-- 8. Drop the dead chat_thread.selected_leaf_message_id column. The pre-Pi
+         intelligence-service tracked the "currently displayed leaf" in a branching
+         conversation tree by storing the leaf id directly. The wave-15 intelligence-service
+         deletion removed the writer; only the reader survived (always null). The Pi mentor
+         issue spec (#1071) explicitly says the leaf is "resolved from the tree" — computed,
+         not stored. Shipping the column + FK + unique constraint + wire field through 4
+         layers when nobody writes to it is dead weight; the webapp's generated client never
+         consumes the field. Drop the column and tighten the wire. Future branching support
+         (if ever) computes the leaf from chat_message's tree structure. -->
+    <changeSet id="mentor-1071-drop-selected-leaf-message-fk" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="FK already dropped">
+            <foreignKeyConstraintExists foreignKeyName="FK34beodgwi0g7kn66svlk4hlfr"/>
+        </preConditions>
+        <comment>Drop FK FK34beodgwi0g7kn66svlk4hlfr (chat_thread.selected_leaf_message_id → chat_message.id)</comment>
+        <dropForeignKeyConstraint baseTableName="chat_thread" constraintName="FK34beodgwi0g7kn66svlk4hlfr"/>
+        <rollback>
+            <addForeignKeyConstraint baseColumnNames="selected_leaf_message_id" baseTableName="chat_thread"
+                                     constraintName="FK34beodgwi0g7kn66svlk4hlfr"
+                                     referencedColumnNames="id" referencedTableName="chat_message"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="mentor-1071-drop-selected-leaf-message-unique" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Unique constraint already dropped">
+            <uniqueConstraintExists constraintName="UC_CHAT_THREADSELECTED_LEAF_MESSAGE_ID_COL"/>
+        </preConditions>
+        <comment>Drop unique constraint on chat_thread.selected_leaf_message_id</comment>
+        <dropUniqueConstraint tableName="chat_thread"
+                              constraintName="UC_CHAT_THREADSELECTED_LEAF_MESSAGE_ID_COL"/>
+        <rollback>
+            <addUniqueConstraint tableName="chat_thread" columnNames="selected_leaf_message_id"
+                                 constraintName="UC_CHAT_THREADSELECTED_LEAF_MESSAGE_ID_COL"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="mentor-1071-drop-selected-leaf-message-column" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Column already dropped">
+            <columnExists tableName="chat_thread" columnName="selected_leaf_message_id"/>
+        </preConditions>
+        <comment>Drop chat_thread.selected_leaf_message_id (vestigial intelligence-service field)</comment>
+        <dropColumn tableName="chat_thread" columnName="selected_leaf_message_id"/>
+        <rollback>
+            <addColumn tableName="chat_thread">
+                <column name="selected_leaf_message_id" type="UUID"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

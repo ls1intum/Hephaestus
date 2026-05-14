@@ -15,12 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> {
     /**
-     * Linear history for a thread, oldest first. Service callers cap the result before
-     * shipping to the runner (see {@code MentorChatService.RECENT_MESSAGES_CAP}).
-     */
-    List<ChatMessage> findByThreadIdOrderByCreatedAtAsc(UUID threadId);
-
-    /**
      * Newest-first slice for the replay window. Callers pass a {@code PageRequest.of(0, N)} and
      * reverse the result in memory to get the trailing chronological tail without loading and
      * trimming the full thread (matches the DB-side LIMIT pattern used by
