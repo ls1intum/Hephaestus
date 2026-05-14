@@ -143,10 +143,7 @@ public class MentorTurnPersistence {
         UIMessageChunk.FinishMetadata existing = finish.messageMetadata();
         UIMessageChunk.FinishMetadata.Usage usage = existing != null ? existing.usage() : null;
         String model = existing != null ? existing.model() : state.observedModel();
-        return new UIMessageChunk.Finish(
-            finish.finishReason(),
-            new UIMessageChunk.FinishMetadata(model, usage, cost)
-        );
+        return new UIMessageChunk.Finish(finish.finishReason(), new UIMessageChunk.FinishMetadata(model, usage, cost));
     }
 
     @Nullable

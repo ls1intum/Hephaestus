@@ -74,11 +74,7 @@ public sealed interface UIMessageChunk {
      * the wire so the AI SDK strict-zod {@code messageMetadata} validator accepts the payload.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    record FinishMetadata(
-        @Nullable String model,
-        @Nullable Usage usage,
-        @Nullable Double costUsd
-    ) {
+    record FinishMetadata(@Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
         public static FinishMetadata of(@Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
             // Cheap "nothing observed" gate so we don't ship `{}` to clients (which the strict
             // validator still accepts but bloats every Finish chunk).
