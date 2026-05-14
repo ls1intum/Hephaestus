@@ -120,6 +120,29 @@ class MentorChatControllerTest extends BaseUnitTest {
         // error chunk on the stream, not an HTTP error code. The proper JSON shape is
         // verified via ObjectMapper round-trip below.
         assertThat(emitter).isNotNull();
+        // Protocol header must be present even on the short-circuit branch — AI-SDK
+        // DefaultChatTransport rejects the stream if the marker is missing.
+        assertThat(response.getHeader(UIMessageChunk.RESPONSE_HEADER)).isEqualTo(UIMessageChunk.PROTOCOL_VERSION);
+    }
+
+    @Test
+    @DisplayName("oversize user message (> MAX_PROMPT_CHARS) short-circuits with an error chunk")
+    void oversizeUserMessage_shortCircuits() {
+        String hugeText = "x".repeat(MentorChatController.MAX_PROMPT_CHARS + 1);
+        MentorChatRequestBody body = body(UUID.randomUUID(), null, hugeText);
+        SseEmitter emitter = controller.chat(stubContext(), body, response);
+        verify(mentorChatService, never()).start(any(), any());
+        assertThat(emitter).isNotNull();
+        assertThat(response.getHeader(UIMessageChunk.RESPONSE_HEADER)).isEqualTo(UIMessageChunk.PROTOCOL_VERSION);
+    }
+
+    @Test
+    @DisplayName("user message exactly MAX_PROMPT_CHARS is accepted and dispatched")
+    void boundarySizedUserMessage_dispatches() {
+        String exactlyAtCap = "x".repeat(MentorChatController.MAX_PROMPT_CHARS);
+        MentorChatRequestBody body = body(UUID.randomUUID(), null, exactlyAtCap);
+        controller.chat(stubContext(), body, response);
+        verify(mentorChatService).start(any(), any());
     }
 
     @Test

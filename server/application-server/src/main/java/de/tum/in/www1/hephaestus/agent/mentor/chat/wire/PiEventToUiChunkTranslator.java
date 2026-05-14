@@ -329,6 +329,10 @@ public class PiEventToUiChunkTranslator {
      * ({@code stop|length|content-filter|tool-calls|error|other}). The wider
      * {@code LanguageModelV2FinishReason} includes {@code "unknown"} but the chunk schema
      * does not — strict-zod parsing rejects it client-side. Unknown values map to {@code OTHER}.
+     *
+     * <p>{@code null} (Pi never reported a stop reason) maps to wire-null. Defaulting to
+     * {@code STOP} would mask provider regressions (e.g. an upstream change dropping
+     * {@code aborted}) and the AI-SDK schema accepts {@code finishReason} as optional.
      */
     @Nullable
     static UIMessageChunk.FinishReason mapStopReason(@Nullable String piStopReason) {
@@ -376,12 +380,17 @@ public class PiEventToUiChunkTranslator {
 
     // ─── helpers ──────────────────────────────────────────────────────────────────────────
 
+    /**
+     * Return the {@code field}'s text value, or {@code null} if absent, JSON-null, or a non-text
+     * shape (object, array, number, boolean). Surfacing {@code value.toString()} for non-textual
+     * nodes would mask shape drift — a future Pi schema change that ships an object where we
+     * expect a string would silently leak {@code "{\"id\":\"...\"}"} into the LLM-visible field.
+     */
     @Nullable
     private static String optionalString(@Nullable JsonNode node, String field) {
-        if (node == null || !node.has(field) || node.get(field).isNull()) {
-            return null;
-        }
+        if (node == null || !node.has(field)) return null;
         JsonNode value = node.get(field);
-        return value.isTextual() ? value.asText() : value.toString();
+        if (value == null || value.isNull() || !value.isTextual()) return null;
+        return value.asText();
     }
 }

@@ -37,6 +37,14 @@ public class MentorChatController {
     private static final Logger log = LoggerFactory.getLogger(MentorChatController.class);
     private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(10).toMillis();
 
+    /**
+     * Hard cap on a single user prompt. {@link MentorRunnerClient}'s stdio frame is unbounded
+     * but a 100k-char prompt is ~25k input tokens — well above any pedagogically meaningful
+     * mentor question, and well below provider context windows. We reject above the cap with a
+     * synthetic error chunk so the controller never even attaches a sandbox for the abuse case.
+     */
+    static final int MAX_PROMPT_CHARS = 100_000;
+
     private final MentorChatService mentorChatService;
     private final ObjectMapper objectMapperBean;
 
@@ -48,14 +56,21 @@ public class MentorChatController {
         @RequestBody MentorChatRequestBody body,
         HttpServletResponse response
     ) {
-        response.setHeader(UIMessageChunk.RESPONSE_HEADER, UIMessageChunk.PROTOCOL_VERSION);
-        response.setHeader("Cache-Control", "no-cache");
-        response.setHeader("X-Accel-Buffering", "no");
+        // Headers must lock in BEFORE we send any chunk on the short-circuit path —
+        // SseEmitter#send commits the response once flushed, so a missing
+        // {@code x-vercel-ai-ui-message-stream: v1} header would cause the AI-SDK transport
+        // to reject the whole stream client-side.
+        applyProtocolHeaders(response);
 
         String userMessage = extractUserMessage(body.message());
         if (userMessage == null || userMessage.isBlank()) {
             SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
             shortCircuitError(emitter, "User message text is empty.");
+            return emitter;
+        }
+        if (userMessage.length() > MAX_PROMPT_CHARS) {
+            SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
+            shortCircuitError(emitter, "User message is too long (max " + MAX_PROMPT_CHARS + " characters).");
             return emitter;
         }
 
@@ -70,6 +85,12 @@ public class MentorChatController {
         );
         mentorChatService.start(serviceRequest, emitter);
         return emitter;
+    }
+
+    private static void applyProtocolHeaders(HttpServletResponse response) {
+        response.setHeader(UIMessageChunk.RESPONSE_HEADER, UIMessageChunk.PROTOCOL_VERSION);
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("X-Accel-Buffering", "no");
     }
 
     private static String extractUserMessage(JsonNode message) {

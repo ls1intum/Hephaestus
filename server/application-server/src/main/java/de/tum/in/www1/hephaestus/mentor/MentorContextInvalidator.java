@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -32,6 +35,7 @@ public class MentorContextInvalidator {
 
     private final CacheManager cacheManager;
     private final WorkspaceRepository workspaceRepository;
+    private final PullRequestRepository pullRequestRepository;
 
     /**
      * PR updates change the per-user activity counts: open PRs, merged-this-week, unresolved
@@ -62,6 +66,52 @@ public class MentorContextInvalidator {
         if (workspaceId == null) return;
         Long authorId = event.issue() != null ? event.issue().authorId() : null;
         evictPerUser(workspaceId, authorId);
+    }
+
+    /**
+     * Review submissions change the reviewer's "reviews-given-this-week" counter AND, indirectly,
+     * the PR author's "reviews-received-this-week" / "pending-review-requests" / "unresolved-threads"
+     * counters. Without this, the user-aspect cache would lie for up to its TTL after every code
+     * review — which is the highest-frequency event in the mentor's per-user surface.
+     *
+     * <p>{@code @Transactional(REQUIRES_NEW)} is mandatory: {@code AFTER_COMMIT} runs after the
+     * originating transaction has closed, so the {@code findById} below needs its own session
+     * to materialise {@code pr.getAuthor()} without a {@code LazyInitializationException}.
+     * Pattern matches the rest of the codebase's {@code @TransactionalEventListener(AFTER_COMMIT)}
+     * usages (e.g. {@code ActivityEventListener}).
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
+        evictForReview(event.context(), event.review());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public void onReviewEdited(DomainEvent.ReviewEdited event) {
+        evictForReview(event.context(), event.review());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public void onReviewDismissed(DomainEvent.ReviewDismissed event) {
+        evictForReview(event.context(), event.review());
+    }
+
+    private void evictForReview(
+        de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext context,
+        de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload.ReviewData review
+    ) {
+        Long workspaceId = resolveWorkspaceId(context);
+        if (workspaceId == null || review == null) return;
+        evictPerUser(workspaceId, review.authorId());
+        Long prAuthorId = pullRequestRepository
+            .findById(review.pullRequestId())
+            .map(pr -> pr.getAuthor() != null ? pr.getAuthor().getId() : null)
+            .orElse(null);
+        if (prAuthorId != null && !prAuthorId.equals(review.authorId())) {
+            evictPerUser(workspaceId, prAuthorId);
+        }
     }
 
     /**

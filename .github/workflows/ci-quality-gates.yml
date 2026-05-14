@@ -97,17 +97,19 @@ jobs:
           cache-type: ${{ matrix.check }}
           os: ${{ runner.os }}
 
-      - name: Application-server formatting + Pi extension typecheck
+      - name: Application-server formatting + Pi extension typecheck + runner smoke
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
           npm ci --prefer-offline --no-audit
 
           ISSUES_FOUND=()
-          FMT_OK=true; TS_OK=true
+          FMT_OK=true; TS_OK=true; RUNNER_OK=true
 
           npm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: npm run format:java"); }
           npm -w server/application-server/agent-extensions run typecheck \
             || { TS_OK=false; ISSUES_FOUND+=("Pi extension TS failed typecheck against @earendil-works/pi-coding-agent. Run: npm -w server/application-server/agent-extensions run typecheck"); }
+          node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
+            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi mentor runner smoke test failed. Run: node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
@@ -115,6 +117,7 @@ jobs:
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`npm run format:java\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$TS_OK" == "false" ]] && echo "| Pi extension TS | :x: Failed | \`npm -w server/application-server/agent-extensions run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$RUNNER_OK" == "false" ]] && echo "| Pi mentor runner smoke | :x: Failed | \`node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi

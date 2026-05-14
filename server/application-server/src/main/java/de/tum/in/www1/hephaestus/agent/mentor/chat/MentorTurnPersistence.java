@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -119,8 +120,28 @@ public class MentorTurnPersistence {
             chatMessageRepository.flush();
             return new TurnPersistenceCookie(thread.getId(), savedUser.getId(), assistantMessageId, Instant.now());
         } catch (DataIntegrityViolationException ex) {
-            throw new TurnAlreadyInFlightException(thread.getId(), ex);
+            // Spring translates ANY DB integrity violation (FK, NOT NULL, CHECK) to this
+            // class — only narrow to TurnAlreadyInFlightException when Hibernate confirms
+            // the underlying constraint is our partial-unique in-flight index. A future
+            // CHECK regression on `parts` / `metadata` would otherwise masquerade as a 409.
+            if (isInFlightUniqueViolation(ex)) {
+                throw new TurnAlreadyInFlightException(thread.getId(), ex);
+            }
+            throw ex;
         }
+    }
+
+    /** {@code ux_chat_message_in_flight} is the Liquibase-managed partial unique on assistant rows. */
+    private static boolean isInFlightUniqueViolation(DataIntegrityViolationException ex) {
+        Throwable cur = ex;
+        while (cur != null) {
+            if (cur instanceof ConstraintViolationException cve) {
+                String name = cve.getConstraintName();
+                return name != null && name.equalsIgnoreCase("ux_chat_message_in_flight");
+            }
+            cur = cur.getCause();
+        }
+        return false;
     }
 
     /**

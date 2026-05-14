@@ -31,6 +31,14 @@ public class MentorReplicaAffinityCheck {
     private final int replicaCount;
     private final boolean stickyAffinity;
 
+    /**
+     * {@code @Value} bindings rather than constructor-injection of {@code InteractiveSandboxProperties}:
+     * pulling the record into this module created a {@code mentor → agent.sandbox} edge that
+     * ArchUnit's modularity cycle rule rejects. {@code @Min(1)} validation on the sibling
+     * record still fires at Spring property-bind time (the record is consumed by
+     * {@code DockerSandboxConfiguration}), so a misconfigured {@code replica-count=0} fails at
+     * boot regardless of whether this check is read.
+     */
     public MentorReplicaAffinityCheck(
         @Value("${hephaestus.mentor.replica-count:1}") int replicaCount,
         @Value("${hephaestus.mentor.replica-affinity.sticky:false}") boolean stickyAffinity

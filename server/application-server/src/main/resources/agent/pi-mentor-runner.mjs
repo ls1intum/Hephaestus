@@ -156,6 +156,17 @@ let runtime = null; // AgentSessionRuntime
 let runtimeInitPromise = null;
 let systemPrompt = null; // cached after first read
 
+// Serialised dispatch chain. Initialised by `start()`; every stdin frame AND every
+// internally-fired side-effect (e.g. watchdog session rebind) appends to it so callers cannot
+// race `runtime.switchSession` against each other. See the comment block on `start()` for the
+// race story this prevents.
+let dispatchQueue = Promise.resolve();
+
+function enqueue(fn) {
+    dispatchQueue = dispatchQueue.then(fn).catch((e) => log("dispatch queue swallowed:", e?.message ?? e));
+    return dispatchQueue;
+}
+
 async function ensureRuntime() {
     if (runtime) return runtime;
     if (runtimeInitPromise) return runtimeInitPromise;
@@ -653,38 +664,54 @@ function handleFetchContextResponse(frame) {
 // agent_end so Java releases its lock. Java sees `turn_watchdog_fired` for diagnostics.
 function startTurnWatchdog(state) {
     clearTurnWatchdog(state);
-    state.watchdogTimer = setTimeout(async () => {
-        log(`watchdog fired: rebuilding session for thread=${state.threadId}`);
-        sendEvent(state.threadId, { type: "turn_watchdog_fired", threadId: state.threadId });
-        try {
-            // Reject pending fetch_context callbacks BEFORE switchSession so the rebound
-            // session can't echo stale callback ids.
-            for (const [cbId, pending] of state.pendingFetchContexts) {
-                clearTimeout(pending.timer);
-                pending.reject(new Error("fetch_context: turn aborted by watchdog"));
-                state.pendingFetchContexts.delete(cbId);
-            }
-            await runtime?.session?.abort().catch((e) => log(`abort during watchdog failed: ${e.message ?? e}`));
-            if (state.unsubscribe) {
-                try { state.unsubscribe(); } catch { /* ignore */ }
-                state.unsubscribe = null;
-            }
-            // Rebind to a fresh AgentSession on the same JSONL file (switchSession teardown
-            // invalidates captured extension ctx; listeners are session-scoped per Pi SDK).
-            if (runtime) {
-                try {
-                    await runtime.switchSession(state.sessionPath);
-                    state.unsubscribe = runtime.session.subscribe((event) => forwardEvent(state, event));
-                } catch (e) {
-                    log(`watchdog rebind failed for thread=${state.threadId}: ${e.message ?? e}`);
-                    if (activeThreadId === state.threadId) activeThreadId = null;
-                }
-            }
-        } finally {
-            sendEvent(state.threadId, { type: "agent_end", messages: [] });
-            state.inFlight = false;
-        }
+    // The setTimeout body runs OFF the dispatch queue (it's wall-clock-driven), so the
+    // session-rebinding work — which races user RPCs that also call switchSession — is
+    // funnelled BACK through the queue via `enqueue`. Without this the watchdog could
+    // hit `runtime.switchSession` concurrently with a `prompt` / `close_thread` and
+    // rebind to whichever resolves last, losing every subsequent event.
+    state.watchdogTimer = setTimeout(() => {
+        enqueue(() => runWatchdogRebind(state));
     }, TURN_BUDGET_MS + TURN_GRACE_MS);
+}
+
+async function runWatchdogRebind(state) {
+    // If `close_thread` was enqueued between `setTimeout` firing and this task running, the
+    // thread state is gone — rebinding would resurrect a ghost subscription that survives until
+    // the next valid bind orphans it. Bail out; the close already cleaned up the watchdog.
+    if (!threads.has(state.threadId)) {
+        log(`watchdog rebind skipped: thread=${state.threadId} already closed`);
+        return;
+    }
+    log(`watchdog fired: rebuilding session for thread=${state.threadId}`);
+    sendEvent(state.threadId, { type: "turn_watchdog_fired", threadId: state.threadId });
+    try {
+        // Reject pending fetch_context callbacks BEFORE switchSession so the rebound
+        // session can't echo stale callback ids.
+        for (const [cbId, pending] of state.pendingFetchContexts) {
+            clearTimeout(pending.timer);
+            pending.reject(new Error("fetch_context: turn aborted by watchdog"));
+            state.pendingFetchContexts.delete(cbId);
+        }
+        await runtime?.session?.abort().catch((e) => log(`abort during watchdog failed: ${e.message ?? e}`));
+        if (state.unsubscribe) {
+            try { state.unsubscribe(); } catch { /* ignore */ }
+            state.unsubscribe = null;
+        }
+        // Rebind to a fresh AgentSession on the same JSONL file (switchSession teardown
+        // invalidates captured extension ctx; listeners are session-scoped per Pi SDK).
+        if (runtime) {
+            try {
+                await runtime.switchSession(state.sessionPath);
+                state.unsubscribe = runtime.session.subscribe((event) => forwardEvent(state, event));
+            } catch (e) {
+                log(`watchdog rebind failed for thread=${state.threadId}: ${e.message ?? e}`);
+                if (activeThreadId === state.threadId) activeThreadId = null;
+            }
+        }
+    } finally {
+        sendEvent(state.threadId, { type: "agent_end", messages: [] });
+        state.inFlight = false;
+    }
 }
 
 function clearTurnWatchdog(state) {
@@ -814,10 +841,13 @@ function buildStubSdk() {
 
 function announceReady() {
     // Notification (no id) so Java's RPC layer ignores it but the controller observes the event.
+    // `threadId: null` keeps the params envelope identical to every other event frame
+    // (`sendEvent`), so downstream consumers can match on `params.threadId` uniformly.
     writeFrame({
         jsonrpc: "2.0",
         method: "event",
         params: {
+            threadId: null,
             event: {
                 type: "runner_ready",
                 protocolVersion: PROTOCOL_VERSION,
@@ -829,30 +859,26 @@ function announceReady() {
 }
 
 function start() {
-    // Serialize dispatch: `createLineSplitter` calls `onLine` synchronously inside a tight
-    // `while` loop and ignores its return. Without this queue, back-to-back frames (e.g.
-    // open_thread immediately followed by prompt) run their `dispatch(frame)` concurrently,
-    // which means two paths can hit `runtime.switchSession` at the same time and rebind the
-    // single Pi session to whichever resolves last. The queue costs nothing on the common
-    // path (Java sends frames sequentially) and prevents the race entirely.
-    let dispatchQueue = Promise.resolve();
+    // Stdin frames AND internally-fired side-effects (watchdog rebinds) all funnel through
+    // module-scoped `dispatchQueue` via `enqueue`. Without that, back-to-back frames (e.g.
+    // open_thread immediately followed by prompt) — or worse, a stdin frame racing the
+    // watchdog timer — would hit `runtime.switchSession` concurrently and rebind the
+    // single Pi session to whichever resolves last, losing every subsequent event.
     const splitter = createLineSplitter((line) => {
-        dispatchQueue = dispatchQueue
-            .then(async () => {
-                let frame;
-                try {
-                    frame = JSON.parse(line);
-                } catch (e) {
-                    log(`parse error: ${e.message} (line len=${line.length})`);
-                    return;
-                }
-                try {
-                    await dispatch(frame);
-                } catch (e) {
-                    log("dispatch failed:", e);
-                }
-            })
-            .catch((e) => log("dispatch queue swallowed unhandled error:", e));
+        enqueue(async () => {
+            let frame;
+            try {
+                frame = JSON.parse(line);
+            } catch (e) {
+                log(`parse error: ${e.message} (line len=${line.length})`);
+                return;
+            }
+            try {
+                await dispatch(frame);
+            } catch (e) {
+                log("dispatch failed:", e);
+            }
+        });
     });
 
     process.stdin.on("data", (chunk) => splitter(chunk));

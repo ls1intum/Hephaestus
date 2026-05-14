@@ -130,7 +130,8 @@ class MentorChatServiceTest extends BaseUnitTest {
             persistence,
             mapper,
             turnExecutorBean,
-            schedulerBean
+            schedulerBean,
+            new MentorChatMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry())
         );
 
         // Default happy-path collaborator wiring; individual tests override as needed.

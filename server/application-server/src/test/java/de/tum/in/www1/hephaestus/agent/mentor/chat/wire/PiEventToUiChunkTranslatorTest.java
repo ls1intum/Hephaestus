@@ -280,6 +280,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(PiEventToUiChunkTranslator.mapStopReason("future-pi-reason")).isSameAs(
             UIMessageChunk.FinishReason.OTHER
         );
+        // Null Pi-side stopReason → wire-null (AI-SDK schema accepts finishReason as optional).
+        // Don't default to STOP — that would mask provider regressions that drop the field.
         assertThat(PiEventToUiChunkTranslator.mapStopReason(null)).isNull();
     }
 

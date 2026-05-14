@@ -26,6 +26,7 @@ import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
+import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
@@ -35,7 +36,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -77,6 +80,7 @@ public class MentorChatService {
     private final ObjectMapper objectMapper;
     private final MentorChatExecutorConfig.MentorTurnExecutor turnExecutor;
     private final MentorChatExecutorConfig.MentorRunnerTimeoutScheduler runnerTimeoutScheduler;
+    private final MentorChatMetrics metrics;
 
     /**
      * Submit a turn to the mentor virtual-thread executor and return immediately. Lifecycle
@@ -99,8 +103,20 @@ public class MentorChatService {
         // attaches a client that will be torn down via runTurn's finally instead.
         channel.onDisconnect(() -> abortRunnerOnDisconnect(clientHolder.get(), request.threadId()));
 
+        // Record-started fires here (not inside the executor task) so the started/completed
+        // totals balance even on the RejectedExecutionException branch below.
+        metrics.recordStarted();
         ExecutorService executor = turnExecutor.executor();
-        executor.execute(() -> dispatchTurn(request, channel, clientHolder));
+        try {
+            executor.execute(() -> dispatchTurn(request, channel, clientHolder));
+        } catch (RejectedExecutionException rejected) {
+            // Executor shut down (PreDestroy / context refresh) — we already wrote the
+            // SSE response headers, so the only honest move is to send a clean Error chunk
+            // plus the AI-SDK [DONE] sentinel before completing the emitter.
+            log.warn("Mentor turn rejected by executor (probably shutting down): {}", rejected.getMessage());
+            metrics.recordCompleted(MentorChatMetrics.Outcome.REJECTED);
+            channel.completeWithError("Mentor service is shutting down — please retry shortly.");
+        }
     }
 
     private void dispatchTurn(
@@ -110,11 +126,14 @@ public class MentorChatService {
     ) {
         MentorTurnLock.ThreadKey key = new MentorTurnLock.ThreadKey(request.workspaceId(), request.threadId());
         Optional<Boolean> acquired = turnLock.withLockOr409(key, () -> {
+            Timer.Sample sample = metrics.startTimer();
             try {
-                runTurn(request, channel, clientHolder);
+                MentorChatMetrics.Outcome outcome = runTurn(request, channel, clientHolder);
+                metrics.recordCompleted(outcome);
                 return Boolean.TRUE;
             } catch (TurnAlreadyInFlightException dup) {
                 log.info("Mentor turn rejected (DB in-flight index): {}", dup.getMessage());
+                metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT);
                 channel.completeWithConflict();
                 return Boolean.FALSE;
             } catch (RuntimeException e) {
@@ -125,8 +144,11 @@ public class MentorChatService {
                     e.getMessage(),
                     e
                 );
+                metrics.recordCompleted(MentorChatMetrics.Outcome.ERROR);
                 channel.completeWithError("Mentor turn failed: " + e.getMessage());
                 return Boolean.FALSE;
+            } finally {
+                metrics.stopTimer(sample);
             }
         });
         if (acquired.isEmpty()) {
@@ -135,11 +157,12 @@ public class MentorChatService {
                 key.workspaceId(),
                 key.threadId()
             );
+            metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT);
             channel.completeWithConflict();
         }
     }
 
-    private void runTurn(
+    private MentorChatMetrics.Outcome runTurn(
         MentorTurnRequest request,
         MentorSseChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
@@ -168,6 +191,7 @@ public class MentorChatService {
         CompletableFuture<Void> turnComplete = new CompletableFuture<>();
         channel.startHeartbeat();
         boolean poisoned = false;
+        MentorChatMetrics.Outcome outcome = MentorChatMetrics.Outcome.ERROR;
         try {
             channel.send(new UIMessageChunk.Start(assistantMessageId, null));
             channel.send(UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"));
@@ -212,6 +236,19 @@ public class MentorChatService {
             // Natural-finish path: Pi emitted `agent_end` → handleEvent sent the `finish` chunk
             // already. Close the wire with AI-SDK's `[DONE]` sentinel.
             channel.completeWithDone();
+            outcome = MentorChatMetrics.Outcome.SUCCESS;
+        } catch (TimeoutException timeout) {
+            // Turn outlasted the prompt deadline (165s) + 30s grace; the future never resolved.
+            // Persistence sees an interrupted assistant row; the runner watchdog is what
+            // actually reclaims the Pi session.
+            log.warn(
+                "Mentor turn timed out waiting for agent_end (threadId={}): {}",
+                request.threadId(),
+                timeout.toString()
+            );
+            persistence.interrupt(cookie, state, timeout);
+            channel.completeWithError("Mentor turn timed out before completion.");
+            outcome = MentorChatMetrics.Outcome.TIMEOUT;
         } catch (ClientDisconnectedException disconnect) {
             // Browser closed mid-turn (tab close, refresh, network blip). This is NOT a turn
             // failure: the runner subscription keeps draining and `handleEvent` will still call
@@ -230,11 +267,13 @@ public class MentorChatService {
                     persistence.interrupt(cookie, state, disconnect);
                 }
             }
+            outcome = MentorChatMetrics.Outcome.CLIENT_DISCONNECT;
         } catch (Exception e) {
             poisoned = isPoisoning(e);
             log.warn("Mentor turn errored (poisoned={}): {}", poisoned, e.getMessage(), e);
             persistence.interrupt(cookie, state, e);
             channel.completeWithError(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            outcome = poisoned ? MentorChatMetrics.Outcome.POISONED : MentorChatMetrics.Outcome.ERROR;
         } finally {
             channel.close();
             if (client != null) {
@@ -259,6 +298,7 @@ public class MentorChatService {
                 }
             }
         }
+        return outcome;
     }
 
     /**
@@ -308,6 +348,8 @@ public class MentorChatService {
                     UIMessageChunk.Finish augmented = persistence.augmentFinishWithCost(finish, state);
                     channel.send(augmented);
                     persistence.finalise(cookie, state, augmented);
+                    Double costUsd = augmented.messageMetadata() != null ? augmented.messageMetadata().costUsd() : null;
+                    if (costUsd != null) metrics.recordCostUsd(costUsd);
                     turnComplete.complete(null);
                 } else if (chunk instanceof UIMessageChunk.Error err) {
                     channel.send(chunk);

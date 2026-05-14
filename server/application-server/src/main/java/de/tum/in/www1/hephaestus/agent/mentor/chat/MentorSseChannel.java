@@ -33,11 +33,23 @@ final class MentorSseChannel implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(MentorSseChannel.class);
 
-    /** Emit an SSE comment-only keep-alive after this many ns of silence. */
+    /**
+     * Emit an SSE comment-only keep-alive after this many ns of silence. Bounded by the
+     * narrowest proxy idle window we ship against — Traefik defaults to 180s but some k8s
+     * ingress configs cap at 60s. Worst-case silence is {@code HEARTBEAT_INITIAL_DELAY_MS}
+     * (first tick) plus {@code HEARTBEAT_QUIET_NS}, so ≤ 21s.
+     */
     private static final long HEARTBEAT_QUIET_NS = TimeUnit.SECONDS.toNanos(20);
 
     /** Wake the heartbeat scheduler this often to check {@link #HEARTBEAT_QUIET_NS}. */
     private static final long HEARTBEAT_TICK_MS = 5_000;
+
+    /**
+     * First scheduler tick happens this many ms after {@link #startHeartbeat()}. Kept small so
+     * a context-build cold start doesn't leak a silence window of
+     * {@code HEARTBEAT_TICK_MS + HEARTBEAT_QUIET_NS} (~25s) before the first keep-alive.
+     */
+    private static final long HEARTBEAT_INITIAL_DELAY_MS = 1_000;
 
     private final SseEmitter emitter;
     private final ObjectMapper objectMapper;
@@ -116,7 +128,7 @@ final class MentorSseChannel implements AutoCloseable {
                     flagDisconnected();
                 }
             },
-            HEARTBEAT_TICK_MS,
+            HEARTBEAT_INITIAL_DELAY_MS,
             HEARTBEAT_TICK_MS,
             TimeUnit.MILLISECONDS
         );
