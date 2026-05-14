@@ -225,8 +225,11 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         state.appendText("Hello there!");
         state.closeTextBlock();
 
-        ObjectNode finishMeta = NODES.objectNode();
-        finishMeta.put("model", "openai/gpt-oss-120b");
+        UIMessageChunk.FinishMetadata finishMeta = new UIMessageChunk.FinishMetadata(
+            "openai/gpt-oss-120b",
+            new UIMessageChunk.FinishMetadata.Usage(123, 45, null, null, 168),
+            /* costUsd */ null
+        );
         UIMessageChunk.Finish finish = new UIMessageChunk.Finish("stop", finishMeta);
 
         persistence.finalise(cookie, state, finish, null);

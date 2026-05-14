@@ -182,7 +182,10 @@ export function useMentorChat({
 		id: stableThreadId, // Use stable ID that never changes
 		messages: initialMessages, // Start with initial messages only - backend will provide thread history
 		generateId: () => uuidv4(), // Generate UUID for all messages
-		experimental_throttle: 100, // Add throttling for smoother streaming
+		// experimental_throttle batches React re-renders, but Pi's text-delta cadence is already
+		// LLM-bound (~10-30/s). Adding 100 ms batches on top makes tokens stall in chunks of
+		// 1-3 deltas, breaking the "live typing" feel users expect from streaming. The webapp's
+		// markdown renderer is cheap enough to handle every delta without throttling.
 		transport: stableTransport,
 		onFinish: stableOnFinish,
 		onError: stableOnError,

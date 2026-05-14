@@ -237,9 +237,10 @@ class MentorEventTranslatorTest extends BaseUnitTest {
 
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) out.get(out.size() - 1);
         assertThat(finish.messageMetadata()).isNotNull();
-        assertThat(finish.messageMetadata().get("model").asText()).isEqualTo("claude-3-5-haiku-20241022");
-        assertThat(finish.messageMetadata().get("usage").get("input").asInt()).isEqualTo(25);
-        assertThat(finish.messageMetadata().get("usage").get("output").asInt()).isEqualTo(5);
+        assertThat(finish.messageMetadata().model()).isEqualTo("claude-3-5-haiku-20241022");
+        assertThat(finish.messageMetadata().usage()).isNotNull();
+        assertThat(finish.messageMetadata().usage().input()).isEqualTo(25);
+        assertThat(finish.messageMetadata().usage().output()).isEqualTo(5);
     }
 
     @Test
@@ -261,7 +262,7 @@ class MentorEventTranslatorTest extends BaseUnitTest {
 
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) out.get(out.size() - 1);
         // message_end snapshot wins.
-        assertThat(finish.messageMetadata().get("usage").get("input").asInt()).isEqualTo(25);
+        assertThat(finish.messageMetadata().usage().input()).isEqualTo(25);
     }
 
     @Test
@@ -289,7 +290,7 @@ class MentorEventTranslatorTest extends BaseUnitTest {
         assertThat(MentorEventTranslator.mapStopReason("tool_use")).isEqualTo("tool-calls");
         assertThat(MentorEventTranslator.mapStopReason("error")).isEqualTo("error");
         assertThat(MentorEventTranslator.mapStopReason("aborted")).isEqualTo("error");
-        assertThat(MentorEventTranslator.mapStopReason("future-pi-reason")).isEqualTo("unknown");
+        assertThat(MentorEventTranslator.mapStopReason("future-pi-reason")).isEqualTo("other");
         assertThat(MentorEventTranslator.mapStopReason(null)).isNull();
     }
 
@@ -395,7 +396,7 @@ class MentorEventTranslatorTest extends BaseUnitTest {
     // ─── parts accumulation ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("State accumulates one text part with concatenated deltas through a real-shape stream")
+    @DisplayName("State accumulates step-start + one text part with concatenated deltas")
     void stateAccumulatesPartsAcrossDeltas() throws Exception {
         translator.translate(fixture("message_start_assistant.json"), state);
         translator.translate(fixture("message_update_text_delta.json"), state);
@@ -405,10 +406,73 @@ class MentorEventTranslatorTest extends BaseUnitTest {
         translator.translate(second, state);
         translator.translate(mapper.readTree("{\"type\":\"turn_end\"}"), state);
 
+        // AI SDK's reducer pushes {type:"step-start"} on every start-step chunk; we mirror that
+        // here so the persisted UIMessage round-trips correctly through safeValidateUIMessages.
         JsonNode snapshot = state.partsSnapshot();
         assertThat(snapshot.isArray()).isTrue();
+        assertThat(snapshot).hasSize(2);
+        assertThat(snapshot.get(0).get("type").asText()).isEqualTo("step-start");
+        assertThat(snapshot.get(1).get("type").asText()).isEqualTo("text");
+        assertThat(snapshot.get(1).get("text").asText()).isEqualTo("hello");
+    }
+
+    // ─── tool-call part mutation (single part per toolCallId across states) ──────────────
+
+    @Test
+    @DisplayName("Tool execution start+end produces ONE persisted part that mutates state in place")
+    void toolPart_mutatesSingleEntryAcrossLifecycle() throws Exception {
+        // 1) start
+        ObjectNode start = mapper.createObjectNode();
+        start.put("type", "tool_execution_start");
+        start.put("toolCallId", "tc-1");
+        start.put("toolName", "fetch_context");
+        start.putObject("args").put("path", "workspace.json");
+        translator.translate(start, state);
+
+        // 2) success end
+        ObjectNode end = mapper.createObjectNode();
+        end.put("type", "tool_execution_end");
+        end.put("toolCallId", "tc-1");
+        end.put("toolName", "fetch_context");
+        end.put("isError", false);
+        end.putObject("result").putArray("content").addObject().put("type", "text").put("text", "ok");
+        translator.translate(end, state);
+
+        JsonNode snapshot = state.partsSnapshot();
+        // Exactly one tool part — AI SDK's reducer keys parts by toolCallId, so triplicating
+        // start/output/error parts would break getToolInvocation() (which find()s the first
+        // toolCallId hit and would surface the input-available state forever).
         assertThat(snapshot).hasSize(1);
-        assertThat(snapshot.get(0).get("type").asText()).isEqualTo("text");
-        assertThat(snapshot.get(0).get("text").asText()).isEqualTo("hello");
+        JsonNode part = snapshot.get(0);
+        assertThat(part.get("type").asText()).isEqualTo("tool-fetch_context");
+        assertThat(part.get("toolCallId").asText()).isEqualTo("tc-1");
+        assertThat(part.get("state").asText()).isEqualTo("output-available");
+        assertThat(part.has("input")).isTrue();
+        assertThat(part.has("output")).isTrue();
+    }
+
+    @Test
+    @DisplayName("Tool start then error mutates the same part; `output` is removed and errorText set")
+    void toolPart_errorMutationCleansOutput() throws Exception {
+        ObjectNode start = mapper.createObjectNode();
+        start.put("type", "tool_execution_start");
+        start.put("toolCallId", "tc-2");
+        start.put("toolName", "fetch_context");
+        start.putObject("args");
+        translator.translate(start, state);
+
+        ObjectNode end = mapper.createObjectNode();
+        end.put("type", "tool_execution_end");
+        end.put("toolCallId", "tc-2");
+        end.put("isError", true);
+        end.put("error", "fetch_context timed out");
+        translator.translate(end, state);
+
+        JsonNode snapshot = state.partsSnapshot();
+        assertThat(snapshot).hasSize(1);
+        JsonNode part = snapshot.get(0);
+        assertThat(part.get("state").asText()).isEqualTo("output-error");
+        assertThat(part.has("output")).isFalse();
+        assertThat(part.get("errorText").asText()).isEqualTo("fetch_context timed out");
     }
 }

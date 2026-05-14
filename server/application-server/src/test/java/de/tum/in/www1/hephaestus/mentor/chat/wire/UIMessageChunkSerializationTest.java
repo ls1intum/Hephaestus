@@ -34,7 +34,11 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
     static List<Object[]> chunkFixtures() {
         UUID messageId = UUID.fromString("11111111-2222-3333-4444-555555555555");
         UUID findingId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        ObjectNode finishMeta = NODES.objectNode().put("costUsd", 0.0042);
+        UIMessageChunk.FinishMetadata finishMeta = new UIMessageChunk.FinishMetadata(
+            "openai/gpt-oss-120b",
+            new UIMessageChunk.FinishMetadata.Usage(655, 65, null, null, 720),
+            0.0042
+        );
         ObjectNode toolOutput = NODES.objectNode().put("status", "ok").put("count", 7);
         return List.of(
             new Object[] {
@@ -55,7 +59,13 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
             },
             new Object[] {
                 new UIMessageChunk.Finish(null, finishMeta),
-                "{\"type\":\"finish\",\"messageMetadata\":{\"costUsd\":0.0042}}",
+                "{\"type\":\"finish\",\"messageMetadata\":{\"model\":\"openai/gpt-oss-120b\"," +
+                "\"usage\":{\"input\":655,\"output\":65,\"totalTokens\":720},\"costUsd\":0.0042}}",
+            },
+            // FinishMetadata.of(null,null,null) collapses to null → Finish.messageMetadata omitted entirely.
+            new Object[] {
+                new UIMessageChunk.Finish("stop", UIMessageChunk.FinishMetadata.of(null, null, null)),
+                "{\"type\":\"finish\",\"finishReason\":\"stop\"}",
             },
             // NON_NULL: finishReason omitted, but messageMetadata kept.
             // data-* envelope shape per AI SDK strict-object schema:

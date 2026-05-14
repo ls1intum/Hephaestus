@@ -51,6 +51,17 @@ public final class TranslatorState {
     /** Tool-call id → tool name, populated on {@code tool_execution_start} for later error labels. */
     private final Map<String, String> toolNameByCallId = new ConcurrentHashMap<>();
 
+    /**
+     * Tool-call id → the mutable {@link ObjectNode} part inside {@link #partsAccumulator}. AI SDK's
+     * {@code processUIMessageStream} reducer mutates a *single* part across the
+     * input-available → output-available/error lifecycle (vercel/ai dist/index.mjs:4632-4666 for
+     * @ai-sdk/react@3.0.3 ⇄ ai@6.0.3). Appending three separate parts (one per state) breaks
+     * {@code getToolInvocation} which {@code find}s by toolCallId and returns the first hit —
+     * the user sees the tool input but never the output after page refresh. We mirror the reducer
+     * here so persisted parts round-trip through {@code safeValidateUIMessages}.
+     */
+    private final Map<String, ObjectNode> toolPartByCallId = new ConcurrentHashMap<>();
+
     /** AI SDK UIMessage parts as accumulated. Order matches the stream; written to JSONB at end-of-turn. */
     private final ArrayNode partsAccumulator = nodes.arrayNode();
 
@@ -92,6 +103,13 @@ public final class TranslatorState {
     }
 
     public int incrementStep() {
+        // AI SDK's client reducer pushes a `{type:"step-start"}` part for every `start-step` chunk
+        // it sees (ai@6.0.3 dist/index.mjs:4988-5050). Mirror that here so the rehydrated message
+        // — fetched via `GET /threads/{id}` — round-trips through `safeValidateUIMessages` and
+        // renders the same step boundaries the client built incrementally during streaming.
+        ObjectNode stepStart = nodes.objectNode();
+        stepStart.put("type", "step-start");
+        partsAccumulator.add(stepStart);
         return ++stepDepth;
     }
 
@@ -149,42 +167,63 @@ public final class TranslatorState {
         this.reasoningBuffer.setLength(0);
     }
 
-    /** Track tool name for the given call id so {@link UIMessageChunk.ToolOutputError} can include it. */
+    /**
+     * Track tool name for the given call id so {@link UIMessageChunk.ToolOutputError} can include
+     * it. Creates the part once; subsequent {@link #recordToolCallOutput}/{@link #recordToolCallError}
+     * calls mutate it in place — matching how AI SDK's reducer threads a single part through
+     * input-available → output-available/error.
+     */
     public void recordToolCallStart(String toolCallId, String toolName, @Nullable JsonNode input) {
-        if (toolCallId != null && toolName != null) {
+        if (toolCallId == null) return;
+        if (toolName != null) {
             toolNameByCallId.put(toolCallId, toolName);
         }
         ObjectNode part = nodes.objectNode();
         part.put("type", "tool-" + (toolName != null ? toolName : "unknown"));
         part.put("toolCallId", toolCallId);
         part.put("state", "input-available");
-        if (input != null) {
-            part.set("input", input);
-        }
+        // `input` is REQUIRED on every state per AI SDK's zod schema (ai@6.0.3 dist/index.mjs:7682).
+        // Default to an empty object so the schema validates even when Pi emits a parameter-less tool.
+        part.set("input", input != null ? input : nodes.objectNode());
         partsAccumulator.add(part);
+        toolPartByCallId.put(toolCallId, part);
     }
 
-    /** Replace the last tool-call part for this id with an output-available shape. */
+    /** Mutate the existing tool-call part to {@code state:"output-available"}. */
     public void recordToolCallOutput(String toolCallId, JsonNode output) {
-        String toolName = toolNameByCallId.getOrDefault(toolCallId, "unknown");
-        ObjectNode part = nodes.objectNode();
-        part.put("type", "tool-" + toolName);
-        part.put("toolCallId", toolCallId);
-        part.put("state", "output-available");
-        if (output != null) {
-            part.set("output", output);
+        if (toolCallId == null) return;
+        ObjectNode part = toolPartByCallId.get(toolCallId);
+        if (part == null) {
+            // Output without a prior start — synthesise a part. Should never happen with Pi's
+            // matched start/end events, but if it ever does we want a coherent terminal state.
+            part = nodes.objectNode();
+            String toolName = toolNameByCallId.getOrDefault(toolCallId, "unknown");
+            part.put("type", "tool-" + toolName);
+            part.put("toolCallId", toolCallId);
+            part.set("input", nodes.objectNode());
+            partsAccumulator.add(part);
+            toolPartByCallId.put(toolCallId, part);
         }
-        partsAccumulator.add(part);
+        part.put("state", "output-available");
+        part.set("output", output != null ? output : nodes.nullNode());
     }
 
+    /** Mutate the existing tool-call part to {@code state:"output-error"}. */
     public void recordToolCallError(String toolCallId, String errorText) {
-        String toolName = toolNameByCallId.getOrDefault(toolCallId, "unknown");
-        ObjectNode part = nodes.objectNode();
-        part.put("type", "tool-" + toolName);
-        part.put("toolCallId", toolCallId);
+        if (toolCallId == null) return;
+        ObjectNode part = toolPartByCallId.get(toolCallId);
+        if (part == null) {
+            part = nodes.objectNode();
+            String toolName = toolNameByCallId.getOrDefault(toolCallId, "unknown");
+            part.put("type", "tool-" + toolName);
+            part.put("toolCallId", toolCallId);
+            part.set("input", nodes.objectNode());
+            partsAccumulator.add(part);
+            toolPartByCallId.put(toolCallId, part);
+        }
         part.put("state", "output-error");
         part.put("errorText", errorText);
-        partsAccumulator.add(part);
+        part.remove("output");
     }
 
     public void recordDataFinding(UUID findingId) {

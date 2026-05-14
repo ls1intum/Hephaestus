@@ -163,6 +163,13 @@ class MentorChatServiceTest extends BaseUnitTest {
         when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
         when(interactiveSandboxService.attach(any())).thenReturn(sandbox);
         when(mentorPiAdapter.buildSandboxSpec(any(), any(), any())).thenReturn(stubSpec());
+        // augmentFinishWithCost passes through unchanged when the mock isn't told otherwise.
+        // Without this stub the default Mockito null return would replace the Finish chunk in the
+        // happy-path stream — the wire would lose its terminal frame and `turnComplete` would
+        // never resolve.
+        when(persistence.augmentFinishWithCost(any(UIMessageChunk.Finish.class), any())).thenAnswer(
+            inv -> inv.getArgument(0, UIMessageChunk.Finish.class)
+        );
     }
 
     @AfterEach

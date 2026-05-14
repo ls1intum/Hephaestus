@@ -338,13 +338,21 @@ public class MentorChatService {
         try {
             List<UIMessageChunk> chunks = translator.translate(piEvent, state);
             for (UIMessageChunk chunk : chunks) {
-                sendChunk(emitter, chunk, clientGone, lastSendNanos);
                 if (chunk instanceof UIMessageChunk.Finish finish) {
-                    persistence.finalise(cookie, state, finish, piEvent);
+                    // Compute cost BEFORE sending the Finish chunk so the client sees the same
+                    // value the DB persists. If we deferred until persistence.finalise the wire
+                    // Finish would carry null costUsd and the client would have to refresh to
+                    // discover it. augmentFinishWithCost is pure (no transaction).
+                    UIMessageChunk.Finish augmented = persistence.augmentFinishWithCost(finish, state);
+                    sendChunk(emitter, augmented, clientGone, lastSendNanos);
+                    persistence.finalise(cookie, state, augmented, piEvent);
                     turnComplete.complete(null);
                 } else if (chunk instanceof UIMessageChunk.Error err) {
+                    sendChunk(emitter, chunk, clientGone, lastSendNanos);
                     persistence.interrupt(cookie, state, new IllegalStateException(err.errorText()));
                     turnComplete.complete(null);
+                } else {
+                    sendChunk(emitter, chunk, clientGone, lastSendNanos);
                 }
             }
         } catch (ClientDisconnectedException disconnect) {

@@ -299,7 +299,19 @@ public class MentorEventTranslator {
         return List.of(new UIMessageChunk.ToolOutputError(toolCallId, errorText));
     }
 
+    /** Max tool-error length surfaced to the UI. Pi's tool result can ship the whole stderr
+     *  (could be MBs). Truncating keeps the AI SDK error banner usable and bounds wire size. */
+    static final int MAX_TOOL_ERROR_LEN = 1024;
+
     private static String extractToolErrorText(JsonNode event) {
+        String raw = extractToolErrorRaw(event);
+        if (raw == null) return "tool execution failed";
+        if (raw.length() <= MAX_TOOL_ERROR_LEN) return raw;
+        return raw.substring(0, MAX_TOOL_ERROR_LEN) + "…[truncated " + (raw.length() - MAX_TOOL_ERROR_LEN) + " chars]";
+    }
+
+    @Nullable
+    private static String extractToolErrorRaw(JsonNode event) {
         JsonNode result = event.path("result");
         if (result.isObject()) {
             JsonNode content = result.path("content");
@@ -320,7 +332,7 @@ public class MentorEventTranslator {
             return error.toString();
         }
         if (error.isTextual()) return error.asText();
-        return "tool execution failed";
+        return null;
     }
 
     @Nullable
@@ -382,25 +394,23 @@ public class MentorEventTranslator {
             piStopReason = firstNonNull(optionalString(event, "stopReason"), optionalString(event, "finish_reason"));
         }
         List<UIMessageChunk> out = closeOpenStreamingBlocks(state);
-        ObjectNode metadata = NODES.objectNode();
-        JsonNode usage = state.observedUsage();
-        if (usage != null) {
-            metadata.set("usage", usage);
-        }
-        String model = state.observedModel();
-        if (model != null) {
-            metadata.put("model", model);
-        }
-        out.add(new UIMessageChunk.Finish(mapStopReason(piStopReason), metadata.isEmpty() ? null : metadata));
+        UIMessageChunk.FinishMetadata metadata = UIMessageChunk.FinishMetadata.of(
+            state.observedModel(),
+            UIMessageChunk.FinishMetadata.Usage.fromJsonNode(state.observedUsage()),
+            /* costUsd, set by the persistence layer post-translation */ null
+        );
+        out.add(new UIMessageChunk.Finish(mapStopReason(piStopReason), metadata));
         return out;
     }
 
     /**
      * Map Pi's {@code StopReason} (pi-ai/src/types.ts:269 — {@code stop|length|toolUse|error|aborted})
-     * to the AI SDK's {@code LanguageModelV2FinishReason} enum
-     * (vercel/ai packages/provider/src/language-model/v2/language-model-v2-finish-reason.ts —
-     * {@code stop|length|content-filter|tool-calls|error|other|unknown}). Strict client-side
-     * validators reject raw Pi values, so the mapping must happen at this boundary.
+     * to the AI SDK's {@code finishReason} enum on the {@code finish} chunk schema
+     * (ai@6.0.3 dist/index.mjs Finish schema — {@code stop|length|content-filter|tool-calls|error|other}).
+     * Note: although the upstream {@code LanguageModelV2FinishReason} type includes {@code "unknown"},
+     * the UIMessageStream {@code finish} chunk uses the narrower {@code z.enum([…])} that does NOT
+     * accept {@code "unknown"} — strict-zod parsing rejects it at the client. Default case maps to
+     * {@code "other"}.
      */
     @Nullable
     static String mapStopReason(@Nullable String piStopReason) {
@@ -410,7 +420,7 @@ public class MentorEventTranslator {
             case "length" -> "length";
             case "toolUse", "tool_use", "tool-calls" -> "tool-calls";
             case "error", "aborted" -> "error";
-            default -> "unknown";
+            default -> "other";
         };
     }
 

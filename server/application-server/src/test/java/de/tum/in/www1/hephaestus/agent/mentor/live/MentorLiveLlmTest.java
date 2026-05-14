@@ -215,16 +215,16 @@ class MentorLiveLlmTest {
         // ever regresses these go to zero — exactly the failure mode this test exists to catch.
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) chunks.get(chunks.size() - 1);
         assertThat(finish.messageMetadata()).as("Finish carries metadata").isNotNull();
-        JsonNode usage = finish.messageMetadata().path("usage");
-        assertThat(usage.isObject()).as("usage object present").isTrue();
-        assertThat(usage.path("input").asInt(0)).as("usage.input ≥ 1").isGreaterThanOrEqualTo(1);
-        assertThat(usage.path("output").asInt(0)).as("usage.output ≥ 1").isGreaterThanOrEqualTo(1);
+        UIMessageChunk.FinishMetadata.Usage usage = finish.messageMetadata().usage();
+        assertThat(usage).as("usage object present").isNotNull();
+        assertThat(usage.input()).as("usage.input ≥ 1").isGreaterThanOrEqualTo(1);
+        assertThat(usage.output()).as("usage.output ≥ 1").isGreaterThanOrEqualTo(1);
         System.out.printf(
-            "[hero] usage: input=%d output=%d totalTokens=%d model=%s%n",
-            usage.path("input").asInt(0),
-            usage.path("output").asInt(0),
-            usage.path("totalTokens").asInt(0),
-            finish.messageMetadata().path("model").asText("?")
+            "[hero] usage: input=%d output=%d totalTokens=%s model=%s%n",
+            usage.input(),
+            usage.output(),
+            usage.totalTokens(),
+            finish.messageMetadata().model()
         );
 
         // ─── Persistence snapshot ─────────────────────────────────────────────────────
@@ -236,10 +236,18 @@ class MentorLiveLlmTest {
         // We assert the *intent* (parts is well-formed JSON) and check the buffered text matches.
         var partsSnapshot = state.partsSnapshot();
         assertThat(partsSnapshot.isArray()).isTrue();
-        if (!partsSnapshot.isEmpty()) {
-            JsonNode firstPart = partsSnapshot.get(0);
-            assertThat(firstPart.path("type").asText()).isEqualTo("text");
-            assertThat(firstPart.path("text").asText()).isEqualTo(concatenated);
+        // AI SDK reducer pushes one `step-start` per start-step, then content parts. Find the
+        // text part (skip the step-start placeholder) — the assertion is that the rehydrated
+        // UIMessage carries the concatenated text exactly.
+        JsonNode textPart = null;
+        for (JsonNode p : partsSnapshot) {
+            if ("text".equals(p.path("type").asText())) {
+                textPart = p;
+                break;
+            }
+        }
+        if (textPart != null) {
+            assertThat(textPart.path("text").asText()).isEqualTo(concatenated);
         }
     }
 

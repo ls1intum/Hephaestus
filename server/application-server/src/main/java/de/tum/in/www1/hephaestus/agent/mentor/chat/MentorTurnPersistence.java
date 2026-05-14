@@ -130,6 +130,45 @@ public class MentorTurnPersistence {
         }
     }
 
+    /**
+     * Compute the {@code costUsd} that {@link #finalise} will write to {@code chat_message.metadata}
+     * and return a copy of {@code finish} with that value injected into its {@code messageMetadata}.
+     * Called by the orchestrator *before* the Finish chunk is sent on the wire so the client sees
+     * the same cost that the DB persists. Returns {@code finish} unchanged when no cost is
+     * computable.
+     */
+    public UIMessageChunk.Finish augmentFinishWithCost(UIMessageChunk.Finish finish, TranslatorState state) {
+        Double cost = computeFinalCostUsd(state);
+        if (cost == null) return finish;
+        UIMessageChunk.FinishMetadata existing = finish.messageMetadata();
+        UIMessageChunk.FinishMetadata.Usage usage = existing != null ? existing.usage() : null;
+        String model = existing != null ? existing.model() : state.observedModel();
+        return new UIMessageChunk.Finish(
+            finish.finishReason(),
+            new UIMessageChunk.FinishMetadata(model, usage, cost)
+        );
+    }
+
+    @Nullable
+    private Double computeFinalCostUsd(TranslatorState state) {
+        Double piCost = extractPiCostUsd(state.observedUsage());
+        if (piCost != null) return piCost;
+        UsageBreakdown breakdown = extractUsageFromState(state, /* rawAgentEnd */ null);
+        if (breakdown.model() == null || (breakdown.inputTokens() <= 0 && breakdown.outputTokens() <= 0)) {
+            return null;
+        }
+        return pricingService
+            .computeCost(
+                breakdown.model(),
+                breakdown.inputTokens(),
+                breakdown.outputTokens(),
+                breakdown.cacheReadTokens(),
+                breakdown.cacheWriteTokens()
+            )
+            .map(java.math.BigDecimal::doubleValue)
+            .orElse(null);
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void finalise(
         TurnPersistenceCookie cookie,

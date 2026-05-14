@@ -587,12 +587,37 @@ async function handleCloseThread(id, params) {
 
 async function handleShutdown(id) {
     sendResult(id, { shuttingDown: true });
-    // Give the response a tick to drain, then exit.
+    // Drain pending fetch_context promises across every thread so Pi sessions don't dangle
+    // on disposed callbacks (they'd time out at the 10s ceiling anyway, but rejecting now is
+    // cleaner + lets Pi flush any partial state). Then tear down sessions in parallel — we no
+    // longer care about ordering since the process is about to exit.
+    const teardowns = [];
+    for (const state of threads.values()) {
+        teardowns.push(Promise.resolve().then(() => cleanupThread(state)));
+    }
+    await Promise.allSettled(teardowns);
+    threads.clear();
+    activeThreadId = null;
+    try {
+        await runtime?.dispose?.();
+    } catch (e) {
+        log(`runtime.dispose during shutdown failed: ${e?.message ?? e}`);
+    }
+    // Drain stdout. `process.stdout.write('', cb)` resolves once the previously-queued frames
+    // (including the result above) have been flushed to the kernel — required because Node
+    // buffers stdout when it's a pipe (which it is when spawned by Java's ProcessBuilder).
+    // Without this drain, `process.exit(0)` truncates the final result frame on a fast exit.
     process.stdout.write("", () => {
         log("shutdown requested — exiting");
         process.exit(0);
     });
 }
+
+// Max bytes of context surfaced to the LLM per fetch_context call. Aspect JSONs occasionally
+// balloon (e.g. `findings.json` for a heavy reviewer); without a cap, a single tool call can
+// blow the model's context window. 200 KB ≈ 50K tokens at ~4 chars/token — comfortably below
+// gpt-oss-120b's 128 K window and gives headroom for system prompt + history.
+const FETCH_CONTEXT_MAX_BYTES = 200_000;
 
 // fetch_context responses (Java → runner)
 function handleFetchContextResponse(frame) {
@@ -608,8 +633,14 @@ function handleFetchContextResponse(frame) {
         state.pendingFetchContexts.delete(callbackId);
         clearTimeout(pending.timer);
         if (frame.error) {
-            // Reject so Pi records this tool call as failed (agent-loop.ts §632-638).
-            pending.reject(new Error(`fetch_context server error: ${frame.error.message || "unknown error"}`));
+            // Reject so Pi records this tool call as failed (agent-loop.ts §632-638). Echo the
+            // JSON-RPC error code in the rejection so server-side diagnostics survive the
+            // rethrow → LLM tool-error round-trip.
+            const code = frame.error.code ?? "unknown";
+            const message = frame.error.message || "unknown error";
+            const err = new Error(`fetch_context server error [${code}]: ${message}`);
+            err.code = code;
+            pending.reject(err);
         } else {
             // Pi tool results accept `content: [{type:"text", text: string}]` (verified against
             // pi-mono SDK tool-result type). When Java returns a JSON object we stringify ONCE;
@@ -617,15 +648,21 @@ function handleFetchContextResponse(frame) {
             // double-stringified strings ("\"foo\"" → "\\\"foo\\\""), which leaked an extra
             // layer of JSON escaping into the LLM prompt.
             const content = frame.result?.content;
-            const text =
+            let text =
                 content == null
                     ? "{}"
                     : typeof content === "string"
                     ? content
                     : JSON.stringify(content);
+            let truncated = false;
+            if (text.length > FETCH_CONTEXT_MAX_BYTES) {
+                const dropped = text.length - FETCH_CONTEXT_MAX_BYTES;
+                text = text.slice(0, FETCH_CONTEXT_MAX_BYTES) + `\n…[truncated ${dropped} chars]`;
+                truncated = true;
+            }
             pending.resolve({
                 content: [{ type: "text", text }],
-                details: { ok: true, length: text.length },
+                details: { ok: true, length: text.length, truncated },
             });
         }
         return;
@@ -652,6 +689,15 @@ function startTurnWatchdog(state) {
             log(`watchdog hard timeout: rebuilding session for thread=${state.threadId}`);
             sendEvent(state.threadId, { type: "turn_watchdog_fired", threadId: state.threadId });
             try {
+                // 0) Reject every still-pending fetch_context promise BEFORE we throw away the
+                //    session — otherwise the new session could echo a stale callback id from a
+                //    rebound thread (no UUID collision in practice, but the timeouts would leak
+                //    until their 10s ceiling fires, and Pi would record phantom tool-call results).
+                for (const [cbId, pending] of state.pendingFetchContexts) {
+                    clearTimeout(pending.timer);
+                    pending.reject(new Error("fetch_context: turn aborted by watchdog"));
+                    state.pendingFetchContexts.delete(cbId);
+                }
                 // 1) Abort first (graceful) — gives Pi a chance to flush partial state and
                 //    surface a real stopReason. Soft-fail: we proceed even if abort throws.
                 await runtime?.session?.abort().catch((e) => log(`abort during watchdog failed: ${e.message ?? e}`));

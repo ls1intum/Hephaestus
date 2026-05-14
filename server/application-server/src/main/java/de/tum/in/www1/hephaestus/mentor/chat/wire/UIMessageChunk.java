@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.lang.Nullable;
 
@@ -52,7 +53,7 @@ public sealed interface UIMessageChunk {
      * primary key of the persisted {@code chat_message} row so client-side {@code useChat}
      * reconciliation survives a page refresh.
      */
-    record Start(@Nullable UUID messageId, @Nullable JsonNode messageMetadata) implements UIMessageChunk {}
+    record Start(@Nullable UUID messageId, @Nullable FinishMetadata messageMetadata) implements UIMessageChunk {}
 
     /** Lifecycle: open a step (Pi internal turn boundary). */
     record StartStep() implements UIMessageChunk {}
@@ -64,7 +65,56 @@ public sealed interface UIMessageChunk {
      * Terminal chunk. The optional {@code messageMetadata} carries cost + usage so the webapp
      * (and downstream observability) can surface them.
      */
-    record Finish(@Nullable String finishReason, @Nullable JsonNode messageMetadata) implements UIMessageChunk {}
+    record Finish(@Nullable String finishReason, @Nullable FinishMetadata messageMetadata) implements UIMessageChunk {}
+
+    /**
+     * Typed metadata attached to {@link Finish} (and, for forward-compat, {@link Start}).
+     * Webapp mirrors this in {@code webapp/src/lib/types.ts → MessageMetadata}; the two must
+     * stay in lock-step. {@code @JsonInclude(NON_NULL)} ensures unknown fields are omitted on
+     * the wire so the AI SDK strict-zod {@code messageMetadata} validator accepts the payload.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    record FinishMetadata(
+        @Nullable String model,
+        @Nullable Usage usage,
+        @Nullable Double costUsd
+    ) {
+        public static FinishMetadata of(@Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
+            // Cheap "nothing observed" gate so we don't ship `{}` to clients (which the strict
+            // validator still accepts but bloats every Finish chunk).
+            if (model == null && usage == null && costUsd == null) return null;
+            return new FinishMetadata(model, usage, costUsd);
+        }
+
+        /** Pi's {@code Usage} shape (pi-ai/src/types.ts) projected onto the AI SDK wire. */
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public record Usage(
+            @Nullable Integer input,
+            @Nullable Integer output,
+            @Nullable Integer cacheRead,
+            @Nullable Integer cacheWrite,
+            @Nullable Integer totalTokens
+        ) {
+            /** Build from a Pi JSONNode {@code usage} block; null-tolerant on every field. */
+            public static Usage fromJsonNode(@Nullable JsonNode node) {
+                if (node == null || !node.isObject() || node.isEmpty()) return null;
+                Integer in = readInt(node, "input");
+                Integer out = readInt(node, "output");
+                Integer cr = readInt(node, "cacheRead");
+                Integer cw = readInt(node, "cacheWrite");
+                Integer tt = readInt(node, "totalTokens");
+                if (Objects.equals(in, null) && out == null && cr == null && cw == null && tt == null) return null;
+                return new Usage(in, out, cr, cw, tt);
+            }
+
+            @Nullable
+            private static Integer readInt(JsonNode node, String field) {
+                JsonNode v = node.get(field);
+                if (v == null || v.isNull() || !v.isIntegralNumber()) return null;
+                return v.asInt();
+            }
+        }
+    }
 
     /**
      * Open a streaming text block. Subsequent {@link TextDelta}s for this {@code id} append.
