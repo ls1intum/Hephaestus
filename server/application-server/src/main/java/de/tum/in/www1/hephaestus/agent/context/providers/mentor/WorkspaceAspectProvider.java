@@ -120,15 +120,19 @@ public class WorkspaceAspectProvider implements ContentProvider {
     }
 
     private void addRecentSessions(ObjectNode root, Long workspaceId, Long contributorId) {
-        List<ChatThread> threads = queryRepository.findRecentChatThreads(workspaceId, contributorId);
+        // DB-side LIMIT via Pageable: previously the query returned every thread the user had
+        // ever opened (power users hit 100s) and we trimmed in-memory; ship the cap as SQL.
+        List<ChatThread> threads = queryRepository.findRecentChatThreads(
+            workspaceId,
+            contributorId,
+            org.springframework.data.domain.PageRequest.of(0, MAX_RECENT_SESSIONS)
+        );
         ArrayNode arr = root.putArray("recentSessions");
         if (threads.isEmpty()) {
             return;
         }
-        List<ChatThread> capped =
-            threads.size() > MAX_RECENT_SESSIONS ? threads.subList(0, MAX_RECENT_SESSIONS) : threads;
-        Map<UUID, String> firstMessages = loadFirstUserMessages(workspaceId, capped);
-        for (ChatThread thread : capped) {
+        Map<UUID, String> firstMessages = loadFirstUserMessages(workspaceId, threads);
+        for (ChatThread thread : threads) {
             ObjectNode node = arr.addObject();
             node.put("id", thread.getId().toString());
             node.put("title", thread.getTitle() != null ? thread.getTitle() : "Untitled");

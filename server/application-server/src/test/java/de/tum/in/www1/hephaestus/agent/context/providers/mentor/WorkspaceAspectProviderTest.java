@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -57,7 +58,7 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
         ws.setDisplayName("Acme");
         when(workspaceRepository.findById(eq(1L))).thenReturn(Optional.of(ws));
 
-        when(queryRepository.findRecentChatThreads(eq(1L), eq(2L))).thenReturn(List.of());
+        when(queryRepository.findRecentChatThreads(eq(1L), eq(2L), any())).thenReturn(List.of());
         when(queryRepository.findAssignedOpenIssues(eq(1L), eq(2L))).thenReturn(List.of());
         when(queryRepository.findPendingReviewRequestPrs(eq(1L), eq(2L))).thenReturn(List.of());
 

@@ -164,7 +164,9 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
     )
     List<PullRequest> findPendingReviewRequestPrs(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 
-    /** Recent chat threads for the user within the workspace, newest first. */
+    /** Recent chat threads for the user within the workspace, newest first. Caller passes
+     *  a {@link Pageable} ({@code PageRequest.of(0, limit)}) so the DB-side LIMIT keeps power
+     *  users (hundreds of threads) from hydrating the full list just to {@code subList(0, 10)}. */
     @Query(
         """
         SELECT t
@@ -174,7 +176,11 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
         ORDER BY t.createdAt DESC
         """
     )
-    List<ChatThread> findRecentChatThreads(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
+    List<ChatThread> findRecentChatThreads(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId,
+        org.springframework.data.domain.Pageable pageable
+    );
 
     // ════════════════════════════════════════════════════════════════════════
     // Findings aspect — reviews received in window

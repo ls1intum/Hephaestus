@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Pi mentor (#1071) — single consolidated schema migration.
+        Author timestamp: 2026-05-14 11:09:06 UTC (epoch-ms 1778756946278).
+
+        Bundles five schema concerns into one file so the mentor module ships as a single
+        reviewable unit. Split into per-concern <changeSet>s so each retains atomic rollback;
+        the in-flight unique index runs CONCURRENTLY which is mandatory outside a transaction.
+
+        1. chat_message.parts JSONB (denormalises legacy chat_message_part rows)
+        2. backfill from chat_message_part (idempotent)
+        3. parts shape: NOT NULL + array CHECK
+        4. metadata shape: CHECK (NULL or JSON object)
+        5. one in-flight assistant message per thread (durable concurrency guard)
+        6. model_pricing table + idempotent seed
+    -->
+
+    <!-- 1. JSONB column for AI-SDK UIMessage parts. Defaults to '[]' so the parts read path
+         (ChatThreadService.effectiveParts) can short-circuit the legacy fallback once #1074
+         drops chat_message_part. -->
+    <changeSet id="mentor-1071-add-parts-column" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message.parts already exists">
+            <not><columnExists tableName="chat_message" columnName="parts"/></not>
+        </preConditions>
+        <comment>Add chat_message.parts JSONB column for AI SDK UIMessage parts</comment>
+        <addColumn tableName="chat_message">
+            <column name="parts" type="JSONB" defaultValueComputed="'[]'::jsonb"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="chat_message" columnName="parts"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 2. Reconstruct parts JSONB from the normalised chat_message_part rows. Idempotent: only
+         touches messages whose parts is still '[]' AND that have any chat_message_part row.
+         Part shape reconstruction merges the per-row `content` JSONB with a synthetic `type`
+         field (original_type wins; else lower(replace(type,'_','-'))). Ordered by order_index. -->
+    <changeSet id="mentor-1071-backfill-parts" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message.parts already populated">
+            <sqlCheck expectedResult="1">
+                SELECT CASE WHEN EXISTS (
+                    SELECT 1 FROM chat_message m
+                    WHERE (m.parts IS NULL OR m.parts = '[]'::jsonb)
+                      AND EXISTS (SELECT 1 FROM chat_message_part p WHERE p.message_id = m.id)
+                ) THEN 1 ELSE 0 END
+            </sqlCheck>
+        </preConditions>
+        <comment>Backfill chat_message.parts from chat_message_part rows</comment>
+        <sql splitStatements="false">
+            UPDATE chat_message m
+               SET parts = COALESCE(sub.parts_array, '[]'::jsonb)
+              FROM (
+                SELECT
+                    p.message_id,
+                    jsonb_agg(
+                        COALESCE(p.content, '{}'::jsonb)
+                            || jsonb_build_object(
+                                'type',
+                                COALESCE(p.original_type, REPLACE(LOWER(p.type), '_', '-'))
+                            )
+                        ORDER BY p.order_index
+                    ) AS parts_array
+                  FROM chat_message_part p
+                 GROUP BY p.message_id
+              ) sub
+             WHERE m.id = sub.message_id
+               AND (m.parts IS NULL OR m.parts = '[]'::jsonb);
+        </sql>
+        <rollback>
+            <!-- No-op: the parts column drop in changeset 1's rollback restores prior state. -->
+        </rollback>
+    </changeSet>
+
+    <!-- 3. Lock parts to a valid AI-SDK shape: array, never null. The backfill (changeset 2)
+         catches every chat_message_part row; defensive UPDATE here covers any race the
+         backfill missed before NOT NULL closes the door. -->
+    <changeSet id="mentor-1071-enforce-parts-shape" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message.parts is already NOT NULL">
+            <sqlCheck expectedResult="1">
+                SELECT CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END
+                  FROM information_schema.columns
+                 WHERE table_name = 'chat_message' AND column_name = 'parts'
+            </sqlCheck>
+        </preConditions>
+        <comment>Enforce chat_message.parts NOT NULL + JSON-array CHECK</comment>
+        <sql splitStatements="false">
+            UPDATE chat_message SET parts = '[]'::jsonb WHERE parts IS NULL;
+            ALTER TABLE chat_message ALTER COLUMN parts SET NOT NULL;
+            ALTER TABLE chat_message
+                ADD CONSTRAINT chk_chat_message_parts_shape
+                CHECK (jsonb_typeof(parts) = 'array');
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE chat_message DROP CONSTRAINT IF EXISTS chk_chat_message_parts_shape;
+                ALTER TABLE chat_message ALTER COLUMN parts DROP NOT NULL;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!-- 4. Constrain metadata to a JSON object (or NULL). MentorChatService writes
+         {status, model, costUsd, ...}; junk shapes (scalars, arrays) would break the read path. -->
+    <changeSet id="mentor-1071-enforce-metadata-shape" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="metadata shape constraint already exists">
+            <!-- pg_constraint is the canonical source; information_schema.constraint_column_usage
+                 behaviour for CHECK constraints has shifted between Postgres 14/15/16. -->
+            <not>
+                <sqlCheck expectedResult="1">
+                    SELECT CASE WHEN EXISTS (
+                        SELECT 1 FROM pg_constraint
+                         WHERE conname = 'chk_chat_message_metadata_shape'
+                    ) THEN 1 ELSE 0 END
+                </sqlCheck>
+            </not>
+        </preConditions>
+        <comment>Constrain chat_message.metadata to JSON object shape (or NULL)</comment>
+        <sql splitStatements="false">
+            ALTER TABLE chat_message
+                ADD CONSTRAINT chk_chat_message_metadata_shape
+                CHECK (metadata IS NULL OR jsonb_typeof(metadata) = 'object');
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE chat_message DROP CONSTRAINT IF EXISTS chk_chat_message_metadata_shape;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- 5. At most one in-flight assistant message per thread — durable concurrency guard
+         against double-submit races that survive replica boundaries until #1077 lands sticky
+         sessions. CREATE INDEX CONCURRENTLY because chat_message is a hot table; mandatory
+         runInTransaction="false" since CONCURRENTLY refuses to run in a transaction. -->
+    <changeSet id="mentor-1071-in-flight-unique-index" author="hephaestus" runInTransaction="false">
+        <preConditions onFail="MARK_RAN" onFailMessage="in-flight unique index already exists">
+            <not><indexExists indexName="ux_chat_message_in_flight"/></not>
+        </preConditions>
+        <comment>One in-flight assistant message per thread (durable concurrency guard)</comment>
+        <sql splitStatements="false">
+            CREATE UNIQUE INDEX CONCURRENTLY ux_chat_message_in_flight
+                ON chat_message (thread_id)
+                WHERE (metadata ->> 'status') = 'in_flight';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS ux_chat_message_in_flight;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- 6. Model pricing lookup + idempotent seed. LiteLLM does NOT return per-request cost
+         on streaming (litellm#12689); we multiply Pi `agent_end` token usage by per-1k prices
+         stored here. ON CONFLICT DO NOTHING keeps the seed safe if an operator hand-patched a
+         row before this changeset ran (e.g. to fix a price typo). -->
+    <changeSet id="mentor-1071-model-pricing" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="model_pricing table already exists">
+            <not><tableExists tableName="model_pricing"/></not>
+        </preConditions>
+        <comment>Create model_pricing for mentor cost computation + seed common vendor prices</comment>
+        <createTable tableName="model_pricing">
+            <column name="model_id" type="VARCHAR(128)">
+                <constraints primaryKey="true" primaryKeyName="pk_model_pricing"/>
+            </column>
+            <column name="per_1k_input_usd" type="DECIMAL(12,6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="per_1k_output_usd" type="DECIMAL(12,6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="per_1k_cache_read_usd" type="DECIMAL(12,6)" defaultValueNumeric="0"/>
+            <column name="per_1k_cache_write_usd" type="DECIMAL(12,6)" defaultValueNumeric="0"/>
+            <column name="valid_from" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="valid_to" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <sql splitStatements="false">
+            INSERT INTO model_pricing (model_id, per_1k_input_usd, per_1k_output_usd, per_1k_cache_read_usd, per_1k_cache_write_usd)
+            VALUES
+                ('gpt-4o-mini',       0.000150, 0.000600, 0.000075, 0.000000),
+                ('gpt-4o',            0.002500, 0.010000, 0.001250, 0.000000),
+                ('claude-3-5-sonnet', 0.003000, 0.015000, 0.000300, 0.003750),
+                ('claude-3-5-haiku',  0.000800, 0.004000, 0.000080, 0.001000),
+                ('claude-opus-4',     0.015000, 0.075000, 0.001500, 0.018750)
+            ON CONFLICT (model_id) DO NOTHING;
+        </sql>
+        <rollback>
+            <dropTable tableName="model_pricing"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -104,7 +104,7 @@ public class ChatMessage {
      * AI SDK UIMessage parts as a JSONB array. Written verbatim by MentorChatService. Reads go
      * through {@code ChatThreadService.effectiveParts}, which falls back to {@link #legacyParts}
      * during the dual-write window. The fallback collapses once {@code chat_message_part} drops
-     * in #1074. NOT NULL enforced at the column level (changeset 1779000000006) plus an array-shape
+     * in #1074. NOT NULL enforced at the column level (changeset {@code mentor-1071-enforce-parts-shape}) plus an array-shape
      * CHECK so a future writer that forgets to set parts cannot silently fall through to the legacy
      * path.
      */

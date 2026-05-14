@@ -81,8 +81,9 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     void setUp() throws Exception {
         databaseTestUtils.cleanDatabase();
         // The test profile uses JPA ddl-auto=create — Liquibase is disabled, so the unique
-        // partial index on chat_message(thread_id) WHERE status='in_flight' (migration
-        // 1779000000004) never lands. Create it here so the contract under test is real.
+        // partial index on chat_message(thread_id) WHERE status='in_flight' (created by the
+        // mentor-1071-in-flight-unique-index changeset) never lands. Create it here so the
+        // contract under test is real.
         try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
             stmt.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ux_chat_message_in_flight " +
