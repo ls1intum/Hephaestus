@@ -237,6 +237,13 @@ public class MentorChatService {
                 });
 
             turnComplete.get(MentorRunnerClient.DEFAULT_PROMPT_TIMEOUT.toMillis() + 30_000, TimeUnit.MILLISECONDS);
+            // Natural-finish path: Pi emitted `agent_end` → handleEvent sent the `finish` chunk
+            // already. Now close the SSE stream with AI SDK's `[DONE]` sentinel so byte-equivalence
+            // with vercel/ai canonical output holds (json-to-sse-transform-stream.ts:12-14).
+            // Cancel the heartbeat first; otherwise a tick between `[DONE]` and `complete()`
+            // surfaces as a spurious IllegalStateException.
+            heartbeat.cancel(false);
+            sendDoneSentinelAndComplete(emitter);
         } catch (ClientDisconnectedException disconnect) {
             // Browser closed mid-turn (tab close, refresh, network blip). This is NOT a turn
             // failure: the runner subscription keeps draining and `handleEvent` will still call
@@ -470,9 +477,7 @@ public class MentorChatService {
         } catch (RuntimeException ignored) {
             // Already failed.
         }
-        try {
-            emitter.complete();
-        } catch (RuntimeException ignored) {}
+        sendDoneSentinelAndComplete(emitter);
     }
 
     private void sendConflictAndComplete(SseEmitter emitter, AtomicBoolean clientGone) {
@@ -491,6 +496,23 @@ public class MentorChatService {
             );
         } catch (RuntimeException ignored) {
             // Best-effort.
+        }
+        sendDoneSentinelAndComplete(emitter);
+    }
+
+    /**
+     * Emit AI SDK's terminal sentinel ({@code data: [DONE]\n\n}) and complete the emitter. The
+     * client parser ({@code parseJsonEventStream}) tolerates its absence — but vercel/ai's
+     * {@code JsonToSseTransformStream.flush()} (json-to-sse-transform-stream.ts:12-14) always
+     * writes it, so any downstream proxy/tool that interprets the stream relies on byte-
+     * equivalence with the canonical AI SDK output. Sending it on every terminal path
+     * (natural finish, error, conflict, client disconnect) keeps our stream protocol-clean.
+     */
+    private static void sendDoneSentinelAndComplete(SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event().data("[DONE]"));
+        } catch (IOException | IllegalStateException ignored) {
+            // Client already disconnected — the next complete() is a no-op anyway.
         }
         try {
             emitter.complete();

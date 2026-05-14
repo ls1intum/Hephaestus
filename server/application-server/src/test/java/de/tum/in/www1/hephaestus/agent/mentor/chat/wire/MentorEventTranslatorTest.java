@@ -278,19 +278,18 @@ class MentorEventTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("agent_end maps Pi stopReason to AI SDK enum (toolUse → tool-calls, aborted → error)")
+    @DisplayName("agent_end maps Pi stopReason to AI SDK enum (toolUse → TOOL_CALLS, aborted → ERROR)")
     void agentEnd_mapsStopReasonToAiSdkEnum() {
         // Pi StopReason union: stop | length | toolUse | error | aborted (pi-ai/src/types.ts:269)
-        // AI SDK union: stop | length | content-filter | tool-calls | error | other | unknown
-        // (vercel/ai language-model-v2-finish-reason.ts). Anything raw-Pi reaching the wire is
-        // a strict-validator rejection on the client.
-        assertThat(MentorEventTranslator.mapStopReason("stop")).isEqualTo("stop");
-        assertThat(MentorEventTranslator.mapStopReason("length")).isEqualTo("length");
-        assertThat(MentorEventTranslator.mapStopReason("toolUse")).isEqualTo("tool-calls");
-        assertThat(MentorEventTranslator.mapStopReason("tool_use")).isEqualTo("tool-calls");
-        assertThat(MentorEventTranslator.mapStopReason("error")).isEqualTo("error");
-        assertThat(MentorEventTranslator.mapStopReason("aborted")).isEqualTo("error");
-        assertThat(MentorEventTranslator.mapStopReason("future-pi-reason")).isEqualTo("other");
+        // AI SDK union: stop | length | content-filter | tool-calls | error | other (ui-message-chunks.ts)
+        // Anything raw-Pi reaching the wire would be a strict-zod rejection at the client.
+        assertThat(MentorEventTranslator.mapStopReason("stop")).isSameAs(UIMessageChunk.FinishReason.STOP);
+        assertThat(MentorEventTranslator.mapStopReason("length")).isSameAs(UIMessageChunk.FinishReason.LENGTH);
+        assertThat(MentorEventTranslator.mapStopReason("toolUse")).isSameAs(UIMessageChunk.FinishReason.TOOL_CALLS);
+        assertThat(MentorEventTranslator.mapStopReason("tool_use")).isSameAs(UIMessageChunk.FinishReason.TOOL_CALLS);
+        assertThat(MentorEventTranslator.mapStopReason("error")).isSameAs(UIMessageChunk.FinishReason.ERROR);
+        assertThat(MentorEventTranslator.mapStopReason("aborted")).isSameAs(UIMessageChunk.FinishReason.ERROR);
+        assertThat(MentorEventTranslator.mapStopReason("future-pi-reason")).isSameAs(UIMessageChunk.FinishReason.OTHER);
         assertThat(MentorEventTranslator.mapStopReason(null)).isNull();
     }
 
@@ -307,7 +306,7 @@ class MentorEventTranslatorTest extends BaseUnitTest {
         List<UIMessageChunk> out = translator.translate(event, state);
 
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) out.get(out.size() - 1);
-        assertThat(finish.finishReason()).isEqualTo("stop");
+        assertThat(finish.finishReason()).isSameAs(UIMessageChunk.FinishReason.STOP);
     }
 
     // ─── turn_end + open block closure ───────────────────────────────────────────────────

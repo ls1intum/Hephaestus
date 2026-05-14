@@ -406,21 +406,21 @@ public class MentorEventTranslator {
     /**
      * Map Pi's {@code StopReason} (pi-ai/src/types.ts:269 — {@code stop|length|toolUse|error|aborted})
      * to the AI SDK's {@code finishReason} enum on the {@code finish} chunk schema
-     * (ai@6.0.3 dist/index.mjs Finish schema — {@code stop|length|content-filter|tool-calls|error|other}).
-     * Note: although the upstream {@code LanguageModelV2FinishReason} type includes {@code "unknown"},
-     * the UIMessageStream {@code finish} chunk uses the narrower {@code z.enum([…])} that does NOT
-     * accept {@code "unknown"} — strict-zod parsing rejects it at the client. Default case maps to
-     * {@code "other"}.
+     * (ai@6.0.3 — {@code stop|length|content-filter|tool-calls|error|other}). Note: although
+     * the upstream {@code LanguageModelV2FinishReason} type includes {@code "unknown"}, the
+     * UIMessageStream {@code finish} chunk uses the narrower {@code z.enum([…])} that does NOT
+     * accept {@code "unknown"} — strict-zod parsing rejects it at the client. Default case maps
+     * to {@link UIMessageChunk.FinishReason#OTHER}.
      */
     @Nullable
-    static String mapStopReason(@Nullable String piStopReason) {
+    static UIMessageChunk.FinishReason mapStopReason(@Nullable String piStopReason) {
         if (piStopReason == null) return null;
         return switch (piStopReason) {
-            case "stop" -> "stop";
-            case "length" -> "length";
-            case "toolUse", "tool_use", "tool-calls" -> "tool-calls";
-            case "error", "aborted" -> "error";
-            default -> "other";
+            case "stop" -> UIMessageChunk.FinishReason.STOP;
+            case "length" -> UIMessageChunk.FinishReason.LENGTH;
+            case "toolUse", "tool_use", "tool-calls" -> UIMessageChunk.FinishReason.TOOL_CALLS;
+            case "error", "aborted" -> UIMessageChunk.FinishReason.ERROR;
+            default -> UIMessageChunk.FinishReason.OTHER;
         };
     }
 

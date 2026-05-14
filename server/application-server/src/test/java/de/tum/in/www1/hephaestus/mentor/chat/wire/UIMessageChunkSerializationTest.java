@@ -1,17 +1,23 @@
 package de.tum.in.www1.hephaestus.mentor.chat.wire;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -64,8 +70,52 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
             },
             // FinishMetadata.of(null,null,null) collapses to null → Finish.messageMetadata omitted entirely.
             new Object[] {
-                new UIMessageChunk.Finish("stop", UIMessageChunk.FinishMetadata.of(null, null, null)),
+                new UIMessageChunk.Finish(
+                    UIMessageChunk.FinishReason.STOP,
+                    UIMessageChunk.FinishMetadata.of(null, null, null)
+                ),
                 "{\"type\":\"finish\",\"finishReason\":\"stop\"}",
+            },
+            // All six FinishReason enum values must serialise to their canonical kebab-case wire form.
+            new Object[] {
+                new UIMessageChunk.Finish(UIMessageChunk.FinishReason.CONTENT_FILTER, null),
+                "{\"type\":\"finish\",\"finishReason\":\"content-filter\"}",
+            },
+            new Object[] {
+                new UIMessageChunk.Finish(UIMessageChunk.FinishReason.TOOL_CALLS, null),
+                "{\"type\":\"finish\",\"finishReason\":\"tool-calls\"}",
+            },
+            // Reasoning lifecycle: start / delta / end — block-id propagation pinned.
+            new Object[] { new UIMessageChunk.ReasoningStart("r-0"), "{\"type\":\"reasoning-start\",\"id\":\"r-0\"}" },
+            new Object[] {
+                new UIMessageChunk.ReasoningDelta("r-0", "Let me think…"),
+                "{\"type\":\"reasoning-delta\",\"id\":\"r-0\",\"delta\":\"Let me think…\"}",
+            },
+            new Object[] { new UIMessageChunk.ReasoningEnd("r-0"), "{\"type\":\"reasoning-end\",\"id\":\"r-0\"}" },
+            // Tool input lifecycle — strict zod requires toolCallId + toolName + input on `*-available`.
+            new Object[] {
+                new UIMessageChunk.ToolInputStart("call-1", "fetch_context"),
+                "{\"type\":\"tool-input-start\",\"toolCallId\":\"call-1\",\"toolName\":\"fetch_context\"}",
+            },
+            new Object[] {
+                new UIMessageChunk.ToolInputAvailable(
+                    "call-1",
+                    "fetch_context",
+                    NODES.objectNode().put("path", "workspace.json")
+                ),
+                "{\"type\":\"tool-input-available\",\"toolCallId\":\"call-1\"," +
+                "\"toolName\":\"fetch_context\",\"input\":{\"path\":\"workspace.json\"}}",
+            },
+            // Error tool output — errorText only, no output field on wire.
+            new Object[] {
+                new UIMessageChunk.ToolOutputError("call-1", "fetch_context: path not allowed"),
+                "{\"type\":\"tool-output-error\",\"toolCallId\":\"call-1\"," +
+                "\"errorText\":\"fetch_context: path not allowed\"}",
+            },
+            // data-finding without id (legacy "anonymous link") still serialises with optional id null-omitted.
+            new Object[] {
+                new UIMessageChunk.DataFinding(null, new UIMessageChunk.DataFinding.DataFindingPayload(findingId)),
+                "{\"type\":\"data-finding\",\"data\":{\"findingId\":\"" + findingId + "\"}}",
             },
             // NON_NULL: finishReason omitted, but messageMetadata kept.
             // data-* envelope shape per AI SDK strict-object schema:
@@ -112,5 +162,56 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
             "data-mentor-status"
         );
         assertThat(MAPPER.readTree(MAPPER.writeValueAsString(finding)).get("type").asText()).isEqualTo("data-finding");
+    }
+
+    @Test
+    @DisplayName("Every UIMessageChunk subtype is registered in @JsonSubTypes — silent polymorphism drift trap")
+    void everyChunkSubtypeIsRegisteredInJsonSubTypes() {
+        // Jackson's @JsonTypeInfo(use=NAME, property="type") only writes the discriminator for
+        // subtypes listed in @JsonSubTypes. Adding a new `record Foo implements UIMessageChunk`
+        // without registering it would emit `{...}` with no `type` field — silently corrupting the
+        // wire and only failing client-side after the chunk leaves the JVM. This test asserts the
+        // class-level annotation contains every permitted subtype of the sealed interface.
+        JsonSubTypes ann = UIMessageChunk.class.getAnnotation(JsonSubTypes.class);
+        assertThat(ann).as("@JsonSubTypes annotation present").isNotNull();
+        Set<Class<?>> registered = new LinkedHashSet<>();
+        for (JsonSubTypes.Type t : ann.value()) {
+            registered.add(t.value());
+        }
+        // Sealed interface auto-permits its directly-nested record subtypes plus DataMentorStatus /
+        // DataFinding which are top-level nested records. Reflectively enumerate permits via the
+        // class-level `getPermittedSubclasses()` (Java 17+).
+        Class<?>[] permitted = UIMessageChunk.class.getPermittedSubclasses();
+        assertThat(permitted).as("sealed permits resolves").isNotEmpty();
+        Set<Class<?>> permittedSet = new LinkedHashSet<>(Arrays.asList(permitted));
+        Set<Class<?>> missing = new LinkedHashSet<>(permittedSet);
+        missing.removeAll(registered);
+        // FinishMetadata is a payload record, not a chunk — it doesn't `implements UIMessageChunk`,
+        // so it won't appear in the permits anyway. If anything is in `missing` here, someone added
+        // a chunk record and forgot the `@JsonSubTypes.Type(...)` entry.
+        assertThat(missing)
+            .as("Every UIMessageChunk subtype must be listed in @JsonSubTypes (missing: %s)", missing)
+            .isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(UIMessageChunk.FinishReason.class)
+    @DisplayName("FinishReason enum serialises to canonical wire string and round-trips")
+    void finishReasonRoundTrips(UIMessageChunk.FinishReason reason) throws Exception {
+        String wire = MAPPER.writeValueAsString(reason);
+        // Wire form is the kebab-case string literal — NOT the enum constant name.
+        assertThat(wire).isEqualTo("\"" + reason.wire() + "\"");
+        UIMessageChunk.FinishReason back = MAPPER.readValue(wire, UIMessageChunk.FinishReason.class);
+        assertThat(back).isSameAs(reason);
+    }
+
+    @Test
+    @DisplayName("FinishReason rejects unknown wire strings (defensive against AI SDK drift)")
+    void finishReasonRejectsUnknown() {
+        // If AI SDK ever ships a `finish` chunk with a new value (e.g. "rate-limit"), we want a
+        // fast, loud failure — not a silent null fallback that hides the protocol drift.
+        assertThatThrownBy(() ->
+            MAPPER.readValue("\"rate-limit\"", UIMessageChunk.FinishReason.class)
+        ).hasMessageContaining("rate-limit");
     }
 }

@@ -1,9 +1,11 @@
 package de.tum.in.www1.hephaestus.mentor.chat.wire;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Objects;
 import java.util.UUID;
@@ -65,7 +67,44 @@ public sealed interface UIMessageChunk {
      * Terminal chunk. The optional {@code messageMetadata} carries cost + usage so the webapp
      * (and downstream observability) can surface them.
      */
-    record Finish(@Nullable String finishReason, @Nullable FinishMetadata messageMetadata) implements UIMessageChunk {}
+    record Finish(
+        @Nullable FinishReason finishReason,
+        @Nullable FinishMetadata messageMetadata
+    ) implements UIMessageChunk {}
+
+    /**
+     * AI SDK strict-zod enum for the {@code finish} chunk's {@code finishReason}
+     * (vercel/ai packages/ai/src/ui-message-stream/ui-message-chunks.ts — {@code finishReasonSchema}).
+     * Modelled as a Java enum so the type system rejects drift at compile time instead of the
+     * AI SDK client rejecting the chunk at runtime.
+     */
+    enum FinishReason {
+        STOP("stop"),
+        LENGTH("length"),
+        CONTENT_FILTER("content-filter"),
+        TOOL_CALLS("tool-calls"),
+        ERROR("error"),
+        OTHER("other");
+
+        private final String wire;
+
+        FinishReason(String wire) {
+            this.wire = wire;
+        }
+
+        @JsonValue
+        public String wire() {
+            return wire;
+        }
+
+        @JsonCreator
+        public static FinishReason fromWire(String value) {
+            for (FinishReason r : values()) {
+                if (r.wire.equals(value)) return r;
+            }
+            throw new IllegalArgumentException("Unknown finishReason '" + value + "' — must be one of the AI SDK enum");
+        }
+    }
 
     /**
      * Typed metadata attached to {@link Finish} (and, for forward-compat, {@link Start}).

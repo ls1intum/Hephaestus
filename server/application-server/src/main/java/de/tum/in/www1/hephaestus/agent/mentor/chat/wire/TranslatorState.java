@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.lang.Nullable;
 
 /**
@@ -48,8 +48,14 @@ public final class TranslatorState {
     /** Buffer of reasoning so far — finalised when reasoning closes. */
     private final StringBuilder reasoningBuffer = new StringBuilder();
 
-    /** Tool-call id → tool name, populated on {@code tool_execution_start} for later error labels. */
-    private final Map<String, String> toolNameByCallId = new ConcurrentHashMap<>();
+    /**
+     * Tool-call id → tool name, populated on {@code tool_execution_start} for later error labels.
+     * Plain {@link LinkedHashMap}: the class doc above states the per-turn translator runs on a
+     * single dispatcher thread; previous {@link java.util.concurrent.ConcurrentHashMap} bought
+     * nothing while every other field (text buffers, step counter, observed usage) was a
+     * non-thread-safe primitive — the type was theatre.
+     */
+    private final Map<String, String> toolNameByCallId = new LinkedHashMap<>();
 
     /**
      * Tool-call id → the mutable {@link ObjectNode} part inside {@link #partsAccumulator}. AI SDK's
@@ -60,7 +66,7 @@ public final class TranslatorState {
      * the user sees the tool input but never the output after page refresh. We mirror the reducer
      * here so persisted parts round-trip through {@code safeValidateUIMessages}.
      */
-    private final Map<String, ObjectNode> toolPartByCallId = new ConcurrentHashMap<>();
+    private final Map<String, ObjectNode> toolPartByCallId = new LinkedHashMap<>();
 
     /** AI SDK UIMessage parts as accumulated. Order matches the stream; written to JSONB at end-of-turn. */
     private final ArrayNode partsAccumulator = nodes.arrayNode();
@@ -136,6 +142,11 @@ public final class TranslatorState {
             ObjectNode part = nodes.objectNode();
             part.put("type", "text");
             part.put("text", textBuffer.toString());
+            // AI SDK's TextUIPart schema (vercel/ai packages/ai/src/ui/ui-messages.ts) allows
+            // {state: "streaming" | "done"}. We persist the terminal value; "done" tells the
+            // client renderer the part is final (vs an in-progress stream) so a refresh-vs-live
+            // visual diff doesn't surface.
+            part.put("state", "done");
             partsAccumulator.add(part);
         }
         this.activeTextId = null;
@@ -161,6 +172,9 @@ public final class TranslatorState {
             ObjectNode part = nodes.objectNode();
             part.put("type", "reasoning");
             part.put("text", reasoningBuffer.toString());
+            // AI SDK's ReasoningUIPart schema mirrors TextUIPart: {state:"streaming"|"done"} is
+            // optional. We persist the terminal value for the same refresh-vs-live invariant.
+            part.put("state", "done");
             partsAccumulator.add(part);
         }
         this.activeReasoningId = null;

@@ -73,17 +73,53 @@ class MentorTurnLockTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Independent keys do not serialise — both succeed")
-    void independentKeysRunInParallel() {
+    @DisplayName("Independent keys do not serialise — TWO REAL THREADS overlap in their holding window")
+    void independentKeysRunInParallel() throws Exception {
+        // Sequential calls cannot prove non-serialisation: a broken global lock would also pass
+        // sequentially. Fork two threads on independent keys, hold them simultaneously, and
+        // assert their critical sections actually overlap in wall-clock time.
         MentorTurnLock lock = new MentorTurnLock();
         MentorTurnLock.ThreadKey a = new MentorTurnLock.ThreadKey(1L, UUID.randomUUID());
         MentorTurnLock.ThreadKey b = new MentorTurnLock.ThreadKey(1L, UUID.randomUUID());
 
-        Optional<String> resultA = lock.withLockOr409(a, () -> "A");
-        Optional<String> resultB = lock.withLockOr409(b, () -> "B");
-
-        assertThat(resultA).contains("A");
-        assertThat(resultB).contains("B");
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch bothInside = new CountDownLatch(2);
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            var fa = pool.submit(() ->
+                lock.withLockOr409(a, () -> {
+                    long enteredA = System.nanoTime();
+                    bothInside.countDown();
+                    try {
+                        release.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return enteredA;
+                })
+            );
+            var fb = pool.submit(() ->
+                lock.withLockOr409(b, () -> {
+                    long enteredB = System.nanoTime();
+                    bothInside.countDown();
+                    try {
+                        release.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return enteredB;
+                })
+            );
+            // Both threads MUST be inside their critical sections at the same time. If the lock
+            // were global, only one would arrive; bothInside would never reach zero and this
+            // assertion times out.
+            assertThat(bothInside.await(5, TimeUnit.SECONDS)).as("both threads inside concurrently").isTrue();
+            release.countDown();
+            assertThat(fa.get(5, TimeUnit.SECONDS)).isPresent();
+            assertThat(fb.get(5, TimeUnit.SECONDS)).isPresent();
+        } finally {
+            pool.shutdownNow();
+        }
         assertThat(lock.activeKeys()).isZero(); // entries reaped after release
     }
 

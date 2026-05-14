@@ -209,6 +209,65 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("persistInFlight: TWO REAL THREADS race the same thread row — exactly one wins, exactly one 409s")
+    void persistInFlight_concurrentRace_exactlyOneWins() throws Exception {
+        // Sequential calls only prove the SQL `WHERE in_flight` semantics fire. The dual-lock
+        // defence (Java MentorTurnLock + DB partial unique index) is supposed to handle the
+        // case where two API replicas (or two virtual threads on one replica) race the same
+        // thread id. This test proves the DB half: even if the Java lock were stripped,
+        // exactly one writer wins at the row level.
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
+
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(2);
+        java.util.concurrent.CountDownLatch fire = new java.util.concurrent.CountDownLatch(1);
+        try {
+            java.util.concurrent.Callable<Object> attempt = () -> {
+                ready.countDown();
+                fire.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                try {
+                    return persistence.persistInFlight(thread, "race", UUID.randomUUID());
+                } catch (RuntimeException ex) {
+                    return ex; // surface to caller for classification
+                }
+            };
+            var fa = pool.submit(attempt);
+            var fb = pool.submit(attempt);
+            // Wait until both threads are at the barrier, then release simultaneously.
+            assertThat(ready.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            fire.countDown();
+            Object resultA = fa.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            Object resultB = fb.get(10, java.util.concurrent.TimeUnit.SECONDS);
+
+            int winners = 0;
+            int conflicts = 0;
+            for (Object r : java.util.List.of(resultA, resultB)) {
+                if (r instanceof MentorTurnPersistence.TurnPersistenceCookie) {
+                    winners++;
+                } else if (r instanceof TurnAlreadyInFlightException) {
+                    conflicts++;
+                } else if (r instanceof Throwable t) {
+                    // Some Postgres drivers wrap the constraint violation in a different
+                    // unchecked exception (DataIntegrityViolationException, etc.). Treat any
+                    // non-cookie outcome as a conflict so long as no other type leaked through.
+                    if (
+                        t.getClass().getSimpleName().contains("DataIntegrity") ||
+                        t.getCause() instanceof TurnAlreadyInFlightException
+                    ) {
+                        conflicts++;
+                    } else {
+                        throw new AssertionError("Unexpected exception type: " + t, t);
+                    }
+                }
+            }
+            assertThat(winners).as("exactly one writer succeeds").isEqualTo(1);
+            assertThat(conflicts).as("exactly one writer 409s").isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     @DisplayName("finalise flips status to completed and writes parts + usage")
     void finalise_writesCompletedRow() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
@@ -230,7 +289,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             new UIMessageChunk.FinishMetadata.Usage(123, 45, null, null, 168),
             /* costUsd */ null
         );
-        UIMessageChunk.Finish finish = new UIMessageChunk.Finish("stop", finishMeta);
+        UIMessageChunk.Finish finish = new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, finishMeta);
 
         persistence.finalise(cookie, state, finish, null);
 

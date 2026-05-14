@@ -180,7 +180,7 @@ public class MentorTurnPersistence {
         ObjectNode meta = newOrCopyMeta(assistant);
         meta.put("status", "completed");
         if (finish.finishReason() != null) {
-            meta.put("finishReason", finish.finishReason());
+            meta.put("finishReason", finish.finishReason().wire());
         }
         // Usage + model come from TranslatorState. The translator accumulates from
         // message_update.partial / message_end / agent_end.messages[] — whichever lands. Pi's
