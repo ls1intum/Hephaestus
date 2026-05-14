@@ -44,23 +44,53 @@ public class PiEventToUiChunkTranslator {
             case "turn_end" -> handleTurnEnd(state);
             case "agent_end" -> handleAgentEnd(piEvent, state);
             case "link_finding" -> handleLinkFinding(piEvent, state);
-            case "pi_error", "turn_watchdog_fired" -> handleError(piEvent);
-            case "runner_ready" -> List.of(); // Controller consumes this directly via the subscription.
+            case "pi_error" -> handleError(piEvent);
+            case "turn_watchdog_fired" -> handleWatchdogFired();
+            // Session-level events Pi emits that we intentionally drop. Listed explicitly so the
+            // `default` arm can WARN on TRULY unknown types — silent default-drops hide protocol
+            // drift (a new Pi event type would just disappear into DEBUG, never noticed).
+            case
+                "runner_ready",
+                "agent_start",
+                "turn_start",
+                "tool_execution_update",
+                "queue_update",
+                "compaction_start",
+                "compaction_end",
+                "session_info_changed",
+                "thinking_level_changed",
+                "auto_retry_start",
+                "auto_retry_end" -> List.of();
             default -> {
-                log.debug("Unhandled Pi event type '{}' — dropping", type);
+                log.warn("Unknown Pi event type '{}' — dropping. Protocol drift?", type);
                 yield List.of();
             }
         };
+    }
+
+    // ─── turn_watchdog_fired → Error with user-friendly text ──────────────────────────────
+
+    private List<UIMessageChunk> handleWatchdogFired() {
+        // Runner emits this when the per-turn budget is exceeded; the bare type string
+        // ("turn_watchdog_fired") leaked to the UI as the error text. Map to a user-facing
+        // message; the runner-side correlate is logged at WARN already.
+        return Collections.singletonList(new UIMessageChunk.Error("Mentor turn timed out before completion."));
     }
 
     // ─── message_end → no chunks, but captures the authoritative usage snapshot ───────────
 
     private List<UIMessageChunk> handleMessageEnd(JsonNode event, TranslatorState state) {
         // Per pi-coding-agent dist/core/extensions/types.d.ts MessageEndEvent.message: AgentMessage.
-        // For assistant messages the final, authoritative `usage` + `model` live here. For tool
-        // result and user messages this branch is a no-op. We don't emit UIMessageChunks; the
-        // turn-level Finish chunk on agent_end carries the metadata to the client.
+        // For assistant messages the final, authoritative `usage` + `model` + `stopReason` live
+        // here. For tool result and user messages this branch is a no-op. We don't emit
+        // UIMessageChunks; the turn-level Finish chunk on agent_end carries the metadata to the
+        // client. Capturing `stopReason` here is the authoritative source — agent_end's walk
+        // through messages[] is a fallback for runners that omit message_end.
         capturePartialUsage(event.path("message"), state);
+        String stopReason = optionalString(event.path("message"), "stopReason");
+        if (stopReason != null) {
+            state.observeStopReason(stopReason);
+        }
         return List.of();
     }
 
@@ -137,15 +167,20 @@ public class PiEventToUiChunkTranslator {
                 String delta = optionalString(ame, "delta");
                 yield delta == null ? List.of() : reasoningDelta(blockId, delta, state);
             }
-            // These are fine-grained lifecycle events Pi emits inside the message stream.
-            // The AI SDK already models TextStart/TextEnd via the lazy lifecycle we open on
-            // first delta. Tool calls surface via the top-level `tool_execution_*` events,
-            // not these inner ones. Dropping here is intentional, not a bug.
+            // Pi may interleave text + reasoning blocks within a single message_update stream.
+            // `*_end` events are the authoritative close signal — without honouring them, a
+            // reasoning block followed by a text block in the same message would never drain
+            // its buffer into the persisted parts array (closeXBlock is the only path that
+            // appends), so the reasoning text is LOST on multi-block messages. Open is lazy
+            // (on first delta); close must respect the explicit end signal.
+            case "text_end" -> closeTextIfMatches(blockId, state);
+            case "thinking_end" -> closeReasoningIfMatches(blockId, state);
+            // text_start / thinking_start are pure lifecycle markers; we open lazily on the
+            // first delta, so the dedicated start events are no-ops. Tool calls surface via
+            // the top-level `tool_execution_*` events.
             case
                 "text_start",
-                "text_end",
                 "thinking_start",
-                "thinking_end",
                 "toolcall_start",
                 "toolcall_delta",
                 "toolcall_end",
@@ -157,6 +192,23 @@ public class PiEventToUiChunkTranslator {
                 yield List.of();
             }
         };
+    }
+
+    /**
+     * Emit {@code TextEnd(id)} if the open text block matches {@code blockId}; close the
+     * accumulator (which flushes the buffered text into {@code partsAccumulator}) regardless.
+     * No-op if no text block is open or the id doesn't match (defends against stray closes).
+     */
+    private List<UIMessageChunk> closeTextIfMatches(String blockId, TranslatorState state) {
+        if (blockId == null || !blockId.equals(state.activeTextId())) return List.of();
+        state.closeTextBlock();
+        return List.of(new UIMessageChunk.TextEnd(blockId));
+    }
+
+    private List<UIMessageChunk> closeReasoningIfMatches(String blockId, TranslatorState state) {
+        if (blockId == null || !blockId.equals(state.activeReasoningId())) return List.of();
+        state.closeReasoningBlock();
+        return List.of(new UIMessageChunk.ReasoningEnd(blockId));
     }
 
     private static String blockIdFor(JsonNode ame, String innerType) {
@@ -308,6 +360,10 @@ public class PiEventToUiChunkTranslator {
         // on each AssistantMessage (verified pi-ai/src/types.ts:277-287). We walk the last
         // assistant message in `messages` to harvest model+usage+stopReason as a last-resort
         // fallback if neither message_update nor message_end ran.
+        // Last-assistant-wins inside the messages[] walk — covers the multi-step case where
+        // agent_end ships all assistant messages of the turn. If none of them carries a
+        // stopReason (e.g. a stub runner or a Pi build that emits only message_end), fall back
+        // to the authoritative value captured on `message_end.message.stopReason` via state.
         String piStopReason = null;
         if (event.path("messages").isArray()) {
             for (JsonNode msg : event.get("messages")) {
@@ -319,6 +375,9 @@ public class PiEventToUiChunkTranslator {
                     if (reason != null) piStopReason = reason; // last assistant wins
                 }
             }
+        }
+        if (piStopReason == null) {
+            piStopReason = state.observedStopReason();
         }
         List<UIMessageChunk> out = closeOpenStreamingBlocks(state);
         UIMessageChunk.FinishMetadata metadata = UIMessageChunk.FinishMetadata.of(

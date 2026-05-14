@@ -64,10 +64,6 @@ public class MentorChatExecutorConfig {
         private final ExecutorService rawDelegate;
         private final ExecutorService delegate;
 
-        MentorTurnExecutor() {
-            this(Executors.newVirtualThreadPerTaskExecutor());
-        }
-
         /**
          * Package-private test seam — let tests inject a synchronous executor without
          * reflection. Tests run on the main thread which already carries the test

@@ -92,6 +92,10 @@ final class MentorSseChannel implements AutoCloseable {
     void bindLifecycle() {
         emitter.onCompletion(this::flagDisconnected);
         emitter.onTimeout(() -> {
+            // INFO because emitter timeout (controller default 10 min) means the request
+            // outlived the SSE window — operationally interesting; the runner may still be
+            // alive on the server while the browser long-disconnected without a close.
+            log.info("Mentor SSE emitter timed out; flagging disconnected");
             flagDisconnected();
             try {
                 emitter.complete();
@@ -147,7 +151,10 @@ final class MentorSseChannel implements AutoCloseable {
                         lastSendNanos.set(System.nanoTime());
                     } catch (IOException | IllegalStateException ex) {
                         // Real disconnect: flip and stop. Spring's emitter callbacks fire and
-                        // unwind the orchestrator naturally.
+                        // unwind the orchestrator naturally. DEBUG-log so a flaky proxy that
+                        // closes the socket between chunks is observable (the lifecycle
+                        // callbacks also fire, but this path can win the race).
+                        log.debug("Heartbeat send failed; flagging disconnected: {}", ex.toString());
                         flagDisconnected();
                     }
                 }

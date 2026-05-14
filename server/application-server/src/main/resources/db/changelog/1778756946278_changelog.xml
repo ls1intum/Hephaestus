@@ -259,4 +259,113 @@
         </rollback>
     </changeSet>
 
+    <!-- 11. Add the missing FK from chat_message_vote → chat_message with ON DELETE CASCADE.
+         The original mentor-framework-v2 migration (1754979350893) created the vote table with
+         message_id as PRIMARY KEY but NO FK — so deletes against chat_message silently orphaned
+         vote rows, and ChatThreadController.deleteThread's "cascades to messages, votes, parts"
+         claim was a lie. JPA-side cascade walks the tree per row (N round-trips); a DB-level
+         ON DELETE CASCADE is one statement and survives bulk SQL deletes (reaper sweeps, GDPR
+         scrubs). Both correctness and performance win. -->
+    <changeSet id="mentor-1071-chat-message-vote-fk" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message_vote FK already exists">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_chat_message_vote_message"/></not>
+        </preConditions>
+        <comment>Add FK chat_message_vote.message_id → chat_message.id ON DELETE CASCADE</comment>
+        <addForeignKeyConstraint baseColumnNames="message_id" baseTableName="chat_message_vote"
+                                 constraintName="fk_chat_message_vote_message"
+                                 referencedColumnNames="id" referencedTableName="chat_message"
+                                 onDelete="CASCADE"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="chat_message_vote"
+                                      constraintName="fk_chat_message_vote_message"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 12. Add ON DELETE CASCADE to the three legacy mentor FKs. The pattern was already used
+         on fk_chat_thread_workspace (in 1764514002516); the original mentor framework migration
+         missed it for thread_id, parent_message_id, and chat_message_part.message_id. Without
+         it, any direct-SQL delete against chat_thread or chat_message (reaper sweeps, GDPR
+         scrubs, ops scripts) fails with FK violation. Pattern: drop the old FK, re-add with
+         ON DELETE CASCADE. Rollback restores the old FK without cascade. -->
+    <changeSet id="mentor-1071-cascade-chat-message-thread" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message.thread_id FK already cascades">
+            <foreignKeyConstraintExists foreignKeyName="FK8s34d909gxc4xrlvml8gag9kh"/>
+        </preConditions>
+        <comment>Replace chat_message.thread_id FK with ON DELETE CASCADE variant</comment>
+        <dropForeignKeyConstraint baseTableName="chat_message" constraintName="FK8s34d909gxc4xrlvml8gag9kh"/>
+        <addForeignKeyConstraint baseColumnNames="thread_id" baseTableName="chat_message"
+                                 constraintName="FK8s34d909gxc4xrlvml8gag9kh"
+                                 referencedColumnNames="id" referencedTableName="chat_thread"
+                                 onDelete="CASCADE"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="chat_message" constraintName="FK8s34d909gxc4xrlvml8gag9kh"/>
+            <addForeignKeyConstraint baseColumnNames="thread_id" baseTableName="chat_message"
+                                     constraintName="FK8s34d909gxc4xrlvml8gag9kh"
+                                     referencedColumnNames="id" referencedTableName="chat_thread"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="mentor-1071-cascade-chat-message-parent" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message.parent_message_id FK already cascades">
+            <foreignKeyConstraintExists foreignKeyName="FKd0fewjs0l68rq2bww9h8o4cmb"/>
+        </preConditions>
+        <comment>Replace chat_message.parent_message_id self-FK with ON DELETE CASCADE variant</comment>
+        <dropForeignKeyConstraint baseTableName="chat_message" constraintName="FKd0fewjs0l68rq2bww9h8o4cmb"/>
+        <addForeignKeyConstraint baseColumnNames="parent_message_id" baseTableName="chat_message"
+                                 constraintName="FKd0fewjs0l68rq2bww9h8o4cmb"
+                                 referencedColumnNames="id" referencedTableName="chat_message"
+                                 onDelete="CASCADE"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="chat_message" constraintName="FKd0fewjs0l68rq2bww9h8o4cmb"/>
+            <addForeignKeyConstraint baseColumnNames="parent_message_id" baseTableName="chat_message"
+                                     constraintName="FKd0fewjs0l68rq2bww9h8o4cmb"
+                                     referencedColumnNames="id" referencedTableName="chat_message"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="mentor-1071-cascade-chat-message-part-message" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message_part.message_id FK already cascades">
+            <foreignKeyConstraintExists foreignKeyName="FKkfle3niou3f9r63mc3u8vi1na"/>
+        </preConditions>
+        <comment>Replace chat_message_part.message_id FK with ON DELETE CASCADE variant</comment>
+        <dropForeignKeyConstraint baseTableName="chat_message_part" constraintName="FKkfle3niou3f9r63mc3u8vi1na"/>
+        <addForeignKeyConstraint baseColumnNames="message_id" baseTableName="chat_message_part"
+                                 constraintName="FKkfle3niou3f9r63mc3u8vi1na"
+                                 referencedColumnNames="id" referencedTableName="chat_message"
+                                 onDelete="CASCADE"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="chat_message_part" constraintName="FKkfle3niou3f9r63mc3u8vi1na"/>
+            <addForeignKeyConstraint baseColumnNames="message_id" baseTableName="chat_message_part"
+                                     constraintName="FKkfle3niou3f9r63mc3u8vi1na"
+                                     referencedColumnNames="id" referencedTableName="chat_message"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 13. Tighten the metadata CHECK to enforce the status enum. The wave-14 constraint only
+         pinned the shape (object-or-null); a future writer that forgets `status` or typos it
+         (`"in_flite"`) wouldn't be caught at write-time, and the partial unique index +
+         reaper SQL silently disagree on what's in-flight. -->
+    <changeSet id="mentor-1071-tighten-metadata-status-check" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="metadata status enum check already applied">
+            <sqlCheck expectedResult="t">
+                SELECT NOT EXISTS (
+                    SELECT 1 FROM information_schema.check_constraints
+                    WHERE constraint_name = 'chk_chat_message_metadata_status'
+                )
+            </sqlCheck>
+        </preConditions>
+        <comment>Tighten metadata CHECK: if status key is present it must be one of (in_flight, completed, interrupted)</comment>
+        <sql>
+            ALTER TABLE chat_message ADD CONSTRAINT chk_chat_message_metadata_status
+            CHECK (
+                metadata IS NULL
+                OR NOT (metadata ? 'status')
+                OR (metadata->>'status') IN ('in_flight', 'completed', 'interrupted')
+            );
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE chat_message DROP CONSTRAINT IF EXISTS chk_chat_message_metadata_status;</sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

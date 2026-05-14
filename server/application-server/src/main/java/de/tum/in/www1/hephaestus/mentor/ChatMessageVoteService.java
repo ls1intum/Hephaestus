@@ -22,7 +22,9 @@ public class ChatMessageVoteService {
     private final ChatMessageRepository chatMessageRepository;
 
     /**
-     * Verifies the message exists inside the given thread, then upserts the vote.
+     * Verifies the message exists inside the given thread, then upserts the vote atomically.
+     * The DB-side {@code INSERT ... ON CONFLICT DO UPDATE} replaces the prior read-modify-write
+     * that 500'd on concurrent vote POSTs to the same message id.
      *
      * @throws EntityNotFoundException when the message does not exist or does not belong
      *                                 to the supplied thread.
@@ -33,11 +35,12 @@ public class ChatMessageVoteService {
             .findById(messageId)
             .filter(m -> m.getThread() != null && m.getThread().getId().equals(threadId))
             .orElseThrow(() -> new EntityNotFoundException("ChatMessage", messageId.toString()));
-        ChatMessageVote vote = chatMessageVoteRepository
+        chatMessageVoteRepository.upsert(message.getId(), isUpvoted);
+        // findById is in the same READ_COMMITTED tx that just committed the upsert above; row
+        // is now visible. Return a fresh read so the caller observes the persisted timestamps.
+        return chatMessageVoteRepository
             .findById(message.getId())
-            .orElseGet(() -> new ChatMessageVote(message.getId(), isUpvoted));
-        vote.setIsUpvoted(isUpvoted);
-        return chatMessageVoteRepository.save(vote);
+            .orElseThrow(() -> new IllegalStateException("Upsert returned 0 rows for message " + messageId));
     }
 
     /** No-op if the vote does not exist (idempotent DELETE semantics). */

@@ -156,7 +156,7 @@ public class MentorChatService {
                         e
                     );
                     metrics.recordCompleted(MentorChatMetrics.Outcome.ERROR);
-                    channel.completeWithError("Mentor turn failed: " + e.getMessage());
+                    channel.completeWithError(userFacingError(e));
                     return Boolean.FALSE;
                 } finally {
                     metrics.stopTimer(sample);
@@ -318,20 +318,30 @@ public class MentorChatService {
             poisoned = isPoisoning(e);
             log.warn("Mentor turn errored (poisoned={}): {}", poisoned, e.getMessage(), e);
             persistence.interrupt(cookie, state, e);
-            channel.completeWithError(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            channel.completeWithError(userFacingError(e));
             outcome = poisoned ? MentorChatMetrics.Outcome.POISONED : MentorChatMetrics.Outcome.ERROR;
         } finally {
             channel.close();
+            // Skip closeThread on client-disconnect: the runner already received `abort` via
+            // the channel's disconnect hook and will free its slot when its watchdog fires.
+            // Issuing closeThread here would force a sandbox round-trip and the .join() can
+            // chain on top of the 20s drain timeout — under load that lets a single dead
+            // client hold the per-thread lock for tens of seconds.
+            boolean skipCloseThread = outcome == MentorChatMetrics.Outcome.CLIENT_DISCONNECT;
             if (client != null) {
-                try {
-                    client
-                        .closeThread(request.threadId())
-                        .orTimeout(5, TimeUnit.SECONDS)
-                        .exceptionally(ex -> null)
-                        .join();
-                } catch (Exception ignored) {
-                    // Best-effort cleanup; the registry will reap the sandbox on idle.
+                if (!skipCloseThread) {
+                    try {
+                        client
+                            .closeThread(request.threadId())
+                            .orTimeout(5, TimeUnit.SECONDS)
+                            .exceptionally(ex -> null)
+                            .join();
+                    } catch (RuntimeException ex) {
+                        log.debug("close_thread cleanup failed: {}", ex.toString());
+                    }
                 }
+                // Always release the runner-client resources, even on the disconnect path —
+                // the client owns timers / subscriptions independent of the thread session.
                 client.close();
             }
             if (poisoned && sandbox != null) {
@@ -440,13 +450,37 @@ public class MentorChatService {
             !hello.has("protocolVersion") ||
             hello.get("protocolVersion").asInt(0) != MentorRunnerClient.PROTOCOL_VERSION
         ) {
+            // Bound the message: a misbehaving runner could ship a 10MB hello frame and
+            // hello.get("protocolVersion") might be an unbounded JsonNode whose toString()
+            // would bloat the log line and (worse) flow into the user-facing error chunk.
+            JsonNode v = hello != null ? hello.get("protocolVersion") : null;
+            String got = v == null ? "missing" : (v.isIntegralNumber() ? Integer.toString(v.asInt()) : "non-integer");
             throw new IllegalStateException(
-                "Runner protocol mismatch — expected version " +
-                    MentorRunnerClient.PROTOCOL_VERSION +
-                    ", got " +
-                    (hello != null ? hello.get("protocolVersion") : "null")
+                "Runner protocol mismatch — expected version " + MentorRunnerClient.PROTOCOL_VERSION + ", got " + got
             );
         }
+    }
+
+    /**
+     * Map an unchecked exception to a string the user can see in the chat. The raw
+     * {@code e.getMessage()} can leak workspace ids, exception class names, internal stack
+     * details ({@code "No enabled AgentConfig for workspace 42 — mentor cannot start"},
+     * {@code "runner error -32002: <internal>"}); the wire ends up as a chat-error toast in
+     * the webapp without any further filtering, so the controller is the right boundary.
+     * Raw message stays in the WARN log for ops.
+     */
+    private static String userFacingError(Throwable e) {
+        if (e instanceof MentorRunnerException) {
+            return "Mentor service hit an unexpected error — please retry.";
+        }
+        if (e instanceof java.util.concurrent.TimeoutException) {
+            return "Mentor turn timed out before completion.";
+        }
+        if (e instanceof ClientDisconnectedException) {
+            // Should never surface to a still-connected client, but guard anyway.
+            return "Connection lost.";
+        }
+        return "Mentor turn failed unexpectedly.";
     }
 
     private Map<String, byte[]> buildAspectContext(MentorTurnRequest request, User user) {

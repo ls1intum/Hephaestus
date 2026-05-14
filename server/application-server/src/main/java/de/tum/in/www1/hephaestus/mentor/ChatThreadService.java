@@ -95,7 +95,7 @@ public class ChatThreadService {
      */
     @Transactional(readOnly = true)
     public List<ChatMessage> recentMessagesForReplay(UUID threadId) {
-        List<ChatMessage> tailDesc = chatMessageRepository.findByThreadIdOrderByCreatedAtDesc(
+        List<ChatMessage> tailDesc = chatMessageRepository.findByThreadIdOrderByCreatedAtDescIdDesc(
             threadId,
             org.springframework.data.domain.PageRequest.of(0, RECENT_MESSAGES_CAP)
         );

@@ -409,6 +409,93 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("Pi session-level events are explicit no-ops (not silent default-drops)")
+    void piSessionLevelEvents_explicitlyDropped() throws Exception {
+        // These types are emitted by Pi but produce no UI chunks. Listing them as explicit
+        // `case` arms lets the `default` arm WARN on TRULY unknown types — otherwise a new
+        // Pi event variant would silently sail through as DEBUG. Each one must return empty.
+        String[] sessionEvents = {
+            "agent_start",
+            "turn_start",
+            "tool_execution_update",
+            "queue_update",
+            "compaction_start",
+            "compaction_end",
+            "session_info_changed",
+            "thinking_level_changed",
+            "auto_retry_start",
+            "auto_retry_end",
+            "runner_ready",
+        };
+        for (String type : sessionEvents) {
+            JsonNode event = mapper.readTree("{\"type\":\"" + type + "\"}");
+            assertThat(translator.translate(event, state))
+                .as("session-level event %s must be an explicit no-op", type)
+                .isEmpty();
+        }
+    }
+
+    @Test
+    @DisplayName("turn_watchdog_fired surfaces a user-friendly Error string (not the bare type symbol)")
+    void turnWatchdogFired_userFriendlyText() throws Exception {
+        JsonNode event = mapper.readTree("{\"type\":\"turn_watchdog_fired\",\"threadId\":\"t\"}");
+        List<UIMessageChunk> out = translator.translate(event, state);
+        assertThat(out).hasSize(1).first().isInstanceOf(UIMessageChunk.Error.class);
+        UIMessageChunk.Error err = (UIMessageChunk.Error) out.get(0);
+        // Must be human-readable, not the wire symbol "turn_watchdog_fired" (the pre-fix bug).
+        assertThat(err.errorText()).doesNotContain("turn_watchdog_fired").contains("timed out");
+    }
+
+    @Test
+    @DisplayName("message_end captures stopReason; agent_end uses it as fallback when messages[] omits it")
+    void messageEndStopReason_consumedByAgentEnd() throws Exception {
+        // message_end carries the authoritative stopReason for the assistant message.
+        ObjectNode messageEnd = mapper.createObjectNode();
+        messageEnd.put("type", "message_end");
+        ObjectNode msg = messageEnd.putObject("message");
+        msg.put("role", "assistant");
+        msg.put("stopReason", "length");
+        translator.translate(messageEnd, state);
+        assertThat(state.observedStopReason()).isEqualTo("length");
+
+        // agent_end with NO stopReason on messages[] uses the captured value.
+        ObjectNode agentEnd = mapper.createObjectNode();
+        agentEnd.put("type", "agent_end");
+        agentEnd.putArray("messages");
+        List<UIMessageChunk> out = translator.translate(agentEnd, state);
+        UIMessageChunk.Finish finish = (UIMessageChunk.Finish) out.get(out.size() - 1);
+        assertThat(finish.finishReason()).isSameAs(UIMessageChunk.FinishReason.LENGTH);
+    }
+
+    @Test
+    @DisplayName("text_end / thinking_end close their open blocks so multi-block messages preserve reasoning text")
+    void textEndThinkingEnd_closeBlocksFlushesBuffers() throws Exception {
+        // Open reasoning block first, append, then end it (multi-block scenario).
+        ObjectNode reasoningDelta = mapper.createObjectNode();
+        reasoningDelta.put("type", "message_update");
+        ObjectNode ame1 = reasoningDelta.putObject("assistantMessageEvent");
+        ame1.put("type", "thinking_delta");
+        ame1.put("contentIndex", 0);
+        ame1.put("delta", "Let me think");
+        translator.translate(reasoningDelta, state);
+
+        ObjectNode reasoningEnd = mapper.createObjectNode();
+        reasoningEnd.put("type", "message_update");
+        ObjectNode ame2 = reasoningEnd.putObject("assistantMessageEvent");
+        ame2.put("type", "thinking_end");
+        ame2.put("contentIndex", 0);
+        List<UIMessageChunk> out = translator.translate(reasoningEnd, state);
+        assertThat(out)
+            .extracting(c -> c.getClass().getSimpleName())
+            .containsExactly("ReasoningEnd");
+
+        // The reasoning text must be drained into the persisted parts array — the pre-fix bug
+        // was that this only happened on turn_end, so a multi-block message with reasoning
+        // followed by text would lose the reasoning content.
+        assertThat(state.partsSnapshot().toString()).contains("Let me think");
+    }
+
+    @Test
     @DisplayName("Malformed event with no type returns empty list")
     void malformedEvent_dropped() {
         assertThat(translator.translate(mapper.createObjectNode().put("noType", true), state)).isEmpty();

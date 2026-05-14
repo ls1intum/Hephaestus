@@ -63,6 +63,16 @@ public class ChatMessage {
     private ChatMessage parentMessage;
 
     /**
+     * Raw {@code parent_message_id} FK exposed as a {@link UUID} that does NOT trigger Hibernate
+     * lazy-load of the parent entity. Used by {@link ChatMessageDTO#from} so listing a thread
+     * with N messages issues 1 query, not 1 + N (lazy proxy per message). {@code insertable} /
+     * {@code updatable} = false because the {@link #parentMessage} relation owns the write side.
+     */
+    @Nullable
+    @Column(name = "parent_message_id", insertable = false, updatable = false)
+    private UUID parentMessageId;
+
+    /**
      * Child messages - branches from this message
      */
     @OneToMany(

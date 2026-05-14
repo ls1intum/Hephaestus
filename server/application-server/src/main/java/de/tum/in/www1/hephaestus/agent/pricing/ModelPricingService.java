@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.agent.pricing;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -55,8 +56,12 @@ public class ModelPricingService {
         if (modelId == null || modelId.isBlank()) {
             return Optional.empty();
         }
+        // Use the validFrom / validTo window — a wrongly-dated row in the registry cannot then
+        // silently apply outside its effective window. Today the seed sets validFrom=now,
+        // validTo=null, so every active row matches; the window only matters when an operator
+        // rolls pricing forward (insert future row, set valid_to on the current row).
         return pricingRepository
-            .findByModelId(modelId)
+            .findActive(modelId, Instant.now())
             .map(pricing -> sum(pricing, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens));
     }
 

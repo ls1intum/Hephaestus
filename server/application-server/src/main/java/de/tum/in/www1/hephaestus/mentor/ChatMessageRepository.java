@@ -19,8 +19,14 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
      * reverse the result in memory to get the trailing chronological tail without loading and
      * trimming the full thread (matches the DB-side LIMIT pattern used by
      * {@code ChatThreadRepository.findRecentThreads}).
+     *
+     * <p>The {@code id} secondary sort is the tiebreaker for messages persisted in the same
+     * {@code persistInFlight} transaction — Postgres {@code TIMESTAMP} is microsecond but
+     * Java's {@code Instant.now()} on the JVM clock can produce identical user/assistant
+     * timestamps. Without the tiebreaker, replay can ship {@code [assistant, user]} instead of
+     * {@code [user, assistant]} and break the LLM's alternating-role contract.
      */
-    List<ChatMessage> findByThreadIdOrderByCreatedAtDesc(UUID threadId, Pageable pageable);
+    List<ChatMessage> findByThreadIdOrderByCreatedAtDescIdDesc(UUID threadId, Pageable pageable);
 
     /**
      * Flip assistant rows still {@code in_flight} past {@code cutoff} to {@code interrupted},

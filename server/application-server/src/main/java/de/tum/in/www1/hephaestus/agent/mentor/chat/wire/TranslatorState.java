@@ -96,6 +96,14 @@ public final class TranslatorState {
     @Nullable
     private String observedModel;
 
+    /**
+     * Authoritative Pi {@code stopReason} captured on {@code message_end.message.stopReason}.
+     * The translator's {@code handleAgentEnd} uses this when present, falling back to a walk
+     * over {@code agent_end.messages[]} only when no message_end was emitted.
+     */
+    @Nullable
+    private String observedStopReason;
+
     public TranslatorState(UUID assistantMessageId) {
         this.assistantMessageId = assistantMessageId;
     }
@@ -296,5 +304,22 @@ public final class TranslatorState {
     @Nullable
     public synchronized String observedModel() {
         return observedModel;
+    }
+
+    /**
+     * Record the authoritative Pi stop reason observed on {@code message_end}. Last write wins
+     * because multi-step turns can emit multiple message_end events; the latest one is the
+     * terminal reason for the turn. Blank values are ignored to defend against an empty-field
+     * runner emit overwriting a real prior reason.
+     */
+    public synchronized void observeStopReason(@Nullable String stopReason) {
+        if (stopReason != null && !stopReason.isBlank()) {
+            this.observedStopReason = stopReason;
+        }
+    }
+
+    @Nullable
+    public synchronized String observedStopReason() {
+        return observedStopReason;
     }
 }

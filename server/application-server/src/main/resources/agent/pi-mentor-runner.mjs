@@ -116,16 +116,31 @@ function writeFrame(obj) {
     process.stdout.write(JSON.stringify(obj) + "\n");
 }
 
+/**
+ * Backpressure threshold: once Node's stdout write queue exceeds this many bytes, the
+ * dispatch queue pauses for a `drain` event before running the next task. Pi can emit
+ * hundreds of text_delta events per second; if Java's consumer is slow (SSE backed up by a
+ * client) the runner's heap balloons unboundedly without this guard, eventually OOM-killing
+ * the container mid-turn. 256 KB is roughly one Pi turn's worth of deltas — well below
+ * Node's default 16 KB highWaterMark × ~16 chunk burst budget.
+ */
+const STDOUT_BACKPRESSURE_THRESHOLD_BYTES = 256 * 1024;
+
 function sendResult(id, result) {
-    if (id === undefined || id === null) return; // notification request — no response
-    writeFrame({ jsonrpc: "2.0", id, result: result ?? null });
+    // JSON-RPC 2.0 §4: `id` absent (undefined here) = notification → MUST NOT respond.
+    // `id: null` is a valid request id — DO respond (used by §6 batch-rejection paths).
+    if (id === undefined) return;
+    writeFrame({ jsonrpc: "2.0", id: id === null ? null : id, result: result ?? null });
 }
 
 function sendError(id, code, message, data) {
-    if (id === undefined || id === null) return;
+    // Same rule as sendResult: only skip when id is genuinely absent (notification). `null`
+    // is a valid id and JSON-RPC §6 explicitly requires it for batch-error / parse-error
+    // responses where the server cannot determine which request id was at fault.
+    if (id === undefined) return;
     const err = { code, message };
     if (data !== undefined) err.data = data;
-    writeFrame({ jsonrpc: "2.0", id, error: err });
+    writeFrame({ jsonrpc: "2.0", id: id === null ? null : id, error: err });
 }
 
 function sendEvent(threadId, event) {
@@ -156,6 +171,15 @@ let runtime = null; // AgentSessionRuntime
 let runtimeInitPromise = null;
 let systemPrompt = null; // cached after first read
 
+/**
+ * Last runtime-init failure — used to fail-fast for a short window so a permanently-broken
+ * SDK doesn't get re-loaded once per inbound frame. The container is throwaway; one short
+ * cooldown burns budget proportional to operational signal (logs + metrics) rather than
+ * spinning a load attempt per request.
+ */
+let runtimeInitFailure = null;
+const RUNTIME_INIT_COOLDOWN_MS = 30_000;
+
 // Serialised dispatch chain. Initialised by `start()`; every stdin frame AND every
 // internally-fired side-effect (e.g. watchdog session rebind) appends to it so callers cannot
 // race `runtime.switchSession` against each other. See the comment block on `start()` for the
@@ -163,13 +187,27 @@ let systemPrompt = null; // cached after first read
 let dispatchQueue = Promise.resolve();
 
 function enqueue(fn) {
-    dispatchQueue = dispatchQueue.then(fn).catch((e) => log("dispatch queue swallowed:", e?.message ?? e));
+    dispatchQueue = dispatchQueue
+        .then(async () => {
+            // Pause for stdout drain before running the next task if writes are backing up.
+            // Awaiting here naturally pauses the inbound pipe (since stdin frames also queue
+            // through enqueue), which is the correct backpressure target: don't accept more
+            // Pi events than we can ship to Java.
+            if (process.stdout.writableLength > STDOUT_BACKPRESSURE_THRESHOLD_BYTES) {
+                await new Promise((resolve) => process.stdout.once("drain", resolve));
+            }
+            return fn();
+        })
+        .catch((e) => log("dispatch queue swallowed:", e?.message ?? e));
     return dispatchQueue;
 }
 
 async function ensureRuntime() {
     if (runtime) return runtime;
     if (runtimeInitPromise) return runtimeInitPromise;
+    if (runtimeInitFailure && Date.now() - runtimeInitFailure.at < RUNTIME_INIT_COOLDOWN_MS) {
+        throw runtimeInitFailure.err;
+    }
 
     runtimeInitPromise = (async () => {
         mkdirSync(SESSIONS_DIR, { recursive: true });
@@ -236,7 +274,12 @@ async function ensureRuntime() {
         return runtime;
     })();
     try {
-        return await runtimeInitPromise;
+        const r = await runtimeInitPromise;
+        runtimeInitFailure = null;
+        return r;
+    } catch (err) {
+        runtimeInitFailure = { err, at: Date.now() };
+        throw err;
     } finally {
         runtimeInitPromise = null;
     }
@@ -748,6 +791,12 @@ async function dispatch(frame) {
     // Two shapes arrive on stdin:
     //   1. JSON-RPC requests from Java: {jsonrpc, id, method, params}
     //   2. JSON-RPC responses to our fetch_context callbacks: {jsonrpc, id, result|error}
+    // JSON-RPC 2.0 §6 allows batch (top-level array) but neither end emits batches today.
+    // Reject loudly rather than silently dropping — a future Java caller that bundles
+    // open_thread + replay_context + prompt would otherwise vanish into the log.
+    if (Array.isArray(frame)) {
+        return sendError(null, ERR.INVALID_REQUEST, "batch requests are not supported on this transport");
+    }
     if (frame?.method) {
         const id = frame.id;
         const handler = METHODS[frame.method];
@@ -902,6 +951,18 @@ function start() {
     process.on("unhandledRejection", (e) => {
         log("unhandledRejection:", e);
     });
+
+    // Funnel SIGTERM / SIGINT through the dispatch queue so a supervisor-driven shutdown
+    // observes the same teardown invariants as an RPC `shutdown` (rejects pending fetch
+    // callbacks, disposes the runtime, drains the dispatch chain). Without these, the
+    // process exits with the default disposition mid-task — any in-flight Pi event between
+    // user-visible chunks vanishes on the wire and Java waits for its 165s prompt deadline.
+    for (const signal of ["SIGTERM", "SIGINT"]) {
+        process.on(signal, () => {
+            log(`received ${signal} — initiating clean shutdown`);
+            enqueue(() => handleShutdown(null));
+        });
+    }
 
     announceReady();
 }

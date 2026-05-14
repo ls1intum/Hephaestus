@@ -157,6 +157,36 @@ test("second concurrent prompt returns -32001 turn_already_in_flight", async () 
     }
 });
 
+test("batch JSON-RPC request is rejected with -32600 (not silently dropped)", async () => {
+    // JSON-RPC 2.0 §6 permits top-level arrays as batches. Neither end emits batches today;
+    // the runner rejects them loudly so a future Java caller that bundles requests doesn't
+    // see its frames vanish into the runner's log.
+    const child = spawn(process.execPath, [RUNNER], {
+        env: { ...process.env, MENTOR_RUNNER_PROTOCOL_ONLY: "1" },
+        stdio: ["pipe", "pipe", "pipe"],
+    });
+    const reader = createReader();
+    child.stdout.on("data", (chunk) => reader.push(chunk));
+    child.stderr.on("data", (chunk) => process.stderr.write(`[runner-stderr] ${chunk}`));
+    try {
+        await readReady(reader);
+
+        // Send a batch (top-level array) with two requests.
+        const batch = [
+            { jsonrpc: "2.0", id: "b1", method: "hello", params: {} },
+            { jsonrpc: "2.0", id: "b2", method: "hello", params: {} },
+        ];
+        child.stdin.write(JSON.stringify(batch) + "\n");
+
+        // Expect a single error frame with id:null and code -32600.
+        const resp = await readUntil(reader, (f) => f?.error?.code === -32600);
+        assert.equal(resp.id, null, "batch rejection error must carry id:null per JSON-RPC §6");
+    } finally {
+        child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: "shut", method: "shutdown", params: {} }) + "\n");
+        await new Promise((r) => child.on("exit", r));
+    }
+});
+
 // Note: fetch_context end-to-end coverage lives Java-side in MentorRunnerClientTest +
 // MentorChatServiceTest. A Node-side smoke test would either assert on stderr text (brittle)
 // or require a real Pi LLM round-trip. Skipped here on purpose.

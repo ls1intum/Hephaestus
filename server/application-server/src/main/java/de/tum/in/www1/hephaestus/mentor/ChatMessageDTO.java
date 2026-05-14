@@ -56,9 +56,11 @@ public record ChatMessageDTO(
             message.getMetadata() != null && message.getMetadata().isObject()
                 ? mapper.convertValue(message.getMetadata(), new TypeReference<Map<String, Object>>() {})
                 : null;
+        // Read the raw FK column instead of dereferencing the lazy parentMessage proxy — a
+        // 100-message thread listing would otherwise issue 100 extra SELECTs.
         return new ChatMessageDTO(
             message.getId(),
-            message.getParentMessage() != null ? message.getParentMessage().getId() : null,
+            message.getParentMessageId(),
             message.getRole().getValue(),
             parts,
             metadata,
