@@ -196,7 +196,15 @@ public class MentorTurnPersistence {
             });
     }
 
-    /** Build the runner replay window from the most recent messages on this thread. */
+    /**
+     * Build the runner replay window from the most recent messages on this thread.
+     *
+     * <p>Wrapped in a read-only transaction so {@code effectiveParts} can lazily materialise the
+     * legacy {@code chat_message_part} collection (during the #1074 dual-write window) without
+     * triggering {@code LazyInitializationException}: the per-message lazy access happens inside
+     * the still-open Hibernate session.
+     */
+    @Transactional(readOnly = true)
     public List<MentorReplayMessage> buildReplay(UUID threadId) {
         List<ChatMessage> recent = chatThreadService.recentMessagesForReplay(threadId);
         List<MentorReplayMessage> out = new ArrayList<>(recent.size());

@@ -362,18 +362,26 @@ public class MentorEventTranslator {
     private List<UIMessageChunk> handleAgentEnd(JsonNode event, TranslatorState state) {
         // Pi shape per pi-coding-agent/dist/core/extensions/types.d.ts AgentEndEvent:
         //   {type:"agent_end", messages: AgentMessage[]}
-        // Crucially, agent_end has NO top-level `usage` or `model` — those live on each
-        // AssistantMessage.usage / .model (verified pi-ai/dist/types.d.ts:144-157). We harvest
-        // them as a last-resort fallback if neither message_update nor message_end ran.
-        if (!state.hasObservedUsage() && event.path("messages").isArray()) {
+        // Crucially, agent_end has NO top-level `usage`, `model`, or `stopReason` — those live
+        // on each AssistantMessage (verified pi-ai/src/types.ts:277-287). We walk the last
+        // assistant message in `messages` to harvest model+usage+stopReason as a last-resort
+        // fallback if neither message_update nor message_end ran.
+        String piStopReason = null;
+        if (event.path("messages").isArray()) {
             for (JsonNode msg : event.get("messages")) {
                 if (msg != null && msg.isObject() && "assistant".equals(optionalString(msg, "role"))) {
-                    capturePartialUsage(msg, state);
+                    if (!state.hasObservedUsage()) {
+                        capturePartialUsage(msg, state);
+                    }
+                    String reason = optionalString(msg, "stopReason");
+                    if (reason != null) piStopReason = reason; // last assistant wins
                 }
             }
         }
+        if (piStopReason == null) {
+            piStopReason = firstNonNull(optionalString(event, "stopReason"), optionalString(event, "finish_reason"));
+        }
         List<UIMessageChunk> out = closeOpenStreamingBlocks(state);
-        String finishReason = firstNonNull(optionalString(event, "stopReason"), optionalString(event, "finish_reason"));
         ObjectNode metadata = NODES.objectNode();
         JsonNode usage = state.observedUsage();
         if (usage != null) {
@@ -383,8 +391,27 @@ public class MentorEventTranslator {
         if (model != null) {
             metadata.put("model", model);
         }
-        out.add(new UIMessageChunk.Finish(finishReason, metadata.isEmpty() ? null : metadata));
+        out.add(new UIMessageChunk.Finish(mapStopReason(piStopReason), metadata.isEmpty() ? null : metadata));
         return out;
+    }
+
+    /**
+     * Map Pi's {@code StopReason} (pi-ai/src/types.ts:269 — {@code stop|length|toolUse|error|aborted})
+     * to the AI SDK's {@code LanguageModelV2FinishReason} enum
+     * (vercel/ai packages/provider/src/language-model/v2/language-model-v2-finish-reason.ts —
+     * {@code stop|length|content-filter|tool-calls|error|other|unknown}). Strict client-side
+     * validators reject raw Pi values, so the mapping must happen at this boundary.
+     */
+    @Nullable
+    static String mapStopReason(@Nullable String piStopReason) {
+        if (piStopReason == null) return null;
+        return switch (piStopReason) {
+            case "stop" -> "stop";
+            case "length" -> "length";
+            case "toolUse", "tool_use", "tool-calls" -> "tool-calls";
+            case "error", "aborted" -> "error";
+            default -> "unknown";
+        };
     }
 
     @Nullable

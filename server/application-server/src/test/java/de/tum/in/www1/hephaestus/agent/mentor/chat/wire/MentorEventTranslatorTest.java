@@ -276,6 +276,39 @@ class MentorEventTranslatorTest extends BaseUnitTest {
         assertThat(finish.messageMetadata()).isNull();
     }
 
+    @Test
+    @DisplayName("agent_end maps Pi stopReason to AI SDK enum (toolUse → tool-calls, aborted → error)")
+    void agentEnd_mapsStopReasonToAiSdkEnum() {
+        // Pi StopReason union: stop | length | toolUse | error | aborted (pi-ai/src/types.ts:269)
+        // AI SDK union: stop | length | content-filter | tool-calls | error | other | unknown
+        // (vercel/ai language-model-v2-finish-reason.ts). Anything raw-Pi reaching the wire is
+        // a strict-validator rejection on the client.
+        assertThat(MentorEventTranslator.mapStopReason("stop")).isEqualTo("stop");
+        assertThat(MentorEventTranslator.mapStopReason("length")).isEqualTo("length");
+        assertThat(MentorEventTranslator.mapStopReason("toolUse")).isEqualTo("tool-calls");
+        assertThat(MentorEventTranslator.mapStopReason("tool_use")).isEqualTo("tool-calls");
+        assertThat(MentorEventTranslator.mapStopReason("error")).isEqualTo("error");
+        assertThat(MentorEventTranslator.mapStopReason("aborted")).isEqualTo("error");
+        assertThat(MentorEventTranslator.mapStopReason("future-pi-reason")).isEqualTo("unknown");
+        assertThat(MentorEventTranslator.mapStopReason(null)).isNull();
+    }
+
+    @Test
+    @DisplayName("agent_end extracts stopReason from the last assistant message in messages[]")
+    void agentEnd_extractsStopReasonFromLastAssistant() {
+        ObjectNode event = mapper.createObjectNode();
+        event.put("type", "agent_end");
+        var msgs = event.putArray("messages");
+        msgs.addObject().put("role", "user").put("stopReason", "irrelevant");
+        msgs.addObject().put("role", "assistant").put("stopReason", "toolUse");
+        msgs.addObject().put("role", "assistant").put("stopReason", "stop"); // last wins
+
+        List<UIMessageChunk> out = translator.translate(event, state);
+
+        UIMessageChunk.Finish finish = (UIMessageChunk.Finish) out.get(out.size() - 1);
+        assertThat(finish.finishReason()).isEqualTo("stop");
+    }
+
     // ─── turn_end + open block closure ───────────────────────────────────────────────────
 
     @Test

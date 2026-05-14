@@ -261,6 +261,10 @@ public class MentorChatService {
             poisoned = isPoisoning(e);
             log.warn("Mentor turn errored (poisoned={}): {}", poisoned, e.getMessage(), e);
             persistence.interrupt(cookie, state, e);
+            // Cancel heartbeat BEFORE the terminal Error chunk + complete(): a tick firing between
+            // emitter.complete() and the finally below would hit a completed emitter and surface as
+            // a spurious IllegalStateException in logs (and a clientGone false-positive).
+            heartbeat.cancel(false);
             sendErrorAndComplete(
                 emitter,
                 clientGone,

@@ -154,7 +154,10 @@ public final class MentorRunnerClient implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
+        // synchronized so close() races with start() are deterministic — both touch
+        // `subscription`. Pending-call drains via the lock-free ConcurrentHashMap so contention
+        // here is bounded to the dispose() path.
         if (subscription != null) {
             try {
                 subscription.dispose();
@@ -257,44 +260,48 @@ public final class MentorRunnerClient implements AutoCloseable {
     }
 
     private void handleFetchContext(JsonNode frame) {
-        long id = frame.has("id") ? frame.get("id").asLong() : 0L;
+        // Runner-originated callbacks carry a string id (`fc-<uuid>`); Java-originated calls use
+        // numeric ids from our own AtomicLong. We MUST echo the runner's id back unchanged — the
+        // runner indexes `pendingFetchContexts` by string key, so any coercion (asLong → 0) silently
+        // breaks correlation and stalls the LLM tool call until the 10s timeout fires.
+        JsonNode idNode = frame.get("id");
         JsonNode params = frame.get("params");
         if (params == null) {
-            sendCallbackError(id, -32600, "missing params");
+            sendCallbackError(idNode, -32600, "missing params");
             return;
         }
         String threadIdStr = params.has("threadId") ? params.get("threadId").asText() : null;
         String path = params.has("path") ? params.get("path").asText() : null;
         if (threadIdStr == null || path == null) {
-            sendCallbackError(id, -32600, "missing threadId or path");
+            sendCallbackError(idNode, -32600, "missing threadId or path");
             return;
         }
         UUID threadId;
         try {
             threadId = UUID.fromString(threadIdStr);
         } catch (IllegalArgumentException ex) {
-            sendCallbackError(id, -32600, "invalid threadId");
+            sendCallbackError(idNode, -32600, "invalid threadId");
             return;
         }
         try {
             JsonNode result = fetchContextHandler.apply(new FetchContextRequest(threadId, path));
             ObjectNode response = objectMapper.createObjectNode();
             response.put("jsonrpc", "2.0");
-            response.put("id", id);
+            response.set("id", idNode != null ? idNode : objectMapper.nullNode());
             ObjectNode resultEnvelope = response.putObject("result");
             resultEnvelope.set("content", result != null ? result : objectMapper.nullNode());
             sandbox.send(response);
         } catch (RuntimeException e) {
             log.warn("fetch_context callback failed: {}", e.getMessage(), e);
-            sendCallbackError(id, -32000, e.getMessage() != null ? e.getMessage() : "fetch_context failed");
+            sendCallbackError(idNode, -32000, e.getMessage() != null ? e.getMessage() : "fetch_context failed");
         }
     }
 
-    private void sendCallbackError(long id, int code, String message) {
+    private void sendCallbackError(@Nullable JsonNode id, int code, String message) {
         try {
             ObjectNode response = objectMapper.createObjectNode();
             response.put("jsonrpc", "2.0");
-            response.put("id", id);
+            response.set("id", id != null ? id : objectMapper.nullNode());
             ObjectNode error = response.putObject("error");
             error.put("code", code);
             error.put("message", message);

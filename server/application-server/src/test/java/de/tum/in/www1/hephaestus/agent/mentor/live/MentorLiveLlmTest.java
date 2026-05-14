@@ -130,6 +130,25 @@ class MentorLiveLlmTest {
             sandbox.close(Duration.ofSeconds(5));
             sandbox = null;
         }
+        if (workspaceDir != null) {
+            // Each test stages a fresh /tmp/hephaestus-mentor-live-* with a runner copy +
+            // settings + symlinked node_modules. Leaking these across runs accumulates GBs of
+            // disposable state on CI agents that re-use volumes.
+            try (var stream = Files.walk(workspaceDir)) {
+                stream
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .forEach(p -> {
+                        try {
+                            Files.deleteIfExists(p);
+                        } catch (java.io.IOException ignored) {
+                            // Best-effort cleanup; the OS-level tmp reaper catches the rest.
+                        }
+                    });
+            } catch (java.io.IOException ignored) {
+                // Workspace already gone — fine.
+            }
+            workspaceDir = null;
+        }
     }
 
     @Test

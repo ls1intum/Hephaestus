@@ -17,8 +17,7 @@ Open the `.mdj` file in StarUML, adjust the relevant diagram, then export the SV
 
 The platform is intentionally layered. Internally we distinguish between:
 
-- **Application Server** - Spring Boot, integrates with Git providers, manages the leaderboard, and exposes the primary REST API.
-- **Intelligence Service** - TypeScript + Hono mentor logic that produces conversational guidance and artifacts.
+- **Application Server** - Spring Boot, integrates with Git providers, manages the leaderboard, exposes the primary REST API, and runs the Pi mentor agent in-process (streaming to clients via SSE).
 - **Webhook Ingest** - NATS-based ingestion for GitHub/GitLab events, decoupling external webhooks from downstream processing.
 - **User Management** - Keycloak identity realm configured with GitHub as identity provider.
 

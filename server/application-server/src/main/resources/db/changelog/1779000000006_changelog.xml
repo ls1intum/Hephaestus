@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        PiMentorAgent #1071: harden chat_message.parts.
+
+        Changeset 1779000000001 added `parts JSONB DEFAULT '[]'::jsonb` but left the column
+        nullable and unchecked. After 1779000000002 backfilled every legacy row and the new
+        writer (MentorChatService) emits `[]` even for in-flight messages, no row should ever
+        be NULL or non-array. Without these constraints, a future writer that forgets to set
+        parts silently falls through to the legacy chat_message_part read path (via
+        ChatThreadService.effectiveParts) — which #1074 removes, at which point the bug
+        becomes a permanent data corruption.
+
+        This changeset runs AFTER 1779000000002 so the backfill has populated every legacy row.
+    -->
+    <changeSet id="1779000000006-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message.parts is already NOT NULL">
+            <sqlCheck expectedResult="1">
+                SELECT CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END
+                  FROM information_schema.columns
+                 WHERE table_name = 'chat_message' AND column_name = 'parts'
+            </sqlCheck>
+        </preConditions>
+        <comment>Backstop any NULL parts (defensive — backfill should have caught all) and enforce NOT NULL</comment>
+        <sql>
+            UPDATE chat_message SET parts = '[]'::jsonb WHERE parts IS NULL;
+            ALTER TABLE chat_message ALTER COLUMN parts SET NOT NULL;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE chat_message ALTER COLUMN parts DROP NOT NULL;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1779000000006-2" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message.parts array CHECK already exists">
+            <not>
+                <sqlCheck expectedResult="1">
+                    SELECT CASE WHEN EXISTS (
+                        SELECT 1 FROM pg_constraint
+                         WHERE conname = 'chk_chat_message_parts_shape'
+                    ) THEN 1 ELSE 0 END
+                </sqlCheck>
+            </not>
+        </preConditions>
+        <comment>Constrain chat_message.parts to JSON array shape (symmetric to metadata constraint)</comment>
+        <sql splitStatements="false">
+            ALTER TABLE chat_message
+                ADD CONSTRAINT chk_chat_message_parts_shape
+                CHECK (jsonb_typeof(parts) = 'array');
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE chat_message DROP CONSTRAINT IF EXISTS chk_chat_message_parts_shape;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

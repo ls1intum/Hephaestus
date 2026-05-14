@@ -47,8 +47,7 @@ body:
       description: Which part of the system is affected?
       options:
         - Webapp (React UI)
-        - Application Server (Java/Spring)
-        - Intelligence Service (TypeScript/AI)
+        - Application Server (Java/Spring, includes Pi mentor agent)
         - Webhook Ingest
         - Don't know
     validations:

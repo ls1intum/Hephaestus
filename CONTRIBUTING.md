@@ -90,8 +90,7 @@ We use **Semantic Release** to automatically version and release our application
 **Service scopes** (where the code lives):
 
 - `webapp`: React frontend
-- `server`: Java application server
-- `ai`: TypeScript intelligence service
+- `server`: Java application server (includes the in-process Pi mentor agent)
 - `webhooks`: Webhook ingestion service
 - `docs`: Documentation
 

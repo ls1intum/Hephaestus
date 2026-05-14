@@ -15,8 +15,7 @@ Hephaestus engages a processor chain of: GitHub (identity provider and source-sy
 | AET servers at TUM (container host) | Own infrastructure | No (Art. 4(7) GDPR — controller's own equipment) | — |
 | PostgreSQL (in-house container) | Application data store | No (self-hosted) | — |
 | Keycloak (in-house container) | Identity and session management | No (self-hosted) | — |
-| Spring Boot application server (in-house container) | Application logic | No (self-hosted) | — |
-| Intelligence service (in-house Node container) | AI-assisted features orchestration | No (self-hosted) | — |
+| Spring Boot application server (in-house container) | Application logic, in-process Pi mentor agent | No (self-hosted) | — |
 | Traefik v3 reverse proxy (in-house container) | TLS termination, routing | No (self-hosted) | — |
 | Let's Encrypt ACME endpoint | Domain-validation certificates | No — Let's Encrypt receives no personal data; it only checks control over the domain | — |
 | **GitHub, Inc.** (USA) | Identity provider (OAuth) and source-system API for connected GitHub repositories | **Yes** | DPA in place at TUM/AET level; GitHub holds its own EU-US Data Privacy Framework certification (independent of Microsoft Corporation's, per Microsoft's published covered-entities list); SCCs Module 2 contracted as fall-back; re-verify DPF status annually |

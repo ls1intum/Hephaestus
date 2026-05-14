@@ -157,6 +157,48 @@ class MentorRunnerClientTest extends BaseUnitTest {
         assertThat(lastFetchContext.get().path()).isEqualTo("workspace.json");
     }
 
+    @Test
+    @DisplayName("fetch_context callback preserves string ids — the runner uses fc-<uuid>, not numerics")
+    void fetchContextRoundTrip_preservesStringIds() {
+        // Regression: an earlier impl coerced frame.get("id").asLong() → 0 for any non-numeric
+        // id, then echoed back `id: 0` which the runner's pendingFetchContexts (keyed by the
+        // original string) never matched. Result: every `fetch_context` LLM tool call hung
+        // until the runner's 10s timeout fired.
+        String callbackId = "fc-" + UUID.randomUUID();
+        ObjectNode callback = mapper.createObjectNode();
+        callback.put("jsonrpc", "2.0");
+        callback.put("id", callbackId);
+        callback.put("method", "fetch_context");
+        ObjectNode params = callback.putObject("params");
+        params.put("threadId", UUID.randomUUID().toString());
+        params.put("path", "workspace.json");
+
+        sandbox.pushFrame(callback);
+
+        JsonNode response = sandbox.takeFrame();
+        assertThat(response.get("id").isTextual()).as("id must remain a string").isTrue();
+        assertThat(response.get("id").asText()).isEqualTo(callbackId);
+        assertThat(response.get("result").get("content").get("ok").asBoolean()).isTrue();
+    }
+
+    @Test
+    @DisplayName("fetch_context error response preserves string id")
+    void fetchContextErrorRoundTrip_preservesStringIds() {
+        String callbackId = "fc-" + UUID.randomUUID();
+        ObjectNode callback = mapper.createObjectNode();
+        callback.put("jsonrpc", "2.0");
+        callback.put("id", callbackId);
+        callback.put("method", "fetch_context");
+        callback.putObject("params"); // missing required fields → -32600
+
+        sandbox.pushFrame(callback);
+
+        JsonNode response = sandbox.takeFrame();
+        assertThat(response.get("id").isTextual()).isTrue();
+        assertThat(response.get("id").asText()).isEqualTo(callbackId);
+        assertThat(response.get("error").get("code").asInt()).isEqualTo(-32600);
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────────────────
 
     private ObjectNode responseOf(long id, JsonNode result) {
