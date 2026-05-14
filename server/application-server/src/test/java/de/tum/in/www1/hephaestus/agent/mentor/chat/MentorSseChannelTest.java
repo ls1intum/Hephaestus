@@ -149,6 +149,51 @@ class MentorSseChannelTest extends BaseUnitTest {
         assertThat(emitter.completed()).isTrue();
     }
 
+    @Test
+    @DisplayName("send AFTER completeWithDone is a silent no-op (no spurious disconnect-hook firing)")
+    void sendAfterCompleteWithDone_isSilentNoOp() {
+        // Setup: register a disconnect hook + bind lifecycle. A correctly-finished turn must
+        // NEVER fire the hook — that hook calls session.abort() against a sandbox we just
+        // cleanly closed. The bug pre-wave-16: post-complete send threw IllegalStateException
+        // → caught as "disconnect" → flagDisconnected → hook fired.
+        AtomicInteger fired = new AtomicInteger();
+        channel.bindLifecycle();
+        channel.onDisconnect(fired::incrementAndGet);
+
+        channel.completeWithDone();
+        // Pi misbehaves: a stray second agent_end event reaches handleEvent post-complete.
+        channel.send(new UIMessageChunk.StartStep());
+
+        assertThat(channel.isClientGone()).isFalse();
+        assertThat(fired.get()).isZero();
+    }
+
+    @Test
+    @DisplayName("concurrent send + heartbeat tick do NOT byte-interleave (writeLock held)")
+    void concurrentSendAndHeartbeat_areSerialised() throws Exception {
+        // SseEmitter#send is not thread-safe in Spring. The channel's writeLock serialises
+        // chunk-writes vs heartbeat ticks; this test drives 200 concurrent chunk sends from
+        // two threads and asserts every recorded data frame is a complete JSON object (no
+        // interleaved bytes from a racing send).
+        int total = 200;
+        var t1 = new Thread(() -> {
+            for (int i = 0; i < total / 2; i++) channel.send(new UIMessageChunk.StartStep());
+        });
+        var t2 = new Thread(() -> {
+            for (int i = 0; i < total / 2; i++) channel.send(new UIMessageChunk.StartStep());
+        });
+        t1.start();
+        t2.start();
+        t1.join();
+        t2.join();
+
+        assertThat(emitter.dataFrames()).hasSize(total);
+        for (String frame : emitter.dataFrames()) {
+            // Every frame is a complete JSON object — no partial / interleaved fragments.
+            assertThat(frame).startsWith("{").endsWith("}").contains("\"type\":\"start-step\"");
+        }
+    }
+
     /** Test-only emitter that records data frames + can simulate disconnect failures. */
     private static final class RecordingEmitter extends SseEmitter {
 

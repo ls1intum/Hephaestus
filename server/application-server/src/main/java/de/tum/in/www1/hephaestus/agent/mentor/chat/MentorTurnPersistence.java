@@ -185,6 +185,15 @@ public class MentorTurnPersistence {
         ChatMessage assistant = chatMessageRepository
             .findById(cookie.assistantMessageId())
             .orElseThrow(() -> new EntityNotFoundException("ChatMessage", cookie.assistantMessageId().toString()));
+        // If the in-flight reaper (MentorInFlightReaper) flipped this row to `interrupted` while
+        // the runner was still streaming, a late finalise would overwrite back to `completed` —
+        // which the unique partial index now permits because the row is out of the index. Two
+        // legitimate completed rows for the same logical turn would then race to render in the
+        // webapp. Guard: only finalise rows still tagged `in_flight`. If we lost the race, leave
+        // the reaper's `interrupted` verdict in place.
+        if (!isStillInFlight(assistant)) {
+            return;
+        }
         assistant.setParts(state.partsSnapshot());
         ObjectNode meta = newOrCopyMeta(assistant);
         meta.put("status", "completed");
@@ -229,6 +238,10 @@ public class MentorTurnPersistence {
         chatMessageRepository
             .findById(cookie.assistantMessageId())
             .ifPresent(assistant -> {
+                // Same race guard as finalise: don't clobber a terminal verdict (completed or a
+                // reaper-written interrupted) — only set our own interrupted on rows still
+                // in_flight.
+                if (!isStillInFlight(assistant)) return;
                 assistant.setParts(state.partsSnapshot());
                 ObjectNode meta = newOrCopyMeta(assistant);
                 meta.put("status", "interrupted");
@@ -237,6 +250,14 @@ public class MentorTurnPersistence {
                 assistant.setMetadata(meta);
                 chatMessageRepository.save(assistant);
             });
+    }
+
+    /** True iff the assistant row's metadata still has {@code status = "in_flight"}. */
+    private static boolean isStillInFlight(ChatMessage assistant) {
+        JsonNode meta = assistant.getMetadata();
+        if (meta == null || !meta.isObject()) return false;
+        JsonNode status = meta.get("status");
+        return status != null && status.isTextual() && "in_flight".equals(status.asText());
     }
 
     /**

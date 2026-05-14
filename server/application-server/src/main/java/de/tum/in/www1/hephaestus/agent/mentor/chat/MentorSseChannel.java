@@ -55,8 +55,25 @@ final class MentorSseChannel implements AutoCloseable {
     private final ObjectMapper objectMapper;
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean clientGone = new AtomicBoolean(false);
+    /**
+     * Set once {@link #completeWithDone}/{@link #completeWithError}/{@link #completeWithConflict}
+     * runs. Distinguishes "we cleanly finished" from "client went away" — without it, a stray
+     * post-complete {@code send()} (e.g. heartbeat tick mid-completion, or Pi emitting a second
+     * {@code agent_end}) would throw {@link IllegalStateException} from Spring, get caught as
+     * "disconnect", flip {@link #clientGone}, and fire the abort hook against a sandbox that
+     * actually finished successfully.
+     */
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicLong lastSendNanos = new AtomicLong(System.nanoTime());
     private final AtomicReference<Runnable> disconnectHook = new AtomicReference<>();
+    /**
+     * Serialises every write to {@link #emitter}. Spring's {@link SseEmitter#send} is NOT
+     * thread-safe — the heartbeat tick (scheduler thread) and chunk writes (runner-event
+     * thread) can otherwise byte-interleave on the socket, producing a corrupt SSE stream that
+     * AI-SDK's parser rejects. The terminal {@code complete*} paths also acquire this lock so
+     * a heartbeat fires before, not concurrent with, the {@code [DONE]} sentinel.
+     */
+    private final Object writeLock = new Object();
     private volatile ScheduledFuture<?> heartbeat;
 
     MentorSseChannel(SseEmitter emitter, ObjectMapper objectMapper, ScheduledExecutorService scheduler) {
@@ -112,20 +129,27 @@ final class MentorSseChannel implements AutoCloseable {
      * Schedule the comment-only keep-alive. Comments are SSE-spec lines starting with {@code :}
      * — they keep proxies (Traefik {@code idleTimeout=300s}) from killing the stream during
      * long Pi LLM calls but never reach {@code DefaultChatTransport}'s JSON parser.
+     *
+     * <p>The tick body acquires {@link #writeLock} so a ping never byte-interleaves with a
+     * concurrent chunk write from the runner-event thread, and a post-{@link #closed} tick is
+     * a clean no-op instead of poisoning the disconnect flag.
      */
     void startHeartbeat() {
         heartbeat = scheduler.scheduleAtFixedRate(
             () -> {
-                if (clientGone.get()) return;
+                if (clientGone.get() || closed.get()) return;
                 long quietNs = System.nanoTime() - lastSendNanos.get();
                 if (quietNs < HEARTBEAT_QUIET_NS) return;
-                try {
-                    emitter.send(SseEmitter.event().comment("ping"));
-                    lastSendNanos.set(System.nanoTime());
-                } catch (IOException | IllegalStateException ex) {
-                    // Same semantics as send(): flip and stop. Spring's emitter callbacks fire and
-                    // unwind the orchestrator naturally.
-                    flagDisconnected();
+                synchronized (writeLock) {
+                    if (clientGone.get() || closed.get()) return;
+                    try {
+                        emitter.send(SseEmitter.event().comment("ping"));
+                        lastSendNanos.set(System.nanoTime());
+                    } catch (IOException | IllegalStateException ex) {
+                        // Real disconnect: flip and stop. Spring's emitter callbacks fire and
+                        // unwind the orchestrator naturally.
+                        flagDisconnected();
+                    }
                 }
             },
             HEARTBEAT_INITIAL_DELAY_MS,
@@ -138,37 +162,52 @@ final class MentorSseChannel implements AutoCloseable {
      * Serialise a {@link UIMessageChunk} as one SSE {@code data:} frame. Throws
      * {@link ClientDisconnectedException} if the emitter is closed or the socket is dead so the
      * orchestrator can stop writing without poisoning the runner subscription.
+     *
+     * <p>A post-{@link #closed} call is a silent no-op: the orchestrator already terminated the
+     * stream cleanly; a runner that emits a stray late event (e.g. a second {@code agent_end})
+     * must not be treated as a client disconnect.
      */
     void send(UIMessageChunk chunk) {
-        if (clientGone.get()) return;
+        if (clientGone.get() || closed.get()) return;
+        // Serialise OUTSIDE the lock to keep the critical section small.
+        String payload;
         try {
-            String payload = objectMapper.writeValueAsString(chunk);
-            emitter.send(SseEmitter.event().data(payload));
-            lastSendNanos.set(System.nanoTime());
+            payload = objectMapper.writeValueAsString(chunk);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialise UIMessageChunk", e);
-        } catch (IOException e) {
-            flagDisconnected();
-            throw new ClientDisconnectedException("SSE send failed: " + e.getMessage(), e);
-        } catch (IllegalStateException ex) {
-            flagDisconnected();
-            throw new ClientDisconnectedException("SSE emitter closed: " + ex.getMessage(), ex);
+        }
+        synchronized (writeLock) {
+            if (clientGone.get() || closed.get()) return;
+            try {
+                emitter.send(SseEmitter.event().data(payload));
+                lastSendNanos.set(System.nanoTime());
+            } catch (IOException e) {
+                flagDisconnected();
+                throw new ClientDisconnectedException("SSE send failed: " + e.getMessage(), e);
+            } catch (IllegalStateException ex) {
+                flagDisconnected();
+                throw new ClientDisconnectedException("SSE emitter closed: " + ex.getMessage(), ex);
+            }
         }
     }
 
     /**
      * Natural-finish path: emit the {@code [DONE]} sentinel and complete the emitter. Cancels
-     * the heartbeat first so a tick can't race {@code emitter.complete()} and surface as a
-     * spurious {@code IllegalStateException}. Idempotent.
+     * the heartbeat first so a tick can't race {@code emitter.complete()}. Flips {@link #closed}
+     * inside the same monitor as {@link #send} so subsequent writes short-circuit instead of
+     * tripping Spring's post-complete {@link IllegalStateException}. Idempotent.
      */
     void completeWithDone() {
         cancelHeartbeat();
-        try {
-            emitter.send(SseEmitter.event().data("[DONE]"));
-        } catch (IOException | IllegalStateException ignored) {}
-        try {
-            emitter.complete();
-        } catch (RuntimeException ignored) {}
+        synchronized (writeLock) {
+            if (!closed.compareAndSet(false, true)) return;
+            try {
+                emitter.send(SseEmitter.event().data("[DONE]"));
+            } catch (IOException | IllegalStateException ignored) {}
+            try {
+                emitter.complete();
+            } catch (RuntimeException ignored) {}
+        }
     }
 
     /** Error path: best-effort emit an {@link UIMessageChunk.Error} chunk + {@code [DONE]}. */

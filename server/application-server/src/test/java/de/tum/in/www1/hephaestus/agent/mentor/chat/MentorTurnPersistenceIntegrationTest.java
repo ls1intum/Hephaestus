@@ -332,6 +332,81 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("finalise: race guard — reaped (interrupted) row is NOT clobbered by a late finalise")
+    void finalise_doesNotClobberReapedInterrupted() {
+        // Setup: assistant row written as in_flight, then reaper flips it to interrupted
+        // BEFORE the runner finally streams agent_end. Late finalise must leave the
+        // reaper's verdict in place — otherwise a single user turn yields two completed-
+        // looking rows fighting to render.
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
+        UUID assistantId = UUID.randomUUID();
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null
+        );
+
+        // Simulate reaper sweep flipping the row to interrupted.
+        chatMessageRepository.reapStaleInFlight(Instant.now().plusSeconds(60));
+        assertThat(
+            chatMessageRepository.findById(assistantId).orElseThrow().getMetadata().path("status").asText()
+        ).isEqualTo("interrupted");
+
+        // Late finalise on the same cookie — must be a no-op.
+        TranslatorState state = new TranslatorState(assistantId);
+        state.observeModel("openai/gpt-oss-120b");
+        ObjectNode usage = NODES.objectNode();
+        usage.put("input", 100).put("output", 50);
+        state.observeUsage(usage);
+        state.openTextBlock("t");
+        state.appendText("late finish");
+        state.closeTextBlock();
+        UIMessageChunk.FinishMetadata fm = new UIMessageChunk.FinishMetadata(
+            "openai/gpt-oss-120b",
+            new UIMessageChunk.FinishMetadata.Usage(100, 50, null, null, 150),
+            null
+        );
+        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, fm));
+
+        ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
+        // Status STAYS interrupted; finalise did not clobber.
+        assertThat(assistant.getMetadata().path("status").asText()).isEqualTo("interrupted");
+        // Reaper's error sentinel is preserved.
+        assertThat(assistant.getMetadata().path("error").asText()).isEqualTo("server restart");
+    }
+
+    @Test
+    @DisplayName("interrupt: race guard — already-completed row is NOT clobbered by a late interrupt")
+    void interrupt_doesNotClobberCompletedRow() {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
+        UUID assistantId = UUID.randomUUID();
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null
+        );
+
+        // Happy-path finalise first.
+        TranslatorState state = new TranslatorState(assistantId);
+        state.openTextBlock("t");
+        state.appendText("done");
+        state.closeTextBlock();
+        UIMessageChunk.FinishMetadata fm = new UIMessageChunk.FinishMetadata(null, null, null);
+        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, fm));
+        assertThat(
+            chatMessageRepository.findById(assistantId).orElseThrow().getMetadata().path("status").asText()
+        ).isEqualTo("completed");
+
+        // Late interrupt — must NOT downgrade the row from completed.
+        persistence.interrupt(cookie, state, new IllegalStateException("stale handler"));
+
+        ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
+        assertThat(assistant.getMetadata().path("status").asText()).isEqualTo("completed");
+    }
+
+    @Test
     @DisplayName("reapStaleInFlight flips in-flight rows older than the cutoff")
     void reaper_flipsStaleInFlightRows() throws Exception {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "stuck");

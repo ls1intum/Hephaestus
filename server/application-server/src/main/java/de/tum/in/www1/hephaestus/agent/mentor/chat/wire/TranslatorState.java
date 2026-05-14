@@ -25,9 +25,13 @@ import org.springframework.lang.Nullable;
  *       a single text block, and we already have the in-flight pieces in memory.</li>
  * </ul>
  *
- * <p>Not thread-safe: a single turn runs on a single dispatcher thread (the runner-event consumer).
- * If that invariant ever changes — wrap the writes in a single lock; do NOT swap each field to an
- * atomic, the invariants are multi-field (e.g. {@code activeTextId == null} ↔ no open text part).
+ * <p>Thread-safety: writes happen on the runner-event dispatcher thread; {@link #partsSnapshot()},
+ * {@link #observedUsage()}, and {@link #observedModel()} can be read from the orchestrator's
+ * virtual thread on timeout/disconnect/error paths to feed {@code persistence.interrupt(...)} a
+ * coherent parts array. Every mutator + reader synchronises on the instance monitor so a snapshot
+ * sees a stable {@code partsAccumulator} ({@link ArrayNode} is NOT thread-safe — a deepCopy racing
+ * an {@code add(...)} from the writer would surface as a {@link java.util.ConcurrentModificationException}).
+ * Locking is per-instance and short — every method body runs in nanoseconds.
  */
 public final class TranslatorState {
 
@@ -100,15 +104,15 @@ public final class TranslatorState {
         return assistantMessageId;
     }
 
-    public boolean isStarted() {
+    public synchronized boolean isStarted() {
         return started;
     }
 
-    public void markStarted() {
+    public synchronized void markStarted() {
         this.started = true;
     }
 
-    public int incrementStep() {
+    public synchronized int incrementStep() {
         // AI SDK's client reducer pushes a `{type:"step-start"}` part for every `start-step` chunk
         // it sees (ai@6.0.3 dist/index.mjs:4988-5050). Mirror that here so the rehydrated message
         // — fetched via `GET /threads/{id}` — round-trips through `safeValidateUIMessages` and
@@ -119,25 +123,25 @@ public final class TranslatorState {
         return ++stepDepth;
     }
 
-    public int decrementStep() {
+    public synchronized int decrementStep() {
         return Math.max(0, --stepDepth);
     }
 
     @Nullable
-    public String activeTextId() {
+    public synchronized String activeTextId() {
         return activeTextId;
     }
 
-    public void openTextBlock(String id) {
+    public synchronized void openTextBlock(String id) {
         this.activeTextId = id;
         this.textBuffer.setLength(0);
     }
 
-    public void appendText(String delta) {
+    public synchronized void appendText(String delta) {
         this.textBuffer.append(delta);
     }
 
-    public void closeTextBlock() {
+    public synchronized void closeTextBlock() {
         if (activeTextId != null && textBuffer.length() > 0) {
             ObjectNode part = nodes.objectNode();
             part.put("type", "text");
@@ -154,20 +158,20 @@ public final class TranslatorState {
     }
 
     @Nullable
-    public String activeReasoningId() {
+    public synchronized String activeReasoningId() {
         return activeReasoningId;
     }
 
-    public void openReasoningBlock(String id) {
+    public synchronized void openReasoningBlock(String id) {
         this.activeReasoningId = id;
         this.reasoningBuffer.setLength(0);
     }
 
-    public void appendReasoning(String delta) {
+    public synchronized void appendReasoning(String delta) {
         this.reasoningBuffer.append(delta);
     }
 
-    public void closeReasoningBlock() {
+    public synchronized void closeReasoningBlock() {
         if (activeReasoningId != null && reasoningBuffer.length() > 0) {
             ObjectNode part = nodes.objectNode();
             part.put("type", "reasoning");
@@ -187,7 +191,7 @@ public final class TranslatorState {
      * calls mutate it in place — matching how AI SDK's reducer threads a single part through
      * input-available → output-available/error.
      */
-    public void recordToolCallStart(String toolCallId, String toolName, @Nullable JsonNode input) {
+    public synchronized void recordToolCallStart(String toolCallId, String toolName, @Nullable JsonNode input) {
         if (toolCallId == null) return;
         if (toolName != null) {
             toolNameByCallId.put(toolCallId, toolName);
@@ -204,7 +208,7 @@ public final class TranslatorState {
     }
 
     /** Mutate the existing tool-call part to {@code state:"output-available"}. */
-    public void recordToolCallOutput(String toolCallId, JsonNode output) {
+    public synchronized void recordToolCallOutput(String toolCallId, JsonNode output) {
         if (toolCallId == null) return;
         ObjectNode part = toolPartByCallId.get(toolCallId);
         if (part == null) {
@@ -223,7 +227,7 @@ public final class TranslatorState {
     }
 
     /** Mutate the existing tool-call part to {@code state:"output-error"}. */
-    public void recordToolCallError(String toolCallId, String errorText) {
+    public synchronized void recordToolCallError(String toolCallId, String errorText) {
         if (toolCallId == null) return;
         ObjectNode part = toolPartByCallId.get(toolCallId);
         if (part == null) {
@@ -240,7 +244,7 @@ public final class TranslatorState {
         part.remove("output");
     }
 
-    public void recordDataFinding(UUID findingId) {
+    public synchronized void recordDataFinding(UUID findingId) {
         // Match the AI SDK data-* envelope: {type, id, data:{...}}. The id at the top level
         // lets AI SDK dedupe across re-renders; findingId stays inside data for consumers.
         ObjectNode part = nodes.objectNode();
@@ -250,8 +254,14 @@ public final class TranslatorState {
         partsAccumulator.add(part);
     }
 
-    /** Snapshot of the parts array; safe to persist to JSONB without further mutation. */
-    public ArrayNode partsSnapshot() {
+    /**
+     * Snapshot of the parts array; safe to persist to JSONB without further mutation. The
+     * {@code synchronized} pairs with every mutator so a cross-thread snapshot from the
+     * orchestrator vthread (timeout / disconnect / error paths) sees a stable
+     * {@link ArrayNode} — {@code ArrayNode.deepCopy()} racing an {@code add(...)} from the
+     * runner-event thread would otherwise surface as a {@code ConcurrentModificationException}.
+     */
+    public synchronized ArrayNode partsSnapshot() {
         return partsAccumulator.deepCopy();
     }
 
@@ -261,30 +271,30 @@ public final class TranslatorState {
      * leaking into persisted metadata. Each call overwrites — Pi's contract is that the latest
      * snapshot is monotonically more complete than the previous one (running totals).
      */
-    public void observeUsage(JsonNode usage) {
+    public synchronized void observeUsage(JsonNode usage) {
         if (usage != null && usage.isObject() && !usage.isEmpty()) {
             this.observedUsage = usage.deepCopy();
         }
     }
 
     /** Record the assistant message's model id; first non-blank wins (model rarely changes mid-turn). */
-    public void observeModel(@Nullable String model) {
+    public synchronized void observeModel(@Nullable String model) {
         if (model != null && !model.isBlank() && this.observedModel == null) {
             this.observedModel = model;
         }
     }
 
-    public boolean hasObservedUsage() {
+    public synchronized boolean hasObservedUsage() {
         return observedUsage != null;
     }
 
     @Nullable
-    public JsonNode observedUsage() {
+    public synchronized JsonNode observedUsage() {
         return observedUsage;
     }
 
     @Nullable
-    public String observedModel() {
+    public synchronized String observedModel() {
         return observedModel;
     }
 }
