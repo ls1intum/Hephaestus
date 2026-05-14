@@ -132,19 +132,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(((UIMessageChunk.ReasoningDelta) out.get(1)).delta()).isEqualTo("Let me think");
     }
 
-    @Test
-    @DisplayName("Legacy snake_case delta_type still works (back-compat for runner stub + synthetic events)")
-    void legacySnakeCaseDelta_stillWorks() throws Exception {
-        JsonNode event = mapper.readTree(
-            "{\"type\":\"message_update\",\"delta_type\":\"text_delta\",\"delta\":\"hi\"}"
-        );
-        List<UIMessageChunk> out = translator.translate(event, state);
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("TextStart", "TextDelta");
-        assertThat(((UIMessageChunk.TextDelta) out.get(1)).delta()).isEqualTo("hi");
-    }
-
     // ─── message_end (captures final usage but emits no UI chunks) ───────────────────────
 
     @Test
@@ -286,9 +273,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(PiEventToUiChunkTranslator.mapStopReason("stop")).isSameAs(UIMessageChunk.FinishReason.STOP);
         assertThat(PiEventToUiChunkTranslator.mapStopReason("length")).isSameAs(UIMessageChunk.FinishReason.LENGTH);
         assertThat(PiEventToUiChunkTranslator.mapStopReason("toolUse")).isSameAs(
-            UIMessageChunk.FinishReason.TOOL_CALLS
-        );
-        assertThat(PiEventToUiChunkTranslator.mapStopReason("tool_use")).isSameAs(
             UIMessageChunk.FinishReason.TOOL_CALLS
         );
         assertThat(PiEventToUiChunkTranslator.mapStopReason("error")).isSameAs(UIMessageChunk.FinishReason.ERROR);
@@ -466,11 +450,18 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         start.putObject("args");
         translator.translate(start, state);
 
+        // Pi's canonical tool-result shape: {result: {content: [{type:"text", text:"..."}]}}.
+        // The translator extracts the first content[].text as the user-facing errorText.
         ObjectNode end = mapper.createObjectNode();
         end.put("type", "tool_execution_end");
         end.put("toolCallId", "tc-2");
         end.put("isError", true);
-        end.put("error", "fetch_context timed out");
+        end
+            .putObject("result")
+            .putArray("content")
+            .addObject()
+            .put("type", "text")
+            .put("text", "fetch_context timed out");
         translator.translate(end, state);
 
         JsonNode snapshot = state.partsSnapshot();

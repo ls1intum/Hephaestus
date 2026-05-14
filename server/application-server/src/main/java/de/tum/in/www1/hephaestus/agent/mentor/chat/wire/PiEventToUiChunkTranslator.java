@@ -94,38 +94,14 @@ public class PiEventToUiChunkTranslator {
     // ─── message_update: text_delta + thinking_delta ──────────────────────────────────────
 
     private List<UIMessageChunk> handleMessageUpdate(JsonNode event, TranslatorState state) {
-        // Pi SDK canonical shape (verified against @earendil-works/pi-ai dist/types.d.ts AssistantMessageEvent
-        // union and @earendil-works/pi-coding-agent dist/core/extensions/types.d.ts MessageUpdateEvent):
-        //   {type: "message_update", message: AgentMessage,
-        //    assistantMessageEvent: {type: "text_delta"|"thinking_delta"|..., contentIndex: number, delta: string, partial: AssistantMessage}}
-        //
-        // The earlier shape (snake_case `delta_type`/`delta` at the top level) is what the
-        // PROTOCOL_ONLY stub used to emit and what some forks of the SDK exposed; we accept it as
-        // a fallback so the protocol-only test suite + the runner's own synthetic `pi_error`/
-        // watchdog events keep working.
+        // Pi shape: {type:"message_update", message: AgentMessage, assistantMessageEvent: {...}}
+        // See pi-coding-agent extensions/types.ts MessageUpdateEvent for the union.
         JsonNode ame = event.path("assistantMessageEvent");
-        if (ame.isObject() && ame.has("type")) {
-            return handleAssistantMessageEvent(ame, event, state);
-        }
-        // Snake-case fallback (legacy stub + synthetic events).
-        JsonNode deltaWrapper = event.has("update") && event.get("update").isObject() ? event.get("update") : event;
-        String deltaType = optionalString(deltaWrapper, "delta_type");
-        if (deltaType == null) {
-            deltaType = optionalString(event, "delta_type");
-        }
-        String deltaText = optionalString(deltaWrapper, "delta");
-        if (deltaText == null) {
-            deltaText = optionalString(event, "delta");
-        }
-        if (deltaType == null || deltaText == null) {
-            log.debug("message_update missing delta_type or delta — skipping: {}", event);
+        if (!ame.isObject() || !ame.has("type")) {
+            log.debug("message_update without assistantMessageEvent — skipping: {}", event);
             return List.of();
         }
-        String blockId = optionalString(deltaWrapper, "id");
-        if (blockId == null) {
-            blockId = optionalString(event, "id");
-        }
-        return mapDelta(deltaType, deltaText, blockId, state);
+        return handleAssistantMessageEvent(ame, event, state);
     }
 
     /**
@@ -171,22 +147,6 @@ public class PiEventToUiChunkTranslator {
                 "error" -> List.of();
             default -> {
                 log.debug("Unknown assistantMessageEvent.type '{}' — dropping", innerType);
-                yield List.of();
-            }
-        };
-    }
-
-    private List<UIMessageChunk> mapDelta(
-        String deltaType,
-        String deltaText,
-        @Nullable String blockId,
-        TranslatorState state
-    ) {
-        return switch (deltaType) {
-            case "text_delta", "text" -> textDelta(blockId, deltaText, state);
-            case "thinking_delta", "reasoning_delta", "thinking" -> reasoningDelta(blockId, deltaText, state);
-            default -> {
-                log.debug("Unknown message_update delta_type '{}' — dropping", deltaType);
                 yield List.of();
             }
         };
@@ -242,20 +202,15 @@ public class PiEventToUiChunkTranslator {
     // ─── tool_execution_start / end ───────────────────────────────────────────────────────
 
     private List<UIMessageChunk> handleToolStart(JsonNode event, TranslatorState state) {
-        // Pi shape per pi-coding-agent/dist/core/extensions/types.d.ts ToolExecutionStartEvent:
+        // Pi shape per pi-coding-agent extensions/types.ts ToolExecutionStartEvent:
         //   {type:"tool_execution_start", toolCallId, toolName, args}
-        // Snake-case fallback kept for the runner's stub events and forward-compat.
         String toolCallId = optionalString(event, "toolCallId");
-        if (toolCallId == null) toolCallId = optionalString(event, "tool_call_id");
-        if (toolCallId == null) toolCallId = optionalString(event, "id");
         String toolName = optionalString(event, "toolName");
-        if (toolName == null) toolName = optionalString(event, "tool_name");
-        if (toolName == null) toolName = optionalString(event, "name");
         if (toolCallId == null || toolName == null) {
             log.debug("tool_execution_start missing toolCallId or toolName — skipping: {}", event);
             return List.of();
         }
-        JsonNode input = firstPresent(event, "args", "input", "arguments");
+        JsonNode input = event.has("args") && !event.get("args").isNull() ? event.get("args") : null;
         state.recordToolCallStart(toolCallId, toolName, input);
         // Closing any open text block before the tool call mirrors what AI SDK does on the client
         // — tools render as discrete blocks; keeping text "open" across them confuses the UI.
@@ -270,30 +225,20 @@ public class PiEventToUiChunkTranslator {
     private List<UIMessageChunk> handleToolEnd(JsonNode event, TranslatorState state) {
         // Pi shape per ToolExecutionEndEvent:
         //   {type:"tool_execution_end", toolCallId, toolName, result, isError: boolean}
-        // `isError` is the authoritative success/failure flag. Snake-case `error.message` is
-        // accepted as a fallback for the runner's synthetic events.
         String toolCallId = optionalString(event, "toolCallId");
-        if (toolCallId == null) toolCallId = optionalString(event, "tool_call_id");
-        if (toolCallId == null) toolCallId = optionalString(event, "id");
         if (toolCallId == null) {
             log.debug("tool_execution_end missing toolCallId — skipping: {}", event);
             return List.of();
         }
-        boolean isError;
-        if (event.has("isError")) {
-            isError = event.get("isError").asBoolean(false);
-        } else {
-            isError = event.has("error") && !event.get("error").isNull();
-        }
+        boolean isError = event.path("isError").asBoolean(false);
         if (!isError) {
-            JsonNode output = firstPresent(event, "result", "output");
+            JsonNode result = event.path("result");
+            JsonNode output = !result.isMissingNode() && !result.isNull() ? result : null;
             state.recordToolCallOutput(toolCallId, output);
             return List.of(
                 new UIMessageChunk.ToolOutputAvailable(toolCallId, output != null ? output : NODES.nullNode())
             );
         }
-        // Failure: prefer extracting a readable message from result.content[0].text (Pi tool
-        // result shape) before falling back to legacy `error.message`.
         String errorText = extractToolErrorText(event);
         state.recordToolCallError(toolCallId, errorText);
         return List.of(new UIMessageChunk.ToolOutputError(toolCallId, errorText));
@@ -312,34 +257,12 @@ public class PiEventToUiChunkTranslator {
 
     @Nullable
     private static String extractToolErrorRaw(JsonNode event) {
-        JsonNode result = event.path("result");
-        if (result.isObject()) {
-            JsonNode content = result.path("content");
-            if (content.isArray() && !content.isEmpty()) {
-                JsonNode first = content.get(0);
-                if (first != null && first.isObject() && first.has("text")) {
-                    return first.get("text").asText();
-                }
-            }
-            if (result.has("message") && result.get("message").isTextual()) {
-                return result.get("message").asText();
-            }
-        }
-        JsonNode error = event.path("error");
-        if (error.isObject()) {
-            String m = optionalString(error, "message");
-            if (m != null) return m;
-            return error.toString();
-        }
-        if (error.isTextual()) return error.asText();
-        return null;
-    }
-
-    @Nullable
-    private static JsonNode firstPresent(JsonNode event, String... fields) {
-        for (String f : fields) {
-            if (event.has(f) && !event.get(f).isNull()) {
-                return event.get(f);
+        // Pi tool-result shape: {result: {content: [{type:"text", text:"..."}]}}.
+        JsonNode content = event.path("result").path("content");
+        if (content.isArray() && !content.isEmpty()) {
+            JsonNode first = content.get(0);
+            if (first.isObject() && first.path("text").isTextual()) {
+                return first.get("text").asText();
             }
         }
         return null;
@@ -390,9 +313,6 @@ public class PiEventToUiChunkTranslator {
                 }
             }
         }
-        if (piStopReason == null) {
-            piStopReason = firstNonNull(optionalString(event, "stopReason"), optionalString(event, "finish_reason"));
-        }
         List<UIMessageChunk> out = closeOpenStreamingBlocks(state);
         UIMessageChunk.FinishMetadata metadata = UIMessageChunk.FinishMetadata.of(
             state.observedModel(),
@@ -404,13 +324,11 @@ public class PiEventToUiChunkTranslator {
     }
 
     /**
-     * Map Pi's {@code StopReason} (pi-ai/src/types.ts:269 — {@code stop|length|toolUse|error|aborted})
-     * to the AI SDK's {@code finishReason} enum on the {@code finish} chunk schema
-     * (ai@6.0.3 — {@code stop|length|content-filter|tool-calls|error|other}). Note: although
-     * the upstream {@code LanguageModelV2FinishReason} type includes {@code "unknown"}, the
-     * UIMessageStream {@code finish} chunk uses the narrower {@code z.enum([…])} that does NOT
-     * accept {@code "unknown"} — strict-zod parsing rejects it at the client. Default case maps
-     * to {@link UIMessageChunk.FinishReason#OTHER}.
+     * Map Pi {@code StopReason} ({@code stop|length|toolUse|error|aborted}, pi-ai/src/types.ts)
+     * to the AI-SDK UIMessageStream {@code finishReason} enum
+     * ({@code stop|length|content-filter|tool-calls|error|other}). The wider
+     * {@code LanguageModelV2FinishReason} includes {@code "unknown"} but the chunk schema
+     * does not — strict-zod parsing rejects it client-side. Unknown values map to {@code OTHER}.
      */
     @Nullable
     static UIMessageChunk.FinishReason mapStopReason(@Nullable String piStopReason) {
@@ -418,28 +336,19 @@ public class PiEventToUiChunkTranslator {
         return switch (piStopReason) {
             case "stop" -> UIMessageChunk.FinishReason.STOP;
             case "length" -> UIMessageChunk.FinishReason.LENGTH;
-            case "toolUse", "tool_use", "tool-calls" -> UIMessageChunk.FinishReason.TOOL_CALLS;
+            case "toolUse" -> UIMessageChunk.FinishReason.TOOL_CALLS;
             case "error", "aborted" -> UIMessageChunk.FinishReason.ERROR;
             default -> UIMessageChunk.FinishReason.OTHER;
         };
     }
 
-    @Nullable
-    private static String firstNonNull(@Nullable String a, @Nullable String b) {
-        return a != null ? a : b;
-    }
-
     // ─── link_finding → DataFinding ──────────────────────────────────────────────────────
 
     private List<UIMessageChunk> handleLinkFinding(JsonNode event, TranslatorState state) {
-        // Runner emits camelCase `findingId` (pi-mentor-runner.mjs defineLinkFindingTool); the
-        // older snake_case form is accepted for back-compat.
+        // Runner emits camelCase `findingId` (pi-mentor-runner.mjs defineLinkFindingTool).
         String findingIdStr = optionalString(event, "findingId");
         if (findingIdStr == null) {
-            findingIdStr = optionalString(event, "finding_id");
-        }
-        if (findingIdStr == null) {
-            log.debug("link_finding missing finding_id — skipping: {}", event);
+            log.debug("link_finding missing findingId — skipping: {}", event);
             return List.of();
         }
         try {

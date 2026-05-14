@@ -74,14 +74,12 @@ const createUserMessage = (text: string, id = "msg-1"): ChatMessage => ({
 	id,
 	role: "user",
 	parts: [{ type: "text", text }],
-	metadata: { createdAt: new Date().toISOString() },
 });
 
 const createAssistantMessage = (text: string, id = "msg-2"): ChatMessage => ({
 	id,
 	role: "assistant",
 	parts: [{ type: "text", text }],
-	metadata: { createdAt: new Date().toISOString() },
 });
 
 const createMessageWithReasoning = (
@@ -95,7 +93,6 @@ const createMessageWithReasoning = (
 		{ type: "reasoning", text: reasoning },
 		{ type: "text", text },
 	],
-	metadata: { createdAt: new Date().toISOString() },
 });
 
 const createMessageWithAttachments = (text: string, id = "msg-4"): ChatMessage => ({
@@ -116,7 +113,6 @@ const createMessageWithAttachments = (text: string, id = "msg-4"): ChatMessage =
 		},
 		{ type: "text", text },
 	],
-	metadata: { createdAt: new Date().toISOString() },
 });
 
 /**

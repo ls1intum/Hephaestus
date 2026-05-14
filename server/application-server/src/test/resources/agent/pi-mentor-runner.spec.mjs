@@ -103,7 +103,6 @@ test("hello handshake returns protocolVersion 1", async () => {
         send({ jsonrpc: "2.0", id: "h1", method: "hello", params: {} });
         const resp = await readUntil(reader, (f) => f?.id === "h1");
         assert.equal(resp.result.protocolVersion, 1);
-        assert.deepEqual(resp.result.capabilities.sort(), ["fetch_context", "link_finding", "mentor"].sort());
     } finally {
         send({ jsonrpc: "2.0", id: "shut", method: "shutdown", params: {} });
         await new Promise((r) => child.on("exit", r));

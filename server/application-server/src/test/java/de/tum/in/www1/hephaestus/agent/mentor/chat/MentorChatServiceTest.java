@@ -209,7 +209,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         // No error chunk on the happy path.
         assertThat(types).doesNotContain("error");
         // Persistence completed via finalise (not interrupt).
-        verify(persistence).finalise(any(), any(), any(UIMessageChunk.Finish.class), any());
+        verify(persistence).finalise(any(), any(), any(UIMessageChunk.Finish.class));
         verify(persistence, never()).interrupt(any(), any(), any());
         // Lock released — no leaked active keys.
         assertThat(turnLock.activeKeys()).isZero();
@@ -236,7 +236,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         // No error chunk emitted — disconnects are not surfaced as turn errors.
         assertThat(emitter.recordedTypes()).doesNotContain("error");
         // Persistence ran finalise (not interrupt).
-        verify(persistence, atLeastOnce()).finalise(any(), any(), any(UIMessageChunk.Finish.class), any());
+        verify(persistence, atLeastOnce()).finalise(any(), any(), any(UIMessageChunk.Finish.class));
         verify(persistence, never()).interrupt(any(), any(), any());
         // Lock released.
         assertThat(turnLock.activeKeys()).isZero();
@@ -257,7 +257,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         // Poisoned sandboxes are explicitly closed so the next turn rebuilds fresh.
         assertThat(sandbox.closed.get()).isTrue();
         verify(persistence).interrupt(any(), any(), any(Throwable.class));
-        verify(persistence, never()).finalise(any(), any(), any(), any());
+        verify(persistence, never()).finalise(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
     }
 
@@ -473,7 +473,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         }
 
         @Override
-        public synchronized void send(SseEventBuilder builder) throws IOException {
+        public void send(SseEventBuilder builder) throws IOException {
             if (clientGone) {
                 throw new IOException("client gone (simulated)");
             }

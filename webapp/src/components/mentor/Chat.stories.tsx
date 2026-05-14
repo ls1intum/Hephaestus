@@ -111,9 +111,6 @@ const CONVERSATION_MESSAGES: ChatMessage[] = [
 				text: "I need help writing a poem for my daughter's birthday. She's turning 8 and loves unicorns and rainbows.",
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-2",
@@ -145,9 +142,6 @@ We celebrate another year!
 Happy 8th Birthday! 🦄🌈`,
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-3",
@@ -158,9 +152,6 @@ Happy 8th Birthday! 🦄🌈`,
 				text: "This is beautiful! Could you also create a simple birthday card message that I can write inside her card?",
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-4",
@@ -188,9 +179,6 @@ Mom & Dad 💕
 P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨`,
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-5",
@@ -201,9 +189,6 @@ P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨
 				text: "Perfect! One more thing - could you update the poem to mention that she's starting 3rd grade soon? I think that would make it even more special.",
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-6",
@@ -240,9 +225,6 @@ We celebrate another year!
 Happy 8th Birthday! 🦄🌈📚`,
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-7",
@@ -253,9 +235,6 @@ Happy 8th Birthday! 🦄🌈📚`,
 				text: "Wonderful! One last request - can you help me create a simple shopping list for her party? We're having about 10 kids over.",
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-8",
@@ -307,9 +286,6 @@ Happy 8th Birthday! 🦄🌈📚`,
 **Budget estimate: $80-120 for everything!** 🎉`,
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-9",
@@ -320,9 +296,6 @@ Happy 8th Birthday! 🦄🌈📚`,
 				text: "This is so helpful! Thank you for making Emma's birthday planning so much easier. You've created everything I need! 🎉",
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-10",
@@ -333,9 +306,6 @@ Happy 8th Birthday! 🦄🌈📚`,
 				text: "You're so welcome! I'm thrilled I could help make Emma's 8th birthday extra special. She's going to love the personalized poem, and it sounds like you have everything planned for a magical celebration. I hope she has the most wonderful day filled with unicorns, rainbows, and lots of birthday joy! 🦄🌈🎂✨",
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 ];
 
@@ -448,9 +418,6 @@ export const StreamingResponse: Story = {
 						text: "I'm crafting a personalized birthday card message that will capture your daughter's special day...",
 					},
 				],
-				metadata: {
-					createdAt: new Date().toISOString(),
-				},
 			},
 		],
 		status: "streaming",

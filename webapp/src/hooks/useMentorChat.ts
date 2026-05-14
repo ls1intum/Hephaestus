@@ -7,7 +7,7 @@ import {
 	readUIMessageStream,
 	uiMessageChunkSchema,
 } from "ai";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import {
 	getThreadOptions,
@@ -115,32 +115,28 @@ export function useMentorChat({
 			updatedAt: new Date(),
 		}));
 
-	// Create stable transport configuration
-	const mentorChatApi = `${environment.serverUrl}/workspaces/${slug}/mentor/chat`;
-	const stableTransport = new DefaultChatTransport<ChatMessage>({
-		api: mentorChatApi,
-		// Always attach a fresh token per request
-		prepareSendMessagesRequest: ({ id, messages }) => {
-			const effectiveId = id || stableThreadId;
-			// Only send the latest message; backend reconstructs context from thread ID
-			const lastMessage = messages.at(-1);
-			// Determine previous message ID from current local state (selected leaf or last message)
-			const prev = messages.length > 1 ? messages[messages.length - 2]?.id : undefined;
-			return {
-				body: {
-					id: effectiveId,
-					message: lastMessage,
-					previousMessageId: prev,
+	// Transport must be stable across renders — `useChat` reads `transport` once on mount
+	// and again only when identity changes; a fresh `DefaultChatTransport` per render would
+	// thrash internal state. The deps reduce to per-workspace + per-thread-id.
+	const transport = useMemo(
+		() =>
+			new DefaultChatTransport<ChatMessage>({
+				api: `${environment.serverUrl}/workspaces/${slug}/mentor/chat`,
+				prepareSendMessagesRequest: ({ id, messages }) => {
+					const effectiveId = id || stableThreadId;
+					// Only send the latest message; backend reconstructs context from thread id.
+					const lastMessage = messages.at(-1);
+					const prev = messages.length > 1 ? messages[messages.length - 2]?.id : undefined;
+					return {
+						body: { id: effectiveId, message: lastMessage, previousMessageId: prev },
+						headers: { Authorization: `Bearer ${keycloakService.getToken()}` },
+					};
 				},
-				headers: {
-					Authorization: `Bearer ${keycloakService.getToken()}`,
-				},
-			};
-		},
-	});
+			}),
+		[slug, stableThreadId],
+	);
 
-	// Create stable onFinish callback
-	const stableOnFinish = (_options: { message: ChatMessage }) => {
+	const handleFinish = useCallback(() => {
 		if (hasWorkspace) {
 			queryClient.invalidateQueries({
 				queryKey: listThreadsQueryKey({ path: { workspaceSlug: slug } }),
@@ -149,20 +145,19 @@ export function useMentorChat({
 		if (threadId || stableThreadId) {
 			queryClient.invalidateQueries({
 				queryKey: getThreadQueryKey({
-					path: {
-						workspaceSlug: slug,
-						threadId: threadId || stableThreadId || "",
-					},
+					path: { workspaceSlug: slug, threadId: threadId || stableThreadId || "" },
 				}),
 			});
 		}
 		onFinish?.();
-	};
+	}, [hasWorkspace, queryClient, slug, threadId, stableThreadId, onFinish]);
 
-	// Create stable onError callback
-	const stableOnError = (error: Error) => {
-		onError?.(error);
-	};
+	const handleError = useCallback(
+		(error: Error) => {
+			onError?.(error);
+		},
+		[onError],
+	);
 
 	const {
 		messages,
@@ -186,9 +181,9 @@ export function useMentorChat({
 		// LLM-bound (~10-30/s). Adding 100 ms batches on top makes tokens stall in chunks of
 		// 1-3 deltas, breaking the "live typing" feel users expect from streaming. The webapp's
 		// markdown renderer is cheap enough to handle every delta without throttling.
-		transport: stableTransport,
-		onFinish: stableOnFinish,
-		onError: stableOnError,
+		transport,
+		onFinish: handleFinish,
+		onError: handleError,
 		// The Pi mentor only streams text/reasoning parts today. If/when typed
 		// data parts return (e.g. token usage, custom UI events), wire them here.
 	});

@@ -31,7 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Integration coverage for {@link MentorTurnPersistence}. Validates the REQUIRES_NEW
@@ -70,7 +70,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
      * is only registered when {@code hephaestus.sandbox.enabled=true} (Docker required). Provide
      * a mock so the integration context loads — this test never touches the sandbox boundary.
      */
-    @MockBean
+    @MockitoBean
     @SuppressWarnings("unused")
     private InteractiveSandboxService interactiveSandboxService;
 
@@ -297,7 +297,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         );
         UIMessageChunk.Finish finish = new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, finishMeta);
 
-        persistence.finalise(cookie, state, finish, null);
+        persistence.finalise(cookie, state, finish);
 
         ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
         JsonNode meta = assistant.getMetadata();

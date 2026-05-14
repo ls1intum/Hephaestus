@@ -143,7 +143,7 @@ public class MentorTurnPersistence {
     private Double computeFinalCostUsd(TranslatorState state) {
         Double piCost = extractPiCostUsd(state.observedUsage());
         if (piCost != null) return piCost;
-        UsageBreakdown breakdown = extractUsageFromState(state, /* rawAgentEnd */ null);
+        UsageBreakdown breakdown = extractUsageFromState(state);
         if (breakdown.model() == null || (breakdown.inputTokens() <= 0 && breakdown.outputTokens() <= 0)) {
             return null;
         }
@@ -160,12 +160,7 @@ public class MentorTurnPersistence {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void finalise(
-        TurnPersistenceCookie cookie,
-        TranslatorState state,
-        UIMessageChunk.Finish finish,
-        @Nullable JsonNode rawAgentEnd
-    ) {
+    public void finalise(TurnPersistenceCookie cookie, TranslatorState state, UIMessageChunk.Finish finish) {
         ChatMessage assistant = chatMessageRepository
             .findById(cookie.assistantMessageId())
             .orElseThrow(() -> new EntityNotFoundException("ChatMessage", cookie.assistantMessageId().toString()));
@@ -175,11 +170,9 @@ public class MentorTurnPersistence {
         if (finish.finishReason() != null) {
             meta.put("finishReason", finish.finishReason().wire());
         }
-        // Usage + model come from TranslatorState. The translator accumulates from
-        // message_update.partial / message_end / agent_end.messages[] — whichever lands. Pi's
-        // `agent_end` event does NOT carry top-level usage or model fields (verified against
-        // pi-coding-agent/dist/core/extensions/types.d.ts AgentEndEvent: {type, messages[]}).
-        UsageBreakdown usage = extractUsageFromState(state, rawAgentEnd);
+        // Usage + model come from TranslatorState — the translator accumulates from
+        // message_update.partial / message_end / agent_end.messages[].
+        UsageBreakdown usage = extractUsageFromState(state);
         meta.put("inputTokens", usage.inputTokens());
         meta.put("outputTokens", usage.outputTokens());
         meta.put("cacheReadTokens", usage.cacheReadTokens());
@@ -261,43 +254,24 @@ public class MentorTurnPersistence {
 
     /**
      * Pull tokens + model from the translator's accumulated usage snapshot. Pi's
-     * {@code AssistantMessage.usage} is canonically camelCase ({@code input}, {@code output},
-     * {@code cacheRead}, {@code cacheWrite}) per pi-ai dist/types.d.ts:124-137. We also accept
-     * snake-case keys so synthetic events from the runner's protocol-only stub still pass through.
-     * {@code rawAgentEnd} is kept as a back-stop in case a future Pi minor version starts
-     * inlining usage on agent_end — today it carries only {@code messages[]}.
+     * {@code AssistantMessage.usage} is canonical camelCase per pi-ai types.ts (Usage).
      */
-    private static UsageBreakdown extractUsageFromState(TranslatorState state, @Nullable JsonNode rawAgentEnd) {
+    private static UsageBreakdown extractUsageFromState(TranslatorState state) {
         String model = state.observedModel();
         JsonNode usage = state.observedUsage();
-        if (usage != null) {
-            long input = readLong(usage, "input", "input_tokens", "inputTokens");
-            long output = readLong(usage, "output", "output_tokens", "outputTokens");
-            long cacheRead = readLong(usage, "cacheRead", "cache_read_tokens", "cacheReadTokens");
-            long cacheWrite = readLong(usage, "cacheWrite", "cache_write_tokens", "cacheWriteTokens");
-            return new UsageBreakdown(model, input, output, cacheRead, cacheWrite);
-        }
-        if (rawAgentEnd != null && rawAgentEnd.path("usage").isObject()) {
-            JsonNode fallback = rawAgentEnd.path("usage");
-            return new UsageBreakdown(
-                model,
-                readLong(fallback, "input", "input_tokens", "inputTokens"),
-                readLong(fallback, "output", "output_tokens", "outputTokens"),
-                readLong(fallback, "cacheRead", "cache_read_tokens", "cacheReadTokens"),
-                readLong(fallback, "cacheWrite", "cache_write_tokens", "cacheWriteTokens")
-            );
-        }
-        return new UsageBreakdown(model, 0, 0, 0, 0);
+        if (usage == null) return new UsageBreakdown(model, 0, 0, 0, 0);
+        return new UsageBreakdown(
+            model,
+            readLong(usage, "input"),
+            readLong(usage, "output"),
+            readLong(usage, "cacheRead"),
+            readLong(usage, "cacheWrite")
+        );
     }
 
-    private static long readLong(JsonNode node, String... fields) {
-        for (String f : fields) {
-            JsonNode v = node.path(f);
-            if (v.isIntegralNumber() || v.isFloatingPointNumber()) {
-                return v.asLong();
-            }
-        }
-        return 0L;
+    private static long readLong(JsonNode node, String field) {
+        JsonNode v = node.path(field);
+        return v.isIntegralNumber() || v.isFloatingPointNumber() ? v.asLong() : 0L;
     }
 
     /**

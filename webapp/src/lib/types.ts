@@ -28,11 +28,10 @@ export interface UsageMetadata {
  * Message metadata attached to mentor messages. The Java side ships this on every {@code finish}
  * chunk via {@code UIMessageChunk.FinishMetadata}; both sides must stay in lock-step. The
  * persistence layer also writes these fields to {@code chat_message.metadata} JSONB so the
- * GET-thread endpoint returns the same shape.
+ * GET-thread endpoint returns the same shape. `createdAt` is NOT here — it's a top-level
+ * field on the persisted message row (see {@code ChatMessageDTO.createdAt} on the Java side).
  */
 export interface MessageMetadata {
-	/** ISO-8601 timestamp the server assigned to this message row. */
-	createdAt?: string;
 	/** LLM model id, e.g. "openai/gpt-oss-120b". */
 	model?: string;
 	/** Token usage breakdown. */

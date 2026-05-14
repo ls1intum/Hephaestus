@@ -311,10 +311,6 @@ public final class MentorRunnerClient implements AutoCloseable {
         }
     }
 
-    int pendingCount() {
-        return pending.size();
-    }
-
     /** Server-callback request from the runner. */
     public record FetchContextRequest(UUID threadId, String path) {}
 

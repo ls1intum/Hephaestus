@@ -134,11 +134,7 @@ function sendEvent(threadId, event) {
 
 //
 // Strategy: hold ONE AgentSessionRuntime. Switch sessions per thread via `runtime.switchSession`
-// (re-subscribing on each switch per SDK docs). Per-thread state:
-//   - sessionPath: the JSONL file on tmpfs
-//   - inFlight: turn lock for concurrency guards
-//   - watchdogTimers: { soft, hard } for the 120s + 30s budget
-//   - pendingFetchContexts: in-flight fetch_context promises keyed by runner-side id
+// (re-subscribing on each switch per SDK docs).
 
 const threads = new Map(); // threadId → ThreadState
 
@@ -147,9 +143,8 @@ class ThreadState {
         this.threadId = threadId;
         this.sessionPath = sessionPath;
         this.inFlight = false;
-        this.watchdogTimers = { soft: null, hard: null };
-        // Pending fetch_context callbacks. Keyed by runner-generated request id.
-        this.pendingFetchContexts = new Map(); // callbackId → {resolve, timer}
+        this.watchdogTimer = null;
+        this.pendingFetchContexts = new Map(); // callbackId → {resolve, reject, timer}
         this.unsubscribe = null;
     }
 }
@@ -274,7 +269,7 @@ function defineFetchContextTool() {
                 throw new Error(`fetch_context: thread state lost for ${activeThreadId}`);
             }
             const callbackId = `fc-${randomUUID()}`;
-            const { promise, resolve, reject } = createPromiseWithResolvers();
+            const { promise, resolve, reject } = Promise.withResolvers();
             const timer = setTimeout(() => {
                 if (state.pendingFetchContexts.delete(callbackId)) {
                     log(`fetch_context timed out: thread=${activeThreadId} path=${path} id=${callbackId}`);
@@ -344,22 +339,11 @@ function flattenPartsToText(parts) {
     return out.join("\n");
 }
 
-function createPromiseWithResolvers() {
-    // Node 22 has Promise.withResolvers; we fall back to a manual closure for portability.
-    if (typeof Promise.withResolvers === "function") return Promise.withResolvers();
-    let resolve, reject;
-    const promise = new Promise((res, rej) => {
-        resolve = res;
-        reject = rej;
-    });
-    return { promise, resolve, reject };
-}
-
 async function handleHello(id /*, params */) {
-    sendResult(id, {
-        protocolVersion: PROTOCOL_VERSION,
-        capabilities: ["mentor", "fetch_context", "link_finding"],
-    });
+    // Java validates only `protocolVersion` (MentorChatService#verifyProtocol); the runner
+    // image pins Node ≥22 (see docker/agents/pi/Dockerfile), so callers can rely on
+    // Promise.withResolvers natively — no polyfill or capability advertisement needed.
+    sendResult(id, { protocolVersion: PROTOCOL_VERSION });
 }
 
 async function handleOpenThread(id, params) {
@@ -587,15 +571,9 @@ async function handleCloseThread(id, params) {
 
 async function handleShutdown(id) {
     sendResult(id, { shuttingDown: true });
-    // Drain pending fetch_context promises across every thread so Pi sessions don't dangle
-    // on disposed callbacks (they'd time out at the 10s ceiling anyway, but rejecting now is
-    // cleaner + lets Pi flush any partial state). Then tear down sessions in parallel — we no
-    // longer care about ordering since the process is about to exit.
-    const teardowns = [];
-    for (const state of threads.values()) {
-        teardowns.push(Promise.resolve().then(() => cleanupThread(state)));
-    }
-    await Promise.allSettled(teardowns);
+    // Reject pending fetch_context callbacks (Pi flushes a clean is-error tool result) and
+    // tear down sessions. cleanupThread is sync, so a plain loop is enough.
+    for (const state of threads.values()) cleanupThread(state);
     threads.clear();
     activeThreadId = null;
     try {
@@ -603,10 +581,9 @@ async function handleShutdown(id) {
     } catch (e) {
         log(`runtime.dispose during shutdown failed: ${e?.message ?? e}`);
     }
-    // Drain stdout. `process.stdout.write('', cb)` resolves once the previously-queued frames
-    // (including the result above) have been flushed to the kernel — required because Node
-    // buffers stdout when it's a pipe (which it is when spawned by Java's ProcessBuilder).
-    // Without this drain, `process.exit(0)` truncates the final result frame on a fast exit.
+    // Node buffers stdout when it's a pipe (always under Java's ProcessBuilder); the empty
+    // write callback fires after the queued result frame reaches the kernel, so process.exit
+    // doesn't truncate it.
     process.stdout.write("", () => {
         log("shutdown requested — exiting");
         process.exit(0);
@@ -670,73 +647,49 @@ function handleFetchContextResponse(frame) {
     log(`fetch_context response had no matching pending callback: id=${callbackId}`);
 }
 
-//
-// 120 s soft → log + emit warning event so Java can surface to the user.
-// 150 s hard → dispose the session and rebind a fresh one. Container survives; only this
-// thread's session state is reset. Java sees a `turn_watchdog_fired` event followed by a
-// synthetic `agent_end` (we clear inFlight so the next prompt is accepted).
-
+// Single watchdog: fires (TURN_BUDGET_MS + TURN_GRACE_MS) after the turn starts. The wider
+// budget covers the worst-case Pi turn; the grace allows Pi to settle if it's close to
+// finishing on its own. On fire we dispose the session, rebind, and surface a synthetic
+// agent_end so Java releases its lock. Java sees `turn_watchdog_fired` for diagnostics.
 function startTurnWatchdog(state) {
     clearTurnWatchdog(state);
-    state.watchdogTimers.soft = setTimeout(() => {
-        log(`watchdog soft timeout (${TURN_BUDGET_MS}ms): thread=${state.threadId}`);
-        sendEvent(state.threadId, {
-            type: "turn_watchdog_warning",
-            budgetMs: TURN_BUDGET_MS,
-            graceMs: TURN_GRACE_MS,
-        });
-        state.watchdogTimers.hard = setTimeout(async () => {
-            log(`watchdog hard timeout: rebuilding session for thread=${state.threadId}`);
-            sendEvent(state.threadId, { type: "turn_watchdog_fired", threadId: state.threadId });
-            try {
-                // 0) Reject every still-pending fetch_context promise BEFORE we throw away the
-                //    session — otherwise the new session could echo a stale callback id from a
-                //    rebound thread (no UUID collision in practice, but the timeouts would leak
-                //    until their 10s ceiling fires, and Pi would record phantom tool-call results).
-                for (const [cbId, pending] of state.pendingFetchContexts) {
-                    clearTimeout(pending.timer);
-                    pending.reject(new Error("fetch_context: turn aborted by watchdog"));
-                    state.pendingFetchContexts.delete(cbId);
-                }
-                // 1) Abort first (graceful) — gives Pi a chance to flush partial state and
-                //    surface a real stopReason. Soft-fail: we proceed even if abort throws.
-                await runtime?.session?.abort().catch((e) => log(`abort during watchdog failed: ${e.message ?? e}`));
-                // 2) Tear down the current subscription so we don't double-dispatch events
-                //    against the soon-to-be-replaced session object.
-                if (state.unsubscribe) {
-                    try { state.unsubscribe(); } catch { /* ignore */ }
-                    state.unsubscribe = null;
-                }
-                // 3) Rebind to a fresh AgentSession on the same JSONL file. switchSession does
-                //    a teardown + recreate via the runtime factory (verified against
-                //    pi-coding-agent/dist/core/agent-session-runtime.d.ts switchSession),
-                //    invalidating any captured extension ctx. SDK docs explicitly state
-                //    listeners are session-scoped — we re-subscribe in (4).
-                if (runtime) {
-                    try {
-                        await runtime.switchSession(state.sessionPath);
-                        // 4) Re-subscribe to the fresh session. activeThreadId is unchanged.
-                        state.unsubscribe = runtime.session.subscribe((event) => forwardEvent(state, event));
-                    } catch (e) {
-                        log(`watchdog rebind failed for thread=${state.threadId}: ${e.message ?? e}`);
-                        // Drop the binding entirely so the next prompt forces a full re-bind.
-                        if (activeThreadId === state.threadId) activeThreadId = null;
-                    }
-                }
-            } finally {
-                // Always surface an agent_end so Java releases its lock and finalises the row.
-                sendEvent(state.threadId, { type: "agent_end", messages: [] });
-                state.inFlight = false;
+    state.watchdogTimer = setTimeout(async () => {
+        log(`watchdog fired: rebuilding session for thread=${state.threadId}`);
+        sendEvent(state.threadId, { type: "turn_watchdog_fired", threadId: state.threadId });
+        try {
+            // Reject pending fetch_context callbacks BEFORE switchSession so the rebound
+            // session can't echo stale callback ids.
+            for (const [cbId, pending] of state.pendingFetchContexts) {
+                clearTimeout(pending.timer);
+                pending.reject(new Error("fetch_context: turn aborted by watchdog"));
+                state.pendingFetchContexts.delete(cbId);
             }
-        }, TURN_GRACE_MS);
-    }, TURN_BUDGET_MS);
+            await runtime?.session?.abort().catch((e) => log(`abort during watchdog failed: ${e.message ?? e}`));
+            if (state.unsubscribe) {
+                try { state.unsubscribe(); } catch { /* ignore */ }
+                state.unsubscribe = null;
+            }
+            // Rebind to a fresh AgentSession on the same JSONL file (switchSession teardown
+            // invalidates captured extension ctx; listeners are session-scoped per Pi SDK).
+            if (runtime) {
+                try {
+                    await runtime.switchSession(state.sessionPath);
+                    state.unsubscribe = runtime.session.subscribe((event) => forwardEvent(state, event));
+                } catch (e) {
+                    log(`watchdog rebind failed for thread=${state.threadId}: ${e.message ?? e}`);
+                    if (activeThreadId === state.threadId) activeThreadId = null;
+                }
+            }
+        } finally {
+            sendEvent(state.threadId, { type: "agent_end", messages: [] });
+            state.inFlight = false;
+        }
+    }, TURN_BUDGET_MS + TURN_GRACE_MS);
 }
 
 function clearTurnWatchdog(state) {
-    if (state.watchdogTimers.soft) clearTimeout(state.watchdogTimers.soft);
-    if (state.watchdogTimers.hard) clearTimeout(state.watchdogTimers.hard);
-    state.watchdogTimers.soft = null;
-    state.watchdogTimers.hard = null;
+    if (state.watchdogTimer) clearTimeout(state.watchdogTimer);
+    state.watchdogTimer = null;
 }
 
 function cleanupThread(state) {

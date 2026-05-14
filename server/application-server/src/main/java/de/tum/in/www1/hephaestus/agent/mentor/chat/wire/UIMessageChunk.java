@@ -7,7 +7,6 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Objects;
 import java.util.UUID;
 import org.springframework.lang.Nullable;
 
@@ -138,7 +137,7 @@ public sealed interface UIMessageChunk {
                 Integer cr = readInt(node, "cacheRead");
                 Integer cw = readInt(node, "cacheWrite");
                 Integer tt = readInt(node, "totalTokens");
-                if (Objects.equals(in, null) && out == null && cr == null && cw == null && tt == null) return null;
+                if (in == null && out == null && cr == null && cw == null && tt == null) return null;
                 return new Usage(in, out, cr, cw, tt);
             }
 

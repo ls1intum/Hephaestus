@@ -352,7 +352,7 @@ public class MentorChatService {
                     // discover it. augmentFinishWithCost is pure (no transaction).
                     UIMessageChunk.Finish augmented = persistence.augmentFinishWithCost(finish, state);
                     sendChunk(emitter, augmented, clientGone, lastSendNanos);
-                    persistence.finalise(cookie, state, augmented, piEvent);
+                    persistence.finalise(cookie, state, augmented);
                     turnComplete.complete(null);
                 } else if (chunk instanceof UIMessageChunk.Error err) {
                     sendChunk(emitter, chunk, clientGone, lastSendNanos);

@@ -42,9 +42,6 @@ const CONVERSATION_MESSAGES: ChatMessage[] = [
 				text: "I need help writing a poem for my daughter's birthday. She's turning 8 and loves unicorns and rainbows.",
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-2",
@@ -76,9 +73,6 @@ We celebrate another year!
 Happy 8th Birthday! 🦄🌈`,
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-3",
@@ -89,9 +83,6 @@ Happy 8th Birthday! 🦄🌈`,
 				text: "This is beautiful! Could you also create a simple birthday card message that I can write inside her card?",
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 	{
 		id: "msg-4",
@@ -119,9 +110,6 @@ Mom & Dad 💕
 P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨`,
 			},
 		],
-		metadata: {
-			createdAt: new Date().toISOString(),
-		},
 	},
 ];
 
