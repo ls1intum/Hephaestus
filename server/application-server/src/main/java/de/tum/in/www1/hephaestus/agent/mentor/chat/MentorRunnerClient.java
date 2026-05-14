@@ -50,6 +50,18 @@ public final class MentorRunnerClient implements AutoCloseable {
     private final Function<FetchContextRequest, JsonNode> fetchContextHandler;
     private final ScheduledExecutorService timeoutScheduler;
 
+    /**
+     * Thread this client is bound to. The underlying sandbox is shared by
+     * {@code (userId, workspaceId)} so multiple clients (one per concurrent thread of the
+     * same user-workspace) subscribe to the SAME frame stream. Without this filter, every
+     * client would see every thread's events — chat sessions would cross-talk into each
+     * other's browser tabs and translator state. {@code null} means "accept anything"
+     * (legacy tests that pre-date multi-session use this constructor; production always
+     * passes the thread id).
+     */
+    @Nullable
+    private final UUID boundThreadId;
+
     private final AtomicLong idGen = new AtomicLong();
     private final ConcurrentHashMap<Long, PendingCall> pending = new ConcurrentHashMap<>();
 
@@ -63,11 +75,23 @@ public final class MentorRunnerClient implements AutoCloseable {
         Function<FetchContextRequest, JsonNode> fetchContextHandler,
         ScheduledExecutorService timeoutScheduler
     ) {
+        this(sandbox, objectMapper, onEvent, fetchContextHandler, timeoutScheduler, null);
+    }
+
+    public MentorRunnerClient(
+        AttachedSandbox sandbox,
+        ObjectMapper objectMapper,
+        Consumer<JsonNode> onEvent,
+        Function<FetchContextRequest, JsonNode> fetchContextHandler,
+        ScheduledExecutorService timeoutScheduler,
+        @Nullable UUID boundThreadId
+    ) {
         this.sandbox = Objects.requireNonNull(sandbox, "sandbox");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
         this.onEvent = Objects.requireNonNull(onEvent, "onEvent");
         this.fetchContextHandler = Objects.requireNonNull(fetchContextHandler, "fetchContextHandler");
         this.timeoutScheduler = Objects.requireNonNull(timeoutScheduler, "timeoutScheduler");
+        this.boundThreadId = boundThreadId;
     }
 
     /** Subscribe to the underlying sandbox; safe to call once per client instance. */
@@ -251,6 +275,18 @@ public final class MentorRunnerClient implements AutoCloseable {
         if (params == null || !params.has("event")) {
             log.debug("Runner event frame missing params.event — ignoring");
             return;
+        }
+        // Per-thread fan-out: the sandbox is shared by (userId, workspaceId), so a second
+        // chat tab in the same workspace subscribes to the same frame stream. Drop any frame
+        // whose threadId doesn't match the one this client is bound to — without the filter,
+        // tab-A's translator sees tab-B's text deltas and ships them down tab-A's wire.
+        // Notification-type frames (`runner_ready`) ship with `threadId: null` and pass
+        // through here for ALL clients; the translator drops them by event-type.
+        if (boundThreadId != null && params.has("threadId") && !params.get("threadId").isNull()) {
+            String frameThreadId = params.get("threadId").asText();
+            if (!boundThreadId.toString().equals(frameThreadId)) {
+                return;
+            }
         }
         try {
             onEvent.accept(params.get("event"));

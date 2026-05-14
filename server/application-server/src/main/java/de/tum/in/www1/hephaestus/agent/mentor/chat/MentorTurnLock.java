@@ -101,4 +101,72 @@ public class MentorTurnLock {
         final ReentrantLock lock = new ReentrantLock();
         final AtomicInteger holders = new AtomicInteger();
     }
+
+    // ─── Sandbox-level FIFO serialisation lock ───────────────────────────────────────────
+    //
+    // The Pi runner subprocess is shared across all threads of a given (userId, workspaceId)
+    // pair (the sandbox registry's key). Pi's `AgentSessionRuntime` is single-session: when
+    // `runtime.switchSession(...)` fires for a NEW thread, the previous session's listeners
+    // are unsubscribed and any in-flight `session.prompt(...)` is orphaned — Java waits for
+    // an agent_end that never reaches the wire.
+    //
+    // To make multi-tab chat work without rearchitecting the runner, this second lock
+    // serialises the open_thread → replay_context → prompt → terminal-chunk window per
+    // sandbox key. Same-user-same-workspace turns are FIFO: tab A finishes (or errors) before
+    // tab B's runner exchange begins. Different users / different workspaces are unaffected.
+    // Same-user-different-thread BLOCKS (waiting) rather than 409s — a second-tab open is
+    // user-initiated and should succeed, just sequentially.
+
+    private final ConcurrentHashMap<SandboxKey, Entry> sandboxLocks = new ConcurrentHashMap<>();
+
+    /**
+     * Acquire the per-sandbox FIFO lock. Blocking — same-user-same-workspace turns serialise
+     * here. Returns a closeable handle the caller releases via try-with-resources. Reference-
+     * counted: when the last holder releases, the entry is removed from the map.
+     */
+    public SandboxLockHandle acquireSandboxLock(SandboxKey key) {
+        Entry entry = sandboxLocks.compute(key, (k, existing) -> {
+            Entry e = existing != null ? existing : new Entry();
+            e.holders.incrementAndGet();
+            return e;
+        });
+        entry.lock.lock();
+        return new SandboxLockHandle(key, entry);
+    }
+
+    private void releaseSandbox(SandboxKey key, Entry entry) {
+        entry.lock.unlock();
+        sandboxLocks.computeIfPresent(key, (k, current) -> {
+            if (current != entry) return current;
+            int after = current.holders.decrementAndGet();
+            return after <= 0 ? null : current;
+        });
+    }
+
+    int activeSandboxKeys() {
+        return sandboxLocks.size();
+    }
+
+    /** Composite key for the per-sandbox lock; mirrors {@code InteractiveSandboxRegistry.SessionKey}. */
+    public record SandboxKey(long workspaceId, long userId) {}
+
+    /** Try-with-resources handle for the per-sandbox lock. */
+    public final class SandboxLockHandle implements AutoCloseable {
+
+        private final SandboxKey key;
+        private final Entry entry;
+        private boolean released = false;
+
+        private SandboxLockHandle(SandboxKey key, Entry entry) {
+            this.key = key;
+            this.entry = entry;
+        }
+
+        @Override
+        public void close() {
+            if (released) return;
+            released = true;
+            releaseSandbox(key, entry);
+        }
+    }
 }

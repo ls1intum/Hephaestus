@@ -141,4 +141,58 @@ class MentorTurnLockTest extends BaseUnitTest {
         assertThat(second).contains("second");
         assertThat(lock.activeKeys()).isZero();
     }
+
+    // ─── Sandbox-level FIFO lock (multi-session) ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("Sandbox lock: same key blocks; different keys run concurrently")
+    void sandboxLock_sameKeySerialises_differentKeysParallel() throws Exception {
+        MentorTurnLock lock = new MentorTurnLock();
+        MentorTurnLock.SandboxKey shared = new MentorTurnLock.SandboxKey(1L, 100L);
+        MentorTurnLock.SandboxKey isolated = new MentorTurnLock.SandboxKey(1L, 200L);
+
+        ExecutorService pool = Executors.newFixedThreadPool(3);
+        CountDownLatch firstInside = new CountDownLatch(1);
+        CountDownLatch firstMayLeave = new CountDownLatch(1);
+        AtomicInteger insideShared = new AtomicInteger();
+        AtomicInteger maxConcurrentShared = new AtomicInteger();
+        try {
+            // Two threads compete for the same SandboxKey — must serialise.
+            for (int i = 0; i < 2; i++) {
+                pool.submit(() -> {
+                    try (var ignored = lock.acquireSandboxLock(shared)) {
+                        int now = insideShared.incrementAndGet();
+                        maxConcurrentShared.accumulateAndGet(now, Math::max);
+                        if (firstInside.getCount() > 0) {
+                            firstInside.countDown();
+                            firstMayLeave.await(5, TimeUnit.SECONDS);
+                        } else {
+                            // Second arrival — verified it had to wait for the first to release.
+                            assertThat(insideShared.get()).isEqualTo(1);
+                        }
+                        insideShared.decrementAndGet();
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+            }
+            // A third thread on a DIFFERENT SandboxKey must not be blocked by the shared lock.
+            CountDownLatch isolatedRan = new CountDownLatch(1);
+            pool.submit(() -> {
+                try (var ignored = lock.acquireSandboxLock(isolated)) {
+                    isolatedRan.countDown();
+                }
+            });
+
+            assertThat(firstInside.await(5, TimeUnit.SECONDS)).isTrue();
+            // Different-key thread completes while same-key thread holds.
+            assertThat(isolatedRan.await(2, TimeUnit.SECONDS)).as("different-key thread must run in parallel").isTrue();
+            firstMayLeave.countDown();
+        } finally {
+            pool.shutdown();
+            pool.awaitTermination(5, TimeUnit.SECONDS);
+        }
+        assertThat(maxConcurrentShared.get()).as("same-key max concurrent").isEqualTo(1);
+        assertThat(lock.activeSandboxKeys()).as("entries reaped").isZero();
+    }
 }

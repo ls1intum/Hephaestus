@@ -255,7 +255,11 @@ public class MentorChatService {
                 objectMapper,
                 event -> handleEvent(event, state, channel, cookie, turnComplete),
                 callback -> handleFetchContext(callback, aspectInputs),
-                runnerTimeoutScheduler.scheduler()
+                runnerTimeoutScheduler.scheduler(),
+                // Per-thread event filter: the sandbox is shared by (userId, workspaceId),
+                // so a second tab in the same workspace would otherwise see this tab's
+                // events. See MentorRunnerClient.handleEvent for the filter rule.
+                request.threadId()
             );
             clientHolder.set(client);
             client.start();
@@ -268,17 +272,29 @@ public class MentorChatService {
 
             JsonNode hello = client.hello().get(20, TimeUnit.SECONDS);
             verifyProtocol(hello);
-            client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
-            client.replayContext(request.threadId(), replay).get(10, TimeUnit.SECONDS);
-            client
-                .prompt(request.threadId(), request.userMessage())
-                .whenComplete((result, ex) -> {
-                    if (ex != null && !turnComplete.isDone()) {
-                        turnComplete.completeExceptionally(ex);
-                    }
-                });
 
-            turnComplete.get(MentorRunnerClient.DEFAULT_PROMPT_TIMEOUT.toMillis() + 30_000, TimeUnit.MILLISECONDS);
+            // Per-sandbox FIFO serialisation: Pi's AgentSessionRuntime is single-session.
+            // `runtime.switchSession(...)` (fired by every `open_thread`) unsubscribes the
+            // prior session — so if tab-B sends open_thread while tab-A is mid-prompt on the
+            // same (userId, workspaceId) sandbox, tab-A's in-flight LLM stream is orphaned.
+            // Serialise the open_thread → terminal-chunk window per sandbox to make tab-B
+            // wait for tab-A to finish. Different-user / different-workspace turns are
+            // unaffected (different SandboxKey). The per-thread lock above remains as the
+            // outer single-flight guard (concurrent SAME-thread attempts return 409).
+            MentorTurnLock.SandboxKey sandboxKey = new MentorTurnLock.SandboxKey(request.workspaceId(), user.getId());
+            try (var ignored = turnLock.acquireSandboxLock(sandboxKey)) {
+                client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
+                client.replayContext(request.threadId(), replay).get(10, TimeUnit.SECONDS);
+                client
+                    .prompt(request.threadId(), request.userMessage())
+                    .whenComplete((result, ex) -> {
+                        if (ex != null && !turnComplete.isDone()) {
+                            turnComplete.completeExceptionally(ex);
+                        }
+                    });
+
+                turnComplete.get(MentorRunnerClient.DEFAULT_PROMPT_TIMEOUT.toMillis() + 30_000, TimeUnit.MILLISECONDS);
+            }
             // Natural-finish path: Pi emitted `agent_end` → handleEvent sent the `finish` chunk
             // already. Close the wire with AI-SDK's `[DONE]` sentinel.
             channel.completeWithDone();
