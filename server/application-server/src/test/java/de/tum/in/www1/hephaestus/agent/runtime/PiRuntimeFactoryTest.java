@@ -145,12 +145,20 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class Environment {
 
         @Test
-        @DisplayName("AGENT_BUDGET_MS reflects timeout minus buffer")
-        void budgetSet() {
-            assertThat(factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).environment()).containsEntry(
-                "AGENT_BUDGET_MS",
-                "540000"
-            ); // (600 - 60) * 1000
+        @DisplayName("AGENT_BUDGET_MS stays strictly below the spec hard timeout (leaves grace)")
+        void budget_leavesGraceUnderSpecTimeout() {
+            // Brittle predecessor asserted the exact constant `540000` from `(600-60)*1000` —
+            // it would break on any buffer-constant tweak even when the architectural
+            // invariant (budget < hard timeout) still held. Now assert the invariant itself.
+            var spec = proxySpec(LlmProvider.AZURE_OPENAI, null);
+            String budget = factory.build(spec).environment().get("AGENT_BUDGET_MS");
+            assertThat(budget).as("AGENT_BUDGET_MS must be present").isNotNull();
+            long budgetMs = Long.parseLong(budget);
+            long hardTimeoutMs = (long) spec.timeoutSeconds() * 1_000L;
+            assertThat(budgetMs)
+                .as("Pi's self-watchdog must fire strictly before the SPI hard kill — leaves grace")
+                .isLessThan(hardTimeoutMs)
+                .isPositive();
         }
 
         @Test

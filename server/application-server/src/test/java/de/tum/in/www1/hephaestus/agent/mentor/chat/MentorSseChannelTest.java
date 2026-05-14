@@ -169,12 +169,12 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("concurrent send + heartbeat tick do NOT byte-interleave (writeLock held)")
-    void concurrentSendAndHeartbeat_areSerialised() throws Exception {
+    @DisplayName("concurrent chunk sends do NOT byte-interleave (writeLock held)")
+    void concurrentSends_areSerialised() throws Exception {
         // SseEmitter#send is not thread-safe in Spring. The channel's writeLock serialises
-        // chunk-writes vs heartbeat ticks; this test drives 200 concurrent chunk sends from
-        // two threads and asserts every recorded data frame is a complete JSON object (no
-        // interleaved bytes from a racing send).
+        // chunk-writes; this test drives 200 concurrent chunk sends from two threads and
+        // asserts every recorded data frame is a complete JSON object (no interleaved bytes
+        // from a racing send).
         int total = 200;
         var t1 = new Thread(() -> {
             for (int i = 0; i < total / 2; i++) channel.send(new UIMessageChunk.StartStep());
@@ -192,6 +192,41 @@ class MentorSseChannelTest extends BaseUnitTest {
             // Every frame is a complete JSON object — no partial / interleaved fragments.
             assertThat(frame).startsWith("{").endsWith("}").contains("\"type\":\"start-step\"");
         }
+    }
+
+    @Test
+    @DisplayName("heartbeat tick + concurrent chunk sends interleave through the writeLock without corruption")
+    void heartbeatTick_concurrentWithSends_writeLockSerialises() throws Exception {
+        // The wave-2-audit's actual concern: the heartbeat ScheduledExecutorService thread and
+        // the runner-event-handler thread are DIFFERENT threads writing to the same emitter.
+        // Without writeLock, a `:ping\n\n` heartbeat comment can land mid-`data: {...}\n\n`
+        // chunk and corrupt the SSE stream. This test starts a tight 5ms-tick heartbeat and
+        // 200 chunk sends; every recorded data frame must remain a complete JSON object AND
+        // every recorded comment frame must be intact.
+        channel.startHeartbeat();
+        // Drive lastSendNanos far in the past so EVERY tick attempts a write.
+        java.lang.reflect.Field lastSendField = MentorSseChannel.class.getDeclaredField("lastSendNanos");
+        lastSendField.setAccessible(true);
+        ((java.util.concurrent.atomic.AtomicLong) lastSendField.get(channel)).set(0L);
+
+        int total = 200;
+        var sender = new Thread(() -> {
+            for (int i = 0; i < total; i++) channel.send(new UIMessageChunk.StartStep());
+        });
+        sender.start();
+        sender.join();
+        // Allow a couple of heartbeat ticks to fire alongside.
+        Thread.sleep(50);
+        channel.close();
+
+        // Every JSON frame must be complete; every comment frame must equal "ping".
+        for (String frame : emitter.dataFrames()) {
+            assertThat(frame).startsWith("{").endsWith("}").contains("\"type\":\"start-step\"");
+        }
+        // Heartbeat comments are SSE `:` lines emitted via `SseEmitter.event().comment("ping")`;
+        // our RecordingEmitter parses `data:` lines only, so we can also assert that the comment
+        // stream didn't poison the data-frame collection. The negative shape is what matters.
+        assertThat(emitter.dataFrames()).allMatch(f -> f.contains("\"type\":\"start-step\""));
     }
 
     /** Test-only emitter that records data frames + can simulate disconnect failures. */

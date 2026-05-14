@@ -150,19 +150,10 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
         assertThat(actual).as("chunk %s", chunk).isEqualTo(expected);
     }
 
-    @Test
-    @DisplayName("data-* discriminators preserve kebab-case (NOT data<Pascal>)")
-    void dataChunkDiscriminatorSpelling() throws Exception {
-        // The AI SDK protocol pins the kebab-case spelling — a Jackson default name strategy
-        // change (e.g. SNAKE_CASE on a future bean override) would silently rename this to
-        // `dataMentorStatus` and break the webapp router. Pin both data-* variants explicitly.
-        UIMessageChunk status = UIMessageChunk.DataMentorStatus.of("ok", "ok");
-        UIMessageChunk finding = UIMessageChunk.DataFinding.of(UUID.randomUUID());
-        assertThat(MAPPER.readTree(MAPPER.writeValueAsString(status)).get("type").asText()).isEqualTo(
-            "data-mentor-status"
-        );
-        assertThat(MAPPER.readTree(MAPPER.writeValueAsString(finding)).get("type").asText()).isEqualTo("data-finding");
-    }
+    // dataChunkDiscriminatorSpelling deleted (wave-18 Test Theatre audit): the parameterised
+    // chunkFixtures test already pins the exact JSON for `data-mentor-status` and
+    // `data-finding` chunks. A Jackson SNAKE_CASE override would fail those fixture tests
+    // BEFORE reaching this one. Pure duplication.
 
     @Test
     @DisplayName("Every UIMessageChunk subtype is registered in @JsonSubTypes — silent polymorphism drift trap")

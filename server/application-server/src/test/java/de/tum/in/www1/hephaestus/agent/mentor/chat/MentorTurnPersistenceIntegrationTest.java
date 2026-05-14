@@ -77,13 +77,26 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private Workspace workspace;
     private User user;
 
+    /**
+     * Path to the consolidated migration. The {@link #migrationDeclaresInFlightUniqueIndex}
+     * test asserts the migration file IS the source of truth for the DDL this integration
+     * test exercises. If the migration changes the index name, predicate, or columns, that
+     * test fails — closing the gap where the previous test re-created the index manually and
+     * silently tolerated migration regressions.
+     */
+    private static final java.nio.file.Path MIGRATION_PATH = java.nio.file.Path.of(
+        "src/main/resources/db/changelog/1778756946278_changelog.xml"
+    );
+
     @BeforeEach
     void setUp() throws Exception {
         databaseTestUtils.cleanDatabase();
-        // The test profile uses JPA ddl-auto=create — Liquibase is disabled, so the unique
-        // partial index on chat_message(thread_id) WHERE status='in_flight' (created by the
-        // mentor-1071-in-flight-unique-index changeset) never lands. Create it here so the
-        // contract under test is real.
+        // The test profile uses JPA ddl-auto=create — Liquibase is disabled, so partial
+        // indexes / CHECK constraints (which JPA can't infer from @Entity) never land. We
+        // create the in-flight unique index here so the persistInFlight contract has the
+        // real partial-index constraint to fail against. The
+        // `migrationDeclaresInFlightUniqueIndex` test ensures THIS DDL stays in lockstep
+        // with the production migration changeset.
         try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
             stmt.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ux_chat_message_in_flight " +
@@ -389,5 +402,33 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         JsonNode meta = chatMessageRepository.findById(assistantId).orElseThrow().getMetadata();
         assertThat(meta.path("status").asText()).isEqualTo("interrupted");
         assertThat(meta.path("error").asText()).isEqualTo("server restart");
+    }
+
+    @Test
+    @DisplayName("migration: file declares the ux_chat_message_in_flight unique partial index this suite exercises")
+    void migrationDeclaresInFlightUniqueIndex() throws Exception {
+        // The test profile disables Liquibase, so this suite re-creates the in-flight partial
+        // index in @BeforeEach. That bypass is acceptable ONLY if the production migration
+        // changeset stays the source of truth — a future migration that renames the index,
+        // changes the predicate, or drops the changeset would otherwise silently sail past
+        // every integration test and break production. This guard fails first.
+        String migration = java.nio.file.Files.readString(MIGRATION_PATH);
+        assertThat(migration)
+            .as("migration must contain the in-flight unique-index changeset")
+            .contains("mentor-1071-in-flight-unique-index");
+        assertThat(migration)
+            .as("migration must declare the index name + predicate the integration tests assume")
+            .contains("ux_chat_message_in_flight")
+            .contains("CONCURRENTLY")
+            .contains("metadata ->> 'status'")
+            .contains("'in_flight'");
+        // @Version column is wired by `mentor-1071-add-version-column` — same lockstep
+        // guarantee: if the column is renamed / dropped, optimistic-locking tests still
+        // pass against JPA-generated DDL but production migration breaks.
+        assertThat(migration)
+            .as("migration must declare the @Version column for optimistic locking")
+            .contains("mentor-1071-add-version-column")
+            .contains("name=\"version\"")
+            .contains("type=\"BIGINT\"");
     }
 }

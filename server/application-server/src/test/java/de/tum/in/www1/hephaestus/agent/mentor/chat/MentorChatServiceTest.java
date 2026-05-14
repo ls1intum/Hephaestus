@@ -99,6 +99,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     private FakeSandbox sandbox;
     private MentorChatService service;
     private RecordingEmitter emitter;
+    private io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -119,6 +120,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         MentorChatExecutorConfig.MentorRunnerTimeoutScheduler schedulerBean =
             new MentorChatExecutorConfig.MentorRunnerTimeoutScheduler(scheduler);
 
+        meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
         service = new MentorChatService(
             userRepository,
             agentConfigRepository,
@@ -131,7 +133,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             mapper,
             turnExecutorBean,
             schedulerBean,
-            new MentorChatMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry())
+            new MentorChatMetrics(meterRegistry)
         );
 
         // Default happy-path collaborator wiring; individual tests override as needed.
@@ -214,6 +216,10 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(persistence, never()).interrupt(any(), any(), any());
         // Lock released — no leaked active keys.
         assertThat(turnLock.activeKeys()).isZero();
+        // Wave-17 R3: the production path through MentorChatService must bump the SUCCESS
+        // counter — without this assertion the metrics wiring is decoupled from real flow.
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
+        assertThat(meterRegistry.find("mentor.turn.duration").timer().count()).isEqualTo(1L);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -241,6 +247,35 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(persistence, never()).interrupt(any(), any(), any());
         // Lock released.
         assertThat(turnLock.activeKeys()).isZero();
+        // Disconnect on the EVENT-HANDLER thread (call #5 = mid-stream chunk send) is
+        // intentionally swallowed inside handleEvent; the runner keeps draining; the turn
+        // completes naturally as SUCCESS even though the wire was already gone. The abort
+        // hook fired (verified above). CLIENT_DISCONNECT outcome is reserved for the rare
+        // case where the orchestrator's *synchronous* sends fail before the runner attaches —
+        // tested separately below.
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("client disconnect on sync send: outcome=CLIENT_DISCONNECT (no runner activity)")
+    void runTurn_clientDisconnectOnSyncSend_recordsClientDisconnect() throws Exception {
+        // The orchestrator's two synchronous sends (Start, DataMentorStatus) happen BEFORE
+        // sandbox.attach. If either throws ClientDisconnectedException (e.g. the client
+        // already closed the socket between request acceptance and Tomcat dispatch), the
+        // catch sets outcome=CLIENT_DISCONNECT and the sandbox is never attached. This is
+        // the only path that records that outcome — without this test it would be
+        // dead-on-write.
+        emitter.disconnectAfterCalls = 1; // call #2 (DataMentorStatus) throws
+
+        runTurnSync();
+
+        try {
+            verify(interactiveSandboxService, never()).attach(any());
+        } catch (InteractiveSandboxException e) {
+            throw new AssertionError(e);
+        }
+        assertThat(turnLock.activeKeys()).isZero();
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.CLIENT_DISCONNECT);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -260,6 +295,8 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(persistence).interrupt(any(), any(), any(Throwable.class));
         verify(persistence, never()).finalise(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
+        // Wave-17 R3: poisoned is a distinct outcome from a generic error.
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.POISONED);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -286,6 +323,29 @@ class MentorChatServiceTest extends BaseUnitTest {
             throw new AssertionError(e);
         }
         assertThat(turnLock.activeKeys()).isZero();
+        // Wave-17 R3: in-flight conflict tagged distinctly so SLO panels separate "real failure"
+        // from "load-shed retry" — the DB unique-index path triggers IN_FLIGHT_CONFLICT.
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT);
+    }
+
+    /**
+     * Asserts exactly one increment on {@code mentor.turn.completed{outcome=<expected>}} and
+     * exactly one increment on {@code mentor.turn.started}. Keeps started/completed in lockstep
+     * — if a future refactor lands one without the other, dashboards drift and SLO ratios lie.
+     */
+    private void assertOutcomeRecorded(MentorChatMetrics.Outcome expected) {
+        assertThat(meterRegistry.find("mentor.turn.started").counter().count()).as("mentor.turn.started").isEqualTo(1d);
+        assertThat(meterRegistry.find("mentor.turn.completed").tag("outcome", expected.tag()).counter().count())
+            .as("mentor.turn.completed{outcome=%s}", expected.tag())
+            .isEqualTo(1d);
+        // No other outcome got bumped — proves the test asserts the RIGHT branch.
+        long otherOutcomes = java.util.Arrays.stream(MentorChatMetrics.Outcome.values())
+            .filter(o -> o != expected)
+            .mapToLong(o ->
+                Math.round(meterRegistry.find("mentor.turn.completed").tag("outcome", o.tag()).counter().count())
+            )
+            .sum();
+        assertThat(otherOutcomes).as("no other outcome counter bumped").isZero();
     }
 
     // ════════════════════════════════════════════════════════════════════════

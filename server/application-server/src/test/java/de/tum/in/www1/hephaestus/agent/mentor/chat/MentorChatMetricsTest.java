@@ -27,13 +27,10 @@ class MentorChatMetricsTest extends BaseUnitTest {
         metrics = new MentorChatMetrics(registry);
     }
 
-    @Test
-    @DisplayName("recordStarted increments mentor.turn.started")
-    void recordStartedIncrementsCounter() {
-        metrics.recordStarted();
-        metrics.recordStarted();
-        assertThat(registry.get("mentor.turn.started").counter().count()).isEqualTo(2d);
-    }
+    // recordStartedIncrementsCounter deleted (wave-18 Test Theatre audit): tested only the
+    // Counter is wired, which `everyOutcomeRoutesToPreRegisteredCounter` already covers in
+    // structure. Started/completed lockstep is now asserted IN-FLIGHT via
+    // MentorChatServiceTest.assertOutcomeRecorded — that's where the invariant matters.
 
     @Test
     @DisplayName("every Outcome value lands on a distinct tagged counter (no per-call rebuild)")
