@@ -254,22 +254,9 @@ public class MentorTurnPersistence {
         assistant.setMetadata(meta);
         chatMessageRepository.save(assistant);
 
-        // Persist the verbatim Pi SDK session JSONL captured by the runner's session_persisted
-        // event. Same REQUIRES_NEW transaction as the assistant-row status flip, so the blob and
-        // `chat_message.status` cannot diverge by more than one in-flight crash window. NULL
-        // session bytes (e.g. PROTOCOL_ONLY stub runs, mid-stream abort before agent_end, or an
-        // upstream SDK that never persists) skip the write — the previous turn's bytes stay
-        // authoritative rather than getting clobbered with garbage.
         byte[] sessionBytes = state.observedSessionJsonl();
         if (sessionBytes != null) {
-            int updated = chatThreadRepository.updateSessionJsonl(cookie.threadId(), sessionBytes);
-            if (updated != 1) {
-                log.warn(
-                    "updateSessionJsonl affected {} rows for threadId={} (expected 1) — session restore on cold restart may be incomplete",
-                    updated,
-                    cookie.threadId()
-                );
-            }
+            chatThreadRepository.updateSessionJsonl(cookie.threadId(), sessionBytes);
         }
     }
 

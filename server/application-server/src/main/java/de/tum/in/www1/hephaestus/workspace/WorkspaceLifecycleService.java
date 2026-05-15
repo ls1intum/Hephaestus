@@ -2,13 +2,10 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import static de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 
-import de.tum.in.www1.hephaestus.audit.DeletionAudit;
-import de.tum.in.www1.hephaestus.audit.DeletionAuditService;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
-import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamLabelFilterRepository;
@@ -42,8 +39,6 @@ public class WorkspaceLifecycleService {
     private final WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository;
     private final WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository;
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
-    private final ChatThreadRepository chatThreadRepository;
-    private final DeletionAuditService deletionAuditService;
 
     // SPI for cross-module cleanup during purge
     private final List<WorkspacePurgeContributor> purgeContributors;
@@ -58,8 +53,6 @@ public class WorkspaceLifecycleService {
         WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository,
         WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
-        ChatThreadRepository chatThreadRepository,
-        DeletionAuditService deletionAuditService,
         List<WorkspacePurgeContributor> purgeContributors
     ) {
         this.natsProperties = natsProperties;
@@ -71,8 +64,6 @@ public class WorkspaceLifecycleService {
         this.workspaceTeamLabelFilterRepository = workspaceTeamLabelFilterRepository;
         this.workspaceTeamRepositorySettingsRepository = workspaceTeamRepositorySettingsRepository;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
-        this.chatThreadRepository = chatThreadRepository;
-        this.deletionAuditService = deletionAuditService;
         this.purgeContributors = purgeContributors;
     }
 
@@ -237,24 +228,6 @@ public class WorkspaceLifecycleService {
         // re-persisting stale values.
         workspace.setGitlabGroupId(null);
         workspace.setGitlabWebhookId(null);
-
-        // Step 7d: Delete mentor chat threads + cascade (chat_message, parts, votes,
-        // session_jsonl BYTEA). Workspace purge is soft (status=PURGED) so the FK
-        // `fk_chat_thread_workspace ON DELETE CASCADE` doesn't fire automatically — we must
-        // issue the bulk delete here so conversation content is actually erased. GDPR Art. 17
-        // requires the data to be inaccessible, not merely orphaned.
-        long threadCount = chatThreadRepository.countByWorkspaceId(workspaceId);
-        if (threadCount > 0) {
-            deletionAuditService.record(
-                DeletionAudit.EntityType.WORKSPACE,
-                String.valueOf(workspaceId),
-                workspaceId,
-                /* actorUserId = */ null,
-                "workspace-purge:" + threadCount + "-chat-threads"
-            );
-            int deleted = chatThreadRepository.deleteByWorkspaceId(workspaceId);
-            log.debug("Deleted chat threads on workspace purge: workspaceId={}, count={}", workspaceId, deleted);
-        }
 
         // Step 8: Clear sync timestamps for clean slate on potential reactivation
         // This ensures that if the workspace is ever reactivated, sync will fetch fresh data

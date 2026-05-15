@@ -25,43 +25,21 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
      */
     Optional<ChatThread> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
-    /**
-     * Bypass-the-entity read of {@code session_jsonl}. Used by the cold-container restore
-     * path in {@code MentorChatService} so we don't materialise the full entity (with its
-     * lazy collections) just to retrieve one column. Returns {@code Optional.empty()} when
-     * either the thread doesn't exist OR the column is NULL (fresh thread, no turns yet).
-     */
+    /** Projection: avoids materialising the full entity to fetch the JSONL blob. Empty when missing or NULL. */
     @Query("SELECT t.sessionJsonl FROM ChatThread t WHERE t.id = :threadId")
     Optional<byte[]> findSessionJsonl(@Param("threadId") UUID threadId);
 
-    /**
-     * Bypass-the-entity write of {@code session_jsonl}. Used by
-     * {@code MentorTurnPersistence.finalise} so the blob update lives in the same
-     * REQUIRES_NEW transaction as the assistant row's status flip without round-tripping
-     * the whole {@link ChatThread} entity (which would also dirty-check unrelated columns).
-     *
-     * <p>Returns the affected row count so callers can detect a missing thread (the result
-     * should always be 1 in production paths since the thread is guaranteed to exist by
-     * {@code persistInFlight} earlier in the same logical turn).
-     */
+    /** Projection write: avoids dirty-checking the entity. {@code persistInFlight} guarantees the row exists. */
     @Modifying
     @Transactional
     @Query("UPDATE ChatThread t SET t.sessionJsonl = :bytes WHERE t.id = :threadId")
     int updateSessionJsonl(@Param("threadId") UUID threadId, @Param("bytes") byte[] bytes);
 
     /**
-     * Count threads for a workspace — used by the workspace purge path to size the audit log
-     * before issuing the bulk delete.
-     */
-    long countByWorkspaceId(Long workspaceId);
-
-    /**
      * Bulk-delete every thread for a workspace. Cascades to {@code chat_message} →
-     * {@code chat_message_part} / {@code chat_message_vote} via the FK ON DELETE CASCADE
-     * defined in {@code 1778756946278_changelog.xml}. Required by {@code purgeWorkspace}
-     * because soft-purging (status=PURGED) the workspace row doesn't trigger the DDL cascade,
-     * leaving chat conversations indefinitely accessible to the workspace's prior users —
-     * a GDPR Art. 17 erasure gap.
+     * {@code chat_message_part} / {@code chat_message_vote} via existing FKs. Used by
+     * {@link de.tum.in.www1.hephaestus.mentor.MentorWorkspacePurgeContributor} on soft purge,
+     * which leaves the workspace row in place (so the workspace-level cascade can't fire).
      */
     @Modifying
     @Transactional

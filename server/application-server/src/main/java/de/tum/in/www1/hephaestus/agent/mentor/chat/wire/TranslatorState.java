@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.tum.in.www1.hephaestus.mentor.ChatThread;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -104,16 +105,7 @@ public final class TranslatorState {
     @Nullable
     private String observedStopReason;
 
-    /**
-     * Verbatim Pi SDK session JSONL bytes captured from the runner's {@code session_persisted}
-     * event (emitted on {@code agent_end} BEFORE the agent_end frame so this field is populated
-     * by the time {@code MentorTurnPersistence.finalise} runs). Persisted into
-     * {@code chat_thread.session_jsonl} BYTEA so a cold container can restore byte-identical
-     * state on the user's next message — critical for provider prompt-cache hits (Anthropic +
-     * OpenAI require byte-identical prefix), tool_use/tool_result pairing (Anthropic 400s on
-     * orphaned tool_use), and thinking blocks (extended-thinking-2025-05-14 requires verbatim
-     * thinking preservation across turns).
-     */
+    /** Verbatim Pi SDK session JSONL captured from {@code session_persisted}; see {@link ChatThread#getSessionJsonl}. */
     @Nullable
     private byte[] observedSessionJsonl;
 
@@ -336,12 +328,6 @@ public final class TranslatorState {
         return observedStopReason;
     }
 
-    /**
-     * Capture the verbatim Pi SDK session JSONL bytes the runner shipped via
-     * {@code session_persisted} on agent_end. The runner emits this event BEFORE the agent_end
-     * frame so the bytes are available when {@code MentorTurnPersistence.finalise} runs.
-     * Defensive-copies to defeat callers that mutate the array post-set.
-     */
     public synchronized void observeSessionJsonl(@Nullable byte[] bytes) {
         if (bytes == null || bytes.length == 0) {
             return;
@@ -349,17 +335,8 @@ public final class TranslatorState {
         this.observedSessionJsonl = bytes.clone();
     }
 
-    /**
-     * Return the captured session JSONL bytes, or {@code null} if the runner never emitted
-     * {@code session_persisted} (e.g. protocol-only test stub, mid-stream abort before
-     * agent_end, or the SDK never persisted the session). Callers must tolerate null —
-     * persistence skips the blob write rather than clobbering a prior turn's bytes.
-     */
     @Nullable
     public synchronized byte[] observedSessionJsonl() {
-        // No defensive copy on read: the byte[] is treated as immutable by all production
-        // callers (passed straight into ChatThreadRepository.updateSessionJsonl). Cloning here
-        // would double memory for the largest field in the state on every read.
         return observedSessionJsonl;
     }
 }

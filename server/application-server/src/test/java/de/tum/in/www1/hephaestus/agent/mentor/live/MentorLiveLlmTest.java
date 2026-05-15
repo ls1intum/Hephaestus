@@ -17,14 +17,18 @@ import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.in.www1.hephaestus.testconfig.LiveLlmTest;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -252,18 +256,12 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("multi-turn (warm runner): turn 2 recalls a fact from turn 1 — proves agent._state.messages threading")
+    @DisplayName("multi-turn (warm runner): turn 2 recalls a fact from turn 1")
     void multiTurn_secondTurnRecallsFirst() throws Exception {
-        // Regression for the loop-4 bug "Conversation history not working". When a single
-        // long-lived runner processes turn 1 then turn 2 on the same thread, the Pi SDK's
-        // session-bound agent appends both the user prompt and the assistant response to
-        // agent._state.messages on each `message_end`. The NEXT turn's createContextSnapshot
-        // must therefore see the full prior history without any explicit replay.
-        //
-        // If anything regresses (rebind drops the agent reference, switchSession resets
-        // state, dispatch races clobber the array), the second turn's LLM call sees ONLY
-        // the new prompt and cannot answer a recall question — the symptom shown in the
-        // user's broken-multi-turn screenshot.
+        // Pin Pi SDK's session-bound agent._state.messages threading: a single long-lived
+        // runner must keep both turns' messages in its in-memory state across message_end
+        // events. Recall failure means rebind/switchSession or dispatch races dropped the
+        // history.
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();
         workspaceDir = stageWorkspace(creds);
@@ -359,201 +357,110 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("cold-restart via session JSONL: post-turn-A bytes captured, runner-B restores and recalls")
-    void coldRestart_sessionJsonlPreservesHistoryAndAllowsRecall() throws Exception {
-        // The production cold-restart contract:
-        //   1. Runner A persists session JSONL on every `agent_end` (`session_persisted` event).
-        //   2. Java writes those bytes into `chat_thread.session_jsonl` BYTEA.
-        //   3. On the next turn, Java loads the bytes back and injects them at
-        //      `.sessions/<threadId>.jsonl` BEFORE spawning runner B.
-        //   4. Runner B's `bindThread` → `switchSession` reads the file off disk; the Pi SDK's
-        //      SessionManager rehydrates `agent._state.messages` byte-identically — no replay
-        //      RPC needed, and prompt-caching prefixes survive verbatim.
-        //
-        // This test exercises that loop against a real LLM. We capture the JSONL after turn 1
-        // (via the `session_persisted` event Pi emits on agent_end), tear runner A down, stage
-        // a SECOND workspace with the bytes pre-seeded, then ask runner B a recall question
-        // that's only answerable if the Pi SDK rehydrated the prior turn from disk.
+    @DisplayName("cold-restart preserves session JSONL: runner-B recalls a fact planted on runner-A")
+    void coldRestart_preservesHistoryViaSessionJsonl() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();
 
-        // ─── Runner A: plant a fact, capture session JSONL on agent_end ────────────────
+        byte[] bytesA = captureSessionBytesAfterTurn(
+            creds,
+            threadId,
+            "Remember: my favorite framework is Spring Boot. Reply with exactly: noted."
+        );
+        assertThat(bytesA).as("runner emitted session_persisted before agent_end").isNotNull();
+
+        respawnWithSession(creds, threadId, bytesA);
+        String followUp = runTurnAndCollect(
+            new RunnerDriver(sandbox),
+            threadId,
+            "What framework am I using? Reply with only the framework name."
+        );
+        assertThat(followUp.toLowerCase())
+            .as("Pi SDK rehydrated agent state from injected .sessions/<id>.jsonl")
+            .contains("spring");
+    }
+
+    @Test
+    @DisplayName("session JSONL is byte-identical across cold restarts (prompt-cache prefix preserved)")
+    void coldRestart_sessionJsonlIsByteIdentical() throws Exception {
+        LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
+        UUID threadId = UUID.randomUUID();
+
+        byte[] bytesA = captureSessionBytesAfterTurn(creds, threadId, "Reply with exactly: alpha.");
+        assertThat(bytesA).isNotNull();
+
+        Path sessionFile = respawnWithSession(creds, threadId, bytesA);
+        runTurnAndCollect(new RunnerDriver(sandbox), threadId, "Reply with exactly: beta.");
+
+        byte[] bytesAfterB = Files.readAllBytes(sessionFile);
+        assertThat(bytesAfterB.length).isGreaterThanOrEqualTo(bytesA.length);
+        assertThat(Arrays.copyOfRange(bytesAfterB, 0, bytesA.length))
+            .as("Pi SDK must append, not rewrite — prompt-cache prefix must survive")
+            .isEqualTo(bytesA);
+    }
+
+    /**
+     * Spawn a runner, run one turn, return the bytes the runner shipped via {@code session_persisted}.
+     * Tears the runner down before returning so the caller can stage a fresh container.
+     */
+    private byte[] captureSessionBytesAfterTurn(LiveLlmCredentials creds, UUID threadId, String prompt)
+        throws Exception {
         workspaceDir = stageWorkspace(creds);
         sandbox = spawnRunner(creds, workspaceDir);
+        var driver = new RunnerDriver(sandbox);
+        driver.expectRunnerReady();
+        driver.helloOk();
+        driver.openThread(threadId);
 
-        var driverA = new RunnerDriver(sandbox);
-        driverA.expectRunnerReady();
-        driverA.helloOk();
-        driverA.openThread(threadId);
-
-        // Capture the session_persisted event the runner ships before each agent_end. This
-        // is the SAME mechanism Java uses in production (PiEventToUiChunkTranslator routes
-        // session_persisted → TranslatorState.observedSessionJsonl).
-        var sessionBytesA = new java.util.concurrent.atomic.AtomicReference<byte[]>();
+        AtomicReference<byte[]> captured = new AtomicReference<>();
         sandbox.subscribe(frame -> {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             if ("session_persisted".equals(event.path("type").asText())) {
                 String jsonl = event.path("jsonl").asText("");
-                if (!jsonl.isEmpty()) {
-                    sessionBytesA.set(jsonl.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                }
+                if (!jsonl.isEmpty()) captured.set(jsonl.getBytes(StandardCharsets.UTF_8));
             }
         });
-
-        String t1 = runTurnAndCollect(
-            driverA,
-            threadId,
-            "Remember: my favorite framework is Spring Boot. Reply with exactly: noted."
-        );
-        System.out.printf("[cold-jsonl] runner-A turn 1 (%d chars): %s%n", t1.length(), trim(t1, 100));
-        assertThat(t1.trim()).as("runner-A turn 1 produced a response").isNotEmpty();
-        assertThat(sessionBytesA.get())
-            .as(
-                "runner-A must emit session_persisted before agent_end so Java can capture the " +
-                    "verbatim JSONL bytes. If null, the runner regressed (pi-mentor-runner.mjs#forwardEvent)."
-            )
-            .isNotNull();
-        System.out.printf("[cold-jsonl] captured %d bytes of session JSONL%n", sessionBytesA.get().length);
-
-        // Close runner A. The on-disk session file dies with it (container tmpfs in prod;
-        // just a tmp directory here). The bytes-we-captured are the ONLY surviving artifact —
-        // exactly like the production BYTEA blob in Postgres.
+        runTurnAndCollect(driver, threadId, prompt);
         sandbox.close(Duration.ofSeconds(5));
         sandbox = null;
-
-        // ─── Runner B: pre-seed the JSONL, prove recall works ─────────────────────────
-        // Stage a fresh workspace and write the captured bytes to .sessions/<threadId>.jsonl
-        // BEFORE the runner spawns. This mirrors what MentorPiAdapter#buildSandboxSpec does:
-        // injects the prior turn's JSONL into the new container's filesystem.
-        Path runnerBWorkspace = stageWorkspace(creds);
-        Path sessionFile = runnerBWorkspace.resolve(".sessions").resolve(threadId + ".jsonl");
-        Files.createDirectories(sessionFile.getParent());
-        Files.write(sessionFile, sessionBytesA.get());
-
-        sandbox = spawnRunner(creds, runnerBWorkspace);
-        try {
-            var driverB = new RunnerDriver(sandbox);
-            driverB.expectRunnerReady();
-            driverB.helloOk();
-            // open_thread → bindThread → switchSession(sessionFile). Pi SDK loads the file
-            // off disk and rehydrates agent._state.messages from the entries verbatim.
-            driverB.openThread(threadId);
-
-            String t2 = runTurnAndCollect(
-                driverB,
-                threadId,
-                "What framework am I using? Reply with only the framework name."
-            );
-            System.out.printf("[cold-jsonl] runner-B follow-up (%d chars): %s%n", t2.length(), trim(t2, 200));
-            assertThat(t2.toLowerCase())
-                .as(
-                    "after cold-restart, runner-B must recall the planted fact. Failure mode: " +
-                        "the Pi SDK didn't rehydrate from the JSONL on disk — check that the " +
-                        "runner's bindThread → switchSession is reading the injected file (and " +
-                        "that Java is writing the bytes to the path the runner's SESSIONS_DIR expects)."
-                )
-                .contains("spring");
-        } finally {
-            // runnerBWorkspace gets cleaned up in @AfterEach via the workspaceDir field; we
-            // swap workspaceDir AFTER capturing the original tmp so the teardown deletes
-            // BOTH staging dirs. The first one we delete here manually.
-            try (var stream = Files.walk(workspaceDir)) {
-                stream
-                    .sorted(java.util.Comparator.reverseOrder())
-                    .forEach(p -> {
-                        try {
-                            Files.deleteIfExists(p);
-                        } catch (java.io.IOException ignored) {
-                            // best-effort
-                        }
-                    });
-            }
-            workspaceDir = runnerBWorkspace;
-        }
+        return captured.get();
     }
 
-    @Test
-    @DisplayName(
-        "session_persisted byte-identical: post-turn-B file extends post-turn-A bytes verbatim (prompt-cache prefix)"
-    )
-    void sessionJsonl_postTurnBExtendsPriorBytesVerbatim() throws Exception {
-        // Anthropic's prompt cache (and OpenAI's prompt_cache_key) hit only on a byte-identical
-        // prefix. If anywhere in our restore loop we re-serialize, re-order, or strip metadata
-        // from the JSONL, the cached-tokens count drops to zero and we burn money on every cold
-        // restart. This test asserts the strongest invariant: after a turn on runner-B (which
-        // started from runner-A's bytes), the on-disk JSONL begins with EXACTLY runner-A's
-        // bytes. The Pi SDK SessionManager appends turn-B entries onto the prior file; if
-        // the prefix isn't preserved, prompt caching is broken.
-        LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
-        UUID threadId = UUID.randomUUID();
-
-        // Runner A: one turn, capture bytes.
-        workspaceDir = stageWorkspace(creds);
-        sandbox = spawnRunner(creds, workspaceDir);
-        var driverA = new RunnerDriver(sandbox);
-        driverA.expectRunnerReady();
-        driverA.helloOk();
-        driverA.openThread(threadId);
-
-        var bytesA = new java.util.concurrent.atomic.AtomicReference<byte[]>();
-        sandbox.subscribe(frame -> {
-            if (!isThreadEvent(frame, threadId)) return;
-            JsonNode event = frame.path("params").path("event");
-            if ("session_persisted".equals(event.path("type").asText())) {
-                bytesA.set(event.path("jsonl").asText("").getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            }
-        });
-        runTurnAndCollect(driverA, threadId, "Reply with exactly: alpha.");
-        assertThat(bytesA.get()).as("runner-A bytes captured").isNotNull();
-        sandbox.close(Duration.ofSeconds(5));
-        sandbox = null;
-
-        // Runner B: pre-seed with runner-A bytes, run one more turn, read the on-disk file.
-        Path runnerBWorkspace = stageWorkspace(creds);
-        Path sessionFile = runnerBWorkspace.resolve(".sessions").resolve(threadId + ".jsonl");
+    /**
+     * Stage a second workspace pre-seeded with the captured JSONL and spawn a fresh runner against
+     * it (mirrors {@code MentorPiAdapter#buildSandboxSpec} injecting {@code .sessions/<id>.jsonl}).
+     * Deletes the prior workspace; {@code workspaceDir} is updated so @AfterEach cleans the new one.
+     */
+    private Path respawnWithSession(LiveLlmCredentials creds, UUID threadId, byte[] sessionBytes) throws Exception {
+        Path nextWorkspace = stageWorkspace(creds);
+        Path sessionFile = nextWorkspace.resolve(".sessions").resolve(threadId + ".jsonl");
         Files.createDirectories(sessionFile.getParent());
-        Files.write(sessionFile, bytesA.get());
+        Files.write(sessionFile, sessionBytes);
 
-        sandbox = spawnRunner(creds, runnerBWorkspace);
-        try {
-            var driverB = new RunnerDriver(sandbox);
-            driverB.expectRunnerReady();
-            driverB.helloOk();
-            driverB.openThread(threadId);
-            runTurnAndCollect(driverB, threadId, "Reply with exactly: beta.");
-            // Re-read the on-disk file — Pi SDK appended turn-B entries.
-            byte[] bytesAfterB = Files.readAllBytes(sessionFile);
-            assertThat(bytesAfterB.length)
-                .as("post-turn-B file must be at least as long as the seeded prefix")
-                .isGreaterThanOrEqualTo(bytesA.get().length);
-            byte[] prefix = java.util.Arrays.copyOfRange(bytesAfterB, 0, bytesA.get().length);
-            assertThat(prefix)
-                .as(
-                    "post-turn-B JSONL must begin with the EXACT bytes of post-turn-A. " +
-                        "If this fails, the Pi SDK is re-serializing prior entries (kills prompt " +
-                        "cache hits on Anthropic/OpenAI) or our staging logic is dropping bytes."
-                )
-                .isEqualTo(bytesA.get());
-            System.out.printf(
-                "[byte-identical] prefix bytes preserved: %d / %d (runner-B grew file by %d bytes)%n",
-                prefix.length,
-                bytesAfterB.length,
-                bytesAfterB.length - bytesA.get().length
-            );
-        } finally {
-            try (var stream = Files.walk(workspaceDir)) {
-                stream
-                    .sorted(java.util.Comparator.reverseOrder())
-                    .forEach(p -> {
-                        try {
-                            Files.deleteIfExists(p);
-                        } catch (java.io.IOException ignored) {
-                            // best-effort
-                        }
-                    });
-            }
-            workspaceDir = runnerBWorkspace;
+        deleteRecursive(workspaceDir);
+        workspaceDir = nextWorkspace;
+
+        sandbox = spawnRunner(creds, workspaceDir);
+        var driver = new RunnerDriver(sandbox);
+        driver.expectRunnerReady();
+        driver.helloOk();
+        driver.openThread(threadId);
+        return sessionFile;
+    }
+
+    private static void deleteRecursive(Path root) throws IOException {
+        if (root == null || !Files.exists(root)) return;
+        try (var stream = Files.walk(root)) {
+            stream
+                .sorted(Comparator.reverseOrder())
+                .forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (IOException ignored) {
+                        // best-effort cleanup
+                    }
+                });
         }
     }
 

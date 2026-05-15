@@ -72,20 +72,12 @@ public class PiEventToUiChunkTranslator {
 
     // ─── session_persisted → capture verbatim Pi session JSONL into state ─────────────────
 
-    /**
-     * Capture the runner's verbatim Pi SDK session JSONL bytes. Emitted by the runner immediately
-     * before {@code agent_end} (see {@code pi-mentor-runner.mjs#forwardEvent}), so by the time
-     * {@code handleAgentEnd} fires {@link TranslatorState#observedSessionJsonl()} is populated and
-     * {@code MentorTurnPersistence.finalise} can persist it into {@code chat_thread.session_jsonl}.
-     *
-     * <p>Yields no UI chunk — this is a side-channel for byte-identical session restoration and
-     * has no client-side analog. Malformed payloads (missing {@code jsonl}, empty string) are
-     * dropped silently so a runner-side glitch doesn't poison the turn.
-     */
     private List<UIMessageChunk> handleSessionPersisted(JsonNode event, TranslatorState state) {
         String jsonl = optionalString(event, "jsonl");
         if (jsonl == null || jsonl.isEmpty()) {
-            log.debug("session_persisted with empty jsonl payload — skipping");
+            // WARN, not DEBUG: a missing payload silently breaks prompt-cache continuity on the
+            // next cold restart. Surfaces runner regressions in logs instead of an invisible miss.
+            log.warn("session_persisted carried no jsonl payload — next cold restart will use stale bytes");
             return List.of();
         }
         state.observeSessionJsonl(jsonl.getBytes(StandardCharsets.UTF_8));

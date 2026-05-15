@@ -66,26 +66,9 @@ public class ChatThread {
     private Workspace workspace;
 
     /**
-     * Pi SDK session JSONL bytes, persisted verbatim per turn so a cold container can
-     * restore byte-identical state — critical for provider prompt caching (Anthropic +
-     * OpenAI key on byte-identical prefix), tool-call / tool-result pairing (Anthropic
-     * 400s on orphaned tool_use), and thinking blocks (extended-thinking models require
-     * verbatim preservation).
-     *
-     * <p>Written by {@code MentorTurnPersistence#finalise} in the same REQUIRES_NEW
-     * transaction as the assistant row, so the column and {@code chat_message.status}
-     * never diverge by more than one in-flight crash window.
-     *
-     * <p>For most reads ({@code /threads} list, message rehydration) this column is
-     * unused; lookups go through {@code ChatThreadRepository#findSessionJsonl} which
-     * bypasses the entity. JSON-ignored so it never leaves the JVM.
-     *
-     * <p><strong>Storage shape:</strong> Postgres BYTEA (NOT pg_largeobject). NO
-     * {@code @Lob} annotation: on Postgres + Hibernate, {@code @Lob byte[]} switches the
-     * driver to large-object (OID) mode which requires explicit transactions and throws
-     * {@code "Large Objects may not be used in auto-commit mode"} on simple reads. A plain
-     * {@code byte[]} column maps directly to BYTEA (with TOAST compression transparently
-     * handling multi-KB payloads), exactly what the migration creates.
+     * Verbatim Pi SDK session JSONL bytes. BYTEA, plain {@code byte[]} — NOT {@code @Lob},
+     * which would force Postgres OID mode and break auto-commit reads. Bulk reads go through
+     * {@code ChatThreadRepository#findSessionJsonl}.
      */
     @Column(name = "session_jsonl", columnDefinition = "bytea")
     @ToString.Exclude

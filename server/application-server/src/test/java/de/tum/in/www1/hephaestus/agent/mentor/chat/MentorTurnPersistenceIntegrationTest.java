@@ -339,13 +339,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("finalise persists session_jsonl bytes; findSessionJsonl returns them verbatim")
-    void finalise_persistsSessionJsonlBlobRoundtrip() {
-        // Wave H3 (issue #1071): the byte-identical restore loop requires that finalise writes
-        // TranslatorState.observedSessionJsonl into chat_thread.session_jsonl in the same
-        // REQUIRES_NEW transaction as the assistant-row status flip. A subsequent read via
-        // ChatThreadRepository.findSessionJsonl must return the EXACT bytes — any
-        // re-encoding/normalisation would defeat Anthropic + OpenAI prompt-cache prefix matching.
+    void finalise_storesSessionJsonlByteIdentically() {
         UUID threadId = UUID.randomUUID();
         ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user, "hello");
         UUID assistantId = UUID.randomUUID();
@@ -356,51 +350,29 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             null
         );
 
-        // Synthetic JSONL bytes that resemble what Pi's SessionManager actually writes — a
-        // mix of ASCII, a UTF-8 multibyte char (€ → 0xE2 0x82 0xAC), and a 4-byte emoji (😀 →
-        // 0xF0 0x9F 0x98 0x80). If any layer (Hibernate, JDBC, BYTEA encoder) re-encodes via
-        // String, the multibyte run gets corrupted and the equality assertion fires.
-        String sessionJsonl =
+        // 3-byte and 4-byte UTF-8 characters exercise any layer that round-trips through String.
+        byte[] expectedBytes = (
             "{\"type\":\"user_message\",\"text\":\"hello €\"}\n" +
-            "{\"type\":\"assistant_message\",\"text\":\"hi 😀\",\"stopReason\":\"stop\"}\n";
-        byte[] expectedBytes = sessionJsonl.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            "{\"type\":\"assistant_message\",\"text\":\"hi 😀\",\"stopReason\":\"stop\"}\n"
+        ).getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
         TranslatorState state = new TranslatorState(assistantId);
         state.observeSessionJsonl(expectedBytes);
+        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null));
 
-        UIMessageChunk.Finish finish = new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null);
-        persistence.finalise(cookie, state, finish);
-
-        // Read back via the dedicated projection — same path MentorChatService uses on the
-        // next turn's cold-start. Returns Optional<byte[]>.
-        java.util.Optional<byte[]> storedBytes = chatThreadRepository.findSessionJsonl(threadId);
-        assertThat(storedBytes)
-            .as("session_jsonl bytes must be persisted by finalise and readable via findSessionJsonl")
-            .isPresent();
-        assertThat(storedBytes.get())
-            .as(
-                "stored bytes must be byte-identical to the captured bytes — any " +
-                    "re-encoding kills prompt-cache prefix matching on Anthropic + OpenAI."
-            )
-            .isEqualTo(expectedBytes);
+        assertThat(chatThreadRepository.findSessionJsonl(threadId))
+            .as("byte-identical: any re-encoding kills prompt-cache prefix matching")
+            .contains(expectedBytes);
     }
 
     @Test
-    @DisplayName("finalise with null session_jsonl leaves prior blob intact (no clobber)")
-    void finalise_nullSessionJsonlDoesNotClobberPriorBlob() {
-        // If a turn never observed session_persisted (e.g. stub runner, mid-stream abort
-        // before agent_end), the translator's observedSessionJsonl is null. finalise must
-        // skip the blob write — overwriting with null would erase a perfectly valid prior
-        // turn's bytes and force the NEXT cold restart to lose prompt-cache prefix.
+    void finalise_withoutSessionJsonl_preservesPriorTurn() {
         UUID threadId = UUID.randomUUID();
         ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user, "hello");
 
-        // Turn 1: persist some bytes via direct update (bypasses persistInFlight/finalise
-        // to keep this test focused on the null-blob branch).
         byte[] priorBytes = "{\"prior\":\"turn\"}\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         chatThreadRepository.updateSessionJsonl(threadId, priorBytes);
 
-        // Turn 2: finalise without observing any session JSONL.
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
             thread,
@@ -408,15 +380,13 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             assistantId,
             null
         );
-        TranslatorState state = new TranslatorState(assistantId);
-        // NO observeSessionJsonl call — observedSessionJsonl() returns null.
-        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null));
+        persistence.finalise(
+            cookie,
+            new TranslatorState(assistantId),
+            new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null)
+        );
 
-        java.util.Optional<byte[]> stored = chatThreadRepository.findSessionJsonl(threadId);
-        assertThat(stored).isPresent();
-        assertThat(stored.get())
-            .as("prior bytes must survive a finalise that did not observe session_persisted")
-            .isEqualTo(priorBytes);
+        assertThat(chatThreadRepository.findSessionJsonl(threadId)).contains(priorBytes);
     }
 
     @Test

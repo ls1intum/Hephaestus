@@ -27,23 +27,11 @@ public record GitRepositoryProperties(
      * When disabled, commits are synced via API only (no file-level data).
      * Defaults to false.
      */
-    boolean enabled,
-
-    /**
-     * Max age (days) of an unaccessed working-tree before {@code GitRepositoryReaper}
-     * evicts it from disk. The agent re-clones on next demand — small one-time latency
-     * cost in exchange for bounded disk usage. Defaults to 30 days.
-     * <p>
-     * Set to 0 to disable the reaper entirely (e.g. local development).
-     */
-    int cacheMaxAgeDays
+    boolean enabled
 ) {
     public GitRepositoryProperties {
         if (storagePath == null || storagePath.isBlank()) {
             storagePath = "/data/git-repos";
-        }
-        if (cacheMaxAgeDays < 0) {
-            cacheMaxAgeDays = 30;
         }
     }
 }

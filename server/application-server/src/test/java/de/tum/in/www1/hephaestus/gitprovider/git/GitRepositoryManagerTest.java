@@ -59,7 +59,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     private GitRepositoryManager createManager(boolean enabled) {
-        GitRepositoryProperties properties = new GitRepositoryProperties(storagePath.toString(), enabled, 30);
+        GitRepositoryProperties properties = new GitRepositoryProperties(storagePath.toString(), enabled);
         return new GitRepositoryManager(properties, lockManager);
     }
 

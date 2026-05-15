@@ -4,8 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import de.tum.in.www1.hephaestus.audit.DeletionAudit;
-import de.tum.in.www1.hephaestus.audit.DeletionAuditService;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -32,7 +30,6 @@ public class ChatThreadService {
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
-    private final DeletionAuditService deletionAuditService;
 
     /** Threads owned by the current user inside the given workspace, newest first. */
     @Transactional(readOnly = true)
@@ -61,19 +58,7 @@ public class ChatThreadService {
     /** Delete a thread (cascades to messages, votes, legacy parts). Owner-scoped via {@link #getOwnedThread}. */
     @Transactional
     public void deleteOwnedThread(Long workspaceId, UUID threadId) {
-        ChatThread thread = getOwnedThread(workspaceId, threadId);
-        // Record audit BEFORE delete (REQUIRES_NEW). A subsequent delete failure leaves an
-        // audit row showing "deletion attempted" — operationally preferable to a successful
-        // delete with no audit trail.
-        Long actorUserId = thread.getUser() != null ? thread.getUser().getId() : null;
-        deletionAuditService.record(
-            DeletionAudit.EntityType.CHAT_THREAD,
-            threadId.toString(),
-            workspaceId,
-            actorUserId,
-            "user-initiated"
-        );
-        chatThreadRepository.delete(thread);
+        chatThreadRepository.delete(getOwnedThread(workspaceId, threadId));
     }
 
     /**

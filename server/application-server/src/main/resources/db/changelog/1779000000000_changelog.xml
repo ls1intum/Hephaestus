@@ -5,110 +5,14 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
 
-    <!-- Externalize the Pi SDK's session JSONL bytes verbatim per thread, so a cold
-         container can be restored byte-identically to a warm one. Critical for:
-           (a) provider prompt-cache hits (Anthropic + OpenAI key on byte-identical prefix —
-               our previous text-flattened replay defeated this, ~10× cost increase on cached
-               portions of the prefix on every cold restart),
-           (b) tool-call / tool-result pairing (Anthropic 400s on orphaned tool_use, which the
-               flatten-to-text path produced),
-           (c) thinking blocks (extended-thinking-2025-05-14 requires thinking blocks be
-               preserved verbatim across turns; we previously dropped them).
-
-         Storage: BYTEA on chat_thread, LAZY-fetched via a separate JPA projection so
-         /threads list queries don't pull the blob into every row. Postgres TOAST gives
-         transparent LZ4/PGLZ compression (~3-4×) for the JSONL payload. Size estimate:
-         50-turn power-user thread ≈ 1-3 MB raw → ~250-800 KB on disk.
-
-         Migration is forward-only with no backfill — the original Pi event stream for past
-         turns is gone. Existing threads start fresh on their next turn (lose one cold-start's
-         worth of prompt cache; the conversation history itself stays in chat_message.parts
-         and remains visible in the webapp). -->
-    <changeSet id="mentor-1071-add-session-jsonl-blob" author="hephaestus">
+    <changeSet id="mentor-add-session-jsonl-blob" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="session_jsonl column already exists">
             <not><columnExists tableName="chat_thread" columnName="session_jsonl"/></not>
         </preConditions>
-        <comment>Add nullable BYTEA column for Pi SDK's verbatim session JSONL bytes.</comment>
-        <sql>
-            ALTER TABLE chat_thread ADD COLUMN session_jsonl BYTEA NULL;
-        </sql>
+        <comment>Verbatim Pi SDK session JSONL bytes for byte-identical cold-restart.</comment>
+        <sql>ALTER TABLE chat_thread ADD COLUMN session_jsonl BYTEA NULL;</sql>
         <rollback>
             <sql>ALTER TABLE chat_thread DROP COLUMN IF EXISTS session_jsonl;</sql>
-        </rollback>
-    </changeSet>
-
-    <!-- Wave G4 (issue #1071): deletion_audit table.
-         NIST SP 800-92 §4.3 recommends 12-month online retention for security-relevant logs;
-         GDPR Art. 17 + Art. 30 require evidence that the controller honoured erasure requests.
-         We record one row per delete-path call (workspace purge, chat thread delete, user
-         account delete) so a future GDPR audit can confirm by-id that erasure ran.
-
-         No FK to the deleted entities — the row outlives them by design.
-
-         Online retention is operational (a future scheduled sweep prunes rows past 365 days);
-         the schema itself imposes no TTL. -->
-    <changeSet id="mentor-1071-create-deletion-audit" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="deletion_audit already exists">
-            <not><tableExists tableName="deletion_audit"/></not>
-        </preConditions>
-        <comment>Create deletion_audit table for GDPR Art. 17/30 evidence.</comment>
-        <createTable tableName="deletion_audit">
-            <column name="id" type="UUID">
-                <constraints nullable="false" primaryKey="true" primaryKeyName="deletion_auditPK"/>
-            </column>
-            <column name="entity_type" type="VARCHAR(64)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="entity_id" type="VARCHAR(128)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="workspace_id" type="BIGINT"/>
-            <column name="actor_user_id" type="BIGINT"/>
-            <column name="reason" type="VARCHAR(512)"/>
-            <column name="occurred_at" type="TIMESTAMP(6) WITH TIME ZONE">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-        <createIndex tableName="deletion_audit" indexName="idx_deletion_audit_occurred_at">
-            <column name="occurred_at"/>
-        </createIndex>
-        <createIndex tableName="deletion_audit" indexName="idx_deletion_audit_entity">
-            <column name="entity_type"/>
-            <column name="entity_id"/>
-        </createIndex>
-        <rollback>
-            <dropTable tableName="deletion_audit"/>
-        </rollback>
-    </changeSet>
-
-    <!-- Wave G2 (issue #1071): make chat_thread.user_id ON DELETE CASCADE.
-         The original FK (1754979350893-13, name `FKikdxlx9viomcwrgxj7fbyfsew`) defaults to
-         NO ACTION, which blocks user deletion when the user owns any chat threads. GDPR
-         right-to-erasure requires that deleting a user actually removes their personal data
-         — including conversation content, which is unambiguously personal. CASCADE here is
-         the correct semantic: deleting a user removes their threads, which then cascade
-         to chat_message → chat_message_part / chat_message_vote (already CASCADE per
-         1778756946278).
-
-         Forward-only. Rollback restores the original NO-ACTION FK so the constraint name
-         survives a backout even though the cascade behaviour reverts. -->
-    <changeSet id="mentor-1071-chat-thread-user-cascade" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="chat_thread.user_id FK already cascades or original FK missing">
-            <foreignKeyConstraintExists foreignKeyName="FKikdxlx9viomcwrgxj7fbyfsew"/>
-        </preConditions>
-        <comment>Replace chat_thread.user_id FK with ON DELETE CASCADE variant for GDPR right-to-erasure</comment>
-        <dropForeignKeyConstraint baseTableName="chat_thread"
-                                  constraintName="FKikdxlx9viomcwrgxj7fbyfsew"/>
-        <addForeignKeyConstraint baseColumnNames="user_id" baseTableName="chat_thread"
-                                 constraintName="fk_chat_thread_user_cascade"
-                                 referencedColumnNames="id" referencedTableName="user"
-                                 onDelete="CASCADE"/>
-        <rollback>
-            <dropForeignKeyConstraint baseTableName="chat_thread"
-                                      constraintName="fk_chat_thread_user_cascade"/>
-            <addForeignKeyConstraint baseColumnNames="user_id" baseTableName="chat_thread"
-                                     constraintName="FKikdxlx9viomcwrgxj7fbyfsew"
-                                     referencedColumnNames="id" referencedTableName="user"/>
         </rollback>
     </changeSet>
 

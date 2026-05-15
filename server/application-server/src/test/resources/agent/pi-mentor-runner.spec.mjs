@@ -215,8 +215,7 @@ test("batch JSON-RPC request is rejected with -32600 (not silently dropped)", as
 });
 
 test("watchdog cross-thread rebind: no event leakage from concurrently-bound thread", async () => {
-    // Regression for the loop-1 audit fix in runWatchdogRebind. The scenario the fix actually
-    // addresses: thread A is mid-prompt (watchdog armed) when ANOTHER thread B opens, which
+    // Scenario: thread A is mid-prompt (watchdog armed) when ANOTHER thread B opens, which
     // — via the regular bindThread teardown — flips activeThreadId from A to B and replaces
     // A's subscription with B's. When A's watchdog later fires (a few ms after), runtime is
     // bound to B but the rebind needs to install a fresh A subscription AND remove B's

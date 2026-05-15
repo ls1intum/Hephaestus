@@ -483,66 +483,39 @@ async function bindThread(state) {
 }
 
 function forwardEvent(state, event) {
-    // Critical ordering: when the SDK fires agent_end we (a) emit `session_persisted`
-    // FIRST so Java captures the verbatim JSONL bytes BEFORE we forward `agent_end`,
-    // (b) forward `agent_end` so the translator emits Finish to the SSE wire. The
-    // translator's `agent_end` handling triggers MentorChatService.finalise — which
-    // reads `TranslatorState.observedSessionJsonl` and writes the blob in the same
-    // REQUIRES_NEW transaction as the assistant-row status flip. Reversing the order
-    // would let finalise() run with an empty observedSessionJsonl on every turn.
+    // Emit session_persisted BEFORE agent_end so TranslatorState captures the bytes before
+    // finalise runs. Watchdog-synthesised agent_end frames bypass this path.
     if (event?.type === "agent_end") {
         emitSessionPersisted(state);
     }
-    // Pass through raw Pi event for Java MentorEventTranslator. Clear in-flight flag on agent_end.
     sendEvent(state.threadId, event);
     if (event?.type === "agent_end") {
-        // The watchdog synthesises its own agent_end at the end of a forced rebind (see
-        // runWatchdogRebind). That path emits its own agent_end via sendEvent directly — it
-        // does NOT route through forwardEvent — so this branch only fires for genuine
-        // SDK-emitted turn completions.
         clearTurnWatchdog(state);
         state.inFlight = false;
         maybePostTurnGc();
     }
 }
 
-/**
- * Read the on-disk session JSONL Pi just flushed and ship it to Java as a `session_persisted`
- * notification event. Java's MentorTurnPersistence.finalise persists these bytes verbatim in
- * `chat_thread.session_jsonl` (BYTEA) so a cold container can restore byte-identical state on
- * the user's next message — preserving provider prompt caching (Anthropic + OpenAI key on
- * byte-identical prefix), tool_use/tool_result pairing (Anthropic 400s on orphaned tool_use),
- * and thinking blocks (extended-thinking models require verbatim preservation across turns).
- *
- * <p>Failure mode: file missing (Pi never persisted — e.g. SDK was stubbed in PROTOCOL_ONLY
- * tests) or a synchronous read error. We log + skip; Java falls back to whatever blob was
- * captured on the previous turn. Better than emitting a corrupt event.
- *
- * <p>Sync read is acceptable here: the file is small (KB–few MB), agent_end is the natural
- * flush boundary, and we're about to forward agent_end which is already going to trigger the
- * full finalise pipeline anyway.
- */
 function emitSessionPersisted(state) {
+    if (!existsSync(state.sessionPath)) {
+        // Legitimate case: PROTOCOL_ONLY stub never persists. In production this is anomalous —
+        // surface as pi_error so Java logs a warning rather than silently caching stale bytes.
+        if (!PROTOCOL_ONLY) {
+            sendEvent(state.threadId, { type: "pi_error", message: "session file missing on agent_end" });
+        }
+        return;
+    }
     try {
-        // existsSync is the un-shimmed import the SDK also uses (see runner top-of-file for
-        // shim limitations); a missing file is the legitimate empty-stub case and not an error.
-        if (!existsSync(state.sessionPath)) {
-            return;
-        }
         const bytes = readFileSync(state.sessionPath, "utf8");
-        if (typeof bytes !== "string" || bytes.length === 0) {
-            return;
-        }
+        if (typeof bytes !== "string" || bytes.length === 0) return;
         writeFrame({
             jsonrpc: "2.0",
             method: "event",
-            params: {
-                threadId: state.threadId,
-                event: { type: "session_persisted", jsonl: bytes },
-            },
+            params: { threadId: state.threadId, event: { type: "session_persisted", jsonl: bytes } },
         });
     } catch (e) {
         log(`emitSessionPersisted failed for thread=${state.threadId}: ${e?.message ?? e}`);
+        sendEvent(state.threadId, { type: "pi_error", message: `session_persist_read_failed: ${e?.message ?? e}` });
     }
 }
 

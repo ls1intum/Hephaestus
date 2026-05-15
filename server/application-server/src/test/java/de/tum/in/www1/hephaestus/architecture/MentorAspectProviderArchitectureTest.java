@@ -18,8 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  * annotation on a helper that is only ever invoked through a self-call is silently dropped
  * (Spring docs: <i>"Calling a method on the proxy from within the target object will not be
  * intercepted"</i>). Combined with {@code spring.jpa.open-in-view=false}, the annotation looks
- * load-bearing in the code but actually does nothing — exactly the failure mode the audit caught
- * in loop-3.
+ * load-bearing in the code but actually does nothing.
  *
  * <p>The fix was to move {@code @Transactional(readOnly = true)} from each provider's helper
  * {@code buildPayload(...)} to {@code contribute(...)}, which IS the external entry point
@@ -49,8 +48,8 @@ class MentorAspectProviderArchitectureTest extends HephaestusArchitectureTest {
             .because(
                 "contribute() is the external entry point WorkspaceContextBuilder calls through the " +
                     "Spring proxy. Removing @Transactional from here OR moving it to a helper would " +
-                    "silently drop the tx (self-invocation bypasses the proxy) and re-introduce the " +
-                    "LazyInitializationException risk loop-3 fixed. See javadoc on each contribute()."
+                    "silently drop the tx (self-invocation bypasses the proxy) and re-introduce a " +
+                    "LazyInitializationException risk on the SSE wire."
             );
         rule.check(classes);
     }

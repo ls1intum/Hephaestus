@@ -177,10 +177,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         thread.setWorkspace(ws);
         thread.setUser(user);
         when(persistence.ensureThread(eq(WORKSPACE_ID), eq(THREAD_ID), any(), any())).thenReturn(thread);
-        // No prior session JSONL by default — tests that exercise the restore path can stub
-        // a non-empty Optional explicitly. Mockito's default for unstubbed Optional returns is
-        // empty Optional already, but pinning it here makes the contract explicit.
-        when(chatThreadRepository.findSessionJsonl(eq(THREAD_ID))).thenReturn(java.util.Optional.empty());
         when(persistence.persistInFlight(any(), any(), any(), any())).thenAnswer(inv -> {
             UUID assistantId = inv.getArgument(2, UUID.class);
             return new MentorTurnPersistence.TurnPersistenceCookie(
