@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
 import de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.in.www1.hephaestus.agent.context.providers.mentor.FindingsHistoryAspectProvider;
@@ -71,6 +73,7 @@ public class MentorChatService {
 
     private final UserRepository userRepository;
     private final AgentConfigRepository agentConfigRepository;
+    private final MentorAgentProperties mentorAgentProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final MentorPiAdapter mentorPiAdapter;
     private final InteractiveSandboxService interactiveSandboxService;
@@ -204,7 +207,11 @@ public class MentorChatService {
             user,
             request.userMessage()
         );
-        AgentConfig agentConfig = resolveAgentConfig(request.workspaceId());
+        MentorLlmConfig llmConfig = resolveLlmConfig(request.workspaceId());
+        // Build replay BEFORE persistInFlight so the current turn's user message (committed
+        // in REQUIRES_NEW) is not included. The runner receives only completed prior turns;
+        // the current user message arrives separately via the prompt RPC.
+        List<MentorReplayMessage> replay = persistence.buildReplay(thread.getId());
 
         UUID assistantMessageId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
@@ -214,7 +221,6 @@ public class MentorChatService {
             request.clientUserMessageId()
         );
         TranslatorState state = new TranslatorState(assistantMessageId);
-        List<MentorReplayMessage> replay = persistence.buildReplay(thread.getId());
 
         AttachedSandbox sandbox = null;
         MentorRunnerClient client = null;
@@ -236,7 +242,7 @@ public class MentorChatService {
             Map<String, byte[]> aspectInputs = buildAspectContext(request, user);
             InteractiveSandboxSpec spec = mentorPiAdapter.buildSandboxSpec(
                 new MentorAgentRequest(request.workspaceId(), user.getId()),
-                agentConfig,
+                llmConfig,
                 aspectInputs
             );
             sandbox = interactiveSandboxService.attach(spec);
@@ -480,7 +486,7 @@ public class MentorChatService {
     /**
      * Map an unchecked exception to a string the user can see in the chat. The raw
      * {@code e.getMessage()} can leak workspace ids, exception class names, internal stack
-     * details ({@code "No enabled AgentConfig for workspace 42 — mentor cannot start"},
+     * details ({@code "No LLM config for mentor in workspace 42"},
      * {@code "runner error -32002: <internal>"}); the wire ends up as a chat-error toast in
      * the webapp without any further filtering, so the controller is the right boundary.
      * Raw message stays in the WARN log for ops.
@@ -505,17 +511,34 @@ public class MentorChatService {
         );
     }
 
-    private AgentConfig resolveAgentConfig(long workspaceId) {
+    /**
+     * Resolve the LLM config mentor should use for this turn.
+     *
+     * <p>Primary path: all three required fields on {@code MentorAgentProperties} are set
+     * ({@code llmProvider}, {@code credentialMode}, {@code modelName}) — the instance config
+     * applies to every workspace without a DB row. Set these in {@code application-local.yml}
+     * or via env vars for local dev and single-model deployments.
+     *
+     * <p>Fallback: first enabled {@code AgentConfig} for the workspace — the original
+     * multi-tenant path for per-workspace key routing.
+     */
+    private MentorLlmConfig resolveLlmConfig(long workspaceId) {
+        if (mentorAgentProperties.llmProvider() != null
+                && mentorAgentProperties.credentialMode() != null
+                && mentorAgentProperties.modelName() != null) {
+            return MentorLlmConfig.fromProperties(mentorAgentProperties);
+        }
         return agentConfigRepository
             .findByWorkspaceId(workspaceId)
             .stream()
             .filter(AgentConfig::isEnabled)
             .findFirst()
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "No enabled AgentConfig for workspace " + workspaceId + " — mentor cannot start"
-                )
-            );
+            .map(MentorLlmConfig::fromAgentConfig)
+            .orElseThrow(() -> new IllegalStateException(
+                "No LLM config for mentor in workspace " + workspaceId +
+                " — set hephaestus.mentor.agent.llm-provider / credential-mode / model-name" +
+                " or create an enabled AgentConfig for this workspace"
+            ));
     }
 
     private JsonNode handleFetchContext(MentorRunnerClient.FetchContextRequest req, Map<String, byte[]> aspectInputs) {

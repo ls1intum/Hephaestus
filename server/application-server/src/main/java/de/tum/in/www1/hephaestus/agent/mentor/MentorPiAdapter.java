@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.mentor;
 
-import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory.PiPlan;
@@ -38,49 +37,41 @@ public class MentorPiAdapter {
      * contract — concurrent attaches with the same key reuse the live handle.
      *
      * <p>Note: mentor sessions never run in PROXY credential mode — interactive chat doesn't
-     * carry a job token. The agent config's credential mode therefore must resolve to a direct
-     * key (or fail fast at attach time). Practice review still drives the PROXY path through
-     * {@code PracticePiAdapter}.
+     * carry a job token. The LLM config's credential mode must resolve to a direct key.
      *
-     * @param request       per-turn routing identity (workspace, contributor, thread, message)
-     * @param agentConfig   the resolved {@link AgentConfig} for the workspace (carries provider,
-     *                      credential mode, model, timeout); never {@code null}
-     * @param aspectInputs  pre-built workspace-relative aspect JSON files
-     *                      (e.g. {@code context/target/user.json}, {@code workspace.json}, ...);
-     *                      typically produced by {@code WorkspaceContextBuilder.build(MentorChatRequest)}.
-     *                      Must not contain entries outside {@link #ASPECT_INPUT_PREFIX}.
-     * @return a validated {@link InteractiveSandboxSpec} ready for the sandbox service.
+     * @param request       per-turn routing identity (workspace, contributor)
+     * @param llmConfig     resolved LLM config — from instance-level properties (primary) or a
+     *                      workspace-scoped AgentConfig (fallback); carries provider, credential
+     *                      mode, model, timeout
+     * @param aspectInputs  pre-built workspace-relative aspect JSON files under
+     *                      {@link #ASPECT_INPUT_PREFIX}
+     * @return a validated {@link InteractiveSandboxSpec} ready for the sandbox service
      */
     public InteractiveSandboxSpec buildSandboxSpec(
         MentorAgentRequest request,
-        AgentConfig agentConfig,
+        MentorLlmConfig llmConfig,
         Map<String, byte[]> aspectInputs
     ) {
         Objects.requireNonNull(request, "request");
-        Objects.requireNonNull(agentConfig, "agentConfig");
+        Objects.requireNonNull(llmConfig, "llmConfig");
         Objects.requireNonNull(aspectInputs, "aspectInputs");
         validateAspectInputs(aspectInputs);
 
         Map<String, byte[]> extraInputs = new LinkedHashMap<>(aspectInputs.size() + 1);
         extraInputs.putAll(aspectInputs);
-        // System prompt lives at a stable workspace-relative path; the runner reads it from
-        // there during the initial handshake.
         extraInputs.put(SYSTEM_PROMPT_PATH, PiRuntimeFactory.loadClasspathResource("mentor/system.md"));
 
-        // Mentor runs interactively — internet is always allowed (model calls go through the
-        // standard LLM proxy plus tool callbacks land on the host). Proxy job token is null:
-        // mentor turns are not job-scoped.
+        String baseUrl = mentorProperties.baseUrl().isBlank() ? null : mentorProperties.baseUrl();
+
         PiPlanSpec planSpec = new PiPlanSpec(
-            agentConfig.getLlmProvider(),
-            agentConfig.getCredentialMode(),
-            agentConfig.getLlmApiKey(),
-            agentConfig.getModelName(),
-            // baseUrl: mentor production today resolves the endpoint from the agent provider
-            // mapping; live tests build PiPlanSpec directly when they need an override.
-            null,
+            llmConfig.llmProvider(),
+            llmConfig.credentialMode(),
+            llmConfig.llmApiKey(),
+            llmConfig.modelName(),
+            baseUrl,
             null,
             true,
-            agentConfig.getTimeoutSeconds(),
+            llmConfig.timeoutSeconds(),
             mentorProperties.runnerScript(),
             extraInputs,
             "" /* no precompute step — mentor analytics arrive as aspect JSON */

@@ -115,22 +115,22 @@ public class WorkspaceContextBuilder {
             }
             for (String key : files.keySet()) {
                 if (beforeKeys.contains(key)) {
-                    String previousOwner = keyOwner.get(key);
-                    if (previousOwner != null && !previousOwner.equals(providerName)) {
-                        throw new IllegalStateException(
-                            "Duplicate workspace key " +
-                                key +
-                                ": written by both " +
-                                previousOwner +
-                                " and " +
-                                providerName
-                        );
-                    }
-                    continue;
+                    continue; // pre-existing key — not written by this provider
                 }
                 if (!key.startsWith(ContentProvider.OUTPUT_PREFIX)) {
                     throw new IllegalStateException(
                         providerName + " wrote file outside " + ContentProvider.OUTPUT_PREFIX + ": " + key
+                    );
+                }
+                String existingOwner = keyOwner.get(key);
+                if (existingOwner != null) {
+                    throw new IllegalStateException(
+                        "Duplicate workspace key " +
+                            key +
+                            ": written by both " +
+                            existingOwner +
+                            " and " +
+                            providerName
                     );
                 }
                 keyOwner.put(key, providerName);

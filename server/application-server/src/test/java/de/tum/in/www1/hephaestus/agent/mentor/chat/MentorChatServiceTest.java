@@ -11,8 +11,12 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.tum.in.www1.hephaestus.agent.CredentialMode;
+import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
+import de.tum.in.www1.hephaestus.agent.sandbox.docker.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorPiAdapter;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
@@ -121,9 +125,24 @@ class MentorChatServiceTest extends BaseUnitTest {
             new MentorChatExecutorConfig.MentorRunnerTimeoutScheduler(scheduler);
 
         meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        // Instance-level LLM config — all three required fields set so resolveLlmConfig takes
+        // the instance path and does not need the agentConfigRepository.
+        MentorAgentProperties mentorProps = new MentorAgentProperties(
+            "test-image",
+            "pi-mentor-runner.mjs",
+            100_000,
+            "",
+            LlmProvider.OPENAI,
+            CredentialMode.API_KEY,
+            "test-key",
+            "test-model",
+            600,
+            ImagePullPolicy.IF_NOT_PRESENT
+        );
         service = new MentorChatService(
             userRepository,
             agentConfigRepository,
+            mentorProps,
             workspaceContextBuilder,
             mentorPiAdapter,
             interactiveSandboxService,

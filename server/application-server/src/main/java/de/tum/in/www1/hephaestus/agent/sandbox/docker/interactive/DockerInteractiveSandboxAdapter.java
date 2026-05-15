@@ -40,8 +40,8 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
 
     private static final List<String> SLEEPER_CMD = List.of("tail", "-f", "/dev/null");
 
-    // CAP_CHOWN is dropped by the security policy, so we use mode bits (1777/1755) rather than
-    // chown to set permissions. Subsequent tar injection preserves its own 1000:1000 ownership.
+    // --cap-drop=ALL removes CAP_DAC_OVERRIDE, so root cannot bypass file permissions.
+    // /workspace is owned by 1000:1000 in the image; run mkdir as the container user.
     private static final String PREP_MKDIR_CMD =
         "mkdir -p /workspace/.runner /workspace/context/target /workspace/context/user /workspace/scratch && " +
         "chmod 1777 /workspace /workspace/.runner /workspace/context/user /workspace/scratch && " +
@@ -177,8 +177,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 throw new InteractiveSandboxException("startContainer failed: " + e.getMessage(), e);
             }
 
-            // Root user for mkdir: images without a WORKDIR layer don't have /workspace yet.
-            runExec(containerId, CONTAINER_ROOT_USER, PREP_MKDIR_CMD, "workspace mkdir");
+            runExec(containerId, CONTAINER_USER, PREP_MKDIR_CMD, "workspace mkdir");
             if (!spec.inputFiles().isEmpty()) {
                 workspaceManager.injectFiles(containerId, spec.inputFiles());
             }

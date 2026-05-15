@@ -18,6 +18,14 @@ interface DockerImageOperations {
     boolean pullImage(String image);
 
     /**
+     * Check whether an image exists in the local Docker daemon cache.
+     * Used to implement {@link ImagePullPolicy#IF_NOT_PRESENT} logic without pulling.
+     *
+     * @return {@code true} if the image is present locally, {@code false} if absent or on error
+     */
+    boolean imageIsPresent(String image);
+
+    /**
      * Ping the Docker daemon to verify connectivity.
      *
      * <p>Mirror of {@link DockerContainerOperations#ping()} — kept on both interfaces because the

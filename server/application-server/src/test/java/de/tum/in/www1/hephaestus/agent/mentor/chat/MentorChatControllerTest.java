@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
+import de.tum.in.www1.hephaestus.agent.sandbox.docker.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
@@ -51,9 +52,16 @@ class MentorChatControllerTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final MentorAgentProperties TEST_PROPERTIES = new MentorAgentProperties(
-        "ghcr.io/ls1intum/hephaestus/agent-pi-mentor:latest",
+        "ghcr.io/ls1intum/hephaestus/agent-pi:latest",
         "pi-mentor-runner.mjs",
-        100_000
+        100_000,
+        "",
+        null,
+        null,
+        null,
+        null,
+        600,
+        ImagePullPolicy.IF_NOT_PRESENT
     );
 
     @Mock

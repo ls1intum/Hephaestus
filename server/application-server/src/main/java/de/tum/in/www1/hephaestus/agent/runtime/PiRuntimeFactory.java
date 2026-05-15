@@ -170,19 +170,19 @@ public class PiRuntimeFactory {
      *       runtime sits at ~100 MB V8 heap; 2.5× headroom defends against a leaky session OOM-ing
      *       the host instead of itself. Default ~1.4 GB on 64-bit lets one bad runner take the
      *       host down.</li>
-     *   <li>{@code --disable-source-maps} — Pi SDK ships source maps; runner errors flow through
-     *       JSON-RPC, not raw stderr stacks, so the source-map parse cache is wasted.</li>
      *   <li>{@code --no-warnings} — keeps stderr clean for ops grep against our own log prefix.</li>
      *   <li>{@code --expose-gc} — exposes {@code global.gc()} so the runner can force a post-turn
      *       compaction in {@code pi-mentor-runner.mjs:forwardEvent}. The flag costs nothing on its
      *       own and is only effective when {@code global.gc()} is actually called.</li>
      * </ul>
      *
-     * <p><b>Practice flags:</b> only {@code --disable-source-maps --no-warnings}. We do NOT cap the
-     * heap because practice routinely parses 30-file diff patches that allocate transiently; a
-     * 256 MB cap would convert worst-case-input OOMs from "rare" to "regular." We do NOT
-     * {@code --expose-gc} because the practice runner never calls {@code global.gc()} and
-     * exposing the global is a foot-gun.
+     * <p><b>Practice flags:</b> only {@code --no-warnings}. We do NOT cap the heap because practice
+     * routinely parses 30-file diff patches that allocate transiently; a 256 MB cap would convert
+     * worst-case-input OOMs from "rare" to "regular." We do NOT {@code --expose-gc} because the
+     * practice runner never calls {@code global.gc()} and exposing the global is a foot-gun.
+     *
+     * <p>Note: {@code --disable-source-maps} was removed — the flag was dropped in Node 22 (source
+     * maps are off by default; the flag itself no longer exists and causes {@code bad option} exit 9).
      *
      * <p>We deliberately removed {@code --max-semi-space-size=16} and {@code UV_THREADPOOL_SIZE=2}
      * from prior revisions: the former matches the Node 22 default on 64-bit (so it was a no-op),
@@ -191,9 +191,9 @@ public class PiRuntimeFactory {
      */
     private static String nodeFlagsFor(String runnerScript) {
         if (MENTOR_RUNNER_SCRIPT.equals(runnerScript)) {
-            return "--max-old-space-size=256 --disable-source-maps --no-warnings --expose-gc ";
+            return "--max-old-space-size=256 --no-warnings --expose-gc ";
         }
-        return "--disable-source-maps --no-warnings ";
+        return "--no-warnings ";
     }
 
     /**

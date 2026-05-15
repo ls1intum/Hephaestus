@@ -551,36 +551,43 @@ async function handleReplayContext(id, params) {
         return sendError(id, ERR.PI_ERROR, `bind failed: ${e.message ?? e}`);
     }
 
-    // Append all replayed messages as system-note custom entries that DO participate in the LLM
-    // context (per session-manager.d.ts §82-99 — appendCustomMessageEntry feeds buildSessionContext).
-    // We intentionally do NOT re-prompt; the agent should treat replay as a recap of prior turns,
-    // not as a fresh user instruction. The history shows what was said; the next `prompt` frame
-    // drives the new turn.
-    const sm = runtime.services?.sessionManager ?? runtime.session.sessionManager;
+    // Seed the LLM context with prior conversation history.
+    //
+    // Root-cause note: appendCustomMessageEntry (used here before) writes entries of
+    // type "custom_message" to the session JSONL. Those entries surface in buildSessionContext
+    // (used by the interactive CLI renderer) but are NOT included in createContextSnapshot —
+    // the method runPromptMessages calls to build the messages array sent to the LLM.
+    // Only agent._state.messages (populated by processEvents on each message_end) reaches
+    // the LLM. appendCustomMessageEntry was therefore a silent no-op for conversation history.
+    //
+    // Fix: push synthetic user/assistant pairs directly into agent._state.messages.
+    // Guard: if _state.messages is already non-empty the session file was loaded with prior
+    // turns (warm container, same thread); replay would duplicate them — skip.
+    // Stub mode: runtime.session.agent is undefined; skip gracefully.
+    const agent = runtime.session?.agent;
+    if (!agent) {
+        // Stub / PROTOCOL_ONLY mode — no real agent, replay is a no-op.
+        return sendResult(id, { replayed: 0 });
+    }
+    if (agent._state.messages.length > 0 || messages.length === 0) {
+        log(`replay_context: skip (existing=${agent._state.messages.length}, offered=${messages.length})`);
+        return sendResult(id, { replayed: 0 });
+    }
+    let replayed = 0;
     try {
-        if (sm && typeof sm.appendCustomMessageEntry === "function") {
-            // Boundary note: makes it obvious to the LLM that the following turns are recap.
-            sm.appendCustomMessageEntry(
-                "hephaestus.replay_boundary",
-                `Context replayed from previous turns — ${messages.length} message(s).`,
-                /* display */ false,
-            );
-            for (const msg of messages) {
-                const role = msg?.role === "assistant" ? "assistant" : "user";
-                // Java owns the flattening: `text` is the pre-extracted concatenation of every
-                // type==="text" entry in `parts`. We accept `parts` as a fallback so future
-                // structured replay (tool calls, reasoning) can roll through without a server
-                // ABI bump; today only text entries make it into the LLM-visible recap.
-                const text = String(msg?.text ?? flattenPartsToText(msg?.parts)).trim();
-                if (!text) continue;
-                const tag = role === "assistant" ? "Assistant said" : "Student said";
-                sm.appendCustomMessageEntry(`hephaestus.replay.${role}`, `${tag}: ${text}`, /* display */ false);
-            }
-        } else {
-            // Degraded mode — see audit note at top of file. Document and continue.
-            log("appendCustomMessageEntry unavailable; replay degraded to a no-op");
+        for (const msg of messages) {
+            const role = msg?.role === "assistant" ? "assistant" : "user";
+            // Java owns the flattening: `text` is the pre-extracted concatenation of every
+            // type==="text" entry in `parts`. We accept `parts` as a fallback so future
+            // structured replay (tool calls, reasoning) can roll through without a server
+            // ABI bump; today only text entries make it into the LLM-visible recap.
+            const text = String(msg?.text ?? flattenPartsToText(msg?.parts)).trim();
+            if (!text) continue;
+            agent._state.messages.push({ role, content: [{ type: "text", text }] });
+            replayed++;
         }
-        sendResult(id, { replayed: messages.length });
+        log(`replay_context: seeded ${replayed} messages into LLM context`);
+        sendResult(id, { replayed });
     } catch (e) {
         log(`replay_context failed: ${e.message ?? e}`);
         sendError(id, ERR.PI_ERROR, `replay failed: ${e.message ?? e}`);
