@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -8,6 +9,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.agent.runtime.PiAgentProperties;
+import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
@@ -145,12 +147,16 @@ class PiImagePullBootstrapperTest extends BaseUnitTest {
     // ─── NEVER policy ───────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("NEVER: performs no Docker operations at all")
-    void never_noDockerInteractions() {
+    @DisplayName("NEVER: only probes image presence to emit a warning; never pulls")
+    void never_onlyProbesPresence() {
         var bootstrapper = bootstrapperWith(ImagePullPolicy.NEVER);
 
         bootstrapper.pullOnStartup();
 
+        // NEVER deliberately reads imageIsPresent so it can emit an operator warning when
+        // the image isn't in the local daemon (container creation would otherwise fail with
+        // an inscrutable error at attach time). The contract is "no pulls", not "no probes".
+        verify(imageOps).imageIsPresent(any());
         verifyNoMoreInteractions(imageOps);
     }
 }

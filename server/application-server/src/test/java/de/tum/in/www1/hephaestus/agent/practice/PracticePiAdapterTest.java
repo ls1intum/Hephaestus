@@ -9,7 +9,7 @@ import de.tum.in.www1.hephaestus.agent.runtime.PiAgentProperties;
 import de.tum.in.www1.hephaestus.agent.runtime.PiResultParser;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi;
-import de.tum.in.www1.hephaestus.agent.sandbox.docker.ImagePullPolicy;
+import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;

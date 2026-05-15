@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.agent.mentor;
 
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
-import de.tum.in.www1.hephaestus.agent.sandbox.docker.ImagePullPolicy;
+import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;

@@ -391,11 +391,14 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(scriptIdx).as("runner script present").isGreaterThan(nodeIdx);
             String nodePrefix = body.substring(nodeIdx, scriptIdx);
             assertThat(nodePrefix)
-                .contains("--disable-source-maps")
                 .contains("--no-warnings")
                 .doesNotContain("--max-old-space-size")
                 .doesNotContain("--max-semi-space-size")
-                .doesNotContain("--expose-gc");
+                .doesNotContain("--expose-gc")
+                // Loop-4 removed --disable-source-maps: it's an unrecognised Node CLI flag in
+                // Node 22 and causes the runner to exit 9 at startup. The runner ships without
+                // it; this assertion now guards the regression in the other direction.
+                .doesNotContain("--disable-source-maps");
             // The shell segment IMMEDIATELY preceding `node ` must not set LD_PRELOAD /
             // MALLOC_CONF. The earlier auth-setup prefix never sets either; but to make the
             // assertion meaningful (rather than tautological against a prefix that never
@@ -460,9 +463,11 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             String nodePrefix = body.substring(nodeIdx, scriptIdx);
             assertThat(nodePrefix)
                 .contains("--max-old-space-size=256")
-                .contains("--disable-source-maps")
                 .contains("--no-warnings")
-                .contains("--expose-gc");
+                .contains("--expose-gc")
+                // Loop-4: --disable-source-maps is an unrecognised Node CLI flag and crashes
+                // the runner at startup (exit 9). Must NOT be present for either runner.
+                .doesNotContain("--disable-source-maps");
             // LD_PRELOAD + MALLOC_CONF appear in the shell env BEFORE `node `, scoped to that
             // invocation only — they do NOT leak to bun (precompute) or other tools.
             String beforeNode = body.substring(0, nodeIdx);

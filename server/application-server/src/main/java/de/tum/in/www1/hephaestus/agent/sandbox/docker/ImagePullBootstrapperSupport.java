@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker;
 
+import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;

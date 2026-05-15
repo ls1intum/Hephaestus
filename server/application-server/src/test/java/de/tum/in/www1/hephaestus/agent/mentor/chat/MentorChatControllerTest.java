@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
-import de.tum.in.www1.hephaestus.agent.sandbox.docker.ImagePullPolicy;
+import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;

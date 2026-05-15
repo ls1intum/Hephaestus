@@ -22,7 +22,7 @@ import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerExcepti
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
-import de.tum.in.www1.hephaestus.agent.sandbox.docker.ImagePullPolicy;
+import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;

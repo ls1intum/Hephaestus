@@ -583,7 +583,24 @@ async function handleReplayContext(id, params) {
             // ABI bump; today only text entries make it into the LLM-visible recap.
             const text = String(msg?.text ?? flattenPartsToText(msg?.parts)).trim();
             if (!text) continue;
-            agent._state.messages.push({ role, content: [{ type: "text", text }] });
+            // Synthetic message shapes for `agent._state.messages`. Assistant messages MUST
+            // carry `usage` and `stopReason` — Pi SDK's `calculateContextTokens` (called from
+            // `getContextStats` on every prompt) reads `usage.totalTokens` unconditionally on
+            // any assistant message whose `stopReason` is neither "aborted" nor "error". A
+            // missing `usage` throws `Cannot read properties of undefined (reading
+            // 'totalTokens')` and the whole prompt rejects. Seeding zeroed usage tells the SDK
+            // "this synthetic message contributed no measured tokens" — the next real turn's
+            // assistant message will populate proper usage and compaction picks up from there.
+            if (role === "assistant") {
+                agent._state.messages.push({
+                    role: "assistant",
+                    content: [{ type: "text", text }],
+                    stopReason: "stop",
+                    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 },
+                });
+            } else {
+                agent._state.messages.push({ role: "user", content: [{ type: "text", text }] });
+            }
             replayed++;
         }
         log(`replay_context: seeded ${replayed} messages into LLM context`);

@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.runtime;
 
-import de.tum.in.www1.hephaestus.agent.sandbox.docker.ImagePullPolicy;
+import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;

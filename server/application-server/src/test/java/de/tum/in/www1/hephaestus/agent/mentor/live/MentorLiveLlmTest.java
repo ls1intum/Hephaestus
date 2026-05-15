@@ -251,6 +251,157 @@ class MentorLiveLlmTest {
         }
     }
 
+    @Test
+    @DisplayName("multi-turn (warm runner): turn 2 recalls a fact from turn 1 — proves agent._state.messages threading")
+    void multiTurn_secondTurnRecallsFirst() throws Exception {
+        // Regression for the loop-4 bug "Conversation history not working". When a single
+        // long-lived runner processes turn 1 then turn 2 on the same thread, the Pi SDK's
+        // session-bound agent appends both the user prompt and the assistant response to
+        // agent._state.messages on each `message_end`. The NEXT turn's createContextSnapshot
+        // must therefore see the full prior history without any explicit replay.
+        //
+        // If anything regresses (rebind drops the agent reference, switchSession resets
+        // state, dispatch races clobber the array), the second turn's LLM call sees ONLY
+        // the new prompt and cannot answer a recall question — the symptom shown in the
+        // user's broken-multi-turn screenshot.
+        LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
+        UUID threadId = UUID.randomUUID();
+        workspaceDir = stageWorkspace(creds);
+        sandbox = spawnRunner(creds, workspaceDir);
+
+        var driver = new RunnerDriver(sandbox);
+        driver.expectRunnerReady();
+        driver.helloOk();
+        driver.openThread(threadId);
+
+        // Turn 1: plant a token only the assistant can have seen.
+        String t1Text = runTurnAndCollect(
+            driver,
+            threadId,
+            "Remember the number forty-two. Reply with exactly: noted."
+        );
+        System.out.printf("[multi-turn] turn 1 (%d chars): %s%n", t1Text.length(), trim(t1Text, 200));
+        assertThat(t1Text.trim()).as("turn 1 produced a non-empty response").isNotEmpty();
+
+        // Turn 2: ask the LLM to recall the fact. If agent._state.messages was not threaded
+        // through turn 1 → turn 2, the LLM has no way to answer this.
+        String t2Text = runTurnAndCollect(
+            driver,
+            threadId,
+            "What number did I ask you to remember? Reply with only the digits."
+        );
+        System.out.printf("[multi-turn] turn 2 (%d chars): %s%n", t2Text.length(), trim(t2Text, 200));
+        // gpt-oss-120b is well-behaved on this prompt; accept "42" or the spelled-out form.
+        String t2Lower = t2Text.toLowerCase();
+        assertThat(t2Lower)
+            .as(
+                "turn 2 must recall the planted number — if this fails, agent._state.messages " +
+                    "is not being fed through between turns and multi-turn conversation is broken " +
+                    "(see loop-4 audit, MentorChatService.runTurn + handleReplayContext)"
+            )
+            .satisfiesAnyOf(s -> assertThat(s).contains("42"), s -> assertThat(s).contains("forty-two"));
+    }
+
+    @Test
+    @DisplayName("replay_context seeds LLM history on a fresh thread: cold-restart recall works")
+    void replayContext_seedsLlmHistoryOnFreshThread() throws Exception {
+        // Regression for the loop-4 fix in handleReplayContext (pi-mentor-runner.mjs).
+        // Production scenario: a mentor session is evicted (idle TTL, container kill,
+        // deploy). On the next user message, MentorChatService gives the FRESH runner the
+        // last 20 chat_message rows via `replay_context` BEFORE the new prompt.
+        //
+        // The fix pushes those messages into `agent._state.messages` (previously they went
+        // to `appendCustomMessageEntry`, which writes to the JSONL log but is NEVER read
+        // by `createContextSnapshot` — so the LLM saw an empty history after restart).
+        //
+        // We simulate the cold-restart path by opening a BRAND-NEW thread and calling
+        // replay_context with synthetic history before the first prompt. This is exactly
+        // the runner state a cold container is in: the agent's `_state.messages` is empty,
+        // replay is the only history path. The follow-up prompt then asks for a recall
+        // that's only answerable if replay correctly fed the LLM.
+        LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
+        UUID threadId = UUID.randomUUID();
+        workspaceDir = stageWorkspace(creds);
+        sandbox = spawnRunner(creds, workspaceDir);
+
+        var driver = new RunnerDriver(sandbox);
+        driver.expectRunnerReady();
+        driver.helloOk();
+        driver.openThread(threadId);
+
+        // Seed synthetic history mirroring what MentorChatService.buildReplay produces:
+        // each message has {role, text} where `text` is the flattened concatenation of
+        // every type==="text" entry from chat_message.parts.
+        ObjectNode replayParams = MAPPER.createObjectNode();
+        replayParams.put("threadId", threadId.toString());
+        var msgs = replayParams.putArray("messages");
+        ObjectNode userMsg = msgs.addObject();
+        userMsg.put("role", "user");
+        userMsg.put("text", "Remember: my favorite colour is teal. Reply with exactly: noted.");
+        ObjectNode assistantMsg = msgs.addObject();
+        assistantMsg.put("role", "assistant");
+        assistantMsg.put("text", "noted");
+
+        JsonNode replayResp = driver.callRaw("replay_context", replayParams, Duration.ofSeconds(10));
+        int replayed = replayResp.path("result").path("replayed").asInt(-1);
+        System.out.printf("[replay] seeded %d messages%n", replayed);
+        assertThat(replayed)
+            .as(
+                "replay_context must report ≥2 messages seeded on a fresh thread. If 0, the " +
+                    "loop-4 fix regressed: messages were pushed to the wrong place (display-only " +
+                    "appendCustomMessageEntry, which buildSessionContext reads but createContextSnapshot " +
+                    "ignores) and the LLM cannot see prior turns after a cold restart."
+            )
+            .isEqualTo(2);
+
+        // Follow-up question: only answerable if the seeded history reached the LLM.
+        String t2Text = runTurnAndCollect(
+            driver,
+            threadId,
+            "What is my favorite colour? Reply with only the colour name."
+        );
+        System.out.printf("[replay] follow-up (%d chars): %s%n", t2Text.length(), trim(t2Text, 200));
+        assertThat(t2Text.toLowerCase())
+            .as(
+                "after cold-restart replay, the follow-up turn must recall the planted fact. " +
+                    "Failure mode: the runner is again writing replay to appendCustomMessageEntry " +
+                    "(display-only) and the LLM sees an empty history."
+            )
+            .contains("teal");
+    }
+
+    /**
+     * Drive one full turn against the runner and collect the concatenated text deltas.
+     * Used by multi-turn / resume tests to assert on the LLM's actual response text.
+     */
+    private String runTurnAndCollect(RunnerDriver driver, UUID threadId, String prompt) throws Exception {
+        PiEventToUiChunkTranslator translator = new PiEventToUiChunkTranslator();
+        TranslatorState state = new TranslatorState(UUID.randomUUID());
+        List<UIMessageChunk> chunks = new ArrayList<>();
+        var done = new java.util.concurrent.CompletableFuture<Void>();
+        // Use a per-turn subscription so collected chunks are scoped to this turn only.
+        var unsubscribe = sandbox.subscribe(frame -> {
+            if (!isThreadEvent(frame, threadId)) return;
+            JsonNode event = frame.path("params").path("event");
+            chunks.addAll(translator.translate(event, state));
+            if ("agent_end".equals(event.path("type").asText())) {
+                done.complete(null);
+            }
+        });
+        try {
+            driver.prompt(threadId, prompt);
+            done.get(TURN_TIMEOUT.toSeconds(), java.util.concurrent.TimeUnit.SECONDS);
+            return chunks
+                .stream()
+                .filter(UIMessageChunk.TextDelta.class::isInstance)
+                .map(UIMessageChunk.TextDelta.class::cast)
+                .map(UIMessageChunk.TextDelta::delta)
+                .reduce("", String::concat);
+        } finally {
+            unsubscribe.dispose();
+        }
+    }
+
     // ────────────────────────────────────────────────────────────────────────────────
     // Workspace + process plumbing
     // ────────────────────────────────────────────────────────────────────────────────
@@ -464,6 +615,11 @@ class MentorLiveLlmTest {
             assertThat(response.path("result").path("accepted").asBoolean())
                 .as("prompt accepted (turn streams via events)")
                 .isTrue();
+        }
+
+        /** Test-only escape hatch: send a raw method call and return the full response frame. */
+        JsonNode callRaw(String method, JsonNode params, Duration timeout) {
+            return call(method, params, timeout);
         }
 
         private JsonNode call(String method, JsonNode params, Duration timeout) {
