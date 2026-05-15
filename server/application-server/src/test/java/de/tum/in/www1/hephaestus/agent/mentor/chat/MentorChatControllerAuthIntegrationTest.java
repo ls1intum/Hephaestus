@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -33,6 +34,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * test fires the real filter chain so a future regression that removes either guard surfaces
  * here, not in production.
  */
+// Test profile disables mentor by default (see application-test.yml); opt back in here so the
+// MentorChatController + dependents are registered. The @MockitoBean below provides the sandbox
+// SPI dependency that DockerSandboxConfiguration would otherwise have to supply.
+@TestPropertySource(properties = "hephaestus.mentor.enabled=true")
 @AutoConfigureWebTestClient
 @DisplayName("MentorChatController auth integration")
 class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrationTest {

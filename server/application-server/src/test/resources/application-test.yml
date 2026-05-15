@@ -62,6 +62,14 @@ github:
 hephaestus:
     workspace:
         init-default: false # Disable PAT workspace bootstrap
+    # Mentor (Pi-powered interactive chat) is OFF by default in tests because its bean graph
+    # transitively requires InteractiveSandboxService, which is only registered by
+    # DockerSandboxConfiguration (gated on hephaestus.sandbox.enabled=true) and needs a Docker
+    # daemon. Mentor-specific integration tests opt in via @TestPropertySource at the class
+    # level and provide a @MockitoBean InteractiveSandboxService. Production application.yml
+    # keeps the default ON (MENTOR_ENABLED=true) so this override is test-only.
+    mentor:
+        enabled: false
     cors:
         allowed-origins:
             - http://localhost:4200
