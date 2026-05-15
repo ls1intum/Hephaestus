@@ -94,6 +94,61 @@ class MentorSandboxStressTest {
         stagedWorkspaces.clear();
     }
 
+    /**
+     * Per-user multi-session scenario. Spawns N runners (one per simulated user) and inside each
+     * opens K mentor threads, then drives a serial K-turn round-robin: prompt thread 0 → wait for
+     * agent_end → prompt thread 1 → … This is the production scenario for a power user with
+     * multiple mentor conversations open — sessions multiplex through one
+     * {@code AgentSessionRuntime} via {@code switchSession}, not separate containers.
+     *
+     * <p>The interesting number is the <b>per-session marginal RSS</b>: how much extra memory each
+     * extra thread costs once the Pi SDK is loaded. The single-session test gives the floor
+     * (~150 MB); this test gives the slope.
+     *
+     * <p>Run: {@code N=3 K=5 ./mvnw -Plive-tests test -Dtest=MentorSandboxStressTest#multiSessionPerRunner}.
+     */
+    @Test
+    @DisplayName("N runners × K sessions each: per-user multi-thread footprint")
+    void multiSessionPerRunner() throws Exception {
+        int n = Integer.parseInt(System.getenv().getOrDefault("N", "3"));
+        int k = Integer.parseInt(System.getenv().getOrDefault("K", "5"));
+        LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
+        ensurePiSdkInstalled();
+
+        ScheduledExecutorService sampler = Executors.newScheduledThreadPool(2);
+        try {
+            var runners = new ArrayList<MultiSessionRunnerMetrics>(n);
+            for (int i = 0; i < n; i++) runners.add(new MultiSessionRunnerMetrics(i, k));
+
+            long t0 = System.nanoTime();
+            var futures = new ArrayList<CompletableFuture<Void>>(n);
+            for (var r : runners) {
+                futures.add(
+                    CompletableFuture.runAsync(() -> {
+                        try {
+                            runOneMultiSessionRunner(creds, r, sampler);
+                        } catch (Exception e) {
+                            r.failure = e;
+                        }
+                    })
+                );
+            }
+            // Budget: cold-start + K × per-turn ceiling. K=5 → 30s cold + 5×120s = 630s ceiling.
+            long budget = 30 + (long) k * SESSION_BUDGET.toSeconds() + 30;
+            CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).get(budget, TimeUnit.SECONDS);
+            long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
+
+            reportMultiSession(n, k, elapsedMs, runners);
+
+            int failed = (int) runners.stream().filter(r -> r.failure != null).count();
+            if (failed > 0) {
+                throw new AssertionError("multi-session stress failed: " + failed + "/" + n + " runners errored");
+            }
+        } finally {
+            sampler.shutdownNow();
+        }
+    }
+
     @Test
     @DisplayName("N concurrent runners: capture cold-start, RSS, turn latency")
     void stressNConcurrentRunners() throws Exception {
@@ -190,6 +245,241 @@ class MentorSandboxStressTest {
         } finally {
             sampleFuture.cancel(false);
         }
+    }
+
+    /**
+     * One runner, K threads. Opens all K threads up front (capturing each switchSession cost),
+     * then drives K serial turns — one prompt per thread. We do this serially because Pi's
+     * single-active-session model means concurrent prompts to different threads would queue on
+     * the dispatchQueue anyway; a real user clicking between threads exhibits the same shape.
+     *
+     * <p>Per-RSS samples capture the growth curve: baseline after open_threadₖ, then plateau
+     * during each turn. Reported numbers: RSS at each stage so we can see the marginal cost.
+     */
+    private void runOneMultiSessionRunner(
+        LiveLlmCredentials creds,
+        MultiSessionRunnerMetrics r,
+        ScheduledExecutorService sampler
+    ) throws Exception {
+        Path ws = stageWorkspace(creds, r.id);
+        stagedWorkspaces.add(ws);
+
+        r.spawnStartNanos = System.nanoTime();
+        StdioAttachedSandbox sandbox = spawnRunner(creds, ws);
+        sandboxes.add(sandbox);
+        r.runnerPid = sandbox.process().pid();
+
+        var sampleFuture = sampler.scheduleAtFixedRate(
+            () -> {
+                if (!sandbox.process().isAlive()) return;
+                try {
+                    r.samples.add(readProcStatus(r.runnerPid));
+                } catch (IOException ignored) {}
+            },
+            0,
+            250,
+            TimeUnit.MILLISECONDS
+        );
+
+        try {
+            var driver = new RunnerDriver(sandbox);
+            driver.expectRunnerReady(Duration.ofSeconds(30));
+            r.readyNanos = System.nanoTime();
+            driver.helloOk(Duration.ofSeconds(10));
+
+            // Open thread #0 first, drive ONE turn, then capture RSS — this is the true single-
+            // session baseline for this exact runner. Per-extra-session marginal then becomes
+            // (RSS_after_K_opens - baseline) / (K-1), avoiding the apples-vs-oranges error of
+            // using the first /proc sample (before Pi SDK was loaded at all).
+
+            // Subscribe once for all per-thread agent_end signals.
+            var turnCompletes = new ConcurrentHashMap<UUID, CompletableFuture<Void>>();
+            sandbox.subscribe(frame -> {
+                if (!"event".equals(frame.path("method").asText())) return;
+                String tid = frame.path("params").path("threadId").asText();
+                UUID parsed;
+                try {
+                    parsed = UUID.fromString(tid);
+                } catch (Exception e) {
+                    return;
+                }
+                if ("agent_end".equals(frame.path("params").path("event").path("type").asText())) {
+                    CompletableFuture<Void> cf = turnCompletes.get(parsed);
+                    if (cf != null) cf.complete(null);
+                }
+            });
+
+            r.threadIds = new UUID[r.k];
+
+            // Stage 1a — open thread #0 and run one warm-up turn so the Pi runtime is fully
+            // initialised. RSS sample taken here is the honest "one-session container floor".
+            UUID warmupTid = UUID.randomUUID();
+            r.threadIds[0] = warmupTid;
+            turnCompletes.put(warmupTid, new CompletableFuture<>());
+            driver.openThread(warmupTid, Duration.ofSeconds(30));
+            driver.prompt(warmupTid, "Reply with the single word: ready.", Duration.ofSeconds(10));
+            turnCompletes.get(warmupTid).get(SESSION_BUDGET.toSeconds(), TimeUnit.SECONDS);
+            r.rssOneSessionFloorKb = currentRss(r.runnerPid);
+
+            // Stage 1b — open threads #1..#K-1. switchSession on each.
+            for (int i = 1; i < r.k; i++) {
+                UUID tid = UUID.randomUUID();
+                r.threadIds[i] = tid;
+                turnCompletes.put(tid, new CompletableFuture<>());
+                driver.openThread(tid, Duration.ofSeconds(30));
+            }
+            r.allThreadsOpenedNanos = System.nanoTime();
+            r.rssAfterOpenKb = currentRss(r.runnerPid);
+
+            // Stage 2 — drive K-1 more serial turns on the remaining threads (thread #0 already
+            // warmed up). Total: K turns across K threads.
+            for (int i = 1; i < r.k; i++) {
+                UUID tid = r.threadIds[i];
+                long promptStart = System.nanoTime();
+                driver.prompt(
+                    tid,
+                    "In one sentence: what is dependency injection? (thread #" + (i + 1) + "/" + r.k + ")",
+                    Duration.ofSeconds(10)
+                );
+                turnCompletes.get(tid).get(SESSION_BUDGET.toSeconds(), TimeUnit.SECONDS);
+                long turnMs = (System.nanoTime() - promptStart) / 1_000_000;
+                r.perTurnMs.add(turnMs);
+            }
+            r.allTurnsDoneNanos = System.nanoTime();
+            r.rssAfterAllTurnsKb = currentRss(r.runnerPid);
+        } finally {
+            sampleFuture.cancel(false);
+        }
+    }
+
+    private static long currentRss(long pid) {
+        try {
+            return readProcStatus(pid)[1];
+        } catch (IOException e) {
+            return -1L;
+        }
+    }
+
+    private void reportMultiSession(int n, int k, long elapsedMs, List<MultiSessionRunnerMetrics> runners) {
+        System.out.println("");
+        System.out.println("══════════════════════════════════════════════════════════════════");
+        System.out.printf(
+            "MULTI-SESSION STRESS — N=%d runners × K=%d sessions each (wall-clock %d ms)%n",
+            n,
+            k,
+            elapsedMs
+        );
+        System.out.println("══════════════════════════════════════════════════════════════════");
+
+        long[] coldStarts = runners
+            .stream()
+            .filter(r -> r.readyNanos > 0)
+            .mapToLong(r -> (r.readyNanos - r.spawnStartNanos) / 1_000_000)
+            .sorted()
+            .toArray();
+        long[] openAllMs = runners
+            .stream()
+            .filter(r -> r.allThreadsOpenedNanos > 0)
+            .mapToLong(r -> (r.allThreadsOpenedNanos - r.readyNanos) / 1_000_000)
+            .sorted()
+            .toArray();
+        long[] turnMs = runners
+            .stream()
+            .flatMapToLong(r -> r.perTurnMs.stream().mapToLong(Long::longValue))
+            .sorted()
+            .toArray();
+
+        // RSS measurements at three timepoints.
+        long[] rssAtOpenAll = runners
+            .stream()
+            .filter(r -> r.rssAfterOpenKb > 0)
+            .mapToLong(r -> r.rssAfterOpenKb)
+            .sorted()
+            .toArray();
+        long[] rssAfterTurns = runners
+            .stream()
+            .filter(r -> r.rssAfterAllTurnsKb > 0)
+            .mapToLong(r -> r.rssAfterAllTurnsKb)
+            .sorted()
+            .toArray();
+        long[] peakRssKb = runners
+            .stream()
+            .filter(r -> !r.samples.isEmpty())
+            .mapToLong(r -> r.samples.stream().mapToLong(arr -> arr[1]).max().orElse(0))
+            .sorted()
+            .toArray();
+
+        printRow("cold-start (spawn→ready)", "ms", coldStarts);
+        printRow("open K threads (total)", "ms", openAllMs);
+        printRow("per-turn (prompt→agent_end)", "ms", turnMs);
+        printRow("RSS after K opens", "KB", rssAtOpenAll);
+        printRow("RSS after K turns", "KB", rssAfterTurns);
+        printRow("peak RSS per runner", "KB", peakRssKb);
+
+        // True marginal: extra RSS each ADDITIONAL session costs on top of a fully-warm
+        // one-session container. Pi SDK init + V8 baseline + per-runtime state are already
+        // amortised into rssOneSessionFloorKb.
+        long[] rssOneSessionFloor = runners
+            .stream()
+            .filter(r -> r.rssOneSessionFloorKb > 0)
+            .mapToLong(r -> r.rssOneSessionFloorKb)
+            .sorted()
+            .toArray();
+        printRow("RSS after 1 warm session", "KB", rssOneSessionFloor);
+
+        long[] marginalKbPerExtraSession = runners
+            .stream()
+            .filter(r -> r.rssAfterOpenKb > 0 && r.rssOneSessionFloorKb > 0 && k > 1)
+            .mapToLong(r -> {
+                long delta = r.rssAfterOpenKb - r.rssOneSessionFloorKb;
+                return delta > 0 ? delta / (k - 1) : 0L;
+            })
+            .filter(v -> v > 0)
+            .sorted()
+            .toArray();
+        if (marginalKbPerExtraSession.length > 0) {
+            printRow("marginal RSS / extra session", "KB", marginalKbPerExtraSession);
+        }
+
+        long totalPeakRssMb = (peakRssKb.length == 0
+                ? 0L
+                : java.util.stream.LongStream.of(peakRssKb).sum() / 1024L);
+        long avgFloorMb = rssOneSessionFloor.length == 0
+            ? 0L
+            : (java.util.stream.LongStream.of(rssOneSessionFloor).sum() / rssOneSessionFloor.length / 1024L);
+        long avgMarginalKb = marginalKbPerExtraSession.length == 0
+            ? 0L
+            : java.util.stream.LongStream.of(marginalKbPerExtraSession).sum() / marginalKbPerExtraSession.length;
+        System.out.printf(
+            "%n  ▸ aggregate peak RSS across all %d runners (× %d sessions): %d MB%n",
+            peakRssKb.length,
+            k,
+            totalPeakRssMb
+        );
+        System.out.printf("  ▸ container floor per user (1 warm session): %d MB%n", avgFloorMb);
+        if (avgMarginalKb > 0) {
+            System.out.printf("  ▸ marginal RSS per extra session multiplexed in: %d KB%n", avgMarginalKb);
+        }
+        // Naive 1-container-per-session vs our 1-container-per-user multiplexed shape.
+        long naiveMb = avgFloorMb * k;
+        long actualMb = totalPeakRssMb / Math.max(1L, n);
+        if (naiveMb > 0 && actualMb > 0) {
+            System.out.printf(
+                "  ▸ multiplexing saving vs naive 1-container-per-session: %.1f× (%d MB → %d MB per user)%n",
+                naiveMb / (double) actualMb,
+                naiveMb,
+                actualMb
+            );
+        }
+
+        long failed = runners.stream().filter(r -> r.failure != null).count();
+        System.out.printf("  ▸ failures: %d / %d%n", failed, n);
+        for (var r : runners) {
+            if (r.failure != null) {
+                System.out.printf("    [runner %d, pid %d] %s%n", r.id, r.runnerPid, r.failure);
+            }
+        }
+        System.out.println("══════════════════════════════════════════════════════════════════");
     }
 
     private void report(int n, long elapsedMs, List<SessionMetrics> sessions) {
@@ -395,6 +685,30 @@ class MentorSandboxStressTest {
         await import(__RUNNER_URL__);
         """).replace("__WORKSPACE__", "\"" + workspace.toString().replace("\\", "\\\\") + "\"")
             .replace("__RUNNER_URL__", "\"" + runner.toUri() + "\"");
+    }
+
+    /** Per-runner metric capture for the multi-session test. K threads opened in one runner. */
+    private static final class MultiSessionRunnerMetrics {
+
+        final int id;
+        final int k;
+        long runnerPid;
+        long spawnStartNanos;
+        long readyNanos;
+        long allThreadsOpenedNanos;
+        long allTurnsDoneNanos;
+        long rssAfterOpenKb;
+        long rssAfterAllTurnsKb;
+        long rssOneSessionFloorKb;
+        UUID[] threadIds;
+        final List<Long> perTurnMs = new CopyOnWriteArrayList<>();
+        final List<long[]> samples = new CopyOnWriteArrayList<>();
+        volatile Throwable failure;
+
+        MultiSessionRunnerMetrics(int id, int k) {
+            this.id = id;
+            this.k = k;
+        }
     }
 
     /** Per-session metric capture. All times are System.nanoTime() ticks; samples are /proc snapshots. */
