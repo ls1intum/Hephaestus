@@ -323,9 +323,10 @@ class MentorChatServiceTest extends BaseUnitTest {
             throw new AssertionError(e);
         }
         assertThat(turnLock.activeKeys()).isZero();
-        // Wave-17 R3: in-flight conflict tagged distinctly so SLO panels separate "real failure"
-        // from "load-shed retry" — the DB unique-index path triggers IN_FLIGHT_CONFLICT.
-        assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT);
+        // In-flight conflict tagged distinctly so SLO panels separate "real failure" from
+        // "load-shed retry". This persistence-throws path triggers the DB-index outcome —
+        // the JVM lock was acquired, so the conflict comes from the durable backstop.
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_DB);
     }
 
     /**

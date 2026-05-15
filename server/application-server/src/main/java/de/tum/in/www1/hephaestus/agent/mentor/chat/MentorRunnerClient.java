@@ -37,10 +37,16 @@ public final class MentorRunnerClient implements AutoCloseable {
     public static final int PROTOCOL_VERSION = 1;
     public static final Duration DEFAULT_CONTROL_TIMEOUT = Duration.ofSeconds(10);
     /**
-     * Default deadline for {@code prompt}. The runner's worst-case path is its watchdog budget
-     * (TURN_BUDGET_MS=120s soft) + grace (TURN_GRACE_MS=30s hard) + a synthetic agent_end frame.
-     * The Java deadline must outlast that worst case so the runner — not the client — owns
-     * turn cancellation. 165s = 120 + 30 + 15s slop for the synthetic emit + transport latency.
+     * Deadline for the {@code prompt} JSON-RPC <em>ack</em> — not a turn duration. The runner
+     * replies {@code {accepted:true}} synchronously after binding the thread and arming its
+     * watchdog (see {@code pi-mentor-runner.mjs#handlePrompt} → {@code sendResult(id, {accepted:true})}),
+     * then fires {@code runtime.session.prompt(...)} fire-and-forget. Turn streaming and
+     * cancellation are observed via subscribed events; the runner's 120s + 30s watchdog owns
+     * the actual turn deadline. This timeout exists only to surface a runner hang during
+     * {@code bindThread}/{@code switchSession} (typical: tens of milliseconds; pathological:
+     * multiple seconds on a large session JSONL). The generous 165s upper bound leaves slack
+     * for a cold-start cohort awaiting {@code ensureRuntime} behind a single mutex; in
+     * practice the future resolves in &lt;1s on warm runners.
      */
     public static final Duration DEFAULT_PROMPT_TIMEOUT = Duration.ofSeconds(165);
 

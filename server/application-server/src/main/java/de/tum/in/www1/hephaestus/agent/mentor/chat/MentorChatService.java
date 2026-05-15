@@ -144,7 +144,7 @@ public class MentorChatService {
                     return Boolean.TRUE;
                 } catch (TurnAlreadyInFlightException dup) {
                     log.info("Mentor turn rejected (DB in-flight index): {}", dup.getMessage());
-                    metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT);
+                    metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_DB);
                     channel.completeWithConflict();
                     return Boolean.FALSE;
                 } catch (RuntimeException e) {
@@ -168,7 +168,7 @@ public class MentorChatService {
                     key.workspaceId(),
                     key.threadId()
                 );
-                metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT);
+                metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_LOCAL);
                 channel.completeWithConflict();
             }
         } catch (Throwable t) {

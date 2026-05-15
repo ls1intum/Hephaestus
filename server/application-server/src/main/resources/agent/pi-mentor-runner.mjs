@@ -20,6 +20,17 @@ import path from "node:path";
 // events sufficient for protocol tests. Production builds never set this.
 const PROTOCOL_ONLY = process.env.MENTOR_RUNNER_PROTOCOL_ONLY === "1";
 
+// PROTOCOL_ONLY swaps the Pi SDK for a deterministic stub. Catching a config drift that flips
+// this on in prod is critical — every prompt would return `stub: <text>` instead of an LLM
+// response, with no other surface signal. Log loudly on startup; the runner has no signed
+// flag to refuse to run, but ops should see this in the container's first stderr line.
+if (PROTOCOL_ONLY) {
+    process.stderr.write(
+        "[pi-mentor-runner] WARN MENTOR_RUNNER_PROTOCOL_ONLY=1 — Pi SDK disabled, all prompts will be stubbed. " +
+            "This must never be set in production. Unset MENTOR_RUNNER_PROTOCOL_ONLY to use the real Pi runtime.\n",
+    );
+}
+
 let sdk;
 async function loadSdk() {
     if (sdk) return sdk;
@@ -31,9 +42,13 @@ async function loadSdk() {
     return sdk;
 }
 
-const CWD = "/workspace";
-const SESSIONS_DIR = "/workspace/.sessions";
-const SYSTEM_PROMPT_PATH = "/workspace/agent/mentor/system.md";
+// Production paths are pinned to the container layout (/workspace/...). PROTOCOL_ONLY tests
+// and CI smoke-test invocations run the runner as a plain Node process where /workspace is
+// unwritable; MENTOR_RUNNER_SESSIONS_DIR / MENTOR_RUNNER_SYSTEM_PROMPT_PATH let callers point
+// at a tmpdir without forking the runner code.
+const CWD = process.env.MENTOR_RUNNER_CWD ?? "/workspace";
+const SESSIONS_DIR = process.env.MENTOR_RUNNER_SESSIONS_DIR ?? "/workspace/.sessions";
+const SYSTEM_PROMPT_PATH = process.env.MENTOR_RUNNER_SYSTEM_PROMPT_PATH ?? "/workspace/agent/mentor/system.md";
 // The SDK's `getAgentDir()` is the canonical default ("~/.pi/agent"). We resolve it lazily
 // inside `ensureRuntime()` so the module loads without the SDK in protocol-only test mode.
 const AGENT_DIR_OVERRIDE = process.env.PI_CODING_AGENT_DIR ?? null;
@@ -130,7 +145,7 @@ function sendResult(id, result) {
     // JSON-RPC 2.0 §4: `id` absent (undefined here) = notification → MUST NOT respond.
     // `id: null` is a valid request id — DO respond (used by §6 batch-rejection paths).
     if (id === undefined) return;
-    writeFrame({ jsonrpc: "2.0", id: id === null ? null : id, result: result ?? null });
+    writeFrame({ jsonrpc: "2.0", id, result: result ?? null });
 }
 
 function sendError(id, code, message, data) {
@@ -140,7 +155,7 @@ function sendError(id, code, message, data) {
     if (id === undefined) return;
     const err = { code, message };
     if (data !== undefined) err.data = data;
-    writeFrame({ jsonrpc: "2.0", id: id === null ? null : id, error: err });
+    writeFrame({ jsonrpc: "2.0", id, error: err });
 }
 
 function sendEvent(threadId, event) {
@@ -788,9 +803,25 @@ async function runWatchdogRebind(state) {
         }
         // Rebind to a fresh AgentSession on the same JSONL file (switchSession teardown
         // invalidates captured extension ctx; listeners are session-scoped per Pi SDK).
+        // If a DIFFERENT thread is currently bound, tear down its subscription first; otherwise
+        // the rebind silently steals the runtime and leaks the prior subscription. After a
+        // successful switchSession the runtime is now bound to OUR sessionPath, so update
+        // activeThreadId; the prior code left the invariant stale after a watchdog rebind.
         if (runtime) {
             try {
+                if (activeThreadId && activeThreadId !== state.threadId) {
+                    const prev = threads.get(activeThreadId);
+                    if (prev?.unsubscribe) {
+                        try {
+                            prev.unsubscribe();
+                        } catch {
+                            /* ignore */
+                        }
+                        prev.unsubscribe = null;
+                    }
+                }
                 await runtime.switchSession(state.sessionPath);
+                activeThreadId = state.threadId;
                 state.unsubscribe = runtime.session.subscribe((event) => forwardEvent(state, event));
             } catch (e) {
                 log(`watchdog rebind failed for thread=${state.threadId}: ${e.message ?? e}`);
@@ -977,9 +1008,13 @@ function start() {
     });
 
     process.stdin.on("data", (chunk) => splitter(chunk));
+    // Route stdin EOF through the dispatch queue so cleanup invariants (runtime.dispose,
+    // unsubscribe of every active thread, pending fetch_context rejection) run identically
+    // for SIGTERM and EOF. Exiting directly here skipped the SessionManager file flush and
+    // left jemalloc thread caches uncollected on parent-process drop.
     process.stdin.on("end", () => {
         log("stdin EOF — shutting down");
-        process.exit(0);
+        enqueue(() => handleShutdown(undefined));
     });
     process.stdin.on("error", (e) => {
         log("stdin error:", e);
@@ -1003,18 +1038,21 @@ function start() {
     // callbacks, disposes the runtime, drains the dispatch chain). Without these, the
     // process exits with the default disposition mid-task — any in-flight Pi event between
     // user-visible chunks vanishes on the wire and Java waits for its 165s prompt deadline.
+    // Pass `undefined` (not `null`) so `sendResult` skips emitting a response frame — there's
+    // no RPC request to reply to. `null` would emit `{id:null, result:…}`, a JSON-RPC reply to
+    // nobody, polluting Java's frame log on every signal-driven shutdown.
     for (const signal of ["SIGTERM", "SIGINT"]) {
         process.on(signal, () => {
             log(`received ${signal} — initiating clean shutdown`);
-            enqueue(() => handleShutdown(null));
+            enqueue(() => handleShutdown(undefined));
         });
     }
 
     // Allocator self-check. PiRuntimeFactory passes LD_PRELOAD=…/libjemalloc.so.2 in the
     // mentor runner's spawn env, and the Dockerfile creates the per-arch symlink at build time.
     // If either of those drifts (symlink missing on a future image, env var clobbered by a
-    // future deploy config), ld.so silently falls back to glibc malloc and the wave-22+ tuning
-    // (MALLOC_CONF dirty_decay, narenas) disappears. Without this check the regression would
+    // future deploy config), ld.so silently falls back to glibc malloc and the MALLOC_CONF
+    // tuning (dirty_decay, narenas) disappears. Without this check the regression would
     // only manifest as a slow RSS bloat in production with no clear cause. One stderr line at
     // startup is enough — ops can grep for it.
     if (!PROTOCOL_ONLY) {

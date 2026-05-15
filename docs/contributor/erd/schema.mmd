@@ -82,6 +82,8 @@ erDiagram
         VARCHAR(16) role "NOT NULL"
         UUID parent_message_id FK
         UUID thread_id FK "NOT NULL"
+        JSONB parts "NOT NULL"
+        BIGINT version "NOT NULL"
     }
 
     ChatMessagePart {
@@ -93,7 +95,7 @@ erDiagram
     }
 
     ChatMessageVote {
-        UUID message_id PK
+        UUID message_id PK,FK
         TIMESTAMPTZ created_at "NOT NULL"
         BOOLEAN is_upvoted "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
@@ -103,7 +105,6 @@ erDiagram
         UUID id PK
         TIMESTAMPTZ created_at "NOT NULL"
         TEXT title
-        UUID selected_leaf_message_id FK,UK
         BIGINT user_id FK
         BIGINT workspace_id FK "NOT NULL"
     }
@@ -365,6 +366,16 @@ erDiagram
         TIMESTAMPTZ last_sync_at
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+    }
+
+    ModelPricing {
+        VARCHAR(128) model_id PK
+        NUMERIC(12,6) per_1k_input_usd "NOT NULL"
+        NUMERIC(12,6) per_1k_output_usd "NOT NULL"
+        NUMERIC(12,6) per_1k_cache_read_usd
+        NUMERIC(12,6) per_1k_cache_write_usd
+        TIMESTAMPTZ valid_from "NOT NULL"
+        TIMESTAMPTZ valid_to
     }
 
     Organization {
@@ -762,7 +773,7 @@ erDiagram
     Workspace ||--|| ActivityEvent : has
     Workspace ||--|| AgentConfig : has
     ChatMessage ||--|| ChatMessagePart : has
-    ChatMessage ||--|| ChatThread : references
+    ChatMessage ||--|| ChatMessageVote : has
     GitCommit ||--|| CommitContributor : has
     DiscussionComment ||--|| Discussion : references
     GitProvider ||--|| Discussion : references

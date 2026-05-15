@@ -145,7 +145,10 @@
                 WHERE (metadata ->> 'status') = 'in_flight';
         </sql>
         <rollback>
-            <sql>DROP INDEX IF EXISTS ux_chat_message_in_flight;</sql>
+            <!-- Mirror the forward path: DROP INDEX CONCURRENTLY so rollback on a hot prod DB
+                 doesn't acquire ACCESS EXCLUSIVE behind every reader. The rollback inherits the
+                 parent changeSet's runInTransaction="false", per Liquibase 4.x docs. -->
+            <sql>DROP INDEX CONCURRENTLY IF EXISTS ux_chat_message_in_flight;</sql>
         </rollback>
     </changeSet>
 
@@ -213,13 +216,13 @@
 
     <!-- 8. Drop the dead chat_thread.selected_leaf_message_id column. The pre-Pi
          intelligence-service tracked the "currently displayed leaf" in a branching
-         conversation tree by storing the leaf id directly. The wave-15 intelligence-service
-         deletion removed the writer; only the reader survived (always null). The Pi mentor
-         issue spec (#1071) explicitly says the leaf is "resolved from the tree" — computed,
-         not stored. Shipping the column + FK + unique constraint + wire field through 4
-         layers when nobody writes to it is dead weight; the webapp's generated client never
-         consumes the field. Drop the column and tighten the wire. Future branching support
-         (if ever) computes the leaf from chat_message's tree structure. -->
+         conversation tree by storing the leaf id directly. With the intelligence-service
+         module removed in this PR the writer is gone; only the reader survived (always null).
+         The Pi mentor issue spec (#1071) explicitly says the leaf is "resolved from the tree"
+         — computed, not stored. Shipping the column + FK + unique constraint + wire field
+         through 4 layers when nobody writes to it is dead weight; the webapp's generated
+         client never consumes the field. Drop the column and tighten the wire. Future
+         branching support (if ever) computes the leaf from chat_message's tree structure. -->
     <changeSet id="mentor-1071-drop-selected-leaf-message-fk" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="FK already dropped">
             <foreignKeyConstraintExists foreignKeyName="FK34beodgwi0g7kn66svlk4hlfr"/>
@@ -235,7 +238,7 @@
 
     <changeSet id="mentor-1071-drop-selected-leaf-message-unique" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="Unique constraint already dropped">
-            <uniqueConstraintExists constraintName="UC_CHAT_THREADSELECTED_LEAF_MESSAGE_ID_COL"/>
+            <uniqueConstraintExists tableName="chat_thread" constraintName="UC_CHAT_THREADSELECTED_LEAF_MESSAGE_ID_COL"/>
         </preConditions>
         <comment>Drop unique constraint on chat_thread.selected_leaf_message_id</comment>
         <dropUniqueConstraint tableName="chat_thread"
@@ -341,10 +344,10 @@
         </rollback>
     </changeSet>
 
-    <!-- 13. Tighten the metadata CHECK to enforce the status enum. The wave-14 constraint only
-         pinned the shape (object-or-null); a future writer that forgets `status` or typos it
-         (`"in_flite"`) wouldn't be caught at write-time, and the partial unique index +
-         reaper SQL silently disagree on what's in-flight. -->
+    <!-- 13. Tighten the metadata CHECK to enforce the status enum. The earlier shape constraint
+         (changeSet 4 above) only pinned object-or-null; a future writer that forgets `status`
+         or typos it (`"in_flite"`) wouldn't be caught at write-time, and the partial unique
+         index + reaper SQL silently disagree on what's in-flight. -->
     <changeSet id="mentor-1071-tighten-metadata-status-check" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="metadata status enum check already applied">
             <sqlCheck expectedResult="t">
@@ -355,11 +358,15 @@
             </sqlCheck>
         </preConditions>
         <comment>Tighten metadata CHECK: if status key is present it must be one of (in_flight, completed, interrupted)</comment>
+        <!-- jsonb_exists(metadata, 'status') instead of the `?` operator: Liquibase's SQL
+             pre-processor parses `?` as a JDBC placeholder and fails with "syntax error at
+             or near '$1'". jsonb_exists is the function-form equivalent that survives
+             unmodified through the JDBC layer. -->
         <sql>
             ALTER TABLE chat_message ADD CONSTRAINT chk_chat_message_metadata_status
             CHECK (
                 metadata IS NULL
-                OR NOT (metadata ? 'status')
+                OR NOT jsonb_exists(metadata, 'status')
                 OR (metadata->>'status') IN ('in_flight', 'completed', 'interrupted')
             );
         </sql>

@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -72,8 +73,14 @@ final class MentorSseChannel implements AutoCloseable {
      * thread) can otherwise byte-interleave on the socket, producing a corrupt SSE stream that
      * AI-SDK's parser rejects. The terminal {@code complete*} paths also acquire this lock so
      * a heartbeat fires before, not concurrent with, the {@code [DONE]} sentinel.
+     *
+     * <p>Uses {@link ReentrantLock} rather than {@code synchronized} because the turn body runs
+     * on a virtual thread ({@code MentorChatExecutorConfig#mentorTurnExecutor}). JEP 444's known
+     * pinning rule: {@code synchronized} blocks pin the carrier OS thread for their full duration,
+     * including any blocking I/O inside (here: socket writes on a slow client). {@link ReentrantLock}
+     * is Loom-friendly and unpins on park.
      */
-    private final Object writeLock = new Object();
+    private final ReentrantLock writeLock = new ReentrantLock();
     private volatile ScheduledFuture<?> heartbeat;
 
     MentorSseChannel(SseEmitter emitter, ObjectMapper objectMapper, ScheduledExecutorService scheduler) {
@@ -144,7 +151,8 @@ final class MentorSseChannel implements AutoCloseable {
                 if (clientGone.get() || closed.get()) return;
                 long quietNs = System.nanoTime() - lastSendNanos.get();
                 if (quietNs < HEARTBEAT_QUIET_NS) return;
-                synchronized (writeLock) {
+                writeLock.lock();
+                try {
                     if (clientGone.get() || closed.get()) return;
                     try {
                         emitter.send(SseEmitter.event().comment("ping"));
@@ -157,6 +165,8 @@ final class MentorSseChannel implements AutoCloseable {
                         log.debug("Heartbeat send failed; flagging disconnected: {}", ex.toString());
                         flagDisconnected();
                     }
+                } finally {
+                    writeLock.unlock();
                 }
             },
             HEARTBEAT_INITIAL_DELAY_MS,
@@ -183,7 +193,8 @@ final class MentorSseChannel implements AutoCloseable {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialise UIMessageChunk", e);
         }
-        synchronized (writeLock) {
+        writeLock.lock();
+        try {
             if (clientGone.get() || closed.get()) return;
             try {
                 emitter.send(SseEmitter.event().data(payload));
@@ -195,6 +206,8 @@ final class MentorSseChannel implements AutoCloseable {
                 flagDisconnected();
                 throw new ClientDisconnectedException("SSE emitter closed: " + ex.getMessage(), ex);
             }
+        } finally {
+            writeLock.unlock();
         }
     }
 
@@ -206,7 +219,8 @@ final class MentorSseChannel implements AutoCloseable {
      */
     void completeWithDone() {
         cancelHeartbeat();
-        synchronized (writeLock) {
+        writeLock.lock();
+        try {
             if (!closed.compareAndSet(false, true)) return;
             try {
                 emitter.send(SseEmitter.event().data("[DONE]"));
@@ -214,6 +228,8 @@ final class MentorSseChannel implements AutoCloseable {
             try {
                 emitter.complete();
             } catch (RuntimeException ignored) {}
+        } finally {
+            writeLock.unlock();
         }
     }
 

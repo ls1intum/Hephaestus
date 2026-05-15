@@ -31,9 +31,8 @@ Run the relevant commands locally before opening a PR:
 | ----------------- | ---------------------- | ---------------------------------------------- |
 | Format everything | `npm run format`       | Apply formatting to Java + TypeScript + webapp |
 | Check formatting  | `npm run format:check` | Verify formatting without changes (CI)         |
-| Lint everything   | `npm run lint`         | Format check + Biome + typecheck               |
+| Lint everything   | `npm run lint`         | Lint all server + client packages              |
 | Full check        | `npm run check`        | Comprehensive: format + lint + typecheck       |
-| CI check          | `npm run ci`           | CI-optimized check across all services         |
 
 ### Per-service commands
 

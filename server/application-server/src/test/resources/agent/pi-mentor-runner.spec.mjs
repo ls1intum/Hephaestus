@@ -13,12 +13,25 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import test from "node:test";
 import assert from "node:assert/strict";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const RUNNER = path.resolve(__dirname, "../../../main/resources/agent/pi-mentor-runner.mjs");
+
+// Production runner targets /workspace/.sessions, which is unwritable in CI / local node test
+// runs. Spawn each runner with an isolated tmpdir to keep the smoke tests hermetic.
+const SESSIONS_TMPDIR = mkdtempSync(path.join(tmpdir(), "pi-mentor-runner-spec-"));
+process.on("exit", () => {
+    try {
+        rmSync(SESSIONS_TMPDIR, { recursive: true, force: true });
+    } catch {
+        /* best-effort tmpdir cleanup; safe to ignore on shutdown */
+    }
+});
 
 // ─── Test-side line splitter mirrors the runner's strict semantics ───────────
 function createReader() {
@@ -67,7 +80,12 @@ function createReader() {
 
 function spawnRunner() {
     const child = spawn(process.execPath, [RUNNER], {
-        env: { ...process.env, MENTOR_RUNNER_PROTOCOL_ONLY: "1", MENTOR_RUNNER_STUB_DELAY_MS: "5" },
+        env: {
+            ...process.env,
+            MENTOR_RUNNER_PROTOCOL_ONLY: "1",
+            MENTOR_RUNNER_STUB_DELAY_MS: "5",
+            MENTOR_RUNNER_SESSIONS_DIR: SESSIONS_TMPDIR,
+        },
         stdio: ["pipe", "pipe", "pipe"],
     });
     const reader = createReader();
@@ -131,7 +149,12 @@ test("U+2028 and U+2029 inside JSON strings do NOT split frames", async () => {
 test("second concurrent prompt returns -32001 turn_already_in_flight", async () => {
     // Use a slow stub so the first prompt is still in flight when we fire the second.
     const child = spawn(process.execPath, [RUNNER], {
-        env: { ...process.env, MENTOR_RUNNER_PROTOCOL_ONLY: "1", MENTOR_RUNNER_STUB_DELAY_MS: "150" },
+        env: {
+            ...process.env,
+            MENTOR_RUNNER_PROTOCOL_ONLY: "1",
+            MENTOR_RUNNER_STUB_DELAY_MS: "150",
+            MENTOR_RUNNER_SESSIONS_DIR: SESSIONS_TMPDIR,
+        },
         stdio: ["pipe", "pipe", "pipe"],
     });
     const reader = createReader();
@@ -162,7 +185,11 @@ test("batch JSON-RPC request is rejected with -32600 (not silently dropped)", as
     // the runner rejects them loudly so a future Java caller that bundles requests doesn't
     // see its frames vanish into the runner's log.
     const child = spawn(process.execPath, [RUNNER], {
-        env: { ...process.env, MENTOR_RUNNER_PROTOCOL_ONLY: "1" },
+        env: {
+            ...process.env,
+            MENTOR_RUNNER_PROTOCOL_ONLY: "1",
+            MENTOR_RUNNER_SESSIONS_DIR: SESSIONS_TMPDIR,
+        },
         stdio: ["pipe", "pipe", "pipe"],
     });
     const reader = createReader();

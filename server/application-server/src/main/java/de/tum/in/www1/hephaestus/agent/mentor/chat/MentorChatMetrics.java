@@ -25,13 +25,24 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "hephaestus.mentor.enabled", havingValue = "true")
 public class MentorChatMetrics {
 
-    /** Tag value enum kept small; reviewers can scan the table to see every terminal branch. */
+    /**
+     * Tag value enum kept small; reviewers can scan the table to see every terminal branch.
+     *
+     * <p>The two conflict outcomes are distinct on purpose: {@link #IN_FLIGHT_CONFLICT_LOCAL}
+     * fires when the in-JVM {@link MentorTurnLock} rejects a same-JVM double-submit;
+     * {@link #IN_FLIGHT_CONFLICT_DB} fires when the durable partial-unique index catches a
+     * cross-replica race (until #1077 sticky-affinity lands). Operationally, the DB-side
+     * outcome firing in prod is the signal that says "the JVM lock leaked through replica
+     * boundaries"; collapsing them into one label hides whether the durable backstop ever
+     * fires, which was the whole point of having both layers.
+     */
     public enum Outcome {
         SUCCESS("success"),
         CLIENT_DISCONNECT("client_disconnect"),
         POISONED("poisoned"),
         TIMEOUT("timeout"),
-        IN_FLIGHT_CONFLICT("in_flight_conflict"),
+        IN_FLIGHT_CONFLICT_LOCAL("in_flight_conflict_local"),
+        IN_FLIGHT_CONFLICT_DB("in_flight_conflict_db"),
         REJECTED("rejected"),
         ERROR("error");
 
