@@ -54,21 +54,6 @@ export function parseThreadMessages(messages: unknown): ChatMessage[] | undefine
 	return result.data as unknown as ChatMessage[];
 }
 
-/**
- * Parse a single chat message for validation.
- *
- * @param message - Unknown message from stream
- * @returns Validated ChatMessage or undefined
- */
-export function parseSingleMessage(message: unknown): ChatMessage | undefined {
-	const result = chatMessageSchema.safeParse(message);
-	if (!result.success) {
-		console.warn("[parseSingleMessage] Validation failed:", result.error);
-		return undefined;
-	}
-	return result.data as unknown as ChatMessage;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Vote Validation
 // ─────────────────────────────────────────────────────────────────────────────

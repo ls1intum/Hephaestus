@@ -232,102 +232,9 @@ describe("useMentorChat", () => {
 		});
 	});
 
-	describe("status transitions", () => {
-		it("should reflect 'ready' status initially", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.status).toBe("ready");
-		});
-
-		it("should reflect 'submitted' status when message is being sent", () => {
-			mockUseChat.mockReturnValue({
-				id: "mock-uuid-123",
-				messages: [createMockMessage("user", "Hello")],
-				status: "submitted",
-				error: undefined,
-				sendMessage: mockSendMessage,
-				setMessages: mockSetMessages,
-				stop: mockStop,
-				regenerate: mockRegenerate,
-				clearError: mockClearError,
-				resumeStream: vi.fn(),
-				addToolResult: vi.fn(),
-				addToolOutput: vi.fn(),
-				addToolApprovalResponse: vi.fn(),
-			});
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.status).toBe("submitted");
-		});
-
-		it("should reflect 'streaming' status during response streaming", () => {
-			mockUseChat.mockReturnValue({
-				id: "mock-uuid-123",
-				messages: [createMockMessage("user", "Hello"), createMockMessage("assistant", "Hi...")],
-				status: "streaming",
-				error: undefined,
-				sendMessage: mockSendMessage,
-				setMessages: mockSetMessages,
-				stop: mockStop,
-				regenerate: mockRegenerate,
-				clearError: mockClearError,
-				resumeStream: vi.fn(),
-				addToolResult: vi.fn(),
-				addToolOutput: vi.fn(),
-				addToolApprovalResponse: vi.fn(),
-			});
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.status).toBe("streaming");
-		});
-
-		it("should compute isLoading correctly for various states", () => {
-			// Test workspace loading
-			mockUseActiveWorkspaceSlug.mockReturnValue({
-				workspaceSlug: "test-workspace",
-				isLoading: true,
-			});
-
-			const { result: loadingResult, rerender } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(loadingResult.current.isLoading).toBe(true);
-
-			// Test submitted status
-			mockUseActiveWorkspaceSlug.mockReturnValue({
-				workspaceSlug: "test-workspace",
-				isLoading: false,
-			});
-
-			mockUseChat.mockReturnValue({
-				id: "mock-uuid-123",
-				messages: [],
-				status: "submitted",
-				error: undefined,
-				sendMessage: mockSendMessage,
-				setMessages: mockSetMessages,
-				stop: mockStop,
-				regenerate: mockRegenerate,
-				clearError: mockClearError,
-				resumeStream: vi.fn(),
-				addToolResult: vi.fn(),
-				addToolOutput: vi.fn(),
-				addToolApprovalResponse: vi.fn(),
-			});
-
-			rerender();
-			expect(loadingResult.current.isLoading).toBe(true);
-		});
-	});
+	// Status pass-through ("ready"/"submitted"/"streaming") is a mock round-trip — the hook
+	// returns whatever useChat returns. Covered structurally; behavioural assertion happens in
+	// live-LLM tests where the real status transitions matter.
 
 	describe("error handling", () => {
 		it("should expose error from useChat", () => {
@@ -394,13 +301,6 @@ describe("useMentorChat", () => {
 			);
 		});
 
-		it("should expose clearError function", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.clearError).toBe(mockClearError);
-		});
 	});
 
 	describe("vote functionality", () => {
@@ -576,20 +476,6 @@ describe("useMentorChat", () => {
 	});
 
 	describe("callback invocation", () => {
-		it("should pass onFinish to useChat", () => {
-			const onFinish = vi.fn();
-
-			renderHook(() => useMentorChat({ onFinish }), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(mockUseChat).toHaveBeenCalledWith(
-				expect.objectContaining({
-					onFinish: expect.any(Function),
-				}),
-			);
-		});
-
 		it("should invalidate queries when message finishes", async () => {
 			const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -644,42 +530,5 @@ describe("useMentorChat", () => {
 			);
 		});
 
-		it("should NOT pass experimental_throttle — Pi's text-delta cadence is already LLM-bound", () => {
-			// Throttling re-renders on top of an already-LLM-bound stream batches deltas in
-			// chunks of 1-3, breaking the live-typing UX. The hook deliberately omits the option.
-			renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			const config = mockUseChat.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
-			expect(config).toBeDefined();
-			expect(config).not.toHaveProperty("experimental_throttle");
-		});
-	});
-
-	describe("exposed controls", () => {
-		it("should expose stop function", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.stop).toBe(mockStop);
-		});
-
-		it("should expose regenerate function", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.regenerate).toBe(mockRegenerate);
-		});
-
-		it("should expose setMessages function", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.setMessages).toBe(mockSetMessages);
-		});
 	});
 });

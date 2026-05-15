@@ -17,39 +17,23 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
+/**
  * Per-turn façade over a single {@link SseEmitter}. Owns everything that writes to the wire —
  * chunk serialisation, comment-only heartbeats, terminal {@code [DONE]} sentinel, and the
  * "client gone" disconnect hook — so {@link MentorChatService} can stay focused on orchestration.
- *
- * <p>Lifecycle: instantiated once per turn inside {@link MentorChatService#start}, garbage-
- * collected when the turn ends. {@link #close()} cancels the heartbeat and is idempotent; the
- * orchestrator calls it from its {@code finally} regardless of how the turn finished.
- *
- * <p>The previous design used a singleton {@code WeakHashMap<AtomicBoolean, Runnable>} side-map
- * keyed by per-turn flags — needed only because there was no per-turn object owning the
- * disconnect hook. With the channel as the owner, the map evaporates: each instance carries
- * one {@link AtomicReference#get()} for the hook, and instance-scope replaces identity-scope.
+ * {@link #close()} is idempotent and called from the orchestrator's {@code finally} block.
  */
 final class MentorSseChannel implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(MentorSseChannel.class);
 
     /**
-     * Emit an SSE comment-only keep-alive after this many ns of silence. Bounded by the
-     * narrowest proxy idle window we ship against — Traefik defaults to 180s but some k8s
-     * ingress configs cap at 60s. Worst-case silence is {@code HEARTBEAT_INITIAL_DELAY_MS}
-     * (first tick) plus {@code HEARTBEAT_QUIET_NS}, so ≤ 21s.
+     * Emit an SSE comment-only keep-alive after this many ns of silence. ≤ 21 s worst-case
+     * silence (initial-delay + quiet), safe under proxies that idle-close at 30 s+.
      */
     private static final long HEARTBEAT_QUIET_NS = TimeUnit.SECONDS.toNanos(20);
 
-    /** Wake the heartbeat scheduler this often to check {@link #HEARTBEAT_QUIET_NS}. */
     private static final long HEARTBEAT_TICK_MS = 5_000;
-
-    /**
-     * First scheduler tick happens this many ms after {@link #startHeartbeat()}. Kept small so
-     * a context-build cold start doesn't leak a silence window of
-     * {@code HEARTBEAT_TICK_MS + HEARTBEAT_QUIET_NS} (~25s) before the first keep-alive.
-     */
     private static final long HEARTBEAT_INITIAL_DELAY_MS = 1_000;
 
     private final SseEmitter emitter;
@@ -68,17 +52,10 @@ final class MentorSseChannel implements AutoCloseable {
     private final AtomicLong lastSendNanos = new AtomicLong(System.nanoTime());
     private final AtomicReference<Runnable> disconnectHook = new AtomicReference<>();
     /**
-     * Serialises every write to {@link #emitter}. Spring's {@link SseEmitter#send} is NOT
-     * thread-safe — the heartbeat tick (scheduler thread) and chunk writes (runner-event
-     * thread) can otherwise byte-interleave on the socket, producing a corrupt SSE stream that
-     * AI-SDK's parser rejects. The terminal {@code complete*} paths also acquire this lock so
-     * a heartbeat fires before, not concurrent with, the {@code [DONE]} sentinel.
-     *
-     * <p>Uses {@link ReentrantLock} rather than {@code synchronized} because the turn body runs
-     * on a virtual thread ({@code MentorChatExecutorConfig#mentorTurnExecutor}). JEP 444's known
-     * pinning rule: {@code synchronized} blocks pin the carrier OS thread for their full duration,
-     * including any blocking I/O inside (here: socket writes on a slow client). {@link ReentrantLock}
-     * is Loom-friendly and unpins on park.
+     * Serialises every write to {@link #emitter} ({@link SseEmitter#send} is NOT thread-safe;
+     * heartbeat tick + chunk writes would otherwise byte-interleave). {@link ReentrantLock} not
+     * {@code synchronized}: the turn body runs on a virtual thread and JEP 444's monitor pins
+     * the carrier OS thread for the full critical section incl. socket writes.
      */
     private final ReentrantLock writeLock = new ReentrantLock();
     private volatile ScheduledFuture<?> heartbeat;
@@ -90,11 +67,9 @@ final class MentorSseChannel implements AutoCloseable {
     }
 
     /**
-     * Wire emitter lifecycle callbacks to flip the disconnect flag once. Must run before the
-     * orchestrator hands the emitter to async work — otherwise a fast client-side abort can
-     * close the emitter before lifecycle is bound. The orchestrator registers the disconnect
-     * hook (which has to capture later state — the runner client — via a holder) AFTER this
-     * call so the hook is in place when the first flip races in.
+     * Wire emitter lifecycle callbacks. Must run before the orchestrator hands the emitter to
+     * async work, otherwise a fast client-side abort can close the emitter before lifecycle
+     * binding completes.
      */
     void bindLifecycle() {
         emitter.onCompletion(this::flagDisconnected);

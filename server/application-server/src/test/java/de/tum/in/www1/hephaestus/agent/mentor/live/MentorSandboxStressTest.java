@@ -893,7 +893,6 @@ class MentorSandboxStressTest {
         private final java.util.concurrent.ConcurrentLinkedQueue<JsonNode> ready =
             new java.util.concurrent.ConcurrentLinkedQueue<>();
         private final AtomicLong idGen = new AtomicLong();
-        private final ConcurrentHashMap<Long, Object> requestSent = new ConcurrentHashMap<>();
 
         RunnerDriver(StdioAttachedSandbox sandbox) {
             this.sandbox = sandbox;
@@ -957,7 +956,6 @@ class MentorSandboxStressTest {
             req.put("id", id);
             req.put("method", method);
             req.set("params", params);
-            requestSent.put(id, Boolean.TRUE);
             sandbox.send(req);
             long deadline = System.nanoTime() + timeout.toNanos();
             while (System.nanoTime() < deadline) {

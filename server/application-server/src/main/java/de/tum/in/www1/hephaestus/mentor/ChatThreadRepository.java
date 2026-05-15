@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,19 +35,21 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
     Optional<ChatThread> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
     /** Projection: avoids materialising the full entity to fetch the JSONL blob. Empty when missing or NULL. */
+    @WorkspaceAgnostic("Caller has already resolved thread ownership via findByIdAndWorkspaceId")
     @Query("SELECT t.sessionJsonl FROM ChatThread t WHERE t.id = :threadId")
     Optional<byte[]> findSessionJsonl(@Param("threadId") UUID threadId);
 
     /** Projection write: avoids dirty-checking the entity. {@code persistInFlight} guarantees the row exists. */
     @Modifying
     @Transactional
+    @WorkspaceAgnostic("Caller has already resolved thread ownership via findByIdAndWorkspaceId")
     @Query("UPDATE ChatThread t SET t.sessionJsonl = :bytes WHERE t.id = :threadId")
     int updateSessionJsonl(@Param("threadId") UUID threadId, @Param("bytes") byte[] bytes);
 
     /**
      * Bulk-delete every thread for a workspace. Cascades to {@code chat_message} →
      * {@code chat_message_part} / {@code chat_message_vote} via existing FKs. Used by
-     * {@link de.tum.in.www1.hephaestus.mentor.MentorWorkspacePurgeContributor} on soft purge,
+     * {@link de.tum.in.www1.hephaestus.mentor.adapter.MentorWorkspacePurgeAdapter} on soft purge,
      * which leaves the workspace row in place (so the workspace-level cascade can't fire).
      */
     @Modifying

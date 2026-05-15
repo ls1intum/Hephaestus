@@ -72,18 +72,13 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         return false;
     }
 
-    /**
-     * {@code @Transactional} sits on the EXTERNAL entry point ({@code contribute}, invoked by
-     * {@link de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder} through the
-     * Spring proxy) — NOT on {@link #buildPayload}. Annotating {@code buildPayload} would be
-     * silently dropped because the only callers are self-invocations below.
-     */
+    /** Tx-on-contribute / not-on-buildPayload AOP convention documented at {@link MentorAspects}. */
     @Override
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
         String key = req.workspaceId() + ":" + req.contributorId();
-        Cache cache = cacheManager != null ? cacheManager.getCache(CACHE_NAME) : null;
+        Cache cache = cacheManager.getCache(CACHE_NAME);
         // Atomic compute-if-absent closes the get/build/put race on invalidation events.
         ObjectNode payload = (cache != null)
             ? cache.get(key, () -> buildPayload(req.workspaceId(), req.contributorId()))
@@ -118,15 +113,21 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
             workspaceId,
             since
         );
-        List<PullRequestReview> reviews = queryRepository.findReviewsReceivedSince(workspaceId, contributorId, since);
+        List<PullRequestReview> reviews = queryRepository.findReviewsReceivedSince(
+            workspaceId,
+            contributorId,
+            since,
+            PageRequest.of(0, MAX_RECENT_REVIEWS)
+        );
 
         ObjectNode root = objectMapper.createObjectNode();
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
 
         ObjectNode summary = root.putObject("summary");
-        long total = recent.size(); // recent is the visible-tail; total in window is the verdict sum.
+        // `recent` is a paged tail (size <= MAX_RECENT_FINDINGS); the verdict aggregate is the
+        // authoritative window total. Use it directly — no need to coalesce.
         long verdictTotal = byVerdict.stream().mapToLong(VerdictCount::getCount).sum();
-        summary.put("totalFindings", Math.max(total, verdictTotal));
+        summary.put("totalFindings", verdictTotal);
 
         ObjectNode verdictNode = summary.putObject("byVerdict");
         for (Verdict v : Verdict.values()) {
@@ -163,9 +164,7 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         }
 
         ArrayNode reviewsArr = root.putArray("reviewsReceived");
-        int reviewCount = 0;
         for (PullRequestReview review : reviews) {
-            if (reviewCount >= MAX_RECENT_REVIEWS) break;
             ObjectNode node = reviewsArr.addObject();
             if (review.getPullRequest() != null) {
                 node.put("prNumber", review.getPullRequest().getNumber());
@@ -180,7 +179,6 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
             }
             node.put("hasComment", review.getBody() != null && !review.getBody().isBlank());
             node.put("submittedAt", review.getSubmittedAt().toString());
-            reviewCount++;
         }
 
         return root;

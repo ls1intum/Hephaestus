@@ -186,7 +186,11 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
         @Param("threadIds") List<java.util.UUID> threadIds
     );
 
-    /** Reviews received on user's authored PRs within {@code since}..now, scoped to workspace. */
+    /**
+     * Reviews received on user's authored PRs within {@code since}..now, scoped to workspace.
+     * Page the cap into the DB query — a heavy reviewer's 90-day window can return hundreds of
+     * rows; surfacing more than {@code MAX_RECENT_REVIEWS} is wasted work.
+     */
     @Query(
         """
         SELECT prr
@@ -203,6 +207,7 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
     List<PullRequestReview> findReviewsReceivedSince(
         @Param("workspaceId") Long workspaceId,
         @Param("userId") Long userId,
-        @Param("since") Instant since
+        @Param("since") Instant since,
+        org.springframework.data.domain.Pageable page
     );
 }

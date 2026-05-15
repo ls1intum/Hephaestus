@@ -45,8 +45,8 @@ public class PiEventToUiChunkTranslator {
             case "turn_end" -> handleTurnEnd(state);
             case "agent_end" -> handleAgentEnd(piEvent, state);
             case "link_finding" -> handleLinkFinding(piEvent, state);
-            case "pi_error" -> handleError(piEvent);
-            case "turn_watchdog_fired" -> handleWatchdogFired();
+            case "pi_error" -> handleError(piEvent, state);
+            case "turn_watchdog_fired" -> handleWatchdogFired(state);
             case "session_persisted" -> handleSessionPersisted(piEvent, state);
             // Session-level events Pi emits that we intentionally drop. Listed explicitly so the
             // `default` arm can WARN on TRULY unknown types — silent default-drops hide protocol
@@ -86,11 +86,15 @@ public class PiEventToUiChunkTranslator {
 
     // ─── turn_watchdog_fired → Error with user-friendly text ──────────────────────────────
 
-    private List<UIMessageChunk> handleWatchdogFired() {
+    private List<UIMessageChunk> handleWatchdogFired(TranslatorState state) {
         // Runner emits this when the per-turn budget is exceeded; the bare type string
         // ("turn_watchdog_fired") leaked to the UI as the error text. Map to a user-facing
-        // message; the runner-side correlate is logged at WARN already.
-        return Collections.singletonList(new UIMessageChunk.Error("Mentor turn timed out before completion."));
+        // message; the runner-side correlate is logged at WARN already. Close any open
+        // text/reasoning block first so the AI SDK reducer doesn't crash on an `error` chunk
+        // following an unmatched `*-start` (vercel/ai #11700).
+        List<UIMessageChunk> out = new ArrayList<>(closeOpenStreamingBlocks(state));
+        out.add(new UIMessageChunk.Error("Mentor turn timed out before completion."));
+        return out;
     }
 
     // ─── message_end → no chunks, but captures the authoritative usage snapshot ───────────
@@ -449,7 +453,7 @@ public class PiEventToUiChunkTranslator {
 
     // ─── pi_error / turn_watchdog_fired → Error ───────────────────────────────────────────
 
-    private List<UIMessageChunk> handleError(JsonNode event) {
+    private List<UIMessageChunk> handleError(JsonNode event, TranslatorState state) {
         String errorText = optionalString(event, "message");
         if (errorText == null) {
             errorText = optionalString(event, "error");
@@ -457,7 +461,11 @@ public class PiEventToUiChunkTranslator {
         if (errorText == null) {
             errorText = event.get("type").asText();
         }
-        return Collections.singletonList(new UIMessageChunk.Error(errorText));
+        // Close any open text/reasoning block before the terminal error chunk: the AI SDK
+        // reducer crashes on an `error` chunk that follows an unmatched `*-start` (vercel/ai #11700).
+        List<UIMessageChunk> out = new ArrayList<>(closeOpenStreamingBlocks(state));
+        out.add(new UIMessageChunk.Error(errorText));
+        return out;
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────────────────────

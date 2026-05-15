@@ -10,7 +10,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Workspace-agnostic by intent: every entry point either runs as a crash-recovery sweep or is
+ * called from {@link de.tum.in.www1.hephaestus.mentor.ChatThreadService}, which has already
+ * resolved the thread's ownership inside the workspace and passes the message id verbatim.
+ */
 @Repository
+@WorkspaceAgnostic("Crash-recovery sweep + downstream-of-thread-ownership message lookup")
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> {
     /**
      * Flip assistant rows still {@code in_flight} past {@code cutoff} to {@code interrupted},
@@ -22,7 +28,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
      */
     @Modifying
     @Transactional
-    @WorkspaceAgnostic("Crash-recovery sweep over stuck rows; runs by created_at globally")
     @Query(
         value = """
         UPDATE chat_message

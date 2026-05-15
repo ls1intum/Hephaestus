@@ -123,7 +123,8 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
             // finding is permanent (linked chip in message history).
             new Object[] {
                 UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"),
-                "{\"type\":\"data-mentor-status\",\"data\":{\"state\":\"warming-up\",\"reason\":\"container-cold\"},\"transient\":true}",
+                "{\"type\":\"data-mentor-status\",\"id\":\"mentor-status\"," +
+                "\"data\":{\"state\":\"warming-up\",\"reason\":\"container-cold\"},\"transient\":true}",
             },
             new Object[] {
                 UIMessageChunk.DataFinding.of(findingId),

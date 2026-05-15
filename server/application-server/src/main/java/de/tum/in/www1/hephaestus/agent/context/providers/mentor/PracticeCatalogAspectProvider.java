@@ -52,18 +52,13 @@ public class PracticeCatalogAspectProvider implements ContentProvider {
         return false;
     }
 
-    /**
-     * {@code @Transactional} sits on the EXTERNAL entry point ({@code contribute}, invoked by
-     * {@link de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder} through the
-     * Spring proxy) — NOT on {@link #buildPayload}. Annotating {@code buildPayload} would be
-     * silently dropped because the only callers are self-invocations below.
-     */
+    /** Tx-on-contribute / not-on-buildPayload AOP convention documented at {@link MentorAspects}. */
     @Override
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
         Long key = req.workspaceId();
-        Cache cache = cacheManager != null ? cacheManager.getCache(CACHE_NAME) : null;
+        Cache cache = cacheManager.getCache(CACHE_NAME);
         // Atomic compute-if-absent closes the get/build/put race on invalidation events.
         ObjectNode payload = (cache != null)
             ? cache.get(key, () -> buildPayload(req.workspaceId()))

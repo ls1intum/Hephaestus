@@ -134,7 +134,8 @@ function GlobalCopilot() {
 		if (idx === -1) return;
 		// Keep everything before the edited message
 		mentorChat.setMessages(mentorChat.messages.slice(0, idx));
-		// Send the edited content as a new message; prepareSendMessagesRequest will set previousMessageId to the new last message
+		// Send the edited content as a new message; the server resolves the parent from the
+		// trimmed history (we only ship the new user message, not previousMessageId).
 		mentorChat.sendMessage(content);
 	};
 

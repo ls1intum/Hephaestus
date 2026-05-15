@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
+import org.springframework.cache.CacheManager;
 
 @DisplayName("WorkspaceAspectProvider")
 class WorkspaceAspectProviderTest extends BaseUnitTest {
@@ -41,6 +42,9 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
 
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
+
+    @Mock
+    CacheManager cacheManager;
 
     @InjectMocks
     WorkspaceAspectProvider provider;

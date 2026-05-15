@@ -1,5 +1,6 @@
-package de.tum.in.www1.hephaestus.mentor;
+package de.tum.in.www1.hephaestus.mentor.adapter;
 
+import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
 import de.tum.in.www1.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class MentorWorkspacePurgeContributor implements WorkspacePurgeContributor {
+public class MentorWorkspacePurgeAdapter implements WorkspacePurgeContributor {
 
     private final ChatThreadRepository chatThreadRepository;
 

@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
+import org.springframework.cache.CacheManager;
 
 @DisplayName("UserAspectProvider")
 class UserAspectProviderTest extends BaseUnitTest {
@@ -36,6 +37,9 @@ class UserAspectProviderTest extends BaseUnitTest {
 
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
+
+    @Mock
+    CacheManager cacheManager;
 
     @InjectMocks
     UserAspectProvider provider;

@@ -61,22 +61,13 @@ public class UserAspectProvider implements ContentProvider {
         return false;
     }
 
-    /**
-     * {@code @Transactional} sits on the EXTERNAL entry point ({@code contribute}, invoked
-     * by {@link de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder} through the
-     * Spring proxy) — NOT on {@link #buildPayload}. Annotating {@code buildPayload} would be
-     * silently dropped because the only callers are the two self-invocations below: Spring AOP
-     * intercepts via the proxy and {@code this.buildPayload(...)} bypasses the proxy entirely.
-     * With {@code spring.jpa.open-in-view=false} the only durable session is the one this
-     * annotation opens here, which now spans the cache loader callback too (Caffeine runs it
-     * synchronously on this same thread).
-     */
+    /** Tx-on-contribute / not-on-buildPayload AOP convention documented at {@link MentorAspects}. */
     @Override
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
         String key = req.workspaceId() + ":" + req.contributorId();
-        Cache cache = cacheManager != null ? cacheManager.getCache(CACHE_NAME) : null;
+        Cache cache = cacheManager.getCache(CACHE_NAME);
         // Atomic compute-if-absent — closes the get/build/put race: an invalidation event
         // landing between a separate get-miss and put would otherwise repopulate the cache with
         // stale data for the full TTL. Caffeine's loader is key-locked.

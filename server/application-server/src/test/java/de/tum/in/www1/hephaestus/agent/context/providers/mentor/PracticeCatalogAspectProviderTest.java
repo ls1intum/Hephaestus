@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
+import org.springframework.cache.CacheManager;
 
 @DisplayName("PracticeCatalogAspectProvider")
 class PracticeCatalogAspectProviderTest extends BaseUnitTest {
@@ -34,6 +35,9 @@ class PracticeCatalogAspectProviderTest extends BaseUnitTest {
 
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
+
+    @Mock
+    CacheManager cacheManager;
 
     @InjectMocks
     PracticeCatalogAspectProvider provider;

@@ -436,6 +436,37 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("pi_error mid-stream closes the open text block before emitting Error (vercel/ai #11700)")
+    void piError_closesOpenStreamingBlock() throws Exception {
+        // Drive a text-start + delta so an open block exists, then fire pi_error. The AI SDK
+        // client reducer crashes on an `error` chunk that follows an unmatched `*-start` — we
+        // must emit `text-end` first.
+        JsonNode start = fixture("message_start_assistant.json");
+        translator.translate(start, state);
+        JsonNode delta = fixture("message_update_text_delta.json");
+        translator.translate(delta, state);
+        JsonNode err = mapper.readTree("{\"type\":\"pi_error\",\"error\":\"upstream timeout\"}");
+        List<UIMessageChunk> out = translator.translate(err, state);
+        assertThat(out)
+            .extracting(c -> c.getClass().getSimpleName())
+            .containsExactly("TextEnd", "Error");
+    }
+
+    @Test
+    @DisplayName("turn_watchdog_fired mid-stream closes the open text block before emitting Error")
+    void watchdogFired_closesOpenStreamingBlock() throws Exception {
+        JsonNode start = fixture("message_start_assistant.json");
+        translator.translate(start, state);
+        JsonNode delta = fixture("message_update_text_delta.json");
+        translator.translate(delta, state);
+        JsonNode watchdog = mapper.readTree("{\"type\":\"turn_watchdog_fired\"}");
+        List<UIMessageChunk> out = translator.translate(watchdog, state);
+        assertThat(out)
+            .extracting(c -> c.getClass().getSimpleName())
+            .containsExactly("TextEnd", "Error");
+    }
+
+    @Test
     @DisplayName("turn_watchdog_fired surfaces a user-friendly Error string (not the bare type symbol)")
     void turnWatchdogFired_userFriendlyText() throws Exception {
         JsonNode event = mapper.readTree("{\"type\":\"turn_watchdog_fired\",\"threadId\":\"t\"}");
@@ -444,6 +475,18 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         UIMessageChunk.Error err = (UIMessageChunk.Error) out.get(0);
         // Must be human-readable, not the wire symbol "turn_watchdog_fired" (the pre-fix bug).
         assertThat(err.errorText()).doesNotContain("turn_watchdog_fired").contains("timed out");
+    }
+
+    @Test
+    @DisplayName("decrementStep does not corrupt the step depth below zero (regression)")
+    void decrementStep_clampsField() {
+        // Pi can emit more turn_end than start-step (e.g. agent_end without a paired turn_end).
+        // The field itself must clamp at 0; if it goes negative, the next incrementStep would
+        // return 0 instead of 1 and the step-start part would not advance.
+        state.decrementStep();
+        state.decrementStep();
+        int after = state.incrementStep();
+        assertThat(after).as("incrementStep after over-decrements should yield 1, not 0").isEqualTo(1);
     }
 
     @Test

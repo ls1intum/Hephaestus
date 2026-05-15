@@ -58,8 +58,6 @@ export type ChatTools = Record<string, { input: unknown; output: unknown }>;
  */
 export type ChatMessage = UIMessage<MessageMetadata, CustomUIDataTypes, ChatTools>;
 
-export type DataPart = never;
-
 export interface Attachment {
 	name: string;
 	url: string;

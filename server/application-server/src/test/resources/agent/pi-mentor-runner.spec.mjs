@@ -124,22 +124,42 @@ test("hello handshake returns protocolVersion 1", async () => {
 });
 
 test("U+2028 and U+2029 inside JSON strings do NOT split frames", async () => {
-    // This is the single test that catches the most insidious bug in the framing layer:
-    // Node's readline (and many naive line splitters) split on U+2028/U+2029, but those
-    // 3-byte UTF-8 sequences are legal inside JSON string values. The runner uses
-    // Buffer.indexOf(0x0a) directly to avoid this.
+    // The most insidious bug in the framing layer: many naive line splitters split on
+    // U+2028/U+2029, but JSON.stringify leaves those 3-byte UTF-8 sequences unescaped inside
+    // string values. The runner uses Buffer.indexOf(0x0a) directly to avoid this. Drive a real
+    // prompt frame whose text carries the chars; if the splitter mis-handled the bytes, the
+    // runner would see two malformed halves and we would never match the accept ack.
     const { child, reader, send } = spawnRunner();
     try {
         await readReady(reader);
-
+        const tid = "11111111-2222-3333-4444-555555555555";
+        send({ jsonrpc: "2.0", id: "o", method: "open_thread", params: { threadId: tid } });
+        await readUntil(reader, (f) => f?.id === "o");
         const tricky = `line1 line2 line3`;
-        send({ jsonrpc: "2.0", id: "echo", method: "open_thread", params: { threadId: tricky } });
-        const resp = await readUntil(reader, (f) => f?.id === "echo");
+        send({ jsonrpc: "2.0", id: "p", method: "prompt", params: { threadId: tid, text: tricky } });
+        const resp = await readUntil(reader, (f) => f?.id === "p");
+        assert.equal(resp.result?.accepted, true);
+    } finally {
+        send({ jsonrpc: "2.0", id: "shut", method: "shutdown", params: {} });
+        await new Promise((r) => child.on("exit", r));
+    }
+});
 
-        // The threadId should arrive back intact with both separators preserved as single chars.
-        assert.equal(resp.result.threadId, tricky);
-        assert.ok(resp.result.threadId.includes(" "));
-        assert.ok(resp.result.threadId.includes(" "));
+test("path-traversal threadId rejected with -32600", async () => {
+    // The runner is a security boundary: even though Java only ever passes UUIDs, a future
+    // bridge or debug shell that bypasses Java must not be able to coax path.join into
+    // resolving outside SESSIONS_DIR. Reject anything that is not a canonical UUID.
+    const { child, reader, send } = spawnRunner();
+    try {
+        await readReady(reader);
+        const cases = ["../../etc/passwd", "/etc/passwd", "..", "abc"];
+        for (let i = 0; i < cases.length; i++) {
+            const evil = cases[i];
+            const reqId = `t-${i}`;
+            send({ jsonrpc: "2.0", id: reqId, method: "open_thread", params: { threadId: evil } });
+            const resp = await readUntil(reader, (f) => f?.id === reqId);
+            assert.equal(resp.error?.code, -32600, `expected -32600 for "${evil}"`);
+        }
     } finally {
         send({ jsonrpc: "2.0", id: "shut", method: "shutdown", params: {} });
         await new Promise((r) => child.on("exit", r));
@@ -163,15 +183,15 @@ test("second concurrent prompt returns -32001 turn_already_in_flight", async () 
     const send = (obj) => child.stdin.write(JSON.stringify(obj) + "\n");
     try {
         await readReady(reader);
-        send({ jsonrpc: "2.0", id: "o1", method: "open_thread", params: { threadId: "t-concurrent" } });
+        send({ jsonrpc: "2.0", id: "o1", method: "open_thread", params: { threadId: "22222222-2222-2222-2222-222222222222" } });
         await readUntil(reader, (f) => f?.id === "o1");
 
-        send({ jsonrpc: "2.0", id: "p1", method: "prompt", params: { threadId: "t-concurrent", text: "first" } });
+        send({ jsonrpc: "2.0", id: "p1", method: "prompt", params: { threadId: "22222222-2222-2222-2222-222222222222", text: "first" } });
         const accepted = await readUntil(reader, (f) => f?.id === "p1");
         assert.equal(accepted.result?.accepted, true);
 
         // Fire the second prompt immediately — stub delay is 150ms so the first is still streaming.
-        send({ jsonrpc: "2.0", id: "p2", method: "prompt", params: { threadId: "t-concurrent", text: "second" } });
+        send({ jsonrpc: "2.0", id: "p2", method: "prompt", params: { threadId: "22222222-2222-2222-2222-222222222222", text: "second" } });
         const rejected = await readUntil(reader, (f) => f?.id === "p2");
         assert.equal(rejected.error?.code, -32001, "expected turn_already_in_flight");
     } finally {
@@ -261,19 +281,19 @@ test("watchdog cross-thread rebind: no event leakage from concurrently-bound thr
         await readReady(reader);
 
         // 1. open A — activeThreadId becomes A; subscribers = {A_callback}
-        send({ jsonrpc: "2.0", id: "oA", method: "open_thread", params: { threadId: "thread-A" } });
+        send({ jsonrpc: "2.0", id: "oA", method: "open_thread", params: { threadId: "33333333-3333-3333-3333-333333333333" } });
         await readUntil(reader, (f) => f?.id === "oA");
 
         // 2. prompt A — arms watchdog A (80 ms). Stub broadcasts agent_start NOW; A_callback
         //    is the only subscriber so we observe threadId=A only (legitimate).
-        send({ jsonrpc: "2.0", id: "pA1", method: "prompt", params: { threadId: "thread-A", text: "go" } });
+        send({ jsonrpc: "2.0", id: "pA1", method: "prompt", params: { threadId: "33333333-3333-3333-3333-333333333333", text: "go" } });
         const ack = await readUntil(reader, (f) => f?.id === "pA1");
         assert.equal(ack.result?.accepted, true);
 
         // 3. open B — bindThread B tears down A_callback, adds B_callback, activeThreadId=B.
         //    Must arrive BEFORE the watchdog ticks (80 ms after pA1 was accepted). The stub
         //    is fast — open_thread is a sync handler, so this races in well under 80 ms.
-        send({ jsonrpc: "2.0", id: "oB", method: "open_thread", params: { threadId: "thread-B" } });
+        send({ jsonrpc: "2.0", id: "oB", method: "open_thread", params: { threadId: "44444444-4444-4444-4444-444444444444" } });
         await readUntil(reader, (f) => f?.id === "oB");
 
         // 4 + 5. Collect every event frame until the stub's residue setTimeout chain drains,
@@ -322,7 +342,7 @@ test("watchdog cross-thread rebind: no event leakage from concurrently-bound thr
         const directRebindIdx = events.findIndex(
             (f, i) =>
                 i > watchdogSeenAtIndex &&
-                f?.params?.threadId === "thread-A" &&
+                f?.params?.threadId === "33333333-3333-3333-3333-333333333333" &&
                 f?.params?.event?.type === "agent_end"
         );
         assert.ok(
@@ -331,7 +351,7 @@ test("watchdog cross-thread rebind: no event leakage from concurrently-bound thr
                 JSON.stringify(events.map((f) => ({ tid: f?.params?.threadId, t: f?.params?.event?.type })))
         );
         const postRebind = events.slice(directRebindIdx + 1);
-        const leakedB = postRebind.filter((f) => f?.params?.threadId === "thread-B");
+        const leakedB = postRebind.filter((f) => f?.params?.threadId === "44444444-4444-4444-4444-444444444444");
         assert.deepEqual(
             leakedB.map((f) => f?.params?.event?.type),
             [],

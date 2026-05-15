@@ -99,8 +99,10 @@ function log(...args) {
     process.stderr.write(`[pi-mentor-runner ${ts}] ${msg}\n`);
 }
 
-// LF-only line splitter (NOT readline — readline mis-splits on U+2028/U+2029 inside JSON
-// string values). CRLF tolerant.
+// LF-only line splitter. JSON.stringify leaves U+2028/U+2029 unescaped (nodejs/node-v0.x-archive
+// #8221) so any splitter that treats Unicode line separators as newlines would corrupt JSON
+// payloads. We split on 0x0a only (CRLF tolerant); this is what Node `readline` does too, but
+// rolling our own keeps the framing rule trivially auditable and shared with the test fixture.
 function createLineSplitter(onLine) {
     let buffer = Buffer.alloc(0);
     const MAX_LINE_BYTES = 8 * 1024 * 1024; // 8 MiB hard cap; aspects are tiny but be safe
@@ -392,10 +394,19 @@ async function handleHello(id /*, params */) {
     }
 }
 
+// Canonical lowercase UUID, the only shape Java ever sends. Validating defensively at the
+// runner boundary means a future caller that bypasses Java (dev bridge, mis-routed message)
+// cannot land an arbitrary path inside `path.join(SESSIONS_DIR, …)` — `path.join` is NOT a
+// security primitive and happily resolves `..` / absolute paths out of the base.
+const THREAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 async function handleOpenThread(id, params) {
-    const threadId = String(params?.threadId ?? "").trim();
+    const threadId = String(params?.threadId ?? "").trim().toLowerCase();
     if (!threadId) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId is required");
+    }
+    if (!THREAD_ID_PATTERN.test(threadId)) {
+        return sendError(id, ERR.INVALID_REQUEST, "threadId must be a canonical UUID");
     }
     try {
         await ensureRuntime();
@@ -407,6 +418,12 @@ async function handleOpenThread(id, params) {
     let state = threads.get(threadId);
     if (!state) {
         const sessionPath = path.join(SESSIONS_DIR, `${threadId}.jsonl`);
+        // Defence-in-depth: even with the regex above, assert the resolved path stays inside
+        // SESSIONS_DIR. `path.resolve` collapses any residual `..` or symlink hop.
+        const resolvedSessions = path.resolve(SESSIONS_DIR) + path.sep;
+        if (!path.resolve(sessionPath).startsWith(resolvedSessions)) {
+            return sendError(id, ERR.INVALID_REQUEST, "threadId resolves outside sessions dir");
+        }
         state = new ThreadState(threadId, sessionPath);
         threads.set(threadId, state);
     }
@@ -627,11 +644,12 @@ async function handleShutdown(id) {
     });
 }
 
-// Max bytes of context surfaced to the LLM per fetch_context call. Aspect JSONs occasionally
-// balloon (e.g. `findings.json` for a heavy reviewer); without a cap, a single tool call can
-// blow the model's context window. 200 KB ≈ 50K tokens at ~4 chars/token — comfortably below
-// gpt-oss-120b's 128 K window and gives headroom for system prompt + history.
-const FETCH_CONTEXT_MAX_BYTES = 200_000;
+// Max characters of context surfaced to the LLM per fetch_context call. Aspect JSONs
+// occasionally balloon (e.g. `findings.json` for a heavy reviewer); without a cap, a single
+// tool call can blow the model's context window. 200 K chars ≈ 50 K tokens at ~4 chars/token —
+// comfortably below gpt-oss-120b's 128 K window. Counted in JS string length (UTF-16 code
+// units), not bytes; aspects are ASCII-dominant so the variance is small.
+const FETCH_CONTEXT_MAX_CHARS = 200_000;
 
 // fetch_context responses (Java → runner)
 function handleFetchContextResponse(frame) {
@@ -670,17 +688,17 @@ function handleFetchContextResponse(frame) {
                     : JSON.stringify(content);
             const originalLength = text.length;
             let truncated = false;
-            if (text.length > FETCH_CONTEXT_MAX_BYTES) {
+            if (text.length > FETCH_CONTEXT_MAX_CHARS) {
                 // Hard-cut the JSON; the marker rides on a separate content part so a model
                 // that parses the first part as JSON never has to skip our truncation prose.
-                text = text.slice(0, FETCH_CONTEXT_MAX_BYTES);
+                text = text.slice(0, FETCH_CONTEXT_MAX_CHARS);
                 truncated = true;
             }
             const parts = [{ type: "text", text }];
             if (truncated) {
                 parts.push({
                     type: "text",
-                    text: `[truncated ${originalLength - FETCH_CONTEXT_MAX_BYTES} chars from response]`,
+                    text: `[truncated ${originalLength - FETCH_CONTEXT_MAX_CHARS} chars from response]`,
                 });
             }
             pending.resolve({

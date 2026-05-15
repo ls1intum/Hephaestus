@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.timeout;
@@ -159,9 +158,5 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         // controller body. timeout() because the controller submits async and returns; the
         // service call lands on the virtual-thread executor a few ms later.
         verify(mentorChatService, timeout(2_000)).start(any(), any());
-        // Sanity: the auth-context propagation made it through. If the SecurityContext was
-        // empty the membership check would have 403'd before the controller body ran, and
-        // the service mock would never have been called.
-        assertThat(true).as("service was invoked → auth + workspace membership both satisfied").isTrue();
     }
 }

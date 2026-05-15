@@ -44,9 +44,12 @@ public class ChatThread {
     private String title;
 
     /**
-     * All messages in this thread (tree structure)
+     * All messages in this thread. DB-side {@code ON DELETE CASCADE} (migration
+     * {@code mentor-1071-cascade-legacy-fks}) covers parent-delete propagation in a single
+     * statement; the JPA-level cascade would issue N per-row DELETEs for nothing. We keep
+     * {@code orphanRemoval} for collection-mutation semantics.
      */
-    @OneToMany(mappedBy = "thread", cascade = CascadeType.REMOVE, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "thread", fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("createdAt ASC")
     @ToString.Exclude
     @JsonIgnore

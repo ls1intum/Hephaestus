@@ -11,28 +11,14 @@ import java.util.UUID;
 import org.springframework.lang.Nullable;
 
 /**
- * Mutable per-turn translator state. Created fresh by the orchestrator at the start of each turn
- * (one assistant message) and discarded once {@code Finish} is emitted. Owns:
+ * Mutable per-turn translator state. Built incrementally as Pi events stream in, snapshotted at
+ * end-of-turn into the persisted {@code chat_message.parts} (and read on disconnect/timeout paths
+ * to flush whatever has been observed so far).
  *
- * <ul>
- *   <li>Open block ids (text + reasoning) — set on first delta so the {@link UIMessageChunk.TextStart}
- *       lifecycle chunk fires exactly once per block. Pi's stream interleaves text and reasoning;
- *       both can be open simultaneously, each with its own id.</li>
- *   <li>Tool-call name lookup — Pi emits the tool name on {@code tool_execution_start} but not on
- *       {@code tool_execution_end}; we cache it so {@code ToolOutputError} can carry the friendly name.</li>
- *   <li>Accumulated parts — the AI SDK UIMessage shape stored verbatim in
- *       {@code chat_message.parts} once the turn completes. Built incrementally because building it
- *       post-hoc from chunks would require replaying every delta to concatenate the deltas back into
- *       a single text block, and we already have the in-flight pieces in memory.</li>
- * </ul>
- *
- * <p>Thread-safety: writes happen on the runner-event dispatcher thread; {@link #partsSnapshot()},
- * {@link #observedUsage()}, and {@link #observedModel()} can be read from the orchestrator's
- * virtual thread on timeout/disconnect/error paths to feed {@code persistence.interrupt(...)} a
- * coherent parts array. Every mutator + reader synchronises on the instance monitor so a snapshot
- * sees a stable {@code partsAccumulator} ({@link ArrayNode} is NOT thread-safe — a deepCopy racing
- * an {@code add(...)} from the writer would surface as a {@link java.util.ConcurrentModificationException}).
- * Locking is per-instance and short — every method body runs in nanoseconds.
+ * <p>Thread-safety: writes happen on the runner-event dispatcher thread; snapshots can be read
+ * from the orchestrator's virtual thread on a disconnect race. Every method synchronises on the
+ * instance monitor so an {@link #partsSnapshot()} deepCopy sees a stable {@link ArrayNode}
+ * (which is NOT thread-safe).
  */
 public final class TranslatorState {
 
@@ -53,23 +39,14 @@ public final class TranslatorState {
     /** Buffer of reasoning so far — finalised when reasoning closes. */
     private final StringBuilder reasoningBuffer = new StringBuilder();
 
-    /**
-     * Tool-call id → tool name, populated on {@code tool_execution_start} for later error labels.
-     * Plain {@link LinkedHashMap}: the class doc above states the per-turn translator runs on a
-     * single dispatcher thread; previous {@link java.util.concurrent.ConcurrentHashMap} bought
-     * nothing while every other field (text buffers, step counter, observed usage) was a
-     * non-thread-safe primitive — the type was theatre.
-     */
+    /** Tool-call id → tool name, populated on {@code tool_execution_start} for later error labels. */
     private final Map<String, String> toolNameByCallId = new LinkedHashMap<>();
 
     /**
-     * Tool-call id → the mutable {@link ObjectNode} part inside {@link #partsAccumulator}. AI SDK's
-     * {@code processUIMessageStream} reducer mutates a *single* part across the
-     * input-available → output-available/error lifecycle (vercel/ai dist/index.mjs:4632-4666 for
-     * @ai-sdk/react@3.0.3 ⇄ ai@6.0.3). Appending three separate parts (one per state) breaks
-     * {@code getToolInvocation} which {@code find}s by toolCallId and returns the first hit —
-     * the user sees the tool input but never the output after page refresh. We mirror the reducer
-     * here so persisted parts round-trip through {@code safeValidateUIMessages}.
+     * Tool-call id → the mutable {@code ObjectNode} part inside {@link #partsAccumulator}. The AI
+     * SDK reducer mutates a single part across input-available → output-available/error; appending
+     * separate parts breaks {@code getToolInvocation} which finds-by-toolCallId and returns the
+     * first hit, so the user sees input but no output after page refresh.
      */
     private final Map<String, ObjectNode> toolPartByCallId = new LinkedHashMap<>();
 
@@ -126,10 +103,8 @@ public final class TranslatorState {
     }
 
     public synchronized int incrementStep() {
-        // AI SDK's client reducer pushes a `{type:"step-start"}` part for every `start-step` chunk
-        // it sees (ai@6.0.3 dist/index.mjs:4988-5050). Mirror that here so the rehydrated message
-        // — fetched via `GET /threads/{id}` — round-trips through `safeValidateUIMessages` and
-        // renders the same step boundaries the client built incrementally during streaming.
+        // Mirror the AI SDK reducer's `{type:"step-start"}` part so a rehydrated message renders
+        // the same step boundaries the client built incrementally during streaming.
         ObjectNode stepStart = nodes.objectNode();
         stepStart.put("type", "step-start");
         partsAccumulator.add(stepStart);
@@ -137,7 +112,13 @@ public final class TranslatorState {
     }
 
     public synchronized int decrementStep() {
-        return Math.max(0, --stepDepth);
+        // Pi may emit more turn_end than start-step (e.g. agent_end without a paired turn_end);
+        // clamp the field itself, not just the return value, so the next incrementStep starts
+        // from a sane base instead of climbing out of a negative hole.
+        if (stepDepth > 0) {
+            stepDepth--;
+        }
+        return stepDepth;
     }
 
     @Nullable
@@ -159,10 +140,8 @@ public final class TranslatorState {
             ObjectNode part = nodes.objectNode();
             part.put("type", "text");
             part.put("text", textBuffer.toString());
-            // AI SDK's TextUIPart schema (vercel/ai packages/ai/src/ui/ui-messages.ts) allows
-            // {state: "streaming" | "done"}. We persist the terminal value; "done" tells the
-            // client renderer the part is final (vs an in-progress stream) so a refresh-vs-live
-            // visual diff doesn't surface.
+            // "done" — terminal value of AI SDK's TextUIPart.state, so a rehydrated message
+            // doesn't render an in-progress streaming cursor.
             part.put("state", "done");
             partsAccumulator.add(part);
         }

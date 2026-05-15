@@ -140,8 +140,11 @@ public class ChatMessage {
      * back-compat; new writers go via the {@link #parts} JSONB. The
      * {@code chat_message_part} table is dropped in #1074.
      */
+    // DB-side ON DELETE CASCADE on chat_message_part.message_id (migration
+    // mentor-1071-cascade-legacy-fks) covers parent-delete propagation; the JPA cascade would
+    // issue N per-row DELETEs for nothing. orphanRemoval kept for collection-mutation semantics.
     @Deprecated(forRemoval = true)
-    @OneToMany(mappedBy = "message", cascade = CascadeType.REMOVE, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "message", fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("id.orderIndex ASC")
     @BatchSize(size = 50)
     @ToString.Exclude
