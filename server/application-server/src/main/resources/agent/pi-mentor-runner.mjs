@@ -5,7 +5,11 @@
 //   stdin  (Java→runner): requests `{jsonrpc, id, method, params}`
 //   stdout (runner→Java): responses + notifications (`method:"event"`) + runner→Java callbacks
 //                         (`fetch_context`).
-// Methods: hello, open_thread, replay_context, prompt, steer, abort, close_thread, shutdown.
+// Methods: hello, open_thread, prompt, steer, abort, close_thread, shutdown.
+// Session restore: Java injects `.sessions/<threadId>.jsonl` into the container at start
+//                  time (sourced from `chat_thread.session_jsonl` BYTEA in Postgres). The runner's
+//                  `bindThread` → `switchSession` loads byte-identical prior turns transparently
+//                  via the Pi SDK SessionManager — no explicit replay RPC is needed.
 // Custom tools: fetch_context (callback to Java, whitelisted paths), link_finding (event emit).
 // Error codes: -32600 invalid_request, -32601 method_not_found, -32000 thread_not_open,
 //              -32001 turn_already_in_flight, -32002 pi_error, -32003 invalid_state.
@@ -396,22 +400,6 @@ function defineLinkFindingTool() {
     });
 }
 
-/**
- * Defensive fallback in case Java forgets to flatten. Walks an AI SDK UIMessage `parts` array
- * and concatenates every text part. Non-text parts (tool calls, reasoning, data-finding) are
- * intentionally dropped — they don't belong in the LLM-visible recap.
- */
-function flattenPartsToText(parts) {
-    if (!Array.isArray(parts)) return "";
-    const out = [];
-    for (const part of parts) {
-        if (part && typeof part === "object" && part.type === "text" && typeof part.text === "string") {
-            out.push(part.text);
-        }
-    }
-    return out.join("\n");
-}
-
 async function handleHello(id /*, params */) {
     // Java validates only `protocolVersion` (MentorChatService#verifyProtocol); the runner
     // image pins Node ≥22 (see docker/agents/pi/Dockerfile), so callers can rely on
@@ -495,6 +483,16 @@ async function bindThread(state) {
 }
 
 function forwardEvent(state, event) {
+    // Critical ordering: when the SDK fires agent_end we (a) emit `session_persisted`
+    // FIRST so Java captures the verbatim JSONL bytes BEFORE we forward `agent_end`,
+    // (b) forward `agent_end` so the translator emits Finish to the SSE wire. The
+    // translator's `agent_end` handling triggers MentorChatService.finalise — which
+    // reads `TranslatorState.observedSessionJsonl` and writes the blob in the same
+    // REQUIRES_NEW transaction as the assistant-row status flip. Reversing the order
+    // would let finalise() run with an empty observedSessionJsonl on every turn.
+    if (event?.type === "agent_end") {
+        emitSessionPersisted(state);
+    }
     // Pass through raw Pi event for Java MentorEventTranslator. Clear in-flight flag on agent_end.
     sendEvent(state.threadId, event);
     if (event?.type === "agent_end") {
@@ -505,6 +503,46 @@ function forwardEvent(state, event) {
         clearTurnWatchdog(state);
         state.inFlight = false;
         maybePostTurnGc();
+    }
+}
+
+/**
+ * Read the on-disk session JSONL Pi just flushed and ship it to Java as a `session_persisted`
+ * notification event. Java's MentorTurnPersistence.finalise persists these bytes verbatim in
+ * `chat_thread.session_jsonl` (BYTEA) so a cold container can restore byte-identical state on
+ * the user's next message — preserving provider prompt caching (Anthropic + OpenAI key on
+ * byte-identical prefix), tool_use/tool_result pairing (Anthropic 400s on orphaned tool_use),
+ * and thinking blocks (extended-thinking models require verbatim preservation across turns).
+ *
+ * <p>Failure mode: file missing (Pi never persisted — e.g. SDK was stubbed in PROTOCOL_ONLY
+ * tests) or a synchronous read error. We log + skip; Java falls back to whatever blob was
+ * captured on the previous turn. Better than emitting a corrupt event.
+ *
+ * <p>Sync read is acceptable here: the file is small (KB–few MB), agent_end is the natural
+ * flush boundary, and we're about to forward agent_end which is already going to trigger the
+ * full finalise pipeline anyway.
+ */
+function emitSessionPersisted(state) {
+    try {
+        // existsSync is the un-shimmed import the SDK also uses (see runner top-of-file for
+        // shim limitations); a missing file is the legitimate empty-stub case and not an error.
+        if (!existsSync(state.sessionPath)) {
+            return;
+        }
+        const bytes = readFileSync(state.sessionPath, "utf8");
+        if (typeof bytes !== "string" || bytes.length === 0) {
+            return;
+        }
+        writeFrame({
+            jsonrpc: "2.0",
+            method: "event",
+            params: {
+                threadId: state.threadId,
+                event: { type: "session_persisted", jsonl: bytes },
+            },
+        });
+    } catch (e) {
+        log(`emitSessionPersisted failed for thread=${state.threadId}: ${e?.message ?? e}`);
     }
 }
 
@@ -533,82 +571,6 @@ function maybePostTurnGc() {
             log("post-turn gc threw:", e);
         }
     });
-}
-
-async function handleReplayContext(id, params) {
-    const threadId = String(params?.threadId ?? "").trim();
-    const messages = Array.isArray(params?.messages) ? params.messages : null;
-    if (!threadId || !messages) {
-        return sendError(id, ERR.INVALID_REQUEST, "threadId and messages are required");
-    }
-    const state = threads.get(threadId);
-    if (!state) {
-        return sendError(id, ERR.THREAD_NOT_OPEN, `thread ${threadId} is not open`);
-    }
-    try {
-        await bindThread(state);
-    } catch (e) {
-        return sendError(id, ERR.PI_ERROR, `bind failed: ${e.message ?? e}`);
-    }
-
-    // Seed the LLM context with prior conversation history.
-    //
-    // Root-cause note: appendCustomMessageEntry (used here before) writes entries of
-    // type "custom_message" to the session JSONL. Those entries surface in buildSessionContext
-    // (used by the interactive CLI renderer) but are NOT included in createContextSnapshot —
-    // the method runPromptMessages calls to build the messages array sent to the LLM.
-    // Only agent._state.messages (populated by processEvents on each message_end) reaches
-    // the LLM. appendCustomMessageEntry was therefore a silent no-op for conversation history.
-    //
-    // Fix: push synthetic user/assistant pairs directly into agent._state.messages.
-    // Guard: if _state.messages is already non-empty the session file was loaded with prior
-    // turns (warm container, same thread); replay would duplicate them — skip.
-    // Stub mode: runtime.session.agent is undefined; skip gracefully.
-    const agent = runtime.session?.agent;
-    if (!agent) {
-        // Stub / PROTOCOL_ONLY mode — no real agent, replay is a no-op.
-        return sendResult(id, { replayed: 0 });
-    }
-    if (agent._state.messages.length > 0 || messages.length === 0) {
-        log(`replay_context: skip (existing=${agent._state.messages.length}, offered=${messages.length})`);
-        return sendResult(id, { replayed: 0 });
-    }
-    let replayed = 0;
-    try {
-        for (const msg of messages) {
-            const role = msg?.role === "assistant" ? "assistant" : "user";
-            // Java owns the flattening: `text` is the pre-extracted concatenation of every
-            // type==="text" entry in `parts`. We accept `parts` as a fallback so future
-            // structured replay (tool calls, reasoning) can roll through without a server
-            // ABI bump; today only text entries make it into the LLM-visible recap.
-            const text = String(msg?.text ?? flattenPartsToText(msg?.parts)).trim();
-            if (!text) continue;
-            // Synthetic message shapes for `agent._state.messages`. Assistant messages MUST
-            // carry `usage` and `stopReason` — Pi SDK's `calculateContextTokens` (called from
-            // `getContextStats` on every prompt) reads `usage.totalTokens` unconditionally on
-            // any assistant message whose `stopReason` is neither "aborted" nor "error". A
-            // missing `usage` throws `Cannot read properties of undefined (reading
-            // 'totalTokens')` and the whole prompt rejects. Seeding zeroed usage tells the SDK
-            // "this synthetic message contributed no measured tokens" — the next real turn's
-            // assistant message will populate proper usage and compaction picks up from there.
-            if (role === "assistant") {
-                agent._state.messages.push({
-                    role: "assistant",
-                    content: [{ type: "text", text }],
-                    stopReason: "stop",
-                    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 },
-                });
-            } else {
-                agent._state.messages.push({ role: "user", content: [{ type: "text", text }] });
-            }
-            replayed++;
-        }
-        log(`replay_context: seeded ${replayed} messages into LLM context`);
-        sendResult(id, { replayed });
-    } catch (e) {
-        log(`replay_context failed: ${e.message ?? e}`);
-        sendError(id, ERR.PI_ERROR, `replay failed: ${e.message ?? e}`);
-    }
 }
 
 async function handlePrompt(id, params) {
@@ -884,7 +846,6 @@ function cleanupThread(state) {
 const METHODS = {
     hello: handleHello,
     open_thread: handleOpenThread,
-    replay_context: handleReplayContext,
     prompt: handlePrompt,
     steer: handleSteer,
     abort: handleAbort,
@@ -898,7 +859,7 @@ async function dispatch(frame) {
     //   2. JSON-RPC responses to our fetch_context callbacks: {jsonrpc, id, result|error}
     // JSON-RPC 2.0 §6 allows batch (top-level array) but neither end emits batches today.
     // Reject loudly rather than silently dropping — a future Java caller that bundles
-    // open_thread + replay_context + prompt would otherwise vanish into the log.
+    // open_thread + prompt would otherwise vanish into the log.
     if (Array.isArray(frame)) {
         return sendError(null, ERR.INVALID_REQUEST, "batch requests are not supported on this transport");
     }

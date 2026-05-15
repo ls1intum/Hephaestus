@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.agent.mentor.chat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import de.tum.in.www1.hephaestus.agent.mentor.MentorReplayMessage;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
@@ -14,13 +13,10 @@ import de.tum.in.www1.hephaestus.mentor.ChatMessage;
 import de.tum.in.www1.hephaestus.mentor.ChatMessageRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
 import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
-import de.tum.in.www1.hephaestus.mentor.ChatThreadService;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
@@ -46,7 +42,6 @@ public class MentorTurnPersistence {
 
     private final ChatThreadRepository chatThreadRepository;
     private final ChatMessageRepository chatMessageRepository;
-    private final ChatThreadService chatThreadService;
     private final WorkspaceRepository workspaceRepository;
     private final ModelPricingService pricingService;
 
@@ -258,6 +253,24 @@ public class MentorTurnPersistence {
         meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
         assistant.setMetadata(meta);
         chatMessageRepository.save(assistant);
+
+        // Persist the verbatim Pi SDK session JSONL captured by the runner's session_persisted
+        // event. Same REQUIRES_NEW transaction as the assistant-row status flip, so the blob and
+        // `chat_message.status` cannot diverge by more than one in-flight crash window. NULL
+        // session bytes (e.g. PROTOCOL_ONLY stub runs, mid-stream abort before agent_end, or an
+        // upstream SDK that never persists) skip the write — the previous turn's bytes stay
+        // authoritative rather than getting clobbered with garbage.
+        byte[] sessionBytes = state.observedSessionJsonl();
+        if (sessionBytes != null) {
+            int updated = chatThreadRepository.updateSessionJsonl(cookie.threadId(), sessionBytes);
+            if (updated != 1) {
+                log.warn(
+                    "updateSessionJsonl affected {} rows for threadId={} (expected 1) — session restore on cold restart may be incomplete",
+                    updated,
+                    cookie.threadId()
+                );
+            }
+        }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -287,25 +300,6 @@ public class MentorTurnPersistence {
                 assistant.setMetadata(meta);
                 chatMessageRepository.save(assistant);
             });
-    }
-
-    /**
-     * Build the runner replay window from the most recent messages on this thread.
-     *
-     * <p>Wrapped in a read-only transaction so {@code effectiveParts} can lazily materialise the
-     * legacy {@code chat_message_part} collection (during the #1074 dual-write window) without
-     * triggering {@code LazyInitializationException}: the per-message lazy access happens inside
-     * the still-open Hibernate session.
-     */
-    @Transactional(readOnly = true)
-    public List<MentorReplayMessage> buildReplay(UUID threadId) {
-        List<ChatMessage> recent = chatThreadService.recentMessagesForReplay(threadId);
-        List<MentorReplayMessage> out = new ArrayList<>(recent.size());
-        for (ChatMessage msg : recent) {
-            JsonNode parts = chatThreadService.effectiveParts(msg);
-            out.add(new MentorReplayMessage(msg.getRole().getValue(), parts, msg.getCreatedAt()));
-        }
-        return out;
     }
 
     private static ObjectNode newOrCopyMeta(ChatMessage message) {

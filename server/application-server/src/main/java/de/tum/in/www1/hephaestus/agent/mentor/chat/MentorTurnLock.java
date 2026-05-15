@@ -111,9 +111,9 @@ public class MentorTurnLock {
     // an agent_end that never reaches the wire.
     //
     // To make multi-tab chat work without rearchitecting the runner, this second lock
-    // serialises the open_thread → replay_context → prompt → terminal-chunk window per
-    // sandbox key. Same-user-same-workspace turns are FIFO: tab A finishes (or errors) before
-    // tab B's runner exchange begins. Different users / different workspaces are unaffected.
+    // serialises the open_thread → prompt → terminal-chunk window per sandbox key.
+    // Same-user-same-workspace turns are FIFO: tab A finishes (or errors) before tab B's
+    // runner exchange begins. Different users / different workspaces are unaffected.
     // Same-user-different-thread BLOCKS (waiting) rather than 409s — a second-tab open is
     // user-initiated and should succeed, just sequentially.
 

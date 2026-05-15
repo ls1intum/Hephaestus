@@ -4,15 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
+import de.tum.in.www1.hephaestus.audit.DeletionAudit;
+import de.tum.in.www1.hephaestus.audit.DeletionAuditRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.mentor.ChatThread;
+import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -49,6 +54,12 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private ChatThreadRepository chatThreadRepository;
+
+    @Autowired
+    private DeletionAuditRepository deletionAuditRepository;
 
     // -------------------------------------------------------------------------
     // Helpers
@@ -286,6 +297,101 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(purged.getSlackSigningSecret()).isNull();
             assertThat(purged.getGitlabGroupId()).isNull();
             assertThat(purged.getGitlabWebhookId()).isNull();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Wave H4 (issue #1071): chat thread cleanup + deletion audit
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Chat thread cleanup + deletion audit")
+    class ChatThreadCleanup {
+
+        @Test
+        @DisplayName("purge deletes mentor chat threads for the workspace and records a deletion_audit row")
+        void purgeDeletesChatThreadsAndAuditsDeletion() {
+            User owner = persistUser("chat-cleanup-owner");
+            Workspace workspace = workspaceService.createWorkspace(
+                new CreateWorkspaceRequestDTO(
+                    "chat-cleanup-ws",
+                    "Chat Cleanup",
+                    "chat-cleanup-group",
+                    AccountType.ORG,
+                    owner.getId(),
+                    Workspace.GitProviderMode.GITLAB_PAT,
+                    "glpat-chat-cleanup-token",
+                    null
+                )
+            );
+            Long workspaceId = workspace.getId();
+
+            // Seed two mentor threads owned by the workspace owner.
+            ChatThread t1 = new ChatThread();
+            t1.setId(UUID.randomUUID());
+            t1.setTitle("Thread A");
+            t1.setWorkspace(workspace);
+            t1.setUser(owner);
+            ChatThread t2 = new ChatThread();
+            t2.setId(UUID.randomUUID());
+            t2.setTitle("Thread B");
+            t2.setWorkspace(workspace);
+            t2.setUser(owner);
+            chatThreadRepository.save(t1);
+            chatThreadRepository.save(t2);
+
+            // Sanity: both threads exist pre-purge.
+            assertThat(chatThreadRepository.countByWorkspaceId(workspaceId)).isEqualTo(2);
+
+            workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
+
+            // Chat threads must be physically gone (GDPR Art. 17 — not orphaned, not soft-flagged).
+            assertThat(chatThreadRepository.countByWorkspaceId(workspaceId))
+                .as("chat threads must be deleted on workspace purge — GDPR Art. 17 erasure")
+                .isZero();
+            assertThat(chatThreadRepository.findById(t1.getId())).isEmpty();
+            assertThat(chatThreadRepository.findById(t2.getId())).isEmpty();
+
+            // Exactly one audit row covering the workspace-purge delete event.
+            List<DeletionAudit> audits = deletionAuditRepository.findByEntityTypeAndEntityIdOrderByOccurredAtDesc(
+                DeletionAudit.EntityType.WORKSPACE,
+                String.valueOf(workspaceId)
+            );
+            assertThat(audits).as("deletion_audit must record one row per workspace purge that had threads").hasSize(1);
+            DeletionAudit audit = audits.get(0);
+            assertThat(audit.getEntityType()).isEqualTo(DeletionAudit.EntityType.WORKSPACE);
+            assertThat(audit.getEntityId()).isEqualTo(String.valueOf(workspaceId));
+            assertThat(audit.getWorkspaceId()).isEqualTo(workspaceId);
+            assertThat(audit.getReason()).contains("workspace-purge").contains("2-chat-threads");
+            assertThat(audit.getOccurredAt()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("purge skips the audit write when no chat threads exist (idempotent + no-noise)")
+        void purgeWithNoThreadsSkipsAudit() {
+            User owner = persistUser("no-thread-owner");
+            Workspace workspace = workspaceService.createWorkspace(
+                new CreateWorkspaceRequestDTO(
+                    "no-thread-ws",
+                    "No Threads",
+                    "no-thread-group",
+                    AccountType.ORG,
+                    owner.getId(),
+                    Workspace.GitProviderMode.GITLAB_PAT,
+                    "glpat-no-thread-token",
+                    null
+                )
+            );
+            Long workspaceId = workspace.getId();
+            assertThat(chatThreadRepository.countByWorkspaceId(workspaceId)).isZero();
+
+            workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
+
+            List<DeletionAudit> audits = deletionAuditRepository.findByEntityTypeAndEntityIdOrderByOccurredAtDesc(
+                DeletionAudit.EntityType.WORKSPACE,
+                String.valueOf(workspaceId)
+            );
+            assertThat(audits).as("no audit row when no chat threads were touched — avoids audit-log noise").isEmpty();
         }
     }
 

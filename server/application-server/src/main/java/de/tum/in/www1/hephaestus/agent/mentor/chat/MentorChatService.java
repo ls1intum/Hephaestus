@@ -15,7 +15,6 @@ import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentRequest;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorPiAdapter;
-import de.tum.in.www1.hephaestus.agent.mentor.MentorReplayMessage;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.ClientDisconnectedException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
@@ -28,6 +27,7 @@ import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
+import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
 import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
 import java.time.Duration;
@@ -72,6 +72,7 @@ public class MentorChatService {
     );
 
     private final UserRepository userRepository;
+    private final ChatThreadRepository chatThreadRepository;
     private final AgentConfigRepository agentConfigRepository;
     private final MentorAgentProperties mentorAgentProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
@@ -208,10 +209,14 @@ public class MentorChatService {
             request.userMessage()
         );
         MentorLlmConfig llmConfig = resolveLlmConfig(request.workspaceId());
-        // Build replay BEFORE persistInFlight so the current turn's user message (committed
-        // in REQUIRES_NEW) is not included. The runner receives only completed prior turns;
-        // the current user message arrives separately via the prompt RPC.
-        List<MentorReplayMessage> replay = persistence.buildReplay(thread.getId());
+        // Load the verbatim Pi SDK session JSONL bytes captured at the end of the prior turn
+        // BEFORE persistInFlight so the lookup runs in its own short-lived read transaction
+        // (no entity, single-column projection). When non-null, these bytes are injected into
+        // the container at `.sessions/<threadId>.jsonl` so the runner's `switchSession`
+        // restores byte-identical state — a cache hit on Anthropic/OpenAI providers and
+        // tool_use/tool_result pairing preserved across container lifetimes. Empty Optional
+        // on the very first turn of a thread.
+        Optional<byte[]> priorSessionBytes = chatThreadRepository.findSessionJsonl(thread.getId());
 
         UUID assistantMessageId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
@@ -240,10 +245,14 @@ public class MentorChatService {
             channel.send(UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"));
 
             Map<String, byte[]> aspectInputs = buildAspectContext(request, user);
+            MentorPiAdapter.SessionRestore sessionRestore = priorSessionBytes
+                .map(bytes -> new MentorPiAdapter.SessionRestore(request.threadId(), bytes))
+                .orElse(null);
             InteractiveSandboxSpec spec = mentorPiAdapter.buildSandboxSpec(
                 new MentorAgentRequest(request.workspaceId(), user.getId()),
                 llmConfig,
-                aspectInputs
+                aspectInputs,
+                sessionRestore
             );
             sandbox = interactiveSandboxService.attach(spec);
 
@@ -289,8 +298,12 @@ public class MentorChatService {
             // outer single-flight guard (concurrent SAME-thread attempts return 409).
             MentorTurnLock.SandboxKey sandboxKey = new MentorTurnLock.SandboxKey(request.workspaceId(), user.getId());
             try (var ignored = turnLock.acquireSandboxLock(sandboxKey)) {
+                // open_thread triggers the runner's switchSession against the per-thread JSONL
+                // file. When session JSONL was injected via SessionRestore above, that file is
+                // already present on disk with prior-turn bytes, so the SDK rehydrates the full
+                // message history transparently. No explicit replay needed — Pi reads the
+                // session entries straight off disk into its message buffer.
                 client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
-                client.replayContext(request.threadId(), replay).get(10, TimeUnit.SECONDS);
                 client
                     .prompt(request.threadId(), request.userMessage())
                     .whenComplete((result, ex) -> {

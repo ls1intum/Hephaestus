@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.tum.in.www1.hephaestus.audit.DeletionAudit;
+import de.tum.in.www1.hephaestus.audit.DeletionAuditService;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -26,13 +28,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ChatThreadService {
 
-    /** Cap on linear history shipped to the runner as replay context. */
-    public static final int RECENT_MESSAGES_CAP = 20;
-
     private final ChatThreadRepository chatThreadRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final DeletionAuditService deletionAuditService;
 
     /** Threads owned by the current user inside the given workspace, newest first. */
     @Transactional(readOnly = true)
@@ -62,6 +62,17 @@ public class ChatThreadService {
     @Transactional
     public void deleteOwnedThread(Long workspaceId, UUID threadId) {
         ChatThread thread = getOwnedThread(workspaceId, threadId);
+        // Record audit BEFORE delete (REQUIRES_NEW). A subsequent delete failure leaves an
+        // audit row showing "deletion attempted" — operationally preferable to a successful
+        // delete with no audit trail.
+        Long actorUserId = thread.getUser() != null ? thread.getUser().getId() : null;
+        deletionAuditService.record(
+            DeletionAudit.EntityType.CHAT_THREAD,
+            threadId.toString(),
+            workspaceId,
+            actorUserId,
+            "user-initiated"
+        );
         chatThreadRepository.delete(thread);
     }
 
@@ -85,25 +96,6 @@ public class ChatThreadService {
 
     /** Snapshot of a thread + messages in DTO form. */
     public record ThreadDetail(UUID id, String title, java.time.Instant createdAt, List<ChatMessageDTO> messages) {}
-
-    /**
-     * Linear history for a thread, oldest first, capped at {@link #RECENT_MESSAGES_CAP}.
-     * Pulls the trailing N rows via DB-side {@code LIMIT}-{@code ORDER BY DESC} and reverses
-     * in memory, so a 500-turn power-user thread does not pull the full {@code parts} JSONB
-     * payload just to drop 480 rows. Same DB-side-LIMIT pattern as
-     * {@code ChatThreadRepository.findRecentThreads}.
-     */
-    @Transactional(readOnly = true)
-    public List<ChatMessage> recentMessagesForReplay(UUID threadId) {
-        List<ChatMessage> tailDesc = chatMessageRepository.findByThreadIdOrderByCreatedAtDescIdDesc(
-            threadId,
-            org.springframework.data.domain.PageRequest.of(0, RECENT_MESSAGES_CAP)
-        );
-        if (tailDesc.isEmpty()) return tailDesc;
-        // Reverse to ascending (oldest first) — replay order matters to the LLM.
-        java.util.Collections.reverse(tailDesc);
-        return tailDesc;
-    }
 
     /**
      * Returns the message parts in AI SDK UIMessage shape. Prefers the JSONB column;

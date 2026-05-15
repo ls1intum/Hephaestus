@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.tum.in.www1.hephaestus.audit.DeletionAuditService;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -40,6 +41,9 @@ class ChatThreadServiceTest extends BaseUnitTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private DeletionAuditService deletionAuditService;
+
     private ChatThreadService service;
 
     private static final Long WORKSPACE_ID = 42L;
@@ -49,7 +53,13 @@ class ChatThreadServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        service = new ChatThreadService(chatThreadRepository, chatMessageRepository, userRepository, objectMapper);
+        service = new ChatThreadService(
+            chatThreadRepository,
+            chatMessageRepository,
+            userRepository,
+            objectMapper,
+            deletionAuditService
+        );
     }
 
     @Test

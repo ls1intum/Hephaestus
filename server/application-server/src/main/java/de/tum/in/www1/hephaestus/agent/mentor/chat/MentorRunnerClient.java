@@ -2,15 +2,12 @@ package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import de.tum.in.www1.hephaestus.agent.mentor.MentorReplayMessage;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerTimeoutException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import java.time.Duration;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -116,48 +113,6 @@ public final class MentorRunnerClient implements AutoCloseable {
         ObjectNode params = objectMapper.createObjectNode();
         params.put("threadId", threadId.toString());
         return call("open_thread", params, DEFAULT_CONTROL_TIMEOUT);
-    }
-
-    public CompletableFuture<JsonNode> replayContext(UUID threadId, List<MentorReplayMessage> messages) {
-        ObjectNode params = objectMapper.createObjectNode();
-        params.put("threadId", threadId.toString());
-        ArrayNode array = params.putArray("messages");
-        for (MentorReplayMessage msg : messages) {
-            ObjectNode entry = array.addObject();
-            entry.put("role", msg.role());
-            // The runner consumes `text` directly when feeding the LLM (see
-            // pi-mentor-runner.mjs#handleReplayContext). We flatten on the Java side so the
-            // runner stays thin and so the AI SDK `parts` shape — which carries non-text chunks
-            // (tools, reasoning) — never leaks into the LLM prompt. `parts` is still shipped
-            // verbatim for forward-compat / future structured replay.
-            entry.put("text", flattenParts(msg.parts()));
-            entry.set("parts", msg.parts());
-            entry.put("createdAt", msg.createdAt().toString());
-        }
-        return call("replay_context", params, DEFAULT_CONTROL_TIMEOUT);
-    }
-
-    /**
-     * Flatten an AI-SDK UIMessage {@code parts} array to a single plain-text string. Concatenates
-     * every {@code type=="text"} part's {@code text} field; non-text parts (tool calls, reasoning,
-     * data-finding) are intentionally dropped — the runner ships them only as a recap, and the
-     * LLM should reason against what the human and assistant SAID, not the tool internals.
-     */
-    static String flattenParts(JsonNode parts) {
-        if (parts == null || !parts.isArray() || parts.isEmpty()) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder();
-        for (JsonNode part : parts) {
-            if (part == null || !part.isObject()) continue;
-            JsonNode type = part.path("type");
-            JsonNode text = part.path("text");
-            if (type.isTextual() && "text".equals(type.asText()) && text.isTextual()) {
-                if (sb.length() > 0) sb.append('\n');
-                sb.append(text.asText());
-            }
-        }
-        return sb.toString();
     }
 
     public CompletableFuture<JsonNode> prompt(UUID threadId, String text) {

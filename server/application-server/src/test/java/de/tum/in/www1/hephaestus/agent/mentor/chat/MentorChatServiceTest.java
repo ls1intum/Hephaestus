@@ -32,6 +32,7 @@ import de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
+import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.io.IOException;
@@ -80,6 +81,9 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Mock
     UserRepository userRepository;
+
+    @Mock
+    ChatThreadRepository chatThreadRepository;
 
     @Mock
     AgentConfigRepository agentConfigRepository;
@@ -141,6 +145,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         );
         service = new MentorChatService(
             userRepository,
+            chatThreadRepository,
             agentConfigRepository,
             mentorProps,
             workspaceContextBuilder,
@@ -172,7 +177,10 @@ class MentorChatServiceTest extends BaseUnitTest {
         thread.setWorkspace(ws);
         thread.setUser(user);
         when(persistence.ensureThread(eq(WORKSPACE_ID), eq(THREAD_ID), any(), any())).thenReturn(thread);
-        when(persistence.buildReplay(eq(THREAD_ID))).thenReturn(List.of());
+        // No prior session JSONL by default — tests that exercise the restore path can stub
+        // a non-empty Optional explicitly. Mockito's default for unstubbed Optional returns is
+        // empty Optional already, but pinning it here makes the contract explicit.
+        when(chatThreadRepository.findSessionJsonl(eq(THREAD_ID))).thenReturn(java.util.Optional.empty());
         when(persistence.persistInFlight(any(), any(), any(), any())).thenAnswer(inv -> {
             UUID assistantId = inv.getArgument(2, UUID.class);
             return new MentorTurnPersistence.TurnPersistenceCookie(
@@ -184,7 +192,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         });
         when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
         when(interactiveSandboxService.attach(any())).thenReturn(sandbox);
-        when(mentorPiAdapter.buildSandboxSpec(any(), any(), any())).thenReturn(stubSpec());
+        when(mentorPiAdapter.buildSandboxSpec(any(), any(), any(), any())).thenReturn(stubSpec());
         // augmentFinishWithCost passes through unchanged when the mock isn't told otherwise.
         // Without this stub the default Mockito null return would replace the Finish chunk in the
         // happy-path stream — the wire would lose its terminal frame and `turnComplete` would
@@ -437,7 +445,7 @@ class MentorChatServiceTest extends BaseUnitTest {
                 long id = frame.path("id").asLong(0);
                 switch (method) {
                     case "hello" -> sb.push(jsonRpcResult(id, mapper.createObjectNode().put("protocolVersion", 1)));
-                    case "open_thread", "replay_context" -> sb.push(jsonRpcResult(id, mapper.createObjectNode()));
+                    case "open_thread" -> sb.push(jsonRpcResult(id, mapper.createObjectNode()));
                     case "prompt" -> {
                         // Stream events in lockstep BEFORE acking the prompt — this is what real Pi does.
                         sb.push(
@@ -477,7 +485,7 @@ class MentorChatServiceTest extends BaseUnitTest {
                 long id = frame.path("id").asLong(0);
                 switch (method) {
                     case "hello" -> sb.push(jsonRpcResult(id, mapper.createObjectNode().put("protocolVersion", 1)));
-                    case "open_thread", "replay_context" -> sb.push(jsonRpcResult(id, mapper.createObjectNode()));
+                    case "open_thread" -> sb.push(jsonRpcResult(id, mapper.createObjectNode()));
                     case "prompt" -> {
                         // Runner returns the poisoning PI_ERROR — orchestrator must close the sandbox.
                         ObjectNode error = mapper.createObjectNode();

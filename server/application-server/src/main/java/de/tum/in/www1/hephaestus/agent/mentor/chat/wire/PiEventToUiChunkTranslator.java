@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -46,6 +47,7 @@ public class PiEventToUiChunkTranslator {
             case "link_finding" -> handleLinkFinding(piEvent, state);
             case "pi_error" -> handleError(piEvent);
             case "turn_watchdog_fired" -> handleWatchdogFired();
+            case "session_persisted" -> handleSessionPersisted(piEvent, state);
             // Session-level events Pi emits that we intentionally drop. Listed explicitly so the
             // `default` arm can WARN on TRULY unknown types — silent default-drops hide protocol
             // drift (a new Pi event type would just disappear into DEBUG, never noticed).
@@ -66,6 +68,28 @@ public class PiEventToUiChunkTranslator {
                 yield List.of();
             }
         };
+    }
+
+    // ─── session_persisted → capture verbatim Pi session JSONL into state ─────────────────
+
+    /**
+     * Capture the runner's verbatim Pi SDK session JSONL bytes. Emitted by the runner immediately
+     * before {@code agent_end} (see {@code pi-mentor-runner.mjs#forwardEvent}), so by the time
+     * {@code handleAgentEnd} fires {@link TranslatorState#observedSessionJsonl()} is populated and
+     * {@code MentorTurnPersistence.finalise} can persist it into {@code chat_thread.session_jsonl}.
+     *
+     * <p>Yields no UI chunk — this is a side-channel for byte-identical session restoration and
+     * has no client-side analog. Malformed payloads (missing {@code jsonl}, empty string) are
+     * dropped silently so a runner-side glitch doesn't poison the turn.
+     */
+    private List<UIMessageChunk> handleSessionPersisted(JsonNode event, TranslatorState state) {
+        String jsonl = optionalString(event, "jsonl");
+        if (jsonl == null || jsonl.isEmpty()) {
+            log.debug("session_persisted with empty jsonl payload — skipping");
+            return List.of();
+        }
+        state.observeSessionJsonl(jsonl.getBytes(StandardCharsets.UTF_8));
+        return List.of();
     }
 
     // ─── turn_watchdog_fired → Error with user-friendly text ──────────────────────────────
