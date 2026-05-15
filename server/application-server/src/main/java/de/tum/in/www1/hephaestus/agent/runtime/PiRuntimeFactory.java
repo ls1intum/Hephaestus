@@ -210,9 +210,14 @@ public class PiRuntimeFactory {
      */
     private static String nodeEnvFor(String runnerScript) {
         if (MENTOR_RUNNER_SCRIPT.equals(runnerScript)) {
+            // `background_thread:true` runs jemalloc's page-decay sweep on a dedicated thread —
+            // without it the mutator must re-enter the allocator to trigger decay, which a
+            // long-idle Node loop rarely does (cf. jemalloc TUNING.md). Decay window 30s
+            // matches jemalloc upstream's "long-lived process" recommendation; 10s was
+            // aggressive without buying anything once background_thread is on.
             return (
                 "LD_PRELOAD=/usr/local/lib/libjemalloc.so.2 " +
-                "MALLOC_CONF=narenas:2,dirty_decay_ms:10000,muzzy_decay_ms:10000 "
+                "MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:30000,muzzy_decay_ms:30000 "
             );
         }
         return "";

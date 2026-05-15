@@ -222,20 +222,28 @@ public class MentorTurnPersistence {
         if (finish.finishReason() != null) {
             meta.put("finishReason", finish.finishReason().wire());
         }
-        // Usage + model come from TranslatorState — the translator accumulates from
-        // message_update.partial / message_end / agent_end.messages[].
+        // Persisted shape MUST match the wire {@code UIMessageChunk.MessageMetadata} — webapp's
+        // `MessageMetadata` is {model, usage:{input,output,cacheRead,cacheWrite,totalTokens}, costUsd}
+        // and `useChat` rehydrates a thread by passing the GET response straight into the same
+        // typed accessor. Flat keys would render usage/cost as undefined on every refresh.
         UsageBreakdown usage = extractUsageFromState(state);
-        meta.put("inputTokens", usage.inputTokens());
-        meta.put("outputTokens", usage.outputTokens());
-        meta.put("cacheReadTokens", usage.cacheReadTokens());
-        meta.put("cacheWriteTokens", usage.cacheWriteTokens());
         if (usage.model() != null) {
             meta.put("model", usage.model());
         }
+        ObjectNode usageNode = meta.has("usage") && meta.get("usage").isObject()
+            ? (ObjectNode) meta.get("usage")
+            : meta.putObject("usage");
+        usageNode.put("input", usage.inputTokens());
+        usageNode.put("output", usage.outputTokens());
+        usageNode.put("cacheRead", usage.cacheReadTokens());
+        usageNode.put("cacheWrite", usage.cacheWriteTokens());
+        long totalTokens = usage.inputTokens() + usage.outputTokens();
+        if (totalTokens > 0) {
+            usageNode.put("totalTokens", totalTokens);
+        }
         // Cost: prefer Pi's own `usage.cost.total` (computed against the provider's price table on
         // the agent host); fall back to ModelPricingService if Pi didn't ship one. If both are
-        // absent the field is left null — downstream UI tolerates absent cost. Recorded even when
-        // tokens are zero (e.g. a steered abort) so we don't drop a real model name on the floor.
+        // absent the field is left null — downstream UI tolerates absent cost.
         Double piCostUsd = extractPiCostUsd(state.observedUsage());
         if (piCostUsd != null) {
             meta.put("costUsd", piCostUsd);

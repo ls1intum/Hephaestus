@@ -274,19 +274,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                 if (r instanceof MentorTurnPersistence.TurnPersistenceCookie) {
                     winners++;
                 } else if (r instanceof TurnAlreadyInFlightException) {
+                    // Narrowed exception — production must translate DataIntegrityViolation into
+                    // TurnAlreadyInFlight before the orchestrator sees it. A regression that
+                    // drops the isInFlightUniqueViolation filter would leak the unwrapped type.
                     conflicts++;
                 } else if (r instanceof Throwable t) {
-                    // Some Postgres drivers wrap the constraint violation in a different
-                    // unchecked exception (DataIntegrityViolationException, etc.). Treat any
-                    // non-cookie outcome as a conflict so long as no other type leaked through.
-                    if (
-                        t.getClass().getSimpleName().contains("DataIntegrity") ||
-                        t.getCause() instanceof TurnAlreadyInFlightException
-                    ) {
-                        conflicts++;
-                    } else {
-                        throw new AssertionError("Unexpected exception type: " + t, t);
-                    }
+                    throw new AssertionError("Unexpected exception type: " + t, t);
                 }
             }
             assertThat(winners).as("exactly one writer succeeds").isEqualTo(1);
@@ -332,8 +325,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         JsonNode meta = assistant.getMetadata();
         assertThat(meta.path("finishReason").asText()).isEqualTo("stop");
         assertThat(meta.path("model").asText()).isEqualTo("openai/gpt-oss-120b");
-        assertThat(meta.path("inputTokens").asLong()).isEqualTo(123);
-        assertThat(meta.path("outputTokens").asLong()).isEqualTo(45);
+        // Nested wire shape — must match UIMessageChunk.MessageMetadata + webapp MessageMetadata
+        // so a rehydrated thread renders identically to the live stream.
+        assertThat(meta.path("usage").path("input").asLong()).isEqualTo(123);
+        assertThat(meta.path("usage").path("output").asLong()).isEqualTo(45);
+        assertThat(meta.path("usage").path("totalTokens").asLong()).isEqualTo(168);
+        assertThat(meta.has("inputTokens")).as("flat keys retired").isFalse();
         assertThat(assistant.getParts().isArray()).isTrue();
         assertThat(assistant.getParts().get(0).path("text").asText()).isEqualTo("Hello there!");
     }

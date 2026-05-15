@@ -150,6 +150,8 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
             .expectStatus()
             .isOk()
             .expectHeader()
+            .contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM)
+            .expectHeader()
             .valueEquals("x-vercel-ai-ui-message-stream", "v1")
             .expectHeader()
             .valueEquals("Cache-Control", "no-cache");

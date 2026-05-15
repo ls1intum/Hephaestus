@@ -472,7 +472,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             String beforeNode = body.substring(0, nodeIdx);
             assertThat(beforeNode)
                 .contains("LD_PRELOAD=/usr/local/lib/libjemalloc.so.2")
-                .contains("MALLOC_CONF=narenas:2,dirty_decay_ms:10000,muzzy_decay_ms:10000");
+                .contains("MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:30000,muzzy_decay_ms:30000");
         }
 
         @Test

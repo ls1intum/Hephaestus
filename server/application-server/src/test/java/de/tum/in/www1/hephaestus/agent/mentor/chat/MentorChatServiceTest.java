@@ -373,6 +373,46 @@ class MentorChatServiceTest extends BaseUnitTest {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // 5. JVM-lock conflict (LOCAL backstop) — distinct outcome from DB conflict
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("in-flight conflict (LOCAL): JVM lock already held; persistence never invoked")
+    void runTurn_inFlightConflict_LOCAL_distinctOutcome() throws Exception {
+        // Hold the lock on a separate carrier thread so the service's tryLock-or-409 sees it busy.
+        MentorTurnLock.ThreadKey key = new MentorTurnLock.ThreadKey(WORKSPACE_ID, THREAD_ID);
+        java.util.concurrent.CountDownLatch holding = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        Thread holder = new Thread(() ->
+            turnLock.withLockOr409(key, () -> {
+                holding.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return Boolean.TRUE;
+            })
+        );
+        holder.setDaemon(true);
+        holder.start();
+        assertThat(holding.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+
+        try {
+            runTurnSync();
+        } finally {
+            release.countDown();
+            holder.join(2_000);
+        }
+
+        // Persistence MUST NOT be called when the LOCAL lock rejects up front.
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
+        // Distinct outcome metric so SLO dashboards separate same-JVM double-submit from the
+        // durable DB backstop (the latter signals JVM-lock leak across replicas).
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_LOCAL);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // Helpers
     // ════════════════════════════════════════════════════════════════════════
 

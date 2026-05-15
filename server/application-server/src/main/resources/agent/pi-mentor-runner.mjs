@@ -381,10 +381,10 @@ function defineLinkFindingTool() {
 }
 
 async function handleHello(id /*, params */) {
-    // Java validates only `protocolVersion` (MentorChatService#verifyProtocol); the runner
-    // image pins Node ≥22 (see docker/agents/pi/Dockerfile), so callers can rely on
-    // Promise.withResolvers natively — no polyfill or capability advertisement needed.
-    sendResult(id, { protocolVersion: PROTOCOL_VERSION });
+    // Java validates `protocolVersion` AND `protocolOnly` (MentorChatService#verifyProtocol);
+    // shipping the latter on hello lets Java fail-closed if MENTOR_RUNNER_PROTOCOL_ONLY=1
+    // leaks into a real deploy, instead of every user receiving stubbed answers.
+    sendResult(id, { protocolVersion: PROTOCOL_VERSION, protocolOnly: PROTOCOL_ONLY });
     // Prewarm the SDK in the background while Java orchestrates DB load + aspect build.
     // Fired AFTER the hello reply because SDK module evaluation is synchronous.
     if (!PROTOCOL_ONLY) {

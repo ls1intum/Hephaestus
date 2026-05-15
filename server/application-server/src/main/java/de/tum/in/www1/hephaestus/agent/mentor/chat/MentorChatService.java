@@ -508,6 +508,14 @@ public class MentorChatService {
                 "Runner protocol mismatch — expected version " + MentorRunnerClient.PROTOCOL_VERSION + ", got " + got
             );
         }
+        // Fail-closed against PROTOCOL_ONLY drift: in stub mode the runner stubs every prompt,
+        // so a deploy that accidentally inherits MENTOR_RUNNER_PROTOCOL_ONLY=1 would silently
+        // serve canned answers to every user. The runner advertises the flag on hello.
+        if (hello.path("protocolOnly").asBoolean(false)) {
+            throw new IllegalStateException(
+                "Runner started in MENTOR_RUNNER_PROTOCOL_ONLY=1 — refusing to serve traffic"
+            );
+        }
     }
 
     /**
