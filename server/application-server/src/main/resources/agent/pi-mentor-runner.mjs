@@ -513,11 +513,10 @@ function forwardEvent(state, event) {
         // runWatchdogRebind). That path emits its own agent_end via sendEvent directly — it
         // does NOT route through forwardEvent — so this branch only fires for genuine
         // SDK-emitted turn completions. If that invariant ever changes, a `state.gcDoneThisTurn`
-        // flag would gate against double-firing. Keeping the implicit invariant + comment
-        // rather than adding a flag we'd have to keep in sync.
+        // flag would gate against double-firing.
         clearTurnWatchdog(state);
         state.inFlight = false;
-        maybePostTurnGc(state.threadId);
+        maybePostTurnGc();
     }
 }
 
@@ -528,10 +527,14 @@ function forwardEvent(state, event) {
  * contractually guaranteed — we surface duration + RSS-before/after as a structured event so a
  * production gauge (or grep) can validate that the call did anything useful.
  *
- * Yielded via setImmediate so the agent_end frame drains to the kernel pipe buffer first
+ * <p>Yielded via setImmediate so the agent_end frame drains to the kernel pipe buffer first
  * (Java still observes the frame ordering it would have without this).
+ *
+ * <p>The emitted event uses {@code threadId: null} — V8 GC is a process-global concern; tagging
+ * with a specific threadId would mislead the Java-side fan-out into routing it to a single
+ * subscriber, which is the wrong scope (every thread shares the same heap).
  */
-function maybePostTurnGc(threadId) {
+function maybePostTurnGc() {
     if (typeof global.gc !== "function") return;
     setImmediate(() => {
         const before = process.memoryUsage().rss;
@@ -545,14 +548,21 @@ function maybePostTurnGc(threadId) {
         }
         const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
         const after = process.memoryUsage().rss;
-        // Emit as a structured runner event so ops can grep / aggregate it. Java-side
-        // MentorEventTranslator already ignores unknown event types — no wire schema change.
-        sendEvent(threadId, {
-            type: "runner_post_turn_gc",
-            ok,
-            durationMs,
-            rssBeforeBytes: before,
-            rssAfterBytes: after,
+        // Notification (threadId:null) — runner-scoped, like runner_prewarm_*. Allow-listed in
+        // PiEventToUiChunkTranslator so it does not WARN as protocol drift.
+        writeFrame({
+            jsonrpc: "2.0",
+            method: "event",
+            params: {
+                threadId: null,
+                event: {
+                    type: "runner_post_turn_gc",
+                    ok,
+                    durationMs,
+                    rssBeforeBytes: before,
+                    rssAfterBytes: after,
+                },
+            },
         });
     });
 }

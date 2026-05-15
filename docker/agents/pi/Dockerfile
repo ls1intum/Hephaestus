@@ -45,17 +45,15 @@ ENV GIT_PAGER=cat
 ENV GIT_TERMINAL_PROMPT=0
 ENV LANG=C.UTF-8
 
-# Memory tunables. We deliberately scope the heavy allocator changes to the long-lived Node
-# mentor runner only — set at process spawn time by PiRuntimeFactory#nodeEnvFor — NOT
+# Memory tunables. ALL allocator-tuning env vars are scoped to the long-lived Node mentor
+# runner only — set per-process by PiRuntimeFactory#nodeEnvFor at spawn time. Nothing is set
 # image-wide. Reason: this image also runs `bun` (mimalloc), `git`, `jq`, `curl` on the
-# practice-review precompute critical path; preloading jemalloc onto those is unmeasured and
-# Bun specifically does not want it.
+# practice-review precompute critical path; preloading jemalloc or capping glibc arenas onto
+# those is unmeasured (we explicitly rejected unmeasured tuning in wave 25 — applying it here
+# image-wide would be the same mistake).
 #
-#   libjemalloc2 installed + per-arch symlink to /usr/local/lib/libjemalloc.so.2 (stable path
-#       so PiRuntimeFactory can hard-code one LD_PRELOAD value across amd64+arm64 buildx).
-#   MALLOC_ARENA_MAX=2 set image-wide as a cheap fallback for any non-jemalloc-scoped Node
-#       invocation (e.g. local debugging). Caps glibc per-thread arenas. No-op once
-#       LD_PRELOAD=libjemalloc takes effect for a given process.
+# Here we only install libjemalloc2 + create the per-arch symlink to a stable path so
+# PiRuntimeFactory can hard-code one LD_PRELOAD literal across amd64+arm64 buildx.
 RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
     case "${arch}" in \
         amd64|x86_64) src="/usr/lib/x86_64-linux-gnu/libjemalloc.so.2" ;; \
@@ -64,7 +62,6 @@ RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
     esac && \
     test -f "${src}" || (echo "libjemalloc.so.2 missing at ${src}" >&2; exit 1) && \
     ln -sf "${src}" /usr/local/lib/libjemalloc.so.2
-ENV MALLOC_ARENA_MAX=2
 
 USER 1000:1000
 WORKDIR /workspace

@@ -163,16 +163,24 @@ class MentorSandboxStressTest {
                 );
             }
             if (k > 1) {
+                // ABSOLUTE delta — a negative delta (V8 freed memory between samples) is real
+                // signal, not noise to clamp. If after-K-opens drops 500 KB below the floor on
+                // one runner and rises 5 MB on another, the previous .max() over signed deltas
+                // would happily report the 5 MB / (k-1) figure while silently ignoring the
+                // -500 KB / (k-1) (negative) — bug shape: drops-the-real-bound. Use the absolute
+                // worst-case magnitude per runner so bloat AND release both trigger investigation.
                 long maxMarginalKb = runners
                     .stream()
                     .filter(r -> r.rssAfterOpenKb > 0 && r.rssOneSessionFloorKb > 0)
-                    .mapToLong(r -> (r.rssAfterOpenKb - r.rssOneSessionFloorKb) / (k - 1))
+                    .mapToLong(r -> Math.abs(r.rssAfterOpenKb - r.rssOneSessionFloorKb) / (k - 1))
                     .max()
                     .orElse(0L);
                 if (maxMarginalKb > marginalBudgetKb) {
                     throw new AssertionError(
-                        "marginal RSS / extra session regression: max=" + maxMarginalKb +
-                        " KB > budget=" + marginalBudgetKb + " KB — per-thread state bloated"
+                        "marginal RSS / extra session regression: |delta|/extra-session=" +
+                        maxMarginalKb + " KB > budget=" + marginalBudgetKb +
+                        " KB — per-thread state bloated OR floor sample bad. " +
+                        "Override budget via MARGINAL_RSS_BUDGET_KB env."
                     );
                 }
             }

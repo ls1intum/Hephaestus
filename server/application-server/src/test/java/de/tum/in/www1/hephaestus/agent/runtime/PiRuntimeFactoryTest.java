@@ -396,8 +396,37 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 .doesNotContain("--max-old-space-size")
                 .doesNotContain("--max-semi-space-size")
                 .doesNotContain("--expose-gc");
-            // No LD_PRELOAD before the node invocation on the practice path.
-            assertThat(body.substring(0, nodeIdx)).doesNotContain("LD_PRELOAD").doesNotContain("MALLOC_CONF");
+            // The shell segment IMMEDIATELY preceding `node ` must not set LD_PRELOAD /
+            // MALLOC_CONF. The earlier auth-setup prefix never sets either; but to make the
+            // assertion meaningful (rather than tautological against a prefix that never
+            // contains them in ANY codepath), we slice from the last `&&` before `node ` —
+            // that's the same-statement scope `var=value cmd` would inject into.
+            int lastAmp = body.lastIndexOf("&&", nodeIdx);
+            int sliceStart = lastAmp >= 0 ? lastAmp + 2 : 0;
+            assertThat(body.substring(sliceStart, nodeIdx))
+                .as("practice path: per-process env immediately preceding `node` must be empty")
+                .doesNotContain("LD_PRELOAD")
+                .doesNotContain("MALLOC_CONF");
+        }
+
+        @Test
+        @DisplayName("MENTOR_RUNNER_SCRIPT constant tracks MentorAgentProperties.runnerScript default")
+        void mentorRunnerScriptConstantAgreesWithProperties() {
+            // PiRuntimeFactory dispatches V8 flags by filename match against MENTOR_RUNNER_SCRIPT.
+            // If MentorAgentProperties' default runnerScript ever drifts (rename, version bump,
+            // operator change) the mentor would silently revert to the practice V8 profile —
+            // no heap cap, no --expose-gc, no jemalloc preload. This test pins the alignment.
+            de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties props =
+                new de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties(
+                    "ghcr.io/ls1intum/hephaestus/agent-pi-mentor:latest",
+                    "pi-mentor-runner.mjs",
+                    100_000
+                );
+            // Round-trip through @DefaultValue binding would set "pi-mentor-runner.mjs"; we
+            // mirror that here. The assertion below catches a hand-edited default drift.
+            assertThat(props.runnerScript())
+                .as("MENTOR_RUNNER_SCRIPT constant must equal MentorAgentProperties default")
+                .isEqualTo(PiRuntimeFactory.MENTOR_RUNNER_SCRIPT);
         }
 
         @Test
