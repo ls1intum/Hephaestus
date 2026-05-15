@@ -172,12 +172,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("UV_THREADPOOL_SIZE capped at 2 (libuv stack reservation)")
-        void uvThreadpoolCapped() {
-            // Drops libuv's default 4 worker stacks to 2; Pi is not fs/crypto/dns/zlib heavy in
-            // interactive mode, so we trade unused worker capacity for ~2 MB RSS per runner.
+        @DisplayName("No image-wide UV_THREADPOOL_SIZE override (would serialise libuv fs bursts)")
+        void uvThreadpoolNotForced() {
+            // Previously set to 2 image-wide — removed because (a) the RSS saving was unmeasured
+            // and (b) it serialises the practice runner's git tool calls. If a workload-specific
+            // override is needed it should be set inline in nodeEnvFor.
             var env = factory.build(proxySpec(LlmProvider.OPENAI, null)).environment();
-            assertThat(env).containsEntry("UV_THREADPOOL_SIZE", "2");
+            assertThat(env).doesNotContainKey("UV_THREADPOOL_SIZE");
         }
 
         @Test
@@ -378,24 +379,58 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class CommandAssembly {
 
         @Test
-        @DisplayName("node invocation carries the lightweight V8 flags ahead of the runner path")
-        void nodeFlagsApplied() {
-            // The exact flag values are part of the runtime contract — each one buys measurable
-            // memory savings on the mentor stress harness. Asserting them here prevents an
-            // accidental revert of the audit fixes.
+        @DisplayName("Practice runner: only safe flags (no heap cap, no --expose-gc)")
+        void nodeFlagsForPractice() {
+            // The default test specs use `pi-runner.mjs` (practice). Practice handles large diffs
+            // and uses no global.gc() — applying a 256 MB heap cap there would be a latent OOM
+            // and exposing gc() is a foot-gun.
             String body = factory.build(apiKeySpec(LlmProvider.OPENAI)).command().get(2);
-            // Find the node-invocation prefix and require all four flags appear before the script.
             int nodeIdx = body.indexOf("node ");
             int scriptIdx = body.indexOf(".run-pi.mjs");
             assertThat(nodeIdx).as("node invocation present").isGreaterThanOrEqualTo(0);
             assertThat(scriptIdx).as("runner script present").isGreaterThan(nodeIdx);
             String nodePrefix = body.substring(nodeIdx, scriptIdx);
             assertThat(nodePrefix)
+                .contains("--disable-source-maps")
+                .contains("--no-warnings")
+                .doesNotContain("--max-old-space-size")
+                .doesNotContain("--max-semi-space-size")
+                .doesNotContain("--expose-gc");
+            // No LD_PRELOAD before the node invocation on the practice path.
+            assertThat(body.substring(0, nodeIdx)).doesNotContain("LD_PRELOAD").doesNotContain("MALLOC_CONF");
+        }
+
+        @Test
+        @DisplayName("Mentor runner: heap cap + --expose-gc + jemalloc preload scoped to node")
+        void nodeFlagsForMentor() {
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                null,
+                null,
+                null,
+                true,
+                600,
+                "pi-mentor-runner.mjs",
+                Map.of(),
+                ""
+            );
+            String body = factory.build(spec).command().get(2);
+            int nodeIdx = body.indexOf("node ");
+            int scriptIdx = body.indexOf(".run-pi.mjs");
+            String nodePrefix = body.substring(nodeIdx, scriptIdx);
+            assertThat(nodePrefix)
                 .contains("--max-old-space-size=256")
-                .contains("--max-semi-space-size=16")
                 .contains("--disable-source-maps")
                 .contains("--no-warnings")
                 .contains("--expose-gc");
+            // LD_PRELOAD + MALLOC_CONF appear in the shell env BEFORE `node `, scoped to that
+            // invocation only — they do NOT leak to bun (precompute) or other tools.
+            String beforeNode = body.substring(0, nodeIdx);
+            assertThat(beforeNode)
+                .contains("LD_PRELOAD=/usr/local/lib/libjemalloc.so.2")
+                .contains("MALLOC_CONF=narenas:2,dirty_decay_ms:10000,muzzy_decay_ms:10000");
         }
 
         @Test

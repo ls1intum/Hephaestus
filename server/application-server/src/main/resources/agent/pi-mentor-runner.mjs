@@ -400,16 +400,46 @@ async function handleHello(id /*, params */) {
     sendResult(id, { protocolVersion: PROTOCOL_VERSION });
     // Cold-start: trigger Pi SDK init in the background so it overlaps with Java's
     // orchestration between hello-reply and the first open_thread (DB load, aspect build,
-    // SSE wiring — typically 100-400 ms). ensureRuntime caches its own promise so the
-    // foreground open_thread call awaits the same result without re-loading.
+    // SSE wiring). ensureRuntime caches its own promise so the foreground open_thread call
+    // awaits the same result without re-loading.
     //
-    // Fired AFTER the hello reply because Pi SDK module evaluation is synchronous and
-    // blocks the event loop for ~300-400 ms once it starts. Firing before the reply
-    // delays the hello round trip by exactly that much; firing after lets hello return
-    // instantly and the SDK load runs while Java is busy.
+    // Fired AFTER the hello reply because Pi SDK module evaluation runs synchronously between
+    // dynamic-import yield points; firing before the reply would delay hello by the load time.
+    // The exact load duration is workload-dependent (transitive imports through
+    // core/resource-loader pull in highlight.js / Ink); the runner_post_warm event below
+    // makes it observable.
     if (!PROTOCOL_ONLY) {
+        const start = process.hrtime.bigint();
         setImmediate(() => {
-            ensureRuntime().catch((e) => log("prewarm ensureRuntime failed (will retry on demand):", e));
+            ensureRuntime().then(
+                () => {
+                    const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+                    // Notification event (threadId:null since prewarm is runner-scoped).
+                    // Java MentorEventTranslator ignores unknown types — no wire schema bump.
+                    writeFrame({
+                        jsonrpc: "2.0",
+                        method: "event",
+                        params: {
+                            threadId: null,
+                            event: { type: "runner_prewarm_ok", durationMs },
+                        },
+                    });
+                },
+                (e) => {
+                    log("prewarm ensureRuntime failed (will retry on demand):", e);
+                    writeFrame({
+                        jsonrpc: "2.0",
+                        method: "event",
+                        params: {
+                            threadId: null,
+                            event: {
+                                type: "runner_prewarm_failed",
+                                error: String(e?.message ?? e),
+                            },
+                        },
+                    });
+                }
+            );
         });
     }
 }
@@ -479,24 +509,52 @@ function forwardEvent(state, event) {
     // Pass through raw Pi event for Java MentorEventTranslator. Clear in-flight flag on agent_end.
     sendEvent(state.threadId, event);
     if (event?.type === "agent_end") {
+        // The watchdog synthesises its own agent_end at the end of a forced rebind (see
+        // runWatchdogRebind). That path emits its own agent_end via sendEvent directly — it
+        // does NOT route through forwardEvent — so this branch only fires for genuine
+        // SDK-emitted turn completions. If that invariant ever changes, a `state.gcDoneThisTurn`
+        // flag would gate against double-firing. Keeping the implicit invariant + comment
+        // rather than adding a flag we'd have to keep in sync.
         clearTurnWatchdog(state);
         state.inFlight = false;
-        // Force V8 compaction so dirty pages from the just-finished turn return to the OS
-        // before the user goes idle. Node 22's idle-page-release fires eventually on its own
-        // (Cribl upstream PR) but only after several seconds of idleness; a deterministic call
-        // here drops ~10-20 MB RSS within tens of ms. Guarded because --expose-gc is a Node
-        // flag and tests may not pass it. No-op when the flag is absent.
-        if (typeof global.gc === "function") {
-            // Yield first so the agent_end frame is fully drained to Java before GC pauses.
-            setImmediate(() => {
-                try {
-                    global.gc();
-                } catch (e) {
-                    log("post-turn gc threw:", e);
-                }
-            });
-        }
+        maybePostTurnGc(state.threadId);
     }
+}
+
+/**
+ * Best-effort post-turn V8 compaction. Returns dirty pages from the just-finished turn back to
+ * the OS before the user goes idle. Triggered only when {@code --expose-gc} was passed (mentor
+ * runner; not practice). The actual RSS reduction depends on V8 build + heap state and is not
+ * contractually guaranteed — we surface duration + RSS-before/after as a structured event so a
+ * production gauge (or grep) can validate that the call did anything useful.
+ *
+ * Yielded via setImmediate so the agent_end frame drains to the kernel pipe buffer first
+ * (Java still observes the frame ordering it would have without this).
+ */
+function maybePostTurnGc(threadId) {
+    if (typeof global.gc !== "function") return;
+    setImmediate(() => {
+        const before = process.memoryUsage().rss;
+        const start = process.hrtime.bigint();
+        let ok = true;
+        try {
+            global.gc();
+        } catch (e) {
+            ok = false;
+            log("post-turn gc threw:", e);
+        }
+        const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+        const after = process.memoryUsage().rss;
+        // Emit as a structured runner event so ops can grep / aggregate it. Java-side
+        // MentorEventTranslator already ignores unknown event types — no wire schema change.
+        sendEvent(threadId, {
+            type: "runner_post_turn_gc",
+            ok,
+            durationMs,
+            rssBeforeBytes: before,
+            rssAfterBytes: after,
+        });
+    });
 }
 
 async function handleReplayContext(id, params) {

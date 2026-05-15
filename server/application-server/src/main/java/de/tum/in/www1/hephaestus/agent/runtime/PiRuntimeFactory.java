@@ -88,13 +88,6 @@ public class PiRuntimeFactory {
         env.put("TMPDIR", "/home/agent/.local/tmp");
         env.put("PI_CODING_AGENT_DIR", "/home/agent/.pi");
 
-        // libuv worker-pool cap. Default is 4 → 4 × ~1 MB stack reserves per runner. Pi never
-        // saturates the threadpool (no heavy fs/crypto/dns/zlib fan-out in interactive mode), so
-        // 2 is enough headroom for occasional file I/O while halving the stack reservation. Saves
-        // ~2–4 MB RSS per long-lived runner — observable in /proc/$pid/status during the mentor
-        // stress test once N runners share the host.
-        env.putIfAbsent("UV_THREADPOOL_SIZE", "2");
-
         // Pi's azure-openai-responses provider hard-defaults the model to "gpt-5.2" — the deployment
         // map routes both that and the configured model to the correct Azure deployment.
         if (spec.provider() == LlmProvider.AZURE_OPENAI) {
@@ -137,32 +130,12 @@ public class PiRuntimeFactory {
             " && " +
             extensionCopyStep +
             spec.precomputeStep() +
-            // Lightweight V8 flags. Each runner is a long-lived JSONL pump, NOT a TUI app:
-            //   --max-old-space-size=256        cap V8 old-gen at 256 MB; current steady-state
-            //                                   V8 heap is ~100 MB so this leaves 2.5× headroom
-            //                                   for compaction spikes while preventing runaway
-            //                                   growth on a leaky session. Default is ~1.4 GB
-            //                                   on 64-bit which lets a single bad runner OOM
-            //                                   the host.
-            //   --max-semi-space-size=16        cap young-gen at 16 MB; default scales with old
-            //                                   heap and reserves 64-256 MB of nursery copies
-            //                                   per runner — wasted because mentor allocations
-            //                                   are short-lived and survive 1 GC at most.
-            //   --disable-source-maps           Pi SDK ships source maps but stack traces are
-            //                                   surfaced via JSON-RPC errors, not raw stderr;
-            //                                   source-map resolution wastes ~5-10 MB of cached
-            //                                   parse state per V8 isolate.
-            //   --no-warnings                   suppresses deprecation/experimental warnings on
-            //                                   stderr; keeps our [pi-mentor-runner] log frames
-            //                                   clean for ops grep.
-            //   --expose-gc                     exposes `global.gc()` so the runner can force a
-            //                                   compaction after agent_end. Node 22 added an
-            //                                   idle-time page release (Cribl upstream PR); a
-            //                                   deterministic post-turn call returns ~10-20 MB to
-            //                                   the host between turns instead of waiting on V8's
-            //                                   own idle heuristic.
-            // Combined saving on the mentor stress harness: ~15-20 MB RSS per runner steady-state.
-            "node --max-old-space-size=256 --max-semi-space-size=16 --disable-source-maps --no-warnings --expose-gc " +
+            // Per-agent Node flags + envs. We deliberately do NOT apply the same flags to both
+            // the long-lived mentor runner and the one-shot practice runner — see the rationale
+            // in {@link #nodeFlagsFor(String)} and {@link #nodeEnvFor(String)}.
+            nodeEnvFor(spec.runnerScript()) +
+            "node " +
+            nodeFlagsFor(spec.runnerScript()) +
             workspaceRoot +
             "/" +
             WorkspaceAbi.RUNNER_SCRIPT_FILENAME;
@@ -182,6 +155,67 @@ public class PiRuntimeFactory {
             inputFiles.size()
         );
         return new PiPlan(List.of("sh", "-c", command), Map.copyOf(env), Map.copyOf(inputFiles), networkPolicy);
+    }
+
+    /** Mentor uses a long-lived runner; the script filename is the dispatch key. */
+    static final String MENTOR_RUNNER_SCRIPT = "pi-mentor-runner.mjs";
+
+    /**
+     * Per-runner Node CLI flags. We split mentor (long-lived JSONL pump, 50+ concurrent containers
+     * on a single host) from practice (one-shot review, reads large diffs, runs precompute).
+     *
+     * <p><b>Mentor flags:</b>
+     * <ul>
+     *   <li>{@code --max-old-space-size=256} — cap V8 old-gen at 256 MB. Empirically the mentor
+     *       runtime sits at ~100 MB V8 heap; 2.5× headroom defends against a leaky session OOM-ing
+     *       the host instead of itself. Default ~1.4 GB on 64-bit lets one bad runner take the
+     *       host down.</li>
+     *   <li>{@code --disable-source-maps} — Pi SDK ships source maps; runner errors flow through
+     *       JSON-RPC, not raw stderr stacks, so the source-map parse cache is wasted.</li>
+     *   <li>{@code --no-warnings} — keeps stderr clean for ops grep against our own log prefix.</li>
+     *   <li>{@code --expose-gc} — exposes {@code global.gc()} so the runner can force a post-turn
+     *       compaction in {@code pi-mentor-runner.mjs:forwardEvent}. The flag costs nothing on its
+     *       own and is only effective when {@code global.gc()} is actually called.</li>
+     * </ul>
+     *
+     * <p><b>Practice flags:</b> only {@code --disable-source-maps --no-warnings}. We do NOT cap the
+     * heap because practice routinely parses 30-file diff patches that allocate transiently; a
+     * 256 MB cap would convert worst-case-input OOMs from "rare" to "regular." We do NOT
+     * {@code --expose-gc} because the practice runner never calls {@code global.gc()} and
+     * exposing the global is a foot-gun.
+     *
+     * <p>We deliberately removed {@code --max-semi-space-size=16} and {@code UV_THREADPOOL_SIZE=2}
+     * from prior revisions: the former matches the Node 22 default on 64-bit (so it was a no-op),
+     * and the latter risks serialising libuv fs/crypto bursts (notably the practice runner's
+     * git tool calls) for an unmeasured ~MB-scale RSS reservation reduction.
+     */
+    private static String nodeFlagsFor(String runnerScript) {
+        if (MENTOR_RUNNER_SCRIPT.equals(runnerScript)) {
+            return "--max-old-space-size=256 --disable-source-maps --no-warnings --expose-gc ";
+        }
+        return "--disable-source-maps --no-warnings ";
+    }
+
+    /**
+     * Per-runner environment fragments injected as {@code VAR=value} pairs into the shell
+     * {@code node …} invocation. This scopes {@code LD_PRELOAD=libjemalloc.so.2} +
+     * {@code MALLOC_CONF=…} to the Node process only — NOT image-wide ENV — so the precompute
+     * runner ({@code bun}), {@code git}, {@code jq}, and short-lived tool invocations all keep
+     * their default glibc allocators. Mentor's long-lived heap benefits from jemalloc's
+     * page-decay tuning; precompute's bursty allocations don't.
+     *
+     * <p>The path matches the {@code /usr/local/lib/libjemalloc.so.2} symlink created by the Pi
+     * Dockerfile (see {@code docker/agents/pi/Dockerfile}). The symlink is per-arch by design;
+     * the env literal here is arch-independent.
+     */
+    private static String nodeEnvFor(String runnerScript) {
+        if (MENTOR_RUNNER_SCRIPT.equals(runnerScript)) {
+            return (
+                "LD_PRELOAD=/usr/local/lib/libjemalloc.so.2 " +
+                "MALLOC_CONF=narenas:2,dirty_decay_ms:10000,muzzy_decay_ms:10000 "
+            );
+        }
+        return "";
     }
 
     /**

@@ -144,6 +144,38 @@ class MentorSandboxStressTest {
             if (failed > 0) {
                 throw new AssertionError("multi-session stress failed: " + failed + "/" + n + " runners errored");
             }
+            // Hard regression budgets for multi-session: peak RSS per runner + marginal RSS per
+            // extra session. The marginal slope is the headline architectural invariant — if it
+            // ever exceeds ~2 MB the per-thread state has bloated and the per-user-container
+            // model stops scaling. Both override via env.
+            long peakRssBudgetKb = Long.parseLong(System.getenv().getOrDefault("PEAK_RSS_BUDGET_KB", "240000"));
+            long marginalBudgetKb = Long.parseLong(System.getenv().getOrDefault("MARGINAL_RSS_BUDGET_KB", "2048"));
+            long maxRssKb = runners
+                .stream()
+                .filter(r -> !r.samples.isEmpty())
+                .flatMapToLong(r -> r.samples.stream().mapToLong(arr -> arr[1]))
+                .max()
+                .orElse(0L);
+            if (maxRssKb > peakRssBudgetKb) {
+                throw new AssertionError(
+                    "multi-session peak RSS regression: max=" + maxRssKb + " KB > budget=" +
+                    peakRssBudgetKb + " KB (override via PEAK_RSS_BUDGET_KB)"
+                );
+            }
+            if (k > 1) {
+                long maxMarginalKb = runners
+                    .stream()
+                    .filter(r -> r.rssAfterOpenKb > 0 && r.rssOneSessionFloorKb > 0)
+                    .mapToLong(r -> (r.rssAfterOpenKb - r.rssOneSessionFloorKb) / (k - 1))
+                    .max()
+                    .orElse(0L);
+                if (maxMarginalKb > marginalBudgetKb) {
+                    throw new AssertionError(
+                        "marginal RSS / extra session regression: max=" + maxMarginalKb +
+                        " KB > budget=" + marginalBudgetKb + " KB — per-thread state bloated"
+                    );
+                }
+            }
         } finally {
             sampler.shutdownNow();
         }
@@ -184,6 +216,36 @@ class MentorSandboxStressTest {
             int failed = (int) sessions.stream().filter(s -> s.failure != null).count();
             if (failed > 0) {
                 throw new AssertionError("stress test failed: " + failed + "/" + n + " sessions errored");
+            }
+            // Hard regression budgets. Without these the test is a printf with a liveness check —
+            // a 10× RSS bloat or 5× cold-start regression would still pass green. Budgets are
+            // generous (≥40% headroom over wave-22 measured numbers) so steady-state numbers
+            // don't flake on shared CI hardware. Override via env for soak runs.
+            long peakRssBudgetKb = Long.parseLong(System.getenv().getOrDefault("PEAK_RSS_BUDGET_KB", "240000"));
+            long coldStartBudgetMs = Long.parseLong(System.getenv().getOrDefault("COLD_START_BUDGET_MS", "5000"));
+            long maxRssKb = sessions
+                .stream()
+                .filter(s -> !s.samples.isEmpty())
+                .flatMapToLong(s -> s.samples.stream().mapToLong(arr -> arr[1]))
+                .max()
+                .orElse(0L);
+            long maxColdStartMs = sessions
+                .stream()
+                .filter(s -> s.readyNanos > 0)
+                .mapToLong(s -> (s.readyNanos - s.spawnStartNanos) / 1_000_000)
+                .max()
+                .orElse(0L);
+            if (maxRssKb > peakRssBudgetKb) {
+                throw new AssertionError(
+                    "peak RSS regression: max=" + maxRssKb + " KB > budget=" + peakRssBudgetKb +
+                    " KB (override via PEAK_RSS_BUDGET_KB env)"
+                );
+            }
+            if (maxColdStartMs > coldStartBudgetMs) {
+                throw new AssertionError(
+                    "cold-start regression: max=" + maxColdStartMs + " ms > budget=" +
+                    coldStartBudgetMs + " ms (override via COLD_START_BUDGET_MS env)"
+                );
             }
         } finally {
             sampler.shutdownNow();
@@ -553,17 +615,38 @@ class MentorSandboxStressTest {
         System.out.println("══════════════════════════════════════════════════════════════════");
     }
 
+    /**
+     * Percentile printing is gated on n ≥ 20 because below that the index for p95/p99 collapses
+     * to {@code max} and printing the label invites people to read the number as statistically
+     * meaningful when it isn't (Wish A/B-test percentile guidance). For small samples we print
+     * min / median / max only.
+     */
+    private static final int PERCENTILE_MIN_N = 20;
+
     private static void printRow(String label, String unit, long[] sortedSamples) {
         if (sortedSamples.length == 0) {
             System.out.printf("  %-30s n=0 (no samples)%n", label);
             return;
         }
         long p50 = sortedSamples[Math.min(sortedSamples.length - 1, sortedSamples.length / 2)];
-        long p95 = sortedSamples[(int) Math.min(sortedSamples.length - 1L, Math.round(sortedSamples.length * 0.95))];
-        long p99 = sortedSamples[(int) Math.min(sortedSamples.length - 1L, Math.round(sortedSamples.length * 0.99))];
         long min = sortedSamples[0];
         long max = sortedSamples[sortedSamples.length - 1];
         long mean = java.util.stream.LongStream.of(sortedSamples).sum() / sortedSamples.length;
+        if (sortedSamples.length < PERCENTILE_MIN_N) {
+            System.out.printf(
+                "  %-30s n=%3d  min=%6d  p50=%6d  max=%6d  mean=%6d  %s%n",
+                label,
+                sortedSamples.length,
+                min,
+                p50,
+                max,
+                mean,
+                unit
+            );
+            return;
+        }
+        long p95 = sortedSamples[(int) Math.min(sortedSamples.length - 1L, Math.round(sortedSamples.length * 0.95))];
+        long p99 = sortedSamples[(int) Math.min(sortedSamples.length - 1L, Math.round(sortedSamples.length * 0.99))];
         System.out.printf(
             "  %-30s n=%3d  min=%6d  p50=%6d  p95=%6d  p99=%6d  max=%6d  mean=%6d  %s%n",
             label,
@@ -669,6 +752,18 @@ class MentorSandboxStressTest {
     }
 
     private static String buildRunnerShim(Path workspace, Path runner) {
+        // JSON-encode the path literals — workspace.toString() can contain backslashes (Windows),
+        // dollar signs, quotes, control chars. Hand-rolled `replace("\\", "\\\\")` covers exactly
+        // one of those cases; Jackson's writeValueAsString covers all of them and produces a valid
+        // JS string literal in one shot.
+        String workspaceLit;
+        String runnerLit;
+        try {
+            workspaceLit = MAPPER.writeValueAsString(workspace.toString());
+            runnerLit = MAPPER.writeValueAsString(runner.toUri().toString());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("failed to encode shim literals", e);
+        }
         return ("""
         import path from "node:path";
         import fs from "node:fs";
@@ -683,8 +778,7 @@ class MentorSandboxStressTest {
         const origMkdir = fs.mkdirSync; fs.mkdirSync = (p, opts) => origMkdir(rewrite(p), opts);
         const origReadFile = fs.readFileSync; fs.readFileSync = (p, opts) => origReadFile(rewrite(p), opts);
         await import(__RUNNER_URL__);
-        """).replace("__WORKSPACE__", "\"" + workspace.toString().replace("\\", "\\\\") + "\"")
-            .replace("__RUNNER_URL__", "\"" + runner.toUri() + "\"");
+        """).replace("__WORKSPACE__", workspaceLit).replace("__RUNNER_URL__", runnerLit);
     }
 
     /** Per-runner metric capture for the multi-session test. K threads opened in one runner. */
