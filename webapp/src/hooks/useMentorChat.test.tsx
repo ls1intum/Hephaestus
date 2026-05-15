@@ -300,7 +300,6 @@ describe("useMentorChat", () => {
 				}),
 			);
 		});
-
 	});
 
 	describe("vote functionality", () => {
@@ -529,6 +528,5 @@ describe("useMentorChat", () => {
 				}),
 			);
 		});
-
 	});
 });
