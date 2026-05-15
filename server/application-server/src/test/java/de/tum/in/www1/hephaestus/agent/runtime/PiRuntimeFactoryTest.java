@@ -429,11 +429,10 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                         new org.springframework.core.env.MapPropertySource("empty", Map.of())
                     )
                 );
-            de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties bound = binder
-                .bindOrCreate(
-                    "hephaestus.mentor.agent",
-                    de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties.class
-                );
+            de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties bound = binder.bindOrCreate(
+                "hephaestus.mentor.agent",
+                de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties.class
+            );
             assertThat(bound.runnerScript())
                 .as("MENTOR_RUNNER_SCRIPT must equal MentorAgentProperties.@DefaultValue('runnerScript')")
                 .isEqualTo(PiRuntimeFactory.MENTOR_RUNNER_SCRIPT);

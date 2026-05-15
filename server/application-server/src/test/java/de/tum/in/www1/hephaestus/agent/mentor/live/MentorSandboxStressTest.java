@@ -58,8 +58,13 @@ class MentorSandboxStressTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String PI_SDK_VERSION = "0.74.0";
     private static final Path SDK_DIR = Path.of("target", "pi-sdk").toAbsolutePath();
-    private static final Path RUNNER = Path.of("src", "main", "resources", "agent", "pi-mentor-runner.mjs")
-        .toAbsolutePath();
+    private static final Path RUNNER = Path.of(
+        "src",
+        "main",
+        "resources",
+        "agent",
+        "pi-mentor-runner.mjs"
+    ).toAbsolutePath();
     /** Per-session deadline: cold-start + handshake + prompt + agent_end against live LLM. */
     private static final Duration SESSION_BUDGET = Duration.ofSeconds(120);
 
@@ -140,7 +145,10 @@ class MentorSandboxStressTest {
 
             reportMultiSession(n, k, elapsedMs, runners);
 
-            int failed = (int) runners.stream().filter(r -> r.failure != null).count();
+            int failed = (int) runners
+                .stream()
+                .filter(r -> r.failure != null)
+                .count();
             if (failed > 0) {
                 throw new AssertionError("multi-session stress failed: " + failed + "/" + n + " runners errored");
             }
@@ -158,8 +166,11 @@ class MentorSandboxStressTest {
                 .orElse(0L);
             if (maxRssKb > peakRssBudgetKb) {
                 throw new AssertionError(
-                    "multi-session peak RSS regression: max=" + maxRssKb + " KB > budget=" +
-                    peakRssBudgetKb + " KB (override via PEAK_RSS_BUDGET_KB)"
+                    "multi-session peak RSS regression: max=" +
+                        maxRssKb +
+                        " KB > budget=" +
+                        peakRssBudgetKb +
+                        " KB (override via PEAK_RSS_BUDGET_KB)"
                 );
             }
             if (k > 1) {
@@ -176,10 +187,12 @@ class MentorSandboxStressTest {
                     .orElse(0L);
                 if (maxMarginalGrowthKb > marginalBudgetKb) {
                     throw new AssertionError(
-                        "marginal RSS growth per extra session: " + maxMarginalGrowthKb +
-                        " KB > budget=" + marginalBudgetKb +
-                        " KB — per-thread state bloated. " +
-                        "Override budget via MARGINAL_RSS_BUDGET_KB env."
+                        "marginal RSS growth per extra session: " +
+                            maxMarginalGrowthKb +
+                            " KB > budget=" +
+                            marginalBudgetKb +
+                            " KB — per-thread state bloated. " +
+                            "Override budget via MARGINAL_RSS_BUDGET_KB env."
                     );
                 }
             }
@@ -214,13 +227,18 @@ class MentorSandboxStressTest {
                     })
                 );
             }
-            CompletableFuture.allOf(spawnFutures.toArray(CompletableFuture[]::new))
-                .get(SESSION_BUDGET.toSeconds() + 30, TimeUnit.SECONDS);
+            CompletableFuture.allOf(spawnFutures.toArray(CompletableFuture[]::new)).get(
+                SESSION_BUDGET.toSeconds() + 30,
+                TimeUnit.SECONDS
+            );
             long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
 
             report(n, elapsedMs, sessions);
 
-            int failed = (int) sessions.stream().filter(s -> s.failure != null).count();
+            int failed = (int) sessions
+                .stream()
+                .filter(s -> s.failure != null)
+                .count();
             if (failed > 0) {
                 throw new AssertionError("stress test failed: " + failed + "/" + n + " sessions errored");
             }
@@ -244,14 +262,20 @@ class MentorSandboxStressTest {
                 .orElse(0L);
             if (maxRssKb > peakRssBudgetKb) {
                 throw new AssertionError(
-                    "peak RSS regression: max=" + maxRssKb + " KB > budget=" + peakRssBudgetKb +
-                    " KB (override via PEAK_RSS_BUDGET_KB env)"
+                    "peak RSS regression: max=" +
+                        maxRssKb +
+                        " KB > budget=" +
+                        peakRssBudgetKb +
+                        " KB (override via PEAK_RSS_BUDGET_KB env)"
                 );
             }
             if (maxColdStartMs > coldStartBudgetMs) {
                 throw new AssertionError(
-                    "cold-start regression: max=" + maxColdStartMs + " ms > budget=" +
-                    coldStartBudgetMs + " ms (override via COLD_START_BUDGET_MS env)"
+                    "cold-start regression: max=" +
+                        maxColdStartMs +
+                        " ms > budget=" +
+                        coldStartBudgetMs +
+                        " ms (override via COLD_START_BUDGET_MS env)"
                 );
             }
         } finally {
@@ -306,7 +330,11 @@ class MentorSandboxStressTest {
                 }
             });
 
-            driver.prompt(threadId, "Answer in exactly one sentence: what is dependency injection?", Duration.ofSeconds(10));
+            driver.prompt(
+                threadId,
+                "Answer in exactly one sentence: what is dependency injection?",
+                Duration.ofSeconds(10)
+            );
             session.promptAcceptedNanos = System.nanoTime();
 
             turnComplete.get(SESSION_BUDGET.toSeconds(), TimeUnit.SECONDS);
@@ -474,7 +502,13 @@ class MentorSandboxStressTest {
         long[] peakRssKb = runners
             .stream()
             .filter(r -> !r.samples.isEmpty())
-            .mapToLong(r -> r.samples.stream().mapToLong(arr -> arr[1]).max().orElse(0))
+            .mapToLong(r ->
+                r.samples
+                    .stream()
+                    .mapToLong(arr -> arr[1])
+                    .max()
+                    .orElse(0)
+            )
             .sorted()
             .toArray();
 
@@ -510,15 +544,15 @@ class MentorSandboxStressTest {
             printRow("marginal RSS / extra session", "KB", marginalKbPerExtraSession);
         }
 
-        long totalPeakRssMb = (peakRssKb.length == 0
+        long totalPeakRssMb = (peakRssKb.length == 0 ? 0L : java.util.stream.LongStream.of(peakRssKb).sum() / 1024L);
+        long avgFloorMb =
+            rssOneSessionFloor.length == 0
                 ? 0L
-                : java.util.stream.LongStream.of(peakRssKb).sum() / 1024L);
-        long avgFloorMb = rssOneSessionFloor.length == 0
-            ? 0L
-            : (java.util.stream.LongStream.of(rssOneSessionFloor).sum() / rssOneSessionFloor.length / 1024L);
-        long avgMarginalKb = marginalKbPerExtraSession.length == 0
-            ? 0L
-            : java.util.stream.LongStream.of(marginalKbPerExtraSession).sum() / marginalKbPerExtraSession.length;
+                : (java.util.stream.LongStream.of(rssOneSessionFloor).sum() / rssOneSessionFloor.length / 1024L);
+        long avgMarginalKb =
+            marginalKbPerExtraSession.length == 0
+                ? 0L
+                : java.util.stream.LongStream.of(marginalKbPerExtraSession).sum() / marginalKbPerExtraSession.length;
         System.out.printf(
             "%n  ▸ aggregate peak RSS across all %d runners (× %d sessions): %d MB%n",
             peakRssKb.length,
@@ -541,7 +575,10 @@ class MentorSandboxStressTest {
             );
         }
 
-        long failed = runners.stream().filter(r -> r.failure != null).count();
+        long failed = runners
+            .stream()
+            .filter(r -> r.failure != null)
+            .count();
         System.out.printf("  ▸ failures: %d / %d%n", failed, n);
         for (var r : runners) {
             if (r.failure != null) {
@@ -590,13 +627,25 @@ class MentorSandboxStressTest {
         long[] peakRssKb = sessions
             .stream()
             .filter(s -> !s.samples.isEmpty())
-            .mapToLong(s -> s.samples.stream().mapToLong(arr -> arr[1]).max().orElse(0))
+            .mapToLong(s ->
+                s.samples
+                    .stream()
+                    .mapToLong(arr -> arr[1])
+                    .max()
+                    .orElse(0)
+            )
             .sorted()
             .toArray();
         long[] peakThreads = sessions
             .stream()
             .filter(s -> !s.samples.isEmpty())
-            .mapToLong(s -> s.samples.stream().mapToLong(arr -> arr[2]).max().orElse(0))
+            .mapToLong(s ->
+                s.samples
+                    .stream()
+                    .mapToLong(arr -> arr[2])
+                    .max()
+                    .orElse(0)
+            )
             .sorted()
             .toArray();
 
@@ -607,12 +656,13 @@ class MentorSandboxStressTest {
         printRow("peak RSS per runner", "KB", peakRssKb);
         printRow("peak threads per runner", "", peakThreads);
 
-        long totalPeakRssMb = (peakRssKb.length == 0
-                ? 0L
-                : java.util.stream.LongStream.of(peakRssKb).sum() / 1024L);
+        long totalPeakRssMb = (peakRssKb.length == 0 ? 0L : java.util.stream.LongStream.of(peakRssKb).sum() / 1024L);
         System.out.printf("%n  ▸ aggregate peak RSS across all %d runners: %d MB%n", peakRssKb.length, totalPeakRssMb);
 
-        long failed = sessions.stream().filter(s -> s.failure != null).count();
+        long failed = sessions
+            .stream()
+            .filter(s -> s.failure != null)
+            .count();
         System.out.printf("  ▸ failures: %d / %d%n", failed, n);
         for (var s : sessions) {
             if (s.failure != null) {
@@ -771,21 +821,24 @@ class MentorSandboxStressTest {
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new IllegalStateException("failed to encode shim literals", e);
         }
-        return ("""
-        import path from "node:path";
-        import fs from "node:fs";
-        const WORKSPACE_REAL = __WORKSPACE__;
-        function rewrite(p) {
-            if (typeof p !== "string") return p;
-            if (p === "/workspace") return WORKSPACE_REAL;
-            if (p.startsWith("/workspace/")) return WORKSPACE_REAL + p.substring("/workspace".length);
-            return p;
-        }
-        const origExists = fs.existsSync; fs.existsSync = (p) => origExists(rewrite(p));
-        const origMkdir = fs.mkdirSync; fs.mkdirSync = (p, opts) => origMkdir(rewrite(p), opts);
-        const origReadFile = fs.readFileSync; fs.readFileSync = (p, opts) => origReadFile(rewrite(p), opts);
-        await import(__RUNNER_URL__);
-        """).replace("__WORKSPACE__", workspaceLit).replace("__RUNNER_URL__", runnerLit);
+        return (
+            """
+            import path from "node:path";
+            import fs from "node:fs";
+            const WORKSPACE_REAL = __WORKSPACE__;
+            function rewrite(p) {
+                if (typeof p !== "string") return p;
+                if (p === "/workspace") return WORKSPACE_REAL;
+                if (p.startsWith("/workspace/")) return WORKSPACE_REAL + p.substring("/workspace".length);
+                return p;
+            }
+            const origExists = fs.existsSync; fs.existsSync = (p) => origExists(rewrite(p));
+            const origMkdir = fs.mkdirSync; fs.mkdirSync = (p, opts) => origMkdir(rewrite(p), opts);
+            const origReadFile = fs.readFileSync; fs.readFileSync = (p, opts) => origReadFile(rewrite(p), opts);
+            await import(__RUNNER_URL__);
+            """
+        ).replace("__WORKSPACE__", workspaceLit)
+            .replace("__RUNNER_URL__", runnerLit);
     }
 
     /** Per-runner metric capture for the multi-session test. K threads opened in one runner. */
@@ -835,8 +888,10 @@ class MentorSandboxStressTest {
     private static final class RunnerDriver {
 
         private final StdioAttachedSandbox sandbox;
-        private final java.util.concurrent.ConcurrentLinkedQueue<JsonNode> responses = new java.util.concurrent.ConcurrentLinkedQueue<>();
-        private final java.util.concurrent.ConcurrentLinkedQueue<JsonNode> ready = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        private final java.util.concurrent.ConcurrentLinkedQueue<JsonNode> responses =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
+        private final java.util.concurrent.ConcurrentLinkedQueue<JsonNode> ready =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
         private final AtomicLong idGen = new AtomicLong();
         private final ConcurrentHashMap<Long, Object> requestSent = new ConcurrentHashMap<>();
 
