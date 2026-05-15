@@ -99,13 +99,8 @@ function log(...args) {
     process.stderr.write(`[pi-mentor-runner ${ts}] ${msg}\n`);
 }
 
-//
-// Buffer.indexOf(0x0a) — NOT readline. The Pi SDK rpc.md docs §28-37 spell out that Node's
-// readline mis-splits on U+2028/U+2029, which are 3-byte UTF-8 sequences legal inside JSON
-// strings. The Java side (JsonlStdoutPump.java) uses the same strict semantics on its end.
-//
-// We accept an optional trailing `\r` (CRLF) and strip it, matching the docs' guidance.
-
+// LF-only line splitter (NOT readline — readline mis-splits on U+2028/U+2029 inside JSON
+// string values). CRLF tolerant.
 function createLineSplitter(onLine) {
     let buffer = Buffer.alloc(0);
     const MAX_LINE_BYTES = 8 * 1024 * 1024; // 8 MiB hard cap; aspects are tiny but be safe
@@ -139,14 +134,7 @@ function writeFrame(obj) {
     process.stdout.write(JSON.stringify(obj) + "\n");
 }
 
-/**
- * Backpressure threshold: once Node's stdout write queue exceeds this many bytes, the
- * dispatch queue pauses for a `drain` event before running the next task. Pi can emit
- * hundreds of text_delta events per second; if Java's consumer is slow (SSE backed up by a
- * client) the runner's heap balloons unboundedly without this guard, eventually OOM-killing
- * the container mid-turn. 256 KB is roughly one Pi turn's worth of deltas — well below
- * Node's default 16 KB highWaterMark × ~16 chunk burst budget.
- */
+/** Pause dispatch when stdout backs up past this size; prevents OOM under slow SSE consumers. */
 const STDOUT_BACKPRESSURE_THRESHOLD_BYTES = 256 * 1024;
 
 function sendResult(id, result) {
@@ -194,19 +182,12 @@ let runtime = null; // AgentSessionRuntime
 let runtimeInitPromise = null;
 let systemPrompt = null; // cached after first read
 
-/**
- * Last runtime-init failure — used to fail-fast for a short window so a permanently-broken
- * SDK doesn't get re-loaded once per inbound frame. The container is throwaway; one short
- * cooldown burns budget proportional to operational signal (logs + metrics) rather than
- * spinning a load attempt per request.
- */
+/** Fail-fast cooldown for runtime init: re-loading the SDK on every inbound frame is wasteful. */
 let runtimeInitFailure = null;
 const RUNTIME_INIT_COOLDOWN_MS = 30_000;
 
-// Serialised dispatch chain. Initialised by `start()`; every stdin frame AND every
-// internally-fired side-effect (e.g. watchdog session rebind) appends to it so callers cannot
-// race `runtime.switchSession` against each other. See the comment block on `start()` for the
-// race story this prevents.
+// Serialised dispatch chain — every stdin frame AND watchdog rebind appends here so callers
+// cannot race `runtime.switchSession` against each other.
 let dispatchQueue = Promise.resolve();
 
 function enqueue(fn) {
@@ -259,8 +240,7 @@ async function ensureRuntime() {
         const fetchContextTool = defineFetchContextTool();
         const linkFindingTool = defineLinkFindingTool();
 
-        // Factory: rebuilds cwd-bound services each time the runtime needs a new session
-        // (newSession, switchSession, fork, importFromJsonl). See pi-coding-agent docs/sdk.md §137-155.
+        // Factory: rebuilds cwd-bound services on every session lifecycle event.
         const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
             const services = await createAgentSessionServices({ cwd, agentDir: agentDir });
             const loader = systemPrompt
@@ -271,10 +251,8 @@ async function ensureRuntime() {
                   })
                 : new DefaultResourceLoader({ cwd, agentDir: agentDir });
             await loader.reload();
-            // Tools allowlist: deny everything except our two custom tools. Pi's default tool
-            // set is ["read","bash","edit","write"] (sdk.ts §271-277) — exposing those to the
-            // mentor agent would let the LLM run shell commands inside the container. The
-            // mentor only needs fetch_context (server callback) and link_finding (event emit).
+            // Mentor needs only fetch_context + link_finding; Pi's default read/bash/edit/write
+            // are dangerous in a shared container and are denied explicitly here.
             const result = await createAgentSessionFromServices({
                 services,
                 sessionManager,
@@ -405,15 +383,8 @@ async function handleHello(id /*, params */) {
     // image pins Node ≥22 (see docker/agents/pi/Dockerfile), so callers can rely on
     // Promise.withResolvers natively — no polyfill or capability advertisement needed.
     sendResult(id, { protocolVersion: PROTOCOL_VERSION });
-    // Cold-start: trigger Pi SDK init in the background so it overlaps with Java's
-    // orchestration between hello-reply and the first open_thread (DB load, aspect build,
-    // SSE wiring). ensureRuntime caches its own promise so the foreground open_thread call
-    // awaits the same result without re-loading.
-    //
-    // Fired AFTER the hello reply because Pi SDK module evaluation runs synchronously between
-    // dynamic-import yield points; firing before the reply would delay hello by the load time.
-    // Failure is logged to stderr (the runner has no structured-event observability surface
-    // wired yet) and ensureRuntime's own cooldown handles retry on subsequent demand.
+    // Prewarm the SDK in the background while Java orchestrates DB load + aspect build.
+    // Fired AFTER the hello reply because SDK module evaluation is synchronous.
     if (!PROTOCOL_ONLY) {
         setImmediate(() => {
             ensureRuntime().catch((e) => log("prewarm ensureRuntime failed (will retry on demand):", e));
@@ -515,19 +486,7 @@ function emitSessionPersisted(state) {
     }
 }
 
-/**
- * Best-effort post-turn V8 compaction. Triggered only when {@code --expose-gc} was passed
- * (mentor; not practice). Effect-only: we do NOT emit observability events for this — write-only
- * telemetry that no Java consumer reads is just stdout noise. If we ever want a production
- * metric for GC behavior, wire it deliberately through a dedicated metrics path.
- *
- * <p>Gated on heap-watermark: a full STW major GC costs ~50–200 ms on a 100 MB heap; for a
- * just-finished 1-token turn the cost is all pause, no benefit. Only fire if V8's own heap
- * has grown past the 64 MB mark — below that, V8's own scavenger handles things without our
- * help.
- *
- * <p>Yielded via setImmediate so the agent_end frame drains to the kernel pipe buffer first.
- */
+/** Post-turn major GC fires only above this heap watermark (requires Node --expose-gc). */
 const POST_TURN_GC_HEAP_THRESHOLD_BYTES = 64 * 1024 * 1024;
 
 function maybePostTurnGc() {
@@ -961,11 +920,8 @@ function announceReady() {
 }
 
 function start() {
-    // Stdin frames AND internally-fired side-effects (watchdog rebinds) all funnel through
-    // module-scoped `dispatchQueue` via `enqueue`. Without that, back-to-back frames (e.g.
-    // open_thread immediately followed by prompt) — or worse, a stdin frame racing the
-    // watchdog timer — would hit `runtime.switchSession` concurrently and rebind the
-    // single Pi session to whichever resolves last, losing every subsequent event.
+    // All stdin frames + side-effect rebinds funnel through `enqueue` to serialise
+    // `runtime.switchSession` against itself.
     const splitter = createLineSplitter((line) => {
         enqueue(async () => {
             let frame;
@@ -984,10 +940,7 @@ function start() {
     });
 
     process.stdin.on("data", (chunk) => splitter(chunk));
-    // Route stdin EOF through the dispatch queue so cleanup invariants (runtime.dispose,
-    // unsubscribe of every active thread, pending fetch_context rejection) run identically
-    // for SIGTERM and EOF. Exiting directly here skipped the SessionManager file flush and
-    // left jemalloc thread caches uncollected on parent-process drop.
+    // EOF routes through the dispatch queue so SIGTERM and EOF run the same teardown.
     process.stdin.on("end", () => {
         log("stdin EOF — shutting down");
         enqueue(() => handleShutdown(undefined));
@@ -1009,14 +962,8 @@ function start() {
         log("unhandledRejection:", e);
     });
 
-    // Funnel SIGTERM / SIGINT through the dispatch queue so a supervisor-driven shutdown
-    // observes the same teardown invariants as an RPC `shutdown` (rejects pending fetch
-    // callbacks, disposes the runtime, drains the dispatch chain). Without these, the
-    // process exits with the default disposition mid-task — any in-flight Pi event between
-    // user-visible chunks vanishes on the wire and Java waits for its 165s prompt deadline.
-    // Pass `undefined` (not `null`) so `sendResult` skips emitting a response frame — there's
-    // no RPC request to reply to. `null` would emit `{id:null, result:…}`, a JSON-RPC reply to
-    // nobody, polluting Java's frame log on every signal-driven shutdown.
+    // Signal-driven shutdown uses the same path as RPC `shutdown`. Pass `undefined` (NOT `null`)
+    // so `sendResult` skips emitting a response frame for this synthetic shutdown.
     for (const signal of ["SIGTERM", "SIGINT"]) {
         process.on(signal, () => {
             log(`received ${signal} — initiating clean shutdown`);

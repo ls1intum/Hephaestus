@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.mentor;
+package de.tum.in.www1.hephaestus.agent.context.providers.mentor;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;

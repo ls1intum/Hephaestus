@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.mentor;
+package de.tum.in.www1.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;

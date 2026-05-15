@@ -287,6 +287,14 @@ public class MentorTurnPersistence {
                 assistant.setMetadata(meta);
                 chatMessageRepository.save(assistant);
             });
+
+        // If the runner shipped session_persisted before the interrupt (e.g. pi_error AFTER a
+        // valid agent_end-adjacent flush), preserve those bytes so the next cold restart still
+        // gets prompt-cache continuity. Same null-skip semantics as doFinalise.
+        byte[] sessionBytes = state.observedSessionJsonl();
+        if (sessionBytes != null) {
+            chatThreadRepository.updateSessionJsonl(cookie.threadId(), sessionBytes);
+        }
     }
 
     private static ObjectNode newOrCopyMeta(ChatMessage message) {

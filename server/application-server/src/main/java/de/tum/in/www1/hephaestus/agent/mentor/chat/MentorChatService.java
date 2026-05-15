@@ -7,10 +7,7 @@ import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
 import de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.in.www1.hephaestus.agent.context.providers.mentor.FindingsHistoryAspectProvider;
-import de.tum.in.www1.hephaestus.agent.context.providers.mentor.PracticeCatalogAspectProvider;
-import de.tum.in.www1.hephaestus.agent.context.providers.mentor.UserAspectProvider;
-import de.tum.in.www1.hephaestus.agent.context.providers.mentor.WorkspaceAspectProvider;
+import de.tum.in.www1.hephaestus.agent.context.providers.mentor.MentorAspects;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentRequest;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorLlmConfig;
@@ -35,7 +32,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -63,14 +59,6 @@ public class MentorChatService {
 
     private static final Logger log = LoggerFactory.getLogger(MentorChatService.class);
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
-
-    /** Whitelist of allowed {@code fetch_context} aspect keys; full output-key match, no path stripping. */
-    private static final Set<String> ALLOWED_FETCH_KEYS = Set.of(
-        UserAspectProvider.OUTPUT_KEY,
-        WorkspaceAspectProvider.OUTPUT_KEY,
-        PracticeCatalogAspectProvider.OUTPUT_KEY,
-        FindingsHistoryAspectProvider.OUTPUT_KEY
-    );
 
     private final UserRepository userRepository;
     private final ChatThreadRepository chatThreadRepository;
@@ -244,6 +232,7 @@ public class MentorChatService {
         AttachedSandbox sandbox = null;
         MentorRunnerClient client = null;
         CompletableFuture<Void> turnComplete = new CompletableFuture<>();
+        java.util.concurrent.atomic.AtomicBoolean errorChunkSeen = new java.util.concurrent.atomic.AtomicBoolean();
         channel.startHeartbeat();
         boolean poisoned = false;
         MentorChatMetrics.Outcome outcome = MentorChatMetrics.Outcome.ERROR;
@@ -283,7 +272,7 @@ public class MentorChatService {
             client = new MentorRunnerClient(
                 sandbox,
                 objectMapper,
-                event -> handleEvent(event, state, channel, cookie, turnComplete),
+                event -> handleEvent(event, state, channel, cookie, turnComplete, errorChunkSeen),
                 callback -> handleFetchContext(callback, aspectInputs),
                 runnerTimeoutScheduler.scheduler(),
                 // Per-thread event filter: the sandbox is shared by (userId, workspaceId), so
@@ -328,7 +317,9 @@ public class MentorChatService {
             // Natural-finish path: Pi emitted `agent_end` → handleEvent sent the `finish` chunk
             // already. Close the wire with AI-SDK's `[DONE]` sentinel.
             channel.completeWithDone();
-            outcome = MentorChatMetrics.Outcome.SUCCESS;
+            // If an Error chunk reached the wire mid-turn, the DB row is `interrupted`. Avoid
+            // recording SUCCESS in that case — metrics must agree with persistence.
+            outcome = errorChunkSeen.get() ? MentorChatMetrics.Outcome.ERROR : MentorChatMetrics.Outcome.SUCCESS;
         } catch (TimeoutException timeout) {
             // Turn outlasted the prompt deadline (165s) + 30s grace; the future never resolved.
             // Persistence sees an interrupted assistant row; the runner watchdog is what
@@ -444,7 +435,8 @@ public class MentorChatService {
         TranslatorState state,
         MentorSseChannel channel,
         MentorTurnPersistence.TurnPersistenceCookie cookie,
-        CompletableFuture<Void> turnComplete
+        CompletableFuture<Void> turnComplete,
+        java.util.concurrent.atomic.AtomicBoolean errorChunkSeen
     ) {
         try {
             List<UIMessageChunk> chunks = translator.translate(piEvent, state);
@@ -469,8 +461,14 @@ public class MentorChatService {
                     if (costUsd != null) metrics.recordCostUsd(costUsd);
                     turnComplete.complete(null);
                 } else if (chunk instanceof UIMessageChunk.Error err) {
+                    // Persistence sees `interrupted`; the wire already carries the Error chunk.
+                    // Failing the future exceptionally would re-emit a generic Error + [DONE]
+                    // (double-error on the wire) AND let the outer catch call interrupt again.
+                    // Complete normally and let runTurnInternal observe the interrupted row via
+                    // the Error-chunk-seen flag below to record the correct outcome metric.
                     channel.send(chunk);
                     persistence.interrupt(cookie, state, new IllegalStateException(err.errorText()));
+                    errorChunkSeen.set(true);
                     turnComplete.complete(null);
                 } else {
                     channel.send(chunk);
@@ -580,7 +578,7 @@ public class MentorChatService {
         String key = path.startsWith(MentorPiAdapter.ASPECT_INPUT_PREFIX)
             ? path
             : MentorPiAdapter.ASPECT_INPUT_PREFIX + stripLeadingPath(path);
-        if (!ALLOWED_FETCH_KEYS.contains(key)) {
+        if (!MentorAspects.ALLOWED_OUTPUT_KEYS.contains(key)) {
             throw new IllegalArgumentException("fetch_context path not allowed: " + path);
         }
         byte[] bytes = aspectInputs.get(key);
