@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>The proper fix is sticky sessions per {@code (workspaceId, threadId)} — tracked in #1077.
  *
- * <h3>Honesty note (Loop-2 audit)</h3>
+ * <h3>Operator-asserted, not topology-derived</h3>
  * This check reads {@code hephaestus.mentor.replica-count} which is OPERATOR-ASSERTED, not
  * derived from the orchestrator. An operator who scales via {@code kubectl scale --replicas=3}
  * <em>without</em> updating the property silently bypasses this guard. The class name and

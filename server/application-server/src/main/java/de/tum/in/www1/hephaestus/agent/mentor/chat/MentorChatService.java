@@ -240,6 +240,7 @@ public class MentorChatService {
 
             Map<String, byte[]> aspectInputs = buildAspectContext(request, user);
             SessionRestore sessionRestore = priorSessionBytes
+                .filter(bytes -> bytes.length > 0)
                 .map(bytes -> new SessionRestore(request.threadId(), bytes))
                 .orElse(null);
             InteractiveSandboxSpec spec = mentorPiAdapter.buildSandboxSpec(

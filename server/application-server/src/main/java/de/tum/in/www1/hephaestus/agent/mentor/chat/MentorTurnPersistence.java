@@ -326,24 +326,13 @@ public class MentorTurnPersistence {
         return v.isIntegralNumber() || v.isFloatingPointNumber() ? v.asLong() : 0L;
     }
 
-    /**
-     * Pi's {@code Usage.cost: {input, output, cacheRead, cacheWrite, total}} is computed on the
-     * agent host (provider price table baked in). We prefer this over our own pricing lookup so
-     * a model we don't have a price row for still gets a real cost.
-     */
-    /**
-     * Upper bound for a single-turn USD cost. Reference math using current frontier pricing
-     * (seeded in {@code model_pricing}): Claude Opus 4 at $15/1k input + $75/1k output → a
-     * heavy 100k-in + 100k-out turn is $1.5 + $7.5 = $9. A 200k-in + 200k-out tool-call burst
-     * lands around $18. The $100 cap is ≈10× a worst-case legitimate turn, leaving headroom
-     * for future model pricing changes while still flagging the upstream bugs we actually
-     * see in practice: Pi returning sentinel −1, NaN-coerced-to-int, accidental unit
-     * confusion (microdollars vs dollars), or 1e9 garbage. Persisting any of those would
-     * poison the {@code mentor.turn.cost.usd} histogram axis and billing audit row more than
-     * dropping the value would.
-     */
+    /** ≈10× a worst-case frontier-model turn; guards bad Pi cost values from poisoning the histogram + audit row. */
     private static final double COST_USD_SANITY_CAP = 100.0d;
 
+    /**
+     * Pi's {@code Usage.cost.total} is computed on the agent host with the provider price table
+     * baked in — preferred over our own pricing lookup so unknown-to-us models still get a real cost.
+     */
     @Nullable
     private static Double extractPiCostUsd(@Nullable JsonNode usage) {
         if (usage == null || !usage.isObject()) return null;

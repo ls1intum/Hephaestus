@@ -11,8 +11,5 @@ public record SessionRestore(UUID threadId, byte[] bytes) {
     public SessionRestore {
         Objects.requireNonNull(threadId, "threadId");
         Objects.requireNonNull(bytes, "bytes");
-        if (bytes.length == 0) {
-            throw new IllegalArgumentException("bytes must be non-empty");
-        }
     }
 }

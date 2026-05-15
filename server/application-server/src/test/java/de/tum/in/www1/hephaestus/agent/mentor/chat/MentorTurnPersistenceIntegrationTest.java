@@ -102,9 +102,9 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // against. Migration ID references kept in sync via the `migrationDeclaresInFlightUniqueIndex`
         // test below.
         //
-        // The wave-2 status-column migration replaced the JSONB-keyed unique index +
-        // metadata-status CHECK with a column-keyed index + column CHECK. We mirror that
-        // shape here so tests exercise the production constraint shape, not the legacy one.
+        // The current production shape uses a column-keyed unique index + column CHECK
+        // (replacing an earlier JSONB-keyed variant). We mirror it here so tests exercise
+        // the real constraint.
         try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
             stmt.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ux_chat_message_in_flight_v2 " +
@@ -477,9 +477,9 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // changes the predicate, or drops the changeset would otherwise silently sail past
         // every integration test and break production. This guard fails first.
         //
-        // Wave-2 added the `_v2` variant keyed on the column instead of metadata->>'status'.
-        // The original changeset still ships for rollback symmetry; the v2 takes over after
-        // backfill. Assert both shapes are declared.
+        // The current schema has both the legacy JSONB-keyed index and a `_v2` column-keyed
+        // index — the original ships for rollback symmetry while v2 is what production uses.
+        // Assert both shapes are declared.
         String migration = java.nio.file.Files.readString(MIGRATION_PATH);
         assertThat(migration)
             .as("migration must contain the legacy + v2 in-flight unique-index changesets")

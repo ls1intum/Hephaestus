@@ -17,8 +17,9 @@ import org.springframework.stereotype.Component;
  * transforms to {@code mentor_turn_started_total} etc. Outcome tag values are kept to a fixed
  * enum so cardinality stays bounded.
  *
- * <p>Wired up in {@link MentorChatService}. {@code mentor.turn.started} fires at lock
- * acquired; {@code mentor.turn.completed} fires at every terminal branch with a single
+ * <p>Wired up in {@link MentorChatService}. {@code mentor.turn.started} fires on inbound
+ * start before executor submission (so rejected submissions still increment);
+ * {@code mentor.turn.completed} fires at every terminal branch with a single
  * {@link Outcome} label.
  */
 @Component
