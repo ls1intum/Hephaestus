@@ -25,7 +25,12 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "hephaestus.mentor")
 public record InteractiveSandboxProperties(
     @DefaultValue("false") boolean enabled,
-    @DefaultValue("900") @Min(1) int idleTtlSeconds,
+    // 5 min default. A mentor runner is ~165 MB RSS; evicting idle users sooner is the
+    // highest-leverage memory lever at fleet level (the per-container floor is dominated by
+    // Pi SDK imports we can't slim cheaply). Cost: a user who walks away for >5 min pays a
+    // ~1 s cold-start on their next message — acceptable for a chat UI. Override via
+    // hephaestus.mentor.idle-ttl-seconds for soak / capacity tests.
+    @DefaultValue("300") @Min(1) int idleTtlSeconds,
     @DefaultValue("25") @Min(1) @Max(25) int graceTimeoutSeconds,
     @DefaultValue("30") @Min(1) int reapIntervalSeconds,
     @DefaultValue("512") @Min(16) int ringBufferFrames,

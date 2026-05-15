@@ -398,6 +398,20 @@ async function handleHello(id /*, params */) {
     // image pins Node ≥22 (see docker/agents/pi/Dockerfile), so callers can rely on
     // Promise.withResolvers natively — no polyfill or capability advertisement needed.
     sendResult(id, { protocolVersion: PROTOCOL_VERSION });
+    // Cold-start: trigger Pi SDK init in the background so it overlaps with Java's
+    // orchestration between hello-reply and the first open_thread (DB load, aspect build,
+    // SSE wiring — typically 100-400 ms). ensureRuntime caches its own promise so the
+    // foreground open_thread call awaits the same result without re-loading.
+    //
+    // Fired AFTER the hello reply because Pi SDK module evaluation is synchronous and
+    // blocks the event loop for ~300-400 ms once it starts. Firing before the reply
+    // delays the hello round trip by exactly that much; firing after lets hello return
+    // instantly and the SDK load runs while Java is busy.
+    if (!PROTOCOL_ONLY) {
+        setImmediate(() => {
+            ensureRuntime().catch((e) => log("prewarm ensureRuntime failed (will retry on demand):", e));
+        });
+    }
 }
 
 async function handleOpenThread(id, params) {
@@ -467,6 +481,21 @@ function forwardEvent(state, event) {
     if (event?.type === "agent_end") {
         clearTurnWatchdog(state);
         state.inFlight = false;
+        // Force V8 compaction so dirty pages from the just-finished turn return to the OS
+        // before the user goes idle. Node 22's idle-page-release fires eventually on its own
+        // (Cribl upstream PR) but only after several seconds of idleness; a deterministic call
+        // here drops ~10-20 MB RSS within tens of ms. Guarded because --expose-gc is a Node
+        // flag and tests may not pass it. No-op when the flag is absent.
+        if (typeof global.gc === "function") {
+            // Yield first so the agent_end frame is fully drained to Java before GC pauses.
+            setImmediate(() => {
+                try {
+                    global.gc();
+                } catch (e) {
+                    log("post-turn gc threw:", e);
+                }
+            });
+        }
     }
 }
 
@@ -965,6 +994,10 @@ function start() {
     }
 
     announceReady();
+    // SDK prewarm is intentionally NOT triggered here — it now fires inside handleHello
+    // after the reply is written. Pi SDK module evaluation is synchronous (~300-400 ms) and
+    // would block hello until it completes. Firing it post-hello lets the reply land
+    // instantly and the load runs while Java orchestrates open_thread.
 }
 
 start();

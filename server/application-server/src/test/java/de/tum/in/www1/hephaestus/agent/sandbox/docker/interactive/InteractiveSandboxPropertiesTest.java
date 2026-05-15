@@ -25,7 +25,7 @@ class InteractiveSandboxPropertiesTest extends BaseUnitTest {
     void bindsDefaultsFromEmptyMap() {
         InteractiveSandboxProperties p = bind(Map.of());
         assertThat(p.enabled()).isFalse();
-        assertThat(p.idleTtlSeconds()).isEqualTo(900);
+        assertThat(p.idleTtlSeconds()).isEqualTo(300);
         assertThat(p.graceTimeoutSeconds()).isEqualTo(25);
         assertThat(p.reapIntervalSeconds()).isEqualTo(30);
         assertThat(p.ringBufferFrames()).isEqualTo(512);

@@ -394,7 +394,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 .contains("--max-old-space-size=256")
                 .contains("--max-semi-space-size=16")
                 .contains("--disable-source-maps")
-                .contains("--no-warnings");
+                .contains("--no-warnings")
+                .contains("--expose-gc");
         }
 
         @Test

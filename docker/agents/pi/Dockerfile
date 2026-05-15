@@ -4,7 +4,7 @@ FROM node:${NODE_TAG}
 
 ARG TARGETARCH
 
-RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq curl ca-certificates unzip && \
+RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq curl ca-certificates unzip libjemalloc2 && \
     rm -rf /var/lib/apt/lists/*
 
 # renovate: datasource=npm depName=@earendil-works/pi-coding-agent
@@ -44,6 +44,26 @@ ENV HOME=/home/agent
 ENV GIT_PAGER=cat
 ENV GIT_TERMINAL_PROMPT=0
 ENV LANG=C.UTF-8
+
+# Memory tunables for long-lived Node runners (mentor multi-session containers):
+#   MALLOC_ARENA_MAX=2 — caps glibc per-thread arenas. Default 8×ncpu × 64 MB virtual reservations
+#       cause ~10-30 MB native fragmentation in Node servers with native addons (undici,
+#       photon-node, …). Measured saving on the mentor stress harness: ~9 MB per runner steady-state.
+#   LD_PRELOAD=libjemalloc — jemalloc returns dirty pages to the OS more aggressively than glibc
+#       malloc (via MALLOC_CONF.dirty_decay_ms / muzzy_decay_ms). Once preloaded glibc never runs;
+#       MALLOC_ARENA_MAX above is then a no-op but keep it for the rare case LD_PRELOAD is unset.
+# Per-arch symlink to a stable name so the ENV LD_PRELOAD below is architecture-independent.
+RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
+    case "${arch}" in \
+        amd64|x86_64) src="/usr/lib/x86_64-linux-gnu/libjemalloc.so.2" ;; \
+        arm64|aarch64) src="/usr/lib/aarch64-linux-gnu/libjemalloc.so.2" ;; \
+        *) echo "Unsupported architecture for libjemalloc: ${arch}" >&2; exit 1 ;; \
+    esac && \
+    test -f "${src}" || (echo "libjemalloc.so.2 missing at ${src}" >&2; exit 1) && \
+    ln -sf "${src}" /usr/local/lib/libjemalloc.so.2
+ENV MALLOC_ARENA_MAX=2
+ENV MALLOC_CONF="narenas:1,dirty_decay_ms:5000,muzzy_decay_ms:5000"
+ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so.2
 
 USER 1000:1000
 WORKDIR /workspace

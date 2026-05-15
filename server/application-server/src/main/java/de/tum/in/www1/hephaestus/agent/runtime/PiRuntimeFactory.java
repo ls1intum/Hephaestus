@@ -155,8 +155,14 @@ public class PiRuntimeFactory {
             //   --no-warnings                   suppresses deprecation/experimental warnings on
             //                                   stderr; keeps our [pi-mentor-runner] log frames
             //                                   clean for ops grep.
+            //   --expose-gc                     exposes `global.gc()` so the runner can force a
+            //                                   compaction after agent_end. Node 22 added an
+            //                                   idle-time page release (Cribl upstream PR); a
+            //                                   deterministic post-turn call returns ~10-20 MB to
+            //                                   the host between turns instead of waiting on V8's
+            //                                   own idle heuristic.
             // Combined saving on the mentor stress harness: ~15-20 MB RSS per runner steady-state.
-            "node --max-old-space-size=256 --max-semi-space-size=16 --disable-source-maps --no-warnings " +
+            "node --max-old-space-size=256 --max-semi-space-size=16 --disable-source-maps --no-warnings --expose-gc " +
             workspaceRoot +
             "/" +
             WorkspaceAbi.RUNNER_SCRIPT_FILENAME;
