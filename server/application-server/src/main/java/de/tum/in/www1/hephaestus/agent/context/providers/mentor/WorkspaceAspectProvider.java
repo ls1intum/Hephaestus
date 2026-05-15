@@ -45,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WorkspaceAspectProvider implements ContentProvider {
 
-    /** Workspace-relative output key. Whitelisted in {@code MentorChatService#ALLOWED_FETCH_KEYS}. */
+    /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "workspace.json";
 
     private static final int MAX_RECENT_SESSIONS = 10;

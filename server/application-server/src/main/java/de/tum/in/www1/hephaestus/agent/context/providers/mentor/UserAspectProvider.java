@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserAspectProvider implements ContentProvider {
 
-    /** Workspace-relative output key. Whitelisted in {@code MentorChatService#ALLOWED_FETCH_KEYS}. */
+    /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "user.json";
 
     /** Open-PR threshold above which we surface "you have a lot of open PRs" advice. */

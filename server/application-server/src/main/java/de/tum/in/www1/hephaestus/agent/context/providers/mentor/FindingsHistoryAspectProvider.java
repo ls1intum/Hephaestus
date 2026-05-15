@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FindingsHistoryAspectProvider implements ContentProvider {
 
-    /** Workspace-relative output key. Whitelisted in {@code MentorChatService#ALLOWED_FETCH_KEYS}. */
+    /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "findings_history.json";
 
     /** Look-back horizon — mirrors the {@code MAX_LOOKBACK_DAYS} in the TS feedback tool. */

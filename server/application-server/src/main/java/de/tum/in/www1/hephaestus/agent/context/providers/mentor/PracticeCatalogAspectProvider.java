@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PracticeCatalogAspectProvider implements ContentProvider {
 
-    /** Workspace-relative output key. Whitelisted in {@code MentorChatService#ALLOWED_FETCH_KEYS}. */
+    /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "practice_catalog.json";
 
     private static final String CACHE_NAME = "mentor_practice_aspect";

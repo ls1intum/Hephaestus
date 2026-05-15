@@ -71,7 +71,7 @@ const TURN_GRACE_MS = (() => {
 
 // Aspect-name whitelist for the fetch_context tool. Any other path is rejected before the
 // callback even leaves the runner. This is a defence-in-depth check; the authoritative
-// whitelist lives Java-side in MentorChatService.ALLOWED_FETCH_KEYS (full-key match against
+// whitelist lives Java-side in MentorAspects.ALLOWED_OUTPUT_KEYS (full-key match against
 // the aspect providers' OUTPUT_KEY constants). Keep this set aligned with the
 // {User,Workspace,PracticeCatalog,FindingsHistory}AspectProvider basenames.
 const FETCH_CONTEXT_ALLOWED = new Set([
