@@ -125,12 +125,7 @@ public class WorkspaceContextBuilder {
                 String existingOwner = keyOwner.get(key);
                 if (existingOwner != null) {
                     throw new IllegalStateException(
-                        "Duplicate workspace key " +
-                            key +
-                            ": written by both " +
-                            existingOwner +
-                            " and " +
-                            providerName
+                        "Duplicate workspace key " + key + ": written by both " + existingOwner + " and " + providerName
                     );
                 }
                 keyOwner.put(key, providerName);

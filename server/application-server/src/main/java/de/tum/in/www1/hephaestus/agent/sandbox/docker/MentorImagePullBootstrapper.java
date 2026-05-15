@@ -20,7 +20,11 @@ public class MentorImagePullBootstrapper {
     private final MentorAgentProperties properties;
     private final MeterRegistry meterRegistry;
 
-    public MentorImagePullBootstrapper(DockerImageOperations imageOps, MentorAgentProperties properties, MeterRegistry meterRegistry) {
+    public MentorImagePullBootstrapper(
+        DockerImageOperations imageOps,
+        MentorAgentProperties properties,
+        MeterRegistry meterRegistry
+    ) {
         this.imageOps = imageOps;
         this.properties = properties;
         this.meterRegistry = meterRegistry;
@@ -29,6 +33,13 @@ public class MentorImagePullBootstrapper {
     @EventListener(ApplicationReadyEvent.class)
     @Order(1)
     public void pullOnStartup() {
-        ImagePullBootstrapperSupport.applyPolicy(properties.image(), properties.pullPolicy(), imageOps, "agent.mentor.image.pull", meterRegistry, log);
+        ImagePullBootstrapperSupport.applyPolicy(
+            properties.image(),
+            properties.pullPolicy(),
+            imageOps,
+            "agent.mentor.image.pull",
+            meterRegistry,
+            log
+        );
     }
 }

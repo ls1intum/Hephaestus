@@ -5,15 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
-import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
-import de.tum.in.www1.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
 import de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.in.www1.hephaestus.agent.context.providers.mentor.FindingsHistoryAspectProvider;
 import de.tum.in.www1.hephaestus.agent.context.providers.mentor.PracticeCatalogAspectProvider;
 import de.tum.in.www1.hephaestus.agent.context.providers.mentor.UserAspectProvider;
 import de.tum.in.www1.hephaestus.agent.context.providers.mentor.WorkspaceAspectProvider;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentRequest;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorPiAdapter;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorReplayMessage;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.ClientDisconnectedException;
@@ -523,9 +523,11 @@ public class MentorChatService {
      * multi-tenant path for per-workspace key routing.
      */
     private MentorLlmConfig resolveLlmConfig(long workspaceId) {
-        if (mentorAgentProperties.llmProvider() != null
-                && mentorAgentProperties.credentialMode() != null
-                && mentorAgentProperties.modelName() != null) {
+        if (
+            mentorAgentProperties.llmProvider() != null &&
+            mentorAgentProperties.credentialMode() != null &&
+            mentorAgentProperties.modelName() != null
+        ) {
             return MentorLlmConfig.fromProperties(mentorAgentProperties);
         }
         return agentConfigRepository
@@ -534,11 +536,14 @@ public class MentorChatService {
             .filter(AgentConfig::isEnabled)
             .findFirst()
             .map(MentorLlmConfig::fromAgentConfig)
-            .orElseThrow(() -> new IllegalStateException(
-                "No LLM config for mentor in workspace " + workspaceId +
-                " — set hephaestus.mentor.agent.llm-provider / credential-mode / model-name" +
-                " or create an enabled AgentConfig for this workspace"
-            ));
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "No LLM config for mentor in workspace " +
+                        workspaceId +
+                        " — set hephaestus.mentor.agent.llm-provider / credential-mode / model-name" +
+                        " or create an enabled AgentConfig for this workspace"
+                )
+            );
     }
 
     private JsonNode handleFetchContext(MentorRunnerClient.FetchContextRequest req, Map<String, byte[]> aspectInputs) {

@@ -18,7 +18,10 @@ final class ImagePullBootstrapperSupport {
     ) {
         if (policy == ImagePullPolicy.NEVER) {
             if (!imageOps.imageIsPresent(image)) {
-                log.warn("pull-policy=NEVER but {} is not in the local Docker daemon — container creation will fail.", image);
+                log.warn(
+                    "pull-policy=NEVER but {} is not in the local Docker daemon — container creation will fail.",
+                    image
+                );
             }
             return;
         }

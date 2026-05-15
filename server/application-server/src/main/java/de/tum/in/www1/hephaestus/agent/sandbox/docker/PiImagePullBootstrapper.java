@@ -20,7 +20,11 @@ public class PiImagePullBootstrapper {
     private final PiAgentProperties properties;
     private final MeterRegistry meterRegistry;
 
-    public PiImagePullBootstrapper(DockerImageOperations imageOps, PiAgentProperties properties, MeterRegistry meterRegistry) {
+    public PiImagePullBootstrapper(
+        DockerImageOperations imageOps,
+        PiAgentProperties properties,
+        MeterRegistry meterRegistry
+    ) {
         this.imageOps = imageOps;
         this.properties = properties;
         this.meterRegistry = meterRegistry;
@@ -29,6 +33,13 @@ public class PiImagePullBootstrapper {
     @EventListener(ApplicationReadyEvent.class)
     @Order(0) // before AgentJobExecutor (Order 2)
     public void pullOnStartup() {
-        ImagePullBootstrapperSupport.applyPolicy(properties.image(), properties.pullPolicy(), imageOps, "agent.pi.image.pull", meterRegistry, log);
+        ImagePullBootstrapperSupport.applyPolicy(
+            properties.image(),
+            properties.pullPolicy(),
+            imageOps,
+            "agent.pi.image.pull",
+            meterRegistry,
+            log
+        );
     }
 }

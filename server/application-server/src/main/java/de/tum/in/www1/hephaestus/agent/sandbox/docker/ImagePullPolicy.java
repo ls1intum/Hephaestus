@@ -4,5 +4,5 @@ package de.tum.in.www1.hephaestus.agent.sandbox.docker;
 public enum ImagePullPolicy {
     ALWAYS,
     IF_NOT_PRESENT,
-    NEVER
+    NEVER,
 }

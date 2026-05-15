@@ -481,7 +481,9 @@ class DockerInteractiveSandboxLiveTest {
             // with --cap-drop=ALL (no CAP_DAC_OVERRIDE) would fail without the CONTAINER_USER fix.
             assumeTrue(
                 dockerOps.imageIsPresent(AGENT_PI_IMAGE),
-                "agent-pi image not in local daemon — build with: docker build -t " + AGENT_PI_IMAGE + " docker/agents/pi/"
+                "agent-pi image not in local daemon — build with: docker build -t " +
+                    AGENT_PI_IMAGE +
+                    " docker/agents/pi/"
             );
             UUID sessionId = UUID.randomUUID();
             SecurityProfile sec = new SecurityProfile(null, "private", List.of("ALL"), Map.of());
@@ -594,7 +596,9 @@ class DockerInteractiveSandboxLiveTest {
         void productionBootstrapSucceeds() {
             assumeTrue(
                 dockerOps.imageIsPresent(AGENT_PI_IMAGE),
-                "agent-pi image not in local daemon — build with: docker build -t " + AGENT_PI_IMAGE + " docker/agents/pi/"
+                "agent-pi image not in local daemon — build with: docker build -t " +
+                    AGENT_PI_IMAGE +
+                    " docker/agents/pi/"
             );
             // Uses the real PiRuntimeFactory command (mkdir + ln + cp + LD_PRELOAD + node).
             // If any step in the sh -c chain fails (missing dir, bad symlink, missing cp source),
@@ -606,11 +610,9 @@ class DockerInteractiveSandboxLiveTest {
                 .atMost(RPC_TIMEOUT)
                 .untilAsserted(() ->
                     assertThat(
-                        frames.stream().anyMatch(f ->
-                            "runner_ready".equals(
-                                f.path("params").path("event").path("type").asText()
-                            )
-                        )
+                        frames
+                            .stream()
+                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
                     ).isTrue()
                 );
             sb.close(Duration.ofSeconds(2));
@@ -625,27 +627,36 @@ class DockerInteractiveSandboxLiveTest {
             sb.subscribe(frames::add);
 
             // Wait for the runner to be ready before sending any RPC.
-            await().atMost(RPC_TIMEOUT).untilAsserted(() ->
-                assertThat(frames.stream().anyMatch(f ->
-                    "runner_ready".equals(f.path("params").path("event").path("type").asText())
-                )).isTrue()
-            );
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() ->
+                    assertThat(
+                        frames
+                            .stream()
+                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                    ).isTrue()
+                );
 
             String helloId = UUID.randomUUID().toString();
-            sb.send(MAPPER.createObjectNode()
-                .<ObjectNode>put("jsonrpc", "2.0")
-                .<ObjectNode>put("id", helloId)
-                .<ObjectNode>put("method", "hello")
-                .set("params", MAPPER.createObjectNode()));
+            sb.send(
+                MAPPER.createObjectNode()
+                    .<ObjectNode>put("jsonrpc", "2.0")
+                    .<ObjectNode>put("id", helloId)
+                    .<ObjectNode>put("method", "hello")
+                    .set("params", MAPPER.createObjectNode())
+            );
 
-            await().atMost(RPC_TIMEOUT).untilAsserted(() -> {
-                JsonNode resp = frames.stream()
-                    .filter(f -> helloId.equals(f.path("id").asText()))
-                    .findFirst().orElse(null);
-                assertThat(resp).as("hello response").isNotNull();
-                assertThat(resp.path("result").path("protocolVersion").asInt())
-                    .as("protocolVersion").isEqualTo(1);
-            });
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() -> {
+                    JsonNode resp = frames
+                        .stream()
+                        .filter(f -> helloId.equals(f.path("id").asText()))
+                        .findFirst()
+                        .orElse(null);
+                    assertThat(resp).as("hello response").isNotNull();
+                    assertThat(resp.path("result").path("protocolVersion").asInt()).as("protocolVersion").isEqualTo(1);
+                });
             sb.close(Duration.ofSeconds(2));
         }
 
@@ -657,72 +668,97 @@ class DockerInteractiveSandboxLiveTest {
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
             sb.subscribe(frames::add);
 
-            await().atMost(RPC_TIMEOUT).untilAsserted(() ->
-                assertThat(frames.stream().anyMatch(f ->
-                    "runner_ready".equals(f.path("params").path("event").path("type").asText())
-                )).isTrue()
-            );
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() ->
+                    assertThat(
+                        frames
+                            .stream()
+                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                    ).isTrue()
+                );
 
             // hello
             String helloId = UUID.randomUUID().toString();
-            sb.send(MAPPER.createObjectNode()
-                .<ObjectNode>put("jsonrpc", "2.0")
-                .<ObjectNode>put("id", helloId)
-                .<ObjectNode>put("method", "hello")
-                .set("params", MAPPER.createObjectNode()));
-            await().atMost(RPC_TIMEOUT).untilAsserted(() ->
-                assertThat(frames.stream().anyMatch(f -> helloId.equals(f.path("id").asText()))).isTrue()
+            sb.send(
+                MAPPER.createObjectNode()
+                    .<ObjectNode>put("jsonrpc", "2.0")
+                    .<ObjectNode>put("id", helloId)
+                    .<ObjectNode>put("method", "hello")
+                    .set("params", MAPPER.createObjectNode())
             );
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() ->
+                    assertThat(frames.stream().anyMatch(f -> helloId.equals(f.path("id").asText()))).isTrue()
+                );
 
             // open_thread
             String threadId = UUID.randomUUID().toString();
             String openId = UUID.randomUUID().toString();
-            sb.send(MAPPER.createObjectNode()
-                .<ObjectNode>put("jsonrpc", "2.0")
-                .<ObjectNode>put("id", openId)
-                .<ObjectNode>put("method", "open_thread")
-                .set("params", MAPPER.createObjectNode().put("threadId", threadId)));
-            await().atMost(RPC_TIMEOUT).untilAsserted(() -> {
-                JsonNode openResp = frames.stream()
-                    .filter(f -> openId.equals(f.path("id").asText()))
-                    .findFirst().orElse(null);
-                assertThat(openResp).as("open_thread response").isNotNull();
-                assertThat(openResp.path("result").path("threadId").asText()).isEqualTo(threadId);
-            });
+            sb.send(
+                MAPPER.createObjectNode()
+                    .<ObjectNode>put("jsonrpc", "2.0")
+                    .<ObjectNode>put("id", openId)
+                    .<ObjectNode>put("method", "open_thread")
+                    .set("params", MAPPER.createObjectNode().put("threadId", threadId))
+            );
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() -> {
+                    JsonNode openResp = frames
+                        .stream()
+                        .filter(f -> openId.equals(f.path("id").asText()))
+                        .findFirst()
+                        .orElse(null);
+                    assertThat(openResp).as("open_thread response").isNotNull();
+                    assertThat(openResp.path("result").path("threadId").asText()).isEqualTo(threadId);
+                });
 
             // prompt (stub emits: agent_start → message_update/text_delta → agent_end)
             String promptId = UUID.randomUUID().toString();
-            sb.send(MAPPER.createObjectNode()
-                .<ObjectNode>put("jsonrpc", "2.0")
-                .<ObjectNode>put("id", promptId)
-                .<ObjectNode>put("method", "prompt")
-                .set("params", MAPPER.createObjectNode()
-                    .put("threadId", threadId)
-                    .put("text", "Hello, stub!")));
-            await().atMost(RPC_TIMEOUT).untilAsserted(() -> {
-                JsonNode promptResp = frames.stream()
-                    .filter(f -> promptId.equals(f.path("id").asText()))
-                    .findFirst().orElse(null);
-                assertThat(promptResp).as("prompt response").isNotNull();
-                assertThat(promptResp.path("result").path("accepted").asBoolean()).isTrue();
-            });
+            sb.send(
+                MAPPER.createObjectNode()
+                    .<ObjectNode>put("jsonrpc", "2.0")
+                    .<ObjectNode>put("id", promptId)
+                    .<ObjectNode>put("method", "prompt")
+                    .set("params", MAPPER.createObjectNode().put("threadId", threadId).put("text", "Hello, stub!"))
+            );
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() -> {
+                    JsonNode promptResp = frames
+                        .stream()
+                        .filter(f -> promptId.equals(f.path("id").asText()))
+                        .findFirst()
+                        .orElse(null);
+                    assertThat(promptResp).as("prompt response").isNotNull();
+                    assertThat(promptResp.path("result").path("accepted").asBoolean()).isTrue();
+                });
 
             // The stub emits agent_start → message_update → agent_end scoped to threadId.
-            await().atMost(RPC_TIMEOUT).untilAsserted(() -> {
-                List<JsonNode> events = frames.stream()
-                    .filter(f ->
-                        "event".equals(f.path("method").asText()) &&
-                        threadId.equals(f.path("params").path("threadId").asText())
-                    )
-                    .map(f -> f.path("params").path("event"))
-                    .collect(Collectors.toList());
-                assertThat(events.stream().anyMatch(e -> "agent_start".equals(e.path("type").asText())))
-                    .as("agent_start").isTrue();
-                assertThat(events.stream().anyMatch(e -> "message_update".equals(e.path("type").asText())))
-                    .as("message_update / text_delta").isTrue();
-                assertThat(events.stream().anyMatch(e -> "agent_end".equals(e.path("type").asText())))
-                    .as("agent_end").isTrue();
-            });
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() -> {
+                    List<JsonNode> events = frames
+                        .stream()
+                        .filter(
+                            f ->
+                                "event".equals(f.path("method").asText()) &&
+                                threadId.equals(f.path("params").path("threadId").asText())
+                        )
+                        .map(f -> f.path("params").path("event"))
+                        .collect(Collectors.toList());
+                    assertThat(events.stream().anyMatch(e -> "agent_start".equals(e.path("type").asText())))
+                        .as("agent_start")
+                        .isTrue();
+                    assertThat(events.stream().anyMatch(e -> "message_update".equals(e.path("type").asText())))
+                        .as("message_update / text_delta")
+                        .isTrue();
+                    assertThat(events.stream().anyMatch(e -> "agent_end".equals(e.path("type").asText())))
+                        .as("agent_end")
+                        .isTrue();
+                });
             sb.close(Duration.ofSeconds(2));
         }
     }

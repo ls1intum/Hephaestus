@@ -47,7 +47,9 @@ class PiImagePullBootstrapperTest extends BaseUnitTest {
 
         verify(imageOps).ping();
         verifyNoMoreInteractions(imageOps);
-        assertThat(registry.counter("agent.pi.image.pull.skipped", "reason", "docker_unreachable").count()).isEqualTo(1d);
+        assertThat(registry.counter("agent.pi.image.pull.skipped", "reason", "docker_unreachable").count()).isEqualTo(
+            1d
+        );
     }
 
     @Test
