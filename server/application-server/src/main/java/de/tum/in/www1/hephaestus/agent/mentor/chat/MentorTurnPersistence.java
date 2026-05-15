@@ -108,6 +108,9 @@ public class MentorTurnPersistence {
             userMessage.setId(userMessageId != null ? userMessageId : UUID.randomUUID());
             userMessage.setThread(thread);
             userMessage.setRole(ChatMessage.Role.USER);
+            // User messages are immutable once written; the column carries the same shape
+            // (NOT NULL VARCHAR) so we set it explicitly to keep JPA + DB in sync.
+            userMessage.setStatus(ChatMessage.Status.completed);
             userMessage.setParts(toTextParts(userText));
             ChatMessage savedUser = chatMessageRepository.save(userMessage);
 
@@ -117,9 +120,11 @@ public class MentorTurnPersistence {
             assistant.setRole(ChatMessage.Role.ASSISTANT);
             assistant.setParentMessage(savedUser);
             assistant.setParts(NODES.arrayNode());
-            ObjectNode meta = NODES.objectNode();
-            meta.put("status", "in_flight");
-            assistant.setMetadata(meta);
+            // Status is now its own column (migration mentor-1071-add-status-column). The
+            // partial unique index `ux_chat_message_in_flight_v2` keys on this column so a
+            // second concurrent turn raises TurnAlreadyInFlightException as before.
+            assistant.setStatus(ChatMessage.Status.in_flight);
+            assistant.setMetadata(NODES.objectNode());
             chatMessageRepository.save(assistant);
             chatMessageRepository.flush();
             return new TurnPersistenceCookie(thread.getId(), savedUser.getId(), assistantMessageId, Instant.now());
@@ -135,13 +140,23 @@ public class MentorTurnPersistence {
         }
     }
 
-    /** {@code ux_chat_message_in_flight} is the Liquibase-managed partial unique on assistant rows. */
+    /**
+     * The partial unique index has had two names across the migration history:
+     * {@code ux_chat_message_in_flight} (legacy, keyed on metadata->>'status') and
+     * {@code ux_chat_message_in_flight_v2} (current, keyed on the status column).
+     * Match either so a concurrent-turn 409 keeps working during the migration window AND
+     * after rollback if anyone backs out.
+     */
     private static boolean isInFlightUniqueViolation(DataIntegrityViolationException ex) {
         Throwable cur = ex;
         while (cur != null) {
             if (cur instanceof ConstraintViolationException cve) {
                 String name = cve.getConstraintName();
-                return name != null && name.equalsIgnoreCase("ux_chat_message_in_flight");
+                return (
+                    name != null &&
+                    (name.equalsIgnoreCase("ux_chat_message_in_flight") ||
+                        name.equalsIgnoreCase("ux_chat_message_in_flight_v2"))
+                );
             }
             cur = cur.getCause();
         }
@@ -207,8 +222,8 @@ public class MentorTurnPersistence {
             .findById(cookie.assistantMessageId())
             .orElseThrow(() -> new EntityNotFoundException("ChatMessage", cookie.assistantMessageId().toString()));
         assistant.setParts(state.partsSnapshot());
+        assistant.setStatus(ChatMessage.Status.completed);
         ObjectNode meta = newOrCopyMeta(assistant);
-        meta.put("status", "completed");
         if (finish.finishReason() != null) {
             meta.put("finishReason", finish.finishReason().wire());
         }
@@ -265,8 +280,8 @@ public class MentorTurnPersistence {
             .findById(cookie.assistantMessageId())
             .ifPresent(assistant -> {
                 assistant.setParts(state.partsSnapshot());
+                assistant.setStatus(ChatMessage.Status.interrupted);
                 ObjectNode meta = newOrCopyMeta(assistant);
-                meta.put("status", "interrupted");
                 meta.put("error", cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName());
                 meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
                 assistant.setMetadata(meta);

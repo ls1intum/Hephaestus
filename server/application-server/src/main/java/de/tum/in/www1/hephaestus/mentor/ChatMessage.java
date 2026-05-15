@@ -95,11 +95,23 @@ public class ChatMessage {
     private Role role;
 
     /**
+     * Turn lifecycle status. The only correctness-critical metadata field: drives the partial
+     * unique index {@code ux_chat_message_in_flight_v2} (one in_flight row per thread) and
+     * the {@code MentorInFlightReaper} stuck-row sweep. Promoted from
+     * {@code metadata.status} JSONB to a real column in migration {@code mentor-1071-add-status-column}.
+     */
+    @NonNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private Status status = Status.in_flight;
+
+    /**
      * Message metadata as a JSON object. Conventional keys (written by MentorChatService):
-     * {@code status} ∈ {in_flight, completed, interrupted}, {@code model}, {@code inputTokens},
-     * {@code outputTokens}, {@code cacheReadTokens}, {@code cacheWriteTokens}, {@code costUsd},
-     * {@code finishReason}, {@code durationMs}, {@code toolCalls}. Shape is enforced by the
-     * {@code chk_chat_message_metadata_shape} CHECK constraint (must be NULL or object).
+     * {@code model}, {@code inputTokens}, {@code outputTokens}, {@code cacheReadTokens},
+     * {@code cacheWriteTokens}, {@code costUsd}, {@code finishReason}, {@code durationMs},
+     * {@code toolCalls}, {@code error}. Pure billing/observability — status is its own column.
+     * Shape is enforced by the {@code chk_chat_message_metadata_shape} CHECK constraint
+     * (must be NULL or object).
      */
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
@@ -155,6 +167,17 @@ public class ChatMessage {
     @jakarta.persistence.Version
     @Column(nullable = false)
     private Long version;
+
+    /**
+     * Turn lifecycle status. Stored as VARCHAR(16) with a CHECK constraint enforcing the enum
+     * values. Lowercase names match the historical metadata.status JSON values verbatim so
+     * the backfill UPDATE is a one-liner (see migration {@code mentor-1071-backfill-status}).
+     */
+    public enum Status {
+        in_flight,
+        completed,
+        interrupted,
+    }
 
     public enum Role {
         USER("user"),

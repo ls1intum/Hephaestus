@@ -98,23 +98,23 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
         // The test profile uses JPA ddl-auto=create — Liquibase is disabled, so partial
         // indexes / CHECK constraints (which JPA can't infer from @Entity) never land. We
-        // create them here so persistence-layer tests have the real production DDL to
-        // fail against. The `migrationDeclaresInFlightUniqueIndex` test ensures the
-        // in-flight DDL stays in lockstep with the production migration; the status-CHECK
-        // mirrors changeSet 13 (mentor-1071-tighten-metadata-status-check) verbatim.
+        // create them here so persistence-layer tests have the real production DDL to fail
+        // against. Migration ID references kept in sync via the `migrationDeclaresInFlightUniqueIndex`
+        // test below.
+        //
+        // The wave-2 status-column migration replaced the JSONB-keyed unique index +
+        // metadata-status CHECK with a column-keyed index + column CHECK. We mirror that
+        // shape here so tests exercise the production constraint shape, not the legacy one.
         try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
             stmt.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS ux_chat_message_in_flight " +
-                    "ON chat_message (thread_id) WHERE (metadata ->> 'status') = 'in_flight'"
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_chat_message_in_flight_v2 " +
+                    "ON chat_message (thread_id) WHERE status = 'in_flight'"
             );
-            // Drop-then-add so a previous run's constraint (different shape, e.g. after a
-            // migration edit) doesn't survive across tests. `IF EXISTS` keeps fresh DBs happy.
-            stmt.execute("ALTER TABLE chat_message DROP CONSTRAINT IF EXISTS chk_chat_message_metadata_status");
+            // Drop-then-add so a previous run's constraint doesn't survive across tests.
+            stmt.execute("ALTER TABLE chat_message DROP CONSTRAINT IF EXISTS chk_chat_message_status");
             stmt.execute(
-                "ALTER TABLE chat_message ADD CONSTRAINT chk_chat_message_metadata_status " +
-                    "CHECK (" +
-                    "metadata IS NULL OR NOT jsonb_exists(metadata, 'status') " +
-                    "OR (metadata->>'status') IN ('in_flight', 'completed', 'interrupted'))"
+                "ALTER TABLE chat_message ADD CONSTRAINT chk_chat_message_status " +
+                    "CHECK (status IN ('in_flight', 'completed', 'interrupted'))"
             );
         }
         workspace = new Workspace();
@@ -204,7 +204,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
         ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(assistant.getRole()).isEqualTo(ChatMessage.Role.ASSISTANT);
-        assertThat(assistant.getMetadata().path("status").asText()).isEqualTo("in_flight");
+        assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.in_flight);
 
         ChatMessage userMessage = chatMessageRepository.findById(cookie.userMessageId()).orElseThrow();
         assertThat(userMessage.getRole()).isEqualTo(ChatMessage.Role.USER);
@@ -328,8 +328,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         persistence.finalise(cookie, state, finish);
 
         ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
+        assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.completed);
         JsonNode meta = assistant.getMetadata();
-        assertThat(meta.path("status").asText()).isEqualTo("completed");
         assertThat(meta.path("finishReason").asText()).isEqualTo("stop");
         assertThat(meta.path("model").asText()).isEqualTo("openai/gpt-oss-120b");
         assertThat(meta.path("inputTokens").asLong()).isEqualTo(123);
@@ -353,9 +353,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         persistence.interrupt(cookie, new TranslatorState(assistantId), new IllegalStateException("upstream timeout"));
 
         ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
-        JsonNode meta = assistant.getMetadata();
-        assertThat(meta.path("status").asText()).isEqualTo("interrupted");
-        assertThat(meta.path("error").asText()).isEqualTo("upstream timeout");
+        assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
+        assertThat(assistant.getMetadata().path("error").asText()).isEqualTo("upstream timeout");
     }
 
     @Test
@@ -379,20 +378,20 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         chatMessageRepository.reapStaleInFlight(Instant.now().plusSeconds(60));
         ChatMessage afterReaper = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(afterReaper.getVersion()).isEqualTo(versionBefore + 1L);
-        assertThat(afterReaper.getMetadata().path("status").asText()).isEqualTo("interrupted");
+        assertThat(afterReaper.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
 
         // Stale-snapshot save attempt: Hibernate's UPDATE predicate fails on the version,
         // surfaces as OptimisticLockingFailureException. A prior read-before-write
         // `isStillInFlight` check is replaced by this DB-enforced protection — version
         // mismatch is the single durable signal that another writer touched the row.
-        stale.setMetadata(NODES.objectNode().put("status", "completed"));
+        stale.setStatus(ChatMessage.Status.completed);
         assertThatThrownBy(() -> {
             chatMessageRepository.saveAndFlush(stale);
         }).isInstanceOf(org.springframework.dao.OptimisticLockingFailureException.class);
 
         // After the failed save attempt, the row in the DB still reflects the reaper's verdict.
         ChatMessage finalState = chatMessageRepository.findById(assistantId).orElseThrow();
-        assertThat(finalState.getMetadata().path("status").asText()).isEqualTo("interrupted");
+        assertThat(finalState.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
         assertThat(finalState.getMetadata().path("error").asText()).isEqualTo("server restart");
     }
 
@@ -406,39 +405,50 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // The cutoff is "older than now" — fresh rows are NOT reaped.
         int updated = chatMessageRepository.reapStaleInFlight(Instant.now().minusSeconds(60));
         assertThat(updated).isZero();
-        assertThat(
-            chatMessageRepository.findById(assistantId).orElseThrow().getMetadata().path("status").asText()
-        ).isEqualTo("in_flight");
+        assertThat(chatMessageRepository.findById(assistantId).orElseThrow().getStatus()).isEqualTo(
+            ChatMessage.Status.in_flight
+        );
 
         // Cutoff in the future → row is past the cutoff → reaped.
         int updatedSweep = chatMessageRepository.reapStaleInFlight(Instant.now().plusSeconds(60));
         assertThat(updatedSweep).isEqualTo(1);
-        JsonNode meta = chatMessageRepository.findById(assistantId).orElseThrow().getMetadata();
-        assertThat(meta.path("status").asText()).isEqualTo("interrupted");
-        assertThat(meta.path("error").asText()).isEqualTo("server restart");
+        ChatMessage reaped = chatMessageRepository.findById(assistantId).orElseThrow();
+        assertThat(reaped.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
+        assertThat(reaped.getMetadata().path("error").asText()).isEqualTo("server restart");
     }
 
     @Test
-    @DisplayName("migration: file declares the ux_chat_message_in_flight unique partial index this suite exercises")
+    @DisplayName("migration: declares both the legacy and v2 in-flight unique partial indexes")
     void migrationDeclaresInFlightUniqueIndex() throws Exception {
         // The test profile disables Liquibase, so this suite re-creates the in-flight partial
         // index in @BeforeEach. That bypass is acceptable ONLY if the production migration
         // changeset stays the source of truth — a future migration that renames the index,
         // changes the predicate, or drops the changeset would otherwise silently sail past
         // every integration test and break production. This guard fails first.
+        //
+        // Wave-2 added the `_v2` variant keyed on the column instead of metadata->>'status'.
+        // The original changeset still ships for rollback symmetry; the v2 takes over after
+        // backfill. Assert both shapes are declared.
         String migration = java.nio.file.Files.readString(MIGRATION_PATH);
         assertThat(migration)
-            .as("migration must contain the in-flight unique-index changeset")
-            .contains("mentor-1071-in-flight-unique-index");
+            .as("migration must contain the legacy + v2 in-flight unique-index changesets")
+            .contains("mentor-1071-in-flight-unique-index")
+            .contains("mentor-1071-replace-in-flight-index");
         assertThat(migration)
-            .as("migration must declare the index name + predicate the integration tests assume")
+            .as("legacy index uses metadata->>'status' predicate; v2 uses status column")
             .contains("ux_chat_message_in_flight")
+            .contains("ux_chat_message_in_flight_v2")
             .contains("CONCURRENTLY")
-            .contains("metadata ->> 'status'")
             .contains("'in_flight'");
+        // Status column promotion: backfill + NOT NULL + CHECK must all be declared.
+        assertThat(migration)
+            .as("migration must declare the status column + backfill + NOT NULL + enum CHECK")
+            .contains("mentor-1071-add-status-column")
+            .contains("mentor-1071-backfill-status")
+            .contains("mentor-1071-status-not-null-and-check")
+            .contains("chk_chat_message_status");
         // @Version column is wired by `mentor-1071-add-version-column` — same lockstep
-        // guarantee: if the column is renamed / dropped, optimistic-locking tests still
-        // pass against JPA-generated DDL but production migration breaks.
+        // guarantee.
         assertThat(migration)
             .as("migration must declare the @Version column for optimistic locking")
             .contains("mentor-1071-add-version-column")
@@ -447,29 +457,41 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("chk_chat_message_metadata_status rejects values outside (in_flight,completed,interrupted)")
-    void metadataStatusCheckConstraintFires() throws Exception {
-        // Pin the production DB-level guard. The migration's CHECK constraint is the only
-        // backstop that catches a future writer typo'ing `"in_flite"` or inventing a new
-        // status without a matching application-side state machine update. The integration
-        // test profile recreates the constraint in @BeforeEach so this assertion exercises
-        // the real predicate, not just a JPA validation hook.
+    @DisplayName("chk_chat_message_status rejects values outside (in_flight,completed,interrupted)")
+    void statusColumnCheckConstraintFires() throws Exception {
+        // Pin the production DB-level guard. The column CHECK is the only backstop that
+        // catches a future writer typo'ing `"in_flite"` or inventing a new status without a
+        // matching application-side state machine update. The integration test profile
+        // recreates the constraint in @BeforeEach so this assertion exercises the real
+        // predicate, not just a JPA enum validation.
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "constraint test");
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> {
             try (
                 var conn = dataSource.getConnection();
                 var stmt = conn.prepareStatement(
-                    "INSERT INTO chat_message (id, thread_id, role, parts, created_at, version, metadata) " +
-                        "VALUES (?, ?, 'ASSISTANT', '[]'::jsonb, now(), 0, ?::jsonb)"
+                    "INSERT INTO chat_message (id, thread_id, role, parts, status, created_at, version) " +
+                        "VALUES (?, ?, 'ASSISTANT', '[]'::jsonb, ?, now(), 0)"
                 )
             ) {
                 stmt.setObject(1, UUID.randomUUID());
                 stmt.setObject(2, thread.getId());
-                stmt.setString(3, "{\"status\": \"bogus_status_value\"}");
+                // Must fit VARCHAR(16) so we exercise the CHECK constraint, not the
+                // length truncation that fires before the CHECK runs.
+                stmt.setString(3, "in_flite");
                 stmt.executeUpdate();
             }
         })
             .isInstanceOf(java.sql.SQLException.class)
-            .hasMessageContaining("chk_chat_message_metadata_status");
+            // The constraint name varies by environment: production ships our explicit
+            // `chk_chat_message_status` via Liquibase, while the test profile's ddl-auto=create
+            // also generates a Hibernate-implicit `chat_message_status_check` from the
+            // @Enumerated(EnumType.STRING) field. Either fires first — both encode the same
+            // enum invariant — so the assertion accepts either.
+            .satisfies(t ->
+                org.assertj.core.api.Assertions.assertThat(t.getMessage()).containsAnyOf(
+                    "chk_chat_message_status",
+                    "chat_message_status_check"
+                )
+            );
     }
 }

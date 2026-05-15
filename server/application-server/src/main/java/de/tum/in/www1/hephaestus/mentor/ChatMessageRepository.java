@@ -42,19 +42,15 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     @Query(
         value = """
         UPDATE chat_message
-           SET metadata = jsonb_set(
-                   jsonb_set(
-                       COALESCE(metadata, '{}'::jsonb),
-                       '{status}',
-                       '"interrupted"'::jsonb,
-                       true
-                   ),
+           SET status = 'interrupted',
+               metadata = jsonb_set(
+                   COALESCE(metadata, '{}'::jsonb),
                    '{error}',
                    '"server restart"'::jsonb,
                    true
                ),
                version = version + 1
-         WHERE (metadata ->> 'status') = 'in_flight'
+         WHERE status = 'in_flight'
            AND created_at < :cutoff
         """,
         nativeQuery = true

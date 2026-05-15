@@ -303,6 +303,151 @@ class MentorLiveLlmTest {
     }
 
     @Test
+    @DisplayName("5-turn coherence: each follow-up references the prior turn correctly")
+    void multiTurn_fiveTurnsCoherent() throws Exception {
+        // High-confidence regression for the multi-turn fragmentation bug the user originally
+        // reported (chat-log screenshot: each follow-up returned a shrinking tail of turn 1).
+        // We drive five sequential turns on the SAME warm runner with a question that REQUIRES
+        // the LLM to integrate turn N-1's answer into turn N's. If agent._state.messages
+        // threading regresses anywhere along the chain, at least one turn's answer becomes
+        // incoherent and the assertion catches it.
+        //
+        // The chain: build a list one item per turn. Turn 5 asks for the full list. This
+        // requires the LLM to have seen every prior assistant message AND its own prior
+        // answers — exactly the failure mode the screenshot showed.
+        LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
+        UUID threadId = UUID.randomUUID();
+        workspaceDir = stageWorkspace(creds);
+        sandbox = spawnRunner(creds, workspaceDir);
+
+        var driver = new RunnerDriver(sandbox);
+        driver.expectRunnerReady();
+        driver.helloOk();
+        driver.openThread(threadId);
+
+        // Turns 1-4: add one fruit per turn, ask for a one-word ack.
+        String[] fruits = { "apple", "banana", "cherry", "date" };
+        for (int i = 0; i < fruits.length; i++) {
+            String resp = runTurnAndCollect(
+                driver,
+                threadId,
+                "Add the fruit '" + fruits[i] + "' to the list. Reply with exactly one word: ok."
+            );
+            System.out.printf("[5-turn] turn %d (%s): %s%n", i + 1, fruits[i], trim(resp, 60));
+            assertThat(resp.trim()).as("turn %d must produce a non-empty response", i + 1).isNotEmpty();
+        }
+
+        // Turn 5: ask for the full list. Only correct if all four prior user+assistant pairs
+        // landed in agent._state.messages.
+        String summary = runTurnAndCollect(
+            driver,
+            threadId,
+            "List every fruit I have added so far, in the order I added them. " +
+                "Reply with just the fruit names separated by commas. No commentary."
+        );
+        System.out.printf("[5-turn] turn 5 summary (%d chars): %s%n", summary.length(), trim(summary, 200));
+        String lower = summary.toLowerCase();
+        for (String fruit : fruits) {
+            assertThat(lower)
+                .as(
+                    "turn 5 must include '%s' — its absence proves a turn earlier in the chain " +
+                        "did not thread through agent._state.messages",
+                    fruit
+                )
+                .contains(fruit);
+        }
+    }
+
+    @Test
+    @DisplayName("replay_context seeds an EMPTY history without crashing or seeding ghosts")
+    void replayContext_emptyHistory_isNoOp() throws Exception {
+        // Production sends `replay_context` on every turn except the very first one on a warm
+        // thread; for a fresh thread it sends `messages: []` (or with content). If the empty
+        // case ever throws or seeds a ghost user/assistant message, the LLM's first real turn
+        // sees garbage. The runner's contract: empty messages array → 0 replayed, no crash, no
+        // state mutation. This test pins that.
+        LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
+        UUID threadId = UUID.randomUUID();
+        workspaceDir = stageWorkspace(creds);
+        sandbox = spawnRunner(creds, workspaceDir);
+
+        var driver = new RunnerDriver(sandbox);
+        driver.expectRunnerReady();
+        driver.helloOk();
+        driver.openThread(threadId);
+
+        ObjectNode params = MAPPER.createObjectNode();
+        params.put("threadId", threadId.toString());
+        params.putArray("messages"); // empty
+        JsonNode resp = driver.callRaw("replay_context", params, Duration.ofSeconds(5));
+        assertThat(resp.path("result").path("replayed").asInt(-1))
+            .as("empty replay must report exactly 0 messages seeded — never a negative or crash")
+            .isZero();
+
+        // Drive a first prompt. If empty replay had ghost-seeded a fake user message, the LLM
+        // would either reject (it sees two consecutive user messages) or echo the ghost.
+        String r = runTurnAndCollect(driver, threadId, "Reply with exactly: hello");
+        System.out.printf("[empty-replay] first turn (%d chars): %s%n", r.length(), trim(r, 100));
+        assertThat(r.trim()).as("after empty replay, the LLM must still answer normally").isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("cold-restart multi-turn: 3 prior turns replayed, then 2 follow-ups still coherent")
+    void coldRestart_multiTurnHistoryStillCoherent() throws Exception {
+        // The user's exact failure scenario: a multi-turn session, container evicted, new
+        // runner takes over via replay_context, follow-ups must remain coherent. Earlier we
+        // only proved 1 turn after cold-restart works. This proves 2 follow-ups still
+        // recall facts from THREE prior turns seeded via replay.
+        LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
+        UUID threadId = UUID.randomUUID();
+        workspaceDir = stageWorkspace(creds);
+        sandbox = spawnRunner(creds, workspaceDir);
+
+        var driver = new RunnerDriver(sandbox);
+        driver.expectRunnerReady();
+        driver.helloOk();
+        driver.openThread(threadId);
+
+        // Seed 3 prior turns mirroring what MentorChatService.buildReplay produces after a
+        // user has had a real conversation in the previous container.
+        ObjectNode params = MAPPER.createObjectNode();
+        params.put("threadId", threadId.toString());
+        var msgs = params.putArray("messages");
+        msgs.addObject().put("role", "user").put("text", "My name is Pat. Reply: hello Pat.");
+        msgs.addObject().put("role", "assistant").put("text", "hello Pat.");
+        msgs.addObject().put("role", "user").put("text", "My favorite framework is Spring Boot. Reply: noted.");
+        msgs.addObject().put("role", "assistant").put("text", "noted.");
+        msgs
+            .addObject()
+            .put("role", "user")
+            .put("text", "I am working on a feature called mentor chat. Reply: understood.");
+        msgs.addObject().put("role", "assistant").put("text", "understood.");
+
+        JsonNode resp = driver.callRaw("replay_context", params, Duration.ofSeconds(5));
+        int replayed = resp.path("result").path("replayed").asInt(-1);
+        System.out.printf("[cold-multi] seeded %d messages%n", replayed);
+        assertThat(replayed).as("replay must seed all 6 turns from the user's prior session").isEqualTo(6);
+
+        // Follow-up 1: recall name. If the LLM doesn't have turn 1's context, this fails.
+        String t1 = runTurnAndCollect(driver, threadId, "What is my name? Reply with only my name.");
+        System.out.printf("[cold-multi] follow-up 1 (%d chars): %s%n", t1.length(), trim(t1, 100));
+        assertThat(t1.toLowerCase()).as("follow-up 1 must recall name from turn 1").contains("pat");
+
+        // Follow-up 2: recall framework. Forces the LLM to see BOTH the replay AND its own
+        // follow-up-1 response in agent._state.messages — the warm-runner threading after
+        // cold-restart replay is the exact regression the user originally reported.
+        String t2 = runTurnAndCollect(
+            driver,
+            threadId,
+            "What framework am I using? Reply with only the framework name."
+        );
+        System.out.printf("[cold-multi] follow-up 2 (%d chars): %s%n", t2.length(), trim(t2, 100));
+        assertThat(t2.toLowerCase())
+            .as("follow-up 2 must still recall the framework — proves replay + post-replay turns thread correctly")
+            .contains("spring");
+    }
+
+    @Test
     @DisplayName("replay_context seeds LLM history on a fresh thread: cold-restart recall works")
     void replayContext_seedsLlmHistoryOnFreshThread() throws Exception {
         // Regression for the loop-4 fix in handleReplayContext (pi-mentor-runner.mjs).

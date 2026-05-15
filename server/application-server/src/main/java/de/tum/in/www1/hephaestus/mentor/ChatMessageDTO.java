@@ -49,8 +49,15 @@ public record ChatMessageDTO(
                 : List.of();
         Map<String, Object> metadata =
             message.getMetadata() != null && message.getMetadata().isObject()
-                ? mapper.convertValue(message.getMetadata(), new TypeReference<Map<String, Object>>() {})
-                : null;
+                ? new java.util.LinkedHashMap<>(
+                      mapper.convertValue(message.getMetadata(), new TypeReference<Map<String, Object>>() {})
+                  )
+                : new java.util.LinkedHashMap<>();
+        // Status was promoted to a real column in migration mentor-1071-add-status-column,
+        // but the webapp's generated client still reads it from `metadata.status`. Merge the
+        // column back into the metadata bag at the API boundary so the wire shape stays
+        // stable across the migration. The server-side reader-of-truth is now the column.
+        metadata.put("status", message.getStatus().name());
         // Read the raw FK column instead of dereferencing the lazy parentMessage proxy — a
         // 100-message thread listing would otherwise issue 100 extra SELECTs.
         return new ChatMessageDTO(

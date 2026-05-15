@@ -375,4 +375,118 @@
         </rollback>
     </changeSet>
 
+    <!-- 14. Promote `metadata.status` JSONB sub-key to a real `chat_message.status` column.
+         Status is the only correctness-critical metadata field (drives the partial unique
+         index + the reaper's stuck-row sweep); the JSONB encoding made every read pay a
+         function-call cost and the partial index opaque to query planners. Other metadata
+         fields (cost, usage, model) are billing/observability and stay in the JSONB bag.
+
+         Strategy (zero-downtime):
+           a. Add nullable column + idempotent backfill from existing JSONB rows.
+           b. Promote NOT NULL + enum CHECK once backfill completes.
+           c. Recreate the partial unique index against the new column (CONCURRENTLY).
+           d. Drop the metadata-status CHECK + the legacy (metadata->>'status')-keyed index. -->
+    <changeSet id="mentor-1071-add-status-column" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="status column already exists">
+            <not><columnExists tableName="chat_message" columnName="status"/></not>
+        </preConditions>
+        <comment>Add nullable status column (backfilled in the next changeset)</comment>
+        <sql>
+            ALTER TABLE chat_message ADD COLUMN status VARCHAR(16) NULL;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE chat_message DROP COLUMN IF EXISTS status;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="mentor-1071-backfill-status" author="hephaestus">
+        <comment>Backfill chat_message.status from metadata.status; idempotent.</comment>
+        <sql>
+            UPDATE chat_message
+               SET status = metadata->>'status'
+             WHERE status IS NULL
+               AND metadata IS NOT NULL
+               AND (metadata->>'status') IN ('in_flight', 'completed', 'interrupted');
+            -- User rows never had a status in metadata; default them to 'completed' (immutable
+            -- once written, never in_flight).
+            UPDATE chat_message
+               SET status = 'completed'
+             WHERE status IS NULL
+               AND role = 'USER';
+            -- Any remaining null assistant rows are pre-status-tracking; treat as completed so
+            -- the NOT NULL promotion below succeeds without manual intervention.
+            UPDATE chat_message
+               SET status = 'completed'
+             WHERE status IS NULL;
+        </sql>
+        <rollback>
+            <comment>No-op: backfill is data movement; rollback drops the column.</comment>
+            <empty/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="mentor-1071-status-not-null-and-check" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="status NOT NULL + check already applied">
+            <sqlCheck expectedResult="t">
+                SELECT NOT EXISTS (SELECT 1 FROM information_schema.constraint_column_usage
+                                   WHERE table_name = 'chat_message'
+                                     AND constraint_name = 'chk_chat_message_status')
+            </sqlCheck>
+        </preConditions>
+        <comment>Enforce NOT NULL + enum CHECK on the status column.</comment>
+        <sql>
+            ALTER TABLE chat_message
+                ALTER COLUMN status SET NOT NULL,
+                ADD CONSTRAINT chk_chat_message_status
+                    CHECK (status IN ('in_flight', 'completed', 'interrupted'));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE chat_message
+                    DROP CONSTRAINT IF EXISTS chk_chat_message_status,
+                    ALTER COLUMN status DROP NOT NULL;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="mentor-1071-replace-in-flight-index" author="hephaestus" runInTransaction="false">
+        <preConditions onFail="MARK_RAN" onFailMessage="new in-flight index already exists">
+            <not><indexExists indexName="ux_chat_message_in_flight_v2"/></not>
+        </preConditions>
+        <comment>Create column-keyed partial unique index; drop legacy JSONB-keyed one.</comment>
+        <sql>
+            CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS ux_chat_message_in_flight_v2
+                ON chat_message (thread_id)
+             WHERE status = 'in_flight';
+            DROP INDEX CONCURRENTLY IF EXISTS ux_chat_message_in_flight;
+        </sql>
+        <rollback>
+            <sql>
+                CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS ux_chat_message_in_flight
+                    ON chat_message (thread_id)
+                 WHERE (metadata ->> 'status') = 'in_flight';
+                DROP INDEX CONCURRENTLY IF EXISTS ux_chat_message_in_flight_v2;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="mentor-1071-drop-metadata-status-check" author="hephaestus">
+        <comment>chk_chat_message_metadata_status is now redundant: status lives in its own
+            column with its own CHECK. Drop it so writers don't need to mirror it in JSONB.
+            The metadata bag itself stays (cost, usage, model, finishReason, durationMs).</comment>
+        <sql>
+            ALTER TABLE chat_message DROP CONSTRAINT IF EXISTS chk_chat_message_metadata_status;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE chat_message ADD CONSTRAINT chk_chat_message_metadata_status
+                CHECK (
+                    metadata IS NULL
+                    OR NOT jsonb_exists(metadata, 'status')
+                    OR (metadata->>'status') IN ('in_flight', 'completed', 'interrupted')
+                );
+            </sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>
