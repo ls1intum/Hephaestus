@@ -214,6 +214,140 @@ test("batch JSON-RPC request is rejected with -32600 (not silently dropped)", as
     }
 });
 
+test("watchdog cross-thread rebind: no event leakage from concurrently-bound thread", async () => {
+    // Regression for the loop-1 audit fix in runWatchdogRebind. The scenario the fix actually
+    // addresses: thread A is mid-prompt (watchdog armed) when ANOTHER thread B opens, which
+    // — via the regular bindThread teardown — flips activeThreadId from A to B and replaces
+    // A's subscription with B's. When A's watchdog later fires (a few ms after), runtime is
+    // bound to B but the rebind needs to install a fresh A subscription AND remove B's
+    // (otherwise the next event broadcast hits both subscribers and emits threadId=B frames
+    // through forwardEvent(state_B, …)).
+    //
+    // The stub's switchSession is a no-op and shares one subscribers Set across sessions, so
+    // a missing cross-thread teardown leaves B_callback in the broadcast list. We force the
+    // window by:
+    //   1. open A — A is active, no watchdog yet
+    //   2. prompt A with a 200 ms slow stub → arms A's watchdog (80 ms budget+grace)
+    //   3. open B — bindThread B fires inside the watchdog window, BEFORE A's watchdog ticks.
+    //      Now activeThreadId=B, A_callback gone, B_callback added. A's ThreadState still
+    //      lives in the `threads` Map; its watchdog timer is still armed.
+    //   4. A's watchdog fires at ~80 ms (post-open-B). With the fix, the rebind sees
+    //      activeThreadId=B ≠ state.threadId=A, tears down B_callback, switches session,
+    //      adds newA_callback, sets activeThreadId=A. Without the fix, B_callback stays and
+    //      activeThreadId remains stale at B.
+    //   5. The first prompt's residue (text_delta at ~100 ms, natural agent_end at ~200 ms)
+    //      broadcasts through whatever subscribers remain. With the fix only newA_callback
+    //      receives them → threadId=A only. Without the fix, B_callback also fires →
+    //      threadId=B leak.
+    //
+    // The legitimate pre-rebind events (the initial agent_start at t=0 fires only through
+    // A_callback because B isn't open yet) are NOT a leak; we demarcate the "leak window"
+    // as everything AFTER the turn_watchdog_fired event.
+    const child = spawn(process.execPath, [RUNNER], {
+        env: {
+            ...process.env,
+            MENTOR_RUNNER_PROTOCOL_ONLY: "1",
+            MENTOR_RUNNER_STUB_DELAY_MS: "100", // 100+100 = 200 ms total stub turn
+            MENTOR_TURN_BUDGET_MS: "50",
+            MENTOR_TURN_GRACE_MS: "30",
+            MENTOR_RUNNER_SESSIONS_DIR: SESSIONS_TMPDIR,
+        },
+        stdio: ["pipe", "pipe", "pipe"],
+    });
+    const reader = createReader();
+    child.stdout.on("data", (chunk) => reader.push(chunk));
+    child.stderr.on("data", (chunk) => process.stderr.write(`[runner-stderr] ${chunk}`));
+    const send = (obj) => child.stdin.write(JSON.stringify(obj) + "\n");
+    try {
+        await readReady(reader);
+
+        // 1. open A — activeThreadId becomes A; subscribers = {A_callback}
+        send({ jsonrpc: "2.0", id: "oA", method: "open_thread", params: { threadId: "thread-A" } });
+        await readUntil(reader, (f) => f?.id === "oA");
+
+        // 2. prompt A — arms watchdog A (80 ms). Stub broadcasts agent_start NOW; A_callback
+        //    is the only subscriber so we observe threadId=A only (legitimate).
+        send({ jsonrpc: "2.0", id: "pA1", method: "prompt", params: { threadId: "thread-A", text: "go" } });
+        const ack = await readUntil(reader, (f) => f?.id === "pA1");
+        assert.equal(ack.result?.accepted, true);
+
+        // 3. open B — bindThread B tears down A_callback, adds B_callback, activeThreadId=B.
+        //    Must arrive BEFORE the watchdog ticks (80 ms after pA1 was accepted). The stub
+        //    is fast — open_thread is a sync handler, so this races in well under 80 ms.
+        send({ jsonrpc: "2.0", id: "oB", method: "open_thread", params: { threadId: "thread-B" } });
+        await readUntil(reader, (f) => f?.id === "oB");
+
+        // 4 + 5. Collect every event frame until the stub's residue setTimeout chain drains,
+        // classified by whether it arrived before or after the turn_watchdog_fired marker.
+        const events = [];
+        let watchdogSeenAtIndex = -1;
+        const start = Date.now();
+        while (Date.now() - start < 2000) {
+            const frame = await reader.next(500).catch(() => null);
+            if (!frame) break;
+            const parsed = JSON.parse(frame);
+            if (parsed?.method !== "event") continue;
+            events.push(parsed);
+            if (parsed?.params?.event?.type === "turn_watchdog_fired") {
+                watchdogSeenAtIndex = events.length - 1;
+            }
+            // Stop ≈400 ms after the watchdog fired so the residue text_delta + natural
+            // agent_end from the first prompt's setTimeout chain have time to reach us
+            // (stub is 200 ms total; watchdog fires at 80 ms → residue at 100 ms, 200 ms).
+            if (watchdogSeenAtIndex >= 0 && Date.now() - start > 600) break;
+        }
+
+        assert.ok(
+            watchdogSeenAtIndex >= 0,
+            "expected turn_watchdog_fired event during the watchdog window; got events: " +
+                JSON.stringify(events.map((f) => ({ tid: f?.params?.threadId, t: f?.params?.event?.type })))
+        );
+
+        // The watchdog emits three events for thread A in close sequence:
+        //   1. turn_watchdog_fired (direct sendEvent, before abort)
+        //   2. abort-broadcast agent_end (fires through whatever subscriber is active at that
+        //      instant — pre-rebind that's B_callback, so ONE legitimate threadId=B agent_end
+        //      arrives here. Not a leak: the fix's order-of-operations puts the teardown of
+        //      B's subscription AFTER the abort, by design.)
+        //   3. direct sendEvent agent_end (post-rebind, marks "subscribers Set is now in the
+        //      fixed state — only newA_callback".)
+        //
+        // The leak signal is anything broadcast AFTER step 3: the stub's residue setTimeout
+        // chain (text_delta, natural agent_end) fires through whatever subscribers remain.
+        // WITH the fix → only newA_callback → no thread-B events. WITHOUT → also B_callback →
+        // duplicate thread-B events.
+        //
+        // We demarcate "post-rebind" as the FIRST threadId=A agent_end after the watchdog
+        // marker (that is the direct sendEvent in step 3, since the abort-broadcast above
+        // tags threadId=B — A_callback was already removed by bindThread B's teardown).
+        const directRebindIdx = events.findIndex(
+            (f, i) =>
+                i > watchdogSeenAtIndex &&
+                f?.params?.threadId === "thread-A" &&
+                f?.params?.event?.type === "agent_end"
+        );
+        assert.ok(
+            directRebindIdx > watchdogSeenAtIndex,
+            "expected watchdog's direct agent_end (threadId=A) after turn_watchdog_fired; got events: " +
+                JSON.stringify(events.map((f) => ({ tid: f?.params?.threadId, t: f?.params?.event?.type })))
+        );
+        const postRebind = events.slice(directRebindIdx + 1);
+        const leakedB = postRebind.filter((f) => f?.params?.threadId === "thread-B");
+        assert.deepEqual(
+            leakedB.map((f) => f?.params?.event?.type),
+            [],
+            "thread B's subscription must be torn down by the watchdog rebind — any threadId=B " +
+                "event AFTER the watchdog's direct agent_end indicates a leaked subscription " +
+                "(the first prompt's residue setTimeout chain broadcast through B_callback). " +
+                "post-rebind frames seen: " +
+                JSON.stringify(postRebind.map((f) => ({ tid: f?.params?.threadId, t: f?.params?.event?.type })))
+        );
+    } finally {
+        send({ jsonrpc: "2.0", id: "shut", method: "shutdown", params: {} });
+        await new Promise((r) => child.on("exit", r));
+    }
+});
+
 // Note: fetch_context end-to-end coverage lives Java-side in MentorRunnerClientTest +
 // MentorChatServiceTest. A Node-side smoke test would either assert on stderr text (brittle)
 // or require a real Pi LLM round-trip. Skipped here on purpose.

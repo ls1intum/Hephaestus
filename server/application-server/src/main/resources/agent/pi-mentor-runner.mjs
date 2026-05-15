@@ -59,7 +59,11 @@ const TURN_BUDGET_MS = (() => {
     const raw = Number(process.env.MENTOR_TURN_BUDGET_MS);
     return Number.isFinite(raw) && raw > 0 ? raw : 120_000;
 })();
-const TURN_GRACE_MS = 30_000;
+// 30 s production grace; small overrides are test-only so watchdog rebind scenarios run in ms.
+const TURN_GRACE_MS = (() => {
+    const raw = Number(process.env.MENTOR_TURN_GRACE_MS);
+    return Number.isFinite(raw) && raw > 0 ? raw : 30_000;
+})();
 
 // Aspect-name whitelist for the fetch_context tool. Any other path is rejected before the
 // callback even leaves the runner. This is a defence-in-depth check; the authoritative
