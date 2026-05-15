@@ -230,9 +230,10 @@ public class MentorTurnPersistence {
         if (usage.model() != null) {
             meta.put("model", usage.model());
         }
-        ObjectNode usageNode = meta.has("usage") && meta.get("usage").isObject()
-            ? (ObjectNode) meta.get("usage")
-            : meta.putObject("usage");
+        ObjectNode usageNode =
+            meta.has("usage") && meta.get("usage").isObject()
+                ? (ObjectNode) meta.get("usage")
+                : meta.putObject("usage");
         usageNode.put("input", usage.inputTokens());
         usageNode.put("output", usage.outputTokens());
         usageNode.put("cacheRead", usage.cacheReadTokens());

@@ -67,8 +67,9 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         ).thenReturn(List.of());
         when(findingRepository.countByVerdictForContributor(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
         when(findingRepository.countBySeverityForContributor(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
-        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
-            .thenReturn(List.of());
+        when(
+            queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
+        ).thenReturn(List.of());
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
@@ -112,8 +113,9 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         when(findingRepository.countBySeverityForContributor(eq(2L), eq(1L), any(Instant.class))).thenReturn(
             List.of(major)
         );
-        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
-            .thenReturn(List.of());
+        when(
+            queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
+        ).thenReturn(List.of());
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
