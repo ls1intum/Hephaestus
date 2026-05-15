@@ -150,10 +150,10 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
         assertThat(actual).as("chunk %s", chunk).isEqualTo(expected);
     }
 
-    // dataChunkDiscriminatorSpelling deleted (wave-18 Test Theatre audit): the parameterised
-    // chunkFixtures test already pins the exact JSON for `data-mentor-status` and
-    // `data-finding` chunks. A Jackson SNAKE_CASE override would fail those fixture tests
-    // BEFORE reaching this one. Pure duplication.
+    // A `dataChunkDiscriminatorSpelling` test would be pure duplication: the parameterised
+    // chunkFixtures test above already pins the exact JSON for `data-mentor-status` and
+    // `data-finding` chunks, and a Jackson SNAKE_CASE override would fail those fixture tests
+    // BEFORE reaching the spelling assertion.
 
     @Test
     @DisplayName("Every UIMessageChunk subtype is registered in @JsonSubTypes — silent polymorphism drift trap")

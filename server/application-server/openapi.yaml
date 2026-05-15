@@ -2736,7 +2736,8 @@ components:
           type: string
           format: uuid
         metadata:
-          type: string
+          type: object
+          additionalProperties: {}
           description: "Per-turn metadata: status, model, costUsd, usage, …"
         parentMessageId:
           type: string

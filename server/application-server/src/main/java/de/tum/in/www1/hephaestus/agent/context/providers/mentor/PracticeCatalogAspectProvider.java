@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Materialises {@code context/target/practice_catalog.json} for {@link MentorChatRequest}.
@@ -67,7 +68,14 @@ public class PracticeCatalogAspectProvider implements ContentProvider {
         }
     }
 
-    /** Pure function of (workspaceId). Callers cache through {@link CacheManager}. */
+    /**
+     * Pure function of (workspaceId). Callers cache through {@link CacheManager}.
+     *
+     * <p>{@code @Transactional(readOnly = true)} keeps a session open across the build so any
+     * lazy association touched downstream cannot trip
+     * {@link org.hibernate.LazyInitializationException} at SSE-write time.
+     */
+    @Transactional(readOnly = true)
     public ObjectNode buildPayload(Long workspaceId) {
         Workspace workspace = workspaceRepository
             .findById(workspaceId)

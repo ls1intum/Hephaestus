@@ -244,8 +244,8 @@ class MentorSandboxStressTest {
             }
             // Hard regression budgets. Without these the test is a printf with a liveness check —
             // a 10× RSS bloat or 5× cold-start regression would still pass green. Budgets are
-            // generous (≥40% headroom over wave-22 measured numbers) so steady-state numbers
-            // don't flake on shared CI hardware. Override via env for soak runs.
+            // generous (≥40% headroom over measured steady-state) so they don't flake on
+            // shared CI hardware. Override via env for soak runs.
             long peakRssBudgetKb = Long.parseLong(System.getenv().getOrDefault("PEAK_RSS_BUDGET_KB", "240000"));
             long coldStartBudgetMs = Long.parseLong(System.getenv().getOrDefault("COLD_START_BUDGET_MS", "5000"));
             long maxRssKb = sessions

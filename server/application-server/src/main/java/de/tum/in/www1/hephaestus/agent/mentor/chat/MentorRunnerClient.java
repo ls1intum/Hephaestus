@@ -349,7 +349,7 @@ public final class MentorRunnerClient implements AutoCloseable {
             error.put("message", message);
             sandbox.send(response);
         } catch (InteractiveSandboxException e) {
-            log.warn("Failed to send fetch_context error response: {}", e.getMessage());
+            log.warn("Failed to send fetch_context error response: {}", e.getMessage(), e);
         }
     }
 

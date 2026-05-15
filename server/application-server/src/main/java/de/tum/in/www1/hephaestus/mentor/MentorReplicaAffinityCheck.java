@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Fail-fast startup guard for multi-replica mentor deployments.
+ * Operator-asserted startup guard for multi-replica mentor deployments.
  *
  * <p>Live mentor sessions are pinned to one app-server replica because the
  * {@code InteractiveSandboxRegistry} is in-process: the {@code AttachedSandbox} owning a
@@ -18,9 +18,15 @@ import org.springframework.stereotype.Component;
  * backstop against poisoned threads.
  *
  * <p>The proper fix is sticky sessions per {@code (workspaceId, threadId)} — tracked in #1077.
- * Until then, scaling beyond one replica without sticky routing is a footgun, so we refuse to
- * start: ops must either set {@code hephaestus.mentor.replica-count=1} or opt-in to
- * {@code hephaestus.mentor.replica-affinity.sticky=true} once the infra change lands.
+ *
+ * <h3>Honesty note (Loop-2 audit)</h3>
+ * This check reads {@code hephaestus.mentor.replica-count} which is OPERATOR-ASSERTED, not
+ * derived from the orchestrator. An operator who scales via {@code kubectl scale --replicas=3}
+ * <em>without</em> updating the property silently bypasses this guard. The class name and
+ * Javadoc imply infra-level enforcement; in reality it catches the misconfiguration where
+ * someone bumps the property without also flipping the sticky-affinity flag. Until the
+ * topology can be read from a real source (Kubernetes downward API / service discovery),
+ * treat this as a config-consistency tripwire, not a deployment safety net.
  */
 @Component
 @WorkspaceAgnostic("Cluster-topology guard — not tenant-scoped")

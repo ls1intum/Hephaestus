@@ -154,8 +154,9 @@ class MentorSseChannelTest extends BaseUnitTest {
     void sendAfterCompleteWithDone_isSilentNoOp() {
         // Setup: register a disconnect hook + bind lifecycle. A correctly-finished turn must
         // NEVER fire the hook — that hook calls session.abort() against a sandbox we just
-        // cleanly closed. The bug pre-wave-16: post-complete send threw IllegalStateException
-        // → caught as "disconnect" → flagDisconnected → hook fired.
+        // cleanly closed. Regression guard: a stray post-complete send (heartbeat tick or a
+        // second agent_end) used to throw IllegalStateException → caught as "disconnect" →
+        // flagDisconnected → hook fired. The `closed` flag now short-circuits before send.
         AtomicInteger fired = new AtomicInteger();
         channel.bindLifecycle();
         channel.onDisconnect(fired::incrementAndGet);
@@ -197,7 +198,7 @@ class MentorSseChannelTest extends BaseUnitTest {
     @Test
     @DisplayName("heartbeat tick + concurrent chunk sends interleave through the writeLock without corruption")
     void heartbeatTick_concurrentWithSends_writeLockSerialises() throws Exception {
-        // The wave-2-audit's actual concern: the heartbeat ScheduledExecutorService thread and
+        // The actual concurrency hazard: the heartbeat ScheduledExecutorService thread and
         // the runner-event-handler thread are DIFFERENT threads writing to the same emitter.
         // Without writeLock, a `:ping\n\n` heartbeat comment can land mid-`data: {...}\n\n`
         // chunk and corrupt the SSE stream. This test starts a tight 5ms-tick heartbeat and

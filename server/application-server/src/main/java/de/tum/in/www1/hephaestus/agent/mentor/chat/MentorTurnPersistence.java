@@ -335,6 +335,16 @@ public class MentorTurnPersistence {
      * agent host (provider price table baked in). We prefer this over our own pricing lookup so
      * a model we don't have a price row for still gets a real cost.
      */
+    /**
+     * Upper bound for a single-turn USD cost. The most expensive frontier model at 100k input
+     * + 100k output tokens lands around $5; the sanity cap is ~20× that to allow for unusual
+     * tool-call bursts without flagging legitimate turns. Anything above this is almost
+     * certainly an upstream bug (Pi returning sentinel −1, NaN-coerced-to-int, accidental
+     * unit confusion microdollars-vs-dollars). Persisting it would poison Grafana axes and
+     * billing dashboards more than dropping it would.
+     */
+    private static final double COST_USD_SANITY_CAP = 100.0d;
+
     @Nullable
     private static Double extractPiCostUsd(@Nullable JsonNode usage) {
         if (usage == null || !usage.isObject()) return null;
@@ -343,7 +353,12 @@ public class MentorTurnPersistence {
         JsonNode total = cost.path("total");
         if (total.isNumber()) {
             double v = total.asDouble();
-            return Double.isFinite(v) ? v : null;
+            // Reject NaN/Infinity AND obviously-bogus values (negative, absurdly large) — the
+            // value flows into both `chat_message.metadata.costUsd` (audit) and the
+            // `mentor.turn.cost.usd` distribution summary (SLO panel). One Pi-side regression
+            // returning −50 or 1e9 would skew the histogram for the lifetime of the registry.
+            if (!Double.isFinite(v) || v < 0d || v > COST_USD_SANITY_CAP) return null;
+            return v;
         }
         return null;
     }

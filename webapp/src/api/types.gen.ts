@@ -1800,7 +1800,9 @@ export type ChatMessage = {
     /**
      * Per-turn metadata: status, model, costUsd, usage, …
      */
-    metadata?: string;
+    metadata?: {
+        [key: string]: unknown;
+    };
     parentMessageId?: string;
     parts?: Array<unknown>;
     role?: string;

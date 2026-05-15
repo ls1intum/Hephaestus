@@ -26,6 +26,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Materialises {@code context/target/findings_history.json} for {@link MentorChatRequest}.
@@ -87,7 +88,14 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         }
     }
 
-    /** Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}. */
+    /**
+     * Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}.
+     *
+     * <p>{@code @Transactional(readOnly = true)} keeps a session open across the build so any
+     * lazy association touched downstream cannot trip
+     * {@link org.hibernate.LazyInitializationException} at SSE-write time.
+     */
+    @Transactional(readOnly = true)
     public ObjectNode buildPayload(Long workspaceId, Long contributorId) {
         User user = userRepository
             .findById(contributorId)

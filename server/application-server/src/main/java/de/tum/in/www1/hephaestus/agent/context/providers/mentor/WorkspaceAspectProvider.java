@@ -29,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Materialises {@code context/target/workspace.json} for {@link MentorChatRequest}.
@@ -85,7 +86,17 @@ public class WorkspaceAspectProvider implements ContentProvider {
         }
     }
 
-    /** Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}. */
+    /**
+     * Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}.
+     *
+     * <p>{@code @Transactional(readOnly = true)} keeps a session open for the duration of the
+     * build. Today every accessed lazy field is fetched via {@code LEFT JOIN FETCH} in the
+     * repository — but a future provider edit that touches an additional lazy association
+     * ({@code issue.assignees}, {@code pr.repository.parent}, etc.) would otherwise throw
+     * {@link org.hibernate.LazyInitializationException} at SSE-write time. Defence against
+     * silent refactor-time regressions, not a current bug.
+     */
+    @Transactional(readOnly = true)
     public ObjectNode buildPayload(Long workspaceId, Long contributorId) {
         User user = userRepository
             .findById(contributorId)

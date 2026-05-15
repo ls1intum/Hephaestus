@@ -116,8 +116,8 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     @WithMentorUser
     @DisplayName("authenticated member → 200 SSE with AI-SDK header (real filter chain + SecurityContext propagation)")
     void authenticatedMember_returnsOkSseStreamAndDispatchesService() throws Exception {
-        // This test exercises the FULL request path that the wave-17 root-cause fix
-        // (DelegatingSecurityContextExecutorService) gated on: the controller fires, the
+        // This test exercises the FULL request path that
+        // DelegatingSecurityContextExecutorService is load-bearing for: the controller fires, the
         // service is invoked, and the AI-SDK protocol header is set on the response. The
         // service itself is mocked so we don't need a Docker sandbox; we assert it WAS
         // called (proves the auth path is wide open), and assert the header (proves the

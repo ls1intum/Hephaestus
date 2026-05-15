@@ -27,10 +27,9 @@ class MentorChatMetricsTest extends BaseUnitTest {
         metrics = new MentorChatMetrics(registry);
     }
 
-    // recordStartedIncrementsCounter deleted (wave-18 Test Theatre audit): tested only the
-    // Counter is wired, which `everyOutcomeRoutesToPreRegisteredCounter` already covers in
-    // structure. Started/completed lockstep is now asserted IN-FLIGHT via
-    // MentorChatServiceTest.assertOutcomeRecorded — that's where the invariant matters.
+    // No standalone `recordStartedIncrementsCounter` test: `everyOutcomeRoutesToPreRegisteredCounter`
+    // already covers wiring, and the started/completed lockstep invariant is asserted IN-FLIGHT
+    // through MentorChatServiceTest.assertOutcomeRecorded — that's where the invariant matters.
 
     @Test
     @DisplayName("every Outcome value lands on a distinct tagged counter (no per-call rebuild)")

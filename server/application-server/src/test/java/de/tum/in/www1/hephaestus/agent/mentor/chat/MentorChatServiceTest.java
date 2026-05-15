@@ -216,7 +216,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(persistence, never()).interrupt(any(), any(), any());
         // Lock released — no leaked active keys.
         assertThat(turnLock.activeKeys()).isZero();
-        // Wave-17 R3: the production path through MentorChatService must bump the SUCCESS
+        // The production path through MentorChatService must bump the SUCCESS
         // counter — without this assertion the metrics wiring is decoupled from real flow.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
         assertThat(meterRegistry.find("mentor.turn.duration").timer().count()).isEqualTo(1L);
@@ -295,7 +295,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(persistence).interrupt(any(), any(), any(Throwable.class));
         verify(persistence, never()).finalise(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
-        // Wave-17 R3: poisoned is a distinct outcome from a generic error.
+        // Poisoned is a distinct outcome from a generic error — keep the labels separate so
         assertOutcomeRecorded(MentorChatMetrics.Outcome.POISONED);
     }
 
