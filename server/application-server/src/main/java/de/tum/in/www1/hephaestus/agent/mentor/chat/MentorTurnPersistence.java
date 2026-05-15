@@ -168,10 +168,10 @@ public class MentorTurnPersistence {
     public UIMessageChunk.Finish augmentFinishWithCost(UIMessageChunk.Finish finish, TranslatorState state) {
         Double cost = computeFinalCostUsd(state);
         if (cost == null) return finish;
-        UIMessageChunk.FinishMetadata existing = finish.messageMetadata();
-        UIMessageChunk.FinishMetadata.Usage usage = existing != null ? existing.usage() : null;
+        UIMessageChunk.MessageMetadata existing = finish.messageMetadata();
+        UIMessageChunk.MessageMetadata.Usage usage = existing != null ? existing.usage() : null;
         String model = existing != null ? existing.model() : state.observedModel();
-        return new UIMessageChunk.Finish(finish.finishReason(), new UIMessageChunk.FinishMetadata(model, usage, cost));
+        return new UIMessageChunk.Finish(finish.finishReason(), new UIMessageChunk.MessageMetadata(model, usage, cost));
     }
 
     @Nullable

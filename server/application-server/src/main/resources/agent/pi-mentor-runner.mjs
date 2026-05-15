@@ -331,12 +331,13 @@ function defineFetchContextTool() {
             },
         },
         execute: async (_toolCallId, params) => {
-            const path = String(params?.path ?? "").trim();
-            // Pi treats THROWN errors as the tool's failure signal (agent-loop.ts §632-638);
-            // a returned `isError: true` field is ignored by the runtime. Throw so the LLM sees
-            // an `is_error` tool result AND so the runtime properly classifies the call as failed.
-            if (!FETCH_CONTEXT_ALLOWED.has(path)) {
-                throw new Error(`fetch_context: path "${path}" is not in the allow-list`);
+            // NOT `path` — that's the imported `node:path` module; shadowing it here is a
+            // future footgun if anyone adds `path.join(...)`.
+            const aspect = String(params?.path ?? "").trim();
+            // Pi treats THROWN errors as the tool's failure signal — a returned `isError:true`
+            // is ignored by the runtime, so throw to flag the call as failed.
+            if (!FETCH_CONTEXT_ALLOWED.has(aspect)) {
+                throw new Error(`fetch_context: path "${aspect}" is not in the allow-list`);
             }
             if (!activeThreadId) {
                 throw new Error("fetch_context: no active thread bound to the runtime");
@@ -349,18 +350,17 @@ function defineFetchContextTool() {
             const { promise, resolve, reject } = Promise.withResolvers();
             const timer = setTimeout(() => {
                 if (state.pendingFetchContexts.delete(callbackId)) {
-                    log(`fetch_context timed out: thread=${activeThreadId} path=${path} id=${callbackId}`);
-                    reject(new Error(`fetch_context(${path}) timed out after ${FETCH_CONTEXT_TIMEOUT_MS}ms`));
+                    log(`fetch_context timed out: thread=${activeThreadId} path=${aspect} id=${callbackId}`);
+                    reject(new Error(`fetch_context(${aspect}) timed out after ${FETCH_CONTEXT_TIMEOUT_MS}ms`));
                 }
             }, FETCH_CONTEXT_TIMEOUT_MS);
             state.pendingFetchContexts.set(callbackId, { resolve, reject, timer });
 
-            // Emit the callback request. Note: Java sees this as a top-level JSON-RPC request.
             writeFrame({
                 jsonrpc: "2.0",
                 id: callbackId,
                 method: "fetch_context",
-                params: { threadId: activeThreadId, path },
+                params: { threadId: activeThreadId, path: aspect },
             });
             return promise;
         },
@@ -456,29 +456,25 @@ async function bindThread(state) {
     if (activeThreadId === state.threadId && state.unsubscribe) {
         return; // already bound
     }
-    // Tear down the previous binding.
-    if (activeThreadId) {
-        const prev = threads.get(activeThreadId);
-        if (prev?.unsubscribe) {
-            try {
-                prev.unsubscribe();
-            } catch (e) {
-                log("prev unsubscribe threw:", e);
-            }
-            prev.unsubscribe = null;
-        }
-    }
-    // switchSession on the runtime (creates the file if missing — SessionManager handles persistence).
-    // If the file doesn't exist yet, Pi SDK creates a fresh session bound to that path.
+    // Switch FIRST so a switchSession failure doesn't leave the previous session unsubscribed
+    // with no path back: if we tore down `prev.unsubscribe` first and switch threw, the
+    // previous thread would lose its event stream permanently. SDK guarantees the prior
+    // session's listeners are invalidated as a side effect of a successful switchSession.
+    const prevState = activeThreadId ? threads.get(activeThreadId) : null;
     const { cancelled } = await runtime.switchSession(state.sessionPath);
     if (cancelled) {
         throw new Error(`switchSession cancelled by extension hook for thread ${state.threadId}`);
     }
+    if (prevState?.unsubscribe) {
+        try {
+            prevState.unsubscribe();
+        } catch (e) {
+            log("prev unsubscribe threw:", e);
+        }
+        prevState.unsubscribe = null;
+    }
     activeThreadId = state.threadId;
-    // Re-subscribe to the new session.
-    state.unsubscribe = runtime.session.subscribe((event) => {
-        forwardEvent(state, event);
-    });
+    state.unsubscribe = runtime.session.subscribe((event) => forwardEvent(state, event));
     log(`bound thread ${state.threadId} → ${state.sessionPath}`);
 }
 
@@ -580,7 +576,11 @@ async function handlePrompt(id, params) {
         })
         .catch((e) => {
             log(`prompt rejected for thread ${threadId}: ${e?.message ?? e}`);
-            // Emit a synthetic event so Java can release its lock and surface to the user.
+            // Synthesise terminal events so Java unblocks. Guard against double-fire: if the
+            // SDK already emitted a real agent_end before rejecting (rare but observed under
+            // abort+error races), `state.inFlight` is already false and the translator would
+            // see a second Finish.
+            if (!state.inFlight) return;
             sendEvent(threadId, { type: "pi_error", error: String(e?.message ?? e) });
             sendEvent(threadId, { type: "agent_end", messages: [] });
             clearTurnWatchdog(state);
@@ -709,15 +709,24 @@ function handleFetchContextResponse(frame) {
                     : typeof content === "string"
                     ? content
                     : JSON.stringify(content);
+            const originalLength = text.length;
             let truncated = false;
             if (text.length > FETCH_CONTEXT_MAX_BYTES) {
-                const dropped = text.length - FETCH_CONTEXT_MAX_BYTES;
-                text = text.slice(0, FETCH_CONTEXT_MAX_BYTES) + `\n…[truncated ${dropped} chars]`;
+                // Hard-cut the JSON; the marker rides on a separate content part so a model
+                // that parses the first part as JSON never has to skip our truncation prose.
+                text = text.slice(0, FETCH_CONTEXT_MAX_BYTES);
                 truncated = true;
             }
+            const parts = [{ type: "text", text }];
+            if (truncated) {
+                parts.push({
+                    type: "text",
+                    text: `[truncated ${originalLength - FETCH_CONTEXT_MAX_BYTES} chars from response]`,
+                });
+            }
             pending.resolve({
-                content: [{ type: "text", text }],
-                details: { ok: true, length: text.length, truncated },
+                content: parts,
+                details: { ok: true, length: text.length, truncated, originalLength },
             });
         }
         return;
@@ -742,11 +751,16 @@ function startTurnWatchdog(state) {
 }
 
 async function runWatchdogRebind(state) {
-    // If `close_thread` was enqueued between `setTimeout` firing and this task running, the
-    // thread state is gone — rebinding would resurrect a ghost subscription that survives until
-    // the next valid bind orphans it. Bail out; the close already cleaned up the watchdog.
+    // Thread closed between timer fire and queue drain — rebinding would leak a subscription.
     if (!threads.has(state.threadId)) {
         log(`watchdog rebind skipped: thread=${state.threadId} already closed`);
+        return;
+    }
+    // The real `agent_end` raced ahead of us through the queue and cleared `inFlight`. Without
+    // this guard we'd emit a SECOND synthetic `agent_end`, and Java's translator would Finish
+    // the assistant message twice (or worse, finalise on a turn that already finalised).
+    if (!state.inFlight) {
+        log(`watchdog rebind skipped: thread=${state.threadId} turn already completed`);
         return;
     }
     log(`watchdog fired: rebuilding session for thread=${state.threadId}`);

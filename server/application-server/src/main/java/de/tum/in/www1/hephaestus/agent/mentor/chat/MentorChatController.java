@@ -134,6 +134,8 @@ public class MentorChatController {
         try {
             String json = objectMapperBean.writeValueAsString(new UIMessageChunk.Error(errorText));
             emitter.send(SseEmitter.event().data(json));
+            // AI-SDK closes the stream on the [DONE] sentinel; every terminal path emits it.
+            emitter.send(SseEmitter.event().data("[DONE]"));
         } catch (Exception ignored) {
             log.debug("Short-circuit emitter send failed; client disconnected");
         }

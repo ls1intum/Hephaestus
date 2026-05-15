@@ -219,7 +219,7 @@ class MentorLiveLlmTest {
         // ever regresses these go to zero — exactly the failure mode this test exists to catch.
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) chunks.get(chunks.size() - 1);
         assertThat(finish.messageMetadata()).as("Finish carries metadata").isNotNull();
-        UIMessageChunk.FinishMetadata.Usage usage = finish.messageMetadata().usage();
+        UIMessageChunk.MessageMetadata.Usage usage = finish.messageMetadata().usage();
         assertThat(usage).as("usage object present").isNotNull();
         assertThat(usage.input()).as("usage.input ≥ 1").isGreaterThanOrEqualTo(1);
         assertThat(usage.output()).as("usage.output ≥ 1").isGreaterThanOrEqualTo(1);

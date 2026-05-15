@@ -5,10 +5,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.springframework.lang.Nullable;
 
-/** Lightweight thread row for the list endpoint — no messages. */
+/** Lightweight thread row for the list endpoint — no messages, no session_jsonl BYTEA. */
 @Schema(description = "Mentor chat thread summary (no messages).")
-public record ChatThreadSummaryDTO(UUID id, @Nullable String title, Instant createdAt) {
-    public static ChatThreadSummaryDTO from(ChatThread thread) {
-        return new ChatThreadSummaryDTO(thread.getId(), thread.getTitle(), thread.getCreatedAt());
-    }
-}
+public record ChatThreadSummaryDTO(UUID id, @Nullable String title, Instant createdAt) {}

@@ -54,7 +54,7 @@ public sealed interface UIMessageChunk {
      * primary key of the persisted {@code chat_message} row so client-side {@code useChat}
      * reconciliation survives a page refresh.
      */
-    record Start(@Nullable UUID messageId, @Nullable FinishMetadata messageMetadata) implements UIMessageChunk {}
+    record Start(@Nullable UUID messageId, @Nullable MessageMetadata messageMetadata) implements UIMessageChunk {}
 
     /** Lifecycle: open a step (Pi internal turn boundary). */
     record StartStep() implements UIMessageChunk {}
@@ -68,7 +68,7 @@ public sealed interface UIMessageChunk {
      */
     record Finish(
         @Nullable FinishReason finishReason,
-        @Nullable FinishMetadata messageMetadata
+        @Nullable MessageMetadata messageMetadata
     ) implements UIMessageChunk {}
 
     /**
@@ -112,12 +112,12 @@ public sealed interface UIMessageChunk {
      * the wire so the AI SDK strict-zod {@code messageMetadata} validator accepts the payload.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    record FinishMetadata(@Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
-        public static FinishMetadata of(@Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
+    record MessageMetadata(@Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
+        public static MessageMetadata of(@Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
             // Cheap "nothing observed" gate so we don't ship `{}` to clients (which the strict
             // validator still accepts but bloats every Finish chunk).
             if (model == null && usage == null && costUsd == null) return null;
-            return new FinishMetadata(model, usage, costUsd);
+            return new MessageMetadata(model, usage, costUsd);
         }
 
         /** Pi's {@code Usage} shape (pi-ai/src/types.ts) projected onto the AI SDK wire. */
@@ -193,13 +193,17 @@ public sealed interface UIMessageChunk {
      * it from the persisted UIMessage parts array on the client.
      */
     record DataMentorStatus(
+        @JsonProperty("id") String id,
         @JsonProperty("data") DataMentorStatusPayload data,
         @JsonProperty("transient") @Nullable Boolean transientFlag
     ) implements UIMessageChunk {
+        /** Stable id so subsequent status emits dedupe client-side instead of accumulating. */
+        public static final String STATUS_PART_ID = "mentor-status";
+
         public record DataMentorStatusPayload(String state, @Nullable String reason) {}
 
         public static DataMentorStatus of(String state, @Nullable String reason) {
-            return new DataMentorStatus(new DataMentorStatusPayload(state, reason), Boolean.TRUE);
+            return new DataMentorStatus(STATUS_PART_ID, new DataMentorStatusPayload(state, reason), Boolean.TRUE);
         }
     }
 

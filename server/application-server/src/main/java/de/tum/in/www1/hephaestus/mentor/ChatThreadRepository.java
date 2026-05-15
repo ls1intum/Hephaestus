@@ -13,11 +13,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
     /**
-     * List threads owned by the given user inside the given workspace, newest first.
-     * Workspace + owner scoping is enforced at the query layer so no controller can
-     * accidentally leak threads across tenants.
+     * List thread summaries (no messages, no session_jsonl BYTEA) owned by the given user
+     * inside the given workspace, newest first. Constructor projection so Postgres never
+     * detoasts the multi-MB session JSONL just to render the sidebar.
      */
-    List<ChatThread> findByWorkspaceIdAndUserIdOrderByCreatedAtDesc(Long workspaceId, Long userId);
+    @Query(
+        "SELECT new de.tum.in.www1.hephaestus.mentor.ChatThreadSummaryDTO(t.id, t.title, t.createdAt) " +
+            "FROM ChatThread t WHERE t.workspace.id = :workspaceId AND t.user.id = :userId " +
+            "ORDER BY t.createdAt DESC"
+    )
+    List<ChatThreadSummaryDTO> findSummariesByWorkspaceAndUser(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId
+    );
 
     /**
      * Resolve a thread within a workspace; returns empty when the thread either does not

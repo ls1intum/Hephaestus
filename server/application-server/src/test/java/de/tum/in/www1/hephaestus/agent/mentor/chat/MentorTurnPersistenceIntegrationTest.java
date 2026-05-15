@@ -318,9 +318,9 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         state.appendText("Hello there!");
         state.closeTextBlock();
 
-        UIMessageChunk.FinishMetadata finishMeta = new UIMessageChunk.FinishMetadata(
+        UIMessageChunk.MessageMetadata finishMeta = new UIMessageChunk.MessageMetadata(
             "openai/gpt-oss-120b",
-            new UIMessageChunk.FinishMetadata.Usage(123, 45, null, null, 168),
+            new UIMessageChunk.MessageMetadata.Usage(123, 45, null, null, 168),
             /* costUsd */ null
         );
         UIMessageChunk.Finish finish = new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, finishMeta);
@@ -363,6 +363,40 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(chatThreadRepository.findSessionJsonl(threadId))
             .as("byte-identical: any re-encoding kills prompt-cache prefix matching")
             .contains(expectedBytes);
+    }
+
+    @Test
+    void finalise_storesSessionJsonlAboveToastThreshold() {
+        // Postgres TOAST threshold is ~2KB; values above ~8KB go out-of-line into pg_toast.
+        // A 1MB payload exercises detoast on read — the path that would surface any
+        // encoding/transport regression introduced by JDBC stream handling. Far more
+        // realistic for a 20+ turn conversation than the byte-string fixtures above.
+        UUID threadId = UUID.randomUUID();
+        ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user, "hello");
+        UUID assistantId = UUID.randomUUID();
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null
+        );
+
+        byte[] bigBytes = new byte[1024 * 1024]; // 1 MiB
+        // Pattern with a stable header + repeating non-zero filler so a partial-read regression
+        // is detectable by a single-byte check anywhere in the array.
+        byte[] header = "{\"type\":\"user_message\",\"text\":\"".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        System.arraycopy(header, 0, bigBytes, 0, header.length);
+        for (int i = header.length; i < bigBytes.length - 3; i++) bigBytes[i] = (byte) ('a' + (i % 26));
+        bigBytes[bigBytes.length - 3] = '"';
+        bigBytes[bigBytes.length - 2] = '}';
+        bigBytes[bigBytes.length - 1] = '\n';
+
+        TranslatorState state = new TranslatorState(assistantId);
+        state.observeSessionJsonl(bigBytes);
+        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null));
+
+        byte[] readBack = chatThreadRepository.findSessionJsonl(threadId).orElseThrow();
+        assertThat(readBack).as("1MB TOAST round-trip preserves every byte").isEqualTo(bigBytes);
     }
 
     @Test

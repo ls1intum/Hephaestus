@@ -40,9 +40,9 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
     static List<Object[]> chunkFixtures() {
         UUID messageId = UUID.fromString("11111111-2222-3333-4444-555555555555");
         UUID findingId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        UIMessageChunk.FinishMetadata finishMeta = new UIMessageChunk.FinishMetadata(
+        UIMessageChunk.MessageMetadata finishMeta = new UIMessageChunk.MessageMetadata(
             "openai/gpt-oss-120b",
-            new UIMessageChunk.FinishMetadata.Usage(655, 65, null, null, 720),
+            new UIMessageChunk.MessageMetadata.Usage(655, 65, null, null, 720),
             0.0042
         );
         ObjectNode toolOutput = NODES.objectNode().put("status", "ok").put("count", 7);
@@ -68,11 +68,11 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
                 "{\"type\":\"finish\",\"messageMetadata\":{\"model\":\"openai/gpt-oss-120b\"," +
                 "\"usage\":{\"input\":655,\"output\":65,\"totalTokens\":720},\"costUsd\":0.0042}}",
             },
-            // FinishMetadata.of(null,null,null) collapses to null → Finish.messageMetadata omitted entirely.
+            // MessageMetadata.of(null,null,null) collapses to null → Finish.messageMetadata omitted entirely.
             new Object[] {
                 new UIMessageChunk.Finish(
                     UIMessageChunk.FinishReason.STOP,
-                    UIMessageChunk.FinishMetadata.of(null, null, null)
+                    UIMessageChunk.MessageMetadata.of(null, null, null)
                 ),
                 "{\"type\":\"finish\",\"finishReason\":\"stop\"}",
             },
@@ -177,7 +177,7 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
         Set<Class<?>> permittedSet = new LinkedHashSet<>(Arrays.asList(permitted));
         Set<Class<?>> missing = new LinkedHashSet<>(permittedSet);
         missing.removeAll(registered);
-        // FinishMetadata is a payload record, not a chunk — it doesn't `implements UIMessageChunk`,
+        // MessageMetadata is a payload record, not a chunk — it doesn't `implements UIMessageChunk`,
         // so it won't appear in the permits anyway. If anything is in `missing` here, someone added
         // a chunk record and forgot the `@JsonSubTypes.Type(...)` entry.
         assertThat(missing)

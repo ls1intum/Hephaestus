@@ -31,11 +31,11 @@ public class ChatThreadService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
-    /** Threads owned by the current user inside the given workspace, newest first. */
+    /** Thread summaries (id, title, createdAt) owned by the current user, newest first. */
     @Transactional(readOnly = true)
-    public List<ChatThread> listForCurrentUser(Long workspaceId) {
+    public List<ChatThreadSummaryDTO> listSummariesForCurrentUser(Long workspaceId) {
         User user = userRepository.getCurrentUserElseThrow();
-        return chatThreadRepository.findByWorkspaceIdAndUserIdOrderByCreatedAtDesc(workspaceId, user.getId());
+        return chatThreadRepository.findSummariesByWorkspaceAndUser(workspaceId, user.getId());
     }
 
     /**

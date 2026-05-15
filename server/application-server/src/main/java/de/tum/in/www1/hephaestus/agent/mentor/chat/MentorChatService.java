@@ -148,7 +148,10 @@ public class MentorChatService {
                     metrics.recordCompleted(outcome);
                     return Boolean.TRUE;
                 } catch (TurnAlreadyInFlightException dup) {
-                    log.info("Mentor turn rejected (DB in-flight index): {}", dup.getMessage());
+                    // WARN, not INFO: hitting the DB unique partial index means the JVM-local
+                    // lock missed — typically a replica-affinity miss across pods. That's a
+                    // correctness signal worth paging on, not a routine event.
+                    log.warn("Mentor turn rejected (DB in-flight index): {}", dup.getMessage());
                     metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_DB);
                     channel.completeWithConflict();
                     return Boolean.FALSE;
@@ -196,6 +199,23 @@ public class MentorChatService {
     }
 
     private MentorChatMetrics.Outcome runTurn(
+        MentorTurnRequest request,
+        MentorSseChannel channel,
+        AtomicReference<MentorRunnerClient> clientHolder
+    ) {
+        // Push thread + workspace ids into MDC so every WARN/ERROR in this turn carries the
+        // correlation keys. Cleared in `finally` so the v-thread pool doesn't leak context.
+        org.slf4j.MDC.put("mentorThreadId", request.threadId().toString());
+        org.slf4j.MDC.put("mentorWorkspaceId", Long.toString(request.workspaceId()));
+        try {
+            return runTurnInternal(request, channel, clientHolder);
+        } finally {
+            org.slf4j.MDC.remove("mentorThreadId");
+            org.slf4j.MDC.remove("mentorWorkspaceId");
+        }
+    }
+
+    private MentorChatMetrics.Outcome runTurnInternal(
         MentorTurnRequest request,
         MentorSseChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
@@ -266,16 +286,17 @@ public class MentorChatService {
                 event -> handleEvent(event, state, channel, cookie, turnComplete),
                 callback -> handleFetchContext(callback, aspectInputs),
                 runnerTimeoutScheduler.scheduler(),
-                // Per-thread event filter: the sandbox is shared by (userId, workspaceId),
-                // so a second tab in the same workspace would otherwise see this tab's
-                // events. See MentorRunnerClient.handleEvent for the filter rule.
+                // Per-thread event filter: the sandbox is shared by (userId, workspaceId), so
+                // a second tab in the same workspace would otherwise see this tab's events.
                 request.threadId()
             );
+            // Publish to the disconnect hook BEFORE start(): if start() throws (rare — frame
+            // queue full, listener exception on the very first emit) the hook still finds the
+            // client and aborts cleanly. The hook's abort is idempotent on Pi's side.
             clientHolder.set(client);
             client.start();
-            // Tiny race: the SSE lifecycle may have flipped the channel *before* clientHolder
-            // captured `client`. In that case the hook's clientHolder.get() returned null and
-            // skipped the abort. Re-fire here if so — abort() is idempotent on Pi's side.
+            // SSE lifecycle may have flipped the channel between bindLifecycle and clientHolder.set.
+            // Re-fire the abort if so.
             if (channel.isClientGone()) {
                 abortRunnerOnDisconnect(client, request.threadId());
             }
@@ -401,13 +422,19 @@ public class MentorChatService {
         }
     }
 
+    /** Bound the cause-chain walk so a self-cycle (rare but seen in JDK 21 with virtual threads) doesn't infinite-loop. */
+    private static final int MAX_CAUSE_DEPTH = 32;
+
     private static boolean isPoisoning(Throwable e) {
         Throwable cur = e;
-        while (cur != null) {
+        int depth = 0;
+        while (cur != null && depth++ < MAX_CAUSE_DEPTH) {
             if (cur instanceof MentorRunnerException mre && mre.poisonsSandbox()) {
                 return true;
             }
-            cur = cur.getCause();
+            Throwable next = cur.getCause();
+            if (next == cur) break; // self-cycle guard
+            cur = next;
         }
         return false;
     }
@@ -422,20 +449,19 @@ public class MentorChatService {
         try {
             List<UIMessageChunk> chunks = translator.translate(piEvent, state);
             for (UIMessageChunk chunk : chunks) {
+                // Defensive: once the turn is done, drop any trailing chunks. Pi shouldn't emit
+                // anything past agent_end, but a misbehaving runner / late delivery would
+                // otherwise hit a closed emitter and re-trigger finalise on an already-finalised row.
+                if (turnComplete.isDone()) break;
                 if (chunk instanceof UIMessageChunk.Finish finish) {
-                    // Cost augmentation must not block the wire Finish: a pricing-row miss, DB
-                    // blip, or token-math overflow would otherwise propagate up `handleEvent`,
-                    // turn-complete the future exceptionally, and surface as an interrupted row
-                    // + generic error chunk even though Pi finished cleanly. Send the raw Finish
-                    // on failure; cost can be backfilled out-of-band.
                     UIMessageChunk.Finish toSend = finish;
                     try {
                         toSend = persistence.augmentFinishWithCost(finish, state);
                     } catch (RuntimeException costEx) {
-                        log.warn(
-                            "Cost augmentation failed for Finish chunk — sending raw Finish: {}",
-                            costEx.toString()
-                        );
+                        // DEBUG, not WARN: a missing price row is observable via the
+                        // `mentor_cost_recorded_ratio` gauge already; per-turn WARN under
+                        // sustained pricing-table drift would noise out actionable logs.
+                        log.debug("Cost augmentation failed — sending raw Finish: {}", costEx.toString());
                     }
                     channel.send(toSend);
                     persistence.finalise(cookie, state, toSend);

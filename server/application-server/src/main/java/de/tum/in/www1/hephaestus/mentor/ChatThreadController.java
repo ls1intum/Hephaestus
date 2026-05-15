@@ -38,12 +38,7 @@ public class ChatThreadController {
     @ApiResponse(responseCode = "200", description = "Threads returned, newest first")
     @PreAuthorize("@workspaceSecure.isMember()")
     public ResponseEntity<List<ChatThreadSummaryDTO>> listThreads(WorkspaceContext workspaceContext) {
-        List<ChatThreadSummaryDTO> threads = chatThreadService
-            .listForCurrentUser(workspaceContext.id())
-            .stream()
-            .map(ChatThreadSummaryDTO::from)
-            .toList();
-        return ResponseEntity.ok(threads);
+        return ResponseEntity.ok(chatThreadService.listSummariesForCurrentUser(workspaceContext.id()));
     }
 
     @GetMapping("/{threadId}")

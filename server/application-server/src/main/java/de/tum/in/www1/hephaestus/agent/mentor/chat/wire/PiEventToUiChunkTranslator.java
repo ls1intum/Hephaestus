@@ -396,9 +396,9 @@ public class PiEventToUiChunkTranslator {
             piStopReason = state.observedStopReason();
         }
         List<UIMessageChunk> out = closeOpenStreamingBlocks(state);
-        UIMessageChunk.FinishMetadata metadata = UIMessageChunk.FinishMetadata.of(
+        UIMessageChunk.MessageMetadata metadata = UIMessageChunk.MessageMetadata.of(
             state.observedModel(),
-            UIMessageChunk.FinishMetadata.Usage.fromJsonNode(state.observedUsage()),
+            UIMessageChunk.MessageMetadata.Usage.fromJsonNode(state.observedUsage()),
             /* costUsd, set by the persistence layer post-translation */ null
         );
         out.add(new UIMessageChunk.Finish(mapStopReason(piStopReason), metadata));
