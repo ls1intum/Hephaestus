@@ -405,41 +405,11 @@ async function handleHello(id /*, params */) {
     //
     // Fired AFTER the hello reply because Pi SDK module evaluation runs synchronously between
     // dynamic-import yield points; firing before the reply would delay hello by the load time.
-    // The exact load duration is workload-dependent (transitive imports through
-    // core/resource-loader pull in highlight.js / Ink); the runner_post_warm event below
-    // makes it observable.
+    // Failure is logged to stderr (the runner has no structured-event observability surface
+    // wired yet) and ensureRuntime's own cooldown handles retry on subsequent demand.
     if (!PROTOCOL_ONLY) {
-        const start = process.hrtime.bigint();
         setImmediate(() => {
-            ensureRuntime().then(
-                () => {
-                    const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
-                    // Notification event (threadId:null since prewarm is runner-scoped).
-                    // Java MentorEventTranslator ignores unknown types — no wire schema bump.
-                    writeFrame({
-                        jsonrpc: "2.0",
-                        method: "event",
-                        params: {
-                            threadId: null,
-                            event: { type: "runner_prewarm_ok", durationMs },
-                        },
-                    });
-                },
-                (e) => {
-                    log("prewarm ensureRuntime failed (will retry on demand):", e);
-                    writeFrame({
-                        jsonrpc: "2.0",
-                        method: "event",
-                        params: {
-                            threadId: null,
-                            event: {
-                                type: "runner_prewarm_failed",
-                                error: String(e?.message ?? e),
-                            },
-                        },
-                    });
-                }
-            );
+            ensureRuntime().catch((e) => log("prewarm ensureRuntime failed (will retry on demand):", e));
         });
     }
 }
@@ -512,8 +482,7 @@ function forwardEvent(state, event) {
         // The watchdog synthesises its own agent_end at the end of a forced rebind (see
         // runWatchdogRebind). That path emits its own agent_end via sendEvent directly — it
         // does NOT route through forwardEvent — so this branch only fires for genuine
-        // SDK-emitted turn completions. If that invariant ever changes, a `state.gcDoneThisTurn`
-        // flag would gate against double-firing.
+        // SDK-emitted turn completions.
         clearTurnWatchdog(state);
         state.inFlight = false;
         maybePostTurnGc();
@@ -521,49 +490,29 @@ function forwardEvent(state, event) {
 }
 
 /**
- * Best-effort post-turn V8 compaction. Returns dirty pages from the just-finished turn back to
- * the OS before the user goes idle. Triggered only when {@code --expose-gc} was passed (mentor
- * runner; not practice). The actual RSS reduction depends on V8 build + heap state and is not
- * contractually guaranteed — we surface duration + RSS-before/after as a structured event so a
- * production gauge (or grep) can validate that the call did anything useful.
+ * Best-effort post-turn V8 compaction. Triggered only when {@code --expose-gc} was passed
+ * (mentor; not practice). Effect-only: we do NOT emit observability events for this — write-only
+ * telemetry that no Java consumer reads is just stdout noise. If we ever want a production
+ * metric for GC behavior, wire it deliberately through a dedicated metrics path.
  *
- * <p>Yielded via setImmediate so the agent_end frame drains to the kernel pipe buffer first
- * (Java still observes the frame ordering it would have without this).
+ * <p>Gated on heap-watermark: a full STW major GC costs ~50–200 ms on a 100 MB heap; for a
+ * just-finished 1-token turn the cost is all pause, no benefit. Only fire if V8's own heap
+ * has grown past the 64 MB mark — below that, V8's own scavenger handles things without our
+ * help.
  *
- * <p>The emitted event uses {@code threadId: null} — V8 GC is a process-global concern; tagging
- * with a specific threadId would mislead the Java-side fan-out into routing it to a single
- * subscriber, which is the wrong scope (every thread shares the same heap).
+ * <p>Yielded via setImmediate so the agent_end frame drains to the kernel pipe buffer first.
  */
+const POST_TURN_GC_HEAP_THRESHOLD_BYTES = 64 * 1024 * 1024;
+
 function maybePostTurnGc() {
     if (typeof global.gc !== "function") return;
+    if (process.memoryUsage().heapUsed < POST_TURN_GC_HEAP_THRESHOLD_BYTES) return;
     setImmediate(() => {
-        const before = process.memoryUsage().rss;
-        const start = process.hrtime.bigint();
-        let ok = true;
         try {
             global.gc();
         } catch (e) {
-            ok = false;
             log("post-turn gc threw:", e);
         }
-        const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
-        const after = process.memoryUsage().rss;
-        // Notification (threadId:null) — runner-scoped, like runner_prewarm_*. Allow-listed in
-        // PiEventToUiChunkTranslator so it does not WARN as protocol drift.
-        writeFrame({
-            jsonrpc: "2.0",
-            method: "event",
-            params: {
-                threadId: null,
-                event: {
-                    type: "runner_post_turn_gc",
-                    ok,
-                    durationMs,
-                    rssBeforeBytes: before,
-                    rssAfterBytes: after,
-                },
-            },
-        });
     });
 }
 
@@ -1061,6 +1010,27 @@ function start() {
         });
     }
 
+    // Allocator self-check. PiRuntimeFactory passes LD_PRELOAD=…/libjemalloc.so.2 in the
+    // mentor runner's spawn env, and the Dockerfile creates the per-arch symlink at build time.
+    // If either of those drifts (symlink missing on a future image, env var clobbered by a
+    // future deploy config), ld.so silently falls back to glibc malloc and the wave-22+ tuning
+    // (MALLOC_CONF dirty_decay, narenas) disappears. Without this check the regression would
+    // only manifest as a slow RSS bloat in production with no clear cause. One stderr line at
+    // startup is enough — ops can grep for it.
+    if (!PROTOCOL_ONLY) {
+        try {
+            const maps = readFileSync("/proc/self/maps", "utf8");
+            if (!/libjemalloc/.test(maps)) {
+                log(
+                    "WARN allocator self-check: libjemalloc NOT loaded into this process — " +
+                    "falling back to glibc malloc. Memory tuning from PiRuntimeFactory#nodeEnvFor " +
+                    "is disabled. Check Dockerfile symlink + LD_PRELOAD env."
+                );
+            }
+        } catch {
+            // /proc/self/maps unavailable (non-Linux, very locked-down containers). Silent.
+        }
+    }
     announceReady();
     // SDK prewarm is intentionally NOT triggered here — it now fires inside handleHello
     // after the reply is written. Pi SDK module evaluation is synchronous (~300-400 ms) and

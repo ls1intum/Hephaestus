@@ -426,13 +426,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
             "auto_retry_start",
             "auto_retry_end",
             "runner_ready",
-            // Hephaestus-runner observability events emitted from pi-mentor-runner.mjs. They are
-            // runner-scoped (post-turn GC + cold-start prewarm). Without these in the allowlist
-            // every mentor turn / cold start would WARN "Protocol drift?" and the drift signal
-            // would drown in noise.
-            "runner_post_turn_gc",
-            "runner_prewarm_ok",
-            "runner_prewarm_failed",
         };
         for (String type : sessionEvents) {
             JsonNode event = mapper.readTree("{\"type\":\"" + type + "\"}");

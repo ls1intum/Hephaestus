@@ -60,15 +60,7 @@ public class PiEventToUiChunkTranslator {
                 "session_info_changed",
                 "thinking_level_changed",
                 "auto_retry_start",
-                "auto_retry_end",
-                // Hephaestus-runner-emitted observability events — see pi-mentor-runner.mjs.
-                // These are runner-scoped (threadId may be null); we drop them at the chunk
-                // layer and rely on a dedicated metrics path (TODO: wire to InteractiveSandboxMetrics)
-                // to count + time them. Without this allowlist entry every mentor turn / cold start
-                // would WARN about protocol drift, defeating the drift-detection signal.
-                "runner_post_turn_gc",
-                "runner_prewarm_ok",
-                "runner_prewarm_failed" -> List.of();
+                "auto_retry_end" -> List.of();
             default -> {
                 log.warn("Unknown Pi event type '{}' — dropping. Protocol drift?", type);
                 yield List.of();

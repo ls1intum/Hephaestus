@@ -414,18 +414,28 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         void mentorRunnerScriptConstantAgreesWithProperties() {
             // PiRuntimeFactory dispatches V8 flags by filename match against MENTOR_RUNNER_SCRIPT.
             // If MentorAgentProperties' default runnerScript ever drifts (rename, version bump,
-            // operator change) the mentor would silently revert to the practice V8 profile —
-            // no heap cap, no --expose-gc, no jemalloc preload. This test pins the alignment.
-            de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties props =
-                new de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties(
-                    "ghcr.io/ls1intum/hephaestus/agent-pi-mentor:latest",
-                    "pi-mentor-runner.mjs",
-                    100_000
+            // operator override) the mentor silently reverts to the practice V8 profile —
+            // no heap cap, no --expose-gc, no jemalloc preload.
+            //
+            // The previous version of this test constructed MentorAgentProperties manually with
+            // the literal "pi-mentor-runner.mjs" and asserted that literal equalled the constant.
+            // It would have passed even if @DefaultValue on MentorAgentProperties was renamed to
+            // "pi-mentor-runner-v2.mjs" — the very drift it claimed to defend against. Fixed by
+            // round-tripping through Spring's Binder against an empty source, which actually
+            // exercises the @DefaultValue resolution.
+            org.springframework.boot.context.properties.bind.Binder binder =
+                new org.springframework.boot.context.properties.bind.Binder(
+                    org.springframework.boot.context.properties.source.ConfigurationPropertySources.from(
+                        new org.springframework.core.env.MapPropertySource("empty", Map.of())
+                    )
                 );
-            // Round-trip through @DefaultValue binding would set "pi-mentor-runner.mjs"; we
-            // mirror that here. The assertion below catches a hand-edited default drift.
-            assertThat(props.runnerScript())
-                .as("MENTOR_RUNNER_SCRIPT constant must equal MentorAgentProperties default")
+            de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties bound = binder
+                .bindOrCreate(
+                    "hephaestus.mentor.agent",
+                    de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties.class
+                );
+            assertThat(bound.runnerScript())
+                .as("MENTOR_RUNNER_SCRIPT must equal MentorAgentProperties.@DefaultValue('runnerScript')")
                 .isEqualTo(PiRuntimeFactory.MENTOR_RUNNER_SCRIPT);
         }
 
