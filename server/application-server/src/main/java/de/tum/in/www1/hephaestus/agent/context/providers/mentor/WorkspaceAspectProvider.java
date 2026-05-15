@@ -70,7 +70,18 @@ public class WorkspaceAspectProvider implements ContentProvider {
         return false;
     }
 
+    /**
+     * {@code @Transactional} sits on the EXTERNAL entry point ({@code contribute}, invoked
+     * by {@link de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder} through the
+     * Spring proxy) — NOT on {@link #buildPayload}. Annotating {@code buildPayload} would be
+     * silently dropped because the only callers are the two self-invocations below: Spring AOP
+     * intercepts via the proxy and {@code this.buildPayload(...)} bypasses the proxy entirely.
+     * With {@code spring.jpa.open-in-view=false} the only durable session is the one this
+     * annotation opens here, which spans the cache loader callback (Caffeine runs it
+     * synchronously on this same thread).
+     */
     @Override
+    @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
         String key = req.workspaceId() + ":" + req.contributorId();
@@ -86,17 +97,7 @@ public class WorkspaceAspectProvider implements ContentProvider {
         }
     }
 
-    /**
-     * Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}.
-     *
-     * <p>{@code @Transactional(readOnly = true)} keeps a session open for the duration of the
-     * build. Today every accessed lazy field is fetched via {@code LEFT JOIN FETCH} in the
-     * repository — but a future provider edit that touches an additional lazy association
-     * ({@code issue.assignees}, {@code pr.repository.parent}, etc.) would otherwise throw
-     * {@link org.hibernate.LazyInitializationException} at SSE-write time. Defence against
-     * silent refactor-time regressions, not a current bug.
-     */
-    @Transactional(readOnly = true)
+    /** Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}. */
     public ObjectNode buildPayload(Long workspaceId, Long contributorId) {
         User user = userRepository
             .findById(contributorId)

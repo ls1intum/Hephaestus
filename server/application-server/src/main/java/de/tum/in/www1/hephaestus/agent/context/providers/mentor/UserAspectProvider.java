@@ -61,7 +61,18 @@ public class UserAspectProvider implements ContentProvider {
         return false;
     }
 
+    /**
+     * {@code @Transactional} sits on the EXTERNAL entry point ({@code contribute}, invoked
+     * by {@link de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder} through the
+     * Spring proxy) — NOT on {@link #buildPayload}. Annotating {@code buildPayload} would be
+     * silently dropped because the only callers are the two self-invocations below: Spring AOP
+     * intercepts via the proxy and {@code this.buildPayload(...)} bypasses the proxy entirely.
+     * With {@code spring.jpa.open-in-view=false} the only durable session is the one this
+     * annotation opens here, which now spans the cache loader callback too (Caffeine runs it
+     * synchronously on this same thread).
+     */
     @Override
+    @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
         String key = req.workspaceId() + ":" + req.contributorId();
@@ -79,14 +90,7 @@ public class UserAspectProvider implements ContentProvider {
         }
     }
 
-    /**
-     * Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}.
-     *
-     * <p>{@code @Transactional(readOnly = true)} keeps a session open across the build so any
-     * lazy association touched downstream cannot trip {@link org.hibernate.LazyInitializationException}
-     * at SSE-write time. Defence against future refactor-time regressions.
-     */
-    @Transactional(readOnly = true)
+    /** Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}. */
     public ObjectNode buildPayload(Long workspaceId, Long contributorId) {
         User user = userRepository
             .findById(contributorId)

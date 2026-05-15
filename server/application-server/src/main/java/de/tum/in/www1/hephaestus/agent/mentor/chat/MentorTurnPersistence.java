@@ -336,12 +336,15 @@ public class MentorTurnPersistence {
      * a model we don't have a price row for still gets a real cost.
      */
     /**
-     * Upper bound for a single-turn USD cost. The most expensive frontier model at 100k input
-     * + 100k output tokens lands around $5; the sanity cap is ~20× that to allow for unusual
-     * tool-call bursts without flagging legitimate turns. Anything above this is almost
-     * certainly an upstream bug (Pi returning sentinel −1, NaN-coerced-to-int, accidental
-     * unit confusion microdollars-vs-dollars). Persisting it would poison Grafana axes and
-     * billing dashboards more than dropping it would.
+     * Upper bound for a single-turn USD cost. Reference math using current frontier pricing
+     * (seeded in {@code model_pricing}): Claude Opus 4 at $15/1k input + $75/1k output → a
+     * heavy 100k-in + 100k-out turn is $1.5 + $7.5 = $9. A 200k-in + 200k-out tool-call burst
+     * lands around $18. The $100 cap is ≈10× a worst-case legitimate turn, leaving headroom
+     * for future model pricing changes while still flagging the upstream bugs we actually
+     * see in practice: Pi returning sentinel −1, NaN-coerced-to-int, accidental unit
+     * confusion (microdollars vs dollars), or 1e9 garbage. Persisting any of those would
+     * poison the {@code mentor.turn.cost.usd} histogram axis and billing audit row more than
+     * dropping the value would.
      */
     private static final double COST_USD_SANITY_CAP = 100.0d;
 

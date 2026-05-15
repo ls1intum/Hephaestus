@@ -72,7 +72,14 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         return false;
     }
 
+    /**
+     * {@code @Transactional} sits on the EXTERNAL entry point ({@code contribute}, invoked by
+     * {@link de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder} through the
+     * Spring proxy) — NOT on {@link #buildPayload}. Annotating {@code buildPayload} would be
+     * silently dropped because the only callers are self-invocations below.
+     */
     @Override
+    @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
         String key = req.workspaceId() + ":" + req.contributorId();
@@ -88,14 +95,7 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         }
     }
 
-    /**
-     * Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}.
-     *
-     * <p>{@code @Transactional(readOnly = true)} keeps a session open across the build so any
-     * lazy association touched downstream cannot trip
-     * {@link org.hibernate.LazyInitializationException} at SSE-write time.
-     */
-    @Transactional(readOnly = true)
+    /** Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}. */
     public ObjectNode buildPayload(Long workspaceId, Long contributorId) {
         User user = userRepository
             .findById(contributorId)

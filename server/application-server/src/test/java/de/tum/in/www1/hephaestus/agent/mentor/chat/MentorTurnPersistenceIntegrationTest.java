@@ -98,14 +98,23 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
         // The test profile uses JPA ddl-auto=create — Liquibase is disabled, so partial
         // indexes / CHECK constraints (which JPA can't infer from @Entity) never land. We
-        // create the in-flight unique index here so the persistInFlight contract has the
-        // real partial-index constraint to fail against. The
-        // `migrationDeclaresInFlightUniqueIndex` test ensures THIS DDL stays in lockstep
-        // with the production migration changeset.
+        // create them here so persistence-layer tests have the real production DDL to
+        // fail against. The `migrationDeclaresInFlightUniqueIndex` test ensures the
+        // in-flight DDL stays in lockstep with the production migration; the status-CHECK
+        // mirrors changeSet 13 (mentor-1071-tighten-metadata-status-check) verbatim.
         try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
             stmt.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ux_chat_message_in_flight " +
                     "ON chat_message (thread_id) WHERE (metadata ->> 'status') = 'in_flight'"
+            );
+            // Drop-then-add so a previous run's constraint (different shape, e.g. after a
+            // migration edit) doesn't survive across tests. `IF EXISTS` keeps fresh DBs happy.
+            stmt.execute("ALTER TABLE chat_message DROP CONSTRAINT IF EXISTS chk_chat_message_metadata_status");
+            stmt.execute(
+                "ALTER TABLE chat_message ADD CONSTRAINT chk_chat_message_metadata_status " +
+                    "CHECK (" +
+                    "metadata IS NULL OR NOT jsonb_exists(metadata, 'status') " +
+                    "OR (metadata->>'status') IN ('in_flight', 'completed', 'interrupted'))"
             );
         }
         workspace = new Workspace();
@@ -435,5 +444,32 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             .contains("mentor-1071-add-version-column")
             .contains("name=\"version\"")
             .contains("type=\"BIGINT\"");
+    }
+
+    @Test
+    @DisplayName("chk_chat_message_metadata_status rejects values outside (in_flight,completed,interrupted)")
+    void metadataStatusCheckConstraintFires() throws Exception {
+        // Pin the production DB-level guard. The migration's CHECK constraint is the only
+        // backstop that catches a future writer typo'ing `"in_flite"` or inventing a new
+        // status without a matching application-side state machine update. The integration
+        // test profile recreates the constraint in @BeforeEach so this assertion exercises
+        // the real predicate, not just a JPA validation hook.
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "constraint test");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> {
+            try (
+                var conn = dataSource.getConnection();
+                var stmt = conn.prepareStatement(
+                    "INSERT INTO chat_message (id, thread_id, role, parts, created_at, version, metadata) " +
+                        "VALUES (?, ?, 'ASSISTANT', '[]'::jsonb, now(), 0, ?::jsonb)"
+                )
+            ) {
+                stmt.setObject(1, UUID.randomUUID());
+                stmt.setObject(2, thread.getId());
+                stmt.setString(3, "{\"status\": \"bogus_status_value\"}");
+                stmt.executeUpdate();
+            }
+        })
+            .isInstanceOf(java.sql.SQLException.class)
+            .hasMessageContaining("chk_chat_message_metadata_status");
     }
 }
