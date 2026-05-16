@@ -13,11 +13,6 @@ export interface WorkspaceFeatures {
 	leaguesEnabled: boolean;
 }
 
-/**
- * Returns the feature flags for the active workspace.
- * Reads from the listWorkspaces query cache (same query as useActiveWorkspaceSlug).
- * Defaults all flags to true while loading to prevent sidebar flicker.
- */
 export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean } {
 	const { selectedSlug } = useWorkspaceStore();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -37,10 +32,11 @@ export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean
 	};
 }
 
-/**
- * Extracts feature flags from a WorkspaceListItem.
- * Defaults all to true when workspace is undefined (loading state).
- */
+// Loading defaults: optimistic (true) for features whose UI surfaces are visible by default —
+// flickering them off-then-on during load is worse than briefly showing a row that's about to
+// be hidden. Pessimistic (false) for opt-in features whose UI must NOT appear unless explicitly
+// granted (mentor, leagues). The chosen value for each field is the same as the post-load
+// behavior most workspaces will see, so the typical render is flicker-free.
 export function getWorkspaceFeatures(workspace?: WorkspaceListItem): WorkspaceFeatures {
 	return {
 		practicesEnabled: workspace?.practicesEnabled ?? true,

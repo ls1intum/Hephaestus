@@ -35,13 +35,10 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Integration coverage for {@link MentorTurnPersistence}. Validates the REQUIRES_NEW
- * transactional contract end-to-end against a real Postgres container, covering the
- * code paths the unit tests cannot exercise (DB unique partial index, JSONB metadata
- * round-trip, status transitions, reaper sweep).
+ * Validates the {@link MentorTurnPersistence} REQUIRES_NEW contract end-to-end against a real
+ * Postgres container: DB unique partial index, JSONB metadata round-trip, status transitions,
+ * reaper sweep.
  */
-// Mentor beans are gated on `hephaestus.sandbox.enabled`; flip it on here so the
-// MentorTurnPersistence + dependent beans register, then provide a mock InteractiveSandboxService.
 @TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
 @DisplayName("MentorTurnPersistence integration")
 class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {

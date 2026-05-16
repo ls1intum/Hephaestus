@@ -1,4 +1,8 @@
-import { AdminFeaturesSettings, type FeatureKey } from "./AdminFeaturesSettings";
+import {
+	AdminFeaturesSettings,
+	type FeatureKey,
+	type FeatureValues,
+} from "./AdminFeaturesSettings";
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 
@@ -20,22 +24,11 @@ export interface AdminSettingsPageProps {
 	onAddRepository: (nameWithOwner: string) => void;
 	onRemoveRepository: (nameWithOwner: string) => void;
 	onResetLeagues: () => void;
-	// Feature flags
-	practicesEnabled: boolean;
-	mentorEnabled: boolean;
-	achievementsEnabled: boolean;
-	leaderboardEnabled: boolean;
-	progressionEnabled: boolean;
-	leaguesEnabled: boolean;
-	practiceReviewAutoTriggerEnabled: boolean;
-	practiceReviewManualTriggerEnabled: boolean;
+	features: FeatureValues;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
 }
 
-/**
- * Presentational component for the admin settings page
- */
 export function AdminSettingsPage({
 	repositories,
 	isLoadingRepositories,
@@ -48,14 +41,7 @@ export function AdminSettingsPage({
 	onAddRepository,
 	onRemoveRepository,
 	onResetLeagues,
-	practicesEnabled,
-	mentorEnabled,
-	achievementsEnabled,
-	leaderboardEnabled,
-	progressionEnabled,
-	leaguesEnabled,
-	practiceReviewAutoTriggerEnabled,
-	practiceReviewManualTriggerEnabled,
+	features,
 	isSavingFeatures,
 	onToggleFeature,
 }: AdminSettingsPageProps) {
@@ -64,21 +50,12 @@ export function AdminSettingsPage({
 			<h1 className="text-3xl font-bold mb-8">Workspace Settings</h1>
 
 			<div className="space-y-10">
-				{/* Features Settings */}
 				<AdminFeaturesSettings
-					practicesEnabled={practicesEnabled}
-					mentorEnabled={mentorEnabled}
-					achievementsEnabled={achievementsEnabled}
-					leaderboardEnabled={leaderboardEnabled}
-					progressionEnabled={progressionEnabled}
-					leaguesEnabled={leaguesEnabled}
-					practiceReviewAutoTriggerEnabled={practiceReviewAutoTriggerEnabled}
-					practiceReviewManualTriggerEnabled={practiceReviewManualTriggerEnabled}
+					values={features}
 					isSaving={isSavingFeatures}
 					onToggle={onToggleFeature}
 				/>
 
-				{/* Repositories Settings */}
 				<AdminRepositoriesSettings
 					repositories={repositories}
 					isLoading={isLoadingRepositories}
@@ -91,8 +68,7 @@ export function AdminSettingsPage({
 					onRemoveRepository={onRemoveRepository}
 				/>
 
-				{/* Leagues Settings — only shown when leagues feature is enabled */}
-				{leaguesEnabled && (
+				{features.leaguesEnabled && (
 					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
 				)}
 			</div>

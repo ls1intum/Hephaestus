@@ -76,42 +76,22 @@ public class MentorChatService {
     private final MentorChatMetrics metrics;
 
     /**
-     * Submit a turn to the mentor virtual-thread executor and return immediately. Lifecycle
-     * callbacks on {@code emitter} flip a per-turn "client gone" flag so the runner subscription
-     * keeps draining to completion (for cost accounting) but no further SSE writes are attempted.
-     *
-     * <p>The shared {@code clientHolder} lets the SSE lifecycle (which fires on the request
-     * thread, possibly before the runner is even attached) ask Pi to stop generating once the
-     * client is gone. {@code session.abort()} is documented idempotent; calling it after the
-     * turn has naturally completed is harmless.
+     * Submit a turn to the virtual-thread executor and return. {@code clientHolder} lets the
+     * SSE disconnect hook abort Pi even when the runner client is attached after bindLifecycle
+     * (which fires synchronously) — {@code session.abort()} is documented idempotent.
      */
     public void start(MentorTurnRequest request, SseEmitter emitter) {
-        // SecurityContext propagates to the vthread executor via
-        // {@link MentorChatExecutorConfig.MentorTurnExecutor}'s
-        // {@link DelegatingSecurityContextExecutorService} wrapper, so
-        // {@code userRepository.getCurrentUserElseThrow()} called inside {@code runTurn} sees
-        // the same authentication the controller's @PreAuthorize verified. No explicit
-        // capture-and-pass needed.
         MentorSseChannel channel = new MentorSseChannel(emitter, objectMapper, runnerTimeoutScheduler.scheduler());
         channel.bindLifecycle();
         AtomicReference<MentorRunnerClient> clientHolder = new AtomicReference<>();
-        // Hook captures `clientHolder` because the runner client is attached AFTER bindLifecycle
-        // runs (so the lifecycle callbacks can flip the channel before the runner exists).
-        // session.abort() is idempotent; if clientHolder is still null when the hook fires
-        // (race window), abortRunnerOnDisconnect short-circuits and the natural runtime later
-        // attaches a client that will be torn down via runTurn's finally instead.
         channel.onDisconnect(() -> abortRunnerOnDisconnect(clientHolder.get(), request.threadId()));
 
-        // Record-started fires here (not inside the executor task) so the started/completed
-        // totals balance even on the RejectedExecutionException branch below.
+        // Record-started fires here so started/completed balance on the executor-rejected branch.
         metrics.recordStarted();
         ExecutorService executor = turnExecutor.executor();
         try {
             executor.execute(() -> dispatchTurn(request, channel, clientHolder));
         } catch (RejectedExecutionException rejected) {
-            // Executor shut down (PreDestroy / context refresh) — we already wrote the
-            // SSE response headers, so the only honest move is to send a clean Error chunk
-            // plus the AI-SDK [DONE] sentinel before completing the emitter.
             log.warn("Mentor turn rejected by executor (probably shutting down): {}", rejected.getMessage());
             metrics.recordCompleted(MentorChatMetrics.Outcome.REJECTED);
             channel.completeWithError("Mentor service is shutting down — please retry shortly.");
@@ -124,10 +104,8 @@ public class MentorChatService {
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
         MentorTurnLock.ThreadKey key = new MentorTurnLock.ThreadKey(request.workspaceId(), request.threadId());
-        // Outer try/catch covers *any* unchecked throwable that can escape `turnLock.withLockOr409`
-        // itself (e.g. a future ConcurrentHashMap.compute that throws an OOME or any code path
-        // outside the lambda). Without it, an uncaught throwable would leave `started` incremented,
-        // `completed` not, and the SseEmitter dangling until EMITTER_TIMEOUT_MS (10 min) fires.
+        // Outer catch: anything that escapes the lock helper itself (not the lambda) would leave
+        // started/completed metrics unbalanced and the emitter dangling for EMITTER_TIMEOUT_MS.
         try {
             Optional<Boolean> acquired = turnLock.withLockOr409(key, () -> {
                 Timer.Sample sample = metrics.startTimer();
@@ -136,9 +114,7 @@ public class MentorChatService {
                     metrics.recordCompleted(outcome);
                     return Boolean.TRUE;
                 } catch (TurnAlreadyInFlightException dup) {
-                    // WARN, not INFO: hitting the DB unique partial index means the JVM-local
-                    // lock missed — typically a replica-affinity miss across pods. That's a
-                    // correctness signal worth paging on, not a routine event.
+                    // WARN (not INFO): DB index trip means the JVM lock missed — pageable signal.
                     log.warn("Mentor turn rejected (DB in-flight index): {}", dup.getMessage());
                     metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_DB);
                     channel.completeWithConflict();
@@ -208,8 +184,6 @@ public class MentorChatService {
         MentorSseChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
-        // SecurityContext propagates from the request thread via the executor's
-        // DelegatingSecurityContextExecutorService wrapper.
         User user = userRepository.getCurrentUserElseThrow();
         ChatThread thread = persistence.ensureThread(
             request.workspaceId(),

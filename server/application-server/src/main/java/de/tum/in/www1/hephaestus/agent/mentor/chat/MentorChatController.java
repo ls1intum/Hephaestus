@@ -53,25 +53,15 @@ public class MentorChatController {
         @RequestBody MentorChatRequestBody body,
         HttpServletResponse response
     ) {
-        // Per-workspace feature gate. Mirrors PracticeReviewDetectionGate (`workspace.features
-        // .practicesEnabled`); 404 (not 403) when disabled because the resource semantically does
-        // not exist for the workspace. EntityNotFoundException (NOT ResponseStatusException) is
-        // the project's NOT_FOUND idiom — GlobalControllerAdvice maps it to RFC-7807 problem+json;
-        // ResponseStatusException falls through to the 500 generic handler. The check is cheap
-        // (single PK lookup, no FETCH JOIN because features is @Embedded).
         boolean mentorEnabled = workspaceRepository
             .findById(workspaceContext.id())
             .map(w -> Boolean.TRUE.equals(w.getFeatures().getMentorEnabled()))
             .orElse(false);
         if (!mentorEnabled) {
-            log.debug("Mentor chat: workspace {} has mentorEnabled=false, returning 404", workspaceContext.id());
             throw new EntityNotFoundException("Mentor chat", workspaceContext.slug());
         }
 
-        // Headers must lock in BEFORE we send any chunk on the short-circuit path —
-        // SseEmitter#send commits the response once flushed, so a missing
-        // {@code x-vercel-ai-ui-message-stream: v1} header would cause the AI-SDK transport
-        // to reject the whole stream client-side.
+        // Set protocol header before any SseEmitter#send — the first send commits the response.
         applyProtocolHeaders(response);
 
         String userMessage = extractUserMessage(body.message());
@@ -122,10 +112,9 @@ public class MentorChatController {
     }
 
     /**
-     * Extract the client-supplied UIMessage id. The webapp's AI SDK transport mints a UUID per
-     * outbound message; persisting it is required for vote / regenerate / refresh reconciliation
-     * (otherwise the client's optimistic row never resolves to the server-side id). Null and
-     * non-UUID values fall back to a server-side mint inside the persistence layer.
+     * Extract the client-supplied UIMessage id (mint per outbound message in the AI-SDK
+     * transport). Persistence requires it so the client's optimistic row resolves to the
+     * server-side id for vote/regenerate. Null/non-UUID values fall back to a server-side mint.
      */
     private static UUID extractMessageId(JsonNode message) {
         if (message == null || !message.isObject()) return null;
@@ -143,16 +132,11 @@ public class MentorChatController {
         return node.has(field) && node.get(field).isTextual() ? node.get(field).asText() : null;
     }
 
-    /**
-     * Emit a single {@code error} chunk and close the emitter. Uses {@link ObjectMapper}
-     * to encode so a backslash or quote inside {@code errorText} survives unescaped — the
-     * earlier hand-rolled JSON concatenation only escaped naive double quotes.
-     */
+    /** Emit one error chunk + the AI-SDK [DONE] sentinel; complete the emitter. */
     private void shortCircuitError(SseEmitter emitter, String errorText) {
         try {
             String json = objectMapperBean.writeValueAsString(new UIMessageChunk.Error(errorText));
             emitter.send(SseEmitter.event().data(json));
-            // AI-SDK closes the stream on the [DONE] sentinel; every terminal path emits it.
             emitter.send(SseEmitter.event().data("[DONE]"));
         } catch (Exception ignored) {
             log.debug("Short-circuit emitter send failed; client disconnected");

@@ -19,14 +19,10 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 	component: AdminSettings,
 });
 
-// Define the repository item type
 type RepositoryItem = {
 	nameWithOwner: string;
 };
 
-/**
- * Admin settings route component with data fetching and state management
- */
 function AdminSettings() {
 	const queryClient = useQueryClient();
 	const {
@@ -91,7 +87,6 @@ function AdminSettings() {
 	const resetLeagues = useMutation({
 		...resetAndRecalculateLeaguesMutation(),
 		onSuccess: () => {
-			// Consider what queries need invalidation after leagues reset
 			queryClient.invalidateQueries({ queryKey: ["workspace"] });
 		},
 	});
@@ -176,14 +171,17 @@ function AdminSettings() {
 				}
 				resetLeagues.mutate({ path: { workspaceSlug } });
 			}}
-			practicesEnabled={workspaceData?.practicesEnabled ?? false}
-			mentorEnabled={workspaceData?.mentorEnabled ?? false}
-			achievementsEnabled={workspaceData?.achievementsEnabled ?? false}
-			leaderboardEnabled={workspaceData?.leaderboardEnabled ?? false}
-			progressionEnabled={workspaceData?.progressionEnabled ?? false}
-			leaguesEnabled={workspaceData?.leaguesEnabled ?? false}
-			practiceReviewAutoTriggerEnabled={workspaceData?.practiceReviewAutoTriggerEnabled ?? true}
-			practiceReviewManualTriggerEnabled={workspaceData?.practiceReviewManualTriggerEnabled ?? true}
+			features={{
+				practicesEnabled: workspaceData?.practicesEnabled ?? false,
+				mentorEnabled: workspaceData?.mentorEnabled ?? false,
+				achievementsEnabled: workspaceData?.achievementsEnabled ?? false,
+				leaderboardEnabled: workspaceData?.leaderboardEnabled ?? false,
+				progressionEnabled: workspaceData?.progressionEnabled ?? false,
+				leaguesEnabled: workspaceData?.leaguesEnabled ?? false,
+				practiceReviewAutoTriggerEnabled: workspaceData?.practiceReviewAutoTriggerEnabled ?? true,
+				practiceReviewManualTriggerEnabled:
+					workspaceData?.practiceReviewManualTriggerEnabled ?? true,
+			}}
 			isSavingFeatures={updateFeatures.isPending}
 			onToggleFeature={handleToggleFeature}
 		/>

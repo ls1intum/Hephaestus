@@ -37,10 +37,6 @@ public class MentorChatExecutorConfig {
 
     @Bean(destroyMethod = "")
     MentorTurnExecutor mentorTurnExecutor() {
-        // Production wrapping: the vthread executor is decorated with
-        // DelegatingSecurityContextExecutorService so the request thread's authentication
-        // is available inside `runTurn` (and any future call from this executor that needs
-        // SecurityContextHolder).
         return new MentorTurnExecutor(Executors.newVirtualThreadPerTaskExecutor(), true);
     }
 
@@ -50,36 +46,21 @@ public class MentorChatExecutorConfig {
     }
 
     /**
-     * Virtual-thread executor for mentor turns, wrapped with
-     * {@link DelegatingSecurityContextExecutorService} so the request thread's
-     * {@code SecurityContext} propagates to the vthread. Without the wrapper,
-     * {@code SecurityContextHolder} (MODE_THREADLOCAL) returns an empty context on every
-     * vthread, and {@code userRepository.getCurrentUserElseThrow()} masks as a turn failure.
-     *
-     * <p>Implements {@link DisposableBean} so Spring shuts the underlying raw executor down
-     * gracefully on context refresh / app stop — the wrapper itself doesn't expose lifecycle.
+     * Virtual-thread executor wrapped with {@link DelegatingSecurityContextExecutorService} so
+     * the request thread's authentication propagates into {@code runTurn} — without it,
+     * {@code SecurityContextHolder} (MODE_THREADLOCAL) is empty on every vthread.
      */
     static final class MentorTurnExecutor implements DisposableBean {
 
         private final ExecutorService rawDelegate;
         private final ExecutorService delegate;
 
-        /**
-         * Package-private test seam — let tests inject a synchronous executor without
-         * reflection. Tests run on the main thread which already carries the test
-         * {@code SecurityContext}, so we deliberately skip the propagation wrapper there to
-         * keep the test surface simple.
-         */
+        /** Test seam: bare delegate, skip the propagation wrapper (main-thread tests). */
         MentorTurnExecutor(ExecutorService delegate) {
             this.rawDelegate = delegate;
             this.delegate = delegate;
         }
 
-        /**
-         * Production-only secondary constructor: wraps the raw executor with the Spring
-         * Security propagation decorator. Kept separate from the default constructor so the
-         * test seam above remains a bare delegate.
-         */
         private MentorTurnExecutor(ExecutorService raw, boolean propagateSecurityContext) {
             this.rawDelegate = raw;
             this.delegate = propagateSecurityContext ? new DelegatingSecurityContextExecutorService(raw) : raw;
@@ -92,9 +73,7 @@ public class MentorChatExecutorConfig {
         @PreDestroy
         @Override
         public void destroy() {
-            // Shut down the RAW executor directly — DelegatingSecurityContextExecutorService
-            // delegates lifecycle, but going through the raw reference makes ownership
-            // explicit and removes a layer of indirection from shutdown reasoning.
+            // Shut down the raw executor directly — the wrapper just delegates lifecycle.
             rawDelegate.shutdown();
             try {
                 if (!rawDelegate.awaitTermination(10, TimeUnit.SECONDS)) {

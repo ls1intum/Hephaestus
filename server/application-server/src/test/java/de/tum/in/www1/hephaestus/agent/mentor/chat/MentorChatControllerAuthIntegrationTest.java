@@ -27,16 +27,10 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Integration test that proves the mentor SSE endpoint is correctly guarded by both the
- * {@code WorkspaceContextFilter} (workspace-membership pre-check) and the controller-level
- * {@code @PreAuthorize("@workspaceSecure.isMember()")} expression. The audit caught that the
- * existing unit-level {@code MentorChatControllerTest} bypasses Spring Security entirely — this
- * test fires the real filter chain so a future regression that removes either guard surfaces
- * here, not in production.
+ * Fires the real filter chain so the SSE endpoint's two guards — WorkspaceContextFilter
+ * membership pre-check and the {@code @PreAuthorize("@workspaceSecure.isMember()")} expression
+ * — survive future regressions.
  */
-// Mentor beans are gated on `hephaestus.sandbox.enabled` (the same property that loads the
-// Docker SPI in production). Tests flip it on here and provide an @MockitoBean
-// InteractiveSandboxService below so the mentor bean graph resolves without a real container.
 @TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
 @AutoConfigureWebTestClient
 @DisplayName("MentorChatController auth integration")
@@ -45,9 +39,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     @Autowired
     private WebTestClient webTestClient;
 
-    // The Pi sandbox SPI is only auto-configured in profiles that have Docker available.
-    // The test profile doesn't provide one; mock it so the mentor controller's bean graph
-    // resolves without us having to wire a real container or stub adapter.
     @MockitoBean
     private InteractiveSandboxService interactiveSandboxService;
 
@@ -86,8 +77,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     @Test
     @DisplayName("unauthenticated POST → 401 (filter rejects before controller handler runs)")
     void unauthenticated_returnsUnauthorized() {
-        // The workspace itself doesn't even need to exist: WorkspaceContextFilter short-circuits
-        // on missing auth before it tries to resolve the slug.
         webTestClient
             .post()
             .uri("/workspaces/{workspaceSlug}/mentor/chat", "any-slug")
@@ -102,10 +91,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     @WithMentorUser
     @DisplayName("authenticated non-member → 403 (filter rejects with FORBIDDEN_MEMBERSHIP)")
     void authenticatedButNotMember_returnsForbidden() {
-        // Mentor user exists; workspace exists owned by someone else; mentor is NOT a member.
-        // The membership-403 path is the entire reason `@PreAuthorize("@workspaceSecure.isMember()")`
-        // exists as a belt-and-braces guard — if anyone ever removes `@WorkspaceScopedController`
-        // from the controller (turning off the filter prefix), this test would catch the regression.
         persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-test");
         Workspace workspace = createWorkspace("mentor-auth-space", "MentorAuth", "mentor-auth", AccountType.ORG, owner);
@@ -124,24 +109,15 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
 
     @Test
     @WithMentorUser
-    @DisplayName("authenticated member → 200 SSE with AI-SDK header (real filter chain + SecurityContext propagation)")
+    @DisplayName("authenticated member → 200 SSE with AI-SDK header and service is dispatched")
     void authenticatedMember_returnsOkSseStreamAndDispatchesService() throws Exception {
-        // This test exercises the FULL request path that
-        // DelegatingSecurityContextExecutorService is load-bearing for: the controller fires, the
-        // service is invoked, and the AI-SDK protocol header is set on the response. The
-        // service itself is mocked so we don't need a Docker sandbox; we assert it WAS
-        // called (proves the auth path is wide open), and assert the header (proves the
-        // controller's protocol contract). The membership lookup goes through the real
-        // SecurityContext / WorkspaceContextFilter path.
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-happy");
         Workspace workspace = createWorkspace("mentor-happy-space", "Happy", "mentor-happy", AccountType.ORG, owner);
         enableMentor(workspace);
         ensureWorkspaceMembership(workspace, mentor, WorkspaceMembership.WorkspaceRole.MEMBER);
 
-        // The mocked service is responsible for completing the emitter — otherwise
-        // WebTestClient blocks indefinitely on the SSE body. Real service path is unit-tested
-        // separately; here we only need to prove the controller dispatched a request to it.
+        // Mocked service must complete the emitter or WebTestClient blocks on the SSE body.
         doAnswer(inv -> {
             SseEmitter emitter = inv.getArgument(1);
             emitter.send(SseEmitter.event().data("[DONE]"));
@@ -168,9 +144,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
             .expectHeader()
             .valueEquals("Cache-Control", "no-cache");
 
-        // Service was invoked — proves auth admitted us and the dispatcher reached the
-        // controller body. timeout() because the controller submits async and returns; the
-        // service call lands on the virtual-thread executor a few ms later.
+        // timeout() because the controller submits to a vthread executor and returns.
         verify(mentorChatService, timeout(2_000)).start(any(), any());
     }
 
@@ -178,9 +152,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     @WithMentorUser
     @DisplayName("authenticated member of workspace with mentorEnabled=false → 404 (per-workspace gate)")
     void authenticatedMember_mentorDisabled_returnsNotFound() {
-        // Per-workspace feature gate must block even an authenticated, fully-permitted member
-        // when the workspace admin has not opted in to mentor. Mirrors the practicesEnabled
-        // model on PracticeReviewDetectionGate. NOT enabling mentor here is the entire point.
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-disabled");
         Workspace workspace = createWorkspace(
@@ -190,7 +161,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
             AccountType.ORG,
             owner
         );
-        // Intentionally NOT calling enableMentor(workspace).
+        // Deliberately NOT enabling mentor — the gate is what we're asserting.
         ensureWorkspaceMembership(workspace, mentor, WorkspaceMembership.WorkspaceRole.MEMBER);
 
         webTestClient

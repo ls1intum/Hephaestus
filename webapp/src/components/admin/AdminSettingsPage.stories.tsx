@@ -1,81 +1,23 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
+import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
 
-/**
- * Admin settings page component that combines repository management and league settings
- */
+const allOff: FeatureValues = {
+	practicesEnabled: false,
+	mentorEnabled: false,
+	achievementsEnabled: false,
+	leaderboardEnabled: false,
+	progressionEnabled: false,
+	leaguesEnabled: false,
+	practiceReviewAutoTriggerEnabled: true,
+	practiceReviewManualTriggerEnabled: true,
+};
+
 const meta = {
 	component: AdminSettingsPage,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
-	argTypes: {
-		repositories: {
-			control: "object",
-			description: "List of repositories to display",
-		},
-		isLoadingRepositories: {
-			control: "boolean",
-			description: "Whether repositories are loading",
-		},
-		repositoriesError: {
-			control: "object",
-			description: "Error that occurred while loading repositories",
-		},
-		addRepositoryError: {
-			control: "object",
-			description: "Error that occurred while adding a repository",
-		},
-		isAddingRepository: {
-			control: "boolean",
-			description: "Whether a repository is currently being added",
-		},
-		isRemovingRepository: {
-			control: "boolean",
-			description: "Whether a repository is currently being removed",
-		},
-		isResettingLeagues: {
-			control: "boolean",
-			description: "Whether leagues are currently being reset",
-		},
-		isAppInstallationWorkspace: {
-			control: "boolean",
-			description:
-				"Whether repository management is disabled (for GitHub App Installation workspaces)",
-		},
-		onAddRepository: {
-			description: "Function called when adding a repository",
-		},
-		onRemoveRepository: {
-			description: "Function called when removing a repository",
-		},
-		onResetLeagues: {
-			description: "Function called when resetting leagues",
-		},
-		practicesEnabled: {
-			control: "boolean",
-			description: "Whether best practices feature is enabled",
-		},
-		achievementsEnabled: {
-			control: "boolean",
-			description: "Whether achievements feature is enabled",
-		},
-		leaderboardEnabled: {
-			control: "boolean",
-			description: "Whether leaderboard feature is enabled",
-		},
-		progressionEnabled: {
-			control: "boolean",
-			description: "Whether progression/leagues feature is enabled",
-		},
-		isSavingFeatures: {
-			control: "boolean",
-			description: "Whether feature toggles are being saved",
-		},
-		onToggleFeature: {
-			description: "Function called when toggling a feature",
-		},
-	},
 	args: {
 		repositories: [
 			{ nameWithOwner: "octocat/Hello-World" },
@@ -92,14 +34,7 @@ const meta = {
 		onAddRepository: fn(),
 		onRemoveRepository: fn(),
 		onResetLeagues: fn(),
-		practicesEnabled: false,
-		mentorEnabled: false,
-		achievementsEnabled: false,
-		leaderboardEnabled: false,
-		progressionEnabled: false,
-		leaguesEnabled: false,
-		practiceReviewAutoTriggerEnabled: true,
-		practiceReviewManualTriggerEnabled: true,
+		features: allOff,
 		isSavingFeatures: false,
 		onToggleFeature: fn(),
 	},
@@ -108,67 +43,31 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default state of the admin settings page
- */
 export const Default: Story = {};
 
-/**
- * Loading state while fetching repositories
- */
 export const LoadingRepositories: Story = {
-	args: {
-		isLoadingRepositories: true,
-		repositories: [],
-	},
+	args: { isLoadingRepositories: true, repositories: [] },
 };
 
-/**
- * Error state when failing to load repositories
- */
 export const RepositoriesError: Story = {
-	args: {
-		repositoriesError: new Error("Failed to load repositories"),
-		repositories: [],
-	},
+	args: { repositoriesError: new Error("Failed to load repositories"), repositories: [] },
 };
 
-/**
- * Adding a repository loading state
- */
-export const AddingRepository: Story = {
-	args: {
-		isAddingRepository: true,
-	},
-};
+export const AddingRepository: Story = { args: { isAddingRepository: true } };
 
-/**
- * League reset loading state
- */
-export const ResettingLeagues: Story = {
-	args: {
-		isResettingLeagues: true,
-	},
-};
+export const ResettingLeagues: Story = { args: { isResettingLeagues: true } };
 
-/**
- * GitHub App Installation workspace with read-only repository management.
- * Repository add/remove controls are hidden and an info message is shown.
- */
-export const AppInstallationWorkspace: Story = {
-	args: {
-		isAppInstallationWorkspace: true,
-	},
-};
+/** GitHub App Installation workspace — repository management is read-only. */
+export const AppInstallationWorkspace: Story = { args: { isAppInstallationWorkspace: true } };
 
-/**
- * Practice review enabled with sub-toggle visibility.
- * Shows the full settings page with auto-trigger and manual trigger sub-toggles.
- */
+/** Practice Review on with auto-trigger only — exercises the nested sub-toggle layout. */
 export const PracticeReviewWithSubToggles: Story = {
 	args: {
-		practicesEnabled: true,
-		practiceReviewAutoTriggerEnabled: true,
-		practiceReviewManualTriggerEnabled: false,
+		features: {
+			...allOff,
+			practicesEnabled: true,
+			practiceReviewAutoTriggerEnabled: true,
+			practiceReviewManualTriggerEnabled: false,
+		},
 	},
 };

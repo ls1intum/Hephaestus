@@ -110,6 +110,7 @@ export function AppSidebar({
 					achievementsEnabled={activeWorkspace.achievementsEnabled}
 					leaderboardEnabled={activeWorkspace.leaderboardEnabled}
 				/>
+				{/* Mentor link requires BOTH the user-scoped Keycloak role and the per-workspace toggle. */}
 				{hasMentorAccess && activeWorkspace.mentorEnabled && (
 					<NavMentor workspaceSlug={activeWorkspace.workspaceSlug} />
 				)}

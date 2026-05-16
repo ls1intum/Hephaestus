@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Per-workspace mentor toggle. Mirrors workspace.practices_enabled. -->
+    <changeSet id="mentor-1071-workspace-mentor-enabled" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.mentor_enabled already exists">
+            <not><columnExists tableName="workspace" columnName="mentor_enabled"/></not>
+        </preConditions>
+        <addColumn tableName="workspace">
+            <column name="mentor_enabled" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="workspace" columnName="mentor_enabled"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

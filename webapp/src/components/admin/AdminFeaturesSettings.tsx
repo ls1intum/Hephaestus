@@ -4,16 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
 export type FeatureKey = keyof UpdateWorkspaceFeaturesRequest;
+export type FeatureValues = Record<FeatureKey, boolean>;
 
 export interface AdminFeaturesSettingsProps {
-	practicesEnabled: boolean;
-	mentorEnabled: boolean;
-	achievementsEnabled: boolean;
-	leaderboardEnabled: boolean;
-	progressionEnabled: boolean;
-	leaguesEnabled: boolean;
-	practiceReviewAutoTriggerEnabled: boolean;
-	practiceReviewManualTriggerEnabled: boolean;
+	values: FeatureValues;
 	isSaving: boolean;
 	onToggle: (feature: FeatureKey, enabled: boolean) => void;
 }
@@ -71,29 +65,7 @@ const FEATURES: ReadonlyArray<FeatureDefinition> = [
 	},
 ];
 
-export function AdminFeaturesSettings({
-	practicesEnabled,
-	mentorEnabled,
-	achievementsEnabled,
-	leaderboardEnabled,
-	progressionEnabled,
-	leaguesEnabled,
-	practiceReviewAutoTriggerEnabled,
-	practiceReviewManualTriggerEnabled,
-	isSaving,
-	onToggle,
-}: AdminFeaturesSettingsProps) {
-	const values: Record<FeatureKey, boolean> = {
-		practicesEnabled,
-		mentorEnabled,
-		achievementsEnabled,
-		leaderboardEnabled,
-		progressionEnabled,
-		leaguesEnabled,
-		practiceReviewAutoTriggerEnabled,
-		practiceReviewManualTriggerEnabled,
-	};
-
+export function AdminFeaturesSettings({ values, isSaving, onToggle }: AdminFeaturesSettingsProps) {
 	return (
 		<div className="space-y-6">
 			<div>
