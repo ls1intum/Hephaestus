@@ -253,14 +253,15 @@ async function ensureRuntime() {
                   })
                 : new DefaultResourceLoader({ cwd, agentDir: agentDir });
             await loader.reload();
-            // Mentor needs only fetch_context + link_finding; Pi's default read/bash/edit/write
-            // are dangerous in a shared container and are denied explicitly here.
+            // Built-in read/bash/grep let the mentor explore the read-only repo checkout
+            // at /workspace/repo/ (git log, diffs, file contents). edit/write are denied —
+            // the mentor is an observer, not a code author.
             const result = await createAgentSessionFromServices({
                 services,
                 sessionManager,
                 sessionStartEvent,
                 customTools: [fetchContextTool, linkFindingTool],
-                tools: ["fetch_context", "link_finding"],
+                tools: ["fetch_context", "link_finding", "read", "bash", "grep"],
                 resourceLoader: loader,
             });
             return { ...result, services, diagnostics: services.diagnostics };

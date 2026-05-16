@@ -176,6 +176,15 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
 
     @Override
     public Disposable subscribe(Consumer<JsonNode> listener) {
+        return subscribeInternal(listener, -1L);
+    }
+
+    @Override
+    public Disposable subscribeFromNow(Consumer<JsonNode> listener) {
+        return subscribeInternal(listener, ring.latestSequence());
+    }
+
+    private Disposable subscribeInternal(Consumer<JsonNode> listener, long replaySince) {
         // CLOSING: late add would leak its dispatcher — runClose has already drained subscriptions.
         AttachedSandboxState s = state.get();
         if (s != AttachedSandboxState.ATTACHED) {
@@ -205,7 +214,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
                 sub.dispose();
                 return sub;
             }
-            List<JsonNode> snapshot = ring.snapshotSince(-1L);
+            List<JsonNode> snapshot = ring.snapshotSince(replaySince);
             subscriptions.add(sub);
             sub.start();
             for (JsonNode frame : snapshot) {

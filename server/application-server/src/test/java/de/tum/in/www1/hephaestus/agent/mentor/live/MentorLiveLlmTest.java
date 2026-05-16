@@ -77,6 +77,7 @@ class MentorLiveLlmTest {
         "pi-mentor-runner.mjs"
     ).toAbsolutePath();
 
+    private final List<Path> workspaceDirs = new ArrayList<>();
     private Path workspaceDir;
     private StdioAttachedSandbox sandbox;
 
@@ -134,25 +135,11 @@ class MentorLiveLlmTest {
             sandbox.close(Duration.ofSeconds(5));
             sandbox = null;
         }
-        if (workspaceDir != null) {
-            // Each test stages a fresh /tmp/hephaestus-mentor-live-* with a runner copy +
-            // settings + symlinked node_modules. Leaking these across runs accumulates GBs of
-            // disposable state on CI agents that re-use volumes.
-            try (var stream = Files.walk(workspaceDir)) {
-                stream
-                    .sorted(java.util.Comparator.reverseOrder())
-                    .forEach(p -> {
-                        try {
-                            Files.deleteIfExists(p);
-                        } catch (java.io.IOException ignored) {
-                            // Best-effort cleanup; the OS-level tmp reaper catches the rest.
-                        }
-                    });
-            } catch (java.io.IOException ignored) {
-                // Workspace already gone — fine.
-            }
-            workspaceDir = null;
+        for (Path dir : workspaceDirs) {
+            deleteRecursive(dir);
         }
+        workspaceDirs.clear();
+        workspaceDir = null;
     }
 
     @Test
@@ -381,6 +368,77 @@ class MentorLiveLlmTest {
     }
 
     @Test
+    @DisplayName("tool use: agent uses read/bash to explore a staged git repo")
+    void toolUse_agentExploresRepoWithReadOrBash() throws Exception {
+        LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
+        UUID threadId = UUID.randomUUID();
+        UUID assistantMessageId = UUID.randomUUID();
+        workspaceDir = stageWorkspaceWithRepo(creds);
+
+        sandbox = spawnRunner(creds, workspaceDir);
+        var driver = new RunnerDriver(sandbox);
+        driver.expectRunnerReady();
+        driver.helloOk();
+        driver.openThread(threadId);
+
+        PiEventToUiChunkTranslator translator = new PiEventToUiChunkTranslator();
+        TranslatorState state = new TranslatorState(assistantMessageId);
+        List<UIMessageChunk> chunks = new ArrayList<>();
+        var done = new java.util.concurrent.CompletableFuture<Void>();
+        sandbox.subscribe(frame -> {
+            if (!isThreadEvent(frame, threadId)) return;
+            JsonNode event = frame.path("params").path("event");
+            chunks.addAll(translator.translate(event, state));
+            if ("agent_end".equals(event.path("type").asText())) {
+                done.complete(null);
+            }
+        });
+
+        driver.prompt(
+            threadId,
+            "Read the file at /workspace/repo/README.md and tell me what the project name is. " +
+                "You MUST use the read or bash tool to read the file. Do NOT guess."
+        );
+        done.get(TURN_TIMEOUT.toSeconds(), java.util.concurrent.TimeUnit.SECONDS);
+
+        // At least one tool was invoked.
+        List<UIMessageChunk.ToolInputStart> toolStarts = chunks
+            .stream()
+            .filter(UIMessageChunk.ToolInputStart.class::isInstance)
+            .map(UIMessageChunk.ToolInputStart.class::cast)
+            .toList();
+        assertThat(toolStarts)
+            .as("agent must invoke at least one tool (read or bash) to answer the question")
+            .isNotEmpty();
+
+        List<String> toolNames = toolStarts.stream().map(UIMessageChunk.ToolInputStart::toolName).toList();
+        assertThat(toolNames)
+            .as("tools used should include read, bash, or grep")
+            .anyMatch(name -> List.of("read", "bash", "grep").contains(name));
+        System.out.printf("[tool-use] tools invoked: %s%n", toolNames);
+
+        // Tool produced output (not error).
+        List<UIMessageChunk.ToolOutputAvailable> toolOutputs = chunks
+            .stream()
+            .filter(UIMessageChunk.ToolOutputAvailable.class::isInstance)
+            .map(UIMessageChunk.ToolOutputAvailable.class::cast)
+            .toList();
+        assertThat(toolOutputs).as("at least one tool call completed with output").isNotEmpty();
+
+        // Agent's text response should reference the planted content.
+        String text = chunks
+            .stream()
+            .filter(UIMessageChunk.TextDelta.class::isInstance)
+            .map(UIMessageChunk.TextDelta.class::cast)
+            .map(UIMessageChunk.TextDelta::delta)
+            .reduce("", String::concat);
+        System.out.printf("[tool-use] LLM response (%d chars): %s%n", text.length(), trim(text, 300));
+        assertThat(text.toLowerCase())
+            .as("agent must reference the project name from README.md (Hephaestus-Fixture)")
+            .contains("hephaestus");
+    }
+
+    @Test
     @DisplayName("session JSONL is byte-identical across cold restarts (prompt-cache prefix preserved)")
     void coldRestart_sessionJsonlIsByteIdentical() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
@@ -438,7 +496,8 @@ class MentorLiveLlmTest {
         Files.createDirectories(sessionFile.getParent());
         Files.write(sessionFile, sessionBytes);
 
-        deleteRecursive(workspaceDir);
+        // Keep the old workspace alive: the Pi SDK stores the CWD path in session JSONL, and
+        // switchSession validates that the stored path still exists on disk. @AfterEach cleans all.
         workspaceDir = nextWorkspace;
 
         sandbox = spawnRunner(creds, workspaceDir);
@@ -449,7 +508,7 @@ class MentorLiveLlmTest {
         return sessionFile;
     }
 
-    private static void deleteRecursive(Path root) throws IOException {
+    private static void deleteRecursive(Path root) {
         if (root == null || !Files.exists(root)) return;
         try (var stream = Files.walk(root)) {
             stream
@@ -457,11 +516,9 @@ class MentorLiveLlmTest {
                 .forEach(p -> {
                     try {
                         Files.deleteIfExists(p);
-                    } catch (IOException ignored) {
-                        // best-effort cleanup
-                    }
+                    } catch (IOException ignored) {}
                 });
-        }
+        } catch (IOException ignored) {}
     }
 
     /**
@@ -502,6 +559,7 @@ class MentorLiveLlmTest {
 
     private Path stageWorkspace(LiveLlmCredentials creds) throws IOException {
         Path tmp = Files.createTempDirectory("hephaestus-mentor-live-");
+        workspaceDirs.add(tmp);
         Files.createDirectories(tmp.resolve(".sessions"));
 
         // ESM resolution walks node_modules upward from the *importing* file, not from cwd. The
@@ -558,12 +616,61 @@ class MentorLiveLlmTest {
         return tmp;
     }
 
-    /** Encode a Java string as a JSON-safe literal for interpolation into TS/JS source. */
-    private static String jsonStringLiteral(String value) {
+    /**
+     * Like {@link #stageWorkspace}, but also creates a small git repo at {@code repo/} with a
+     * known README.md and uses the production system prompt so the agent knows about read/bash/grep.
+     */
+    private Path stageWorkspaceWithRepo(LiveLlmCredentials creds) throws IOException {
+        Path workspace = stageWorkspace(creds);
+
+        // Overwrite the minimal system prompt with the production one that lists available tools.
+        Path productionPrompt = Path.of("src", "main", "resources", "agent", "mentor", "system.md").toAbsolutePath();
+        if (Files.exists(productionPrompt)) {
+            Files.copy(productionPrompt, workspace.resolve("agent").resolve("mentor").resolve("system.md"),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        // Stage a small git repo with a known file the agent can read.
+        Path repoDir = workspace.resolve("repo");
+        Files.createDirectories(repoDir);
+        Files.writeString(repoDir.resolve("README.md"),
+            "# Hephaestus-Fixture\n\nA test project for validating mentor tool use.\n");
+        Files.writeString(repoDir.resolve("Main.java"),
+            "public class Main {\n    public static void main(String[] args) {\n" +
+                "        System.out.println(\"Hello from Hephaestus-Fixture!\");\n    }\n}\n");
+
+        // Initialize as a git repo so `git log`, `git diff` etc. work.
+        runGit(repoDir, "init");
+        runGit(repoDir, "add", ".");
+        runGit(repoDir, "commit", "-m", "initial commit", "--allow-empty-message");
+        return workspace;
+    }
+
+    private static void runGit(Path cwd, String... args) throws IOException {
+        List<String> cmd = new ArrayList<>();
+        cmd.add("git");
+        cmd.addAll(List.of(args));
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.directory(cwd.toFile());
+        pb.environment().put("GIT_AUTHOR_NAME", "test");
+        pb.environment().put("GIT_AUTHOR_EMAIL", "test@test.local");
+        pb.environment().put("GIT_COMMITTER_NAME", "test");
+        pb.environment().put("GIT_COMMITTER_EMAIL", "test@test.local");
+        pb.redirectErrorStream(true);
+        Process p;
         try {
-            return MAPPER.writeValueAsString(value);
+            p = pb.start();
         } catch (IOException e) {
-            throw new IllegalStateException("jackson cannot serialize a String — JVM is broken", e);
+            throw new IOException("git command failed to start: " + cmd, e);
+        }
+        try {
+            if (!p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                throw new IOException("git command timed out: " + cmd);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("git command interrupted: " + cmd, e);
         }
     }
 
@@ -581,64 +688,21 @@ class MentorLiveLlmTest {
         // Pi looks for settings under PI_CODING_AGENT_DIR; pin it inside our temp dir so the
         // runtime never touches the user's real ~/.pi.
         env.put("PI_CODING_AGENT_DIR", workspace.resolve(".pi-home").toString());
-        // The runner hard-codes the CWD constant to /workspace, but it only uses CWD for
-        // SESSIONS_DIR / SYSTEM_PROMPT_PATH lookups via `existsSync`. We patch by setting CWD to
-        // our workspace and letting the runner's existence checks fail gracefully (system prompt
-        // is optional). Actually — the runner does `mkdirSync(SESSIONS_DIR, { recursive: true })`
-        // which would create `/workspace/.sessions` and fail without root. So we override the
-        // path constants by symlinking the runner's expected /workspace into our temp dir if it
-        // doesn't exist, otherwise we copy.
+        // The runner hard-codes CWD/SESSIONS_DIR/SYSTEM_PROMPT_PATH to /workspace/... paths.
+        // ESM named imports (`import { mkdirSync } from "node:fs"`) capture bindings at module
+        // evaluation time, so a monkey-patch shim on the `fs` default export object does NOT
+        // affect them in Node 22+. Use the runner's own env var overrides instead.
+        env.put("MENTOR_RUNNER_CWD", workspace.toString());
+        env.put("MENTOR_RUNNER_SESSIONS_DIR", workspace.resolve(".sessions").toString());
+        env.put("MENTOR_RUNNER_SYSTEM_PROMPT_PATH",
+            workspace.resolve("agent").resolve("mentor").resolve("system.md").toString());
         pb.directory(workspace.toFile());
 
-        // The runner reads SESSIONS_DIR = "/workspace/.sessions" verbatim. There's no env override
-        // for that path in v1, so we either need root (to create /workspace) or to monkey-patch
-        // fs reads. The shim does the latter. It lives next to the staged runner so ESM
-        // resolution still picks up the workspace's node_modules symlink for both files.
-        Path shim = workspace.resolve("runner-entry.mjs");
-        Path stagedRunner = workspace.resolve("pi-mentor-runner.mjs");
-        Files.writeString(shim, buildRunnerShim(workspace, stagedRunner));
-        pb.command("node", shim.toString());
+        pb.command("node", workspace.resolve("pi-mentor-runner.mjs").toString());
 
         pb.redirectErrorStream(false);
         Process process = pb.start();
         return new StdioAttachedSandbox(UUID.randomUUID(), "live-test-user", "live-test-workspace", process);
-    }
-
-    /**
-     * Build a Node shim that monkey-patches {@code fs.existsSync} / {@code fs.mkdirSync} /
-     * {@code fs.readFileSync} to map {@code /workspace/*} reads onto the test temp dir, then
-     * imports the real {@code pi-mentor-runner.mjs}. This keeps the runner unmodified — we
-     * test the exact bytes that ship.
-     */
-    private static String buildRunnerShim(Path workspace, Path runner) {
-        // Use String.replace, not String.format, to avoid Java's % collisions with JS templates.
-        return """
-        import { createRequire } from "node:module";
-        import path from "node:path";
-        import fs from "node:fs";
-
-        const WORKSPACE_REAL = __WORKSPACE__;
-
-        // Pi mentor runner hard-codes "/workspace" as CWD. We can't easily mount a tmpfs at
-        // that path from inside the JVM-spawned process; instead, redirect every fs call that
-        // begins with "/workspace" to our real temp dir. This is shim-only — the production
-        // container has /workspace bind-mounted, no redirect needed.
-        function rewrite(p) {
-            if (typeof p !== "string") return p;
-            if (p === "/workspace") return WORKSPACE_REAL;
-            if (p.startsWith("/workspace/")) return WORKSPACE_REAL + p.substring("/workspace".length);
-            return p;
-        }
-        const origExists = fs.existsSync;
-        fs.existsSync = (p) => origExists(rewrite(p));
-        const origMkdir = fs.mkdirSync;
-        fs.mkdirSync = (p, opts) => origMkdir(rewrite(p), opts);
-        const origReadFile = fs.readFileSync;
-        fs.readFileSync = (p, opts) => origReadFile(rewrite(p), opts);
-
-        await import(__RUNNER_URL__);
-        """.replace("__WORKSPACE__", jsonStringLiteral(workspace.toString()))
-            .replace("__RUNNER_URL__", jsonStringLiteral(runner.toUri().toString()));
     }
 
     private static boolean isThreadEvent(JsonNode frame, UUID threadId) {

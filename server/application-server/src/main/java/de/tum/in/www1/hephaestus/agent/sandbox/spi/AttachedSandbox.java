@@ -37,6 +37,15 @@ public interface AttachedSandbox extends AutoCloseable {
      */
     Disposable subscribe(Consumer<JsonNode> listener);
 
+    /**
+     * Like {@link #subscribe}, but skips the ring-buffer replay and only delivers frames that
+     * arrive after the subscription is registered. Use this for subsequent turns on a reused
+     * sandbox to avoid replaying terminal events from prior turns.
+     */
+    default Disposable subscribeFromNow(Consumer<JsonNode> listener) {
+        return subscribe(listener);
+    }
+
     /** Wall-clock of the last frame in either direction. */
     Instant lastActivityAt();
 

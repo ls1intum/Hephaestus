@@ -102,7 +102,10 @@ public final class MentorRunnerClient implements AutoCloseable {
         if (subscription != null) {
             return;
         }
-        this.subscription = sandbox.subscribe(this::onFrame);
+        // subscribeFromNow: skip ring-buffer replay of frames from prior turns on the same
+        // reused sandbox. Without this, a second turn replays turn-1's agent_end event and
+        // completes instantly with stale data.
+        this.subscription = sandbox.subscribeFromNow(this::onFrame);
     }
 
     public CompletableFuture<JsonNode> hello() {
