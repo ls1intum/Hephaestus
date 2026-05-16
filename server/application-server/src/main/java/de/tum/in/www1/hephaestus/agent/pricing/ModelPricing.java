@@ -11,6 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 import org.springframework.lang.Nullable;
 
 /**
@@ -45,9 +46,11 @@ public class ModelPricing {
     @Column(name = "per_1k_output_usd", nullable = false, precision = 12, scale = 6)
     private BigDecimal per1kOutputUsd;
 
+    @ColumnDefault("0")
     @Column(name = "per_1k_cache_read_usd", precision = 12, scale = 6)
     private BigDecimal per1kCacheReadUsd;
 
+    @ColumnDefault("0")
     @Column(name = "per_1k_cache_write_usd", precision = 12, scale = 6)
     private BigDecimal per1kCacheWriteUsd;
 

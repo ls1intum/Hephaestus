@@ -30,6 +30,8 @@
         12. chat_message.status column (promoted from metadata)
         13. chat_thread.session_jsonl BYTEA (verbatim Pi session for cold-restart)
         14. drop chat_message_part (last — backfill is canonical, table now inert)
+        15. drop legacy `document` table (intelligence-service Pi-context store; obsolete after
+            the Pi mentor moves context loading into application-server providers)
     -->
 
     <!-- 1. JSONB column for AI-SDK UIMessage parts. Default '[]' so reads stay non-null
@@ -564,6 +566,46 @@
                 referencedTableName="chat_message"
                 referencedColumnNames="id"
                 onDelete="CASCADE"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 15. Drop the legacy `document` table. Created by the intelligence-service mentor
+         framework (changelog 1754979350893) to persist Pi-context fragments. Obsolete now
+         that intelligence-service is deleted and the Pi mentor loads context through the
+         JPA-side providers in `agent/context/providers/mentor/`. The FK on `user_id` and the
+         indices die with the table; precondition keeps the changeset idempotent in case it
+         was already dropped by a hand-run cleanup on staging. -->
+    <changeSet id="mentor-1071-drop-document" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="document table already dropped">
+            <tableExists tableName="document"/>
+        </preConditions>
+        <comment>Drop legacy intelligence-service `document` table (FKs and indices cascade)</comment>
+        <dropTable tableName="document" cascadeConstraints="true"/>
+        <rollback>
+            <createTable tableName="document">
+                <column name="id" type="UUID">
+                    <constraints nullable="false" primaryKey="true" primaryKeyName="documentPK"/>
+                </column>
+                <column name="version_number" type="INTEGER">
+                    <constraints nullable="false" primaryKey="true" primaryKeyName="documentPK"/>
+                </column>
+                <column name="content" type="TEXT"/>
+                <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE">
+                    <constraints nullable="false"/>
+                </column>
+                <column name="kind" type="VARCHAR(255)">
+                    <constraints nullable="false"/>
+                </column>
+                <column name="title" type="VARCHAR(255)">
+                    <constraints nullable="false"/>
+                </column>
+                <column name="user_id" type="BIGINT">
+                    <constraints nullable="false"/>
+                </column>
+                <column name="workspace_id" type="BIGINT">
+                    <constraints nullable="false"/>
+                </column>
+            </createTable>
         </rollback>
     </changeSet>
 

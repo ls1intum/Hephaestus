@@ -13,7 +13,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Type;
 import org.springframework.lang.NonNull;
@@ -124,10 +123,14 @@ public class ChatMessage {
     /**
      * AI SDK UIMessage parts as a JSONB array. Written verbatim by MentorChatService. NOT NULL +
      * JSONB-array CHECK enforced at the column level (changeset {@code mentor-1071-enforce-parts-shape}).
+     * DB-side default {@code '[]'::jsonb} is applied by Liquibase; the JPA-level
+     * {@link org.hibernate.annotations.ColumnDefault} is intentionally omitted because the
+     * Postgres typecast literal trips liquibase-hibernate6 4.33.0's diff snapshot (NPE on
+     * {@code LiquibaseDataType.getName()}). MentorChatService writes the column explicitly on
+     * every insert, so we never rely on Hibernate's omit-from-INSERT optimization.
      */
     @Type(JsonType.class)
     @Column(name = "parts", columnDefinition = "jsonb", nullable = false)
-    @ColumnDefault("'[]'::jsonb")
     private JsonNode parts;
 
     /**
