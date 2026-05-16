@@ -178,6 +178,10 @@ services:
   # Application Server - Spring Boot backend
   # Main app domain (set once): https://api.hephaestus.example.com
   # Previews auto-generate: https://{{pr_id}}.api.hephaestus.example.com
+  #
+  # Replica affinity: previews are single-replica by design, so the mentor sticky-cookie
+  # labels from docker/compose.app.yaml are intentionally omitted here — they would be a
+  # no-op. See docs/contributor/unified-pi-runtime.mdx.
   # ---------------------------------------------------------------------------
   application-server:
     build:
