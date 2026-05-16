@@ -135,14 +135,7 @@ public class ChatMessage {
     @ColumnDefault("'[]'::jsonb")
     private JsonNode parts;
 
-    /**
-     * Legacy normalised parts rows from the pre-Pi mentor era. Retained for read-path
-     * back-compat; new writers go via the {@link #parts} JSONB. The
-     * {@code chat_message_part} table is dropped in #1074.
-     */
-    // DB-side ON DELETE CASCADE on chat_message_part.message_id (migration
-    // mentor-1071-cascade-legacy-fks) covers parent-delete propagation; the JPA cascade would
-    // issue N per-row DELETEs for nothing. orphanRemoval kept for collection-mutation semantics.
+    /** Pre-Pi normalised parts; read-only back-compat until {@code chat_message_part} drops in #1074. */
     @Deprecated(forRemoval = true)
     @OneToMany(mappedBy = "message", fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("id.orderIndex ASC")
@@ -152,19 +145,9 @@ public class ChatMessage {
     private List<ChatMessagePart> legacyParts = new ArrayList<>();
 
     /**
-     * Optimistic-lock version. Bumped by Hibernate on every managed write; a
-     * {@code @Modifying} UPDATE (e.g. {@link ChatMessageRepository#reapStaleInFlight}) bumps it
-     * explicitly. Race scenarios covered:
-     * <ul>
-     *   <li><b>Reaper-vs-finalise</b>: reaper flips a stuck row to {@code interrupted} at
-     *       version=N; meanwhile the runner's late {@code finalise} re-saves the same row from
-     *       a stale (version=N-1) snapshot. Hibernate detects the version mismatch and throws
-     *       {@code OptimisticLockingFailureException}; the orchestrator logs and skips so the
-     *       reaper's verdict survives.</li>
-     *   <li><b>Finalise-vs-interrupt</b>: a successful finalise (version=N+1) is followed by a
-     *       stale-handler interrupt; same exception, same skip — no downgrade.</li>
-     * </ul>
-     * Replaces the prior {@code isStillInFlight} read-before-write TOCTOU check.
+     * Optimistic-lock version — Hibernate bumps on managed writes, {@code reapStaleInFlight}
+     * bumps explicitly. Stale-snapshot writers (reaper-vs-finalise, finalise-vs-interrupt) get
+     * {@code OptimisticLockingFailureException}; the orchestrator skips so the winner survives.
      */
     @org.hibernate.annotations.ColumnDefault("0")
     @jakarta.persistence.Version

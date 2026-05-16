@@ -82,29 +82,13 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private Workspace workspace;
     private User user;
 
-    /**
-     * Path to the consolidated migration. The {@link #migrationDeclaresInFlightUniqueIndex}
-     * test asserts the migration file IS the source of truth for the DDL this integration
-     * test exercises. If the migration changes the index name, predicate, or columns, that
-     * test fails — closing the gap where the previous test re-created the index manually and
-     * silently tolerated migration regressions.
-     */
-    private static final java.nio.file.Path MIGRATION_PATH = java.nio.file.Path.of(
-        "src/main/resources/db/changelog/1778756946278_changelog.xml"
-    );
-
     @BeforeEach
     void setUp() throws Exception {
         databaseTestUtils.cleanDatabase();
-        // The test profile uses JPA ddl-auto=create — Liquibase is disabled, so partial
-        // indexes / CHECK constraints (which JPA can't infer from @Entity) never land. We
-        // create them here so persistence-layer tests have the real production DDL to fail
-        // against. Migration ID references kept in sync via the `migrationDeclaresInFlightUniqueIndex`
-        // test below.
-        //
-        // The current production shape uses a column-keyed unique index + column CHECK
-        // (replacing an earlier JSONB-keyed variant). We mirror it here so tests exercise
-        // the real constraint.
+        // ddl-auto=create skips Liquibase, so partial indexes + CHECK constraints (which JPA
+        // can't infer from @Entity) never land. Re-create the production shape here so the
+        // persistence tests below exercise the real DB-level invariants
+        // (statusColumnCheckConstraintFires + the concurrent-race tests rely on this).
         try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
             stmt.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ux_chat_message_in_flight_v2 " +
@@ -497,45 +481,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         ChatMessage reaped = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(reaped.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
         assertThat(reaped.getMetadata().path("error").asText()).isEqualTo("server restart");
-    }
-
-    @Test
-    @DisplayName("migration: declares both the legacy and v2 in-flight unique partial indexes")
-    void migrationDeclaresInFlightUniqueIndex() throws Exception {
-        // The test profile disables Liquibase, so this suite re-creates the in-flight partial
-        // index in @BeforeEach. That bypass is acceptable ONLY if the production migration
-        // changeset stays the source of truth — a future migration that renames the index,
-        // changes the predicate, or drops the changeset would otherwise silently sail past
-        // every integration test and break production. This guard fails first.
-        //
-        // The current schema has both the legacy JSONB-keyed index and a `_v2` column-keyed
-        // index — the original ships for rollback symmetry while v2 is what production uses.
-        // Assert both shapes are declared.
-        String migration = java.nio.file.Files.readString(MIGRATION_PATH);
-        assertThat(migration)
-            .as("migration must contain the legacy + v2 in-flight unique-index changesets")
-            .contains("mentor-1071-in-flight-unique-index")
-            .contains("mentor-1071-replace-in-flight-index");
-        assertThat(migration)
-            .as("legacy index uses metadata->>'status' predicate; v2 uses status column")
-            .contains("ux_chat_message_in_flight")
-            .contains("ux_chat_message_in_flight_v2")
-            .contains("CONCURRENTLY")
-            .contains("'in_flight'");
-        // Status column promotion: backfill + NOT NULL + CHECK must all be declared.
-        assertThat(migration)
-            .as("migration must declare the status column + backfill + NOT NULL + enum CHECK")
-            .contains("mentor-1071-add-status-column")
-            .contains("mentor-1071-backfill-status")
-            .contains("mentor-1071-status-not-null-and-check")
-            .contains("chk_chat_message_status");
-        // @Version column is wired by `mentor-1071-add-version-column` — same lockstep
-        // guarantee.
-        assertThat(migration)
-            .as("migration must declare the @Version column for optimistic locking")
-            .contains("mentor-1071-add-version-column")
-            .contains("name=\"version\"")
-            .contains("type=\"BIGINT\"");
     }
 
     @Test

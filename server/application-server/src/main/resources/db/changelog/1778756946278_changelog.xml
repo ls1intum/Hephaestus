@@ -495,4 +495,16 @@
         </rollback>
     </changeSet>
 
+    <!-- Verbatim Pi SDK session JSONL bytes for byte-identical cold-restart. -->
+    <changeSet id="mentor-1071-add-session-jsonl-blob" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="session_jsonl column already exists">
+            <not><columnExists tableName="chat_thread" columnName="session_jsonl"/></not>
+        </preConditions>
+        <comment>Add chat_thread.session_jsonl BYTEA for Pi prompt-cache continuity across cold restarts</comment>
+        <sql>ALTER TABLE chat_thread ADD COLUMN session_jsonl BYTEA NULL;</sql>
+        <rollback>
+            <sql>ALTER TABLE chat_thread DROP COLUMN IF EXISTS session_jsonl;</sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>
