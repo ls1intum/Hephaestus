@@ -31,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -39,8 +40,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * code paths the unit tests cannot exercise (DB unique partial index, JSONB metadata
  * round-trip, status transitions, reaper sweep).
  */
-// Mentor beans only register if InteractiveSandboxService is on the context; the @MockitoBean
-// below provides that dependency that DockerSandboxConfiguration would otherwise have to supply.
+// Mentor beans are gated on `hephaestus.sandbox.enabled`; flip it on here so the
+// MentorTurnPersistence + dependent beans register, then provide a mock InteractiveSandboxService.
+@TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
 @DisplayName("MentorTurnPersistence integration")
 class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 

@@ -1,13 +1,12 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
-import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.EnumMap;
 import java.util.Map;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,7 +23,7 @@ import org.springframework.stereotype.Component;
  * {@link Outcome} label.
  */
 @Component
-@ConditionalOnBean(InteractiveSandboxService.class)
+@ConditionalOnProperty(prefix = "hephaestus.sandbox", name = "enabled", havingValue = "true")
 public class MentorChatMetrics {
 
     /**

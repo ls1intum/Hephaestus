@@ -10,11 +10,10 @@ import org.springframework.validation.annotation.Validated;
  * Configuration for the interactive (mentor) sandbox. Bound from {@code hephaestus.mentor.*}.
  *
  * <p>The mentor is gated <em>per workspace</em> via {@code WorkspaceFeatures.mentorEnabled}
- * (admin UI toggle, mirroring {@code practicesEnabled}). The mentor beans only register if
- * {@code InteractiveSandboxService} is on the context — that bean ships with the Docker
- * sandbox subsystem ({@code hephaestus.sandbox.enabled=true}). There is intentionally no
- * deployment-time mentor-only enable flag: the runtime is a product feature, not an infra
- * switch.
+ * (admin UI toggle, mirroring {@code practicesEnabled}). The mentor bean graph piggybacks on
+ * the existing sandbox infra gate ({@code hephaestus.sandbox.enabled=true}) — it does not
+ * register a separate deployment-time mentor-only enable flag, because the runtime is a
+ * product feature gated per tenant, not an infra switch.
  *
  * @param idleTtlSeconds default 300 s (5 min). A mentor runner is ~165 MB RSS; evicting idle
  *     users sooner is the highest-leverage fleet-level memory lever because the per-container

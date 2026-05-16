@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
-import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import jakarta.annotation.PreDestroy;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -11,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
@@ -31,7 +30,7 @@ import org.springframework.security.concurrent.DelegatingSecurityContextExecutor
  * </ul>
  */
 @Configuration
-@ConditionalOnBean(InteractiveSandboxService.class)
+@ConditionalOnProperty(prefix = "hephaestus.sandbox", name = "enabled", havingValue = "true")
 public class MentorChatExecutorConfig {
 
     private static final Logger log = LoggerFactory.getLogger(MentorChatExecutorConfig.class);

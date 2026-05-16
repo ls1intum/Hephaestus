@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -33,8 +34,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * test fires the real filter chain so a future regression that removes either guard surfaces
  * here, not in production.
  */
-// Mentor beans only register if InteractiveSandboxService is on the context; the @MockitoBean
-// below provides that dependency that DockerSandboxConfiguration would otherwise have to supply.
+// Mentor beans are gated on `hephaestus.sandbox.enabled` (the same property that loads the
+// Docker SPI in production). Tests flip it on here and provide an @MockitoBean
+// InteractiveSandboxService below so the mentor bean graph resolves without a real container.
+@TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
 @AutoConfigureWebTestClient
 @DisplayName("MentorChatController auth integration")
 class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrationTest {

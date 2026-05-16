@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
-import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
@@ -17,7 +16,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,7 +31,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * mentor virtual-thread executor; the orchestration lives in {@link MentorChatService}.
  */
 @WorkspaceScopedController
-@ConditionalOnBean(InteractiveSandboxService.class)
+@ConditionalOnProperty(prefix = "hephaestus.sandbox", name = "enabled", havingValue = "true")
 @RequestMapping("/mentor/chat")
 @Tag(name = "Mentor Chat", description = "Mentor chat SSE stream")
 @RequiredArgsConstructor
