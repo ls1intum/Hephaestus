@@ -404,13 +404,12 @@ hephaestus:
             cpus: ${SANDBOX_CPUS:2.0}
             pids-limit: ${SANDBOX_PIDS_LIMIT:256}
 
-    # Pi-powered chat mentor (SSE turn pipeline + JPA persistence). Opt-in like its
-    # SANDBOX_ENABLED/GITLAB_ENABLED siblings: the mentor depends on the sandbox runtime + Pi
-    # docker image + agent NATS, so a fresh deploy stays dark until the operator wires those
-    # up and flips MENTOR_ENABLED=true (compose.app.yaml + production-setup.mdx both reflect
-    # this). The specs profile keeps it off so OpenAPI generation skips the SSE/sandbox beans.
-    mentor:
-        enabled: ${MENTOR_ENABLED:false}
+    # Pi-powered chat mentor (SSE turn pipeline + JPA persistence). Gated per-workspace via
+    # WorkspaceFeatures.mentorEnabled (admin UI toggle, mirroring practicesEnabled). The mentor
+    # beans only load when InteractiveSandboxService is on the context — that bean ships with
+    # the Docker sandbox subsystem (hephaestus.sandbox.enabled=true), so there is no separate
+    # deployment-time mentor enable flag. Resource knobs (idle TTL, queue sizes, etc.) live on
+    # the `hephaestus.mentor.*` prefix and bind to InteractiveSandboxProperties.
 
     # Dev-only actuator for manually triggering PR reviews (never enable in production).
     # Layered safety: (1) this flag, (2) not in endpoint exposure list, (3) Spring Security auth.

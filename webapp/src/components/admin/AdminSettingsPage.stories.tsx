@@ -93,6 +93,7 @@ const meta = {
 		onRemoveRepository: fn(),
 		onResetLeagues: fn(),
 		practicesEnabled: false,
+		mentorEnabled: false,
 		achievementsEnabled: false,
 		leaderboardEnabled: false,
 		progressionEnabled: false,

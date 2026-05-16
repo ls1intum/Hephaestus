@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -33,10 +33,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * test fires the real filter chain so a future regression that removes either guard surfaces
  * here, not in production.
  */
-// Test profile disables mentor by default (see application-test.yml); opt back in here so the
-// MentorChatController + dependents are registered. The @MockitoBean below provides the sandbox
-// SPI dependency that DockerSandboxConfiguration would otherwise have to supply.
-@TestPropertySource(properties = "hephaestus.mentor.enabled=true")
+// Mentor beans only register if InteractiveSandboxService is on the context; the @MockitoBean
+// below provides that dependency that DockerSandboxConfiguration would otherwise have to supply.
 @AutoConfigureWebTestClient
 @DisplayName("MentorChatController auth integration")
 class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -55,6 +53,15 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
 
     @MockitoBean
     private MentorChatService mentorChatService;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepositoryForFeatures;
+
+    /** Flip the per-workspace mentor toggle on so the controller's feature gate passes. */
+    private Workspace enableMentor(Workspace workspace) {
+        workspace.getFeatures().setMentorEnabled(true);
+        return workspaceRepositoryForFeatures.save(workspace);
+    }
 
     /** Minimal valid mentor turn request body. */
     private static Map<String, Object> validBody() {
@@ -99,6 +106,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-test");
         Workspace workspace = createWorkspace("mentor-auth-space", "MentorAuth", "mentor-auth", AccountType.ORG, owner);
+        enableMentor(workspace);
 
         webTestClient
             .post()
@@ -125,6 +133,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-happy");
         Workspace workspace = createWorkspace("mentor-happy-space", "Happy", "mentor-happy", AccountType.ORG, owner);
+        enableMentor(workspace);
         ensureWorkspaceMembership(workspace, mentor, WorkspaceMembership.WorkspaceRole.MEMBER);
 
         // The mocked service is responsible for completing the emitter — otherwise
@@ -160,5 +169,36 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         // controller body. timeout() because the controller submits async and returns; the
         // service call lands on the virtual-thread executor a few ms later.
         verify(mentorChatService, timeout(2_000)).start(any(), any());
+    }
+
+    @Test
+    @WithMentorUser
+    @DisplayName("authenticated member of workspace with mentorEnabled=false → 404 (per-workspace gate)")
+    void authenticatedMember_mentorDisabled_returnsNotFound() {
+        // Per-workspace feature gate must block even an authenticated, fully-permitted member
+        // when the workspace admin has not opted in to mentor. Mirrors the practicesEnabled
+        // model on PracticeReviewDetectionGate. NOT enabling mentor here is the entire point.
+        User mentor = persistUser("mentor");
+        User owner = persistUser("workspace-owner-for-mentor-disabled");
+        Workspace workspace = createWorkspace(
+            "mentor-disabled-space",
+            "Disabled",
+            "mentor-disabled",
+            AccountType.ORG,
+            owner
+        );
+        // Intentionally NOT calling enableMentor(workspace).
+        ensureWorkspaceMembership(workspace, mentor, WorkspaceMembership.WorkspaceRole.MEMBER);
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{workspaceSlug}/mentor/chat", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .accept(MediaType.TEXT_EVENT_STREAM)
+            .bodyValue(validBody())
+            .exchange()
+            .expectStatus()
+            .isNotFound();
     }
 }

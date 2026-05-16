@@ -98,12 +98,8 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
 
     @Override
     public AttachedSandbox attach(InteractiveSandboxSpec spec) {
-        if (!properties.enabled()) {
-            metrics.attachFailureOther.increment();
-            throw new InteractiveSandboxException(
-                "hephaestus.mentor.enabled=false — interactive sandbox is dark-launched"
-            );
-        }
+        // Per-workspace gating happens upstream in MentorChatController via
+        // WorkspaceFeatures.mentorEnabled — there is no deployment-wide mentor enable flag.
 
         // tryRegister below is the authoritative race resolver; this fast path just avoids
         // spawning a container that would immediately lose the race.

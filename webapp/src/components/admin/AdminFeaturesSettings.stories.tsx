@@ -47,6 +47,7 @@ const meta = {
 	},
 	args: {
 		practicesEnabled: false,
+		mentorEnabled: false,
 		achievementsEnabled: false,
 		leaderboardEnabled: false,
 		progressionEnabled: false,

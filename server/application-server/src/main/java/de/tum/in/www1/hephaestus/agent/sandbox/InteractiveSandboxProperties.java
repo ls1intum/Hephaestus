@@ -9,6 +9,13 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Configuration for the interactive (mentor) sandbox. Bound from {@code hephaestus.mentor.*}.
  *
+ * <p>The mentor is gated <em>per workspace</em> via {@code WorkspaceFeatures.mentorEnabled}
+ * (admin UI toggle, mirroring {@code practicesEnabled}). The mentor beans only register if
+ * {@code InteractiveSandboxService} is on the context — that bean ships with the Docker
+ * sandbox subsystem ({@code hephaestus.sandbox.enabled=true}). There is intentionally no
+ * deployment-time mentor-only enable flag: the runtime is a product feature, not an infra
+ * switch.
+ *
  * @param idleTtlSeconds default 300 s (5 min). A mentor runner is ~165 MB RSS; evicting idle
  *     users sooner is the highest-leverage fleet-level memory lever because the per-container
  *     floor is dominated by Pi SDK imports that we cannot slim (transitive imports through
@@ -25,12 +32,10 @@ import org.springframework.validation.annotation.Validated;
  *     encoded character can be up to 4 bytes, so the on-wire memory ceiling is roughly 4× this).
  *     A longer line is treated as a stream-level fault and the session terminates {@code ERROR}.
  *     Without this bound a hostile runner could OOM the app-server.
- * @param replicaCount informational; guards multi-replica activation (see #1077).
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.mentor")
 public record InteractiveSandboxProperties(
-    @DefaultValue("false") boolean enabled,
     @DefaultValue("300") @Min(1) int idleTtlSeconds,
     @DefaultValue("25") @Min(1) @Max(25) int graceTimeoutSeconds,
     @DefaultValue("30") @Min(1) int reapIntervalSeconds,
@@ -41,6 +46,5 @@ public record InteractiveSandboxProperties(
     @DefaultValue("30") @Min(1) int attachFirstFrameTimeoutSeconds,
     @DefaultValue("3") @Min(1) int maxSessionsPerUser,
     @DefaultValue("50") @Min(1) int maxSessionsTotal,
-    @DefaultValue("1") @Min(1) int replicaCount,
     @DefaultValue("1048576") @Min(1024) int maxFrameChars
 ) {}

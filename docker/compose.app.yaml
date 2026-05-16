@@ -105,9 +105,8 @@ services:
       # GitLab integration
       GITLAB_ENABLED: ${GITLAB_ENABLED:-false}
       KEYCLOAK_GITLAB_BASE_URL: ${KEYCLOAK_GITLAB_BASE_URL:-https://gitlab.lrz.de}
-      # Pi mentor chat (server-side LLM mentor; depends on sandbox + agent-NATS)
-      MENTOR_ENABLED: ${MENTOR_ENABLED:-false}
-      # Agent sandbox (practice review)
+      # Agent sandbox (practice review + Pi mentor chat — both gated per-workspace via
+      # WorkspaceFeatures.{practicesEnabled,mentorEnabled})
       SANDBOX_ENABLED: ${SANDBOX_ENABLED:-false}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}

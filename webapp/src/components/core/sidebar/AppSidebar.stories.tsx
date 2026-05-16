@@ -12,6 +12,7 @@ const mockWorkspace = {
 	providerType: "GITHUB",
 	createdAt: new Date("2025-01-15T00:00:00Z"),
 	practicesEnabled: true,
+	mentorEnabled: true,
 	achievementsEnabled: true,
 	leaderboardEnabled: true,
 	progressionEnabled: false,

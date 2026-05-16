@@ -102,7 +102,6 @@ class DockerInteractiveSandboxLiveTest {
         );
         // Tight TTL so idle eviction tests don't have to wait minutes.
         InteractiveSandboxProperties interactiveProperties = new InteractiveSandboxProperties(
-            true,
             /* idleTtlSeconds */ 2,
             /* graceTimeoutSeconds */ 2,
             /* reapIntervalSeconds */ 1,
@@ -113,7 +112,6 @@ class DockerInteractiveSandboxLiveTest {
             /* attachFirstFrameTimeoutSeconds */ 15,
             /* maxSessionsPerUser */ 3,
             /* maxSessionsTotal */ 50,
-            /* replicaCount */ 1,
             /* maxFrameChars */ 64 * 1024
         );
 

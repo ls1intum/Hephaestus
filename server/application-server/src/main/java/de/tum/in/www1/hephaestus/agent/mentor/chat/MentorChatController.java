@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -15,12 +17,14 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -28,7 +32,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * mentor virtual-thread executor; the orchestration lives in {@link MentorChatService}.
  */
 @WorkspaceScopedController
-@ConditionalOnProperty(name = "hephaestus.mentor.enabled", havingValue = "true")
+@ConditionalOnBean(InteractiveSandboxService.class)
 @RequestMapping("/mentor/chat")
 @Tag(name = "Mentor Chat", description = "Mentor chat SSE stream")
 @RequiredArgsConstructor
@@ -41,6 +45,7 @@ public class MentorChatController {
     private final MentorChatService mentorChatService;
     private final ObjectMapper objectMapperBean;
     private final MentorAgentProperties mentorAgentProperties;
+    private final WorkspaceRepository workspaceRepository;
 
     @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Send one mentor-chat turn; stream the response as AI SDK UIMessage chunks")
@@ -50,6 +55,20 @@ public class MentorChatController {
         @RequestBody MentorChatRequestBody body,
         HttpServletResponse response
     ) {
+        // Per-workspace feature gate. Mirrors PracticeReviewDetectionGate (`workspace.features
+        // .practicesEnabled`); 404 (not 403) when disabled because the resource semantically does
+        // not exist for the workspace — same shape an unmembered caller already gets from
+        // @workspaceSecure.isMember(). The check is cheap (single PK lookup, no FETCH JOIN
+        // because features is @Embedded).
+        boolean mentorEnabled = workspaceRepository
+            .findById(workspaceContext.id())
+            .map(w -> Boolean.TRUE.equals(w.getFeatures().getMentorEnabled()))
+            .orElse(false);
+        if (!mentorEnabled) {
+            log.debug("Mentor chat: workspace {} has mentorEnabled=false, returning 404", workspaceContext.id());
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Mentor is not enabled for this workspace");
+        }
+
         // Headers must lock in BEFORE we send any chunk on the short-circuit path —
         // SseEmitter#send commits the response once flushed, so a missing
         // {@code x-vercel-ai-ui-message-stream: v1} header would cause the AI-SDK transport

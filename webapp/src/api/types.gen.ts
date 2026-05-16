@@ -145,6 +145,10 @@ export type WorkspaceListItem = {
      */
     leaguesEnabled: boolean;
     /**
+     * Whether the Pi mentor chat feature is enabled
+     */
+    mentorEnabled: boolean;
+    /**
      * Whether the practice review feature is enabled
      */
     practicesEnabled: boolean;
@@ -250,6 +254,10 @@ export type Workspace = {
      * Whether league tiers and rankings are enabled
      */
     leaguesEnabled: boolean;
+    /**
+     * Whether the Pi mentor chat feature is enabled
+     */
+    mentorEnabled: boolean;
     /**
      * Whether automatic practice reviews triggered by PR events are enabled
      */
@@ -476,6 +484,10 @@ export type UpdateWorkspaceFeaturesRequest = {
      * Enable league tiers and rankings
      */
     leaguesEnabled?: boolean;
+    /**
+     * Enable the Pi mentor chat feature
+     */
+    mentorEnabled?: boolean;
     /**
      * Enable automatic practice reviews triggered by PR events
      */

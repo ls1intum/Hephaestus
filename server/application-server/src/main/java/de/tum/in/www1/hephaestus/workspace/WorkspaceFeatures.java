@@ -35,6 +35,11 @@ public class WorkspaceFeatures {
     @NotNull(message = "Practices enabled flag is required")
     private Boolean practicesEnabled = false;
 
+    /** Whether the Pi mentor chat feature is enabled for this workspace */
+    @Column(name = "mentor_enabled", nullable = false)
+    @NotNull(message = "Mentor enabled flag is required")
+    private Boolean mentorEnabled = false;
+
     /** Whether the achievements system (badges, skill trees) is enabled */
     @Column(name = "achievements_enabled", nullable = false)
     @NotNull(message = "Achievements enabled flag is required")
@@ -72,6 +77,9 @@ public class WorkspaceFeatures {
     public void applyPatch(UpdateWorkspaceFeaturesRequestDTO request) {
         if (request.practicesEnabled() != null) {
             this.practicesEnabled = request.practicesEnabled();
+        }
+        if (request.mentorEnabled() != null) {
+            this.mentorEnabled = request.mentorEnabled();
         }
         if (request.achievementsEnabled() != null) {
             this.achievementsEnabled = request.achievementsEnabled();

@@ -32,6 +32,9 @@
         14. drop chat_message_part (last — backfill is canonical, table now inert)
         15. drop legacy `document` table (intelligence-service Pi-context store; obsolete after
             the Pi mentor moves context loading into application-server providers)
+        16. workspace.mentor_enabled — per-workspace mentor feature toggle (mirrors
+            workspace.practices_enabled; replaces the deployment-time `hephaestus.mentor.enabled`
+            switch that previously gated bean creation via `@ConditionalOnProperty`)
     -->
 
     <!-- 1. JSONB column for AI-SDK UIMessage parts. Default '[]' so reads stay non-null
@@ -606,6 +609,26 @@
                     <constraints nullable="false"/>
                 </column>
             </createTable>
+        </rollback>
+    </changeSet>
+
+    <!-- 16. Per-workspace mentor toggle. Mirrors the existing `practices_enabled` column.
+         Replaces the deployment-time `hephaestus.mentor.enabled` switch — the mentor is a
+         product feature, not a deployment-time concern, so it gets the same per-workspace
+         gating as practice detection. Default false so existing workspaces opt in via the
+         admin UI. -->
+    <changeSet id="mentor-1071-workspace-mentor-enabled" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.mentor_enabled already exists">
+            <not><columnExists tableName="workspace" columnName="mentor_enabled"/></not>
+        </preConditions>
+        <comment>Add workspace.mentor_enabled boolean (per-workspace mentor toggle)</comment>
+        <addColumn tableName="workspace">
+            <column name="mentor_enabled" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="workspace" columnName="mentor_enabled"/>
         </rollback>
     </changeSet>
 

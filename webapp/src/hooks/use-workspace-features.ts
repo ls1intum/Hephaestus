@@ -6,6 +6,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export interface WorkspaceFeatures {
 	practicesEnabled: boolean;
+	mentorEnabled: boolean;
 	achievementsEnabled: boolean;
 	leaderboardEnabled: boolean;
 	progressionEnabled: boolean;
@@ -43,6 +44,7 @@ export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean
 export function getWorkspaceFeatures(workspace?: WorkspaceListItem): WorkspaceFeatures {
 	return {
 		practicesEnabled: workspace?.practicesEnabled ?? true,
+		mentorEnabled: workspace?.mentorEnabled ?? false,
 		achievementsEnabled: workspace?.achievementsEnabled ?? true,
 		leaderboardEnabled: workspace?.leaderboardEnabled ?? true,
 		progressionEnabled: workspace?.progressionEnabled ?? true,

@@ -31,7 +31,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -40,10 +39,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * code paths the unit tests cannot exercise (DB unique partial index, JSONB metadata
  * round-trip, status transitions, reaper sweep).
  */
-// Test profile disables mentor by default (see application-test.yml); opt back in here so the
-// MentorTurnPersistence + dependent beans are registered. The @MockitoBean below provides the
-// sandbox SPI dependency that DockerSandboxConfiguration would otherwise have to supply.
-@TestPropertySource(properties = "hephaestus.mentor.enabled=true")
+// Mentor beans only register if InteractiveSandboxService is on the context; the @MockitoBean
+// below provides that dependency that DockerSandboxConfiguration would otherwise have to supply.
 @DisplayName("MentorTurnPersistence integration")
 class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 

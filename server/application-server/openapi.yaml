@@ -4308,6 +4308,9 @@ components:
         leaguesEnabled:
           type: boolean
           description: Enable league tiers and rankings
+        mentorEnabled:
+          type: boolean
+          description: Enable the Pi mentor chat feature
         practiceReviewAutoTriggerEnabled:
           type: boolean
           description: Enable automatic practice reviews triggered by PR events
@@ -4545,6 +4548,9 @@ components:
         leaguesEnabled:
           type: boolean
           description: Whether league tiers and rankings are enabled
+        mentorEnabled:
+          type: boolean
+          description: Whether the Pi mentor chat feature is enabled
         practiceReviewAutoTriggerEnabled:
           type: boolean
           description: Whether automatic practice reviews triggered by PR events are
@@ -4595,6 +4601,7 @@ components:
       - isPubliclyViewable
       - leaderboardEnabled
       - leaguesEnabled
+      - mentorEnabled
       - practiceReviewAutoTriggerEnabled
       - practiceReviewManualTriggerEnabled
       - practicesEnabled
@@ -4630,6 +4637,9 @@ components:
         leaguesEnabled:
           type: boolean
           description: Whether league tiers and rankings are enabled
+        mentorEnabled:
+          type: boolean
+          description: Whether the Pi mentor chat feature is enabled
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
@@ -4658,6 +4668,7 @@ components:
       - id
       - leaderboardEnabled
       - leaguesEnabled
+      - mentorEnabled
       - practicesEnabled
       - progressionEnabled
       - providerType

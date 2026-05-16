@@ -22,6 +22,7 @@ export interface AdminSettingsPageProps {
 	onResetLeagues: () => void;
 	// Feature flags
 	practicesEnabled: boolean;
+	mentorEnabled: boolean;
 	achievementsEnabled: boolean;
 	leaderboardEnabled: boolean;
 	progressionEnabled: boolean;
@@ -48,6 +49,7 @@ export function AdminSettingsPage({
 	onRemoveRepository,
 	onResetLeagues,
 	practicesEnabled,
+	mentorEnabled,
 	achievementsEnabled,
 	leaderboardEnabled,
 	progressionEnabled,
@@ -65,6 +67,7 @@ export function AdminSettingsPage({
 				{/* Features Settings */}
 				<AdminFeaturesSettings
 					practicesEnabled={practicesEnabled}
+					mentorEnabled={mentorEnabled}
 					achievementsEnabled={achievementsEnabled}
 					leaderboardEnabled={leaderboardEnabled}
 					progressionEnabled={progressionEnabled}

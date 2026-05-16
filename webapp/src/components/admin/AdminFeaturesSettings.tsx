@@ -7,6 +7,7 @@ export type FeatureKey = keyof UpdateWorkspaceFeaturesRequest;
 
 export interface AdminFeaturesSettingsProps {
 	practicesEnabled: boolean;
+	mentorEnabled: boolean;
 	achievementsEnabled: boolean;
 	leaderboardEnabled: boolean;
 	progressionEnabled: boolean;
@@ -43,6 +44,12 @@ const FEATURES: ReadonlyArray<FeatureDefinition> = [
 		],
 	},
 	{
+		key: "mentorEnabled",
+		label: "Mentor Chat",
+		description:
+			"Enable the Pi mentor chat assistant for workspace members. Requires the sandbox runtime and agent NATS to be available on the deployment.",
+	},
+	{
 		key: "achievementsEnabled",
 		label: "Achievements",
 		description: "Enable the achievements system with badges and skill trees.",
@@ -66,6 +73,7 @@ const FEATURES: ReadonlyArray<FeatureDefinition> = [
 
 export function AdminFeaturesSettings({
 	practicesEnabled,
+	mentorEnabled,
 	achievementsEnabled,
 	leaderboardEnabled,
 	progressionEnabled,
@@ -77,6 +85,7 @@ export function AdminFeaturesSettings({
 }: AdminFeaturesSettingsProps) {
 	const values: Record<FeatureKey, boolean> = {
 		practicesEnabled,
+		mentorEnabled,
 		achievementsEnabled,
 		leaderboardEnabled,
 		progressionEnabled,

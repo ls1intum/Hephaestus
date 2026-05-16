@@ -1,9 +1,13 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -12,8 +16,12 @@ import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceFeatures;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,7 +30,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -67,14 +77,25 @@ class MentorChatControllerTest extends BaseUnitTest {
     @Mock
     MentorChatService mentorChatService;
 
+    @Mock
+    WorkspaceRepository workspaceRepository;
+
     private MentorChatController controller;
     private MockHttpServletResponse response;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        controller = new MentorChatController(mentorChatService, MAPPER, TEST_PROPERTIES);
+        controller = new MentorChatController(mentorChatService, MAPPER, TEST_PROPERTIES, workspaceRepository);
         response = new MockHttpServletResponse();
+        // Default: workspace exists and has mentorEnabled=true — individual tests override.
+        // Lenient because the ObjectMapper-encoding test never invokes the controller, so the
+        // stub is intentionally unused there.
+        Workspace ws = new Workspace();
+        WorkspaceFeatures features = new WorkspaceFeatures();
+        features.setMentorEnabled(true);
+        ws.setFeatures(features);
+        lenient().when(workspaceRepository.findById(anyLong())).thenReturn(Optional.of(ws));
     }
 
     @Test
@@ -157,6 +178,34 @@ class MentorChatControllerTest extends BaseUnitTest {
         MentorChatRequestBody body = body(UUID.randomUUID(), null, exactlyAtCap);
         controller.chat(stubContext(), body, response);
         verify(mentorChatService).start(any(), any());
+    }
+
+    @Test
+    @DisplayName("workspace with mentorEnabled=false → 404; service is NOT invoked")
+    void workspaceWithMentorDisabled_returns404() {
+        Workspace ws = new Workspace();
+        WorkspaceFeatures features = new WorkspaceFeatures();
+        features.setMentorEnabled(false);
+        ws.setFeatures(features);
+        when(workspaceRepository.findById(anyLong())).thenReturn(Optional.of(ws));
+
+        assertThatThrownBy(() -> controller.chat(stubContext(), validBody(UUID.randomUUID(), "hi"), response))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting("statusCode")
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(mentorChatService, never()).start(any(), any());
+    }
+
+    @Test
+    @DisplayName("workspace not found → 404; service is NOT invoked")
+    void workspaceNotFound_returns404() {
+        when(workspaceRepository.findById(anyLong())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.chat(stubContext(), validBody(UUID.randomUUID(), "hi"), response))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting("statusCode")
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(mentorChatService, never()).start(any(), any());
     }
 
     @Test

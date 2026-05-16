@@ -177,6 +177,7 @@ function AdminSettings() {
 				resetLeagues.mutate({ path: { workspaceSlug } });
 			}}
 			practicesEnabled={workspaceData?.practicesEnabled ?? false}
+			mentorEnabled={workspaceData?.mentorEnabled ?? false}
 			achievementsEnabled={workspaceData?.achievementsEnabled ?? false}
 			leaderboardEnabled={workspaceData?.leaderboardEnabled ?? false}
 			progressionEnabled={workspaceData?.progressionEnabled ?? false}
