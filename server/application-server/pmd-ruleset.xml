@@ -13,7 +13,6 @@
     </description>
 
     <!-- Exclude generated code -->
-    <exclude-pattern>.*/intelligenceservice/.*</exclude-pattern>
     <exclude-pattern>.*/target/.*</exclude-pattern>
 
     <!-- ====================================================================

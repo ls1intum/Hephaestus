@@ -44,23 +44,16 @@ public class ChatThread {
     private String title;
 
     /**
-     * All messages in this thread (tree structure)
+     * All messages in this thread. DB-side {@code ON DELETE CASCADE} (migration
+     * {@code mentor-1071-cascade-legacy-fks}) covers parent-delete propagation in a single
+     * statement; the JPA-level cascade would issue N per-row DELETEs for nothing. We keep
+     * {@code orphanRemoval} for collection-mutation semantics.
      */
-    @OneToMany(mappedBy = "thread", cascade = CascadeType.REMOVE, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "thread", fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("createdAt ASC")
     @ToString.Exclude
     @JsonIgnore
     private List<ChatMessage> allMessages = new ArrayList<>();
-
-    /**
-     * Currently selected leaf message - represents the end of the active conversation path
-     * The full selected path is computed by traversing parent relationships from this message
-     */
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "selected_leaf_message_id")
-    @ToString.Exclude
-    @JsonIgnore
-    private ChatMessage selectedLeafMessage;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
@@ -74,4 +67,14 @@ public class ChatThread {
     @ToString.Exclude
     @JsonIgnore
     private Workspace workspace;
+
+    /**
+     * Verbatim Pi SDK session JSONL bytes. BYTEA, plain {@code byte[]} — NOT {@code @Lob},
+     * which would force Postgres OID mode and break auto-commit reads. Bulk reads go through
+     * {@code ChatThreadRepository#findSessionJsonl}.
+     */
+    @Column(name = "session_jsonl", columnDefinition = "bytea")
+    @ToString.Exclude
+    @JsonIgnore
+    private byte[] sessionJsonl;
 }

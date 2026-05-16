@@ -39,11 +39,6 @@
   ],
   "properties": [
     {
-      "name": "hephaestus.intelligence-service.url",
-      "type": "java.lang.String",
-      "description": "Base URL of the intelligence service"
-    },
-    {
       "name": "hephaestus.leaderboard.schedule.cron",
       "type": "java.lang.String",
       "description": "Cron expression for leaderboard calculation"

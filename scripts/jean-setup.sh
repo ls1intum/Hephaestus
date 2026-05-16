@@ -24,7 +24,6 @@ else
   copy_if_exists "server/application-server/src/main/resources/application-local.yml"
   copy_if_exists "server/application-server/src/test/resources/application-live-local.yml"
   copy_if_exists "server/application-server/.env"
-  copy_if_exists "server/intelligence-service/.env"
   copy_if_exists "server/webhook-ingest/.env"
   copy_if_exists "docker/.env"
   copy_if_exists ".claude/settings.local.json"

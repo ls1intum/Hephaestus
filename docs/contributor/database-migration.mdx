@@ -5,7 +5,7 @@ title: Database Migration Workflow
 description: Generate and validate Liquibase changesets with confidence.
 ---
 
-Liquibase manages schema changes in the application server. Follow this workflow to keep the database, ERD docs, and generated Drizzle schema in sync.
+Liquibase manages schema changes in the application server. Follow this workflow to keep the database and ERD docs in sync.
 
 ## Quick start
 
@@ -18,14 +18,13 @@ Liquibase manages schema changes in the application server. Follow this workflow
 
 3. **Review `changelog_new.xml` carefully** – check for destructive operations.
 4. Rename and move the file to `server/application-server/src/main/resources/db/changelog/{id}_changelog.xml`.
-5. Regenerate docs and models:
+5. Regenerate docs:
 
    ```bash
    npm run db:generate-erd-docs
-   npm run db:generate-models:intelligence-service
    ```
 
-6. Commit the migration, documentation (`docs/contributor/erd/schema.mmd`), and updated models.
+6. Commit the migration and documentation (`docs/contributor/erd/schema.mmd`).
 
 :::danger Always validate
 Generated migrations can drop or rename columns unexpectedly. Double-check each changeset before committing.
@@ -54,11 +53,10 @@ Generated migrations can drop or rename columns unexpectedly. Double-check each 
 
 ## CI validation
 
-Three GitHub Actions guard against drift:
+Two GitHub Actions guard against drift:
 
 1. **Database schema validation** – Applies migrations to a fresh DB and compares it with current entities. Failure produces a new `changelog_new.xml`.
 2. **Database documentation validation** – Generates an ERD from migrations and compares it with the committed diagram.
-3. **Intelligence service model validation** – Regenerates the Drizzle schema and compares it with `server/intelligence-service/src/shared/db/schema.ts`.
 
 ## Entity change tips
 
@@ -98,34 +96,20 @@ flowchart TD
     subgraph CI [CI quality gates]
         D[Schema validation]
         E[ERD validation]
-        F[Intelligence models]
     end
 
     A -.-> D
     B -.-> D
     B -.-> E
     C -.-> E
-    B -.-> F
 
     D -->|❌ Drift| G[Missing migration]
     D -->|✅| H[Schema OK]
     E -->|❌ Outdated| I[Update ERD]
     E -->|✅| J[Docs OK]
-    F -->|❌ Mismatch| K[Regenerate models]
-    F -->|✅| L[Models OK]
 
     style CI fill:#fff3e0,stroke:#ff9800,stroke-width:2px
 ```
-
-## Intelligence service sync
-
-Every migration may affect the intelligence service. Regenerate models with:
-
-```bash
-npm run db:generate-models:intelligence-service
-```
-
-The command applies migrations, introspects the database, and updates `server/intelligence-service/src/shared/db/schema.ts`. Treat the generated file as disposable – never edit it manually.
 
 ## Resources
 

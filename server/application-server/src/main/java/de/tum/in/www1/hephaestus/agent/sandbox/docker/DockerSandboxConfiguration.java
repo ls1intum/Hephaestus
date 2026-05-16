@@ -178,7 +178,7 @@ public class DockerSandboxConfiguration {
     }
 
     // -------------------------------------------------------------------------
-    // Interactive (mentor) sandbox — sibling of SandboxManager, dark-launched until #1071.
+    // Interactive (mentor) sandbox — sibling of SandboxManager.
     // -------------------------------------------------------------------------
 
     @Bean

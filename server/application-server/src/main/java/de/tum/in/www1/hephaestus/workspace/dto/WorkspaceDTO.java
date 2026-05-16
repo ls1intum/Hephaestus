@@ -43,6 +43,7 @@ public record WorkspaceDTO(
     @Schema(description = "Whether a GitLab webhook has been auto-registered for this workspace")
     Boolean gitlabWebhookRegistered,
     @NonNull @Schema(description = "Whether the practice review feature is enabled") Boolean practicesEnabled,
+    @NonNull @Schema(description = "Whether the Pi mentor chat feature is enabled") Boolean mentorEnabled,
     @NonNull @Schema(description = "Whether the achievements system is enabled") Boolean achievementsEnabled,
     @NonNull @Schema(description = "Whether the leaderboard is enabled") Boolean leaderboardEnabled,
     @NonNull @Schema(description = "Whether the league/progression system is enabled") Boolean progressionEnabled,
@@ -79,6 +80,7 @@ public record WorkspaceDTO(
             workspace.getSlackSigningSecret() != null && !workspace.getSlackSigningSecret().isEmpty(),
             workspace.getGitlabWebhookId() != null,
             workspace.getFeatures().getPracticesEnabled(),
+            workspace.getFeatures().getMentorEnabled(),
             workspace.getFeatures().getAchievementsEnabled(),
             workspace.getFeatures().getLeaderboardEnabled(),
             workspace.getFeatures().getProgressionEnabled(),

@@ -561,14 +561,16 @@ async function main() {
 
     // Pi SDK option `tools` is an allowlist of tool *names*, not constructed tool
     // instances. Restricting to read/bash/grep prevents the agent from invoking
-    // edit/write — findings are persisted only via the customTools below.
+    // edit/write — findings are persisted only via the customTools below. Pi 0.74+
+    // filters customTools through the same allowlist (see agent-session.js:1796), so
+    // the custom tool names must be listed here too or they won't be exposed to the LLM.
     const settingsManager = SettingsManager.create(CWD, process.env.PI_CODING_AGENT_DIR || "/home/agent/.pi");
     const sessionManager = SessionManager.inMemory();
 
     const { session } = await createAgentSession({
         cwd: CWD,
         agentDir: process.env.PI_CODING_AGENT_DIR || "/home/agent/.pi",
-        tools: ["read", "bash", "grep"],
+        tools: ["read", "bash", "grep", "report_finding", "set_review_summary"],
         customTools: [reportFindingTool, setReviewSummaryTool],
         sessionManager,
         settingsManager,

@@ -202,14 +202,12 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * No generic exceptions (excludes generated intelligenceservice client code).
+         * No generic exceptions.
          */
         @Test
         @DisplayName("No generic exceptions")
         void noGenericExceptions() {
             ArchRule rule = noClasses()
-                .that()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should(THROW_GENERIC_EXCEPTIONS)
                 .because("Use specific exception types for better error handling");
             rule.check(classes);
@@ -261,8 +259,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @DisplayName("No java.util.logging")
         void noJavaUtilLogging() {
             ArchRule rule = noClasses()
-                .that()
-                .resideOutsideOfPackage("..intelligenceservice..") // Exclude generated API clients
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("java.util.logging..")
@@ -274,14 +270,11 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * No Apache Commons Logging.
          *
          * <p>SLF4J provides consistent logging facade.
-         * Generated intelligence-service client is excluded.
          */
         @Test
         @DisplayName("No Apache Commons Logging")
         void noCommonsLogging() {
             ArchRule rule = noClasses()
-                .that()
-                .resideOutsideOfPackage("..intelligenceservice..") // Exclude generated API clients
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("org.apache.commons.logging..")

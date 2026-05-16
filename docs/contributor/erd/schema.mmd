@@ -82,18 +82,13 @@ erDiagram
         VARCHAR(16) role "NOT NULL"
         UUID parent_message_id FK
         UUID thread_id FK "NOT NULL"
-    }
-
-    ChatMessagePart {
-        UUID message_id PK,FK
-        INTEGER order_index PK
-        JSONB content
-        VARCHAR(128) original_type
-        VARCHAR(32) type "NOT NULL"
+        JSONB parts "NOT NULL"
+        BIGINT version "NOT NULL"
+        VARCHAR(16) status "NOT NULL"
     }
 
     ChatMessageVote {
-        UUID message_id PK
+        UUID message_id PK,FK
         TIMESTAMPTZ created_at "NOT NULL"
         BOOLEAN is_upvoted "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
@@ -103,9 +98,9 @@ erDiagram
         UUID id PK
         TIMESTAMPTZ created_at "NOT NULL"
         TEXT title
-        UUID selected_leaf_message_id FK,UK
         BIGINT user_id FK
         BIGINT workspace_id FK "NOT NULL"
+        BYTEA session_jsonl
     }
 
     CommitContributor {
@@ -193,17 +188,6 @@ erDiagram
     DiscussionLabel {
         BIGINT discussion_id PK,FK
         BIGINT label_id PK,FK
-    }
-
-    Document {
-        UUID id PK
-        INTEGER version_number PK
-        TEXT content
-        TIMESTAMPTZ created_at "NOT NULL"
-        VARCHAR(255) kind "NOT NULL"
-        VARCHAR(255) title "NOT NULL"
-        BIGINT user_id FK "NOT NULL"
-        BIGINT workspace_id FK "NOT NULL"
     }
 
     FindingFeedback {
@@ -365,6 +349,16 @@ erDiagram
         TIMESTAMPTZ last_sync_at
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+    }
+
+    ModelPricing {
+        VARCHAR(128) model_id PK
+        NUMERIC(12,6) per_1k_input_usd "NOT NULL"
+        NUMERIC(12,6) per_1k_output_usd "NOT NULL"
+        NUMERIC(12,6) per_1k_cache_read_usd
+        NUMERIC(12,6) per_1k_cache_write_usd
+        TIMESTAMPTZ valid_from "NOT NULL"
+        TIMESTAMPTZ valid_to
     }
 
     Organization {
@@ -718,6 +712,7 @@ erDiagram
         BOOLEAN leagues_enabled "NOT NULL"
         BOOLEAN practice_review_auto_trigger_enabled "NOT NULL"
         BOOLEAN practice_review_manual_trigger_enabled "NOT NULL"
+        BOOLEAN mentor_enabled "NOT NULL"
     }
 
     WorkspaceMembership {
@@ -761,8 +756,7 @@ erDiagram
     %% One-to-One relationships
     Workspace ||--|| ActivityEvent : has
     Workspace ||--|| AgentConfig : has
-    ChatMessage ||--|| ChatMessagePart : has
-    ChatMessage ||--|| ChatThread : references
+    ChatMessage ||--|| ChatMessageVote : has
     GitCommit ||--|| CommitContributor : has
     DiscussionComment ||--|| Discussion : references
     GitProvider ||--|| Discussion : references
@@ -816,8 +810,6 @@ erDiagram
     User ||--o{ DiscussionComment : commented_on
     Discussion ||--o{ DiscussionComment : commented_on
     DiscussionComment ||--o{ DiscussionComment : commented_on
-    User ||--o{ Document : has
-    Workspace ||--o{ Document : has
     User ||--o{ FindingFeedback : references
     PracticeFinding ||--o{ FindingFeedback : has
     User ||--o{ GitCommit : authored_by

@@ -1,12 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
-import type { Document } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import { PreviewMessage, ThinkingMessage } from "./Message";
 
 /**
  * Message component displays chat messages from both users and assistants with rich content support.
- * Handles text, reasoning, file attachments, tool interactions (weather, documents), voting, and editing functionality.
+ * Handles text, reasoning, file attachments, voting, and editing functionality.
  * Features smooth animations, edit mode for user messages, and comprehensive action handling.
  */
 const meta = {
@@ -75,14 +74,12 @@ const createUserMessage = (text: string, id = "msg-1"): ChatMessage => ({
 	id,
 	role: "user",
 	parts: [{ type: "text", text }],
-	metadata: { createdAt: new Date().toISOString() },
 });
 
 const createAssistantMessage = (text: string, id = "msg-2"): ChatMessage => ({
 	id,
 	role: "assistant",
 	parts: [{ type: "text", text }],
-	metadata: { createdAt: new Date().toISOString() },
 });
 
 const createMessageWithReasoning = (
@@ -96,7 +93,6 @@ const createMessageWithReasoning = (
 		{ type: "reasoning", text: reasoning },
 		{ type: "text", text },
 	],
-	metadata: { createdAt: new Date().toISOString() },
 });
 
 const createMessageWithAttachments = (text: string, id = "msg-4"): ChatMessage => ({
@@ -117,54 +113,7 @@ const createMessageWithAttachments = (text: string, id = "msg-4"): ChatMessage =
 		},
 		{ type: "text", text },
 	],
-	metadata: { createdAt: new Date().toISOString() },
 });
-
-const sampleDocument: Document = {
-	id: "doc-1",
-	title: "React Component Guidelines",
-	content: `# React Component Guidelines
-
-## Best Practices
-
-1. **Use TypeScript** for type safety
-2. **Keep components small** and focused
-3. **Use functional components** with hooks
-4. **Follow naming conventions** with PascalCase
-
-## Example Component
-
-\`\`\`tsx
-interface ButtonProps {
-  children: React.ReactNode;
-  onClick: () => void;
-  variant?: 'primary' | 'secondary';
-}
-
-export const Button: React.FC<ButtonProps> = ({ 
-  children, 
-  onClick, 
-  variant = 'primary' 
-}) => {
-  return (
-    <button 
-      className={\`btn btn-\${variant}\`}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
-};
-\`\`\`
-
-## Testing
-
-Always write tests for your components using Jest and React Testing Library.`,
-	kind: "text",
-	userId: 1,
-	versionNumber: 1,
-	createdAt: new Date(),
-};
 
 /**
  * Simple user message with plain text content.
@@ -250,7 +199,6 @@ export const UpvotedMessage: Story = {
 		vote: {
 			messageId: "msg-2",
 			isUpvoted: true,
-			createdAt: new Date(),
 			updatedAt: new Date(),
 		},
 	},
@@ -267,7 +215,6 @@ export const DownvotedMessage: Story = {
 		vote: {
 			messageId: "msg-2",
 			isUpvoted: false,
-			createdAt: new Date(),
 			updatedAt: new Date(),
 		},
 	},
@@ -302,89 +249,6 @@ export const EditModeMessage: Story = {
 	args: {
 		message: createUserMessage("How do I optimize React performance in large applications?"),
 		initialEditMode: true,
-	},
-};
-
-/**
- * Message demonstrating weather tool integration.
- */
-export const WeatherToolMessage: Story = {
-	args: {
-		message: {
-			id: "msg-weather",
-			role: "assistant",
-			parts: [
-				{
-					type: "tool-getWeather",
-					toolCallId: "weather-1",
-					state: "output-available",
-					input: { location: "San Francisco" },
-					output: {
-						location: "San Francisco, CA",
-						temperature: 72,
-						condition: "Sunny",
-						humidity: 65,
-						windSpeed: 8,
-					},
-				},
-				{
-					type: "text",
-					text: "Here's the current weather for San Francisco. It's a beautiful sunny day with comfortable temperatures!",
-				},
-			],
-			metadata: { createdAt: new Date().toISOString() },
-		} as ChatMessage,
-	},
-};
-
-/**
- * Message showing document creation tool in action.
- */
-export const CreateDocumentMessage: Story = {
-	args: {
-		message: {
-			id: "msg-create-doc",
-			role: "assistant",
-			parts: [
-				{
-					type: "tool-createDocument",
-					toolCallId: "create-doc-1",
-					state: "output-available",
-					input: { title: "React Component Guidelines", kind: "text" },
-					output: sampleDocument,
-				},
-				{
-					type: "text",
-					text: "I've created a comprehensive guide about React component patterns for you. You can click on the document to view and edit it.",
-				},
-			],
-			metadata: { createdAt: new Date().toISOString() },
-		} as ChatMessage,
-	},
-};
-
-/**
- * Message showing document update tool in progress.
- */
-export const UpdateDocumentLoadingMessage: Story = {
-	args: {
-		message: {
-			id: "msg-update-doc",
-			role: "assistant",
-			parts: [
-				{
-					type: "tool-updateDocument",
-					toolCallId: "update-doc-1",
-					state: "input-available",
-					input: {
-						id: "doc-1",
-						description: "Add section about testing best practices",
-					},
-				},
-			],
-			metadata: { createdAt: new Date().toISOString() },
-		} as ChatMessage,
-		isLoading: true,
 	},
 };
 

@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
  * This is sufficient because:
  * <ul>
  *   <li>Only application-server writes to repositories (fetch, clone)</li>
- *   <li>intelligence-service only reads via shared volume mount</li>
+ *   <li>Sandboxed agent containers only read via shared volume mount</li>
  *   <li>Git operations are atomic for concurrent reads</li>
  * </ul>
  * <p>

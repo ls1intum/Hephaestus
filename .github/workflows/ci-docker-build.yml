@@ -20,11 +20,6 @@ on:
         required: false
         type: string
         default: "true"
-      intelligence_service_changed:
-        description: "Whether intelligence-service files changed (or should build for other reasons)"
-        required: false
-        type: string
-        default: "true"
       webhook_ingest_changed:
         description: "Whether webhook-ingest files changed (or should build for other reasons)"
         required: false
@@ -78,27 +73,6 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=application-server
-
-  intelligence-service-build:
-    name: "Intelligence"
-    if: inputs.should_skip != 'true' && inputs.intelligence_service_changed == 'true'
-    uses: ./.github/workflows/reusable-docker-build.yml
-    with:
-      image-name: "ls1intum/hephaestus/intelligence-service"
-      docker-file: "./server/intelligence-service/Dockerfile"
-      docker-context: "./server/intelligence-service"
-      registry: "ghcr.io"
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Intelligence Service
-        org.opencontainers.image.description=Node/Hono-based AI service for Hephaestus (AI SDK v6)
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=intelligence-service
 
   webhook-ingest-build:
     name: "Webhook"

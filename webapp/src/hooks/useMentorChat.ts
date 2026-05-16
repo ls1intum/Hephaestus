@@ -1,88 +1,46 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DataUIPart } from "ai";
-import {
-	DefaultChatTransport,
-	parseJsonEventStream,
-	readUIMessageStream,
-	uiMessageChunkSchema,
-} from "ai";
-import { useEffect, useRef, useState } from "react";
+import { DefaultChatTransport } from "ai";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import {
-	getGroupedThreadsOptions,
-	getGroupedThreadsQueryKey,
 	getThreadOptions,
 	getThreadQueryKey,
-	voteMessageMutation,
+	listThreadsOptions,
+	listThreadsQueryKey,
+	voteMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type {
-	ChatMessageVote,
-	ChatThreadGroup,
-	Document,
-	GetThreadError,
-	ThreadDetail,
-} from "@/api/types.gen";
+import type { ChatMessageVote, ChatThreadDetail, ChatThreadSummary } from "@/api/types.gen";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { keycloakService } from "@/integrations/auth";
-import {
-	extractVotesFromThreadDetail,
-	parseSingleMessage,
-	parseThreadMessages,
-} from "@/lib/chat-validation";
-import { AUTO_OPEN_THRESHOLD, getCenteredRect } from "@/lib/dom-utils";
-import type { ChatMessage, DocumentDataTypes } from "@/lib/types";
-import { useArtifactStore } from "@/stores/artifact-store";
-import { useDocumentsStore } from "@/stores/document-store";
-
-/**
- * Type guard that filters data parts to only document-related ones.
- * Returns a properly typed DocumentDataPart for handling document streaming.
- */
-function isDocumentDataPart(part: {
-	type: string;
-	data?: unknown;
-}): part is DataUIPart<DocumentDataTypes> {
-	return (
-		part.type === "data-document-create" ||
-		part.type === "data-document-update" ||
-		part.type === "data-document-delta" ||
-		part.type === "data-document-finish"
-	);
-}
+import { extractVotesFromThreadDetail, parseThreadMessages } from "@/lib/chat-validation";
+import type { ChatMessage } from "@/lib/types";
 
 interface UseMentorChatOptions {
 	threadId?: string;
 	initialMessages?: ChatMessage[];
-	autoGreeting?: boolean; // If true, trigger greeting on mount for new threads
 	onFinish?: () => void;
 	onError?: (error: Error) => void;
 }
 
 interface UseMentorChatReturn extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
 	sendMessage: (text: string) => void;
-	triggerGreeting: () => Promise<void>; // Manually trigger a greeting
-	threadDetail: ThreadDetail | undefined;
+	threadDetail: ChatThreadDetail | undefined;
 	isThreadLoading: boolean;
-	threadError: GetThreadError | null;
-	groupedThreads: ChatThreadGroup[] | undefined;
-	isGroupedThreadsLoading: boolean;
+	threadError: Error | null;
+	threads: ChatThreadSummary[] | undefined;
+	isThreadsLoading: boolean;
 	isLoading: boolean;
 	currentThreadId: string | undefined;
 	voteMessage: (messageId: string, isUpvoted: boolean) => void;
 	votes: ChatMessageVote[];
-	// Minimal overlay actions exposed to parent when needed
-	openArtifactForDocument: (document: Document, boundingBox: DOMRect) => void;
-	openArtifactById: (documentId: string, boundingBox: DOMRect) => Promise<void>;
-	closeArtifact: () => void;
 }
 
 export function useMentorChat({
 	threadId,
 	initialMessages = [],
-	autoGreeting = false,
 	onFinish,
 	onError,
 }: UseMentorChatOptions): UseMentorChatReturn {
@@ -103,7 +61,10 @@ export function useMentorChat({
 			path: { workspaceSlug: slug, threadId: threadId || "" },
 		}),
 		enabled: Boolean(threadId) && hasWorkspace,
-		initialData: () => (hasWorkspace ? queryClient.getQueryData(threadQueryKey) : undefined),
+		initialData: () =>
+			hasWorkspace
+				? (queryClient.getQueryData(threadQueryKey) as ChatThreadDetail | undefined)
+				: undefined,
 		initialDataUpdatedAt: Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
@@ -113,14 +74,15 @@ export function useMentorChat({
 
 	const { data: threadDetail, isLoading: isThreadLoading, error: threadError } = threadQuery;
 
-	// Fetch grouped threads for sidebar/navigation; avoid immediate refetch on mount
-	const groupedThreadsKey = getGroupedThreadsQueryKey({
-		path: { workspaceSlug: slug },
-	});
-	const { data: groupedThreads, isLoading: isGroupedThreadsLoading } = useQuery({
-		...getGroupedThreadsOptions({ path: { workspaceSlug: slug } }),
+	// Fetch threads for sidebar/navigation; avoid immediate refetch on mount
+	const threadsKey = listThreadsQueryKey({ path: { workspaceSlug: slug } });
+	const { data: threads, isLoading: isThreadsLoading } = useQuery({
+		...listThreadsOptions({ path: { workspaceSlug: slug } }),
 		enabled: hasWorkspace,
-		initialData: () => (hasWorkspace ? queryClient.getQueryData(groupedThreadsKey) : undefined),
+		initialData: () =>
+			hasWorkspace
+				? (queryClient.getQueryData(threadsKey) as ChatThreadSummary[] | undefined)
+				: undefined,
 		initialDataUpdatedAt: Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
@@ -129,7 +91,7 @@ export function useMentorChat({
 	});
 
 	// Vote message mutation
-	const voteMessageMut = useMutation(voteMessageMutation());
+	const voteMessageMut = useMutation(voteMutation());
 
 	// Optimistic votes state: messageId -> isUpvoted
 	const [voteState, setVoteState] = useState<Record<string, boolean | undefined>>({});
@@ -138,81 +100,53 @@ export function useMentorChat({
 		.map(([messageId, isUpvoted]) => ({
 			messageId,
 			isUpvoted,
-			createdAt: new Date(),
 			updatedAt: new Date(),
 		}));
 
-	// ---------------------------
-	// Artifact/document state
-	// ---------------------------
-
-	// Document streaming is handled directly in onData callback using store actions
-	// to avoid stale closure issues with hook-based handlers
-
-	const openArtifactForDocument = (document: Document, boundingBox: DOMRect) => {
-		// Delegate to global overlay store
-		useArtifactStore.getState().openArtifact(`text:${document.id}`, boundingBox, document.title);
-	};
-
-	const openArtifactById = async (documentId: string, boundingBox: DOMRect) => {
-		// Optimistically open overlay; data will be fetched by overlay hook
-		useArtifactStore.getState().openArtifact(`text:${documentId}`, boundingBox, "Document");
-	};
-
-	const closeArtifact = () => {
-		useArtifactStore.getState().closeArtifact();
-	};
-
-	// No save/version APIs exposed; handled in TextArtifactContainer
-
-	// Create stable transport configuration
-	const mentorChatApi = `${environment.serverUrl}/workspaces/${slug}/mentor/chat`;
-	const stableTransport = new DefaultChatTransport<ChatMessage>({
-		api: mentorChatApi,
-		// Always attach a fresh token per request
-		prepareSendMessagesRequest: ({ id, messages }) => {
-			const effectiveId = id || stableThreadId;
-			// Only send the latest message; backend reconstructs context from thread ID
-			const lastMessage = messages.at(-1);
-			// Determine previous message ID from current local state (selected leaf or last message)
-			const prev = messages.length > 1 ? messages[messages.length - 2]?.id : undefined;
-			return {
-				body: {
-					id: effectiveId,
-					message: lastMessage,
-					previousMessageId: prev,
+	// Transport must be stable across renders — `useChat` reads `transport` once on mount
+	// and again only when identity changes; a fresh `DefaultChatTransport` per render would
+	// thrash internal state. The deps reduce to per-workspace + per-thread-id.
+	const transport = useMemo(
+		() =>
+			new DefaultChatTransport<ChatMessage>({
+				api: `${environment.serverUrl}/workspaces/${slug}/mentor/chat`,
+				prepareSendMessagesRequest: ({ id, messages }) => {
+					const effectiveId = id || stableThreadId;
+					// Only send the latest message; backend reconstructs context from thread id.
+					// Parent-message linkage lives on the server via the chat_message tree, so we
+					// don't ship a `previousMessageId` (it would be a no-op the server ignores).
+					const lastMessage = messages.at(-1);
+					return {
+						body: { id: effectiveId, message: lastMessage },
+						headers: { Authorization: `Bearer ${keycloakService.getToken()}` },
+					};
 				},
-				headers: {
-					Authorization: `Bearer ${keycloakService.getToken()}`,
-				},
-			};
-		},
-	});
+			}),
+		[slug, stableThreadId],
+	);
 
-	// Create stable onFinish callback
-	const stableOnFinish = (_options: { message: ChatMessage }) => {
+	const handleFinish = useCallback(() => {
 		if (hasWorkspace) {
 			queryClient.invalidateQueries({
-				queryKey: getGroupedThreadsQueryKey({ path: { workspaceSlug: slug } }),
+				queryKey: listThreadsQueryKey({ path: { workspaceSlug: slug } }),
 			});
 		}
 		if (threadId || stableThreadId) {
 			queryClient.invalidateQueries({
 				queryKey: getThreadQueryKey({
-					path: {
-						workspaceSlug: slug,
-						threadId: threadId || stableThreadId || "",
-					},
+					path: { workspaceSlug: slug, threadId: threadId || stableThreadId || "" },
 				}),
 			});
 		}
 		onFinish?.();
-	};
+	}, [hasWorkspace, queryClient, slug, threadId, stableThreadId, onFinish]);
 
-	// Create stable onError callback
-	const stableOnError = (error: Error) => {
-		onError?.(error);
-	};
+	const handleError = useCallback(
+		(error: Error) => {
+			onError?.(error);
+		},
+		[onError],
+	);
 
 	const {
 		messages,
@@ -232,54 +166,15 @@ export function useMentorChat({
 		id: stableThreadId, // Use stable ID that never changes
 		messages: initialMessages, // Start with initial messages only - backend will provide thread history
 		generateId: () => uuidv4(), // Generate UUID for all messages
-		experimental_throttle: 100, // Add throttling for smoother streaming
-		transport: stableTransport,
-		onFinish: stableOnFinish,
-		onError: stableOnError,
-		onData: (dataPart) => {
-			// Handle document-related data parts directly using store actions
-			// This avoids stale closure issues with hook-based handlers
-			if (isDocumentDataPart(dataPart)) {
-				const { setEmptyDraft, appendDraftDelta, finishDraft } = useDocumentsStore.getState();
-				const { openArtifact } = useArtifactStore.getState();
-
-				switch (dataPart.type) {
-					case "data-document-create":
-						setEmptyDraft(dataPart.data.id, { title: dataPart.data.title });
-						break;
-
-					case "data-document-update":
-						setEmptyDraft(dataPart.data.id);
-						break;
-
-					case "data-document-delta": {
-						const docState = useDocumentsStore.getState().documents[dataPart.data.id];
-						const draftLength = docState?.draft?.content?.length ?? 0;
-						const newLength = draftLength + dataPart.data.delta.length;
-
-						// Auto-open overlay when content exceeds threshold
-						if (newLength > AUTO_OPEN_THRESHOLD && draftLength <= AUTO_OPEN_THRESHOLD) {
-							openArtifact(`text:${dataPart.data.id}`, getCenteredRect(), docState?.draft?.title);
-						}
-						appendDraftDelta(dataPart.data.id, dataPart.data.delta);
-						break;
-					}
-
-					case "data-document-finish": {
-						finishDraft(dataPart.data.id);
-						const docState = useDocumentsStore.getState().documents[dataPart.data.id];
-						const draftLength = docState?.draft?.content?.length ?? 0;
-
-						// Auto-open for short documents that finish
-						if (draftLength <= AUTO_OPEN_THRESHOLD) {
-							openArtifact(`text:${dataPart.data.id}`, getCenteredRect(), docState?.draft?.title);
-						}
-						break;
-					}
-				}
-			}
-			// data-usage and other parts are ignored (not needed on client)
-		},
+		// experimental_throttle batches React re-renders, but Pi's text-delta cadence is already
+		// LLM-bound (~10-30/s). Adding 100 ms batches on top makes tokens stall in chunks of
+		// 1-3 deltas, breaking the "live typing" feel users expect from streaming. The webapp's
+		// markdown renderer is cheap enough to handle every delta without throttling.
+		transport,
+		onFinish: handleFinish,
+		onError: handleError,
+		// The Pi mentor only streams text/reasoning parts today. If/when typed
+		// data parts return (e.g. token usage, custom UI events), wire them here.
 	});
 
 	// Hydrate thread messages once when loaded and not streaming
@@ -328,91 +223,26 @@ export function useMentorChat({
 		originalSendMessage({ text });
 	};
 
-	// Trigger greeting from the mentor (no user message required)
-	// Uses the same /chat endpoint with greeting=true flag
-	// React Compiler handles memoization automatically - no useCallback needed
-	const greetingTriggeredRef = useRef(false);
-	const triggerGreeting = async () => {
-		if (!hasWorkspace || greetingTriggeredRef.current) {
-			return;
-		}
-		greetingTriggeredRef.current = true;
-
-		// Use the same chat endpoint with greeting flag
-		const chatApi = `${environment.serverUrl}/workspaces/${slug}/mentor/chat`;
-
-		try {
-			const response = await fetch(chatApi, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${keycloakService.getToken()}`,
-				},
-				body: JSON.stringify({
-					id: stableThreadId,
-					greeting: true,
-					// No message - greeting mode
-				}),
-			});
-
-			if (!response.ok || !response.body) {
-				throw new Error("Failed to fetch greeting");
-			}
-
-			// Parse the SSE stream into UIMessageChunks
-			const chunkStream = parseJsonEventStream({
-				stream: response.body,
-				schema: uiMessageChunkSchema,
-			}).pipeThrough(
-				new TransformStream({
-					transform(chunk, controller) {
-						if (!chunk.success) {
-							throw chunk.error;
-						}
-						controller.enqueue(chunk.value);
-					},
-				}),
-			);
-
-			// Read the stream and update messages in real-time
-			const messageStream = readUIMessageStream({ stream: chunkStream });
-
-			for await (const message of messageStream) {
-				// Validate and update messages with the streaming greeting
-				const validatedMessage = parseSingleMessage(message);
-				if (validatedMessage) {
-					setMessages([validatedMessage]);
-				}
-			}
-
-			// Invalidate queries to refresh sidebar
-			queryClient.invalidateQueries({
-				queryKey: getGroupedThreadsQueryKey({ path: { workspaceSlug: slug } }),
-			});
-		} catch (err) {
-			console.error("Greeting error:", err);
-			onError?.(err instanceof Error ? err : new Error(String(err)));
-		}
-	};
-
-	// Auto-trigger greeting on mount if enabled
-	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler ensures triggerGreeting is stable - no useCallback needed
-	useEffect(() => {
-		if (autoGreeting && hasWorkspace && messages.length === 0) {
-			triggerGreeting();
-		}
-	}, [autoGreeting, hasWorkspace, messages.length]);
+	// The new-thread "Hi! I'm your mentor" greeting is rendered statically by the route
+	// component when `messages.length === 0` (see Greeting.tsx). The previous implementation
+	// did a separate POST to /mentor/chat with `{greeting: true}` to stream a server-generated
+	// greeting; the server has no greeting flag, so the round-trip silently short-circuited as
+	// "User message text is empty." The static greeting matches the UX without an API call.
 
 	// Vote message function
 	const voteMessage = (messageId: string, isUpvoted: boolean) => {
 		if (!hasWorkspace) {
 			return;
 		}
+		const effectiveThreadId = threadId || stableThreadId;
+		if (!effectiveThreadId) {
+			return;
+		}
 		// Optimistically set local vote state
 		setVoteState((prev) => ({ ...prev, [messageId]: isUpvoted }));
 		voteMessageMut.mutate(
 			{
-				path: { workspaceSlug: slug, messageId },
+				path: { workspaceSlug: slug, threadId: effectiveThreadId, messageId },
 				body: { isUpvoted },
 			},
 			{
@@ -425,16 +255,14 @@ export function useMentorChat({
 					});
 				},
 				onSettled: () => {
-					if (threadId || stableThreadId) {
-						queryClient.invalidateQueries({
-							queryKey: getThreadQueryKey({
-								path: {
-									workspaceSlug: slug,
-									threadId: threadId || stableThreadId || "",
-								},
-							}),
-						});
-					}
+					queryClient.invalidateQueries({
+						queryKey: getThreadQueryKey({
+							path: {
+								workspaceSlug: slug,
+								threadId: effectiveThreadId,
+							},
+						}),
+					});
 				},
 			},
 		);
@@ -448,7 +276,7 @@ export function useMentorChat({
 		(!!threadId && isThreadLoading);
 
 	// Return object without memoization to avoid dependency issues
-	const result = {
+	const result: UseMentorChatReturn = {
 		// Core chat functionality
 		messages,
 		status,
@@ -469,9 +297,9 @@ export function useMentorChat({
 		// Thread management
 		threadDetail,
 		isThreadLoading,
-		threadError,
-		groupedThreads,
-		isGroupedThreadsLoading,
+		threadError: threadError as Error | null,
+		threads,
+		isThreadsLoading,
 		currentThreadId: threadId || id,
 
 		// Voting
@@ -480,14 +308,6 @@ export function useMentorChat({
 
 		// Loading state
 		isLoading,
-
-		// Greeting
-		triggerGreeting,
-
-		// Overlay actions
-		openArtifactForDocument,
-		openArtifactById,
-		closeArtifact,
 	};
 
 	return result;

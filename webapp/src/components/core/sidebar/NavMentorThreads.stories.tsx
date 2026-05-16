@@ -4,7 +4,8 @@ import { NavMentorThreads } from "./NavMentorThreads";
 
 /**
  * Navigation component showing chat thread history in mentor mode.
- * Displays a list of previous conversations with the AI mentor, including timestamps and read status.
+ * Displays a flat list of previous conversations; the component buckets
+ * threads locally by createdAt (Today, Yesterday, Last 7 days, ...).
  */
 const meta = {
 	component: NavMentorThreads,
@@ -25,12 +26,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const now = Date.now();
+const day = 24 * 60 * 60 * 1000;
+
 /**
  * Default view showing empty state.
  */
 export const Default: Story = {
 	args: {
-		threadGroups: [],
+		threads: [],
 	},
 };
 
@@ -39,51 +43,24 @@ export const Default: Story = {
  */
 export const WithMockData: Story = {
 	args: {
-		threadGroups: [
+		threads: [
+			{ id: "1", title: "React Hooks Best Practices", createdAt: new Date() },
+			{ id: "2", title: "TypeScript Generic Types", createdAt: new Date() },
+			{ id: "3", title: "Database Design Help", createdAt: new Date() },
 			{
-				groupName: "Today",
-				threads: [
-					{
-						id: "1",
-						title: "React Hooks Best Practices",
-						createdAt: new Date(),
-					},
-					{
-						id: "2",
-						title: "TypeScript Generic Types",
-						createdAt: new Date(),
-					},
-					{
-						id: "3",
-						title: "Database Design Help",
-						createdAt: new Date(),
-					},
-				],
+				id: "4",
+				title: "API Architecture Review",
+				createdAt: new Date(now - day - 60_000),
 			},
 			{
-				groupName: "Yesterday",
-				threads: [
-					{
-						id: "4",
-						title: "API Architecture Review",
-						createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-					},
-					{
-						id: "5",
-						title: "Frontend Performance Tips",
-						createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-					},
-				],
+				id: "5",
+				title: "Frontend Performance Tips",
+				createdAt: new Date(now - day - 60_000),
 			},
 			{
-				groupName: "Last 7 Days",
-				threads: [
-					{
-						id: "6",
-						title: "Performance Optimization",
-						createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-					},
-				],
+				id: "6",
+				title: "Performance Optimization",
+				createdAt: new Date(now - 3 * day),
 			},
 		],
 	},
@@ -101,7 +78,7 @@ export const WithMockData: Story = {
  */
 export const Loading: Story = {
 	args: {
-		threadGroups: [],
+		threads: [],
 		isLoading: true,
 	},
 };
@@ -111,7 +88,7 @@ export const Loading: Story = {
  */
 export const ErrorState: Story = {
 	args: {
-		threadGroups: [],
+		threads: [],
 		error: "Failed to load threads",
 	},
 };

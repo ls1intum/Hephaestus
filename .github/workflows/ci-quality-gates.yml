@@ -19,11 +19,6 @@ on:
         required: false
         type: string
         default: "true"
-      intelligence_service_changed:
-        description: "Whether intelligence-service files changed (or should run for other reasons)"
-        required: false
-        type: string
-        default: "true"
       webhook_ingest_changed:
         description: "Whether webhook-ingest files changed (or should run for other reasons)"
         required: false
@@ -44,8 +39,6 @@ jobs:
             display-name: "App Server"
           - check: webapp-quality
             display-name: "Webapp"
-          - check: intelligence-service-quality
-            display-name: "Intelligence"
           - check: webhook-ingest-quality
             display-name: "Webhook"
           - check: openapi-validation
@@ -60,24 +53,8 @@ jobs:
             "webapp-quality")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
               ;;
-            "application-server-quality"|"openapi-validation")
+            "application-server-quality"|"openapi-validation"|"database-validation")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
-              ;;
-            "intelligence-service-quality")
-              # intelligence-service depends on application-server schema for DB models
-              if [[ "${{ inputs.intelligence_service_changed }}" == "true" || "${{ inputs.application_server_changed }}" == "true" ]]; then
-                echo "run=true" >> $GITHUB_OUTPUT
-              else
-                echo "run=false" >> $GITHUB_OUTPUT
-              fi
-              ;;
-            "database-validation")
-              # DB validation covers schema, ERD, and models - depends on both app-server and intelligence-service
-              if [[ "${{ inputs.application_server_changed }}" == "true" || "${{ inputs.intelligence_service_changed }}" == "true" ]]; then
-                echo "run=true" >> $GITHUB_OUTPUT
-              else
-                echo "run=false" >> $GITHUB_OUTPUT
-              fi
               ;;
             "webhook-ingest-quality")
               echo "run=${{ inputs.webhook_ingest_changed }}" >> $GITHUB_OUTPUT
@@ -112,7 +89,6 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             webapp/package-lock.json
-            server/intelligence-service/package-lock.json
 
       - name: Setup caches
         if: steps.should_run.outputs.run == 'true'
@@ -121,16 +97,28 @@ jobs:
           cache-type: ${{ matrix.check }}
           os: ${{ runner.os }}
 
-      - name: Application-server formatting
+      - name: Application-server formatting + Pi extension typecheck + runner smoke
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
           npm ci --prefer-offline --no-audit
-          if ! npm run format:java:check; then
-            echo "::error::Java formatting failed. Run: npm run format:java"
+
+          ISSUES_FOUND=()
+          FMT_OK=true; TS_OK=true; RUNNER_OK=true
+
+          npm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: npm run format:java"); }
+          npm -w server/application-server/agent-extensions run typecheck \
+            || { TS_OK=false; ISSUES_FOUND+=("Pi extension TS failed typecheck against @earendil-works/pi-coding-agent. Run: npm -w server/application-server/agent-extensions run typecheck"); }
+          node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
+            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi mentor runner smoke test failed. Run: node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs"); }
+
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            echo "| Java formatting | :x: Failed | \`npm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`npm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TS_OK" == "false" ]] && echo "| Pi extension TS | :x: Failed | \`npm -w server/application-server/agent-extensions run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$RUNNER_OK" == "false" ]] && echo "| Pi mentor runner smoke | :x: Failed | \`node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs\` |" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
 
@@ -156,31 +144,6 @@ jobs:
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             [[ "$BIOME_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`cd webapp && npm run check -- --write\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`cd webapp && npm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
-            for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
-            exit 1
-          fi
-
-      - name: Intelligence-service quality
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'intelligence-service-quality'
-        run: |
-          # npm ci already handles node_modules cleanup when package-lock.json changes
-          npm ci --no-audit --progress=false
-          node scripts/install-platform-binaries.mjs
-
-          ISSUES_FOUND=()
-          CHECK_OK=true; TYPES_OK=true; BUILD_OK=true
-
-          npm -w server/intelligence-service run check || { CHECK_OK=false; ISSUES_FOUND+=("Biome check failed. Run: npm -w server/intelligence-service run check"); }
-          npm -w server/intelligence-service run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript failed. Run: npm run typecheck:intelligence-service"); }
-          npm -w server/intelligence-service run build || { BUILD_OK=false; ISSUES_FOUND+=("Build failed. Run: npm run build:intelligence-service"); }
-
-          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            echo "### Intelligence Service Quality" >> $GITHUB_STEP_SUMMARY
-            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
-            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$CHECK_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`npm -w server/intelligence-service run check\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`npm run typecheck:intelligence-service\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$BUILD_OK" == "false" ]] && echo "| Build | :x: Failed | \`npm run build:intelligence-service\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
@@ -279,15 +242,6 @@ jobs:
           if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
             echo "::error::ERD outdated. Run: npm run db:generate-erd-docs"
             ISSUES_FOUND+=("ERD outdated")
-          fi
-
-          # Check 3: Drizzle models for intelligence-service
-          scripts/db-utils.sh generate-models-intelligence-service || ISSUES_FOUND+=("Models generation failed. Run: npm run db:generate-models:intelligence-service")
-          git add server/intelligence-service/src/shared/db/schema.ts
-          if ! git diff --cached --quiet server/intelligence-service/src/shared/db/schema.ts; then
-            echo "::error::DB models out of sync. Run: npm run db:generate-models:intelligence-service"
-            git diff --cached server/intelligence-service/src/shared/db/schema.ts
-            ISSUES_FOUND+=("DB models out of sync")
           fi
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then

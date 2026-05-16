@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.mentor;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
-import io.micrometer.common.lang.Nullable;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -17,6 +16,7 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Type;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 /**
  * Message in a conversation tree structure that maps to AI SDK UI Message format.
@@ -61,6 +61,16 @@ public class ChatMessage {
     private ChatMessage parentMessage;
 
     /**
+     * Raw {@code parent_message_id} FK exposed as a {@link UUID} that does NOT trigger Hibernate
+     * lazy-load of the parent entity. Used by {@link ChatMessageDTO#from} so listing a thread
+     * with N messages issues 1 query, not 1 + N (lazy proxy per message). {@code insertable} /
+     * {@code updatable} = false because the {@link #parentMessage} relation owns the write side.
+     */
+    @Nullable
+    @Column(name = "parent_message_id", insertable = false, updatable = false)
+    private UUID parentMessageId;
+
+    /**
      * Child messages - branches from this message
      */
     @OneToMany(
@@ -83,8 +93,23 @@ public class ChatMessage {
     private Role role;
 
     /**
-     * Optional message metadata in JSON format
-     * Can contain any structure as defined in UIMessage<METADATA>
+     * Turn lifecycle status. The only correctness-critical metadata field: drives the partial
+     * unique index {@code ux_chat_message_in_flight_v2} (one in_flight row per thread) and
+     * the {@code MentorInFlightReaper} stuck-row sweep. Promoted from
+     * {@code metadata.status} JSONB to a real column in migration {@code mentor-1071-add-status-column}.
+     */
+    @NonNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private Status status = Status.in_flight;
+
+    /**
+     * Message metadata as a JSON object. Conventional keys (written by MentorChatService):
+     * {@code model}, {@code inputTokens}, {@code outputTokens}, {@code cacheReadTokens},
+     * {@code cacheWriteTokens}, {@code costUsd}, {@code finishReason}, {@code durationMs},
+     * {@code toolCalls}, {@code error}. Pure billing/observability — status is its own column.
+     * Shape is enforced by the {@code chk_chat_message_metadata_shape} CHECK constraint
+     * (must be NULL or object).
      */
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
@@ -96,14 +121,38 @@ public class ChatMessage {
     private Instant createdAt;
 
     /**
-     * Message parts - handles complex multi-part content
-     * Each part corresponds to a UIMessagePart type
+     * AI SDK UIMessage parts as a JSONB array. Written verbatim by MentorChatService. NOT NULL +
+     * JSONB-array CHECK enforced at the column level (changeset {@code mentor-1071-enforce-parts-shape}).
+     * DB-side default {@code '[]'::jsonb} is applied by Liquibase; the JPA-level
+     * {@link org.hibernate.annotations.ColumnDefault} is intentionally omitted because the
+     * Postgres typecast literal trips liquibase-hibernate6 4.33.0's diff snapshot (NPE on
+     * {@code LiquibaseDataType.getName()}). MentorChatService writes the column explicitly on
+     * every insert, so we never rely on Hibernate's omit-from-INSERT optimization.
      */
-    @OneToMany(mappedBy = "message", cascade = CascadeType.REMOVE, fetch = FetchType.LAZY, orphanRemoval = true)
-    @OrderBy("id.orderIndex ASC")
-    @ToString.Exclude
-    @JsonIgnore
-    private List<ChatMessagePart> parts = new ArrayList<>();
+    @Type(JsonType.class)
+    @Column(name = "parts", columnDefinition = "jsonb", nullable = false)
+    private JsonNode parts;
+
+    /**
+     * Optimistic-lock version — Hibernate bumps on managed writes, {@code reapStaleInFlight}
+     * bumps explicitly. Stale-snapshot writers (reaper-vs-finalise, finalise-vs-interrupt) get
+     * {@code OptimisticLockingFailureException}; the orchestrator skips so the winner survives.
+     */
+    @org.hibernate.annotations.ColumnDefault("0")
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private Long version;
+
+    /**
+     * Turn lifecycle status. Stored as VARCHAR(16) with a CHECK constraint enforcing the enum
+     * values. Lowercase names match the historical metadata.status JSON values verbatim so
+     * the backfill UPDATE is a one-liner (see migration {@code mentor-1071-backfill-status}).
+     */
+    public enum Status {
+        in_flight,
+        completed,
+        interrupted,
+    }
 
     public enum Role {
         USER("user"),

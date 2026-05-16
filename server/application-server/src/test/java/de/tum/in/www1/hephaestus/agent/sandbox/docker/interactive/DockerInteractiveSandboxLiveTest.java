@@ -11,6 +11,10 @@ import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
+import de.tum.in.www1.hephaestus.agent.CredentialMode;
+import de.tum.in.www1.hephaestus.agent.LlmProvider;
+import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
+import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.in.www1.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.in.www1.hephaestus.agent.sandbox.docker.ContainerSecurityPolicy;
@@ -27,6 +31,7 @@ import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.in.www1.hephaestus.testconfig.LiveDockerTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -34,27 +39,29 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 
 /** Live integration tests — boots real Docker. Run with {@code -Pgroups=live} or {@code live-tests}. */
-@Tag("live")
+@LiveDockerTest
 @DisplayName("Docker Interactive Sandbox Live")
 class DockerInteractiveSandboxLiveTest {
 
     private static final String NODE_IMAGE = "node:22-slim";
+    private static final String AGENT_PI_IMAGE = "ghcr.io/ls1intum/hephaestus/agent-pi:latest";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private DockerClient dockerClient;
@@ -95,7 +102,6 @@ class DockerInteractiveSandboxLiveTest {
         );
         // Tight TTL so idle eviction tests don't have to wait minutes.
         InteractiveSandboxProperties interactiveProperties = new InteractiveSandboxProperties(
-            true,
             /* idleTtlSeconds */ 2,
             /* graceTimeoutSeconds */ 2,
             /* reapIntervalSeconds */ 1,
@@ -106,7 +112,6 @@ class DockerInteractiveSandboxLiveTest {
             /* attachFirstFrameTimeoutSeconds */ 15,
             /* maxSessionsPerUser */ 3,
             /* maxSessionsTotal */ 50,
-            /* replicaCount */ 1,
             /* maxFrameChars */ 64 * 1024
         );
 
@@ -465,6 +470,38 @@ class DockerInteractiveSandboxLiveTest {
                 sb.close(Duration.ofSeconds(2));
             }
         }
+
+        @Test
+        @DisplayName("agent-pi image: workspace setup succeeds with cap-drop=ALL (uid-1000-owned /workspace)")
+        void agentPiWorkspaceSetupWithCapDropAll() {
+            // node:22-slim lets root create /workspace itself, so it owns it and mkdir never fails.
+            // agent-pi pre-creates /workspace owned by 1000:1000 in the Dockerfile; mkdir as root
+            // with --cap-drop=ALL (no CAP_DAC_OVERRIDE) would fail without the CONTAINER_USER fix.
+            assumeTrue(
+                dockerOps.imageIsPresent(AGENT_PI_IMAGE),
+                "agent-pi image not in local daemon — build with: docker build -t " +
+                    AGENT_PI_IMAGE +
+                    " docker/agents/pi/"
+            );
+            UUID sessionId = UUID.randomUUID();
+            SecurityProfile sec = new SecurityProfile(null, "private", List.of("ALL"), Map.of());
+            InteractiveSandboxSpec piSpec = new InteractiveSandboxSpec(
+                sessionId,
+                "u_pi_perm",
+                "w_pi_perm",
+                AGENT_PI_IMAGE,
+                List.of("node", "/workspace/.runner/pi-mentor-runner.mjs"),
+                Map.of(),
+                new NetworkPolicy(true, null, null, null),
+                new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
+                sec,
+                Map.of(".runner/pi-mentor-runner.mjs", runnerBytes),
+                Map.of()
+            );
+            AttachedSandbox sb = adapter.attach(piSpec);
+            assertThat(((DockerAttachedSandboxAdapter) sb).state()).isEqualTo(AttachedSandboxState.ATTACHED);
+            sb.close(Duration.ofSeconds(2));
+        }
     }
 
     @Nested
@@ -497,6 +534,230 @@ class DockerInteractiveSandboxLiveTest {
             // Must distinguish runner-crash from flow-control timeout for dashboards.
             assertThat(metrics.attachFailureFirstFrameFailed.count() - failedBefore).isEqualTo(1.0);
             assertThat(metrics.attachFailureFirstFrameTimeout.count() - timeoutBefore).isZero();
+        }
+    }
+
+    /**
+     * Builds an {@link InteractiveSandboxSpec} that uses the REAL {@link PiRuntimeFactory}
+     * production command — identical to what {@code MentorPiAdapter} produces in the live server.
+     * {@code MENTOR_RUNNER_PROTOCOL_ONLY=1} stubs the Pi SDK so no LLM or API key is needed.
+     *
+     * <p>This exercises the full {@code sh -c "mkdir … && ln … && cp … && LD_PRELOAD=… node …"}
+     * chain, catching bootstrap failures (missing dirs, bad LD_PRELOAD symlink, failing {@code cp})
+     * that the toy-command tests in other nested classes never reach.
+     */
+    private InteractiveSandboxSpec buildMentorSpec(String userId, String workspaceId) {
+        PiRuntimeFactory factory = new PiRuntimeFactory(MAPPER);
+        // API_KEY + baseUrl triggers the custom provider extension code path used in production.
+        PiPlanSpec planSpec = new PiPlanSpec(
+            LlmProvider.OPENAI,
+            CredentialMode.API_KEY,
+            "stub-api-key",
+            "stub-model",
+            "https://api.stub.example.com/v1",
+            null,
+            true,
+            120,
+            "pi-mentor-runner.mjs",
+            Map.of(),
+            ""
+        );
+        PiRuntimeFactory.PiPlan plan = factory.build(planSpec);
+
+        Map<String, String> env = new HashMap<>(plan.environment());
+        // Stub: skip Pi SDK load; runner emits runner_ready + handles requests without an LLM.
+        env.put("MENTOR_RUNNER_PROTOCOL_ONLY", "1");
+
+        return new InteractiveSandboxSpec(
+            UUID.randomUUID(),
+            userId,
+            workspaceId,
+            AGENT_PI_IMAGE,
+            plan.command(),
+            Map.copyOf(env),
+            plan.networkPolicy(),
+            ResourceLimits.DEFAULT,
+            SecurityProfile.DEFAULT,
+            plan.inputFiles(),
+            Map.of()
+        );
+    }
+
+    @Nested
+    @DisplayName("Mentor RPC protocol")
+    class MentorRpcProtocol {
+
+        private static final Duration RPC_TIMEOUT = Duration.ofSeconds(25);
+
+        @Test
+        @DisplayName("production bootstrap: sh -c chain succeeds and runner emits runner_ready")
+        void productionBootstrapSucceeds() {
+            assumeTrue(
+                dockerOps.imageIsPresent(AGENT_PI_IMAGE),
+                "agent-pi image not in local daemon — build with: docker build -t " +
+                    AGENT_PI_IMAGE +
+                    " docker/agents/pi/"
+            );
+            // Uses the real PiRuntimeFactory command (mkdir + ln + cp + LD_PRELOAD + node).
+            // If any step in the sh -c chain fails (missing dir, bad symlink, missing cp source),
+            // the runner never starts, the pump sees EOF with non-zero exit, and attach() throws.
+            AttachedSandbox sb = adapter.attach(buildMentorSpec("u_boot", "w_boot"));
+            CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
+            sb.subscribe(frames::add);
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() ->
+                    assertThat(
+                        frames
+                            .stream()
+                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                    ).isTrue()
+                );
+            sb.close(Duration.ofSeconds(2));
+        }
+
+        @Test
+        @DisplayName("hello → {protocolVersion:1}")
+        void helloHandshake() {
+            assumeTrue(dockerOps.imageIsPresent(AGENT_PI_IMAGE), "agent-pi image not in local daemon");
+            AttachedSandbox sb = adapter.attach(buildMentorSpec("u_hello", "w_hello"));
+            CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
+            sb.subscribe(frames::add);
+
+            // Wait for the runner to be ready before sending any RPC.
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() ->
+                    assertThat(
+                        frames
+                            .stream()
+                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                    ).isTrue()
+                );
+
+            String helloId = UUID.randomUUID().toString();
+            sb.send(
+                MAPPER.createObjectNode()
+                    .<ObjectNode>put("jsonrpc", "2.0")
+                    .<ObjectNode>put("id", helloId)
+                    .<ObjectNode>put("method", "hello")
+                    .set("params", MAPPER.createObjectNode())
+            );
+
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() -> {
+                    JsonNode resp = frames
+                        .stream()
+                        .filter(f -> helloId.equals(f.path("id").asText()))
+                        .findFirst()
+                        .orElse(null);
+                    assertThat(resp).as("hello response").isNotNull();
+                    assertThat(resp.path("result").path("protocolVersion").asInt()).as("protocolVersion").isEqualTo(1);
+                });
+            sb.close(Duration.ofSeconds(2));
+        }
+
+        @Test
+        @DisplayName("open_thread + prompt → agent_start + text_delta + agent_end (stub turn)")
+        void stubTurn() {
+            assumeTrue(dockerOps.imageIsPresent(AGENT_PI_IMAGE), "agent-pi image not in local daemon");
+            AttachedSandbox sb = adapter.attach(buildMentorSpec("u_turn", "w_turn"));
+            CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
+            sb.subscribe(frames::add);
+
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() ->
+                    assertThat(
+                        frames
+                            .stream()
+                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                    ).isTrue()
+                );
+
+            // hello
+            String helloId = UUID.randomUUID().toString();
+            sb.send(
+                MAPPER.createObjectNode()
+                    .<ObjectNode>put("jsonrpc", "2.0")
+                    .<ObjectNode>put("id", helloId)
+                    .<ObjectNode>put("method", "hello")
+                    .set("params", MAPPER.createObjectNode())
+            );
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() ->
+                    assertThat(frames.stream().anyMatch(f -> helloId.equals(f.path("id").asText()))).isTrue()
+                );
+
+            // open_thread
+            String threadId = UUID.randomUUID().toString();
+            String openId = UUID.randomUUID().toString();
+            sb.send(
+                MAPPER.createObjectNode()
+                    .<ObjectNode>put("jsonrpc", "2.0")
+                    .<ObjectNode>put("id", openId)
+                    .<ObjectNode>put("method", "open_thread")
+                    .set("params", MAPPER.createObjectNode().put("threadId", threadId))
+            );
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() -> {
+                    JsonNode openResp = frames
+                        .stream()
+                        .filter(f -> openId.equals(f.path("id").asText()))
+                        .findFirst()
+                        .orElse(null);
+                    assertThat(openResp).as("open_thread response").isNotNull();
+                    assertThat(openResp.path("result").path("threadId").asText()).isEqualTo(threadId);
+                });
+
+            // prompt (stub emits: agent_start → message_update/text_delta → agent_end)
+            String promptId = UUID.randomUUID().toString();
+            sb.send(
+                MAPPER.createObjectNode()
+                    .<ObjectNode>put("jsonrpc", "2.0")
+                    .<ObjectNode>put("id", promptId)
+                    .<ObjectNode>put("method", "prompt")
+                    .set("params", MAPPER.createObjectNode().put("threadId", threadId).put("text", "Hello, stub!"))
+            );
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() -> {
+                    JsonNode promptResp = frames
+                        .stream()
+                        .filter(f -> promptId.equals(f.path("id").asText()))
+                        .findFirst()
+                        .orElse(null);
+                    assertThat(promptResp).as("prompt response").isNotNull();
+                    assertThat(promptResp.path("result").path("accepted").asBoolean()).isTrue();
+                });
+
+            // The stub emits agent_start → message_update → agent_end scoped to threadId.
+            await()
+                .atMost(RPC_TIMEOUT)
+                .untilAsserted(() -> {
+                    List<JsonNode> events = frames
+                        .stream()
+                        .filter(
+                            f ->
+                                "event".equals(f.path("method").asText()) &&
+                                threadId.equals(f.path("params").path("threadId").asText())
+                        )
+                        .map(f -> f.path("params").path("event"))
+                        .collect(Collectors.toList());
+                    assertThat(events.stream().anyMatch(e -> "agent_start".equals(e.path("type").asText())))
+                        .as("agent_start")
+                        .isTrue();
+                    assertThat(events.stream().anyMatch(e -> "message_update".equals(e.path("type").asText())))
+                        .as("message_update / text_delta")
+                        .isTrue();
+                    assertThat(events.stream().anyMatch(e -> "agent_end".equals(e.path("type").asText())))
+                        .as("agent_end")
+                        .isTrue();
+                });
+            sb.close(Duration.ofSeconds(2));
         }
     }
 

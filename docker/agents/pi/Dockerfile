@@ -4,7 +4,7 @@ FROM node:${NODE_TAG}
 
 ARG TARGETARCH
 
-RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq curl ca-certificates unzip && \
+RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq curl ca-certificates unzip libjemalloc2 && \
     rm -rf /var/lib/apt/lists/*
 
 # renovate: datasource=npm depName=@earendil-works/pi-coding-agent
@@ -44,6 +44,24 @@ ENV HOME=/home/agent
 ENV GIT_PAGER=cat
 ENV GIT_TERMINAL_PROMPT=0
 ENV LANG=C.UTF-8
+
+# Memory tunables. ALL allocator-tuning env vars are scoped to the long-lived Node mentor
+# runner only — set per-process by PiRuntimeFactory#nodeEnvFor at spawn time. Nothing is set
+# image-wide. Reason: this image also runs `bun` (mimalloc), `git`, `jq`, `curl` on the
+# practice-review precompute critical path; preloading jemalloc or capping glibc arenas onto
+# those is unmeasured (we explicitly rejected unmeasured tuning in wave 25 — applying it here
+# image-wide would be the same mistake).
+#
+# Here we only install libjemalloc2 + create the per-arch symlink to a stable path so
+# PiRuntimeFactory can hard-code one LD_PRELOAD literal across amd64+arm64 buildx.
+RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
+    case "${arch}" in \
+        amd64|x86_64) src="/usr/lib/x86_64-linux-gnu/libjemalloc.so.2" ;; \
+        arm64|aarch64) src="/usr/lib/aarch64-linux-gnu/libjemalloc.so.2" ;; \
+        *) echo "Unsupported architecture for libjemalloc: ${arch}" >&2; exit 1 ;; \
+    esac && \
+    test -f "${src}" || (echo "libjemalloc.so.2 missing at ${src}" >&2; exit 1) && \
+    ln -sf "${src}" /usr/local/lib/libjemalloc.so.2
 
 USER 1000:1000
 WORKDIR /workspace

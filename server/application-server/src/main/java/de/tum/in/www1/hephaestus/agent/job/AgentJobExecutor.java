@@ -367,6 +367,9 @@ public class AgentJobExecutor {
             snapshot.credentialMode(),
             snapshot.modelName(),
             job.getLlmApiKey(),
+            // Production resolves the LLM endpoint from the workspace's configured provider; no
+            // per-job override. Live tests construct PiPlanSpec directly with a non-null baseUrl.
+            null,
             job.getJobToken(),
             snapshot.allowInternet(),
             snapshot.timeoutSeconds()

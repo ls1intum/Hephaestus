@@ -28,7 +28,6 @@ public final class ArchitectureTestConstants {
 
     /** Generated code packages to exclude from most checks. */
     public static final String GENERATED_GRAPHQL_PACKAGE = "..graphql..model..";
-    public static final String GENERATED_INTELLIGENCE_SERVICE_PACKAGE = "..intelligenceservice..";
 
     // ========================================================================
     // COMPLEXITY THRESHOLDS (Single Responsibility Principle)

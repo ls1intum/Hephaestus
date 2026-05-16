@@ -27,8 +27,7 @@ const TYPES = [
 const SCOPES = [
   // === SERVICE SCOPES (where the code lives) - WILL trigger release ===
   "webapp", // React frontend, webapp Dockerfile
-  "server", // Java backend, server Dockerfile
-  "ai", // Intelligence service, ai Dockerfile
+  "server", // Java backend (includes in-process Pi mentor agent), server Dockerfile
   "webhooks", // Webhook ingestion, webhooks Dockerfile
   "docs", // Documentation site
 

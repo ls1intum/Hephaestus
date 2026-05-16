@@ -32,15 +32,7 @@ export default defineConfig({
 	],
 	resolve: {
 		alias: {
-			"@": path.resolve(dirname, "./src"),
-			"@intelligence-service": path.resolve(
-				dirname,
-				"../server/intelligence-service/src/mentor"
-			),
-			"@intelligence-service-utils": path.resolve(
-				dirname,
-				"../server/intelligence-service/src/shared"
-			)
+			"@": path.resolve(dirname, "./src")
 		}
 	},
 	test: {

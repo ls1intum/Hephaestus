@@ -137,9 +137,33 @@ Available examples include `label.created`, `repository.created`, `create`, `pus
 ./mvnw test -Dtest=UserServiceTest#methodName # Single test method
 ```
 
-## GitHub live API tests
+## Live external-service tests
 
-Some regression scenarios can only be validated against GitHub itself. We ship a focused suite that exercises the live GitHub App installation and verifies end-to-end sync behaviour (repository metadata, labels, milestones, and teams).
+Some regressions can only be validated against real systems — the GitHub API, a real LLM endpoint, a Docker daemon. Live tests are tagged `@Tag("live")` and **excluded from `mvn test` / `mvn verify`**; they only run under `mvn test -Plive-tests`. The profile flips Surefire's group filter and adds `failIfNoSpecifiedTests=false` so single-test invocations don't fail when the gating env var is unset.
+
+### Meta-annotation cheat sheet
+
+Use one of these composite annotations on the test class (or method) rather than wiring `@Tag("live") + @EnabledIfEnvironmentVariable` by hand. They keep gates uniform and put the env-var contract in one place.
+
+| Annotation | Gate | Use for |
+| --- | --- | --- |
+| `@LiveLlmTest` | `HEPHAESTUS_LIVE_LLM_API_KEY` | Tests that drive a real LLM. Defaults to the TUM AET ASE gateway running `openai/gpt-oss-120b`; override with `HEPHAESTUS_LIVE_LLM_BASE_URL` / `HEPHAESTUS_LIVE_LLM_MODEL`. Read via `LiveLlmCredentials.fromEnv()`. |
+| `@LiveGitHubTest` | `GH_APP_INSTALLATION_ID` | Tests that hit github.com via the installed GitHub App. `BaseGitHubLiveIntegrationTest` runs an extra runtime check on private-key material. |
+| `@LiveGitLabTest` | `HEPHAESTUS_LIVE_GITLAB_TOKEN` | Reserved for GitLab-side replay/live-sync tests. |
+| `@LiveDockerTest` | none — runtime probe in `@BeforeAll` | Tests that need a Docker daemon. Combine with `@LiveLlmTest` when the sandbox payload also needs LLM credentials. |
+
+Each annotation pins JUnit to `Execution(SAME_THREAD)` so two live tests in the same module never race on rate limits, log interleaving, or shared temp dirs.
+
+### Authoring a new live test
+
+1. Pick the right meta-annotation. If the env var doesn't exist yet, add a new annotation alongside the existing four — don't reuse one with a misleading name.
+2. Put the test under `src/test/java/.../live/`. The directory marker keeps live and non-live tests in different code-review buckets.
+3. Read credentials from `LiveLlmCredentials.fromEnv()` (or the GitHub helpers); never inline values. Secrets stay in env vars only.
+4. Per-test wall-clock timeouts: 90s is reasonable for a single mentor turn; 5 minutes for a full practice run.
+
+### GitHub live API tests
+
+We ship a focused suite that exercises the live GitHub App installation and verifies end-to-end sync behaviour (repository metadata, labels, milestones, and teams).
 
 ### Prerequisites
 

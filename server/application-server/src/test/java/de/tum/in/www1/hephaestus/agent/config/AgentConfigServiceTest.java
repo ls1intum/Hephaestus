@@ -57,6 +57,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             AccountType.ORG,
             null,
             false,
+            false,
             Set.of()
         );
     }

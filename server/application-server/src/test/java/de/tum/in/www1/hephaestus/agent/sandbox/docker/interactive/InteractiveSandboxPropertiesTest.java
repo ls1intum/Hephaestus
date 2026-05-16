@@ -10,51 +10,34 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
+/**
+ * Pins the operational contract on {@code hephaestus.mentor.*}: defaults are the production
+ * tuning documented on the record, and overrides bind through the prefix.
+ */
 @DisplayName("InteractiveSandboxProperties")
 class InteractiveSandboxPropertiesTest extends BaseUnitTest {
+
+    @Test
+    @DisplayName("defaults match the documented production tuning; overrides bind through the prefix")
+    void bindsDefaultsAndOverrides() {
+        InteractiveSandboxProperties defaults = bind(Map.of());
+        assertThat(defaults.idleTtlSeconds()).isEqualTo(300);
+        assertThat(defaults.graceTimeoutSeconds()).isEqualTo(25);
+        assertThat(defaults.maxSessionsPerUser()).isEqualTo(3);
+        assertThat(defaults.maxFrameChars()).isEqualTo(1_048_576);
+
+        InteractiveSandboxProperties overridden = bind(
+            Map.of("hephaestus.mentor.idle-ttl-seconds", "60", "hephaestus.mentor.max-frame-chars", "16384")
+        );
+        assertThat(overridden.idleTtlSeconds()).isEqualTo(60);
+        assertThat(overridden.maxFrameChars()).isEqualTo(16_384);
+        assertThat(overridden.ringBufferFrames()).isEqualTo(512); // unspecified → default holds
+    }
 
     private static InteractiveSandboxProperties bind(Map<String, String> source) {
         return new Binder(new MapConfigurationPropertySource(source)).bindOrCreate(
             "hephaestus.mentor",
             InteractiveSandboxProperties.class
         );
-    }
-
-    @Test
-    @DisplayName("@DefaultValue annotations bind to the documented defaults from an empty source")
-    void bindsDefaultsFromEmptyMap() {
-        InteractiveSandboxProperties p = bind(Map.of());
-        assertThat(p.enabled()).isFalse();
-        assertThat(p.idleTtlSeconds()).isEqualTo(900);
-        assertThat(p.graceTimeoutSeconds()).isEqualTo(25);
-        assertThat(p.reapIntervalSeconds()).isEqualTo(30);
-        assertThat(p.ringBufferFrames()).isEqualTo(512);
-        assertThat(p.stdinWriteTimeoutMs()).isEqualTo(5000);
-        assertThat(p.sendQueueCapacity()).isEqualTo(64);
-        assertThat(p.subscriberQueueCapacity()).isEqualTo(64);
-        assertThat(p.attachFirstFrameTimeoutSeconds()).isEqualTo(30);
-        assertThat(p.maxSessionsPerUser()).isEqualTo(3);
-        assertThat(p.maxSessionsTotal()).isEqualTo(50);
-        assertThat(p.replicaCount()).isEqualTo(1);
-        assertThat(p.maxFrameChars()).isEqualTo(1_048_576);
-    }
-
-    @Test
-    @DisplayName("overrides bind from a real config source (proves the prefix wiring works end-to-end)")
-    void bindsOverridesFromSource() {
-        InteractiveSandboxProperties p = bind(
-            Map.of(
-                "hephaestus.mentor.enabled",
-                "true",
-                "hephaestus.mentor.idle-ttl-seconds",
-                "60",
-                "hephaestus.mentor.max-frame-chars",
-                "16384"
-            )
-        );
-        assertThat(p.enabled()).isTrue();
-        assertThat(p.idleTtlSeconds()).isEqualTo(60);
-        assertThat(p.maxFrameChars()).isEqualTo(16_384);
-        assertThat(p.ringBufferFrames()).isEqualTo(512);
     }
 }

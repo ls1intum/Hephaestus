@@ -1,0 +1,10 @@
+{
+  "type": "tool_execution_end",
+  "toolCallId": "call-real-1",
+  "toolName": "fetch_context",
+  "result": {
+    "content": [{"type": "text", "text": "{\"workspace\":{}}"}],
+    "details": {"ok": true, "length": 16}
+  },
+  "isError": false
+}

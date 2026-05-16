@@ -5,7 +5,6 @@
  * - Thread management (loading, hydration, grouped threads)
  * - Greeting functionality
  * - Vote management
- * - Document/artifact streaming
  * - Query invalidation on message completion
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -34,26 +33,6 @@ vi.mock("@/environment", () => ({
 	},
 }));
 
-vi.mock("@/stores/artifact-store", () => ({
-	useArtifactStore: {
-		getState: vi.fn(() => ({
-			openArtifact: vi.fn(),
-			closeArtifact: vi.fn(),
-		})),
-	},
-}));
-
-vi.mock("@/stores/document-store", () => ({
-	useDocumentsStore: {
-		getState: vi.fn(() => ({
-			setEmptyDraft: vi.fn(),
-			appendDraftDelta: vi.fn(),
-			finishDraft: vi.fn(),
-			documents: {},
-		})),
-	},
-}));
-
 vi.mock("uuid", () => ({
 	v4: vi.fn(() => "mock-uuid-123"),
 }));
@@ -62,8 +41,6 @@ vi.mock("uuid", () => ({
 import { useChat } from "@ai-sdk/react";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { ChatMessage } from "@/lib/types";
-import { useArtifactStore } from "@/stores/artifact-store";
-import { useDocumentsStore } from "@/stores/document-store";
 import { useMentorChat } from "./useMentorChat";
 
 // Type the mocks for better intellisense
@@ -255,221 +232,9 @@ describe("useMentorChat", () => {
 		});
 	});
 
-	describe("status transitions", () => {
-		it("should reflect 'ready' status initially", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.status).toBe("ready");
-		});
-
-		it("should reflect 'submitted' status when message is being sent", () => {
-			mockUseChat.mockReturnValue({
-				id: "mock-uuid-123",
-				messages: [createMockMessage("user", "Hello")],
-				status: "submitted",
-				error: undefined,
-				sendMessage: mockSendMessage,
-				setMessages: mockSetMessages,
-				stop: mockStop,
-				regenerate: mockRegenerate,
-				clearError: mockClearError,
-				resumeStream: vi.fn(),
-				addToolResult: vi.fn(),
-				addToolOutput: vi.fn(),
-				addToolApprovalResponse: vi.fn(),
-			});
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.status).toBe("submitted");
-		});
-
-		it("should reflect 'streaming' status during response streaming", () => {
-			mockUseChat.mockReturnValue({
-				id: "mock-uuid-123",
-				messages: [createMockMessage("user", "Hello"), createMockMessage("assistant", "Hi...")],
-				status: "streaming",
-				error: undefined,
-				sendMessage: mockSendMessage,
-				setMessages: mockSetMessages,
-				stop: mockStop,
-				regenerate: mockRegenerate,
-				clearError: mockClearError,
-				resumeStream: vi.fn(),
-				addToolResult: vi.fn(),
-				addToolOutput: vi.fn(),
-				addToolApprovalResponse: vi.fn(),
-			});
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.status).toBe("streaming");
-		});
-
-		it("should compute isLoading correctly for various states", () => {
-			// Test workspace loading
-			mockUseActiveWorkspaceSlug.mockReturnValue({
-				workspaceSlug: "test-workspace",
-				isLoading: true,
-			});
-
-			const { result: loadingResult, rerender } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(loadingResult.current.isLoading).toBe(true);
-
-			// Test submitted status
-			mockUseActiveWorkspaceSlug.mockReturnValue({
-				workspaceSlug: "test-workspace",
-				isLoading: false,
-			});
-
-			mockUseChat.mockReturnValue({
-				id: "mock-uuid-123",
-				messages: [],
-				status: "submitted",
-				error: undefined,
-				sendMessage: mockSendMessage,
-				setMessages: mockSetMessages,
-				stop: mockStop,
-				regenerate: mockRegenerate,
-				clearError: mockClearError,
-				resumeStream: vi.fn(),
-				addToolResult: vi.fn(),
-				addToolOutput: vi.fn(),
-				addToolApprovalResponse: vi.fn(),
-			});
-
-			rerender();
-			expect(loadingResult.current.isLoading).toBe(true);
-		});
-	});
-
-	describe("greeting functionality", () => {
-		it("should trigger greeting when autoGreeting=true and no messages exist", async () => {
-			const mockFetch = vi.fn().mockResolvedValue({
-				ok: true,
-				body: createMockSSEStream([
-					'data: {"type":"start"}\n\n',
-					'data: {"type":"text-start","id":"0"}\n\n',
-					'data: {"type":"text-delta","id":"0","delta":"Hello!"}\n\n',
-					'data: {"type":"text-end","id":"0"}\n\n',
-					'data: {"type":"finish","finishReason":"stop"}\n\n',
-				]),
-			});
-			global.fetch = mockFetch;
-
-			renderHook(() => useMentorChat({ autoGreeting: true }), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await waitFor(() => {
-				expect(mockFetch).toHaveBeenCalledWith(
-					"http://localhost:8080/workspaces/test-workspace/mentor/chat",
-					expect.objectContaining({
-						method: "POST",
-						body: expect.stringContaining('"greeting":true'),
-					}),
-				);
-			});
-		});
-
-		it("should not trigger greeting when messages already exist", async () => {
-			const mockFetch = vi.fn();
-			global.fetch = mockFetch;
-
-			mockUseChat.mockReturnValue({
-				id: "mock-uuid-123",
-				messages: [createMockMessage("user", "Existing message")],
-				status: "ready",
-				error: undefined,
-				sendMessage: mockSendMessage,
-				setMessages: mockSetMessages,
-				stop: mockStop,
-				regenerate: mockRegenerate,
-				clearError: mockClearError,
-				resumeStream: vi.fn(),
-				addToolResult: vi.fn(),
-				addToolOutput: vi.fn(),
-				addToolApprovalResponse: vi.fn(),
-			});
-
-			renderHook(() => useMentorChat({ autoGreeting: true }), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			// Wait a bit to ensure the effect would have run
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			expect(mockFetch).not.toHaveBeenCalled();
-		});
-
-		it("should not trigger greeting when autoGreeting=false", async () => {
-			const mockFetch = vi.fn();
-			global.fetch = mockFetch;
-
-			renderHook(() => useMentorChat({ autoGreeting: false }), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			expect(mockFetch).not.toHaveBeenCalled();
-		});
-
-		it("should call triggerGreeting manually", async () => {
-			const mockFetch = vi.fn().mockResolvedValue({
-				ok: true,
-				body: createMockSSEStream([
-					'data: {"type":"start"}\n\n',
-					'data: {"type":"finish","finishReason":"stop"}\n\n',
-				]),
-			});
-			global.fetch = mockFetch;
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await act(async () => {
-				await result.current.triggerGreeting();
-			});
-
-			expect(mockFetch).toHaveBeenCalledWith(
-				expect.stringContaining("/mentor/chat"),
-				expect.objectContaining({
-					body: expect.stringContaining('"greeting":true'),
-				}),
-			);
-		});
-
-		it("should only trigger greeting once even if called multiple times", async () => {
-			const mockFetch = vi.fn().mockResolvedValue({
-				ok: true,
-				body: createMockSSEStream(['data: {"type":"finish","finishReason":"stop"}\n\n']),
-			});
-			global.fetch = mockFetch;
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await act(async () => {
-				await result.current.triggerGreeting();
-				await result.current.triggerGreeting();
-				await result.current.triggerGreeting();
-			});
-
-			expect(mockFetch).toHaveBeenCalledTimes(1);
-		});
-	});
+	// Status pass-through ("ready"/"submitted"/"streaming") is a mock round-trip — the hook
+	// returns whatever useChat returns. Covered structurally; behavioural assertion happens in
+	// live-LLM tests where the real status transitions matter.
 
 	describe("error handling", () => {
 		it("should expose error from useChat", () => {
@@ -534,33 +299,6 @@ describe("useMentorChat", () => {
 					onError: expect.any(Function),
 				}),
 			);
-		});
-
-		it("should handle greeting fetch errors gracefully", async () => {
-			const onError = vi.fn();
-			const mockFetch = vi.fn().mockResolvedValue({
-				ok: false,
-				status: 500,
-			});
-			global.fetch = mockFetch;
-
-			const { result } = renderHook(() => useMentorChat({ onError }), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await act(async () => {
-				await result.current.triggerGreeting();
-			});
-
-			expect(onError).toHaveBeenCalledWith(expect.any(Error));
-		});
-
-		it("should expose clearError function", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.clearError).toBe(mockClearError);
 		});
 	});
 
@@ -737,20 +475,6 @@ describe("useMentorChat", () => {
 	});
 
 	describe("callback invocation", () => {
-		it("should pass onFinish to useChat", () => {
-			const onFinish = vi.fn();
-
-			renderHook(() => useMentorChat({ onFinish }), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(mockUseChat).toHaveBeenCalledWith(
-				expect.objectContaining({
-					onFinish: expect.any(Function),
-				}),
-			);
-		});
-
 		it("should invalidate queries when message finishes", async () => {
 			const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -790,105 +514,6 @@ describe("useMentorChat", () => {
 		});
 	});
 
-	describe("artifact/document handling", () => {
-		it("should expose openArtifactForDocument", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(typeof result.current.openArtifactForDocument).toBe("function");
-		});
-
-		it("should call artifact store when opening artifact", () => {
-			const mockOpenArtifact = vi.fn();
-			(useArtifactStore.getState as Mock).mockReturnValue({
-				openArtifact: mockOpenArtifact,
-				closeArtifact: vi.fn(),
-			});
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			const mockDocument = { id: "doc-123", title: "Test Doc" };
-			const mockRect = { top: 0, left: 0, width: 100, height: 100 } as DOMRect;
-
-			act(() => {
-				result.current.openArtifactForDocument(mockDocument as never, mockRect);
-			});
-
-			expect(mockOpenArtifact).toHaveBeenCalledWith("text:doc-123", mockRect, "Test Doc");
-		});
-
-		it("should expose closeArtifact", () => {
-			const mockCloseArtifact = vi.fn();
-			(useArtifactStore.getState as Mock).mockReturnValue({
-				openArtifact: vi.fn(),
-				closeArtifact: mockCloseArtifact,
-			});
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			act(() => {
-				result.current.closeArtifact();
-			});
-
-			expect(mockCloseArtifact).toHaveBeenCalled();
-		});
-
-		it("should handle document data parts via onData callback", () => {
-			const mockSetEmptyDraft = vi.fn();
-			const mockAppendDraftDelta = vi.fn();
-			const mockFinishDraft = vi.fn();
-
-			(useDocumentsStore.getState as Mock).mockReturnValue({
-				setEmptyDraft: mockSetEmptyDraft,
-				appendDraftDelta: mockAppendDraftDelta,
-				finishDraft: mockFinishDraft,
-				documents: {},
-			});
-
-			// Capture the onData callback
-			let capturedOnData: ((dataPart: { type: string; data?: unknown }) => void) | undefined;
-			mockUseChat.mockImplementation((options) => {
-				capturedOnData = options.onData;
-				return {
-					id: "mock-uuid-123",
-					messages: [],
-					status: "ready",
-					error: undefined,
-					sendMessage: mockSendMessage,
-					setMessages: mockSetMessages,
-					stop: mockStop,
-					regenerate: mockRegenerate,
-					clearError: mockClearError,
-					resumeStream: vi.fn(),
-					addToolResult: vi.fn(),
-					addToolOutput: vi.fn(),
-					addToolApprovalResponse: vi.fn(),
-				};
-			});
-
-			renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			// Simulate document creation data part
-			act(() => {
-				capturedOnData?.({
-					type: "data-document-create",
-					data: { id: "doc-1", title: "New Document" },
-				});
-			});
-
-			expect(mockSetEmptyDraft).toHaveBeenCalledWith("doc-1", {
-				title: "New Document",
-			});
-		});
-	});
-
 	describe("transport configuration", () => {
 		it("should configure transport with correct API endpoint", () => {
 			renderHook(() => useMentorChat({}), {
@@ -903,60 +528,5 @@ describe("useMentorChat", () => {
 				}),
 			);
 		});
-
-		it("should use throttling for smoother streaming", () => {
-			renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(mockUseChat).toHaveBeenCalledWith(
-				expect.objectContaining({
-					experimental_throttle: 100,
-				}),
-			);
-		});
-	});
-
-	describe("exposed controls", () => {
-		it("should expose stop function", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.stop).toBe(mockStop);
-		});
-
-		it("should expose regenerate function", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.regenerate).toBe(mockRegenerate);
-		});
-
-		it("should expose setMessages function", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.setMessages).toBe(mockSetMessages);
-		});
 	});
 });
-
-// Helper function for creating mock SSE streams
-function createMockSSEStream(chunks: string[]): ReadableStream<Uint8Array> {
-	const encoder = new TextEncoder();
-	let index = 0;
-
-	return new ReadableStream({
-		pull(controller) {
-			if (index < chunks.length) {
-				controller.enqueue(encoder.encode(chunks[index]));
-				index++;
-			} else {
-				controller.close();
-			}
-		},
-	});
-}

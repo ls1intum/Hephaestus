@@ -48,7 +48,6 @@ npm run generate:api:application-server:client
 - Commit credentials or API keys
 - Use `System.out.println()` (use `@Slf4j` logging)
 - Skip tests without documented reason
-- Hand-edit generated files in `intelligenceservice/`
 
 ## Project Structure
 
@@ -66,10 +65,9 @@ src/main/java/de/tum/in/www1/hephaestus/
 │   └── sync/                     # Data synchronization orchestration
 ├── leaderboard/                  # Scoring, rankings, league points
 ├── activity/                     # Activity tracking (XP, leaderboard gamification)
-├── mentor/                       # AI mentor proxy to intelligence-service
+├── mentor/                       # AI mentor (in-process Pi agent)
 ├── profile/                      # User profiles
-├── notification/                 # Email and Slack messaging
-└── intelligenceservice/          # Generated AI service client (DO NOT EDIT)
+└── notification/                 # Email and Slack messaging
 ```
 
 ## Architecture Patterns
@@ -305,4 +303,3 @@ public ProblemDetail handleNotFound(EntityNotFoundException ex) {
 | `@Transactional` on controller | Move to service layer                                           |
 | Missing test tag               | Add `@Tag("unit")` or `@Tag("integration")`                     |
 | N+1 query                      | Use `JOIN FETCH` in `@Query`                                    |
-| Edited generated client        | Discard, run `npm run generate:api:intelligence-service:client` |

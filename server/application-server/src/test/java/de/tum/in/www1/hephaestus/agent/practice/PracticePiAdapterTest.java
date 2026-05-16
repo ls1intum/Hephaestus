@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.agent.runtime.PiAgentProperties;
 import de.tum.in.www1.hephaestus.agent.runtime.PiResultParser;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +29,7 @@ class PracticePiAdapterTest extends BaseUnitTest {
         adapter = new PracticePiAdapter(
             new PiRuntimeFactory(mapper),
             new PiResultParser(mapper, metrics),
-            new PiAgentProperties(IMAGE, "pi-runner.mjs", false)
+            new PiAgentProperties(IMAGE, "pi-runner.mjs", ImagePullPolicy.IF_NOT_PRESENT)
         );
     }
 
@@ -36,6 +37,7 @@ class PracticePiAdapterTest extends BaseUnitTest {
         return new PracticeAgentRequest(
             LlmProvider.AZURE_OPENAI,
             CredentialMode.PROXY,
+            null,
             null,
             null,
             "job-token-123",

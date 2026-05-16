@@ -2,7 +2,7 @@
 id: coding-guidelines
 sidebar_position: 6
 title: Coding & Design Guidelines
-description: Shared principles for the React client, Spring Boot server, and TypeScript intelligence service.
+description: Shared principles for the React client, Spring Boot server (with the in-process Pi mentor agent), and webhook-ingest service.
 ---
 
 These guidelines keep every service aligned. Keep changes focused. Mention any deviation in your pull request. Raise follow-up issues when you discover gaps.
@@ -74,15 +74,6 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Run the modular test suites with `./mvnw verify`. The build uses ArchUnit checks to enforce package boundaries.
 - Prefer integration tests that extend `AbstractSpringIntegrationTest` when you touch persistence logic.
 
-## Intelligence service (`/server/intelligence-service`)
-
-- Uses Hono for HTTP routing and Vercel AI SDK for model orchestration.
-- Settings live in `src/env.ts`; `MODEL_NAME` must be provider-qualified (`openai:gpt-5-mini`, `azure:gpt-5-mini`, etc.).
-- Drizzle ORM for database access; regenerate the schema with `npm run db:generate-models:intelligence-service` (writes to `src/shared/db/schema.ts`).
-- Export the OpenAPI spec with `npm run openapi:export` after API changes.
-- Format and lint with Biome (`npm run format:intelligence-service`, `npm run check:intelligence-service`).
-- Add or update service tests with Vitest (`npm -w server/intelligence-service run test`).
-
 ## Webhook ingest service (`/server/webhook-ingest`)
 
 - Uses Hono for HTTP routing and `@nats-io/jetstream` for NATS publishing.
@@ -102,7 +93,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Liquibase changesets live in `server/application-server/src/main/resources/config/liquibase`.
 - Prefer `renameColumn` or `modifyDataType` when evolving schemas so data survives deployments.
 - Add indexes before backfilling large tables. Profile long migrations locally.
-- After schema updates, regenerate the ERD, refresh the Drizzle schema, and run server tests that touch the affected tables.
+- After schema updates, regenerate the ERD and run server tests that touch the affected tables.
 
 ## Observability and security
 

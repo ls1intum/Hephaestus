@@ -292,8 +292,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .haveSimpleNameEndingWith("DTO")
                 .or()
                 .haveSimpleNameEndingWith("Dto")
-                .and()
-                .resideOutsideOfPackage(GENERATED_INTELLIGENCE_SERVICE_PACKAGE)
                 .should(beImmutable())
                 .because("DTOs should be immutable for thread safety");
             rule.check(classes);

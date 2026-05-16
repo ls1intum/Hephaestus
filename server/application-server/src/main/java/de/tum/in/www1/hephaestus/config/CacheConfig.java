@@ -5,7 +5,7 @@ import de.tum.in.www1.hephaestus.achievement.AchievementService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
 import java.time.Duration;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
@@ -14,74 +14,108 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Cache configuration for the application using Caffeine for TTL support and metrics.
+ * Cache configuration using Caffeine for TTL support and Micrometer-bound metrics.
  *
- * <p>Registers named caches for:
+ * <p>{@link CacheSpec} entries are the single source of truth. Callers MAY use either the
+ * declarative {@code @Cacheable(value="...")} aspect OR resolve a {@code Cache} imperatively
+ * through {@code CacheManager.getCache(name)} — the mentor aspect providers chose the latter
+ * to avoid the proxy-self-invocation footgun. Either way, the name must appear in
+ * {@link #SPECS}: a typo silently falls back to a no-op {@code NoOpCache}.
+ *
+ * <p>All caches expose Micrometer metrics:
  * <ul>
- *   <li>{@code contributors} - Contributor list cache (1 hour TTL, also evicted by CacheScheduler)</li>
- *   <li>{@code pullRequestTemplates} - PR template cache (1 hour TTL)</li>
+ *   <li>{@code cache.gets} — hit/miss count by result tag</li>
+ *   <li>{@code cache.evictions} — eviction count</li>
+ *   <li>{@code cache.size} — current entry count</li>
  * </ul>
  *
- * <p>All caches expose metrics via Micrometer:
- * <ul>
- *   <li>{@code cache.gets} - hit/miss count by result tag</li>
- *   <li>{@code cache.evictions} - eviction count</li>
- *   <li>{@code cache.size} - current entry count</li>
- * </ul>
+ * <h2>Mentor aspect caches</h2>
+ *
+ * <p>{@code mentor_user_aspect}, {@code mentor_workspace_aspect},
+ * {@code mentor_practice_aspect}, {@code mentor_findings_aspect} feed the
+ * {@code agent.context.providers.mentor.*} content providers. 5-minute TTL is short enough
+ * that staleness across a single chat turn (which itself runs in seconds) is invisible to
+ * users, but long enough that two consecutive turns from the same user hit warm. The
+ * invalidator ({@code MentorContextInvalidator}) evicts surgically on PR / Issue events for
+ * per-user caches; the practice cache has no event-driven invalidator and relies on TTL alone.
  */
 @Configuration
 public class CacheConfig {
 
-    /** TTL for long-lived caches (contributors, PR templates) in seconds. */
-    private static final long LONG_CACHE_TTL_SECONDS = 3600; // 1 hour
+    /** TTL for long-lived caches (contributors, PR templates, achievement progress). */
+    private static final Duration LONG_TTL = Duration.ofSeconds(3600);
 
-    /** Maximum entries per cache to prevent memory issues. */
-    private static final long MAX_CACHE_SIZE = 1000;
+    /** TTL for mentor aspect caches. Short enough to be invisible per-turn, long enough to be warm across consecutive turns. */
+    private static final Duration MENTOR_ASPECT_TTL = Duration.ofMinutes(5);
+
+    /** Max entries for the long-lived caches. */
+    private static final long LONG_MAX = 1000L;
+
+    /** Max entries for mentor aspect caches — bounded per active user, not per workspace. */
+    private static final long MENTOR_MAX = 512L;
+
+    /**
+     * Declarative cache specs. Order doesn't matter at runtime — the manager owns the lookup
+     * map. Keep alphabetical for diff hygiene.
+     */
+    static final List<CacheSpec> SPECS = List.of(
+        new CacheSpec(AchievementService.ACHIEVEMENT_PROGRESS_CACHE, LONG_TTL, LONG_MAX),
+        new CacheSpec("contributors", LONG_TTL, LONG_MAX),
+        new CacheSpec("mentor_findings_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_practice_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_user_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_workspace_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
+        new CacheSpec("pullRequestTemplates", LONG_TTL, LONG_MAX)
+    );
 
     @Bean
     public CacheManager cacheManager(MeterRegistry meterRegistry) {
-        SimpleCacheManager cacheManager = new SimpleCacheManager();
-
-        // Contributors cache: 1 hour TTL, also evicted by CacheScheduler
-        CaffeineCache contributorsCache = buildCache("contributors", LONG_CACHE_TTL_SECONDS, meterRegistry);
-
-        // PR templates cache: 1 hour TTL
-        CaffeineCache pullRequestTemplatesCache = buildCache(
-            "pullRequestTemplates",
-            LONG_CACHE_TTL_SECONDS,
-            meterRegistry
-        );
-
-        // Achievement progress cache: 1 hour TTL
-        CaffeineCache achievementProgressCache = buildCache(
-            AchievementService.ACHIEVEMENT_PROGRESS_CACHE,
-            LONG_CACHE_TTL_SECONDS,
-            meterRegistry
-        );
-
-        cacheManager.setCaches(Arrays.asList(contributorsCache, pullRequestTemplatesCache, achievementProgressCache));
-
-        return cacheManager;
+        SimpleCacheManager manager = new SimpleCacheManager();
+        List<CaffeineCache> caches = new ArrayList<>(SPECS.size());
+        for (CacheSpec spec : SPECS) {
+            caches.add(buildCache(spec, meterRegistry));
+        }
+        manager.setCaches(caches);
+        // SimpleCacheManager defers populating its internal lookup map until afterPropertiesSet()
+        // is invoked. Spring calls it automatically when the bean is wired; we call it eagerly
+        // so the manager is fully ready before the @Bean method returns (matters for tests
+        // that instantiate the configuration directly).
+        manager.afterPropertiesSet();
+        return manager;
     }
 
     /**
-     * Builds a Caffeine cache with TTL, size limit, and metrics registration.
-     *
-     * @param name cache name (used for metrics tags)
-     * @param ttlSeconds time-to-live after write in seconds
-     * @param meterRegistry registry for cache metrics
-     * @return configured CaffeineCache
+     * Build a single Caffeine-backed Spring cache from a {@link CacheSpec} and bind it to
+     * Micrometer.
      */
-    private CaffeineCache buildCache(String name, long ttlSeconds, MeterRegistry meterRegistry) {
+    private static CaffeineCache buildCache(CacheSpec spec, MeterRegistry meterRegistry) {
         com.github.benmanes.caffeine.cache.Cache<Object, Object> cache = Caffeine.newBuilder()
-            .expireAfterWrite(Duration.ofSeconds(ttlSeconds))
-            .maximumSize(MAX_CACHE_SIZE)
+            .expireAfterWrite(spec.ttl())
+            .maximumSize(spec.maxSize())
             .recordStats()
             .build();
+        CaffeineCacheMetrics.monitor(meterRegistry, cache, spec.name(), List.of());
+        return new CaffeineCache(spec.name(), cache);
+    }
 
-        // Register cache metrics with Micrometer
-        CaffeineCacheMetrics.monitor(meterRegistry, cache, name, List.of());
-
-        return new CaffeineCache(name, cache);
+    /**
+     * One row of the cache table.
+     *
+     * @param name    cache name; the value passed to {@code @Cacheable(value="...")}
+     * @param ttl     expire-after-write duration
+     * @param maxSize Caffeine size cap; entries beyond this are evicted by Window-TinyLFU
+     */
+    public record CacheSpec(String name, Duration ttl, long maxSize) {
+        public CacheSpec {
+            if (name == null || name.isBlank()) {
+                throw new IllegalArgumentException("cache name must not be blank");
+            }
+            if (ttl == null || ttl.isNegative() || ttl.isZero()) {
+                throw new IllegalArgumentException("ttl must be positive, got: " + ttl);
+            }
+            if (maxSize <= 0) {
+                throw new IllegalArgumentException("maxSize must be positive, got: " + maxSize);
+            }
+        }
     }
 }

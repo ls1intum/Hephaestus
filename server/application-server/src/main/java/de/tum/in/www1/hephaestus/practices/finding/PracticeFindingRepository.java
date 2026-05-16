@@ -226,4 +226,80 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         @Param("contributorId") Long contributorId,
         @Param("workspaceId") Long workspaceId
     );
+
+    /**
+     * Recent findings for a contributor within a workspace since a cutoff, newest first.
+     *
+     * <p>Used by the mentor's {@code findings_history.json} aspect: the agent needs to see
+     * what specific findings have been delivered to the contributor lately so it can refer
+     * to them by title in the conversation. Bounded by {@code limit} at the caller so the
+     * page size stays a JPA concern.
+     */
+    @Query(
+        """
+        SELECT f FROM PracticeFinding f
+        JOIN FETCH f.practice p
+        WHERE f.contributor.id = :contributorId
+          AND p.workspace.id = :workspaceId
+          AND f.detectedAt >= :since
+        ORDER BY f.detectedAt DESC
+        """
+    )
+    List<PracticeFinding> findRecentByContributorAndWorkspace(
+        @Param("contributorId") Long contributorId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") Instant since,
+        org.springframework.data.domain.Pageable pageable
+    );
+
+    /**
+     * Severity histogram for a contributor's findings within a workspace.
+     * Returns {@code [severityName, count]} rows — caller maps to a name→count map.
+     */
+    @Query(
+        """
+        SELECT f.severity AS severity, COUNT(f) AS count
+        FROM PracticeFinding f
+        JOIN f.practice p
+        WHERE f.contributor.id = :contributorId
+          AND p.workspace.id = :workspaceId
+          AND f.detectedAt >= :since
+        GROUP BY f.severity
+        """
+    )
+    List<SeverityCount> countBySeverityForContributor(
+        @Param("contributorId") Long contributorId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") Instant since
+    );
+
+    /** Verdict histogram for a contributor's findings within a workspace. */
+    @Query(
+        """
+        SELECT f.verdict AS verdict, COUNT(f) AS count
+        FROM PracticeFinding f
+        JOIN f.practice p
+        WHERE f.contributor.id = :contributorId
+          AND p.workspace.id = :workspaceId
+          AND f.detectedAt >= :since
+        GROUP BY f.verdict
+        """
+    )
+    List<VerdictCount> countByVerdictForContributor(
+        @Param("contributorId") Long contributorId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") Instant since
+    );
+
+    /** Projection: severity → count. */
+    interface SeverityCount {
+        de.tum.in.www1.hephaestus.practices.model.Severity getSeverity();
+        Long getCount();
+    }
+
+    /** Projection: verdict → count. */
+    interface VerdictCount {
+        de.tum.in.www1.hephaestus.practices.model.Verdict getVerdict();
+        Long getCount();
+    }
 }

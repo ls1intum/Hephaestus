@@ -65,7 +65,6 @@ services:
       DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
-      INTELLIGENCE_SERVICE_URL: http://intelligence-service:8000
       NATS_SERVER: nats://nats-server:4222
       KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
       KEYCLOAK_REALM: hephaestus
@@ -106,7 +105,8 @@ services:
       # GitLab integration
       GITLAB_ENABLED: ${GITLAB_ENABLED:-false}
       KEYCLOAK_GITLAB_BASE_URL: ${KEYCLOAK_GITLAB_BASE_URL:-https://gitlab.lrz.de}
-      # Agent sandbox (practice review)
+      # Agent sandbox (practice review + Pi mentor chat — both gated per-workspace via
+      # WorkspaceFeatures.{practicesEnabled,mentorEnabled})
       SANDBOX_ENABLED: ${SANDBOX_ENABLED:-false}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
@@ -168,37 +168,6 @@ services:
       - "traefik.http.routers.https-application-server.priority=10"
     healthcheck:
       test: "wget -qO- http://localhost:8080/actuator/health || exit 1"
-      interval: 5s
-      timeout: 10s
-      retries: 10
-      start_period: 10s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
-
-  intelligence-service:
-    image: "ghcr.io/ls1intum/hephaestus/intelligence-service:${IMAGE_TAG}"
-    environment:
-      APP_VERSION: ${IMAGE_TAG}
-      NODE_ENV: production
-      PORT: 8000
-      LOG_LEVEL: info
-      DATABASE_URL: postgresql://root:root@postgres:5432/hephaestus
-      MODEL_NAME: ${MODEL_NAME}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      AZURE_RESOURCE_NAME: ${AZURE_RESOURCE_NAME}
-      AZURE_API_KEY: ${AZURE_API_KEY}
-    depends_on:
-      - postgres
-    restart: unless-stopped
-    ports:
-      - "8000"
-    networks:
-      - shared-network
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
       interval: 5s
       timeout: 10s
       retries: 10

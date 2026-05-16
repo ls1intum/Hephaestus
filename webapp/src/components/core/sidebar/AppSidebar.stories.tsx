@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import type { ChatThreadGroup } from "@/api/types.gen";
+import type { ChatThreadSummary } from "@/api/types.gen";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 
@@ -12,6 +12,7 @@ const mockWorkspace = {
 	providerType: "GITHUB",
 	createdAt: new Date("2025-01-15T00:00:00Z"),
 	practicesEnabled: true,
+	mentorEnabled: true,
 	achievementsEnabled: true,
 	leaderboardEnabled: true,
 	progressionEnabled: false,
@@ -95,7 +96,10 @@ export const AdminUser: Story = {
 };
 
 /**
- * Mentor sidebar context with grouped threads.
+ * Mentor sidebar context with sample threads.
+ *
+ * NavMentorThreads buckets these locally by createdAt (Today, Yesterday,
+ * Last 7 days, etc.) since the server returns a flat list.
  */
 export const MentorContext: Story = {
 	args: {
@@ -103,33 +107,23 @@ export const MentorContext: Story = {
 		isAdmin: false,
 		hasMentorAccess: true,
 		context: "mentor",
-		mentorThreadGroups: [
+		mentorThreads: [
 			{
-				groupName: "Today",
-				threads: [
-					{
-						id: "1",
-						title: "React Hooks Best Practices",
-						createdAt: new Date("2025-01-15T00:00:00Z"),
-					},
-					{
-						id: "2",
-						title: "TypeScript Generic Types",
-						createdAt: new Date("2025-01-15T00:00:00Z"),
-					},
-				],
+				id: "1",
+				title: "React Hooks Best Practices",
+				createdAt: new Date(),
 			},
 			{
-				groupName: "Yesterday",
-				threads: [
-					{
-						id: "3",
-						title: "API Architecture Review",
-						createdAt: new Date("2025-01-14T00:00:00Z"),
-					},
-				],
+				id: "2",
+				title: "TypeScript Generic Types",
+				createdAt: new Date(),
 			},
-		] as ChatThreadGroup[],
+			{
+				id: "3",
+				title: "API Architecture Review",
+				createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000 - 60_000),
+			},
+		] satisfies ChatThreadSummary[],
 		mentorThreadsLoading: false,
 	},
 };
@@ -185,5 +179,14 @@ export const LoadingWorkspaces: Story = {
 		workspaces: [],
 		activeWorkspace: undefined,
 		workspacesLoading: true,
+	},
+};
+
+/** User has the MENTOR_ACCESS Keycloak role but the workspace toggle is off — link hidden. */
+export const MentorRoleButFeatureDisabled: Story = {
+	args: {
+		hasMentorAccess: true,
+		activeWorkspace: { ...mockWorkspace, mentorEnabled: false },
+		workspaces: [{ ...mockWorkspace, mentorEnabled: false }],
 	},
 };

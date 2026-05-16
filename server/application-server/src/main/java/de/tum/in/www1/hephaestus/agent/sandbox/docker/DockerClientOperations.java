@@ -60,6 +60,19 @@ public class DockerClientOperations
     }
 
     @Override
+    public boolean imageIsPresent(String image) {
+        try {
+            dockerClient.inspectImageCmd(image).exec();
+            return true;
+        } catch (NotFoundException e) {
+            return false;
+        } catch (Exception e) {
+            log.debug("imageIsPresent check failed for {}: {}", image, e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
     public boolean pullImage(String image) {
         if (image == null || image.isBlank()) {
             log.warn("pullImage called with blank image reference, skipping");

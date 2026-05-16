@@ -43,7 +43,7 @@ import org.springframework.stereotype.Service;
  * This approach:
  * <ul>
  *   <li>Supports worktree-based operations for coding agents</li>
- *   <li>Allows intelligence-service to read files directly from the working tree</li>
+ *   <li>Allows sandboxed agents to read files directly from the working tree</li>
  *   <li>Maintains all branches via {@code setCloneAllBranches(true)}</li>
  * </ul>
  */

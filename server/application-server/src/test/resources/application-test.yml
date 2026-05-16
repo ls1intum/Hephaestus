@@ -62,8 +62,6 @@ github:
 hephaestus:
     workspace:
         init-default: false # Disable PAT workspace bootstrap
-    intelligence-service:
-        url: http://localhost:8080
     cors:
         allowed-origins:
             - http://localhost:4200

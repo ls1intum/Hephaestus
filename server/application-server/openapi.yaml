@@ -28,6 +28,10 @@ tags:
   name: Practice Findings
 - description: Workspace-scoped agent configuration management
   name: Agent Config
+- description: Workspace-scoped mentor chat threads
+  name: Mentor Threads
+- description: Up/down votes on mentor assistant messages
+  name: Mentor Votes
 - description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
@@ -964,106 +968,9 @@ paths:
       summary: Toggle the hidden flag for a workspace member.
       tags:
       - workspace-membership
-  /workspaces/{workspaceSlug}/mentor/chat:
-    post:
-      operationId: mentorChat
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                greeting:
-                  type: boolean
-                  description: "If true, generate a greeting without user message"
-                id:
-                  type: string
-                  format: uuid
-                message:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                      format: uuid
-                    parts:
-                      type: array
-                      items:
-                        anyOf:
-                        - type: object
-                          properties:
-                            text:
-                              type: string
-                              maxLength: 2000
-                              minLength: 1
-                            type:
-                              type: string
-                              enum:
-                              - text
-                          required:
-                          - text
-                          - type
-                        - type: object
-                          properties:
-                            mediaType:
-                              type: string
-                              enum:
-                              - image/jpeg
-                              - image/png
-                            name:
-                              type: string
-                              maxLength: 100
-                              minLength: 1
-                            type:
-                              type: string
-                              enum:
-                              - file
-                            url:
-                              type: string
-                              format: uri
-                          required:
-                          - mediaType
-                          - name
-                          - type
-                          - url
-                    role:
-                      type: string
-                      enum:
-                      - user
-                  required:
-                  - id
-                  - parts
-                  - role
-                previousMessageId:
-                  type: string
-              required:
-              - id
-        description: Chat request body
-        required: true
-      responses:
-        "200":
-          content:
-            text/event-stream:
-              schema:
-                $ref: "#/components/schemas/StreamPart"
-          description: Event stream of chat updates.
-      summary: Handle mentor chat (set greeting=true for initial greeting without
-        user message)
-      tags:
-      - mentor
-      - exported
-      x-hephaestus:
-        export: true
-  /workspaces/{workspaceSlug}/mentor/documents:
+  /workspaces/{workspaceSlug}/mentor/threads:
     get:
-      operationId: listDocuments
+      operationId: listThreads
       parameters:
       - description: Workspace slug
         in: path
@@ -1072,27 +979,6 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - explode: true
-        in: query
-        name: page
-        required: false
-        schema:
-          type:
-          - integer
-          - "null"
-          default: 0
-          minimum: 0
-        style: form
-      - explode: true
-        in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          default: 20
-          maximum: 100
-          minimum: 1
-        style: form
       responses:
         "200":
           content:
@@ -1100,71 +986,14 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/DocumentSummary"
-          description: Document summaries
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing context
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-      summary: List documents owned by the authenticated user
+                  $ref: "#/components/schemas/ChatThreadSummary"
+          description: "Threads returned, newest first"
+      summary: List the current user's mentor threads in this workspace
       tags:
-      - documents
-      - exported
-      x-hephaestus:
-        export: true
-    post:
-      operationId: createDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateDocumentRequest"
-        description: Create document
-        required: true
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Created document
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing required context
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-      summary: Create a new document
-      tags:
-      - documents
-      - exported
-      x-hephaestus:
-        export: true
-  /workspaces/{workspaceSlug}/mentor/documents/{id}:
+      - Mentor Threads
+  /workspaces/{workspaceSlug}/mentor/threads/{threadId}:
     delete:
-      operationId: deleteDocument
+      operationId: deleteThread
       parameters:
       - description: Workspace slug
         in: path
@@ -1173,433 +1002,20 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - explode: false
-        in: path
-        name: id
+      - in: path
+        name: threadId
         required: true
         schema:
           type: string
           format: uuid
-        style: simple
       responses:
         "204":
-          description: Deleted
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing context
+          description: Thread deleted
         "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Not found
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-      summary: Delete a document and all versions
+          description: Thread not found OR not owned by current user
+      summary: "Delete a mentor thread (cascades to messages, votes, parts)"
       tags:
-      - documents
-      - exported
-      x-hephaestus:
-        export: true
-    get:
-      operationId: getDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-        style: simple
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing context
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Not found
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-      summary: Get latest version of a document
-      tags:
-      - documents
-      - exported
-      x-hephaestus:
-        export: true
-    put:
-      operationId: updateDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-        style: simple
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateDocumentRequest"
-        description: Update document
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Updated document
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing context
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Not found
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-      summary: Update a document (creates new version)
-      tags:
-      - documents
-      - exported
-      x-hephaestus:
-        export: true
-  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions:
-    delete:
-      operationId: deleteDocumentVersionsAfter
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-        style: simple
-      - explode: true
-        in: query
-        name: after
-        required: true
-        schema:
-          type: string
-          format: date-time
-        style: form
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Deleted versions
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing context
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Not found
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-      summary: Delete versions after timestamp
-      tags:
-      - documents
-      - exported
-      x-hephaestus:
-        export: true
-    get:
-      operationId: listVersions
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-        style: simple
-      - explode: true
-        in: query
-        name: page
-        required: false
-        schema:
-          type:
-          - integer
-          - "null"
-          default: 0
-          minimum: 0
-        style: form
-      - explode: true
-        in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          default: 20
-          maximum: 100
-          minimum: 1
-        style: form
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Document versions
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing context
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Not found
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-      summary: List versions of a document
-      tags:
-      - documents
-      - exported
-      x-hephaestus:
-        export: true
-  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions/{versionNumber}:
-    get:
-      operationId: getVersion
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-        style: simple
-      - explode: false
-        in: path
-        name: versionNumber
-        required: true
-        schema:
-          type:
-          - integer
-          - "null"
-        style: simple
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing context
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Not found
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-      summary: Get specific version
-      tags:
-      - documents
-      - exported
-      x-hephaestus:
-        export: true
-  /workspaces/{workspaceSlug}/mentor/messages/{messageId}/vote:
-    put:
-      operationId: voteMessage
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - explode: false
-        in: path
-        name: messageId
-        required: true
-        schema:
-          type: string
-          format: uuid
-        style: simple
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/VoteMessageRequest"
-        description: Vote request body
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Vote recorded
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing context
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Message not found
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-      summary: Vote on a chat message (upvote/downvote) - idempotent upsert
-      tags:
-      - vote
-      - exported
-      x-hephaestus:
-        export: true
-  /workspaces/{workspaceSlug}/mentor/threads/grouped:
-    get:
-      operationId: getGroupedThreads
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadGroup"
-          description: Grouped chat threads
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing context
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-      summary: List chat threads grouped by time buckets
-      tags:
-      - mentor
-      - exported
-      x-hephaestus:
-        export: true
-  /workspaces/{workspaceSlug}/mentor/threads/{threadId}:
+      - Mentor Threads
     get:
       operationId: getThread
       parameters:
@@ -1610,51 +1026,95 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - explode: false
-        in: path
+      - in: path
         name: threadId
         required: true
         schema:
           type: string
           format: uuid
-        style: simple
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ThreadDetail"
-          description: Thread detail with messages
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Missing required context
+                $ref: "#/components/schemas/ChatThreadDetail"
+          description: Thread + messages returned
         "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Thread not found
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Internal error
-        "503":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Service temporarily unavailable
-      summary: Get mentor chat thread detail
+          description: Thread not found OR not owned by current user
+      summary: Get a mentor thread with its full message history
       tags:
-      - mentor
-      - exported
-      x-hephaestus:
-        export: true
+      - Mentor Threads
+  /workspaces/{workspaceSlug}/mentor/threads/{threadId}/messages/{messageId}/vote:
+    delete:
+      operationId: removeVote
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: threadId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Vote removed or did not exist
+        "404":
+          description: Thread or message not found (or not owned by current user)
+      summary: Remove a vote on an assistant message (idempotent)
+      tags:
+      - Mentor Votes
+    post:
+      operationId: vote
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: threadId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageVoteRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Vote recorded
+        "404":
+          description: Thread or message not found (or not owned by current user)
+      summary: Upsert a vote on an assistant message
+      tags:
+      - Mentor Votes
   /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
@@ -3265,12 +2725,33 @@ components:
       description: Binary progress indicating unlocked state
       required:
       - unlocked
-    ChatMessageVote:
+    ChatMessage:
       type: object
+      description: Mentor chat message in AI SDK UIMessage shape.
       properties:
         createdAt:
           type: string
           format: date-time
+        id:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+          additionalProperties: {}
+          description: "Per-turn metadata: status, model, costUsd, usage, …"
+        parentMessageId:
+          type: string
+          format: uuid
+        parts:
+          type: array
+          items:
+            description: AI SDK UIMessage part (text / reasoning / tool / data-finding).
+        role:
+          type: string
+    ChatMessageVote:
+      type: object
+      description: User vote on a mentor assistant message.
+      properties:
         isUpvoted:
           type: boolean
         messageId:
@@ -3279,29 +2760,34 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required:
-      - createdAt
-      - isUpvoted
-      - messageId
-      - updatedAt
-      x-hephaestus:
-        export: true
-    ChatThreadGroup:
+    ChatMessageVoteRequest:
       type: object
+      description: Upsert a vote on a mentor assistant message
       properties:
-        groupName:
+        isUpvoted:
+          type: boolean
+          description: "true = upvote (helpful), false = downvote"
+      required:
+      - isUpvoted
+    ChatThreadDetail:
+      type: object
+      description: Mentor chat thread with all messages.
+      properties:
+        createdAt:
           type: string
-        threads:
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        messages:
           type: array
           items:
-            $ref: "#/components/schemas/ChatThreadSummary"
-      required:
-      - groupName
-      - threads
-      x-hephaestus:
-        export: true
+            $ref: "#/components/schemas/ChatMessage"
+        title:
+          type: string
     ChatThreadSummary:
       type: object
+      description: Mentor chat thread summary (no messages).
       properties:
         createdAt:
           type: string
@@ -3311,11 +2797,6 @@ components:
           format: uuid
         title:
           type: string
-      required:
-      - id
-      - title
-      x-hephaestus:
-        export: true
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -3440,24 +2921,6 @@ components:
       required:
       - llmProvider
       - name
-    CreateDocumentRequest:
-      type: object
-      properties:
-        content:
-          type: string
-          minLength: 1
-        kind:
-          $ref: "#/components/schemas/DocumentKind"
-        title:
-          type: string
-          maxLength: 255
-          minLength: 1
-      required:
-      - content
-      - kind
-      - title
-      x-hephaestus:
-        export: true
     CreateFindingFeedback:
       type: object
       description: Submit feedback on an AI-generated practice finding
@@ -3591,74 +3054,6 @@ components:
       - accountType
       - displayName
       - workspaceSlug
-    Document:
-      type: object
-      properties:
-        content:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        id:
-          type: string
-          format: uuid
-        kind:
-          $ref: "#/components/schemas/DocumentKind"
-        title:
-          type: string
-        userId:
-          type: integer
-        versionNumber:
-          type: integer
-      required:
-      - content
-      - createdAt
-      - id
-      - kind
-      - title
-      - userId
-      - versionNumber
-      x-hephaestus:
-        export: true
-    DocumentKind:
-      type: string
-      enum:
-      - text
-      x-hephaestus:
-        export: true
-    DocumentSummary:
-      type: object
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        id:
-          type: string
-          format: uuid
-        kind:
-          $ref: "#/components/schemas/DocumentKind"
-        title:
-          type: string
-        userId:
-          type: integer
-      required:
-      - createdAt
-      - id
-      - kind
-      - title
-      - userId
-      x-hephaestus:
-        export: true
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-          description: Human-readable error message
-      required:
-      - error
-      x-hephaestus:
-        export: true
     FeatureFlags:
       type: object
       description: Feature flags evaluated for the current user
@@ -4676,16 +4071,6 @@ components:
           type: boolean
         unsorted:
           type: boolean
-    StreamPart:
-      type: object
-      additionalProperties: {}
-      properties:
-        type:
-          type: string
-      required:
-      - type
-      x-hephaestus:
-        export: true
     TeamInfo:
       type: object
       description: "Detailed information about a team including members, repositories,\
@@ -4789,62 +4174,6 @@ components:
       - hidden
       - id
       - name
-    ThreadDetail:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        messages:
-          type: array
-          items:
-            type: object
-            properties:
-              createdAt:
-                type: string
-                format: date-time
-              id:
-                type: string
-                format: uuid
-              parentMessageId:
-                type:
-                - string
-                - "null"
-                format: uuid
-              parts:
-                type: array
-                items:
-                  type: object
-                  additionalProperties: {}
-                  properties:
-                    type:
-                      type: string
-                  required:
-                  - type
-              role:
-                type: string
-                enum:
-                - system
-                - user
-                - assistant
-            required:
-            - id
-            - parts
-            - role
-        selectedLeafMessageId:
-          type:
-          - string
-          - "null"
-          format: uuid
-        title:
-          type:
-          - string
-          - "null"
-      required:
-      - id
-      - messages
-      x-hephaestus:
-        export: true
     UpdateAgentConfigRequest:
       type: object
       description: Request to update an existing agent configuration (all fields optional
@@ -4979,6 +4308,9 @@ components:
         leaguesEnabled:
           type: boolean
           description: Enable league tiers and rankings
+        mentorEnabled:
+          type: boolean
+          description: Enable the Pi mentor chat feature
         practiceReviewAutoTriggerEnabled:
           type: boolean
           description: Enable automatic practice reviews triggered by PR events
@@ -5144,15 +4476,6 @@ components:
       - name
       - teams
       - url
-    VoteMessageRequest:
-      type: object
-      properties:
-        isUpvoted:
-          type: boolean
-      required:
-      - isUpvoted
-      x-hephaestus:
-        export: true
     Workspace:
       type: object
       description: Complete workspace information including configuration and settings
@@ -5225,6 +4548,9 @@ components:
         leaguesEnabled:
           type: boolean
           description: Whether league tiers and rankings are enabled
+        mentorEnabled:
+          type: boolean
+          description: Whether the Pi mentor chat feature is enabled
         practiceReviewAutoTriggerEnabled:
           type: boolean
           description: Whether automatic practice reviews triggered by PR events are
@@ -5275,6 +4601,7 @@ components:
       - isPubliclyViewable
       - leaderboardEnabled
       - leaguesEnabled
+      - mentorEnabled
       - practiceReviewAutoTriggerEnabled
       - practiceReviewManualTriggerEnabled
       - practicesEnabled
@@ -5310,6 +4637,9 @@ components:
         leaguesEnabled:
           type: boolean
           description: Whether league tiers and rankings are enabled
+        mentorEnabled:
+          type: boolean
+          description: Whether the Pi mentor chat feature is enabled
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
@@ -5338,6 +4668,7 @@ components:
       - id
       - leaderboardEnabled
       - leaguesEnabled
+      - mentorEnabled
       - practicesEnabled
       - progressionEnabled
       - providerType

@@ -1,6 +1,4 @@
-import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
-import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayContainer";
+import { createFileRoute } from "@tanstack/react-router";
 import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,34 +10,17 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$t
 });
 
 function ThreadContainer() {
-	const { workspaceSlug, threadId } = Route.useParams();
-	const { state } = useLocation();
-	const navigate = useNavigate({ from: Route.fullPath });
+	const { threadId } = Route.useParams();
 
-	// Check if we should auto-trigger a greeting (for new threads)
-	const autoGreeting = state?.autoGreeting === true;
-
-	// Initialize mentor chat hook
+	// Initialize mentor chat hook. The empty-thread greeting renders statically inside
+	// <Chat /> when messages are empty; no server roundtrip needed.
 	const mentorChat = useMentorChat({
 		threadId,
-		autoGreeting,
 		onError: (error: Error) => {
 			console.error("Chat error:", error);
 		},
 	});
 
-	// Clear navigation state after mounting to prevent re-triggering on back/forward
-	const stateCleared = useRef(false);
-	useEffect(() => {
-		if (stateCleared.current || !autoGreeting) return;
-		stateCleared.current = true;
-		navigate({
-			to: Route.fullPath,
-			params: { workspaceSlug, threadId },
-			replace: true,
-			state: undefined,
-		});
-	}, [autoGreeting, navigate, workspaceSlug, threadId]);
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		if (!text.trim()) return;
 		mentorChat.sendMessage(text);
@@ -167,20 +148,6 @@ function ThreadContainer() {
 				inputPlaceholder="Continue the conversation..."
 				disableAttachments={true}
 				className="h-[calc(100dvh-4rem)]"
-				partRenderers={defaultPartRenderers}
-			/>
-			<ArtifactOverlayContainer
-				messages={mentorChat.messages as unknown as ChatMessage[]}
-				votes={mentorChat.votes}
-				status={mentorChat.status}
-				attachments={[]}
-				readonly={false}
-				onMessageSubmit={handleMessageSubmit}
-				onStop={mentorChat.stop}
-				onFileUpload={() => Promise.resolve([])}
-				onMessageEdit={handleMessageEdit}
-				onCopy={handleCopy}
-				onVote={handleVote}
 				partRenderers={defaultPartRenderers}
 			/>
 		</div>

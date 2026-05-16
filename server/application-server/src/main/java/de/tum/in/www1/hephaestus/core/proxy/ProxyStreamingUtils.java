@@ -22,8 +22,8 @@ import reactor.core.scheduler.Schedulers;
 /**
  * Shared utilities for HTTP proxy controllers that need SSE streaming support.
  *
- * <p>Extracted from {@code MentorProxyController} to be reused by the LLM proxy and
- * any future proxy endpoints. All methods are stateless and thread-safe.
+ * <p>Used today by the LLM proxy controller; written to be reusable by any future proxy
+ * endpoint. All methods are stateless and thread-safe.
  */
 public final class ProxyStreamingUtils {
 

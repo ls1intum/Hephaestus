@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
-import type { ChatThreadGroup, WorkspaceListItem } from "@/api/types.gen";
+import type { ChatThreadSummary, WorkspaceListItem } from "@/api/types.gen";
 import {
 	Sidebar,
 	SidebarContent,
@@ -36,7 +36,7 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	onAddWorkspace?: () => void;
 	workspacesLoading?: boolean;
 	// Optional mentor thread data - using API types directly
-	mentorThreadGroups?: ChatThreadGroup[];
+	mentorThreads?: ChatThreadSummary[];
 	mentorThreadsLoading?: boolean;
 	mentorThreadsError?: string;
 }
@@ -51,7 +51,7 @@ export function AppSidebar({
 	onWorkspaceChange,
 	onAddWorkspace,
 	workspacesLoading = false,
-	mentorThreadGroups,
+	mentorThreads,
 	mentorThreadsLoading,
 	mentorThreadsError,
 	...props
@@ -96,7 +96,7 @@ export function AppSidebar({
 		sidebarContent = (
 			<NavMentorThreads
 				workspaceSlug={activeWorkspace.workspaceSlug}
-				threadGroups={mentorThreadGroups ?? []}
+				threads={mentorThreads ?? []}
 				isLoading={mentorThreadsLoading}
 				error={mentorThreadsError}
 			/>
@@ -110,7 +110,10 @@ export function AppSidebar({
 					achievementsEnabled={activeWorkspace.achievementsEnabled}
 					leaderboardEnabled={activeWorkspace.leaderboardEnabled}
 				/>
-				{hasMentorAccess && <NavMentor workspaceSlug={activeWorkspace.workspaceSlug} />}
+				{/* Mentor link requires BOTH the user-scoped Keycloak role and the per-workspace toggle. */}
+				{hasMentorAccess && activeWorkspace.mentorEnabled && (
+					<NavMentor workspaceSlug={activeWorkspace.workspaceSlug} />
+				)}
 				{isAdmin && (
 					<NavAdmin
 						workspaceSlug={activeWorkspace.workspaceSlug}

@@ -63,7 +63,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "PracticeFinding", // through Practice.workspace
         // Through chat thread -> workspace
         "ChatMessage", // through ChatThread.workspace
-        "ChatMessagePart", // through ChatMessage.thread.workspace
         "ChatMessageVote", // through ChatMessage (via messageId) -> ChatThread.workspace
         // Through Workspace.organization (ID-based relationship via JOIN)
         "OrganizationMembership", // organizationId -> Workspace.organization
@@ -92,7 +91,8 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "Workspace", // Is the tenant root
         "WorkspaceSlugHistory", // Tracks workspace slug changes
         "IssueType", // GitHub issue types are workspace-scoped through issue
-        "GitProvider" // Global provider instances (e.g., github.com, gitlab.com)
+        "GitProvider", // Global provider instances (e.g., github.com, gitlab.com)
+        "ModelPricing" // Vendor list prices per LLM model — not tenant-scoped (#1071)
     );
 
     // ========================================================================
@@ -279,8 +279,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                 .haveSimpleNameEndingWith("Dto")
                 .and()
                 .resideInAPackage(BASE_PACKAGE + "..")
-                .and()
-                .resideOutsideOfPackage("..intelligenceservice..")
                 .should(notExposeCrossWorkspaceData)
                 .because("DTOs should use projections to prevent cross-workspace data leakage");
 

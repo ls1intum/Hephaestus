@@ -98,9 +98,16 @@ public class WorkspaceContextBuilder {
                 continue;
             }
             String providerName = provider.getClass().getSimpleName();
-            // Snapshot pre-call keyset so we can detect both (a) overwrites of another provider's
-            // output (caught here) and (b) brand-new keys (validated for prefix below).
+            // Snapshot pre-call keyset AND values so we can detect both (a) brand-new keys
+            // (validated for prefix below) and (b) silent overwrites — a second provider
+            // calling files.put(key, newBytes) on a key already owned by another provider
+            // would otherwise replace the value in-place, and the keyOwner check below
+            // (gated on `if (beforeKeys.contains(key)) continue`) would miss it.
             java.util.Set<String> beforeKeys = java.util.Set.copyOf(files.keySet());
+            // Reference-snapshot is enough: ContentProvider#contribute is required to publish
+            // a NEW byte[] for any modification (the existing arrays are interpreted as the
+            // owner's immutable output), so reference equality identifies an in-place replace.
+            java.util.Map<String, byte[]> beforeValues = java.util.Map.copyOf(files);
             try {
                 provider.contribute(request, files);
             } catch (JobPreparationException e) {
@@ -115,13 +122,17 @@ public class WorkspaceContextBuilder {
             }
             for (String key : files.keySet()) {
                 if (beforeKeys.contains(key)) {
-                    String previousOwner = keyOwner.get(key);
-                    if (previousOwner != null && !previousOwner.equals(providerName)) {
+                    // Pre-existing key — only an overwrite is a wiring bug. Reference-equality
+                    // on the array is enough because providers must publish fresh byte[]s; a
+                    // mutated-in-place array from an earlier provider would also fail here
+                    // (which is the safer default).
+                    if (beforeValues.get(key) != files.get(key)) {
+                        String existingOwner = keyOwner.get(key);
                         throw new IllegalStateException(
                             "Duplicate workspace key " +
                                 key +
                                 ": written by both " +
-                                previousOwner +
+                                existingOwner +
                                 " and " +
                                 providerName
                         );
@@ -131,6 +142,12 @@ public class WorkspaceContextBuilder {
                 if (!key.startsWith(ContentProvider.OUTPUT_PREFIX)) {
                     throw new IllegalStateException(
                         providerName + " wrote file outside " + ContentProvider.OUTPUT_PREFIX + ": " + key
+                    );
+                }
+                String existingOwner = keyOwner.get(key);
+                if (existingOwner != null) {
+                    throw new IllegalStateException(
+                        "Duplicate workspace key " + key + ": written by both " + existingOwner + " and " + providerName
                     );
                 }
                 keyOwner.put(key, providerName);

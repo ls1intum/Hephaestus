@@ -21,12 +21,11 @@ jobs:
     outputs:
       webapp: ${{ steps.filter.outputs.webapp }}
       application-server: ${{ steps.filter.outputs.application-server }}
-      intelligence-service: ${{ steps.filter.outputs.intelligence-service }}
       webhook-ingest: ${{ steps.filter.outputs.webhook-ingest }}
       agent-images: ${{ steps.filter.outputs.agent-images }}
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
-      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.intelligence-service == 'true' || steps.filter.outputs.webhook-ingest == 'true' || steps.filter.outputs.agent-images == 'true' }}
+      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.webhook-ingest == 'true' || steps.filter.outputs.agent-images == 'true' }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
     steps:
@@ -51,13 +50,6 @@ jobs:
             application-server:
               - 'server/application-server/**'
               - 'scripts/db-utils.sh'
-            intelligence-service:
-              - 'server/intelligence-service/**'
-              - 'scripts/install-platform-binaries.mjs'
-              - 'scripts/generate-mermaid-erd.ts'
-              - 'scripts/postprocess-openapi-java.ts'
-              - 'package.json'
-              - 'package-lock.json'
             webhook-ingest:
               - 'server/webhook-ingest/**'
               - 'package.json'
@@ -108,7 +100,6 @@ jobs:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Security:
@@ -138,7 +129,6 @@ jobs:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Docker:
@@ -155,7 +145,6 @@ jobs:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
@@ -241,7 +230,6 @@ jobs:
           echo "|-----------|---------|" >> $GITHUB_STEP_SUMMARY
           echo "| Webapp | ${{ needs.detect-changes.outputs.webapp == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Application Server | ${{ needs.detect-changes.outputs.application-server == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Intelligence Service | ${{ needs.detect-changes.outputs.intelligence-service == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Webhook Ingest | ${{ needs.detect-changes.outputs.webhook-ingest == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Agent Images | ${{ needs.detect-changes.outputs.agent-images == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| CI Config | ${{ needs.detect-changes.outputs.ci-config == 'true' && '⚙️ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
@@ -278,7 +266,6 @@ jobs:
               echo "| Webapp unit | \`npm run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Webapp Storybook | \`npm -w webapp run test:storybook\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Application server | \`cd server/application-server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Intelligence service | \`npm -w server/intelligence-service run test\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Webhook ingest | \`npm -w server/webhook-ingest run test\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY

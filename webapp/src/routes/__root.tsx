@@ -9,11 +9,10 @@ import {
 } from "@tanstack/react-router";
 import type React from "react";
 import { Toaster } from "sonner";
-import { getGroupedThreadsOptions, getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
+import { getUserSettingsOptions, listThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
 import { AppSidebar, type SidebarContext } from "@/components/core/sidebar/AppSidebar";
-import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayContainer";
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
@@ -135,7 +134,8 @@ function GlobalCopilot() {
 		if (idx === -1) return;
 		// Keep everything before the edited message
 		mentorChat.setMessages(mentorChat.messages.slice(0, idx));
-		// Send the edited content as a new message; prepareSendMessagesRequest will set previousMessageId to the new last message
+		// Send the edited content as a new message; the server resolves the parent from the
+		// trimmed history (we only ship the new user message, not previousMessageId).
 		mentorChat.sendMessage(content);
 	};
 
@@ -183,20 +183,6 @@ function GlobalCopilot() {
 				inputPlaceholder="Ask me anything..."
 				disableAttachments={true}
 				className="h-full max-h-none"
-				partRenderers={defaultPartRenderers}
-			/>
-			<ArtifactOverlayContainer
-				messages={mentorChat.messages as ChatMessage[]}
-				votes={mentorChat.votes}
-				status={mentorChat.status}
-				attachments={[]}
-				readonly={false}
-				onMessageSubmit={handleMessageSubmit}
-				onStop={mentorChat.stop}
-				onFileUpload={() => Promise.resolve([])}
-				onMessageEdit={handleMessageEdit}
-				onCopy={handleCopy}
-				onVote={handleVote}
 				partRenderers={defaultPartRenderers}
 			/>
 		</Copilot>
@@ -260,11 +246,11 @@ function AppSidebarContainer() {
 
 	// Always call useQuery but only enable when in mentor context and authenticated
 	const {
-		data: threadGroups,
+		data: mentorThreads,
 		isLoading: mentorThreadsLoading,
 		error: mentorThreadsError,
 	} = useQuery({
-		...getGroupedThreadsOptions({
+		...listThreadsOptions({
 			path: { workspaceSlug: workspaceSlug ?? "" },
 		}),
 		enabled: sidebarContext === "mentor" && isAuthenticated && hasWorkspace,
@@ -297,7 +283,7 @@ function AppSidebarContainer() {
 			onWorkspaceChange={handleWorkspaceChange}
 			onAddWorkspace={handleAddWorkspace}
 			workspacesLoading={workspaceAccess.isLoading}
-			mentorThreadGroups={sidebarContext === "mentor" ? threadGroups : undefined}
+			mentorThreads={sidebarContext === "mentor" ? mentorThreads : undefined}
 			mentorThreadsLoading={sidebarContext === "mentor" ? mentorThreadsLoading : undefined}
 			mentorThreadsError={
 				sidebarContext === "mentor" && mentorThreadsError ? "Failed to load threads" : undefined

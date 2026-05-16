@@ -39,7 +39,6 @@
     {
       "description": "Group TypeScript services",
       "matchFileNames": [
-        "server/intelligence-service/**",
         "server/webhook-ingest/**"
       ],
       "matchUpdateTypes": ["minor", "patch"],

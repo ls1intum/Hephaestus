@@ -139,7 +139,7 @@ public class InteractiveSandboxRegistry {
 
     @Scheduled(fixedDelayString = "${hephaestus.mentor.reap-interval-seconds:30}", timeUnit = TimeUnit.SECONDS)
     public void reap() {
-        if (!properties.enabled() || shuttingDown) {
+        if (shuttingDown) {
             // During @PreDestroy the scheduler can still fire; closeExecutor may already be down
             // and we'd run runClose inline on the scheduler thread, stalling the watchdog.
             return;
@@ -164,7 +164,7 @@ public class InteractiveSandboxRegistry {
 
     @Scheduled(fixedDelay = 1, timeUnit = TimeUnit.SECONDS)
     public void tickWatchdog() {
-        if (!properties.enabled() || shuttingDown) {
+        if (shuttingDown) {
             return;
         }
         watchdog.tick();
@@ -173,15 +173,6 @@ public class InteractiveSandboxRegistry {
     /** After a restart the in-memory registry is gone; any {@code KIND=interactive} container is orphan. */
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
-        if (!properties.enabled()) {
-            return;
-        }
-        if (properties.replicaCount() > 1) {
-            log.warn(
-                "Mentor is enabled with replicaCount={}; session affinity is not enforced until #1077",
-                properties.replicaCount()
-            );
-        }
         try {
             List<DockerOperations.ContainerInfo> managed = containerManager.listManagedContainers();
             int removed = 0;

@@ -4,15 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
 export type FeatureKey = keyof UpdateWorkspaceFeaturesRequest;
+export type FeatureValues = Record<FeatureKey, boolean>;
 
 export interface AdminFeaturesSettingsProps {
-	practicesEnabled: boolean;
-	achievementsEnabled: boolean;
-	leaderboardEnabled: boolean;
-	progressionEnabled: boolean;
-	leaguesEnabled: boolean;
-	practiceReviewAutoTriggerEnabled: boolean;
-	practiceReviewManualTriggerEnabled: boolean;
+	values: FeatureValues;
 	isSaving: boolean;
 	onToggle: (feature: FeatureKey, enabled: boolean) => void;
 }
@@ -43,6 +38,12 @@ const FEATURES: ReadonlyArray<FeatureDefinition> = [
 		],
 	},
 	{
+		key: "mentorEnabled",
+		label: "Mentor Chat",
+		description:
+			"Enable the Pi mentor chat assistant for workspace members. Requires the sandbox runtime and agent NATS to be available on the deployment.",
+	},
+	{
 		key: "achievementsEnabled",
 		label: "Achievements",
 		description: "Enable the achievements system with badges and skill trees.",
@@ -64,27 +65,7 @@ const FEATURES: ReadonlyArray<FeatureDefinition> = [
 	},
 ];
 
-export function AdminFeaturesSettings({
-	practicesEnabled,
-	achievementsEnabled,
-	leaderboardEnabled,
-	progressionEnabled,
-	leaguesEnabled,
-	practiceReviewAutoTriggerEnabled,
-	practiceReviewManualTriggerEnabled,
-	isSaving,
-	onToggle,
-}: AdminFeaturesSettingsProps) {
-	const values: Record<FeatureKey, boolean> = {
-		practicesEnabled,
-		achievementsEnabled,
-		leaderboardEnabled,
-		progressionEnabled,
-		leaguesEnabled,
-		practiceReviewAutoTriggerEnabled,
-		practiceReviewManualTriggerEnabled,
-	};
-
+export function AdminFeaturesSettings({ values, isSaving, onToggle }: AdminFeaturesSettingsProps) {
 	return (
 		<div className="space-y-6">
 			<div>

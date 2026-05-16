@@ -10,19 +10,14 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.servers.Server;
 import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.parameters.Parameter;
-import io.swagger.v3.parser.OpenAPIV3Parser;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,13 +27,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * OpenAPI configuration that:
- * 1. Processes application-server DTOs (removes "DTO" suffix)
- * 2. Imports tagged schemas and paths from intelligence-service
- * <p>
- * Intelligence-service schemas/paths are included if they have:
- * x-hephaestus:
- * export: true
+ * OpenAPI configuration: processes application-server DTOs (strips the {@code DTO}
+ * suffix from schema names and {@code $ref}s) and normalises paths (workspace-slug
+ * parameter, tag cleanup, WorkspaceContext filtering).
  */
 @Configuration
 @OpenAPIDefinition(
@@ -62,8 +53,6 @@ import org.springframework.context.annotation.Configuration;
 public class OpenAPIConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAPIConfiguration.class);
-    private static final String INTELLIGENCE_SERVICE_SPEC = "../intelligence-service/openapi.yaml";
-    private static final String WORKSPACE_PATH_PREFIX = "/workspaces/{workspaceSlug}";
 
     /**
      * Domain objects to include even without DTO suffix
@@ -82,7 +71,6 @@ public class OpenAPIConfiguration {
         return openApi -> {
             openApi.getInfo().setVersion(appVersion);
             processApplicationServerSchemas(openApi);
-            importIntelligenceServiceSpec(openApi);
             processAllPaths(openApi);
 
             // Inject AchievementId enum based on registry keys
@@ -146,204 +134,6 @@ public class OpenAPIConfiguration {
         filteredSchemas.values().forEach(this::removeDtoSuffixFromRefs);
 
         components.setSchemas(filteredSchemas);
-    }
-
-    /**
-     * Import schemas and paths from intelligence-service that are tagged for export.
-     */
-    @SuppressWarnings("unchecked")
-    private void importIntelligenceServiceSpec(OpenAPI openApi) {
-        File specFile = new File(INTELLIGENCE_SERVICE_SPEC);
-        if (!specFile.exists()) {
-            log.warn("Intelligence service spec not found at: {}", specFile.getAbsolutePath());
-            return;
-        }
-
-        OpenAPI intelligenceSpec = new OpenAPIV3Parser().read(specFile.getAbsolutePath());
-        if (intelligenceSpec == null) {
-            log.error("Failed to parse intelligence service spec");
-            return;
-        }
-
-        if (intelligenceSpec.getComponents() == null || intelligenceSpec.getComponents().getSchemas() == null) {
-            log.warn("No schemas found in intelligence-service spec");
-            return;
-        }
-
-        Map<String, Schema<?>> allIntelligenceSchemas = (Map<String, Schema<?>>) (Map<?, ?>) intelligenceSpec
-            .getComponents()
-            .getSchemas();
-
-        // Collect all schema names we need to import (from tagged schemas AND from path references)
-        Set<String> schemasToImport = new HashSet<>();
-
-        // 1. Find schemas explicitly tagged for export
-        for (var entry : allIntelligenceSchemas.entrySet()) {
-            if (isTaggedForExport(entry.getValue())) {
-                schemasToImport.add(entry.getKey());
-            }
-        }
-
-        // 2. Import tagged paths and collect all schemas they reference
-        int importedPaths = 0;
-        if (intelligenceSpec.getPaths() != null) {
-            for (var entry : intelligenceSpec.getPaths().entrySet()) {
-                String path = entry.getKey();
-                PathItem pathItem = entry.getValue();
-
-                boolean shouldExport = pathItem.readOperations().stream().anyMatch(this::isTaggedForExport);
-
-                if (shouldExport) {
-                    // Collect all schemas referenced by this path's operations
-                    for (var operation : pathItem.readOperations()) {
-                        collectSchemasFromOperation(operation, schemasToImport);
-                    }
-
-                    // Rewrite path to include workspace prefix
-                    String newPath = WORKSPACE_PATH_PREFIX + path;
-                    openApi.getPaths().addPathItem(newPath, pathItem);
-                    importedPaths++;
-                }
-            }
-        }
-
-        // 3. Recursively include all schemas referenced by the schemas we're importing
-        Set<String> visited = new HashSet<>();
-        for (String name : new HashSet<>(schemasToImport)) {
-            collectReferencedSchemas(name, allIntelligenceSchemas, schemasToImport, visited);
-        }
-
-        // 4. Add all collected schemas to openApi
-        var targetSchemas = openApi.getComponents().getSchemas();
-        for (String name : schemasToImport) {
-            Schema<?> schema = allIntelligenceSchemas.get(name);
-            if (schema != null) {
-                targetSchemas.put(name, schema);
-            }
-        }
-
-        log.info("Imported {} schemas from intelligence-service", schemasToImport.size());
-        log.info("Imported {} paths from intelligence-service", importedPaths);
-    }
-
-    /**
-     * Collect all schema names referenced in an operation's request/response bodies.
-     */
-    private void collectSchemasFromOperation(io.swagger.v3.oas.models.Operation operation, Set<String> out) {
-        if (operation == null) return;
-
-        // Collect from responses
-        if (operation.getResponses() != null) {
-            operation
-                .getResponses()
-                .forEach((code, response) -> {
-                    if (response.getContent() != null) {
-                        response
-                            .getContent()
-                            .forEach((type, media) -> {
-                                if (media.getSchema() != null) {
-                                    collectRefs(media.getSchema(), out);
-                                }
-                            });
-                    }
-                });
-        }
-
-        // Collect from request body
-        if (operation.getRequestBody() != null && operation.getRequestBody().getContent() != null) {
-            operation
-                .getRequestBody()
-                .getContent()
-                .forEach((type, media) -> {
-                    if (media.getSchema() != null) {
-                        collectRefs(media.getSchema(), out);
-                    }
-                });
-        }
-    }
-
-    /**
-     * Check if a schema or operation is tagged with x-hephaestus.export: true
-     */
-    private boolean isTaggedForExport(Object item) {
-        Map<String, Object> extensions = null;
-
-        if (item instanceof Schema<?> schema) {
-            extensions = schema.getExtensions();
-        } else if (item instanceof io.swagger.v3.oas.models.Operation op) {
-            extensions = op.getExtensions();
-        }
-
-        if (extensions == null) {
-            return false;
-        }
-
-        Object hephaestus = extensions.get("x-hephaestus");
-        if (hephaestus instanceof Map<?, ?> map) {
-            Object export = map.get("export");
-            if (export instanceof Boolean b) return b;
-            if (export instanceof String s) return Boolean.parseBoolean(s);
-        }
-
-        return false;
-    }
-
-    /**
-     * Recursively collect all schemas referenced by a given schema.
-     */
-    private void collectReferencedSchemas(
-        String name,
-        Map<String, Schema<?>> allSchemas,
-        Set<String> toImport,
-        Set<String> visited
-    ) {
-        if (name == null || visited.contains(name)) return;
-        visited.add(name);
-
-        Schema<?> schema = allSchemas.get(name);
-        if (schema == null) return;
-
-        Set<String> refs = new HashSet<>();
-        collectRefs(schema, refs);
-
-        for (String ref : refs) {
-            if (!toImport.contains(ref)) {
-                toImport.add(ref);
-                collectReferencedSchemas(ref, allSchemas, toImport, visited);
-            }
-        }
-    }
-
-    /**
-     * Collect $ref names from a schema.
-     */
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    private void collectRefs(Schema schema, Set<String> out) {
-        if (schema == null) return;
-
-        if (schema.get$ref() != null) {
-            String ref = schema.get$ref();
-            out.add(ref.substring(ref.lastIndexOf('/') + 1));
-        }
-
-        Map<String, Schema> props = schema.getProperties();
-        if (props != null) {
-            props.values().forEach(p -> collectRefs(p, out));
-        }
-
-        if (schema.getItems() != null) {
-            collectRefs(schema.getItems(), out);
-        }
-
-        if (schema.getAllOf() != null) {
-            schema.getAllOf().forEach(s -> collectRefs((Schema) s, out));
-        }
-        if (schema.getAnyOf() != null) {
-            schema.getAnyOf().forEach(s -> collectRefs((Schema) s, out));
-        }
-        if (schema.getOneOf() != null) {
-            schema.getOneOf().forEach(s -> collectRefs((Schema) s, out));
-        }
     }
 
     /**

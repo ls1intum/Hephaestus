@@ -8,6 +8,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.mentor.ChatThread;
+import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
@@ -49,6 +51,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private ChatThreadRepository chatThreadRepository;
 
     // -------------------------------------------------------------------------
     // Helpers
@@ -286,6 +291,47 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(purged.getSlackSigningSecret()).isNull();
             assertThat(purged.getGitlabGroupId()).isNull();
             assertThat(purged.getGitlabWebhookId()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("Chat thread cleanup")
+    class ChatThreadCleanup {
+
+        @Test
+        @DisplayName("purge deletes mentor chat threads via WorkspacePurgeContributor")
+        void purgeDeletesChatThreads() {
+            User owner = persistUser("chat-cleanup-owner");
+            Workspace workspace = workspaceService.createWorkspace(
+                new CreateWorkspaceRequestDTO(
+                    "chat-cleanup-ws",
+                    "Chat Cleanup",
+                    "chat-cleanup-group",
+                    AccountType.ORG,
+                    owner.getId(),
+                    Workspace.GitProviderMode.GITLAB_PAT,
+                    "glpat-chat-cleanup-token",
+                    null
+                )
+            );
+
+            ChatThread t1 = new ChatThread();
+            t1.setId(UUID.randomUUID());
+            t1.setTitle("Thread A");
+            t1.setWorkspace(workspace);
+            t1.setUser(owner);
+            ChatThread t2 = new ChatThread();
+            t2.setId(UUID.randomUUID());
+            t2.setTitle("Thread B");
+            t2.setWorkspace(workspace);
+            t2.setUser(owner);
+            chatThreadRepository.save(t1);
+            chatThreadRepository.save(t2);
+
+            workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
+
+            assertThat(chatThreadRepository.findById(t1.getId())).isEmpty();
+            assertThat(chatThreadRepository.findById(t2.getId())).isEmpty();
         }
     }
 
