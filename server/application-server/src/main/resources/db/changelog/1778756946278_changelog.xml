@@ -21,9 +21,9 @@
         6. model_pricing table + idempotent seed
     -->
 
-    <!-- 1. JSONB column for AI-SDK UIMessage parts. Defaults to '[]' so the parts read path
-         (ChatThreadService.effectiveParts) can short-circuit the legacy fallback once #1074
-         drops chat_message_part. -->
+    <!-- 1. JSONB column for AI-SDK UIMessage parts. Default '[]' so reads stay non-null
+         between schema apply and backfill; chat_message_part itself is dropped in the
+         1778800000000 changelog. -->
     <changeSet id="mentor-1071-add-parts-column" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="chat_message.parts already exists">
             <not><columnExists tableName="chat_message" columnName="parts"/></not>

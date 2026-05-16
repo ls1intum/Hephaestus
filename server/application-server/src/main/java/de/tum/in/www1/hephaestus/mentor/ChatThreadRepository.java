@@ -47,8 +47,8 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
     int updateSessionJsonl(@Param("threadId") UUID threadId, @Param("bytes") byte[] bytes);
 
     /**
-     * Bulk-delete every thread for a workspace. Cascades to {@code chat_message} →
-     * {@code chat_message_part} / {@code chat_message_vote} via existing FKs. Used by
+     * Bulk-delete every thread for a workspace. Cascades to {@code chat_message} +
+     * {@code chat_message_vote} via existing FKs. Used by
      * {@link de.tum.in.www1.hephaestus.mentor.adapter.MentorWorkspacePurgeAdapter} on soft purge,
      * which leaves the workspace row in place (so the workspace-level cascade can't fire).
      */

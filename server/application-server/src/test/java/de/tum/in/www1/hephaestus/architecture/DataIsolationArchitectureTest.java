@@ -63,7 +63,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "PracticeFinding", // through Practice.workspace
         // Through chat thread -> workspace
         "ChatMessage", // through ChatThread.workspace
-        "ChatMessagePart", // through ChatMessage.thread.workspace
         "ChatMessageVote", // through ChatMessage (via messageId) -> ChatThread.workspace
         // Through Workspace.organization (ID-based relationship via JOIN)
         "OrganizationMembership", // organizationId -> Workspace.organization

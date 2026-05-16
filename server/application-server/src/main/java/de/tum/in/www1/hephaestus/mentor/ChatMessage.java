@@ -13,7 +13,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Type;
@@ -123,26 +122,13 @@ public class ChatMessage {
     private Instant createdAt;
 
     /**
-     * AI SDK UIMessage parts as a JSONB array. Written verbatim by MentorChatService. Reads go
-     * through {@code ChatThreadService.effectiveParts}, which falls back to {@link #legacyParts}
-     * during the dual-write window. The fallback collapses once {@code chat_message_part} drops
-     * in #1074. NOT NULL enforced at the column level (changeset {@code mentor-1071-enforce-parts-shape}) plus an array-shape
-     * CHECK so a future writer that forgets to set parts cannot silently fall through to the legacy
-     * path.
+     * AI SDK UIMessage parts as a JSONB array. Written verbatim by MentorChatService. NOT NULL +
+     * JSONB-array CHECK enforced at the column level (changeset {@code mentor-1071-enforce-parts-shape}).
      */
     @Type(JsonType.class)
     @Column(name = "parts", columnDefinition = "jsonb", nullable = false)
     @ColumnDefault("'[]'::jsonb")
     private JsonNode parts;
-
-    /** Pre-Pi normalised parts; read-only back-compat until {@code chat_message_part} drops in #1074. */
-    @Deprecated(forRemoval = true)
-    @OneToMany(mappedBy = "message", fetch = FetchType.LAZY, orphanRemoval = true)
-    @OrderBy("id.orderIndex ASC")
-    @BatchSize(size = 50)
-    @ToString.Exclude
-    @JsonIgnore
-    private List<ChatMessagePart> legacyParts = new ArrayList<>();
 
     /**
      * Optimistic-lock version — Hibernate bumps on managed writes, {@code reapStaleInFlight}

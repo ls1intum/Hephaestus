@@ -87,14 +87,6 @@ erDiagram
         VARCHAR(16) status "NOT NULL"
     }
 
-    ChatMessagePart {
-        UUID message_id PK,FK
-        INTEGER order_index PK
-        JSONB content
-        VARCHAR(128) original_type
-        VARCHAR(32) type "NOT NULL"
-    }
-
     ChatMessageVote {
         UUID message_id PK,FK
         TIMESTAMPTZ created_at "NOT NULL"
@@ -774,7 +766,6 @@ erDiagram
     %% One-to-One relationships
     Workspace ||--|| ActivityEvent : has
     Workspace ||--|| AgentConfig : has
-    ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatMessageVote : has
     GitCommit ||--|| CommitContributor : has
     DiscussionComment ||--|| Discussion : references

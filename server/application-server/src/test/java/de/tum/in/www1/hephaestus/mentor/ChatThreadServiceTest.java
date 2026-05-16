@@ -5,17 +5,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,9 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * Service-layer unit tests. Focused on the two behaviours that have wire-level consequences:
- * owner scoping (controllers rely on a 404 — not a silent leak — for cross-user reads) and
- * the dual-write fallback for {@code effectiveParts} (drops once #1074 lands).
+ * Service-layer unit tests. Pin the workspace + owner scoping the controllers rely on for
+ * 404-vs-leak semantics.
  */
 @DisplayName("ChatThreadService")
 class ChatThreadServiceTest extends BaseUnitTest {
@@ -88,56 +82,6 @@ class ChatThreadServiceTest extends BaseUnitTest {
         assertThat(resolved).isSameAs(thread);
     }
 
-    @Test
-    @DisplayName("effectiveParts: JSONB column wins when populated")
-    void effectiveParts_prefersJsonbColumn() {
-        ChatMessage msg = new ChatMessage();
-        ArrayNode parts = JsonNodeFactory.instance.arrayNode();
-        parts.add(JsonNodeFactory.instance.objectNode().put("type", "text").put("text", "hello"));
-        msg.setParts(parts);
-
-        JsonNode resolved = service.effectiveParts(msg);
-
-        assertThat(resolved).isSameAs(parts);
-    }
-
-    @Test
-    @DisplayName("effectiveParts: rebuilds from legacyParts when JSONB column is empty")
-    void effectiveParts_rebuildsFromLegacyParts() {
-        ChatMessage msg = new ChatMessage();
-        // parts is null/empty array → fallback engaged
-
-        ChatMessagePart legacyText = stubLegacyPart(ChatMessagePart.PartType.TEXT, "text", "{\"text\":\"hi\"}");
-        ChatMessagePart legacyTool = stubLegacyPart(
-            ChatMessagePart.PartType.TOOL,
-            "tool-fetch_context",
-            "{\"toolCallId\":\"call-1\",\"state\":\"output-available\"}"
-        );
-        msg.setLegacyParts(List.of(legacyText, legacyTool));
-
-        JsonNode rebuilt = service.effectiveParts(msg);
-
-        assertThat(rebuilt.isArray()).isTrue();
-        assertThat(rebuilt).hasSize(2);
-        assertThat(rebuilt.get(0).get("type").asText()).isEqualTo("text");
-        assertThat(rebuilt.get(0).get("text").asText()).isEqualTo("hi");
-        // Tool part keeps its originalType discriminator (NOT the enum.value() fallback) so
-        // AI SDK clients receive the canonical `tool-<name>` literal Pi emits.
-        assertThat(rebuilt.get(1).get("type").asText()).isEqualTo("tool-fetch_context");
-        assertThat(rebuilt.get(1).get("toolCallId").asText()).isEqualTo("call-1");
-    }
-
-    @Test
-    @DisplayName("effectiveParts: returns empty array when both shapes are empty")
-    void effectiveParts_emptyWhenNeitherSet() {
-        ChatMessage msg = new ChatMessage();
-
-        JsonNode result = service.effectiveParts(msg);
-
-        assertThat(result.isArray()).isTrue();
-        assertThat(result).isEmpty();
-    }
-
     private static User stubUser(Long id) {
         User u = new User();
         u.setId(id);
@@ -152,18 +96,6 @@ class ChatThreadServiceTest extends BaseUnitTest {
         workspace.setId(WORKSPACE_ID);
         thread.setWorkspace(workspace);
         return thread;
-    }
-
-    private ChatMessagePart stubLegacyPart(ChatMessagePart.PartType type, String originalType, String contentJson) {
-        ChatMessagePart part = new ChatMessagePart();
-        part.setType(type);
-        part.setOriginalType(originalType);
-        try {
-            part.setContent(objectMapper.readTree(contentJson));
-        } catch (Exception e) {
-            throw new AssertionError("Test fixture JSON should be parseable", e);
-        }
-        return part;
     }
 
     private static void assertThatThrownByEnityNotFound(Runnable runnable) {
