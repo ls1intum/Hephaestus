@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -30,9 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -181,7 +180,7 @@ class MentorChatControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("workspace with mentorEnabled=false → 404; service is NOT invoked")
+    @DisplayName("workspace with mentorEnabled=false → EntityNotFoundException; service NOT invoked")
     void workspaceWithMentorDisabled_returns404() {
         Workspace ws = new Workspace();
         WorkspaceFeatures features = new WorkspaceFeatures();
@@ -189,22 +188,20 @@ class MentorChatControllerTest extends BaseUnitTest {
         ws.setFeatures(features);
         when(workspaceRepository.findById(anyLong())).thenReturn(Optional.of(ws));
 
-        assertThatThrownBy(() -> controller.chat(stubContext(), validBody(UUID.randomUUID(), "hi"), response))
-            .isInstanceOf(ResponseStatusException.class)
-            .extracting("statusCode")
-            .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThatThrownBy(() ->
+            controller.chat(stubContext(), validBody(UUID.randomUUID(), "hi"), response)
+        ).isInstanceOf(EntityNotFoundException.class);
         verify(mentorChatService, never()).start(any(), any());
     }
 
     @Test
-    @DisplayName("workspace not found → 404; service is NOT invoked")
+    @DisplayName("workspace not found → EntityNotFoundException; service NOT invoked")
     void workspaceNotFound_returns404() {
         when(workspaceRepository.findById(anyLong())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> controller.chat(stubContext(), validBody(UUID.randomUUID(), "hi"), response))
-            .isInstanceOf(ResponseStatusException.class)
-            .extracting("statusCode")
-            .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThatThrownBy(() ->
+            controller.chat(stubContext(), validBody(UUID.randomUUID(), "hi"), response)
+        ).isInstanceOf(EntityNotFoundException.class);
         verify(mentorChatService, never()).start(any(), any());
     }
 

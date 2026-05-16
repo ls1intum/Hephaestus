@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
@@ -17,13 +18,11 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -56,16 +55,17 @@ public class MentorChatController {
     ) {
         // Per-workspace feature gate. Mirrors PracticeReviewDetectionGate (`workspace.features
         // .practicesEnabled`); 404 (not 403) when disabled because the resource semantically does
-        // not exist for the workspace — same shape an unmembered caller already gets from
-        // @workspaceSecure.isMember(). The check is cheap (single PK lookup, no FETCH JOIN
-        // because features is @Embedded).
+        // not exist for the workspace. EntityNotFoundException (NOT ResponseStatusException) is
+        // the project's NOT_FOUND idiom — GlobalControllerAdvice maps it to RFC-7807 problem+json;
+        // ResponseStatusException falls through to the 500 generic handler. The check is cheap
+        // (single PK lookup, no FETCH JOIN because features is @Embedded).
         boolean mentorEnabled = workspaceRepository
             .findById(workspaceContext.id())
             .map(w -> Boolean.TRUE.equals(w.getFeatures().getMentorEnabled()))
             .orElse(false);
         if (!mentorEnabled) {
             log.debug("Mentor chat: workspace {} has mentorEnabled=false, returning 404", workspaceContext.id());
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Mentor is not enabled for this workspace");
+            throw new EntityNotFoundException("Mentor chat", workspaceContext.slug());
         }
 
         // Headers must lock in BEFORE we send any chunk on the short-circuit path —
