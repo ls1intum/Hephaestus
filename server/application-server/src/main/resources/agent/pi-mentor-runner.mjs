@@ -225,7 +225,10 @@ async function ensureRuntime() {
             DefaultResourceLoader,
             getAgentDir,
         } = await loadSdk();
-        const agentDir = AGENT_DIR_OVERRIDE ?? getAgentDir();
+        // `typeof getAgentDir === "function"` guard accommodates MENTOR_RUNNER_PROTOCOL_ONLY=1 mode,
+        // where the stub SDK (see buildStubSdk) does not export getAgentDir. Tests then fall through
+        // to the workspace-relative default that matches production's PI_CODING_AGENT_DIR.
+        const agentDir = AGENT_DIR_OVERRIDE ?? (typeof getAgentDir === "function" ? getAgentDir() : "/workspace/.pi");
 
         // System prompt is optional in v1 — the Java caller may inject it later. If the
         // resource exists we load it once and reuse via ResourceLoader override.
