@@ -197,9 +197,13 @@
         </sql>
     </changeSet>
 
-    <!-- Step 3c: Final fallback for any remaining NULL rows (runs every time if needed) -->
+    <!-- Step 3c: Final fallback for any remaining NULL rows (runs every time if needed).
+         tableExists guard added when `document` was dropped in #1071 — these runAlways
+         preconditions hit FROM-clause errors on environments past the drop, masking real
+         migration failures with a generic precondition-error. -->
     <changeSet id="1764514002516-7c-final" author="FelixTJDietrich" runAlways="true">
         <preConditions onFail="MARK_RAN">
+            <tableExists tableName="document"/>
             <tableExists tableName="workspace"/>
             <sqlCheck expectedResult="1">SELECT CASE WHEN COUNT(*) &gt; 0 THEN 1 ELSE 0 END FROM workspace</sqlCheck>
             <sqlCheck expectedResult="1">SELECT CASE WHEN COUNT(*) &gt; 0 THEN 1 ELSE 0 END FROM document WHERE workspace_id IS NULL</sqlCheck>
@@ -215,9 +219,12 @@
         </sql>
     </changeSet>
 
-    <!-- Step 4: Validate migration succeeded (runs always to catch issues, skips if valid) -->
+    <!-- Step 4: Validate migration succeeded (runs always to catch issues, skips if valid).
+         tableExists guard added when `document` was dropped in #1071; without it the
+         sqlCheck precondition errors on FROM document after the drop. -->
     <changeSet id="1764514002516-7d" author="FelixTJDietrich" runAlways="true">
         <preConditions onFail="MARK_RAN">
+            <tableExists tableName="document"/>
             <sqlCheck expectedResult="0">SELECT COUNT(*) FROM document WHERE workspace_id IS NULL</sqlCheck>
         </preConditions>
         <comment>Validation: all document rows must have workspace_id populated</comment>
