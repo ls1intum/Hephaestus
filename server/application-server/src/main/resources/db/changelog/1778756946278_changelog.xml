@@ -9,16 +9,27 @@
         Pi mentor (#1071) — single consolidated schema migration.
         Author timestamp: 2026-05-14 11:09:06 UTC (epoch-ms 1778756946278).
 
-        Bundles five schema concerns into one file so the mentor module ships as a single
-        reviewable unit. Split into per-concern <changeSet>s so each retains atomic rollback;
-        the in-flight unique index runs CONCURRENTLY which is mandatory outside a transaction.
+        Single file = single reviewable unit for the whole mentor schema delta. Split into
+        per-concern <changeSet>s so each retains atomic rollback; the in-flight unique index
+        runs CONCURRENTLY (mandatory outside a transaction).
 
-        1. chat_message.parts JSONB (denormalises legacy chat_message_part rows)
-        2. backfill from chat_message_part (idempotent)
-        3. parts shape: NOT NULL + array CHECK
-        4. metadata shape: CHECK (NULL or JSON object)
-        5. one in-flight assistant message per thread (durable concurrency guard)
-        6. model_pricing table + idempotent seed
+        Changeset order matters: drop of chat_message_part MUST sit last so the backfill +
+        cascade-FK + shape checks have all run against the live table first.
+
+        1.  chat_message.parts JSONB column
+        2.  backfill from chat_message_part (idempotent)
+        3.  parts shape: NOT NULL + array CHECK
+        4.  metadata shape: CHECK (NULL or JSON object)
+        5.  one in-flight assistant message per thread (durable concurrency guard)
+        6.  model_pricing table + idempotent seed
+        7.  chat_message.version (optimistic lock)
+        8.  drop vestigial chat_thread.selected_leaf_message_id
+        9.  chat_message_vote.message_id FK ON DELETE CASCADE
+        10. chat_message.thread_id / parent_message_id / chat_message_part.message_id ON DELETE CASCADE
+        11. metadata status enum CHECK
+        12. chat_message.status column (promoted from metadata)
+        13. chat_thread.session_jsonl BYTEA (verbatim Pi session for cold-restart)
+        14. drop chat_message_part (last — backfill is canonical, table now inert)
     -->
 
     <!-- 1. JSONB column for AI-SDK UIMessage parts. Default '[]' so reads stay non-null
@@ -504,6 +515,55 @@
         <sql>ALTER TABLE chat_thread ADD COLUMN session_jsonl BYTEA NULL;</sql>
         <rollback>
             <sql>ALTER TABLE chat_thread DROP COLUMN IF EXISTS session_jsonl;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- Final step: drop chat_message_part. Backfill (changeSet 2) already denormalised every
+         row into chat_message.parts JSONB; intelligence-service (the only writer) is deleted
+         in this same PR. HALT precondition refuses to drop if any row survives. MUST be the
+         last chat_message_part-touching changeset in this file — runs AFTER the cascade-FK
+         migration above. -->
+    <changeSet id="mentor-1071-drop-chat-message-part" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message_part already dropped">
+            <tableExists tableName="chat_message_part"/>
+        </preConditions>
+        <comment>Drop legacy chat_message_part table (replaced by chat_message.parts JSONB)</comment>
+        <!-- Inline HALT-on-non-empty guard. A single <preConditions> block can't express
+             "skip if table gone" AND "halt if non-empty" cleanly; embedding the row-count
+             check in PL/pgSQL keeps the safety net intact. splitStatements=false because
+             Liquibase's default splitter doesn't understand $$ blocks. -->
+        <sql splitStatements="false">
+            DO $$
+            DECLARE remaining BIGINT;
+            BEGIN
+                SELECT COUNT(*) INTO remaining FROM chat_message_part;
+                IF remaining &gt; 0 THEN
+                    RAISE EXCEPTION 'chat_message_part has % rows — backfill incomplete or post-deploy writes occurred', remaining;
+                END IF;
+            END $$;
+        </sql>
+        <dropTable tableName="chat_message_part"/>
+        <rollback>
+            <createTable tableName="chat_message_part">
+                <column name="message_id" type="UUID">
+                    <constraints nullable="false" primaryKey="true" primaryKeyName="chat_message_partPK"/>
+                </column>
+                <column name="order_index" type="INTEGER">
+                    <constraints nullable="false" primaryKey="true" primaryKeyName="chat_message_partPK"/>
+                </column>
+                <column name="content" type="JSONB"/>
+                <column name="original_type" type="VARCHAR(64)"/>
+                <column name="type" type="VARCHAR(32)">
+                    <constraints nullable="false"/>
+                </column>
+            </createTable>
+            <addForeignKeyConstraint
+                baseTableName="chat_message_part"
+                baseColumnNames="message_id"
+                constraintName="fk_chat_message_part_message"
+                referencedTableName="chat_message"
+                referencedColumnNames="id"
+                onDelete="CASCADE"/>
         </rollback>
     </changeSet>
 
