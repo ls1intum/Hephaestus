@@ -626,18 +626,25 @@ class MentorLiveLlmTest {
         // Overwrite the minimal system prompt with the production one that lists available tools.
         Path productionPrompt = Path.of("src", "main", "resources", "agent", "mentor", "system.md").toAbsolutePath();
         if (Files.exists(productionPrompt)) {
-            Files.copy(productionPrompt, workspace.resolve("agent").resolve("mentor").resolve("system.md"),
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(
+                productionPrompt,
+                workspace.resolve("agent").resolve("mentor").resolve("system.md"),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            );
         }
 
         // Stage a small git repo with a known file the agent can read.
         Path repoDir = workspace.resolve("repo");
         Files.createDirectories(repoDir);
-        Files.writeString(repoDir.resolve("README.md"),
-            "# Hephaestus-Fixture\n\nA test project for validating mentor tool use.\n");
-        Files.writeString(repoDir.resolve("Main.java"),
+        Files.writeString(
+            repoDir.resolve("README.md"),
+            "# Hephaestus-Fixture\n\nA test project for validating mentor tool use.\n"
+        );
+        Files.writeString(
+            repoDir.resolve("Main.java"),
             "public class Main {\n    public static void main(String[] args) {\n" +
-                "        System.out.println(\"Hello from Hephaestus-Fixture!\");\n    }\n}\n");
+                "        System.out.println(\"Hello from Hephaestus-Fixture!\");\n    }\n}\n"
+        );
 
         // Initialize as a git repo so `git log`, `git diff` etc. work.
         runGit(repoDir, "init");
@@ -694,8 +701,10 @@ class MentorLiveLlmTest {
         // affect them in Node 22+. Use the runner's own env var overrides instead.
         env.put("MENTOR_RUNNER_CWD", workspace.toString());
         env.put("MENTOR_RUNNER_SESSIONS_DIR", workspace.resolve(".sessions").toString());
-        env.put("MENTOR_RUNNER_SYSTEM_PROMPT_PATH",
-            workspace.resolve("agent").resolve("mentor").resolve("system.md").toString());
+        env.put(
+            "MENTOR_RUNNER_SYSTEM_PROMPT_PATH",
+            workspace.resolve("agent").resolve("mentor").resolve("system.md").toString()
+        );
         pb.directory(workspace.toFile());
 
         pb.command("node", workspace.resolve("pi-mentor-runner.mjs").toString());
