@@ -84,6 +84,7 @@ erDiagram
         UUID thread_id FK "NOT NULL"
         JSONB parts "NOT NULL"
         BIGINT version "NOT NULL"
+        VARCHAR(16) status "NOT NULL"
     }
 
     ChatMessagePart {
@@ -107,6 +108,7 @@ erDiagram
         TEXT title
         BIGINT user_id FK
         BIGINT workspace_id FK "NOT NULL"
+        BYTEA session_jsonl
     }
 
     CommitContributor {
