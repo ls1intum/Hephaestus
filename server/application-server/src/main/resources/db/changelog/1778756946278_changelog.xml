@@ -32,10 +32,8 @@
         14. drop chat_message_part (last — backfill is canonical, table now inert)
         15. drop legacy `document` table (intelligence-service Pi-context store; obsolete after
             the Pi mentor moves context loading into application-server providers)
-
-        The per-workspace `workspace.mentor_enabled` toggle is NOT in this file — it lives in
-        its own changelog (`1778760000000_workspace_mentor_enabled.xml`) because it touches the
-        `workspace` table, not `chat_message_*`. Single-concern per file.
+        16. workspace.mentor_enabled — per-workspace mentor feature toggle (mirrors
+            workspace.practices_enabled)
     -->
 
     <!-- 1. JSONB column for AI-SDK UIMessage parts. Default '[]' so reads stay non-null
@@ -613,5 +611,19 @@
         </rollback>
     </changeSet>
 
+    <!-- 16. Per-workspace mentor toggle. Mirrors workspace.practices_enabled. -->
+    <changeSet id="mentor-1071-workspace-mentor-enabled" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.mentor_enabled already exists">
+            <not><columnExists tableName="workspace" columnName="mentor_enabled"/></not>
+        </preConditions>
+        <addColumn tableName="workspace">
+            <column name="mentor_enabled" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="workspace" columnName="mentor_enabled"/>
+        </rollback>
+    </changeSet>
 
 </databaseChangeLog>
