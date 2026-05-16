@@ -10,7 +10,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Workspace-agnostic by intent: the only entry point is a global crash-recovery sweep keyed by
+ * {@code created_at}; ownership is enforced upstream in {@link ChatThreadService} for every
+ * non-sweep access path. Class-level {@link WorkspaceAgnostic} satisfies the architecture rule
+ * that requires either workspace-scoped query methods or an explicit opt-out marker.
+ */
 @Repository
+@WorkspaceAgnostic("Crash-recovery sweep only; thread-scoped access goes through ChatThreadService")
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> {
     /**
      * Flip assistant rows still {@code in_flight} past {@code cutoff} to {@code interrupted},
@@ -22,7 +29,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
      */
     @Modifying
     @Transactional
-    @WorkspaceAgnostic("Global crash-recovery sweep over stuck rows by created_at.")
     @Query(
         value = """
         UPDATE chat_message
