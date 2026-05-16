@@ -29,7 +29,8 @@ import reactor.core.Disposable;
  * Per-session adapter: owns the docker-exec subprocess, JSONL pump + writer, ring buffer, and
  * subscriber fan-out. State transitions {@code ATTACHED → CLOSING → CLOSED} are CAS-guarded.
  */
-public final class DockerAttachedSandboxAdapter implements AttachedSandbox, StdinWriteWatchdog.StallTarget {
+public final class DockerAttachedSandboxAdapter
+    implements AttachedSandbox, StdinWriteWatchdog.StallTarget, InteractiveSandboxRegistry.ReapTarget {
 
     private static final Logger log = LoggerFactory.getLogger(DockerAttachedSandboxAdapter.class);
 
@@ -246,8 +247,13 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         process.destroyForcibly();
     }
 
-    /** Forced close with a specific reason and the configured default grace. Idempotent. */
-    void terminate(EvictionReason reason) {
+    /**
+     * Forced close with a specific reason and the configured default grace. Idempotent. Public
+     * by virtue of {@link InteractiveSandboxRegistry.ReapTarget}, but {@code DockerAttachedSandbox}
+     * is itself a package-private surface — only the registry can resolve it.
+     */
+    @Override
+    public void terminate(EvictionReason reason) {
         if (!state.compareAndSet(AttachedSandboxState.ATTACHED, AttachedSandboxState.CLOSING)) {
             return;
         }
@@ -298,6 +304,12 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     }
 
     Instant attachedAt() {
+        return attachedAt;
+    }
+
+    /** SPI exposure of {@link #attachedAt}: required by the registry's lifetime reaper. */
+    @Override
+    public Instant createdAt() {
         return attachedAt;
     }
 
@@ -393,6 +405,10 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
             EvictionReason reason = terminalReason.get();
             if (reason == null) reason = EvictionReason.ERROR;
             metrics.evictionsBy(reason).increment();
+            metrics.interactiveEvictedBy(reason).increment();
+            // Free the per-(user,sandbox) debounce entry: the 50-userId cardinality cap bounds
+            // the absolute table size, but evicting per session keeps churn under control.
+            metrics.evictDropDebounce(userId, sessionId);
 
             state.set(AttachedSandboxState.CLOSED);
             try {

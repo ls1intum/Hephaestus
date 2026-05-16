@@ -12,6 +12,7 @@ import de.tum.in.www1.hephaestus.agent.sandbox.docker.SandboxNetworkManager;
 import de.tum.in.www1.hephaestus.agent.sandbox.docker.SandboxWorkspaceManager;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.EvictionReason;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxCapacityExceededException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
@@ -222,10 +223,15 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 }
                 case MAX_SESSIONS_PER_USER, MAX_SESSIONS_TOTAL -> {
                     metrics.attachFailureMaxSessions.increment();
-                    throw new InteractiveSandboxException(
-                        outcome == InteractiveSandboxRegistry.RegistrationOutcome.MAX_SESSIONS_PER_USER
-                            ? "Per-user session cap exceeded"
-                            : "Per-replica session cap exceeded"
+                    boolean perUser = outcome == InteractiveSandboxRegistry.RegistrationOutcome.MAX_SESSIONS_PER_USER;
+                    // Typed exception so the chat layer can route to the CAPACITY_EXCEEDED metric
+                    // outcome without string-matching on the message — alerts that split user-cap
+                    // from global-cap need the structured scope.
+                    throw new InteractiveSandboxCapacityExceededException(
+                        perUser
+                            ? InteractiveSandboxCapacityExceededException.Scope.PER_USER
+                            : InteractiveSandboxCapacityExceededException.Scope.GLOBAL,
+                        perUser ? "Per-user session cap exceeded" : "Per-replica session cap exceeded"
                     );
                 }
                 case REGISTERED -> registered = true;
@@ -288,7 +294,14 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         String networkId,
         PiProcessHandle process
     ) {
-        FrameRingBuffer ring = new FrameRingBuffer(properties.ringBufferFrames(), metrics.ringBufferDropped);
+        // Route every drop through the metrics facade so the per-user `frame_ring.dropped_total`
+        // counter sees the userId + sandboxId for debounce, while the global counter still ticks.
+        final java.util.UUID sandboxId = spec.sessionId();
+        final String userId = spec.userId();
+        FrameRingBuffer ring = new FrameRingBuffer(
+            properties.ringBufferFrames(),
+            () -> metrics.recordRingBufferDrop(userId, sandboxId)
+        );
         DockerAttachedSandboxAdapter.LifecycleOps lifecycleOps = new DockerAttachedSandboxAdapter.LifecycleOps() {
             @Override
             public void stopContainer(String cid, int graceSeconds) {

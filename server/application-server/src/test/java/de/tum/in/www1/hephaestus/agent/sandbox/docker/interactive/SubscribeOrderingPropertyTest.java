@@ -22,7 +22,7 @@ class SubscribeOrderingPropertyTest extends BaseUnitTest {
     @DisplayName("a subscriber that races a producer sees snapshot frames before any live frames")
     void snapshotThenLive() throws Exception {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
-        FrameRingBuffer ring = new FrameRingBuffer(1024, reg.counter("test.dropped"));
+        FrameRingBuffer ring = new FrameRingBuffer(1024, () -> reg.counter("test.dropped").increment());
         Object lock = new Object();
         CopyOnWriteArrayList<FrameSubscription> subs = new CopyOnWriteArrayList<>();
 

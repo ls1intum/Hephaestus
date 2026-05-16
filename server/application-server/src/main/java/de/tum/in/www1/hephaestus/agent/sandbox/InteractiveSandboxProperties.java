@@ -25,6 +25,11 @@ import org.springframework.validation.annotation.Validated;
  *     encoded character can be up to 4 bytes, so the on-wire memory ceiling is roughly 4× this).
  *     A longer line is treated as a stream-level fault and the session terminates {@code ERROR}.
  *     Without this bound a hostile runner could OOM the app-server.
+ * @param maxLifetimeMinutes absolute lifetime cap. A session attached this long ago is evicted
+ *     on the next reap tick regardless of recent activity — a backstop against runners that
+ *     accumulate state, drift on context, or leak file descriptors over time. Range {@code [5, 480]}
+ *     is a guard rail: too low and chatty users get evicted mid-conversation; too high and a
+ *     leaky runner can chew through the daemon's resources before idle eviction catches it.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.mentor")
@@ -39,5 +44,6 @@ public record InteractiveSandboxProperties(
     @DefaultValue("30") @Min(1) int attachFirstFrameTimeoutSeconds,
     @DefaultValue("3") @Min(1) int maxSessionsPerUser,
     @DefaultValue("50") @Min(1) int maxSessionsTotal,
-    @DefaultValue("1048576") @Min(1024) int maxFrameChars
+    @DefaultValue("1048576") @Min(1024) int maxFrameChars,
+    @DefaultValue("60") @Min(5) @Max(480) int maxLifetimeMinutes
 ) {}

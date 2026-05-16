@@ -1,29 +1,34 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.micrometer.core.instrument.Counter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Bounded ring buffer of frames with drop-oldest on overflow. Frames carry a monotonic sequence
  * number; {@link #snapshotSince} lets a subscriber resume without duplicates from a known cursor.
+ *
+ * <p>The {@code onDrop} callback fires exactly once per evicted frame. The buffer itself stays
+ * metric-agnostic — the callback can route to one or more counters (debounced or not) without
+ * pulling Micrometer into the buffer's surface. Callbacks must be cheap and non-blocking; they
+ * run while holding the buffer's monitor.
  */
 final class FrameRingBuffer {
 
     private final int capacity;
     private final ArrayDeque<Entry> entries;
-    private final Counter droppedCounter;
+    private final Runnable onDrop;
     private long nextSequence;
 
-    FrameRingBuffer(int capacity, Counter droppedCounter) {
+    FrameRingBuffer(int capacity, Runnable onDrop) {
         if (capacity <= 0) {
             throw new IllegalArgumentException("capacity must be positive, got: " + capacity);
         }
         this.capacity = capacity;
         this.entries = new ArrayDeque<>(capacity);
-        this.droppedCounter = droppedCounter;
+        this.onDrop = Objects.requireNonNull(onDrop, "onDrop");
         this.nextSequence = 0L;
     }
 
@@ -31,7 +36,12 @@ final class FrameRingBuffer {
         long seq = nextSequence++;
         if (entries.size() == capacity) {
             entries.removeFirst();
-            droppedCounter.increment();
+            try {
+                onDrop.run();
+            } catch (RuntimeException ignored) {
+                // A metric callback throwing must not corrupt the buffer's state. The observability
+                // path is best-effort; the buffer's correctness guarantees are unconditional.
+            }
         }
         entries.addLast(new Entry(seq, frame));
         return seq;

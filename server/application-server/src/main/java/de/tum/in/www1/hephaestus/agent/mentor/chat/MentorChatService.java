@@ -20,6 +20,7 @@ import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslat
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxCapacityExceededException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -306,6 +307,20 @@ public class MentorChatService {
             persistence.interrupt(cookie, state, timeout);
             channel.completeWithError("Mentor turn timed out before completion.");
             outcome = MentorChatMetrics.Outcome.TIMEOUT;
+        } catch (InteractiveSandboxCapacityExceededException capacity) {
+            // Per-user or per-replica cap — surfaceable on the dashboard as a capacity signal,
+            // NOT an error. INFO (not WARN): hitting the cap is policy-driven, expected behaviour
+            // under load; alerts on `mentor.turn.completed{outcome=CAPACITY_EXCEEDED}` should split
+            // from `outcome=ERROR` so on-call doesn't get paged when the fleet just needs scaling.
+            log.info(
+                "Mentor turn rejected by sandbox capacity (threadId={}, scope={}): {}",
+                request.threadId(),
+                capacity.scope(),
+                capacity.getMessage()
+            );
+            persistence.interrupt(cookie, state, capacity);
+            channel.completeWithError(userFacingError(capacity));
+            outcome = MentorChatMetrics.Outcome.CAPACITY_EXCEEDED;
         } catch (ClientDisconnectedException disconnect) {
             // Browser closed mid-turn (tab close, refresh, network blip). This is NOT a turn
             // failure: the runner subscription keeps draining and `handleEvent` will still call
@@ -501,6 +516,11 @@ public class MentorChatService {
      * Raw message stays in the WARN log for ops.
      */
     private static String userFacingError(Throwable e) {
+        if (e instanceof InteractiveSandboxCapacityExceededException capacity) {
+            return capacity.scope() == InteractiveSandboxCapacityExceededException.Scope.PER_USER
+                ? "You have too many mentor sessions open right now — close one and try again."
+                : "Mentor service is at capacity — please retry in a moment.";
+        }
         if (e instanceof MentorRunnerException) {
             return "Mentor service hit an unexpected error — please retry.";
         }

@@ -5,8 +5,12 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import java.time.Clock;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Micrometer instruments for the interactive sandbox. Stable names — do not rename without
@@ -44,7 +48,42 @@ public final class InteractiveSandboxMetrics {
 
     private final Map<EvictionReason, Counter> evictionsByReason;
 
+    /**
+     * Parallel counter to {@link #evictionsByReason} under the SPI-aligned metric name. Kept
+     * pre-registered per reason so the hot path (eviction at close) is a single map lookup +
+     * counter increment with no allocation. The {@code mentor.session.eviction} variant is
+     * retained for dashboard back-compat — both increment together on every eviction.
+     */
+    private final Map<EvictionReason, Counter> interactiveEvictedByReason;
+
+    /**
+     * Per-user counter for {@code interactive_sandbox.frame_ring.dropped_total}. The cardinality
+     * cap (50 distinct userIds across the JVM) is enforced upstream by a {@code MeterFilter} —
+     * any further userId triggers a {@code denyAll} for THIS specific counter only, so the rest
+     * of the registry is unaffected.
+     */
+    private final ConcurrentHashMap<String, Counter> userDroppedCounters = new ConcurrentHashMap<>();
+
+    /**
+     * Debounce table: max one increment per second per {@code (userId, sandboxId)} pair. The
+     * buffer drop itself is unconditional — only the counter increment is throttled. Entries
+     * are evicted when {@link #evictDropDebounce(String, UUID)} is called from the per-sandbox
+     * close path; the 50-userId cardinality cap bounds the absolute size in the meantime.
+     */
+    private final ConcurrentHashMap<String, AtomicLong> dropDebounce = new ConcurrentHashMap<>();
+
+    private final MeterRegistry registry;
+    private final Clock clock;
+    private static final long DROP_DEBOUNCE_INTERVAL_MS = 1_000L;
+
     public InteractiveSandboxMetrics(MeterRegistry registry) {
+        this(registry, Clock.systemUTC());
+    }
+
+    /** Test seam — production wiring goes through {@link #InteractiveSandboxMetrics(MeterRegistry)}. */
+    InteractiveSandboxMetrics(MeterRegistry registry, Clock clock) {
+        this.registry = registry;
+        this.clock = clock;
         this.attachFailureImage = attachFailure(registry, "image_pull_failed");
         this.attachFailureStart = attachFailure(registry, "container_start_failed");
         this.attachFailureStdin = attachFailure(registry, "stdin_open_failed");
@@ -98,6 +137,7 @@ public final class InteractiveSandboxMetrics {
             .register(registry);
 
         this.evictionsByReason = new EnumMap<>(EvictionReason.class);
+        this.interactiveEvictedByReason = new EnumMap<>(EvictionReason.class);
         for (EvictionReason r : EvictionReason.values()) {
             evictionsByReason.put(
                 r,
@@ -106,11 +146,76 @@ public final class InteractiveSandboxMetrics {
                     .description("Session evictions by reason (covers all termination causes)")
                     .register(registry)
             );
+            interactiveEvictedByReason.put(
+                r,
+                Counter.builder("interactive_sandbox.evicted")
+                    .tag("reason", r.tag())
+                    .description("Interactive sandbox evictions by reason (SPI-aligned metric name)")
+                    .register(registry)
+            );
         }
     }
 
     Counter evictionsBy(EvictionReason reason) {
         return evictionsByReason.get(reason);
+    }
+
+    /**
+     * Pre-registered counter for {@code interactive_sandbox.evicted_total{reason}}. Both this
+     * and {@link #evictionsBy(EvictionReason)} are incremented from the same call site so the
+     * two metric streams agree.
+     */
+    Counter interactiveEvictedBy(EvictionReason reason) {
+        return interactiveEvictedByReason.get(reason);
+    }
+
+    /**
+     * Record a ring-buffer drop for {@code (userId, sandboxId)}. The caller is responsible for
+     * the actual buffer eviction; this only manages the metric increment. Two effects:
+     *
+     * <ol>
+     *   <li>Global counter {@link #ringBufferDropped} is always incremented (cheap, untagged).
+     *   <li>Per-user counter {@code interactive_sandbox.frame_ring.dropped_total{userId}} is
+     *       incremented at most once per {@value #DROP_DEBOUNCE_INTERVAL_MS}ms per
+     *       {@code (userId, sandboxId)} pair. Under steady-state overflow the per-second cap
+     *       gives dashboards a stable rate without amplifying registry pressure.
+     * </ol>
+     */
+    void recordRingBufferDrop(String userId, UUID sandboxId) {
+        ringBufferDropped.increment();
+        if (userId == null || sandboxId == null) {
+            return;
+        }
+        long now = clock.millis();
+        String key = userId + ':' + sandboxId;
+        AtomicLong lastEmit = dropDebounce.computeIfAbsent(key, k -> new AtomicLong(0L));
+        long prev = lastEmit.get();
+        if (now - prev < DROP_DEBOUNCE_INTERVAL_MS) {
+            return;
+        }
+        if (!lastEmit.compareAndSet(prev, now)) {
+            // Another thread won the CAS within the same window — they recorded, we skip.
+            return;
+        }
+        userDroppedCounter(userId).increment();
+    }
+
+    /**
+     * Eviction hook called from the per-sandbox close path. The debounce map is bounded by the
+     * 50-userId cardinality cap, but evicting per-sandbox keeps it tight under user churn.
+     */
+    void evictDropDebounce(String userId, UUID sandboxId) {
+        if (userId == null || sandboxId == null) return;
+        dropDebounce.remove(userId + ':' + sandboxId);
+    }
+
+    private Counter userDroppedCounter(String userId) {
+        return userDroppedCounters.computeIfAbsent(userId, u ->
+            Counter.builder("interactive_sandbox.frame_ring.dropped")
+                .tag("userId", u)
+                .description("Per-user frame ring overflow drops (debounced to <=1/s per session, capped at 50 distinct users)")
+                .register(registry)
+        );
     }
 
     private static Counter attachFailure(MeterRegistry registry, String reason) {

@@ -24,6 +24,7 @@ import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslat
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxCapacityExceededException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
@@ -350,6 +351,48 @@ class MentorChatServiceTest extends BaseUnitTest {
         // "load-shed retry". This persistence-throws path triggers the DB-index outcome —
         // the JVM lock was acquired, so the conflict comes from the durable backstop.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_DB);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 4a. Sandbox capacity (per-user/global cap) — distinct from ERROR
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("per-user cap exceeded: outcome=CAPACITY_EXCEEDED (not ERROR)")
+    void runTurn_perUserCapExceeded_recordsCapacityExceeded() throws Exception {
+        when(interactiveSandboxService.attach(any())).thenThrow(
+            new InteractiveSandboxCapacityExceededException(
+                InteractiveSandboxCapacityExceededException.Scope.PER_USER,
+                "Per-user session cap exceeded"
+            )
+        );
+
+        runTurnSync();
+
+        // Persistence sees an interrupted row (cap rejection is observable as a failed turn for
+        // the user, just not a *bug* failure).
+        verify(persistence).interrupt(any(), any(), any(Throwable.class));
+        assertThat(emitter.recordedTypes()).contains("error");
+        assertThat(turnLock.activeKeys()).isZero();
+        // Critical: this is the metric the dashboard alert splits on — capacity rejections must
+        // not bury a real ERROR signal (and vice versa).
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.CAPACITY_EXCEEDED);
+    }
+
+    @Test
+    @DisplayName("global cap exceeded: outcome=CAPACITY_EXCEEDED (same outcome as per-user)")
+    void runTurn_globalCapExceeded_recordsCapacityExceeded() throws Exception {
+        when(interactiveSandboxService.attach(any())).thenThrow(
+            new InteractiveSandboxCapacityExceededException(
+                InteractiveSandboxCapacityExceededException.Scope.GLOBAL,
+                "Per-replica session cap exceeded"
+            )
+        );
+
+        runTurnSync();
+
+        verify(persistence).interrupt(any(), any(), any(Throwable.class));
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.CAPACITY_EXCEEDED);
     }
 
     /**

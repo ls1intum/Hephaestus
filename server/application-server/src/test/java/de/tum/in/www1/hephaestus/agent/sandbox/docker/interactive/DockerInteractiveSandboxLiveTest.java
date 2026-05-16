@@ -112,7 +112,8 @@ class DockerInteractiveSandboxLiveTest {
             /* attachFirstFrameTimeoutSeconds */ 15,
             /* maxSessionsPerUser */ 3,
             /* maxSessionsTotal */ 50,
-            /* maxFrameChars */ 64 * 1024
+            /* maxFrameChars */ 64 * 1024,
+            /* maxLifetimeMinutes */ 60
         );
 
         dockerClient = DockerClientImpl.getInstance(

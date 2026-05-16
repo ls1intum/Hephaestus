@@ -39,6 +39,12 @@ public class MentorChatMetrics {
         IN_FLIGHT_CONFLICT_LOCAL("in_flight_conflict_local"),
         IN_FLIGHT_CONFLICT_DB("in_flight_conflict_db"),
         REJECTED("rejected"),
+        /**
+         * Sandbox registration was denied because a capacity cap fired — either per-user or
+         * per-replica. Distinct from {@link #ERROR} so capacity-driven alerts don't bury a
+         * genuine failure (and vice versa).
+         */
+        CAPACITY_EXCEEDED("capacity_exceeded"),
         ERROR("error");
 
         private final String tag;

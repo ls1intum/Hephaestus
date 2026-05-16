@@ -11,7 +11,9 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import jakarta.annotation.PreDestroy;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -38,6 +40,7 @@ public class InteractiveSandboxRegistry {
     private final SandboxContainerManager containerManager;
     private final InteractiveSandboxMetrics metrics;
     private final StdinWriteWatchdog watchdog;
+    private final Clock clock;
 
     private final ConcurrentHashMap<SessionKey, DockerAttachedSandboxAdapter> sessions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicInteger> sessionsPerUser = new ConcurrentHashMap<>();
@@ -50,10 +53,26 @@ public class InteractiveSandboxRegistry {
         StdinWriteWatchdog watchdog,
         MeterRegistry meterRegistry
     ) {
+        this(properties, containerManager, metrics, watchdog, meterRegistry, Clock.systemUTC());
+    }
+
+    /**
+     * Test seam: a constructor-injected {@link Clock} lets {@code MAX_LIFETIME} reaper tests
+     * advance time without {@code Thread.sleep}. Production wiring uses {@link Clock#systemUTC()}.
+     */
+    InteractiveSandboxRegistry(
+        InteractiveSandboxProperties properties,
+        SandboxContainerManager containerManager,
+        InteractiveSandboxMetrics metrics,
+        StdinWriteWatchdog watchdog,
+        MeterRegistry meterRegistry,
+        Clock clock
+    ) {
         this.properties = properties;
         this.containerManager = containerManager;
         this.metrics = metrics;
         this.watchdog = watchdog;
+        this.clock = clock;
         Gauge.builder("mentor.session.active", sessions, ConcurrentHashMap::size)
             .description("Currently attached mentor sandbox sessions on this replica")
             .register(meterRegistry);
@@ -144,9 +163,32 @@ public class InteractiveSandboxRegistry {
             // and we'd run runClose inline on the scheduler thread, stalling the watchdog.
             return;
         }
+        reapInternal(sessions.values());
+    }
+
+    /**
+     * Pure reap logic over an arbitrary iterable — extracted so tests can drive a synthetic set
+     * of sandboxes without funneling through the full register/start machinery. Production wiring
+     * always passes {@code sessions.values()}.
+     */
+    void reapInternal(Iterable<? extends ReapTarget> targets) {
         Duration ttl = Duration.ofSeconds(properties.idleTtlSeconds());
-        for (DockerAttachedSandboxAdapter sandbox : sessions.values()) {
+        Duration maxLifetime = Duration.ofMinutes(properties.maxLifetimeMinutes());
+        Instant now = clock.instant();
+        for (ReapTarget sandbox : targets) {
             if (sandbox.state() != AttachedSandboxState.ATTACHED) {
+                continue;
+            }
+            // Lifetime check first: a chatty user who never goes idle would otherwise stay
+            // attached forever and the idle-only reaper never fires for them.
+            Duration lifetime = Duration.between(sandbox.createdAt(), now);
+            if (lifetime.compareTo(maxLifetime) > 0) {
+                log.info(
+                    "Reaping sandbox past max lifetime: sessionId={}, lifetimeMinutes={}",
+                    sandbox.sessionId(),
+                    lifetime.toMinutes()
+                );
+                sandbox.terminate(EvictionReason.MAX_LIFETIME);
                 continue;
             }
             if (sandbox.idleFor().compareTo(ttl) > 0) {
@@ -160,6 +202,18 @@ public class InteractiveSandboxRegistry {
                 sandbox.terminate(EvictionReason.IDLE);
             }
         }
+    }
+
+    /**
+     * Narrow surface the reaper actually needs. The production {@link DockerAttachedSandboxAdapter}
+     * trivially conforms; the test uses a hand-rolled fake to avoid having to mock a final class.
+     */
+    interface ReapTarget {
+        AttachedSandboxState state();
+        Instant createdAt();
+        Duration idleFor();
+        java.util.UUID sessionId();
+        void terminate(EvictionReason reason);
     }
 
     @Scheduled(fixedDelay = 1, timeUnit = TimeUnit.SECONDS)

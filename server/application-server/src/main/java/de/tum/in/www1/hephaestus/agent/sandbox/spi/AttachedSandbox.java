@@ -52,6 +52,17 @@ public interface AttachedSandbox extends AutoCloseable {
     Duration idleFor();
 
     /**
+     * Wall-clock instant the session was attached. Used by the registry's lifetime reaper to
+     * evict sessions that have accumulated state past a configured maximum. Every implementation
+     * captures this at construction time — the {@code default} fallback here exists only so a
+     * future SPI consumer that forgets to implement it returns a sensible value (caller treats
+     * "now" as a brand-new session, so the reaper simply won't fire).
+     */
+    default Instant createdAt() {
+        return Instant.now();
+    }
+
+    /**
      * Stops the underlying container with {@code docker stop --time=graceTimeout} (SIGTERM →
      * grace → SIGKILL), then removes it. Idempotent. The hard SIGKILL mitigates the Pi SDK
      * abort-hang risk.

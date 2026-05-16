@@ -52,6 +52,24 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
                 .because("SPI types must not leak implementation details");
             rule.check(classes);
         }
+
+        @Test
+        @DisplayName("SPI types must not depend on Micrometer")
+        void spiHasNoMicrometerDeps() {
+            ArchRule rule = noClasses()
+                .that()
+                .resideInAPackage(SANDBOX_SPI)
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("io.micrometer..")
+                .because(
+                    "SPI must stay transport- and observability-agnostic. " +
+                        "Metrics live in docker.interactive.* and agent.mentor.chat.* only — " +
+                        "depending on Micrometer here would force every future SPI consumer " +
+                        "to ship a MeterRegistry whether they care about metrics or not."
+                );
+            rule.check(classes);
+        }
     }
 
     @Nested

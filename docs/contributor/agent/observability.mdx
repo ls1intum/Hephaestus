@@ -1,0 +1,90 @@
+---
+id: agent-observability
+sidebar_position: 6
+title: Agent Observability
+description: Mentor and interactive-sandbox metrics — names, tags, intended alerts.
+---
+
+This page catalogues the Micrometer metrics emitted by the mentor pipeline and the interactive
+sandbox layer underneath it. Names are stable contracts with the dashboards — coordinate any
+rename through the on-call rotation before shipping.
+
+## Capacity & lifecycle
+
+### `interactive_sandbox.evicted_total{reason}`
+
+Counter, one increment per sandbox eviction.
+
+| Tag value | Meaning |
+| --- | --- |
+| `idle` | Session evicted because it crossed `hephaestus.mentor.idle-ttl-seconds`. |
+| `max_lifetime` | Session evicted because it crossed `hephaestus.mentor.max-lifetime-minutes` (absolute lifetime cap, default 60 min). |
+| `manual` | Explicit `close()` from the chat layer (e.g., poisoned sandbox after a `-32002`). |
+| `error` | Forced eviction due to a pump/writer fault. |
+| `natural_exit` | The runner subprocess exited cleanly. |
+| `daemon_unhealthy` | Docker daemon health check failed during reap. |
+
+`mentor.session.eviction{reason}` carries the same data with the legacy name retained for
+back-compat — both increment together. Alert on the SPI-aligned name.
+
+### `mentor.chat.outcome{outcome=CAPACITY_EXCEEDED}`
+
+Counter, increments when a turn is rejected because `InteractiveSandboxRegistry.tryRegister`
+returned `MAX_SESSIONS_PER_USER` or `MAX_SESSIONS_TOTAL`. **Distinguish from
+`outcome=ERROR` when alerting** — capacity rejections are policy-driven and expected under load
+(answer: add a replica or raise the cap); `ERROR` is a genuine failure that needs investigation.
+
+### `mentor.session.active`
+
+Gauge of currently-attached sandbox sessions on this replica. Useful as the denominator for
+capacity dashboards.
+
+## Frame pipeline
+
+### `interactive_sandbox.frame_ring.dropped_total{userId}`
+
+Per-user counter of ring-buffer overflows. Tagged by `userId` and **capped at 50 distinct
+users** by a `MeterFilter` (`MetricsCardinalityConfig`) — the 51st user's drops still hit the
+global counter but are not separately attributed.
+
+Per `(userId, sandboxId)` the increment is **debounced to at most once per second**. The buffer
+still drops every overflowed frame (no data loss in the *behaviour*; just the *metric* is
+rate-limited). Under sustained overflow you get a stable per-second signal instead of a flood.
+
+How to read it:
+
+- A spike on one user → that user's stream is producing tokens faster than the subscriber
+  can drain. Check their subscriber queue (`mentor.subscriber.dropped`) — if it's also high,
+  the SSE pipe is saturated.
+- Several users at once → the **ring is too small for production traffic**. Raise
+  `hephaestus.mentor.ring-buffer-frames` (default `512`) after confirming via this metric.
+  The default has **not yet been benchmarked against real Pi token-delta volumes** — it is the
+  starting point for the observation, not the final answer.
+
+### `mentor.ring.buffer.dropped`
+
+Global, untagged counter — always increments, regardless of cardinality cap or debounce.
+Useful for the gross "is the system dropping frames at all" question. The per-user counter
+above is for attribution; this one is for total volume.
+
+## Send / receive bytes
+
+`mentor.send.frame.bytes{direction=in|out}` — bytes pushed to runner stdin / received from
+runner stdout. A clean way to compute steady-state token throughput.
+
+`mentor.send.rejected{reason}` — `send()` rejections by reason (`queue_full`, `write_timeout`,
+`broken_pipe`, `closed`). `queue_full` rising = upstream is producing faster than the runner
+can absorb.
+
+## Tuning knobs (none auto-bumped in this PR)
+
+The defaults are conservative starting points:
+
+- `hephaestus.mentor.ring-buffer-frames=512` — observe `frame_ring.dropped_total` for a week
+  before deciding to raise; bumping it eats per-session heap proportionally.
+- `hephaestus.mentor.max-lifetime-minutes=60` — backstop against runners that accumulate
+  state or leak FDs over hours. Range `[5, 480]`. Too low evicts chatty users; too high lets
+  a leaky runner drink resources before idle eviction catches it.
+
+This page intentionally **does not** raise either default — the right number comes from the
+metrics, not from a guess.
