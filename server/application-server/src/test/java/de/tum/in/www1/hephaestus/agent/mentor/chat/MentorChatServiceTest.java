@@ -22,7 +22,6 @@ import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerExcepti
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
-import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
@@ -132,7 +131,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         // Instance-level LLM config — all three required fields set so resolveLlmConfig takes
         // the instance path and does not need the agentConfigRepository.
         MentorAgentProperties mentorProps = new MentorAgentProperties(
-            "test-image",
             "pi-mentor-runner.mjs",
             100_000,
             "",
@@ -140,8 +138,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             CredentialMode.API_KEY,
             "test-key",
             "test-model",
-            600,
-            ImagePullPolicy.IF_NOT_PRESENT
+            600
         );
         service = new MentorChatService(
             userRepository,

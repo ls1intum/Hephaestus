@@ -35,6 +35,10 @@
     {
       "name": "hephaestus.sentry",
       "description": "Sentry error tracking integration"
+    },
+    {
+      "name": "hephaestus.agent.image",
+      "description": "Shared image reference for the Pi practice + mentor agent runtime"
     }
   ],
   "properties": [
@@ -167,6 +171,21 @@
       "name": "hephaestus.sentry.dsn",
       "type": "java.lang.String",
       "description": "Sentry DSN for error tracking; leave blank to disable"
+    },
+    {
+      "name": "hephaestus.agent.image.reference",
+      "type": "java.lang.String",
+      "description": "Fully-qualified image reference (registry/path:tag or registry/path@sha256:<digest>) used by both Pi practice sandboxes and the mentor container. Production must be digest-pinned."
+    },
+    {
+      "name": "hephaestus.agent.image.pull-policy",
+      "type": "de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy",
+      "description": "Startup pull behaviour: ALWAYS, IF_NOT_PRESENT (default), or NEVER. With digest-pinned references, IF_NOT_PRESENT is safe; with tags, prefer ALWAYS."
+    },
+    {
+      "name": "hephaestus.agent.image.require-digest",
+      "type": "java.lang.Boolean",
+      "description": "When true, the application fails to start unless 'reference' ends in @sha256:<64 hex>. Production sets this to true; dev defaults to false so :latest keeps working."
     }
   ],
   "hints": [
@@ -210,6 +229,19 @@
       "values": [
         { "value": "https://app.posthog.com", "description": "PostHog Cloud (default)" },
         { "value": "https://eu.posthog.com", "description": "PostHog Cloud EU" }
+      ]
+    },
+    {
+      "name": "hephaestus.agent.image.reference",
+      "values": [
+        {
+          "value": "ghcr.io/ls1intum/hephaestus/agent-pi:latest",
+          "description": "Dev/local — tag-based, mutable"
+        },
+        {
+          "value": "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "description": "Production — digest-pinned (replace zeros with the release digest from docker/agent-image-pin.env)"
+        }
       ]
     }
   ]

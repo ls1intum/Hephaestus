@@ -4,6 +4,7 @@ const sidebars: SidebarsConfig = {
   adminSidebar: [
     {type: 'doc', id: 'production-setup', label: 'Production Setup'},
     {type: 'doc', id: 'legal-pages', label: 'Legal Pages'},
+    {type: 'doc', id: 'agent-image-digests', label: 'Agent image digests'},
     {
       type: 'category',
       label: 'Data-Protection Documentation',

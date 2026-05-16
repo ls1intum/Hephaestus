@@ -1,15 +1,14 @@
 package de.tum.in.www1.hephaestus.agent.runtime;
 
-import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Pi practice-agent-specific runtime knobs. The image reference and pull policy live in
+ * {@link AgentImageProperties} so practice and mentor stay aligned on a single agent-pi digest.
+ */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.agent.pi")
-public record PiAgentProperties(
-    @DefaultValue("ghcr.io/ls1intum/hephaestus/agent-pi:latest") @NotBlank String image,
-    @DefaultValue("pi-runner.mjs") @NotBlank String runnerScript,
-    @DefaultValue("IF_NOT_PRESENT") ImagePullPolicy pullPolicy
-) {}
+public record PiAgentProperties(@DefaultValue("pi-runner.mjs") @NotBlank String runnerScript) {}

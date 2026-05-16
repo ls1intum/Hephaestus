@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
+import de.tum.in.www1.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.in.www1.hephaestus.agent.runtime.PiAgentProperties;
 import de.tum.in.www1.hephaestus.agent.runtime.PiResultParser;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -29,7 +30,8 @@ class PracticePiAdapterTest extends BaseUnitTest {
         adapter = new PracticePiAdapter(
             new PiRuntimeFactory(mapper),
             new PiResultParser(mapper, metrics),
-            new PiAgentProperties(IMAGE, "pi-runner.mjs", ImagePullPolicy.IF_NOT_PRESENT)
+            new PiAgentProperties("pi-runner.mjs"),
+            new AgentImageProperties(IMAGE, ImagePullPolicy.IF_NOT_PRESENT, false)
         );
     }
 
