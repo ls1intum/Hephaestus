@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus;
 
 import de.tum.in.www1.hephaestus.config.CorsProperties;
 import de.tum.in.www1.hephaestus.feature.FeatureFlag;
+import de.tum.in.www1.hephaestus.observability.ReplicaIdentityFilter;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -142,6 +143,7 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(
             List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin")
         );
+        configuration.setExposedHeaders(List.of(ReplicaIdentityFilter.HEADER_NAME));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

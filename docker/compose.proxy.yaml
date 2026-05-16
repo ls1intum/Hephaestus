@@ -1,6 +1,6 @@
 services:
   reverse-proxy:
-    image: traefik:v3.2
+    image: traefik:v3.4
     restart: unless-stopped
     networks:
       - shared-network
