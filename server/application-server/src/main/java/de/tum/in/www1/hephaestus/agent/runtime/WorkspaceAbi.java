@@ -57,6 +57,12 @@ public final class WorkspaceAbi {
     /** Workspace-relative path of the orchestrator instructions (combination of prefix + filename). */
     public static final String ORCHESTRATOR_PATH = PI_AGENT_PREFIX + ORCHESTRATOR_FILENAME;
 
+    /**
+     * Workspace-relative path of the mentor runner's system prompt file. Single-sourced so the
+     * Java materialiser (writing the bytes) and the JavaScript runner (reading them) cannot drift.
+     */
+    public static final String MENTOR_SYSTEM_PROMPT_PATH = "agent/mentor/system.md";
+
     /** Exit code emitted by the Pi runner on envelope/image drift (unsupported {@code schemaVersion} or {@code kind}). */
     public static final int EXIT_ENVELOPE_MISMATCH = 42;
 

@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.agent.mentor.live;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.Cursor;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -101,10 +102,14 @@ final class StdioAttachedSandbox implements AttachedSandbox {
     }
 
     @Override
-    public Disposable subscribe(Consumer<JsonNode> listener) {
+    public Disposable subscribe(Cursor cursor, Consumer<JsonNode> listener) {
         if (closed) {
             return Disposables.disposed();
         }
+        // Stdio harness has no ring buffer (test-only stand-in), so RING_REPLAY and FROM_NOW
+        // observe the same live-only stream. The argument is accepted so this implementation
+        // tracks the SPI surface verbatim — if a future change adds buffering, the dispatch
+        // belongs here.
         listeners.add(listener);
         return () -> listeners.remove(listener);
     }

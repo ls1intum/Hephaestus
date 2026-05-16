@@ -14,6 +14,7 @@ import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.Cursor;
 import de.tum.in.www1.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.in.www1.hephaestus.testconfig.LiveLlmTest;
 import java.io.IOException;
@@ -162,7 +163,7 @@ class MentorLiveLlmTest {
         TranslatorState state = new TranslatorState(assistantMessageId);
         List<UIMessageChunk> chunks = new ArrayList<>();
         var translationDone = new java.util.concurrent.CompletableFuture<Void>();
-        sandbox.subscribe(frame -> {
+        sandbox.subscribe(Cursor.RING_REPLAY, frame -> {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             chunks.addAll(translator.translate(event, state));
@@ -385,7 +386,7 @@ class MentorLiveLlmTest {
         TranslatorState state = new TranslatorState(assistantMessageId);
         List<UIMessageChunk> chunks = new ArrayList<>();
         var done = new java.util.concurrent.CompletableFuture<Void>();
-        sandbox.subscribe(frame -> {
+        sandbox.subscribe(Cursor.RING_REPLAY, frame -> {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             chunks.addAll(translator.translate(event, state));
@@ -471,7 +472,7 @@ class MentorLiveLlmTest {
         driver.openThread(threadId);
 
         AtomicReference<byte[]> captured = new AtomicReference<>();
-        sandbox.subscribe(frame -> {
+        sandbox.subscribe(Cursor.RING_REPLAY, frame -> {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             if ("session_persisted".equals(event.path("type").asText())) {
@@ -531,7 +532,7 @@ class MentorLiveLlmTest {
         List<UIMessageChunk> chunks = new ArrayList<>();
         var done = new java.util.concurrent.CompletableFuture<Void>();
         // Use a per-turn subscription so collected chunks are scoped to this turn only.
-        var unsubscribe = sandbox.subscribe(frame -> {
+        var unsubscribe = sandbox.subscribe(Cursor.RING_REPLAY, frame -> {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             chunks.addAll(translator.translate(event, state));
@@ -739,7 +740,7 @@ class MentorLiveLlmTest {
 
         RunnerDriver(AttachedSandbox sandbox) {
             this.sandbox = sandbox;
-            sandbox.subscribe(frame -> {
+            sandbox.subscribe(Cursor.RING_REPLAY, frame -> {
                 if (frame.has("id") && (frame.has("result") || frame.has("error"))) {
                     responses.add(frame);
                 } else if (

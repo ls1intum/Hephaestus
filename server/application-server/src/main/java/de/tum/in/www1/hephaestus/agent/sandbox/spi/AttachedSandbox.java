@@ -9,10 +9,10 @@ import reactor.core.Disposable;
 
 /**
  * Live handle to one attached sandbox session: bidirectional JSONL channel plus fan-out and idle
- * bookkeeping. {@link #subscribe} delivers a snapshot of the ring buffer followed by live frames,
- * each subscriber on its own bounded queue + virtual-thread dispatcher (slow listeners drop their
- * own frames, never the pump). After termination, {@code send} throws and {@code subscribe}
- * returns a disposed handle.
+ * bookkeeping. {@link #subscribe} delivers frames on a per-subscriber bounded queue + virtual
+ * thread dispatcher (slow listeners drop their own frames, never the pump); the {@link Cursor}
+ * argument controls whether the snapshot of buffered frames is replayed before live frames.
+ * After termination, {@code send} throws and {@code subscribe} returns a disposed handle.
  */
 public interface AttachedSandbox extends AutoCloseable {
     UUID sessionId();
@@ -32,19 +32,19 @@ public interface AttachedSandbox extends AutoCloseable {
     void send(JsonNode frame) throws InteractiveSandboxException;
 
     /**
+     * Subscribe to the frame stream starting at {@code cursor}.
+     *
+     * <p>{@link Cursor#RING_REPLAY} is for re-attach after a server restart — the existing
+     * session's buffered frames replay so the new subscriber can rebuild its view. {@link
+     * Cursor#FROM_NOW} is correct for multi-turn reuse of the same sandbox: each new turn
+     * subscribes fresh, and replay would terminate the new turn instantly with the prior
+     * turn's {@code agent_end}.
+     *
+     * @param cursor   where in the frame stream to begin
      * @param listener invoked on a dedicated virtual thread per subscriber; may block
      * @return a {@link Disposable} whose {@code dispose()} is idempotent
      */
-    Disposable subscribe(Consumer<JsonNode> listener);
-
-    /**
-     * Like {@link #subscribe}, but skips the ring-buffer replay and only delivers frames that
-     * arrive after the subscription is registered. Use this for subsequent turns on a reused
-     * sandbox to avoid replaying terminal events from prior turns.
-     */
-    default Disposable subscribeFromNow(Consumer<JsonNode> listener) {
-        return subscribe(listener);
-    }
+    Disposable subscribe(Cursor cursor, Consumer<JsonNode> listener);
 
     /** Wall-clock of the last frame in either direction. */
     Instant lastActivityAt();

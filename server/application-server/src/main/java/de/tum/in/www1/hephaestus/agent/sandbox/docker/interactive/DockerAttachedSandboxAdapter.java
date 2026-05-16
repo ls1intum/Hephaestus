@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandboxState;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.Cursor;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.EvictionReason;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import java.time.Duration;
@@ -175,13 +176,12 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     }
 
     @Override
-    public Disposable subscribe(Consumer<JsonNode> listener) {
-        return subscribeInternal(listener, -1L);
-    }
-
-    @Override
-    public Disposable subscribeFromNow(Consumer<JsonNode> listener) {
-        return subscribeInternal(listener, ring.latestSequence());
+    public Disposable subscribe(Cursor cursor, Consumer<JsonNode> listener) {
+        long replaySince = switch (cursor) {
+            case RING_REPLAY -> -1L;
+            case FROM_NOW -> ring.latestSequence();
+        };
+        return subscribeInternal(listener, replaySince);
     }
 
     private Disposable subscribeInternal(Consumer<JsonNode> listener, long replaySince) {

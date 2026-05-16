@@ -1,0 +1,33 @@
+---
+sidebar_position: 6
+title: Mentor Deployment
+description: Sticky-routing contract and replica-affinity health check for the Pi mentor.
+---
+
+## Replica affinity
+
+Mentor chat keeps one in-flight turn per `(workspaceId, contributorId, threadId)` alive
+across HTTP requests. Every follow-up SSE GET must route to the JVM that owns the
+interactive sandbox; otherwise the follow-up hits a replica without the sandbox handle and
+the DB partial unique index `ux_chat_message_in_flight_v2` rejects the duplicate with a 409
+after an orphan `IN_FLIGHT` row has already been written.
+
+### Contract
+
+When the deployment runs more than one replica, the load balancer **must** route by a
+stable session-affinity key (Traefik sticky cookie, AWS ALB stickiness, or equivalent). The
+backend cannot introspect the LB's routing policy, so sticky routing is an **operator
+assertion** via configuration:
+
+```properties
+hephaestus.mentor.expected-replicas=3
+hephaestus.mentor.sticky-routing-confirmed=true
+```
+
+The `MentorReplicaAffinityCheck` `HealthIndicator` reports DOWN when
+`expected-replicas > 1` and `sticky-routing-confirmed` is false. The Kubernetes readiness
+probe (or Coolify equivalent) refuses to route traffic to a replica reporting DOWN, turning
+a silent correctness bug into a loud deploy failure.
+
+Single-replica deployments leave both values at their defaults (`1` / `false`) and report
+UP — there is no affinity hazard with one replica.

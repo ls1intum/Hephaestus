@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.Cursor;
 import de.tum.in.www1.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.in.www1.hephaestus.testconfig.LiveLlmTest;
 import java.io.IOException;
@@ -322,7 +323,7 @@ class MentorSandboxStressTest {
 
             // Listen for agent_end (turn complete signal) for this thread.
             CompletableFuture<Void> turnComplete = new CompletableFuture<>();
-            sandbox.subscribe(frame -> {
+            sandbox.subscribe(Cursor.RING_REPLAY, frame -> {
                 if (!"event".equals(frame.path("method").asText())) return;
                 if (!threadId.toString().equals(frame.path("params").path("threadId").asText())) return;
                 if ("agent_end".equals(frame.path("params").path("event").path("type").asText())) {
@@ -391,7 +392,7 @@ class MentorSandboxStressTest {
 
             // Subscribe once for all per-thread agent_end signals.
             var turnCompletes = new ConcurrentHashMap<UUID, CompletableFuture<Void>>();
-            sandbox.subscribe(frame -> {
+            sandbox.subscribe(Cursor.RING_REPLAY, frame -> {
                 if (!"event".equals(frame.path("method").asText())) return;
                 String tid = frame.path("params").path("threadId").asText();
                 UUID parsed;
@@ -896,7 +897,7 @@ class MentorSandboxStressTest {
 
         RunnerDriver(StdioAttachedSandbox sandbox) {
             this.sandbox = sandbox;
-            sandbox.subscribe(frame -> {
+            sandbox.subscribe(Cursor.RING_REPLAY, frame -> {
                 if (frame.has("id") && (frame.has("result") || frame.has("error"))) {
                     responses.add(frame);
                 } else if (

@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.Cursor;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
@@ -238,7 +239,9 @@ class MentorRunnerClientTest extends BaseUnitTest {
         }
 
         @Override
-        public Disposable subscribe(Consumer<JsonNode> listener) {
+        public Disposable subscribe(Cursor cursor, Consumer<JsonNode> listener) {
+            // Test fake has no ring buffer: cursor is accepted for SPI conformance, both values
+            // observe the same live-only stream.
             listeners.add(listener);
             return () -> listeners.remove(listener);
         }

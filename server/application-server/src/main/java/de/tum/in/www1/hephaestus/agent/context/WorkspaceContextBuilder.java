@@ -70,7 +70,7 @@ public class WorkspaceContextBuilder {
      * @return insertion-ordered {@link LinkedHashMap} of workspace-relative path → bytes
      */
     public Map<String, byte[]> build(ContextRequest request) {
-        ReentrantLock lock = stripeFor(repoKey(request));
+        ReentrantLock lock = stripeFor(stripeKey(request));
         long startNs = System.nanoTime();
         lock.lock();
         try {
@@ -83,10 +83,9 @@ public class WorkspaceContextBuilder {
         }
     }
 
-    /** Map a repository id to one of {@link #LOCK_STRIPES} locks; {@code null} keys all collide on stripe 0. */
-    private ReentrantLock stripeFor(Long repoKey) {
-        int idx = repoKey == null ? 0 : Math.floorMod(repoKey.hashCode(), LOCK_STRIPES);
-        return repoLockStripes[idx];
+    /** Map a stripe key to one of {@link #LOCK_STRIPES} locks. */
+    private ReentrantLock stripeFor(int stripeKey) {
+        return repoLockStripes[Math.floorMod(stripeKey, LOCK_STRIPES)];
     }
 
     private Map<String, byte[]> buildLocked(ContextRequest request) {
@@ -158,14 +157,29 @@ public class WorkspaceContextBuilder {
         return files;
     }
 
-    /** Repository id for single-flight locking, or {@code null} for requests that don't touch git. */
-    private static Long repoKey(ContextRequest request) {
-        if (request instanceof ContextRequest.PracticeReviewRequest pr) {
-            JsonNode meta = pr.job().getMetadata();
-            if (meta != null && meta.has("repository_id") && meta.get("repository_id").isNumber()) {
-                return meta.get("repository_id").asLong();
+    /**
+     * Hash a {@link ContextRequest} into a stripe-key for single-flight locking. Practice review
+     * stripes on {@code repository_id} (concurrent reviews of the same repo serialise so they
+     * don't trample each other's git working tree); mentor chat stripes on
+     * {@code (contributorId, workspaceId)} so concurrent mentor sessions for distinct users
+     * fan out across stripes instead of collapsing onto stripe 0.
+     *
+     * <p>{@link ContextRequest} is {@code sealed} → a sealed switch makes adding a new variant
+     * a compile error here, which is the intended forcing function.
+     */
+    static int stripeKey(ContextRequest request) {
+        return switch (request) {
+            case ContextRequest.PracticeReviewRequest pr -> {
+                JsonNode meta = pr.job().getMetadata();
+                if (meta != null && meta.has("repository_id") && meta.get("repository_id").isNumber()) {
+                    yield Long.hashCode(meta.get("repository_id").asLong());
+                }
+                // No repository_id in metadata: hash the job id so distinct jobs still fan out
+                // across stripes (rather than every metadata-less job piling onto stripe 0).
+                yield pr.job().getId() != null ? pr.job().getId().hashCode() : 0;
             }
-        }
-        return null;
+            case ContextRequest.MentorChatRequest mr -> (Long.hashCode(mr.contributorId()) * 31) ^
+            Long.hashCode(mr.workspaceId());
+        };
     }
 }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerTimeoutException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.Cursor;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import java.time.Duration;
 import java.util.Objects;
@@ -102,10 +103,10 @@ public final class MentorRunnerClient implements AutoCloseable {
         if (subscription != null) {
             return;
         }
-        // subscribeFromNow: skip ring-buffer replay of frames from prior turns on the same
+        // Cursor.FROM_NOW: skip ring-buffer replay of frames from prior turns on the same
         // reused sandbox. Without this, a second turn replays turn-1's agent_end event and
         // completes instantly with stale data.
-        this.subscription = sandbox.subscribeFromNow(this::onFrame);
+        this.subscription = sandbox.subscribe(Cursor.FROM_NOW, this::onFrame);
     }
 
     public CompletableFuture<JsonNode> hello() {

@@ -24,6 +24,7 @@ import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslat
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.Cursor;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
@@ -675,7 +676,9 @@ class MentorChatServiceTest extends BaseUnitTest {
         }
 
         @Override
-        public Disposable subscribe(Consumer<JsonNode> listener) {
+        public Disposable subscribe(Cursor cursor, Consumer<JsonNode> listener) {
+            // Test fake has no ring buffer: cursor is accepted for SPI conformance, both values
+            // observe the same live-only stream.
             listeners.add(listener);
             return () -> listeners.remove(listener);
         }

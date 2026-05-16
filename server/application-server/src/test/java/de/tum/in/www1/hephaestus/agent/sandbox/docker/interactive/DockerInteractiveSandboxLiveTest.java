@@ -25,6 +25,7 @@ import de.tum.in.www1.hephaestus.agent.sandbox.docker.SandboxNetworkManager;
 import de.tum.in.www1.hephaestus.agent.sandbox.docker.SandboxWorkspaceManager;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandboxState;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.Cursor;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.EvictionReason;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
@@ -225,7 +226,7 @@ class DockerInteractiveSandboxLiveTest {
         void pingPong() {
             AttachedSandbox sb = adapter.attach(buildSpec("u1", "w1"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
-            sb.subscribe(frames::add);
+            sb.subscribe(Cursor.RING_REPLAY, frames::add);
             sb.send(ping());
 
             await()
@@ -250,7 +251,7 @@ class DockerInteractiveSandboxLiveTest {
         void unicodeSurvives() {
             AttachedSandbox sb = adapter.attach(buildSpec("u2", "w2"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
-            sb.subscribe(frames::add);
+            sb.subscribe(Cursor.RING_REPLAY, frames::add);
             String payload = "a" + LINE_SEP + "b" + PARA_SEP + "c\nd\re";
             sb.send(echo(payload));
 
@@ -295,7 +296,7 @@ class DockerInteractiveSandboxLiveTest {
 
             // Late subscriber's snapshot must hold the NEWEST ringCapacity ticks, not any prefix.
             CopyOnWriteArrayList<JsonNode> snapshot = new CopyOnWriteArrayList<>();
-            sb.subscribe(snapshot::add);
+            sb.subscribe(Cursor.RING_REPLAY, snapshot::add);
             await()
                 .atMost(Duration.ofSeconds(5))
                 .untilAsserted(() ->
@@ -603,7 +604,7 @@ class DockerInteractiveSandboxLiveTest {
             // the runner never starts, the pump sees EOF with non-zero exit, and attach() throws.
             AttachedSandbox sb = adapter.attach(buildMentorSpec("u_boot", "w_boot"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
-            sb.subscribe(frames::add);
+            sb.subscribe(Cursor.RING_REPLAY, frames::add);
             await()
                 .atMost(RPC_TIMEOUT)
                 .untilAsserted(() ->
@@ -622,7 +623,7 @@ class DockerInteractiveSandboxLiveTest {
             assumeTrue(dockerOps.imageIsPresent(AGENT_PI_IMAGE), "agent-pi image not in local daemon");
             AttachedSandbox sb = adapter.attach(buildMentorSpec("u_hello", "w_hello"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
-            sb.subscribe(frames::add);
+            sb.subscribe(Cursor.RING_REPLAY, frames::add);
 
             // Wait for the runner to be ready before sending any RPC.
             await()
@@ -664,7 +665,7 @@ class DockerInteractiveSandboxLiveTest {
             assumeTrue(dockerOps.imageIsPresent(AGENT_PI_IMAGE), "agent-pi image not in local daemon");
             AttachedSandbox sb = adapter.attach(buildMentorSpec("u_turn", "w_turn"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
-            sb.subscribe(frames::add);
+            sb.subscribe(Cursor.RING_REPLAY, frames::add);
 
             await()
                 .atMost(RPC_TIMEOUT)

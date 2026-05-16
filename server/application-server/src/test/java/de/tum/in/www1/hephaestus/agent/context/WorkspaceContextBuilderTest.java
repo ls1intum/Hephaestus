@@ -269,6 +269,47 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     @Nested
+    @DisplayName("stripe-key fan-out")
+    class StripeKey {
+
+        @Test
+        @DisplayName("striping for mentor requests is not degenerate (>= 32/64 stripes used over 100 pairs)")
+        void stripingForMentorRequestsIsNotDegenerate() {
+            // Pre-#1081 bug: repoKey returned null for MentorChatRequest, collapsing every concurrent
+            // mentor session onto stripe 0 (Math.floorMod(0, 64) == 0). Inputs are drawn from a
+            // seeded Random so the test is deterministic AND uncorrelated — DB-generated user/workspace
+            // IDs in production are independent sequences, so randomly-paired ids mirror the real
+            // workload better than an arithmetic progression (which can collide on low bits with the
+            // simple `h(c)*31 ^ h(w)` mix). Threshold: at least half of 64 stripes used.
+            int stripes = 64;
+            java.util.Random rng = new java.util.Random(0xC0FFEE);
+            java.util.Set<Integer> seen = new java.util.HashSet<>();
+            for (int i = 0; i < 100; i++) {
+                long contributorId = 1L + (rng.nextLong() & 0x0FFFFFFFFFFFFFFFL);
+                long workspaceId = 1L + (rng.nextLong() & 0x0FFFFFFFFFFFFFFFL);
+                ContextRequest.MentorChatRequest req = new ContextRequest.MentorChatRequest(
+                    workspaceId,
+                    contributorId,
+                    UUID.nameUUIDFromBytes(("t-" + i).getBytes(StandardCharsets.UTF_8))
+                );
+                int idx = Math.floorMod(WorkspaceContextBuilder.stripeKey(req), stripes);
+                seen.add(idx);
+            }
+            assertThat(seen)
+                .as("distinct stripe count over 100 mentor (contributorId, workspaceId) pairs")
+                .hasSizeGreaterThanOrEqualTo(32);
+        }
+
+        @Test
+        @DisplayName("two mentor requests with the same (contributorId, workspaceId) land on the same stripe")
+        void mentorStripeKeyStableForSamePair() {
+            ContextRequest.MentorChatRequest a = new ContextRequest.MentorChatRequest(42L, 7L, UUID.randomUUID());
+            ContextRequest.MentorChatRequest b = new ContextRequest.MentorChatRequest(42L, 7L, UUID.randomUUID());
+            assertThat(WorkspaceContextBuilder.stripeKey(a)).isEqualTo(WorkspaceContextBuilder.stripeKey(b));
+        }
+    }
+
+    @Nested
     @DisplayName("single-flight per repository")
     class SingleFlight {
 
