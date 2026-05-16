@@ -34,6 +34,7 @@ class WorkspaceContextExecutorTest {
             AccountType.ORG,
             100L,
             false,
+            false,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -72,6 +73,7 @@ class WorkspaceContextExecutorTest {
             AccountType.USER,
             null,
             false,
+            false,
             Set.of()
         );
         WorkspaceContextHolder.setContext(workspaceContext);
@@ -106,6 +108,7 @@ class WorkspaceContextExecutorTest {
             "Test",
             AccountType.ORG,
             777L,
+            false,
             false,
             Set.of()
         );
@@ -142,6 +145,7 @@ class WorkspaceContextExecutorTest {
             "Test",
             AccountType.ORG,
             null,
+            false,
             false,
             Set.of()
         );
@@ -213,8 +217,26 @@ class WorkspaceContextExecutorTest {
     @DisplayName("Should not leak context between multiple wrapped executions")
     void shouldNotLeakContextBetweenExecutions() throws Exception {
         // Arrange
-        WorkspaceContext context1 = new WorkspaceContext(1L, "ws1", "WS1", AccountType.ORG, null, false, Set.of());
-        WorkspaceContext context2 = new WorkspaceContext(2L, "ws2", "WS2", AccountType.USER, null, false, Set.of());
+        WorkspaceContext context1 = new WorkspaceContext(
+            1L,
+            "ws1",
+            "WS1",
+            AccountType.ORG,
+            null,
+            false,
+            false,
+            Set.of()
+        );
+        WorkspaceContext context2 = new WorkspaceContext(
+            2L,
+            "ws2",
+            "WS2",
+            AccountType.USER,
+            null,
+            false,
+            false,
+            Set.of()
+        );
 
         AtomicReference<String> capturedSlug1 = new AtomicReference<>();
         AtomicReference<String> capturedSlug2 = new AtomicReference<>();
@@ -254,6 +276,7 @@ class WorkspaceContextExecutorTest {
             AccountType.ORG,
             null,
             false,
+            false,
             Set.of()
         );
         WorkspaceContext wrappedContext = new WorkspaceContext(
@@ -262,6 +285,7 @@ class WorkspaceContextExecutorTest {
             "Wrapped",
             AccountType.USER,
             null,
+            false,
             false,
             Set.of()
         );

@@ -9,12 +9,16 @@ import java.util.Set;
  * Immutable request-scoped context containing workspace metadata and user roles.
  * Used for isolation, authorization, and observability (MDC enrichment).
  *
+ * <p>{@code mentorEnabled} is captured here so per-request mentor controllers can short-circuit
+ * without re-loading the {@link Workspace} entity — the filter already has the row in hand.
+ *
  * @param id Workspace internal ID
  * @param slug Workspace URL-safe slug
  * @param displayName Workspace display name
  * @param accountType GitHub account type (ORG or USER)
  * @param installationId GitHub App installation ID (nullable)
  * @param publiclyViewable Whether the workspace allows public read access
+ * @param mentorEnabled Whether the Pi mentor chat feature is enabled for this workspace
  * @param roles Set of workspace roles for the current user
  */
 public record WorkspaceContext(
@@ -24,15 +28,9 @@ public record WorkspaceContext(
     AccountType accountType,
     Long installationId,
     boolean publiclyViewable,
+    boolean mentorEnabled,
     Set<WorkspaceRole> roles
 ) {
-    /**
-     * Factory method to create WorkspaceContext from Workspace entity and user roles.
-     *
-     * @param workspace Workspace entity
-     * @param roles User's roles in this workspace (null will be converted to empty set)
-     * @return WorkspaceContext instance
-     */
     public static WorkspaceContext fromWorkspace(Workspace workspace, Set<WorkspaceRole> roles) {
         return new WorkspaceContext(
             workspace.getId(),
@@ -41,6 +39,7 @@ public record WorkspaceContext(
             workspace.getAccountType(),
             workspace.getInstallationId(),
             Boolean.TRUE.equals(workspace.getIsPubliclyViewable()),
+            Boolean.TRUE.equals(workspace.getFeatures().getMentorEnabled()),
             roles != null ? roles : Set.of()
         );
     }

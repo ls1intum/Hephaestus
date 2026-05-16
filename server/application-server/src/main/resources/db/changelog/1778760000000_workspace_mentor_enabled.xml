@@ -5,7 +5,6 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <!-- Per-workspace mentor toggle. Mirrors workspace.practices_enabled. -->
     <changeSet id="mentor-1071-workspace-mentor-enabled" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.mentor_enabled already exists">
             <not><columnExists tableName="workspace" columnName="mentor_enabled"/></not>

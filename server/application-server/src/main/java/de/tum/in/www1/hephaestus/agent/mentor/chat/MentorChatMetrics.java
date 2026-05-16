@@ -27,15 +27,9 @@ import org.springframework.stereotype.Component;
 public class MentorChatMetrics {
 
     /**
-     * Tag value enum kept small; reviewers can scan the table to see every terminal branch.
-     *
-     * <p>The two conflict outcomes are distinct on purpose: {@link #IN_FLIGHT_CONFLICT_LOCAL}
-     * fires when the in-JVM {@link MentorTurnLock} rejects a same-JVM double-submit;
-     * {@link #IN_FLIGHT_CONFLICT_DB} fires when the durable partial-unique index catches a
-     * cross-replica race (until #1077 sticky-affinity lands). Operationally, the DB-side
-     * outcome firing in prod is the signal that says "the JVM lock leaked through replica
-     * boundaries"; collapsing them into one label hides whether the durable backstop ever
-     * fires, which was the whole point of having both layers.
+     * Terminal outcome tagged on {@code mentor.turn.completed}. {@link #IN_FLIGHT_CONFLICT_LOCAL}
+     * = same-JVM lock rejection; {@link #IN_FLIGHT_CONFLICT_DB} = durable partial-unique index
+     * trip (cross-replica race). The split is intentional so the DB-side firing is observable.
      */
     public enum Outcome {
         SUCCESS("success"),

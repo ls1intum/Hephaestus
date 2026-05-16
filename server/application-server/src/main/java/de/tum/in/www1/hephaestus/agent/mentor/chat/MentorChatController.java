@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -43,7 +42,6 @@ public class MentorChatController {
     private final MentorChatService mentorChatService;
     private final ObjectMapper objectMapperBean;
     private final MentorAgentProperties mentorAgentProperties;
-    private final WorkspaceRepository workspaceRepository;
 
     @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Send one mentor-chat turn; stream the response as AI SDK UIMessage chunks")
@@ -53,11 +51,7 @@ public class MentorChatController {
         @RequestBody MentorChatRequestBody body,
         HttpServletResponse response
     ) {
-        boolean mentorEnabled = workspaceRepository
-            .findById(workspaceContext.id())
-            .map(w -> Boolean.TRUE.equals(w.getFeatures().getMentorEnabled()))
-            .orElse(false);
-        if (!mentorEnabled) {
+        if (!workspaceContext.mentorEnabled()) {
             throw new EntityNotFoundException("Mentor chat", workspaceContext.slug());
         }
 

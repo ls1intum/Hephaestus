@@ -3,10 +3,8 @@ package de.tum.in.www1.hephaestus.agent.mentor.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -16,12 +14,8 @@ import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceFeatures;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,22 +47,14 @@ class MentorChatControllerTest extends BaseUnitTest {
     @Mock
     MentorChatService mentorChatService;
 
-    @Mock
-    WorkspaceRepository workspaceRepository;
-
     private MentorChatController controller;
     private MockHttpServletResponse response;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        controller = new MentorChatController(mentorChatService, MAPPER, TEST_PROPERTIES, workspaceRepository);
+        controller = new MentorChatController(mentorChatService, MAPPER, TEST_PROPERTIES);
         response = new MockHttpServletResponse();
-        Workspace ws = new Workspace();
-        WorkspaceFeatures features = new WorkspaceFeatures();
-        features.setMentorEnabled(true);
-        ws.setFeatures(features);
-        when(workspaceRepository.findById(anyLong())).thenReturn(Optional.of(ws));
     }
 
     @Test
@@ -148,20 +134,33 @@ class MentorChatControllerTest extends BaseUnitTest {
     @Test
     @DisplayName("workspace with mentorEnabled=false → 404; service NOT invoked")
     void workspaceWithMentorDisabled_returns404() {
-        Workspace ws = new Workspace();
-        WorkspaceFeatures features = new WorkspaceFeatures();
-        features.setMentorEnabled(false);
-        ws.setFeatures(features);
-        when(workspaceRepository.findById(anyLong())).thenReturn(Optional.of(ws));
-
+        WorkspaceContext disabledCtx = new WorkspaceContext(
+            1L,
+            "test-ws",
+            "Test",
+            AccountType.ORG,
+            null,
+            false,
+            false,
+            Set.of(WorkspaceRole.MEMBER)
+        );
         assertThatThrownBy(() ->
-            controller.chat(stubContext(), validBody(UUID.randomUUID(), "hi"), response)
+            controller.chat(disabledCtx, validBody(UUID.randomUUID(), "hi"), response)
         ).isInstanceOf(EntityNotFoundException.class);
         verify(mentorChatService, never()).start(any(), any());
     }
 
     private static WorkspaceContext stubContext() {
-        return new WorkspaceContext(1L, "test-ws", "Test", AccountType.ORG, null, false, Set.of(WorkspaceRole.MEMBER));
+        return new WorkspaceContext(
+            1L,
+            "test-ws",
+            "Test",
+            AccountType.ORG,
+            null,
+            false,
+            true,
+            Set.of(WorkspaceRole.MEMBER)
+        );
     }
 
     private static MentorChatRequestBody validBody(UUID threadId, String text) {

@@ -57,7 +57,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new FindingFeedbackService(feedbackRepository, findingRepository, userRepository);
-        workspaceContext = new WorkspaceContext(WORKSPACE_ID, "test-ws", "Test WS", null, null, false, Set.of());
+        workspaceContext = new WorkspaceContext(WORKSPACE_ID, "test-ws", "Test WS", null, null, false, false, Set.of());
     }
 
     private PracticeFinding createFinding(Long contributorId) {
