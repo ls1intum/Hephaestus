@@ -65,14 +65,13 @@ public class PiRuntimeFactory {
         boolean useCustomProvider = shouldRegisterHephaestusProvider(spec);
         if (useCustomProvider) {
             inputFiles.put(
-                WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts",
+                WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts",
                 buildExtensionFile(spec)
             );
         }
 
-        // Settings live outside .pi/ so Pi's settings lock file lands on a writable mount.
         inputFiles.put(
-            WorkspaceAbi.PI_RUNTIME_PREFIX + "settings.json",
+            WorkspaceAbi.PI_AGENT_PREFIX + "settings.json",
             buildPiSettingsJson(spec.provider(), spec.modelName(), useCustomProvider)
         );
         inputFiles.put(WorkspaceAbi.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
@@ -82,11 +81,12 @@ public class PiRuntimeFactory {
         long agentTimeoutMs = Math.max(60_000L, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
         env.put("AGENT_BUDGET_MS", Long.toString(agentTimeoutMs));
 
-        // Redirect writable runtime state away from the read-only /workspace mount.
+        // TMPDIR resolves under the mandatory /home/agent/.local tmpfs (see ContainerSecurityPolicy);
+        // Pi runs as uid 1000 and the Dockerfile pre-creates and chowns /home/agent so $HOME writes work.
         env.put("HOME", "/home/agent");
         env.put("XDG_CONFIG_HOME", "/home/agent/.config");
         env.put("TMPDIR", "/home/agent/.local/tmp");
-        env.put("PI_CODING_AGENT_DIR", "/home/agent/.pi");
+        env.put("PI_CODING_AGENT_DIR", WorkspaceAbi.PI_AGENT_DIR);
 
         // Pi's azure-openai-responses provider hard-defaults the model to "gpt-5.2" — the deployment
         // map routes both that and the configured model to the correct Azure deployment.
@@ -100,35 +100,15 @@ public class PiRuntimeFactory {
         }
 
         String workspaceRoot = WorkspaceAbi.WORKSPACE_ROOT;
-        String extensionCopyStep = useCustomProvider
-            ? "mkdir -p /home/agent/.pi/extensions && cp " +
-              workspaceRoot +
-              "/" +
-              WorkspaceAbi.PI_RUNTIME_PREFIX +
-              "extensions/hephaestus-provider.ts /home/agent/.pi/extensions/hephaestus-provider.ts && "
-            : "";
         String command =
             authSetup +
             "mkdir -p " +
             WorkspaceAbi.OUTPUT_PATH +
-            " /home/agent/.pi /home/agent/.config /home/agent/.local/tmp && " +
+            " /home/agent/.config /home/agent/.local/tmp && " +
             // Pi SDK ESM imports require a workspace-local node_modules.
             "ln -sf /usr/local/lib/node_modules " +
             workspaceRoot +
             "/node_modules && " +
-            "cp " +
-            workspaceRoot +
-            "/" +
-            WorkspaceAbi.PI_RUNTIME_PREFIX +
-            "settings.json /home/agent/.pi/settings.json && " +
-            "cp " +
-            workspaceRoot +
-            "/" +
-            WorkspaceAbi.ORCHESTRATOR_PATH +
-            " /home/agent/.pi/" +
-            WorkspaceAbi.ORCHESTRATOR_FILENAME +
-            " && " +
-            extensionCopyStep +
             spec.precomputeStep() +
             // Per-agent Node flags + envs. We deliberately do NOT apply the same flags to both
             // the long-lived mentor runner and the one-shot practice runner — see the rationale

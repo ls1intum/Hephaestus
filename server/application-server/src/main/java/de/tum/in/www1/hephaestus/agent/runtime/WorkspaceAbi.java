@@ -42,11 +42,14 @@ public final class WorkspaceAbi {
     /** Workspace-relative path of the practices-analysis marker directory. */
     public static final String ANALYSIS_PRACTICES_PREFIX = ANALYSIS_PREFIX + "practices/";
 
-    /** Workspace-relative path the Pi runtime config (settings.json) is staged into. */
-    public static final String PI_RUNTIME_PREFIX = ".pi-runtime/";
+    /** Workspace-relative directory name of the Pi SDK agent dir. */
+    private static final String PI_AGENT_NAME = ".pi";
 
-    /** Workspace-relative path the orchestrator instructions ({@code .pi/AGENTS.md}) live under. */
-    public static final String PI_AGENT_PREFIX = ".pi/";
+    /** Workspace-relative path of the Pi SDK agent dir — settings.json, AGENTS.md, extensions/. */
+    public static final String PI_AGENT_PREFIX = PI_AGENT_NAME + "/";
+
+    /** Absolute container path of the Pi SDK agent dir — value of {@code PI_CODING_AGENT_DIR}. */
+    public static final String PI_AGENT_DIR = WORKSPACE_ROOT + "/" + PI_AGENT_NAME;
 
     /** Workspace-relative filename of the runner script copied from the classpath. */
     public static final String RUNNER_SCRIPT_FILENAME = ".run-pi.mjs";

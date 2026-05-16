@@ -162,13 +162,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("HOME / TMPDIR redirected to writable mount")
+        @DisplayName("HOME / TMPDIR on tmpfs; PI_CODING_AGENT_DIR points into the workspace")
         void writableMounts() {
             var env = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).environment();
             assertThat(env)
                 .containsEntry("HOME", "/home/agent")
                 .containsEntry("TMPDIR", "/home/agent/.local/tmp")
-                .containsEntry("PI_CODING_AGENT_DIR", "/home/agent/.pi");
+                .containsEntry("PI_CODING_AGENT_DIR", WorkspaceAbi.PI_AGENT_DIR);
         }
 
         @Test
@@ -250,7 +250,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class CustomProvider {
 
         @Test
-        @DisplayName("baseUrl-pinned OPENAI spec emits hephaestus-provider.ts under .pi-runtime/extensions/")
+        @DisplayName("baseUrl-pinned OPENAI spec emits hephaestus-provider.ts under .pi/extensions/")
         void baseUrlOpenaiEmitsExtension() {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
@@ -267,7 +267,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             var inputs = factory.build(spec).inputFiles();
             String ts = new String(
-                inputs.get(WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts"),
+                inputs.get(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts"),
                 StandardCharsets.UTF_8
             );
             assertThat(ts)
@@ -296,7 +296,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 factory
                     .build(spec)
                     .inputFiles()
-                    .get(WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts"),
+                    .get(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts"),
                 StandardCharsets.UTF_8
             );
             assertThat(ts).contains("api: \"anthropic-messages\"");
@@ -320,7 +320,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             JsonNode settings = objectMapper.readTree(
                 new String(
-                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_RUNTIME_PREFIX + "settings.json"),
+                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"),
                     StandardCharsets.UTF_8
                 )
             );
@@ -345,9 +345,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 ""
             );
             var inputs = factory.build(spec).inputFiles();
-            assertThat(inputs).doesNotContainKey(WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts");
+            assertThat(inputs).doesNotContainKey(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts");
             JsonNode settings = objectMapper.readTree(
-                new String(inputs.get(WorkspaceAbi.PI_RUNTIME_PREFIX + "settings.json"), StandardCharsets.UTF_8)
+                new String(inputs.get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"), StandardCharsets.UTF_8)
             );
             assertThat(settings.path("defaultProvider").asText()).isEqualTo("openai");
         }
@@ -369,7 +369,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 ""
             );
             assertThat(factory.build(spec).inputFiles()).doesNotContainKey(
-                WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts"
+                WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts"
             );
         }
     }
@@ -499,6 +499,27 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             // the command line may carry V8 flags (`--max-old-space-size`, `--disable-source-maps`,
             // …) between `node` and the script path. Asserting the script path alone is enough.
             assertThat(body.indexOf("echo precompute")).isLessThan(body.indexOf("/workspace/.run-pi.mjs"));
+        }
+
+        @Test
+        @DisplayName("No shell-side cp of Pi config")
+        void noCopyShim() {
+            // Asserted on the baseUrl-pinned spec because the custom-provider extension path was
+            // the last conditional `cp` the old boot script emitted.
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                "gpt-x",
+                "https://gpu.example.com/api",
+                null,
+                true,
+                600,
+                "pi-runner.mjs",
+                Map.of(),
+                ""
+            );
+            assertThat(factory.build(spec).command().get(2)).doesNotContain(" cp ");
         }
     }
 

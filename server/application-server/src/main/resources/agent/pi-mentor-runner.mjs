@@ -225,7 +225,7 @@ async function ensureRuntime() {
             DefaultResourceLoader,
             getAgentDir,
         } = await loadSdk();
-        const agentDir = AGENT_DIR_OVERRIDE ?? (typeof getAgentDir === "function" ? getAgentDir() : "/home/agent/.pi");
+        const agentDir = AGENT_DIR_OVERRIDE ?? getAgentDir();
 
         // System prompt is optional in v1 — the Java caller may inject it later. If the
         // resource exists we load it once and reuse via ResourceLoader override.

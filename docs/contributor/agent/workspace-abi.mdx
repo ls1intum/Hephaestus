@@ -24,8 +24,10 @@ lands (#1071) and beyond.
 ├── scratch/               # RESERVED (#1071). AI-writable scratch area. Survives Pi turns,
 │                          # ephemeral across runs. Never read by the server.
 ├── task.json              # TaskEnvelope<…> — runtime contract between handler and runner.
-├── .pi/                   # Pi SDK orchestrator + agent state (AGENTS.md, sessions…).
-├── .pi-runtime/           # settings.json bundle (copied to ~/.pi/settings.json at boot).
+├── .pi/                   # Pi SDK agent dir — $PI_CODING_AGENT_DIR resolves here.
+│   ├── AGENTS.md          #   Orchestrator instructions
+│   ├── settings.json      #   Pi SDK config (provider, model, compaction)
+│   └── extensions/        #   Custom provider extensions (auto-discovered)
 ├── .run-pi.mjs            # Runner script entry point.
 ├── .practices/            # Practice catalog (index.json, {slug}.md, all-criteria.md).
 ├── .precompute/           # Per-practice precompute scripts injected by the server.

@@ -606,9 +606,7 @@ class MentorLiveLlmTest {
         Files.createDirectories(piHome);
         Files.write(piHome.resolve("settings.json"), settingsBytes);
 
-        // Extensions go under PI_CODING_AGENT_DIR/extensions/ (the SDK auto-discovers them via
-        // jiti during session start). The production container path is /home/agent/.pi/extensions/
-        // — same shape, different root.
+        // Pi SDK auto-discovers extensions in $PI_CODING_AGENT_DIR/extensions/ via jiti.
         Path extDir = piHome.resolve("extensions");
         Files.createDirectories(extDir);
         Files.write(extDir.resolve("hephaestus-provider.ts"), extensionBytes);

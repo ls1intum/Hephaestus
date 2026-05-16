@@ -1,5 +1,12 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
+import static de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.ANALYSIS_PREFIX;
+import static de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_TARGET_PREFIX;
+import static de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PI_AGENT_PREFIX;
+import static de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX;
+import static de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX;
+import static de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
@@ -45,13 +52,12 @@ class DeliveryComposer {
 
     /** Paths that are internal workspace artifacts, not student code. */
     private static final List<String> INTERNAL_PATH_PREFIXES = List.of(
-        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_TARGET_PREFIX,
-        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX,
-        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.ANALYSIS_PREFIX,
-        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PI_AGENT_PREFIX,
-        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PI_RUNTIME_PREFIX,
-        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX,
-        de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX
+        CONTEXT_TARGET_PREFIX,
+        PRACTICES_PREFIX,
+        ANALYSIS_PREFIX,
+        PI_AGENT_PREFIX,
+        PRECOMPUTE_PREFIX,
+        PRECOMPUTE_OUT_PREFIX
     );
 
     /**
