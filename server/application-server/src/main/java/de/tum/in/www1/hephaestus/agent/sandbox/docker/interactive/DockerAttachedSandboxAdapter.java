@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -176,20 +177,21 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     }
 
     @Override
-    public Disposable subscribe(Cursor cursor, Consumer<JsonNode> listener) {
+    public Disposable subscribe(Cursor cursor, Predicate<JsonNode> filter, Consumer<JsonNode> listener) {
         long replaySince = switch (cursor) {
             case RING_REPLAY -> -1L;
             case FROM_NOW -> ring.latestSequence();
         };
-        return subscribeInternal(listener, replaySince);
+        return subscribeInternal(filter, listener, replaySince);
     }
 
-    private Disposable subscribeInternal(Consumer<JsonNode> listener, long replaySince) {
+    private Disposable subscribeInternal(Predicate<JsonNode> filter, Consumer<JsonNode> listener, long replaySince) {
         // CLOSING: late add would leak its dispatcher — runClose has already drained subscriptions.
         AttachedSandboxState s = state.get();
         if (s != AttachedSandboxState.ATTACHED) {
             FrameSubscription disposed = new FrameSubscription(
                 listener,
+                filter,
                 1,
                 metrics.subscriberDropped,
                 metrics.subscriberError,
@@ -201,6 +203,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         FrameSubscription[] holder = new FrameSubscription[1];
         FrameSubscription sub = new FrameSubscription(
             listener,
+            filter,
             subscriberQueueCapacity,
             metrics.subscriberDropped,
             metrics.subscriberError,

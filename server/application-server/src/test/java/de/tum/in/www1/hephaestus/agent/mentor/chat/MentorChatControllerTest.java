@@ -33,7 +33,6 @@ class MentorChatControllerTest extends BaseUnitTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final MentorAgentProperties TEST_PROPERTIES = new MentorAgentProperties(
         "ghcr.io/ls1intum/hephaestus/agent-pi:latest",
-        "pi-mentor-runner.mjs",
         100_000,
         "",
         null,

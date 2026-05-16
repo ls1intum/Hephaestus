@@ -23,6 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -239,11 +240,17 @@ class MentorRunnerClientTest extends BaseUnitTest {
         }
 
         @Override
-        public Disposable subscribe(Cursor cursor, Consumer<JsonNode> listener) {
+        public Disposable subscribe(Cursor cursor, Predicate<JsonNode> filter, Consumer<JsonNode> listener) {
             // Test fake has no ring buffer: cursor is accepted for SPI conformance, both values
-            // observe the same live-only stream.
-            listeners.add(listener);
-            return () -> listeners.remove(listener);
+            // observe the same live-only stream. The predicate is applied at delivery time so
+            // tests exercise the same filter contract the production adapter enforces.
+            Consumer<JsonNode> filtered = frame -> {
+                if (filter.test(frame)) {
+                    listener.accept(frame);
+                }
+            };
+            listeners.add(filtered);
+            return () -> listeners.remove(filtered);
         }
 
         @Override

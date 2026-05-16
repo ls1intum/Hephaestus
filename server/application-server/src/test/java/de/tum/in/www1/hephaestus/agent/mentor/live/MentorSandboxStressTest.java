@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.Cursor;
@@ -769,7 +770,7 @@ class MentorSandboxStressTest {
             null,
             true,
             300,
-            "pi-mentor-runner.mjs",
+            new MentorRunnerProfile(),
             Map.of(),
             ""
         );

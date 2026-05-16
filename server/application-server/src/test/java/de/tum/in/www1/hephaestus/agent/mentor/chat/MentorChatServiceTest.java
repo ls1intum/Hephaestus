@@ -53,6 +53,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -134,7 +135,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         // the instance path and does not need the agentConfigRepository.
         MentorAgentProperties mentorProps = new MentorAgentProperties(
             "test-image",
-            "pi-mentor-runner.mjs",
             100_000,
             "",
             LlmProvider.OPENAI,
@@ -676,11 +676,16 @@ class MentorChatServiceTest extends BaseUnitTest {
         }
 
         @Override
-        public Disposable subscribe(Cursor cursor, Consumer<JsonNode> listener) {
+        public Disposable subscribe(Cursor cursor, Predicate<JsonNode> filter, Consumer<JsonNode> listener) {
             // Test fake has no ring buffer: cursor is accepted for SPI conformance, both values
-            // observe the same live-only stream.
-            listeners.add(listener);
-            return () -> listeners.remove(listener);
+            // observe the same live-only stream. The predicate is applied at delivery time.
+            Consumer<JsonNode> filtered = frame -> {
+                if (filter.test(frame)) {
+                    listener.accept(frame);
+                }
+            };
+            listeners.add(filtered);
+            return () -> listeners.remove(filtered);
         }
 
         @Override

@@ -18,6 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import reactor.core.Disposable;
 import reactor.core.Disposables;
 
@@ -102,7 +103,7 @@ final class StdioAttachedSandbox implements AttachedSandbox {
     }
 
     @Override
-    public Disposable subscribe(Cursor cursor, Consumer<JsonNode> listener) {
+    public Disposable subscribe(Cursor cursor, Predicate<JsonNode> filter, Consumer<JsonNode> listener) {
         if (closed) {
             return Disposables.disposed();
         }
@@ -110,8 +111,16 @@ final class StdioAttachedSandbox implements AttachedSandbox {
         // observe the same live-only stream. The argument is accepted so this implementation
         // tracks the SPI surface verbatim — if a future change adds buffering, the dispatch
         // belongs here.
-        listeners.add(listener);
-        return () -> listeners.remove(listener);
+        //
+        // The predicate is applied at delivery time (matches the production adapter's
+        // server-side filtering). A filter that rejects passes the frame through unobserved.
+        Consumer<JsonNode> filtered = frame -> {
+            if (filter.test(frame)) {
+                listener.accept(frame);
+            }
+        };
+        listeners.add(filtered);
+        return () -> listeners.remove(filtered);
     }
 
     @Override

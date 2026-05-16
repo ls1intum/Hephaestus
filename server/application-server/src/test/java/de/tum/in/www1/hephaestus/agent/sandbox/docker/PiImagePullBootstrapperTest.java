@@ -25,11 +25,7 @@ class PiImagePullBootstrapperTest extends BaseUnitTest {
     private DockerImageOperations imageOps;
 
     private PiImagePullBootstrapper bootstrapperWith(ImagePullPolicy policy) {
-        return new PiImagePullBootstrapper(
-            imageOps,
-            new PiAgentProperties(IMAGE, "pi-runner.mjs", policy),
-            new SimpleMeterRegistry()
-        );
+        return new PiImagePullBootstrapper(imageOps, new PiAgentProperties(IMAGE, policy), new SimpleMeterRegistry());
     }
 
     // ─── ALWAYS policy ──────────────────────────────────────────────────────────
@@ -41,7 +37,7 @@ class PiImagePullBootstrapperTest extends BaseUnitTest {
         var registry = new SimpleMeterRegistry();
         var bootstrapper = new PiImagePullBootstrapper(
             imageOps,
-            new PiAgentProperties(IMAGE, "pi-runner.mjs", ImagePullPolicy.ALWAYS),
+            new PiAgentProperties(IMAGE, ImagePullPolicy.ALWAYS),
             registry
         );
 
@@ -60,7 +56,7 @@ class PiImagePullBootstrapperTest extends BaseUnitTest {
         var registry = new SimpleMeterRegistry();
         var bootstrapper = new PiImagePullBootstrapper(
             imageOps,
-            new PiAgentProperties(IMAGE, "pi-runner.mjs", ImagePullPolicy.ALWAYS),
+            new PiAgentProperties(IMAGE, ImagePullPolicy.ALWAYS),
             registry
         );
         when(imageOps.ping()).thenReturn(true);
@@ -78,7 +74,7 @@ class PiImagePullBootstrapperTest extends BaseUnitTest {
         var registry = new SimpleMeterRegistry();
         var bootstrapper = new PiImagePullBootstrapper(
             imageOps,
-            new PiAgentProperties(IMAGE, "pi-runner.mjs", ImagePullPolicy.ALWAYS),
+            new PiAgentProperties(IMAGE, ImagePullPolicy.ALWAYS),
             registry
         );
         when(imageOps.ping()).thenReturn(true);

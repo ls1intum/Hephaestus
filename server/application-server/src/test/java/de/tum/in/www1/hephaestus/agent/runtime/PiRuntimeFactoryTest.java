@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorRunnerProfile;
+import de.tum.in.www1.hephaestus.agent.practice.PracticeRunnerProfile;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -20,6 +22,9 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 @DisplayName("PiRuntimeFactory")
 class PiRuntimeFactoryTest extends BaseUnitTest {
+
+    private static final PracticeRunnerProfile PRACTICE = new PracticeRunnerProfile();
+    private static final MentorRunnerProfile MENTOR = new MentorRunnerProfile();
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private PiRuntimeFactory factory;
@@ -39,7 +44,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             "job-token-123",
             false,
             600,
-            "pi-runner.mjs",
+            PRACTICE,
             Map.of(),
             ""
         );
@@ -55,7 +60,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             null,
             true,
             600,
-            "pi-runner.mjs",
+            PRACTICE,
             Map.of(),
             ""
         );
@@ -96,8 +101,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("extra inputs merge into the input-files map")
+        @DisplayName("extra inputs merge into the input-files map when path is whitelisted")
         void extraInputsMerge() {
+            byte[] payload = "deadbeef".getBytes(StandardCharsets.UTF_8);
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
@@ -107,11 +113,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
-                Map.of("task.json", "{\"schemaVersion\":1}".getBytes(StandardCharsets.UTF_8)),
+                PRACTICE,
+                Map.of(WorkspaceAbi.CONTEXT_TARGET_PREFIX + "metadata.json", payload),
                 ""
             );
-            assertThat(factory.build(spec).inputFiles()).containsKey("task.json");
+            assertThat(factory.build(spec).inputFiles()).containsKey(
+                WorkspaceAbi.CONTEXT_TARGET_PREFIX + "metadata.json"
+            );
         }
     }
 
@@ -176,7 +184,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         void uvThreadpoolNotForced() {
             // Previously set to 2 image-wide — removed because (a) the RSS saving was unmeasured
             // and (b) it serialises the practice runner's git tool calls. If a workload-specific
-            // override is needed it should be set inline in nodeEnvFor.
+            // override is needed it should be set inline on the runner profile.
             var env = factory.build(proxySpec(LlmProvider.OPENAI, null)).environment();
             assertThat(env).doesNotContainKey("UV_THREADPOOL_SIZE");
         }
@@ -211,7 +219,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
@@ -235,7 +243,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 "job-token-123",
                 false,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
@@ -261,7 +269,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
@@ -288,7 +296,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
@@ -314,7 +322,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
@@ -340,7 +348,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
@@ -364,7 +372,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
@@ -375,15 +383,14 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("command")
+    @DisplayName("command assembly drives off the runner profile")
     class CommandAssembly {
 
         @Test
-        @DisplayName("Practice runner: only safe flags (no heap cap, no --expose-gc)")
-        void nodeFlagsForPractice() {
-            // The default test specs use `pi-runner.mjs` (practice). Practice handles large diffs
-            // and uses no global.gc() — applying a 256 MB heap cap there would be a latent OOM
-            // and exposing gc() is a foot-gun.
+        @DisplayName("Practice profile: only --no-warnings, no jemalloc preload, no heap cap")
+        void practiceProfileContributesPracticeFlags() {
+            // Practice handles large diffs and uses no global.gc() — applying a 256 MB heap cap
+            // there would be a latent OOM and exposing gc() is a foot-gun.
             String body = factory.build(apiKeySpec(LlmProvider.OPENAI)).command().get(2);
             int nodeIdx = body.indexOf("node ");
             int scriptIdx = body.indexOf(".run-pi.mjs");
@@ -399,10 +406,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 // runner at startup with exit 9. Guard the regression.
                 .doesNotContain("--disable-source-maps");
             // The shell segment IMMEDIATELY preceding `node ` must not set LD_PRELOAD /
-            // MALLOC_CONF. The earlier auth-setup prefix never sets either; but to make the
-            // assertion meaningful (rather than tautological against a prefix that never
-            // contains them in ANY codepath), we slice from the last `&&` before `node ` —
-            // that's the same-statement scope `var=value cmd` would inject into.
+            // MALLOC_CONF. Slice from the last `&&` before `node ` — that's the same-statement
+            // scope `var=value cmd` would inject into.
             int lastAmp = body.lastIndexOf("&&", nodeIdx);
             int sliceStart = lastAmp >= 0 ? lastAmp + 2 : 0;
             assertThat(body.substring(sliceStart, nodeIdx))
@@ -412,37 +417,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("MENTOR_RUNNER_SCRIPT constant tracks MentorAgentProperties.runnerScript default")
-        void mentorRunnerScriptConstantAgreesWithProperties() {
-            // PiRuntimeFactory dispatches V8 flags by filename match against MENTOR_RUNNER_SCRIPT.
-            // If MentorAgentProperties' default runnerScript ever drifts (rename, version bump,
-            // operator override) the mentor silently reverts to the practice V8 profile —
-            // no heap cap, no --expose-gc, no jemalloc preload.
-            //
-            // The previous version of this test constructed MentorAgentProperties manually with
-            // the literal "pi-mentor-runner.mjs" and asserted that literal equalled the constant.
-            // It would have passed even if @DefaultValue on MentorAgentProperties was renamed to
-            // "pi-mentor-runner-v2.mjs" — the very drift it claimed to defend against. Fixed by
-            // round-tripping through Spring's Binder against an empty source, which actually
-            // exercises the @DefaultValue resolution.
-            org.springframework.boot.context.properties.bind.Binder binder =
-                new org.springframework.boot.context.properties.bind.Binder(
-                    org.springframework.boot.context.properties.source.ConfigurationPropertySources.from(
-                        new org.springframework.core.env.MapPropertySource("empty", Map.of())
-                    )
-                );
-            de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties bound = binder.bindOrCreate(
-                "hephaestus.mentor.agent",
-                de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties.class
-            );
-            assertThat(bound.runnerScript())
-                .as("MENTOR_RUNNER_SCRIPT must equal MentorAgentProperties.@DefaultValue('runnerScript')")
-                .isEqualTo(PiRuntimeFactory.MENTOR_RUNNER_SCRIPT);
-        }
-
-        @Test
-        @DisplayName("Mentor runner: heap cap + --expose-gc + jemalloc preload scoped to node")
-        void nodeFlagsForMentor() {
+        @DisplayName("Mentor profile: heap cap + --expose-gc + jemalloc preload scoped to node")
+        void mentorProfileContributesMentorFlagsAndEnv() {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
@@ -452,7 +428,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-mentor-runner.mjs",
+                MENTOR,
                 Map.of(),
                 ""
             );
@@ -465,7 +441,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 .contains("--no-warnings")
                 .contains("--expose-gc")
                 // --disable-source-maps is an unrecognised Node 22 CLI flag and crashes the
-                // runner at startup (exit 9). Must NOT be present for either runner.
+                // runner at startup (exit 9). Must NOT be present for either profile.
                 .doesNotContain("--disable-source-maps");
             // LD_PRELOAD + MALLOC_CONF appear in the shell env BEFORE `node `, scoped to that
             // invocation only — they do NOT leak to bun (precompute) or other tools.
@@ -473,6 +449,33 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(beforeNode)
                 .contains("LD_PRELOAD=/usr/local/lib/libjemalloc.so.2")
                 .contains("MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:30000,muzzy_decay_ms:30000");
+        }
+
+        @Test
+        @DisplayName("Mentor profile loads the mentor runner script from classpath")
+        void mentorProfileResolvesCorrectScript() {
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                null,
+                null,
+                null,
+                true,
+                600,
+                MENTOR,
+                Map.of(),
+                ""
+            );
+            // The bytes copied to the workspace script slot must come from the mentor runner
+            // resource — distinct from the practice runner. We don't pin the exact bytes (they
+            // change every Pi-SDK bump), but the mentor runner header is stable.
+            String runner = new String(
+                factory.build(spec).inputFiles().get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME),
+                StandardCharsets.UTF_8
+            );
+            // Practice runner does NOT speak the JSON-RPC mentor protocol; mentor does.
+            assertThat(runner).contains("jsonrpc");
         }
 
         @Test
@@ -487,7 +490,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 "echo precompute && "
             );
@@ -496,8 +499,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(plan.command().get(0)).isEqualTo("sh");
             String body = plan.command().get(2);
             // Precompute step must run before the runner. Don't pin the exact `node` invocation —
-            // the command line may carry V8 flags (`--max-old-space-size`, `--disable-source-maps`,
-            // …) between `node` and the script path. Asserting the script path alone is enough.
+            // the command line may carry V8 flags between `node` and the script path. Asserting
+            // the script path alone is enough.
             assertThat(body.indexOf("echo precompute")).isLessThan(body.indexOf("/workspace/.run-pi.mjs"));
         }
     }
@@ -519,7 +522,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     null,
                     false,
                     600,
-                    "pi-runner.mjs",
+                    PRACTICE,
                     Map.of(),
                     ""
                 )
@@ -541,7 +544,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     null,
                     false,
                     600,
-                    "pi-runner.mjs",
+                    PRACTICE,
                     Map.of(),
                     ""
                 )
@@ -563,7 +566,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     null,
                     true,
                     PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
-                    "pi-runner.mjs",
+                    PRACTICE,
                     Map.of(),
                     ""
                 )
@@ -573,8 +576,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("runnerScript must not be blank")
-        void runnerScriptNotBlank() {
+        @DisplayName("runnerProfile must not be null")
+        void runnerProfileNotNull() {
             assertThatThrownBy(() ->
                 new PiPlanSpec(
                     LlmProvider.OPENAI,
@@ -585,13 +588,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     null,
                     true,
                     600,
-                    "  ",
+                    null,
                     Map.of(),
                     ""
                 )
             )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("runnerScript");
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("runnerProfile");
         }
     }
 }

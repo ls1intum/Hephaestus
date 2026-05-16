@@ -32,6 +32,8 @@ public class PracticePiAdapter {
         this.properties = properties;
     }
 
+    private static final PracticeRunnerProfile PROFILE = new PracticeRunnerProfile();
+
     public PracticeSandboxSpec buildSandboxSpec(PracticeAgentRequest request) {
         PiRuntimeFactory.PiPlan plan = runtimeFactory.build(
             new PiPlanSpec(
@@ -43,7 +45,7 @@ public class PracticePiAdapter {
                 request.jobToken(),
                 request.allowInternet(),
                 request.timeoutSeconds(),
-                properties.runnerScript(),
+                PROFILE,
                 Map.of(),
                 buildPrecomputeStep()
             )

@@ -15,6 +15,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -52,6 +53,16 @@ final class JsonlStdinWriter {
 
     private volatile boolean terminated = false;
     private volatile Thread writerThread;
+
+    /**
+     * Guards the enqueue-vs-terminal race in {@link #send} and the drain-on-terminate path in
+     * {@link #markTerminal}. {@link ReentrantLock} (not a monitor): {@link #send} runs on the
+     * mentor turn's virtual thread, and JEP 444's monitor pins the carrier OS thread for the
+     * full critical section (incl. the inner {@code queue.offer}). This mirrors
+     * {@code MentorSseChannel#writeLock}; both surfaces are virtual-thread call sites that hand
+     * off to bounded queues with downstream backpressure.
+     */
+    private final ReentrantLock terminalLock = new ReentrantLock();
 
     private final Runnable onTerminalFailure;
 
@@ -107,7 +118,8 @@ final class JsonlStdinWriter {
         // Atomic enqueue-vs-terminal: without this, send() could observe terminated==false,
         // markTerminal() could drain the queue, then send()'s offer would orphan an envelope
         // whose ack never completes (caller blocks for stdinWriteTimeoutMs).
-        synchronized (this) {
+        terminalLock.lock();
+        try {
             if (terminated) {
                 rejectedClosed.increment();
                 throw new InteractiveSandboxException("Session is closed");
@@ -116,6 +128,8 @@ final class JsonlStdinWriter {
                 rejectedQueueFull.increment();
                 throw new InteractiveSandboxException("Writer queue full (capacity=" + queueCapacity + ")");
             }
+        } finally {
+            terminalLock.unlock();
         }
         try {
             ack.get(stdinWriteTimeoutMs, TimeUnit.MILLISECONDS);
@@ -160,15 +174,26 @@ final class JsonlStdinWriter {
         return terminated;
     }
 
-    private synchronized void markTerminal() {
-        if (terminated) return;
-        terminated = true;
-        WriteEnvelope env;
-        while ((env = queue.poll()) != null) {
-            env.ack.completeExceptionally(new IOException("Session terminated"));
+    private void markTerminal() {
+        // Drain runs INSIDE the lock so an in-flight send() either observes terminated=true and
+        // rejects, or has already enqueued an envelope that we drain here (no orphan acks).
+        // The user-supplied callback runs OUTSIDE the lock to keep the critical section bounded
+        // and avoid re-entrancy if the callback synchronously calls back into the writer.
+        Runnable callback;
+        terminalLock.lock();
+        try {
+            if (terminated) return;
+            terminated = true;
+            WriteEnvelope env;
+            while ((env = queue.poll()) != null) {
+                env.ack.completeExceptionally(new IOException("Session terminated"));
+            }
+            callback = onTerminalFailure;
+        } finally {
+            terminalLock.unlock();
         }
         try {
-            onTerminalFailure.run();
+            callback.run();
         } catch (Throwable t) {
             log.debug("onTerminalFailure callback threw", t);
         }

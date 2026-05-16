@@ -29,7 +29,7 @@ class PracticePiAdapterTest extends BaseUnitTest {
         adapter = new PracticePiAdapter(
             new PiRuntimeFactory(mapper),
             new PiResultParser(mapper, metrics),
-            new PiAgentProperties(IMAGE, "pi-runner.mjs", ImagePullPolicy.IF_NOT_PRESENT)
+            new PiAgentProperties(IMAGE, ImagePullPolicy.IF_NOT_PRESENT)
         );
     }
 

@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
@@ -594,7 +595,7 @@ class MentorLiveLlmTest {
             null,
             true,
             300,
-            "pi-mentor-runner.mjs",
+            new MentorRunnerProfile(),
             Map.of(),
             ""
         );

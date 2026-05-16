@@ -39,6 +39,7 @@ class SubscribeOrderingPropertyTest extends BaseUnitTest {
                 received.add(frame.intValue());
                 listenerCalledOnce.countDown();
             },
+            frame -> true,
             4096,
             reg.counter("test.sub.dropped"),
             reg.counter("test.sub.error"),

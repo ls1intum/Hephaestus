@@ -35,7 +35,9 @@ public class MentorPiAdapter {
     public static final String ASPECT_INPUT_PREFIX = "context/target/";
 
     /** Workspace-relative directory for restored Pi SDK session JSONL files (matches the runner's {@code SESSIONS_DIR}). */
-    public static final String SESSIONS_DIR_PREFIX = ".sessions/";
+    public static final String SESSIONS_DIR_PREFIX = WorkspaceAbi.SESSIONS_DIR_PREFIX;
+
+    private static final MentorRunnerProfile PROFILE = new MentorRunnerProfile();
 
     private final PiRuntimeFactory runtimeFactory;
     private final MentorAgentProperties mentorProperties;
@@ -75,7 +77,7 @@ public class MentorPiAdapter {
             null,
             true,
             llmConfig.timeoutSeconds(),
-            mentorProperties.runnerScript(),
+            PROFILE,
             extraInputs,
             "" /* no precompute step — mentor analytics arrive as aspect JSON */
         );

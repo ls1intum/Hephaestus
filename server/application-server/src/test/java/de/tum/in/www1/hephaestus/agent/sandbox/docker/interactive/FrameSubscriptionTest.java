@@ -29,6 +29,7 @@ class FrameSubscriptionTest extends BaseUnitTest {
 
         FrameSubscription sub = new FrameSubscription(
             frame -> received.add(frame.intValue()),
+            frame -> true,
             16,
             dropped,
             errors,
@@ -65,6 +66,7 @@ class FrameSubscriptionTest extends BaseUnitTest {
                 }
                 received.add(frame.intValue());
             },
+            frame -> true,
             4,
             dropped,
             errors,
@@ -100,6 +102,7 @@ class FrameSubscriptionTest extends BaseUnitTest {
                 called.incrementAndGet();
                 throw new RuntimeException("boom");
             },
+            frame -> true,
             8,
             dropped,
             errors,
@@ -127,6 +130,7 @@ class FrameSubscriptionTest extends BaseUnitTest {
         AtomicInteger onDisposeFires = new AtomicInteger();
         FrameSubscription sub = new FrameSubscription(
             frame -> {},
+            frame -> true,
             4,
             reg.counter("test.drop"),
             reg.counter("test.err"),
@@ -152,6 +156,7 @@ class FrameSubscriptionTest extends BaseUnitTest {
         List<Integer> received = new CopyOnWriteArrayList<>();
         FrameSubscription sub = new FrameSubscription(
             frame -> received.add(frame.intValue()),
+            frame -> true,
             4,
             reg.counter("test.drop"),
             reg.counter("test.err"),

@@ -106,7 +106,16 @@ public final class MentorRunnerClient implements AutoCloseable {
         // Cursor.FROM_NOW: skip ring-buffer replay of frames from prior turns on the same
         // reused sandbox. Without this, a second turn replays turn-1's agent_end event and
         // completes instantly with stale data.
-        this.subscription = sandbox.subscribe(Cursor.FROM_NOW, this::onFrame);
+        //
+        // Per-thread routing is pushed into the SPI as a Predicate<JsonNode>: rejected frames
+        // never enter this client's subscription queue and never consume drop-counter budget.
+        // Broadcast frames (server notifications without a thread destination) cross the
+        // filter for every client — see MentorFrameFilters.forThread.
+        this.subscription = sandbox.subscribe(
+            Cursor.FROM_NOW,
+            MentorFrameFilters.forThread(boundThreadId),
+            this::onFrame
+        );
     }
 
     public CompletableFuture<JsonNode> hello() {
@@ -241,18 +250,10 @@ public final class MentorRunnerClient implements AutoCloseable {
             log.debug("Runner event frame missing params.event — ignoring");
             return;
         }
-        // Per-thread fan-out: the sandbox is shared by (userId, workspaceId), so a second
-        // chat tab in the same workspace subscribes to the same frame stream. Drop any frame
-        // whose threadId doesn't match the one this client is bound to — without the filter,
-        // tab-A's translator sees tab-B's text deltas and ships them down tab-A's wire.
-        // Notification-type frames (`runner_ready`) ship with `threadId: null` and pass
-        // through here for ALL clients; the translator drops them by event-type.
-        if (boundThreadId != null && params.has("threadId") && !params.get("threadId").isNull()) {
-            String frameThreadId = params.get("threadId").asText();
-            if (!boundThreadId.toString().equals(frameThreadId)) {
-                return;
-            }
-        }
+        // Per-thread fan-out used to filter here; the predicate is now applied server-side at
+        // subscribe() time so cross-thread frames never enter this client's dispatcher queue.
+        // Notification-type frames (`runner_ready`) ship with `threadId: null` and pass through
+        // the predicate for ALL clients; the translator drops them by event-type.
         try {
             onEvent.accept(params.get("event"));
         } catch (RuntimeException e) {

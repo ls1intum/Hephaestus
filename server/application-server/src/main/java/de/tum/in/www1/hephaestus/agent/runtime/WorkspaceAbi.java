@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.runtime;
 
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -68,4 +69,31 @@ public final class WorkspaceAbi {
 
     /** Practice slug pattern enforced at the handler boundary as defense-in-depth against FS-path injection. */
     public static final Pattern PRACTICE_SLUG = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
+
+    /**
+     * Allowlist of {@link PiPlanSpec#extraInputs()} workspace paths that do NOT live under
+     * {@link #CONTEXT_TARGET_PREFIX}. Every adapter writing one of these paths must declare it
+     * here AND on this enum-of-strings, so the next reader sees the complete set of mount points
+     * an adapter can plant in the workspace.
+     *
+     * <p>The set is the wire contract between {@code PiPlanSpec}'s compact-constructor validator
+     * (which rejects unknown paths fail-fast at boot/test time) and the {@code MentorPiAdapter}
+     * (which writes {@link #MENTOR_SYSTEM_PROMPT_PATH}). A future adapter adding a new path will
+     * fail validation until the path is added here — forcing the architectural review.
+     *
+     * <p>Mentor's per-thread session JSONL restores ({@code .sessions/&lt;threadId&gt;.jsonl})
+     * are NOT in this set: the threadId is dynamic, so we accept the {@link #SESSIONS_DIR_PREFIX}
+     * prefix instead.
+     */
+    public static final String SESSIONS_DIR_PREFIX = ".sessions/";
+
+    /** Returns paths an adapter may put in {@code PiPlanSpec.extraInputs} outside the context-target prefix. */
+    public static Set<String> allowedExtraInputPaths() {
+        return Set.of(MENTOR_SYSTEM_PROMPT_PATH);
+    }
+
+    /** Returns workspace-path prefixes accepted by {@code PiPlanSpec.extraInputs} for dynamic-suffix paths. */
+    public static Set<String> allowedExtraInputPrefixes() {
+        return Set.of(CONTEXT_TARGET_PREFIX, SESSIONS_DIR_PREFIX);
+    }
 }

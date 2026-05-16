@@ -13,6 +13,7 @@ import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.sandbox.InteractiveSandboxProperties;
@@ -559,7 +560,7 @@ class DockerInteractiveSandboxLiveTest {
             null,
             true,
             120,
-            "pi-mentor-runner.mjs",
+            new MentorRunnerProfile(),
             Map.of(),
             ""
         );
