@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
@@ -17,24 +18,13 @@ import org.springframework.stereotype.Service;
  * {@link PracticeSandboxSpec}.
  */
 @Service
+@RequiredArgsConstructor
 public class PracticePiAdapter {
 
     private final PiRuntimeFactory runtimeFactory;
     private final PiResultParser resultParser;
     private final PiAgentProperties properties;
     private final AgentImageProperties imageProperties;
-
-    public PracticePiAdapter(
-        PiRuntimeFactory runtimeFactory,
-        PiResultParser resultParser,
-        PiAgentProperties properties,
-        AgentImageProperties imageProperties
-    ) {
-        this.runtimeFactory = runtimeFactory;
-        this.resultParser = resultParser;
-        this.properties = properties;
-        this.imageProperties = imageProperties;
-    }
 
     public PracticeSandboxSpec buildSandboxSpec(PracticeAgentRequest request) {
         PiRuntimeFactory.PiPlan plan = runtimeFactory.build(
