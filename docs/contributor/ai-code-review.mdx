@@ -176,7 +176,7 @@ hephaestus:
   agent:
     image:
       reference: ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<digest>
-      pull-policy: ALWAYS
+      pull-policy: IF_NOT_PRESENT
       require-digest: true # production only
     nats:
       enabled: true # Enable agent job processing

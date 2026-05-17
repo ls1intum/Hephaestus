@@ -19,7 +19,14 @@ The `agent-pi` Docker image runs every practice-review sandbox and every Pi ment
 HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<digest>
 ```
 
-`compose.app.yaml` loads it via `env_file:` (with `required: false`). The application server reads it into `hephaestus.agent.image.reference`; `application-prod.yml` sets `hephaestus.agent.image.require-digest: true`, so `AgentImagePinGuard` refuses to start on a tag reference.
+`compose.app.yaml` loads it via `env_file:` (with `required: false`), followed by an optional `docker/agent-image-pin.local.env` (gitignored) for local overrides. The application server reads the final value into `hephaestus.agent.image.reference`; `application-prod.yml` sets `hephaestus.agent.image.require-digest: true`, so `AgentImagePinGuard` refuses to start on a tag reference.
+
+For local agent-pi iteration: build your image and drop a one-line override into `docker/agent-image-pin.local.env`:
+
+```bash
+docker build -t ghcr.io/ls1intum/hephaestus/agent-pi:dev docker/agents -f docker/agents/pi/Dockerfile
+echo 'HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi:dev' > docker/agent-image-pin.local.env
+```
 
 ## How the pin gets updated
 

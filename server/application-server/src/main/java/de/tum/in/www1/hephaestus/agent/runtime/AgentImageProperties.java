@@ -11,7 +11,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "hephaestus.agent.image")
 public record AgentImageProperties(
     @DefaultValue("ghcr.io/ls1intum/hephaestus/agent-pi:latest") @NotBlank String reference,
-    @DefaultValue("ALWAYS") ImagePullPolicy pullPolicy,
+    @DefaultValue("IF_NOT_PRESENT") ImagePullPolicy pullPolicy,
     @DefaultValue("false") boolean requireDigest
 ) {
     public static final String DIGEST_SUFFIX_DESCRIPTION = "@sha256:<64 lowercase hex>";

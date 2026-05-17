@@ -180,7 +180,7 @@
     {
       "name": "hephaestus.agent.image.pull-policy",
       "type": "de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy",
-      "description": "Startup pull behaviour: ALWAYS (default — registry HEAD on every restart, cheap when digest-pinned), IF_NOT_PRESENT, or NEVER."
+      "description": "Startup pull behaviour: IF_NOT_PRESENT (default — skips when local cache has the image), ALWAYS, or NEVER."
     },
     {
       "name": "hephaestus.agent.image.require-digest",
