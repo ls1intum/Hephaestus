@@ -71,4 +71,5 @@
  * @see de.tum.in.www1.hephaestus.gitprovider.common.events Domain Events
  * @see de.tum.in.www1.hephaestus.gitprovider.sync Sync Orchestration
  */
+@org.springframework.modulith.ApplicationModule(displayName = "Git Provider")
 package de.tum.in.www1.hephaestus.gitprovider;

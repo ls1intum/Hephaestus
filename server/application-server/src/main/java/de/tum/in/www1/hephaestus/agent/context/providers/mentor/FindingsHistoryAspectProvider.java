@@ -1,9 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.context.providers.mentor;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.context.ContentProvider;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest.MentorChatRequest;
@@ -27,6 +23,10 @@ import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Materialises {@code context/target/findings_history.json} for {@link MentorChatRequest}.
@@ -85,7 +85,7 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
             : buildPayload(req.workspaceId(), req.contributorId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize findings history aspect", e);
         }
     }

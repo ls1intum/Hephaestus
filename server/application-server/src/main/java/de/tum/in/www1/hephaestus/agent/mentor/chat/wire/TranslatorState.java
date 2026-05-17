@@ -1,14 +1,14 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat.wire;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Mutable per-turn translator state. Built incrementally as Pi events stream in, snapshotted at

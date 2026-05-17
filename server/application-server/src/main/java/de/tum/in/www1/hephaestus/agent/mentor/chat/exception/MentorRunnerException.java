@@ -1,10 +1,10 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat.exception;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.Serial;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import tools.jackson.databind.JsonNode;
 
 /** JSON-RPC error response from the runner, surfaced to callers as an exception. */
 @ResponseStatus(HttpStatus.BAD_GATEWAY)

@@ -4,10 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.IntNode;
-import com.fasterxml.jackson.databind.node.TextNode;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.Counter;
@@ -24,6 +20,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.IntNode;
+import tools.jackson.databind.node.TextNode;
 
 @DisplayName("JsonlStdinWriter")
 class JsonlStdinWriterTest extends BaseUnitTest {

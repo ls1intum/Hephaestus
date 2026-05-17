@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
@@ -33,6 +32,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Spring configuration for the Docker sandbox subsystem.

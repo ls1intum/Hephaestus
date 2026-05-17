@@ -4,8 +4,6 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubActorMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubIssueMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2FieldConfigurationMixin;
@@ -51,6 +49,8 @@ import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 import reactor.util.retry.Retry;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Production-grade configuration for GitHub GraphQL API client.

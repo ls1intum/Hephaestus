@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.workspace.context;
 
 import java.lang.reflect.Method;
 import java.util.LinkedHashSet;
-import org.springframework.boot.autoconfigure.web.servlet.WebMvcRegistrations;
+import org.springframework.boot.webmvc.autoconfigure.WebMvcRegistrations;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;

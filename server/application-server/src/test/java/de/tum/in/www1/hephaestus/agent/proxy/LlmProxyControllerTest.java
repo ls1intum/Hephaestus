@@ -6,7 +6,6 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
@@ -27,6 +26,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("LlmProxyController")
 class LlmProxyControllerTest extends BaseUnitTest {

@@ -1,8 +1,8 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker;
 
 import de.tum.in.www1.hephaestus.agent.sandbox.SandboxProperties;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.HealthIndicator;
 
 /**
  * Health indicator for Docker daemon connectivity.

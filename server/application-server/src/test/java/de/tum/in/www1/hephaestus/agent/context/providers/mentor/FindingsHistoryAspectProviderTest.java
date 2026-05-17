@@ -5,8 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -29,6 +27,8 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.Pageable;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("FindingsHistoryAspectProvider")
 class FindingsHistoryAspectProviderTest extends BaseUnitTest {

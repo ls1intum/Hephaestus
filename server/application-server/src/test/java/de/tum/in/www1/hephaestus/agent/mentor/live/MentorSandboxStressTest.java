@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.mentor.live;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
@@ -28,6 +25,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Production-readiness stress test for the Pi mentor runner. Spawns {@code N} concurrent
@@ -818,7 +818,7 @@ class MentorSandboxStressTest {
         try {
             workspaceLit = MAPPER.writeValueAsString(workspace.toString());
             runnerLit = MAPPER.writeValueAsString(runner.toUri().toString());
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException("failed to encode shim literals", e);
         }
         return (

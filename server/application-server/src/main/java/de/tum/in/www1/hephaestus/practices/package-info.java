@@ -40,4 +40,5 @@
  *
  * @see de.tum.in.www1.hephaestus.activity Activity module (event log for gamification)
  */
+@org.springframework.modulith.ApplicationModule(displayName = "Practices")
 package de.tum.in.www1.hephaestus.practices;

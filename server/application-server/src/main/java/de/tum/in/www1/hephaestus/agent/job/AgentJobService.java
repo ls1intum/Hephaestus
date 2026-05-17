@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
@@ -34,6 +33,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class AgentJobService {

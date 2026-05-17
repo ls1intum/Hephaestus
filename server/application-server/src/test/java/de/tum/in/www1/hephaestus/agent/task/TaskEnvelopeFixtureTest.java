@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.agent.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Byte-identical snapshot test for {@link TaskEnvelopeWriter} output. The fixture lives at

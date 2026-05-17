@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.mentor;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -10,6 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.lang.Nullable;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * AI SDK UIMessage shape served to the webapp. Parts are the JSONB array (or the legacy

@@ -3,8 +3,6 @@ package de.tum.in.www1.hephaestus.agent.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
@@ -12,6 +10,8 @@ import de.tum.in.www1.hephaestus.workspace.Workspace;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("ConfigSnapshot")
 class ConfigSnapshotTest extends BaseUnitTest {
@@ -151,7 +151,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
             JsonNode json = original.toJson(OBJECT_MAPPER);
 
             // Mutate schemaVersion to a future version
-            ((com.fasterxml.jackson.databind.node.ObjectNode) json).put("schemaVersion", 999);
+            ((tools.jackson.databind.node.ObjectNode) json).put("schemaVersion", 999);
 
             assertThatThrownBy(() -> ConfigSnapshot.fromJson(json, OBJECT_MAPPER))
                 .isInstanceOf(IllegalStateException.class)
@@ -165,7 +165,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
             JsonNode json = original.toJson(OBJECT_MAPPER);
 
             // Add an unknown field (simulates future schema addition)
-            ((com.fasterxml.jackson.databind.node.ObjectNode) json).put("futureField", "future-value");
+            ((tools.jackson.databind.node.ObjectNode) json).put("futureField", "future-value");
 
             ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
             assertThat(deserialized).isEqualTo(original);

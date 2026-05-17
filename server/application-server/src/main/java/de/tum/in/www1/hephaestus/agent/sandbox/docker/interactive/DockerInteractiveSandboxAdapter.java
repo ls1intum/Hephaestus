@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.in.www1.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.in.www1.hephaestus.agent.sandbox.docker.ContainerSecurityPolicy;
@@ -27,6 +26,7 @@ import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import tools.jackson.databind.ObjectMapper;
 
 public class DockerInteractiveSandboxAdapter implements InteractiveSandboxService {
 

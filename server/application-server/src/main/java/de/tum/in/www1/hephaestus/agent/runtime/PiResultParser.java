@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.runtime;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -14,6 +11,9 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Parse Pi-runner output into an {@link AgentResult}.
@@ -214,7 +214,7 @@ public class PiResultParser {
         try {
             JsonNode node = objectMapper.readTree(text);
             return node != null && node.isObject() && node.has("findings");
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return false;
         }
     }

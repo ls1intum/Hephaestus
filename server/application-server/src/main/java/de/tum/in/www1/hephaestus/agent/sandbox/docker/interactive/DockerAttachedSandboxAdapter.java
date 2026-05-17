@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandboxState;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.EvictionReason;
@@ -24,6 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import reactor.core.Disposable;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Per-session adapter: owns the docker-exec subprocess, JSONL pump + writer, ring buffer, and

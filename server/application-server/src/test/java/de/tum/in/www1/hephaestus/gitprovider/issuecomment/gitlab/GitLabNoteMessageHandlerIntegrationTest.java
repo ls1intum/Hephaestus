@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
@@ -42,6 +41,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 /** Integration tests: JSON fixtures → DTO → handler → processor → DB. */
 @Tag("integration")

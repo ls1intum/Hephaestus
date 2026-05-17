@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerTimeoutException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
@@ -22,6 +19,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 import reactor.core.Disposable;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * JSON-RPC 2.0 wrapper around an {@link AttachedSandbox}. Owns id correlation, response

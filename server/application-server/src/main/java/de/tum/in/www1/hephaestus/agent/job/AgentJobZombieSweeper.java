@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import io.micrometer.core.instrument.Counter;
@@ -15,6 +14,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Periodic recovery for orphaned agent jobs.

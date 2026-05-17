@@ -4,9 +4,6 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInsta
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Field;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2IterationField;
@@ -17,6 +14,9 @@ import java.util.Collections;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Domain DTO for GitHub Projects V2 field configuration.
@@ -34,7 +34,8 @@ public record GitHubProjectFieldDTO(
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
-    private static final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    // Jackson 3: JSR-310 module is built in, no explicit registration needed.
+    private static final ObjectMapper objectMapper = JsonMapper.builder().build();
 
     /**
      * Option for single-select fields.
@@ -92,7 +93,7 @@ public record GitHubProjectFieldDTO(
         }
         try {
             return objectMapper.writeValueAsString(options);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to serialize options to JSON", e);
             return null;
         }

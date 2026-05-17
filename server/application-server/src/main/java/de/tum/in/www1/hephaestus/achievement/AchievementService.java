@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.achievement;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
@@ -28,6 +26,8 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Service for evaluating and unlocking achievements via incremental progress updates.
@@ -272,7 +272,7 @@ public class AchievementService {
         String progressJson;
         try {
             progressJson = objectMapper.writeValueAsString(uaProgress.getProgressData());
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException(
                 "Failed to serialize achievement progress for user=" +
                     uaProgress.getUser().getId() +

@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.practices.finding.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
@@ -36,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import tools.jackson.databind.ObjectMapper;
 
 @AutoConfigureWebTestClient
 @DisplayName("Finding feedback controller integration")

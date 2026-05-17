@@ -1,10 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.common;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nats.client.Message;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Centralized service for deserializing NATS messages.

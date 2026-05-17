@@ -3,8 +3,6 @@ package de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.IntNode;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -13,6 +11,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.IntNode;
 
 @DisplayName("FrameRingBuffer")
 class FrameRingBufferTest extends BaseUnitTest {

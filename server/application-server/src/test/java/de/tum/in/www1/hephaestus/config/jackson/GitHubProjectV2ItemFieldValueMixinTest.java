@@ -2,10 +2,6 @@ package de.tum.in.www1.hephaestus.config.jackson;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldDateValue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldIterationValue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldLabelValue;
@@ -26,6 +22,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Tests for Jackson mixin-based polymorphic deserialization of GitHub ProjectV2 item field values.
@@ -38,11 +38,13 @@ class GitHubProjectV2ItemFieldValueMixinTest {
 
     @BeforeEach
     void setUp() {
-        objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
-        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        objectMapper.configure(DeserializationFeature.USE_LONG_FOR_INTS, true);
-        objectMapper.addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class);
+        // Jackson 3: ObjectMapper is immutable; use JsonMapper.builder() and configure inline.
+        // JSR-310 (Instant / LocalDate / OffsetDateTime) support is built into databind core.
+        objectMapper = JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .enable(DeserializationFeature.USE_LONG_FOR_INTS)
+            .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class)
+            .build();
     }
 
     @Nested

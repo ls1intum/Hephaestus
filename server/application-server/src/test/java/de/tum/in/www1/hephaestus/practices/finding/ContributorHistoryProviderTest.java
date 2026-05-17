@@ -4,9 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -18,6 +15,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("ContributorHistoryProvider")
 class ContributorHistoryProviderTest extends BaseUnitTest {
@@ -165,13 +165,13 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty when ObjectMapper throws JsonProcessingException")
+        @DisplayName("returns empty when ObjectMapper throws JacksonException")
         void returnsEmptyOnSerializationFailure() throws Exception {
             ObjectMapper brokenMapper = org.mockito.Mockito.mock(ObjectMapper.class);
             when(brokenMapper.createArrayNode()).thenReturn(objectMapper.createArrayNode());
             when(brokenMapper.createObjectNode()).thenReturn(objectMapper.createObjectNode());
             when(brokenMapper.writeValueAsBytes(any())).thenThrow(
-                new JsonProcessingException("Simulated serialization failure") {}
+                new JacksonException("Simulated serialization failure") {}
             );
 
             ContributorHistoryProvider brokenProvider = new ContributorHistoryProvider(

@@ -1,11 +1,5 @@
 package de.tum.in.www1.hephaestus.achievement;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import jakarta.annotation.PostConstruct;
 import java.io.File;
@@ -23,6 +17,11 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.dataformat.yaml.YAMLMapper;
 
 /**
  * Registry acting as the central source of truth for all achievements defined in achievements.yml.
@@ -43,10 +42,12 @@ public class AchievementRegistry {
     private volatile List<AchievementDefinition> allAchievements = List.of();
 
     public AchievementRegistry() {
-        this.yamlMapper = new ObjectMapper(new YAMLFactory())
-            .registerModule(new ParameterNamesModule())
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS);
+        // Jackson 3: ObjectMapper is immutable; build via YAMLMapper.builder().
+        // ParameterNamesModule was removed in Jackson 3 — parameter-name discovery is built in.
+        this.yamlMapper = YAMLMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .build();
     }
 
     @PostConstruct

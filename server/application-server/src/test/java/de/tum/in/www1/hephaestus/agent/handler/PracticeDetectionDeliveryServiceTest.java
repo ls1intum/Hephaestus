@@ -13,8 +13,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
@@ -42,6 +40,8 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @DisplayName("PracticeDetectionDeliveryService")
 class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {

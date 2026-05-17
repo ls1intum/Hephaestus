@@ -1,8 +1,8 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Wire shape of the body the webapp sends on {@code POST /mentor/chat}. Mirrors AI SDK's

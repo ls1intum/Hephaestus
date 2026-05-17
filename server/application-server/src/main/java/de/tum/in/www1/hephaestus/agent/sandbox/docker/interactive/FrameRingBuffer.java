@@ -1,10 +1,10 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import io.micrometer.core.instrument.Counter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Bounded ring buffer of frames with drop-oldest on overflow. Frames carry a monotonic sequence

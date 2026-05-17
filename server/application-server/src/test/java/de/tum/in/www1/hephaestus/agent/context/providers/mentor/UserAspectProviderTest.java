@@ -6,9 +6,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
 import de.tum.in.www1.hephaestus.agent.context.providers.mentor.UserAspectProvider.ActivityInsights;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -25,6 +22,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.springframework.cache.CacheManager;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @DisplayName("UserAspectProvider")
 class UserAspectProviderTest extends BaseUnitTest {

@@ -2,9 +2,6 @@ package de.tum.in.www1.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
@@ -13,6 +10,9 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 @DisplayName("PullRequestReviewHandler static methods")
 class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {

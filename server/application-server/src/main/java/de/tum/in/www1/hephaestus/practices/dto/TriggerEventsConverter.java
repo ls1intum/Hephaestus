@@ -1,10 +1,10 @@
 package de.tum.in.www1.hephaestus.practices.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.ArrayList;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 /**
  * Converts between {@link JsonNode} (entity storage) and {@code List<String>} (DTO representation)

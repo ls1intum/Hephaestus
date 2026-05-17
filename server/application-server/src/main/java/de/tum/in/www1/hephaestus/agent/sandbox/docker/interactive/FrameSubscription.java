@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import io.micrometer.core.instrument.Counter;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -10,6 +9,7 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Per-subscriber bounded queue + virtual-thread dispatcher. Slow listeners drop their own frames
@@ -20,7 +20,7 @@ final class FrameSubscription implements Disposable {
     private static final Logger log = LoggerFactory.getLogger(FrameSubscription.class);
 
     // Identity-checked sentinel to wake a blocked queue.take() on dispose.
-    private static final JsonNode TERMINAL_SENTINEL = com.fasterxml.jackson.databind.node.NullNode.getInstance();
+    private static final JsonNode TERMINAL_SENTINEL = tools.jackson.databind.node.NullNode.getInstance();
 
     private static final long DISPATCHER_JOIN_TIMEOUT_MS = 250L;
 

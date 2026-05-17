@@ -11,4 +11,5 @@
  * self-invocations from {@code contribute}, which bypass the proxy. Pinned by
  * {@code MentorAspectProviderArchitectureTest}.
  */
+@org.springframework.modulith.ApplicationModule(displayName = "Agent Mentor Context")
 package de.tum.in.www1.hephaestus.agent.context.providers.mentor;

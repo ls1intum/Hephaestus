@@ -1,9 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.context.ContentProvider;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
@@ -35,6 +31,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
@@ -318,7 +318,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         try {
             String quoted = objectMapper.writeValueAsString(s);
             return quoted.substring(1, quoted.length() - 1);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
         }
     }

@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
@@ -19,9 +18,9 @@ import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import okhttp3.mockwebserver.RecordedRequest;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +32,7 @@ import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWeb
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import tools.jackson.databind.ObjectMapper;
 
 @AutoConfigureWebTestClient
 @DisplayName("LLM proxy integration")

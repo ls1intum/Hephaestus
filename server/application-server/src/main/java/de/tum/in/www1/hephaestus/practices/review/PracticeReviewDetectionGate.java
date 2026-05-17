@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.practices.review;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.feature.FeatureFlag;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -20,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Detection gate that decides whether to run the practice review agent for a given PR event.

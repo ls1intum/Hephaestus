@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -14,6 +11,9 @@ import java.util.function.IntSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Reads JSONL frames from a runner's stdout. Frames are delimited by ASCII {@code \n} ONLY;
@@ -125,7 +125,7 @@ final class JsonlStdoutPump {
         JsonNode frame;
         try {
             frame = mapper.readTree(text);
-        } catch (JsonProcessingException pe) {
+        } catch (JacksonException pe) {
             parseErrorCounter.increment();
             log.debug("Skipping malformed JSONL frame: sessionId={}, len={}", sessionId, text.length());
             return;

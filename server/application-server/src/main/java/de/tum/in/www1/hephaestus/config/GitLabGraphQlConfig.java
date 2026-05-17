@@ -8,7 +8,6 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabRateLimitTracker;
@@ -38,6 +37,7 @@ import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 import reactor.util.retry.Retry;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Configuration for GitLab GraphQL API client.

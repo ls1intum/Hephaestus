@@ -7,7 +7,6 @@ import static de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PRE
 import static de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX;
 import static de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
@@ -20,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Composes delivery content (mrNote + diffNotes) from structured findings.

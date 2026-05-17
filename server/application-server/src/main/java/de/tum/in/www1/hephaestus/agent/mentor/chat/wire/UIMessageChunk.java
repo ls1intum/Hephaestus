@@ -6,9 +6,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonValue;
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.UUID;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Sealed root of every chunk emitted on the mentor SSE stream. Wire-compatible with AI SDK

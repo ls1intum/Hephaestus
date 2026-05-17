@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.integrations.posthog;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.net.URI;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -14,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import tools.jackson.databind.JsonNode;
 
 @Component
 public class PosthogClient {

@@ -1,10 +1,10 @@
 package de.tum.in.www1.hephaestus.agent.task;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import java.nio.charset.StandardCharsets;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
 
 /**
  * Serializes a {@link TaskEnvelope} to bytes for the workspace input-files map.
@@ -32,7 +32,7 @@ public class TaskEnvelopeWriter {
     public byte[] write(TaskEnvelope envelope) {
         try {
             return writer.writerWithDefaultPrettyPrinter().writeValueAsBytes(envelope);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize TaskEnvelope", e);
         }
     }

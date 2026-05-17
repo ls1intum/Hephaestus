@@ -1,9 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.nio.charset.StandardCharsets;
@@ -17,6 +13,10 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Parses structured agent output into validated practice findings and optional delivery content.
@@ -102,7 +102,7 @@ public class PracticeDetectionResultParser {
         try {
             // Use lenient mapper: LLMs produce JSON with literal newlines/tabs in strings
             root = lenientMapper.readTree(sanitizedText);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             // Fallback: try to extract JSON from mixed text (e.g., "[PHASE0]...\n{...}")
             root = extractJsonFromText(sanitizedText);
             if (root == null) {
@@ -430,7 +430,7 @@ public class PracticeDetectionResultParser {
                 } else {
                     log.debug("Evidence exceeds {} bytes, dropping: slug={}", MAX_EVIDENCE_BYTES, practiceSlug);
                 }
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 log.debug("Failed to parse evidence JSON, dropping: slug={}, error={}", practiceSlug, e.getMessage());
             }
         }
@@ -573,7 +573,7 @@ public class PracticeDetectionResultParser {
                 if (node != null && node.isObject() && node.has("findings")) {
                     return node;
                 }
-            } catch (JsonProcessingException ignored) {
+            } catch (JacksonException ignored) {
                 // Not valid JSON from this position, try next '{'
             }
             startIdx = braceIdx + 1;
