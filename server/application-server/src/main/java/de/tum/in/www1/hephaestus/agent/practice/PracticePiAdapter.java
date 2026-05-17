@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.agent.practice;
 
 import de.tum.in.www1.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.in.www1.hephaestus.agent.runtime.AgentResult;
-import de.tum.in.www1.hephaestus.agent.runtime.PiAgentProperties;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.in.www1.hephaestus.agent.runtime.PiResultParser;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -25,7 +24,6 @@ public class PracticePiAdapter {
 
     private final PiRuntimeFactory runtimeFactory;
     private final PiResultParser resultParser;
-    private final PiAgentProperties properties;
     private final AgentImageProperties imageProperties;
 
     public PracticeSandboxSpec buildSandboxSpec(PracticeAgentRequest request) {
