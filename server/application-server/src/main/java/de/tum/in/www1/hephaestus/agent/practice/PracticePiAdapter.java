@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class PracticePiAdapter {
 
+    private static final PracticeRunnerProfile PROFILE = new PracticeRunnerProfile();
+
     private final PiRuntimeFactory runtimeFactory;
     private final PiResultParser resultParser;
     private final PiAgentProperties properties;
@@ -43,7 +45,7 @@ public class PracticePiAdapter {
                 request.jobToken(),
                 request.allowInternet(),
                 request.timeoutSeconds(),
-                properties.runnerScript(),
+                PROFILE,
                 Map.of(),
                 buildPrecomputeStep()
             )

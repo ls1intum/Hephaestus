@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.agent.mentor;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory.PiPlan;
+import de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile;
@@ -23,14 +24,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MentorPiAdapter {
 
-    /** Workspace-relative path of the system prompt file the runner loads. */
-    public static final String SYSTEM_PROMPT_PATH = "agent/mentor/system.md";
+    public static final String SYSTEM_PROMPT_PATH = WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH;
+    public static final String ASPECT_INPUT_PREFIX = WorkspaceAbi.CONTEXT_TARGET_PREFIX;
+    public static final String SESSIONS_DIR_PREFIX = WorkspaceAbi.SESSIONS_DIR_PREFIX;
 
-    /** Workspace-relative directory the aspect JSON files land in (matches {@code ContentProvider.OUTPUT_PREFIX}). */
-    public static final String ASPECT_INPUT_PREFIX = "context/target/";
-
-    /** Workspace-relative directory for restored Pi SDK session JSONL files (matches the runner's {@code SESSIONS_DIR}). */
-    public static final String SESSIONS_DIR_PREFIX = ".sessions/";
+    private static final MentorRunnerProfile PROFILE = new MentorRunnerProfile();
 
     private final PiRuntimeFactory runtimeFactory;
     private final MentorAgentProperties mentorProperties;
@@ -70,9 +68,9 @@ public class MentorPiAdapter {
             null,
             true,
             llmConfig.timeoutSeconds(),
-            mentorProperties.runnerScript(),
+            PROFILE,
             extraInputs,
-            "" /* no precompute step — mentor analytics arrive as aspect JSON */
+            ""
         );
 
         PiPlan plan = runtimeFactory.build(planSpec);

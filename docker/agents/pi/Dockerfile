@@ -11,7 +11,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends git finduti
 ARG PI_VERSION=0.74.0
 RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
     npm cache clean --force && \
-    mkdir -p /home/agent/.pi /workspace && \
+    mkdir -p /home/agent /workspace && \
     chown -R 1000:1000 /home/agent /workspace
 
 # Bun runtime for precomputation scripts (static analysis before agent runs)

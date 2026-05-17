@@ -18,7 +18,6 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "hephaestus.mentor.agent")
 public record MentorAgentProperties(
     @DefaultValue("ghcr.io/ls1intum/hephaestus/agent-pi:latest") @NotBlank String image,
-    @DefaultValue("pi-mentor-runner.mjs") @NotBlank String runnerScript,
     @DefaultValue("100000") @Min(1) int maxPromptChars,
     @DefaultValue("") String baseUrl,
     @Nullable LlmProvider llmProvider,

@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.agent.task;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import java.util.Objects;
 
 /**
@@ -17,6 +18,7 @@ public sealed interface Task {
      * files materialised by the content providers — this record only carries the prompt and
      * routing hints needed by the runner.
      */
+    @JsonTypeName(Task.PracticeReview.KIND)
     record PracticeReview(String prompt, int pullRequestNumber, String repositoryFullName) implements Task {
         public static final String KIND = "practice_review";
 

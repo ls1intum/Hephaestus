@@ -75,8 +75,10 @@ Every agent container gets this file structure (agent-specific files noted):
   .precompute/practices/{slug}.ts    # Precompute scripts (from DB, if present)
   .precompute-out/                   # Precompute output (summary.md + per-practice JSON)
   task.json                          # TaskEnvelope<PracticeReviewTask> — prompt, jobId, workspaceId
-  .pi/AGENTS.md                      # Pi orchestrator instructions
-  .pi-runtime/settings.json          # Pi SDK configuration (provider, model, compaction)
+  .pi/                               # Pi SDK agent dir ($PI_CODING_AGENT_DIR)
+    AGENTS.md                        #   Pi orchestrator instructions
+    settings.json                    #   Pi SDK configuration (provider, model, compaction)
+    extensions/                      #   Custom provider extensions (auto-discovered)
   .run-pi.mjs                        # Runner script
   .analysis/practices/.gitkeep       # Directory for intermediate findings
   .output/                           # Agent writes final results here

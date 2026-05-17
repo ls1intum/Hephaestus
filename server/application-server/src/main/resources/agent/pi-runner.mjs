@@ -17,6 +17,10 @@ const AGENT_BUDGET_MS = Number(process.env.AGENT_BUDGET_MS);
 if (!Number.isFinite(AGENT_BUDGET_MS) || AGENT_BUDGET_MS <= 0) {
     throw new Error(`AGENT_BUDGET_MS env var is required and must be a positive number, got: ${process.env.AGENT_BUDGET_MS}`);
 }
+const AGENT_DIR = process.env.PI_CODING_AGENT_DIR;
+if (!AGENT_DIR) {
+    throw new Error("PI_CODING_AGENT_DIR env var is required");
+}
 // 85% initial / 15% retry; soft nudge at 50% of initial.
 const INITIAL_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.85));
 const RETRY_TIMEOUT_MS = Math.max(30_000, AGENT_BUDGET_MS - INITIAL_TIMEOUT_MS);
@@ -564,12 +568,12 @@ async function main() {
     // edit/write — findings are persisted only via the customTools below. Pi 0.74+
     // filters customTools through the same allowlist (see agent-session.js:1796), so
     // the custom tool names must be listed here too or they won't be exposed to the LLM.
-    const settingsManager = SettingsManager.create(CWD, process.env.PI_CODING_AGENT_DIR || "/home/agent/.pi");
+    const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
     const sessionManager = SessionManager.inMemory();
 
     const { session } = await createAgentSession({
         cwd: CWD,
-        agentDir: process.env.PI_CODING_AGENT_DIR || "/home/agent/.pi",
+        agentDir: AGENT_DIR,
         tools: ["read", "bash", "grep", "report_finding", "set_review_summary"],
         customTools: [reportFindingTool, setReviewSummaryTool],
         sessionManager,
