@@ -8,9 +8,10 @@ FROM base AS builder
 RUN apk add --no-cache gcompat
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-# Bake the packageManager-pinned pnpm version into the image; without --activate
-# the first install fetches pnpm from the network.
-RUN corepack enable && corepack prepare --activate
+# Bake the pinned pnpm version into the image so the first install does not need
+# network. Version explicit (not `--activate` alone) because package.json is
+# COPYed in a later step.
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 WORKDIR /repo
 
 # Copy workspace manifests for layer caching

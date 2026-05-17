@@ -8,7 +8,8 @@ WORKDIR /repo
 
 # Enable Corepack-managed pnpm and bake the pinned version into the image so the
 # first `pnpm install` does not need network access to resolve packageManager.
-RUN corepack enable && corepack prepare --activate
+# Version explicit (not `--activate` alone) because package.json is COPYed later.
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 # Copy the workspace manifests first to maximize layer caching
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc /repo/
