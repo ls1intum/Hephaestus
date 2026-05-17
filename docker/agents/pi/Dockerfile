@@ -10,7 +10,10 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends git finduti
 # renovate: datasource=npm depName=@earendil-works/pi-coding-agent
 ARG PI_VERSION=0.74.1
 ENV PNPM_HOME=/usr/local/pnpm
-ENV PATH=$PNPM_HOME:$PATH
+# pnpm 11 installs globals into $PNPM_HOME/bin (the v10 flat layout was
+# deprecated); both PNPM_HOME and PNPM_HOME/bin need to be in PATH so corepack
+# can find the pnpm shim and pnpm can find the binaries it installs globally.
+ENV PATH=$PNPM_HOME/bin:$PNPM_HOME:$PATH
 RUN corepack enable && \
     corepack prepare pnpm@11.1.2 --activate && \
     pnpm add -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
