@@ -58,10 +58,7 @@ services:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
     ports:
       - "8080"
-    # Pin file rewritten by release.yml; needs Compose v2.24+. The .local override
-    # is gitignored — drop a one-line HEPHAESTUS_AGENT_IMAGE_REFERENCE=… in it for
-    # local agent-pi iteration without touching the tracked pin file.
-    # See docs/admin/agent-image-digests.md.
+    # Long-form env_file requires Compose v2.24+. See docs/admin/agent-image-digests.md.
     env_file:
       - path: ./agent-image-pin.env
         required: false

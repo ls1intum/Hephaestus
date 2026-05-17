@@ -24,7 +24,7 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
     private DockerImageOperations imageOps;
 
     private AgentImagePullBootstrapper bootstrapperWith(ImagePullPolicy policy, SimpleMeterRegistry registry) {
-        return new AgentImagePullBootstrapper(imageOps, new AgentImageProperties(IMAGE, policy, false), registry);
+        return new AgentImagePullBootstrapper(imageOps, new AgentImageProperties(IMAGE, policy), registry);
     }
 
     @Test
@@ -58,26 +58,19 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
         assertThat(registry.counter("agent.image.pull.failure").count()).isEqualTo(expectedFailureCount);
     }
 
-    @Test
-    void shouldSkipPullWhenImagePresentAndPolicyIsIfNotPresent() {
-        when(imageOps.imageIsPresent(IMAGE)).thenReturn(true);
+    @ParameterizedTest(name = "IF_NOT_PRESENT, imageIsPresent={0} → pullImage invoked={1}")
+    @CsvSource({ "true, 0", "false, 1" })
+    void shouldHonourCacheWhenPolicyIsIfNotPresent(boolean alreadyPresent, int expectedPulls) {
+        when(imageOps.imageIsPresent(IMAGE)).thenReturn(alreadyPresent);
+        if (!alreadyPresent) {
+            when(imageOps.ping()).thenReturn(true);
+            when(imageOps.pullImage(IMAGE)).thenReturn(true);
+        }
 
         bootstrapperWith(ImagePullPolicy.IF_NOT_PRESENT, new SimpleMeterRegistry()).pullOnStartup();
 
         verify(imageOps).imageIsPresent(IMAGE);
-        verify(imageOps, never()).ping();
-        verify(imageOps, never()).pullImage(IMAGE);
-    }
-
-    @Test
-    void shouldPullImageWhenImageAbsentAndPolicyIsIfNotPresent() {
-        when(imageOps.imageIsPresent(IMAGE)).thenReturn(false);
-        when(imageOps.ping()).thenReturn(true);
-        when(imageOps.pullImage(IMAGE)).thenReturn(true);
-
-        bootstrapperWith(ImagePullPolicy.IF_NOT_PRESENT, new SimpleMeterRegistry()).pullOnStartup();
-
-        verify(imageOps).pullImage(IMAGE);
+        verify(imageOps, alreadyPresent ? never() : org.mockito.Mockito.times(expectedPulls)).pullImage(IMAGE);
     }
 
     @Test

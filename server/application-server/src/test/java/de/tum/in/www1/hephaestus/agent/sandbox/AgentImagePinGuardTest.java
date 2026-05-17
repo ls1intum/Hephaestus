@@ -1,22 +1,30 @@
 package de.tum.in.www1.hephaestus.agent.sandbox;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.in.www1.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class AgentImagePinGuardTest extends BaseUnitTest {
 
-    private static final String TAG_REF = "ghcr.io/x/agent-pi:latest";
-
     @Test
-    void shouldFailFastWhenReferenceIsTagOnly() {
-        var props = new AgentImageProperties(TAG_REF, ImagePullPolicy.ALWAYS, true);
+    void shouldAllowStartupWhenReferenceIsDigestPinned() {
+        var props = new AgentImageProperties("ghcr.io/x/agent-pi@sha256:" + "a".repeat(64), ImagePullPolicy.ALWAYS);
+        assertThatCode(() -> new AgentImagePinGuard(props)).doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "ghcr.io/x/agent-pi:latest", "ghcr.io/x/agent-pi@sha256:abc123" })
+    void shouldFailFastWhenReferenceIsNotDigestPinned(String reference) {
+        var props = new AgentImageProperties(reference, ImagePullPolicy.ALWAYS);
         assertThatThrownBy(() -> new AgentImagePinGuard(props))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining(TAG_REF)
-            .hasMessageContaining(AgentImageProperties.DIGEST_SUFFIX_DESCRIPTION)
+            .hasMessageContaining(reference)
+            .hasMessageContaining("hephaestus.agent.image.require-digest")
             .hasMessageContaining("docs/admin/agent-image-digests.md");
     }
 }

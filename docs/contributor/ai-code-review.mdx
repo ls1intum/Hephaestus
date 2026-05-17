@@ -177,9 +177,9 @@ Key tables for code review:
 hephaestus:
   agent:
     image:
-      reference: ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<digest>
+      reference: ghcr.io/ls1intum/hephaestus/agent-pi:latest # dev; prod overrides via docker/agent-image-pin.env
       pull-policy: IF_NOT_PRESENT
-      require-digest: true # production only
+      # require-digest: true # set only in application-prod.yml
     nats:
       enabled: true # Enable agent job processing
       server: nats://localhost:4222

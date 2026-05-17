@@ -67,21 +67,21 @@ HEPHAESTUS_AGENT_PI_PULL_POLICY=IF_NOT_PRESENT
 HEPHAESTUS_MENTOR_AGENT_PULL_POLICY=IF_NOT_PRESENT
 ```
 
-**After**:
+**After** (`docker/agent-image-pin.env`, rewritten by the release workflow):
 
 ```bash
 HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<digest>
-HEPHAESTUS_AGENT_IMAGE_PULL_POLICY=IF_NOT_PRESENT
-HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST=true
 ```
+
+`pull-policy` and `require-digest` are now Spring properties set in `application-prod.yml`, not env vars.
 
 **Migration**:
 
 1. Drop the four old env vars from your prod configuration.
-2. The pin now lives in `docker/agent-image-pin.env`, loaded by `compose.app.yaml` via `env_file:`. If `HEPHAESTUS_AGENT_PI_IMAGE` is set in the Coolify UI, **unset it** — UI values shadow `env_file:`.
+2. Production reads the pinned digest from `docker/agent-image-pin.env` via Compose `env_file:`. If `HEPHAESTUS_AGENT_PI_IMAGE` is set in the Coolify UI, **unset it** — UI values shadow `env_file:`.
 3. See [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md) for verification + rollback.
 
-**Why**: GHCR retention previously pruned `:latest` between releases; sandboxes 500'd until the next push refilled the tag. Long-lived mentor containers on tags can pick up unexpected upstream changes mid-session. Digest pinning + a startup guard makes both impossible.
+**Why**: GHCR retention previously pruned `:latest` between releases; sandboxes 500'd until the next push refilled the tag. Long-lived mentor containers on tags can pick up unexpected upstream changes mid-session. Digest pinning protects bytes-in-flight; the `require-digest` startup guard fails fast if a tag ever slips back into config.
 
 
 

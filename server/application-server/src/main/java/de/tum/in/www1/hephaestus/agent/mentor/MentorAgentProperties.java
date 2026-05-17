@@ -11,9 +11,6 @@ import org.springframework.validation.annotation.Validated;
 /**
  * When llmProvider + credentialMode + modelName are all set, mentor uses them directly and
  * skips the workspace-scoped AgentConfig table. Omit any one to fall back to AgentConfig.
- *
- * <p>The image reference and pull policy live in {@code AgentImageProperties} (shared with the
- * Pi practice agent) so the two runtimes can't drift apart on the agent-pi digest.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.mentor.agent")
