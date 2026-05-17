@@ -175,11 +175,8 @@ Key tables for code review:
 hephaestus:
   agent:
     image:
-      # Shared by Pi practice sandboxes and the mentor container. Production must
-      # be digest-pinned (set via docker/agent-image-pin.env — rewritten by the
-      # release workflow). require-digest=true fails startup on a :tag reference.
       reference: ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<digest>
-      pull-policy: IF_NOT_PRESENT
+      pull-policy: ALWAYS
       require-digest: true # production only
     nats:
       enabled: true # Enable agent job processing
@@ -192,7 +189,7 @@ hephaestus:
     storage-path: /tmp/hephaestus-git-repos
 ```
 
-For local dev, override the image via the `HEPHAESTUS_AGENT_IMAGE_REFERENCE` env var (Spring relaxed binding); production loads the pinned digest from `docker/agent-image-pin.env` via Compose's `env_file:` directive. The pin policy, release-time update path, and rollback procedure live in [Agent image digests](/admin/agent-image-digests).
+Production pins via `docker/agent-image-pin.env`; see [Agent image digests](/admin/agent-image-digests).
 
 ### Dev trigger
 

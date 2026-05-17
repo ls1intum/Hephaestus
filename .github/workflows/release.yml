@@ -14,7 +14,6 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-# Per-job least-privilege; deploy-staging / deploy-production inherit nothing.
 permissions: {}
 
 jobs:
@@ -56,7 +55,6 @@ jobs:
           echo "- **Staging**: Deploying automatically" >> $GITHUB_STEP_SUMMARY
           echo "- **Production**: Waiting for approval" >> $GITHUB_STEP_SUMMARY
 
-  # Retag SHA→VERSION, verify digest equality, smoke-test, and pin the digest to git.
   tag-images:
     needs: release
     if: needs.release.outputs.released == 'true'
@@ -71,8 +69,6 @@ jobs:
         with:
           token: ${{ secrets.GH_PAT }}
           persist-credentials: true
-          # Pull main HEAD (which now includes the semantic-release commit) so the
-          # auto-commit below builds on the right tip.
           ref: main
 
       - name: Login to GitHub Container Registry
@@ -90,8 +86,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # OCI spec defines a manifest digest as sha256 of its canonical JSON bytes.
-          # Computing it from --raw is template-stable across buildx versions.
           manifest_digest() {
             printf 'sha256:%s\n' "$(docker buildx imagetools inspect --raw "$1" | sha256sum | awk '{print $1}')"
           }
@@ -101,7 +95,6 @@ jobs:
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
             echo "::group::$img"
 
-            # Poll up to 2 minutes for the SHA-tagged build to land in GHCR.
             for i in $(seq 1 24); do
               if docker buildx imagetools inspect "$FULL_IMAGE:$SHA" > /dev/null 2>&1; then break; fi
               if [ "$i" -ge 24 ]; then
@@ -132,7 +125,6 @@ jobs:
             echo "::endgroup::"
           done
 
-      # Spot-check bun/node binaries. Real-entrypoint boot is the staging deploy's job.
       - name: Smoke-test agent-pi
         env:
           IMAGE: ghcr.io/ls1intum/hephaestus/agent-pi@${{ steps.retag.outputs.agent-pi-digest }}
@@ -174,14 +166,9 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add "$PIN_FILE"
-          # [skip ci] suppresses the cicd.yml push-trigger and prevents re-releasing.
-          # cycjimmy/semantic-release-action's commit-analyzer also ignores chore(release):
-          # commits, so this is belt-and-braces.
+          # [skip ci] keeps cicd.yml from re-firing on this commit.
           git commit -m "chore(release): pin agent-pi to ${DIGEST} for v${VERSION} [skip ci]"
 
-          # Race-tolerant push: rebase + retry up to 3× to absorb concurrent main
-          # commits. The post-rebase invariant catches the case where rebase
-          # swallows our commit (e.g. an in-between commit recreated the file).
           for attempt in 1 2 3; do
             if git push origin HEAD:main; then exit 0; fi
             echo "push attempt $attempt failed — fetching + rebasing"

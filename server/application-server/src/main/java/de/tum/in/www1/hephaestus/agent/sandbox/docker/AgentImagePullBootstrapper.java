@@ -31,7 +31,7 @@ public class AgentImagePullBootstrapper {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Order(0) // run before any agent-container launcher
+    @Order(0)
     public void pullOnStartup() {
         ImagePullBootstrapperSupport.applyPolicy(
             properties.reference(),

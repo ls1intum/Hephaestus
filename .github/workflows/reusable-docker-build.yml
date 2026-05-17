@@ -224,8 +224,6 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ inputs.registry }}/${{ inputs.image-name }}:${{ steps.meta.outputs.version }}
 
-      # Production pulls the multi-arch manifest list. The OCI digest is sha256 of
-      # the raw manifest bytes the registry serves — Docker-Content-Digest by spec.
       - name: Capture manifest digest
         id: digest
         env:
@@ -250,18 +248,14 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
 
-      # --recursive signs every child manifest in the index, not just the index
-      # itself, so per-platform `cosign verify` works for downstream consumers
-      # (Kubernetes admission, Coolify) that resolve a specific child.
+      # --recursive: sign each child manifest so per-platform verify works.
       - name: Sign image with cosign
         env:
           IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.digest.outputs.manifest-digest }}
         run: |
           cosign sign --yes --recursive "$IMAGE_REF"
 
-      # Pin the cert SAN to THIS reusable workflow (not any workflow in the repo)
-      # and cross-check the GitHub-workflow-repository OID extension. Catches an
-      # in-repo workflow forging a signature with the same Fulcio identity prefix.
+      # Pin cert SAN to this workflow + cross-check the workflow-repo OID.
       - name: Verify signature + attestation
         env:
           IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.digest.outputs.manifest-digest }}

@@ -260,9 +260,7 @@ jobs:
             exit 1
           fi
 
-  # Issue #1076 retired a legacy agent runtime image; this job blocks
-  # accidental re-introductions in code/CI/docker. The needle is built at
-  # runtime so this guard file itself doesn't match its own check.
+  # Needle built at runtime so this guard file doesn't self-match.
   legacy-cleanup-guard:
     name: "No legacy agent image"
     if: inputs.should_skip != 'true'
@@ -275,10 +273,7 @@ jobs:
       - name: Assert no legacy agent-image references
         run: |
           set -euo pipefail
-          # MIGRATION.md and the admin doc document the removal; the path filter
-          # below excludes those (and the guard's own file) by full path so
-          # similarly-named files in subdirectories can't slip through.
-          NEEDLE="agent-$(printf 'open\x63ode')"   # split so this guard file doesn't self-match
+          NEEDLE="agent-$(printf 'open\x63ode')"
           if grep -rEnI "$NEEDLE" \
                 --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \
                 . \

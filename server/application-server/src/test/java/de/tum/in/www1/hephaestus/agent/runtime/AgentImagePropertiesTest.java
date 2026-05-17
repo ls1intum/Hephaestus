@@ -4,11 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-@DisplayName("AgentImageProperties")
 class AgentImagePropertiesTest extends BaseUnitTest {
 
     @ParameterizedTest(name = "isDigestPinned({0}) = {1}")

@@ -7,18 +7,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
-/**
- * Shared image reference for the agent runtime. Pi practice and Pi mentor share the same image
- * by design (unified Pi runtime epic #1066); a single property prevents drift between defaults.
- * Production sets {@code require-digest=true} so {@link
- * de.tum.in.www1.hephaestus.agent.sandbox.AgentImagePinGuard} fails startup on tag references —
- * see {@code docs/admin/agent-image-digests.md}.
- *
- * @param reference fully-qualified image reference; production must end in
- *     {@value #DIGEST_SUFFIX_DESCRIPTION}.
- * @param pullPolicy startup pull behaviour for {@code AgentImagePullBootstrapper}.
- * @param requireDigest enables the pin guard.
- */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.agent.image")
 public record AgentImageProperties(

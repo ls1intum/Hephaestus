@@ -56,23 +56,9 @@ Before upgrading to any new `0.x.0` version:
 #### 🔴 Agent runtime: image config consolidated under `hephaestus.agent.image.*`
 
 **Version**: v0.10.0
-**Affected**: any deployment that pinned the agent-pi image via `HEPHAESTUS_AGENT_PI_IMAGE`, `HEPHAESTUS_MENTOR_AGENT_IMAGE`, or the matching Spring properties / pull-policy env vars.
-
-Pi practice sandboxes and the mentor container share the same Docker image by design (unified Pi runtime, #1066). Issue #1076 collapses the two parallel configs into one record so the defaults can't drift, and adds a startup guard that rejects un-pinned references in production.
+**Affected**: any deployment that pinned the agent-pi image via `HEPHAESTUS_AGENT_PI_IMAGE`, `HEPHAESTUS_MENTOR_AGENT_IMAGE`, or the matching pull-policy env vars.
 
 **Before**:
-
-```yaml
-hephaestus:
-  agent:
-    pi:
-      image: ghcr.io/ls1intum/hephaestus/agent-pi:latest
-      pull-policy: IF_NOT_PRESENT
-  mentor:
-    agent:
-      image: ghcr.io/ls1intum/hephaestus/agent-pi:latest
-      pull-policy: IF_NOT_PRESENT
-```
 
 ```bash
 HEPHAESTUS_AGENT_PI_IMAGE=ghcr.io/ls1intum/hephaestus/agent-pi:latest
@@ -83,29 +69,19 @@ HEPHAESTUS_MENTOR_AGENT_PULL_POLICY=IF_NOT_PRESENT
 
 **After**:
 
-```yaml
-hephaestus:
-  agent:
-    image:
-      reference: ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<digest>
-      pull-policy: IF_NOT_PRESENT
-      require-digest: true # production only
-```
-
 ```bash
 HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<digest>
-HEPHAESTUS_AGENT_IMAGE_PULL_POLICY=IF_NOT_PRESENT
+HEPHAESTUS_AGENT_IMAGE_PULL_POLICY=ALWAYS
 HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST=true
 ```
 
 **Migration**:
 
-1. Drop the four old env vars / properties from your prod configuration.
-2. Production: the canonical pin now lives in `docker/agent-image-pin.env`, loaded by `compose.app.yaml` via `env_file:`. The release workflow rewrites it on every release. If you currently set `HEPHAESTUS_AGENT_PI_IMAGE` in the Coolify UI, **unset it** — Coolify-UI values shadow `env_file:` values, silently bypassing the pin.
-3. `application-prod.yml` now sets `hephaestus.agent.image.require-digest: true`. The app server will refuse to start on a tag reference. See [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md).
-4. `agent-opencode` is fully removed from the tree; no migration entry was needed for it.
+1. Drop the four old env vars from your prod configuration.
+2. The pin now lives in `docker/agent-image-pin.env`, loaded by `compose.app.yaml` via `env_file:`. If `HEPHAESTUS_AGENT_PI_IMAGE` is set in the Coolify UI, **unset it** — UI values shadow `env_file:`.
+3. See [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md) for verification + rollback.
 
-**Why**: GHCR retention previously pruned `:latest` between releases; sandbox runs 500'd until the next push refilled the tag. Long-lived mentor containers running on tags can pick up unexpected upstream changes on a mid-session pull. Digest pinning + a startup guard makes both classes of failure impossible.
+**Why**: GHCR retention previously pruned `:latest` between releases; sandboxes 500'd until the next push refilled the tag. Long-lived mentor containers on tags can pick up unexpected upstream changes mid-session. Digest pinning + a startup guard makes both impossible.
 
 
 

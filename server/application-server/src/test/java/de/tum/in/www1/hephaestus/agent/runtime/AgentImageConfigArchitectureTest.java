@@ -8,26 +8,14 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.tum.in.www1.hephaestus.architecture.HephaestusArchitectureTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
-/**
- * Drift guard: only {@link AgentImageProperties} may hard-code a container registry reference.
- *
- * <p>Issue #1076 collapsed two parallel image properties onto one record. Spring's
- * {@code @DefaultValue} is {@code @Target(PARAMETER)} only, so it lands on canonical-constructor
- * parameters of {@code @ConfigurationProperties} records — not on synthetic backing fields. This
- * rule scans those parameters and rejects any default whose value contains {@code ghcr.io/} or
- * {@code @sha256:} outside {@link AgentImageProperties}.
- */
-@DisplayName("Agent image config")
 class AgentImageConfigArchitectureTest extends HephaestusArchitectureTest {
 
     @Test
-    @DisplayName("only AgentImageProperties may hard-code a container registry reference")
-    void shouldCentraliseImageConfigWhenScanningConfigurationProperties() {
+    void onlyAgentImagePropertiesMayHardCodeARegistryReference() {
         constructors()
             .that()
             .areDeclaredInClassesThat()
