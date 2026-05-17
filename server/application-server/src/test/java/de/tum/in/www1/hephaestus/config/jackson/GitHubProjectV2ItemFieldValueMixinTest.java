@@ -40,8 +40,11 @@ class GitHubProjectV2ItemFieldValueMixinTest {
     void setUp() {
         // Jackson 3: ObjectMapper is immutable; use JsonMapper.builder() and configure inline.
         // JSR-310 (Instant / LocalDate / OffsetDateTime) support is built into databind core.
+        // Jackson 3 flipped FAIL_ON_NULL_FOR_PRIMITIVES to true by default — disable for GitHub
+        // response shapes that legitimately omit numeric fields like iteration.duration.
         objectMapper = JsonMapper.builder()
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
             .enable(DeserializationFeature.USE_LONG_FOR_INTS)
             .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class)
             .build();

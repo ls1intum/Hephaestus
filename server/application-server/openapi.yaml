@@ -678,6 +678,7 @@ paths:
         required: true
         schema:
           type: string
+          minLength: 1
       - description: Determines the ranking metric. In TEAM mode SCORE uses summed
           contribution scores; LEAGUE_POINTS uses total league points.
         in: query
@@ -2424,7 +2425,9 @@ components:
           type: boolean
           description: Whether the achievement should be hidden until unlocked
         parent:
-          type: string
+          type:
+          - string
+          - "null"
           description: Parent achievement in progression chain
           example: first_pull
         progressData:
@@ -2736,11 +2739,15 @@ components:
           type: string
           format: uuid
         metadata:
-          type: object
+          type:
+          - object
+          - "null"
           additionalProperties: {}
           description: "Per-turn metadata: status, model, costUsd, usage, …"
         parentMessageId:
-          type: string
+          type:
+          - string
+          - "null"
           format: uuid
         parts:
           type: array
@@ -2784,7 +2791,9 @@ components:
           items:
             $ref: "#/components/schemas/ChatMessage"
         title:
-          type: string
+          type:
+          - string
+          - "null"
     ChatThreadSummary:
       type: object
       description: Mentor chat thread summary (no messages).
@@ -2796,7 +2805,9 @@ components:
           type: string
           format: uuid
         title:
-          type: string
+          type:
+          - string
+          - "null"
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -2833,10 +2844,14 @@ components:
       description: Per-practice finding summary for a contributor
       properties:
         category:
-          type: string
+          type:
+          - string
+          - "null"
           description: Practice category
         lastFindingAt:
-          type: string
+          type:
+          - string
+          - "null"
           format: date-time
           description: Timestamp of most recent finding
         negativeCount:
@@ -3048,6 +3063,7 @@ components:
           type: string
           description: URL-friendly identifier for the workspace
           example: my-workspace
+          minLength: 1
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - accountLogin
@@ -3140,7 +3156,9 @@ components:
       description: GitLab group accessible to the provided PAT
       properties:
         avatarUrl:
-          type: string
+          type:
+          - string
+          - "null"
           description: Group avatar URL
         fullPath:
           type: string
@@ -3154,10 +3172,14 @@ components:
           type: string
           description: Group display name
         visibility:
-          type: string
+          type:
+          - string
+          - "null"
           description: "Group visibility: public, internal, or private"
         webUrl:
-          type: string
+          type:
+          - string
+          - "null"
           description: Group web URL
       required:
       - fullPath
@@ -3177,6 +3199,7 @@ components:
           type: string
           description: GitLab Personal Access Token to validate
           example: your-gitlab-token
+          minLength: 1
         serverUrl:
           type: string
           description: GitLab server URL. Defaults to https://gitlab.com if not specified.
@@ -3188,14 +3211,20 @@ components:
       description: Result of GitLab PAT validation
       properties:
         error:
-          type: string
+          type:
+          - string
+          - "null"
           description: Error message if validation failed
         userId:
-          type: integer
+          type:
+          - integer
+          - "null"
           format: int64
           description: GitLab user ID or group ID
         username:
-          type: string
+          type:
+          - string
+          - "null"
           description: Username of the token owner (personal tokens) or group name
             (group tokens)
         valid:
@@ -3389,7 +3418,9 @@ components:
           type: boolean
           description: Whether the user has linked this provider
         linkedUsername:
-          type: string
+          type:
+          - string
+          - "null"
           description: "Username on the external provider, if connected"
         providerAlias:
           type: string
@@ -3491,14 +3522,18 @@ components:
           type: boolean
           description: Whether this practice is actively being detected
         category:
-          type: string
+          type:
+          - string
+          - "null"
           description: Practice category
         createdAt:
           type: string
           format: date-time
           description: Timestamp when the practice was created
         criteria:
-          type: string
+          type:
+          - string
+          - "null"
           description: Practice evaluation criteria
         description:
           type: string
@@ -3511,7 +3546,9 @@ components:
           type: string
           description: Human-readable name
         precomputeScript:
-          type: string
+          type:
+          - string
+          - "null"
           description: TypeScript/Bun precompute script for static analysis before
             AI review
         slug:
@@ -3540,7 +3577,9 @@ components:
       description: Full practice finding detail including guidance and evidence
       properties:
         category:
-          type: string
+          type:
+          - string
+          - "null"
           description: Practice category
         confidence:
           type: number
@@ -3551,9 +3590,12 @@ components:
           format: date-time
           description: When the finding was detected
         evidence:
+          type: "null"
           description: "Structured evidence (locations, snippets, references)"
         guidance:
-          type: string
+          type:
+          - string
+          - "null"
           description: Actionable guidance for the contributor
         id:
           type: string
@@ -3566,7 +3608,9 @@ components:
           type: string
           description: Practice slug
         reasoning:
-          type: string
+          type:
+          - string
+          - "null"
           description: AI reasoning behind the verdict
         severity:
           type: string
@@ -3611,7 +3655,9 @@ components:
       description: Practice finding summary for list views
       properties:
         category:
-          type: string
+          type:
+          - string
+          - "null"
           description: Practice category
         confidence:
           type: number
@@ -4024,6 +4070,7 @@ components:
           type: string
           description: New URL-friendly identifier for the workspace
           example: new-workspace-slug
+          minLength: 1
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - newSlug
@@ -4373,9 +4420,11 @@ components:
         slackSigningSecret:
           type: string
           description: Slack Signing Secret for webhook verification
+          minLength: 1
         slackToken:
           type: string
           description: Slack Bot User OAuth Token for API access
+          minLength: 1
       required:
       - slackSigningSecret
       - slackToken
@@ -4399,6 +4448,7 @@ components:
         personalAccessToken:
           type: string
           description: GitHub Personal Access Token for API access
+          minLength: 1
       required:
       - personalAccessToken
     UserInfo:
@@ -4712,9 +4762,11 @@ components:
       description: Available workspace creation providers and their configuration
       properties:
         github:
+          type: "null"
           $ref: "#/components/schemas/GitHubProvider"
           description: "GitHub workspace provider config, null if not available"
         gitlab:
+          type: "null"
           $ref: "#/components/schemas/GitLabProvider"
           description: "GitLab workspace provider config, null if not available"
     WorkspaceTeamRepositorySettings:

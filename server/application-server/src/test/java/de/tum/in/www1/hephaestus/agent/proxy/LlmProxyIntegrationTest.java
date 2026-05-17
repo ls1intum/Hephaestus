@@ -28,13 +28,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
-@AutoConfigureWebTestClient
 @DisplayName("LLM proxy integration")
 class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -54,14 +52,14 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private Workspace workspace;
 
     @BeforeAll
-    static void startMockUpstream() throws IOException {
+    static void startMockUpstream() throws java.io.IOException {
         mockUpstream = new MockWebServer();
         mockUpstream.start();
     }
 
     @AfterAll
-    static void stopMockUpstream() throws IOException {
-        mockUpstream.shutdown();
+    static void stopMockUpstream() throws java.io.IOException {
+        mockUpstream.close();
     }
 
     @DynamicPropertySource
@@ -277,10 +275,11 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @DisplayName("should forward Anthropic request with real API key and correct path")
         void shouldForwardAnthropicWithRealApiKey() throws Exception {
             mockUpstream.enqueue(
-                new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader("Content-Type", "application/json")
-                    .setBody("{\"id\":\"msg_test\",\"content\":[]}")
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "application/json")
+                    .body("{\"id\":\"msg_test\",\"content\":[]}")
+                    .build()
             );
 
             AgentJob job = createRunningJobWithApiKey("sk-ant-real-key-123");
@@ -299,24 +298,25 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
             assertThat(upstream).isNotNull();
-            assertThat(upstream.getPath()).isEqualTo("/v1/messages");
+            assertThat(upstream.getTarget()).isEqualTo("/v1/messages");
             // Real API key injected — NOT the job token
-            assertThat(upstream.getHeader("x-api-key")).isEqualTo("sk-ant-real-key-123");
-            assertThat(upstream.getHeader("x-api-key")).isNotEqualTo(job.getJobToken());
+            assertThat(upstream.getHeaders().get("x-api-key")).isEqualTo("sk-ant-real-key-123");
+            assertThat(upstream.getHeaders().get("x-api-key")).isNotEqualTo(job.getJobToken());
             // No Bearer auth for Anthropic
-            assertThat(upstream.getHeader("Authorization")).isNull();
+            assertThat(upstream.getHeaders().get("Authorization")).isNull();
             // Body forwarded intact
-            assertThat(upstream.getBody().readUtf8()).contains("claude-sonnet-4-20250514");
+            assertThat(upstream.getBody().utf8()).contains("claude-sonnet-4-20250514");
         }
 
         @Test
         @DisplayName("should forward OpenAI request with Bearer auth and correct path")
         void shouldForwardOpenAIWithBearerAuth() throws Exception {
             mockUpstream.enqueue(
-                new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader("Content-Type", "application/json")
-                    .setBody("{\"id\":\"chatcmpl-test\",\"choices\":[]}")
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "application/json")
+                    .body("{\"id\":\"chatcmpl-test\",\"choices\":[]}")
+                    .build()
             );
 
             AgentJob job = createRunningJobWithApiKey("sk-openai-real-key-456");
@@ -335,23 +335,24 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
             assertThat(upstream).isNotNull();
-            assertThat(upstream.getPath()).isEqualTo("/v1/chat/completions");
+            assertThat(upstream.getTarget()).isEqualTo("/v1/chat/completions");
             // Real API key injected with Bearer prefix
-            assertThat(upstream.getHeader("Authorization")).isEqualTo("Bearer sk-openai-real-key-456");
+            assertThat(upstream.getHeaders().get("Authorization")).isEqualTo("Bearer sk-openai-real-key-456");
             // Job token must NOT appear in upstream headers
-            assertThat(upstream.getHeader("Authorization")).doesNotContain(job.getJobToken());
+            assertThat(upstream.getHeaders().get("Authorization")).doesNotContain(job.getJobToken());
             // No x-api-key for OpenAI
-            assertThat(upstream.getHeader("x-api-key")).isNull();
+            assertThat(upstream.getHeaders().get("x-api-key")).isNull();
         }
 
         @Test
         @DisplayName("should authenticate via api-key header (Azure-style) for OpenAI endpoint")
         void shouldAuthenticateViaApiKeyForAzure() throws Exception {
             mockUpstream.enqueue(
-                new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader("Content-Type", "application/json")
-                    .setBody("{\"id\":\"chatcmpl-azure\"}")
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "application/json")
+                    .body("{\"id\":\"chatcmpl-azure\"}")
+                    .build()
             );
 
             AgentJob job = createRunningJobWithApiKey("sk-azure-real-key");
@@ -369,18 +370,19 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
             assertThat(upstream).isNotNull();
             // Real API key injected, NOT the job token
-            assertThat(upstream.getHeader("Authorization")).isEqualTo("Bearer sk-azure-real-key");
-            assertThat(upstream.getHeader("api-key")).isNull();
+            assertThat(upstream.getHeaders().get("Authorization")).isEqualTo("Bearer sk-azure-real-key");
+            assertThat(upstream.getHeaders().get("api-key")).isNull();
         }
 
         @Test
         @DisplayName("should support GET method (for model listing)")
         void shouldSupportGetMethod() throws Exception {
             mockUpstream.enqueue(
-                new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader("Content-Type", "application/json")
-                    .setBody("{\"data\":[{\"id\":\"gpt-4\"}]}")
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "application/json")
+                    .body("{\"data\":[{\"id\":\"gpt-4\"}]}")
+                    .build()
             );
 
             AgentJob job = createRunningJobWithApiKey("sk-list-key");
@@ -398,8 +400,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
             assertThat(upstream).isNotNull();
             assertThat(upstream.getMethod()).isEqualTo("GET");
-            assertThat(upstream.getPath()).isEqualTo("/v1/models");
-            assertThat(upstream.getHeader("Authorization")).isEqualTo("Bearer sk-list-key");
+            assertThat(upstream.getTarget()).isEqualTo("/v1/models");
+            assertThat(upstream.getHeaders().get("Authorization")).isEqualTo("Bearer sk-list-key");
         }
 
         @Test
@@ -422,10 +424,11 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void shouldStreamSseResponse() throws Exception {
             String ssePayload = "data: {\"id\":\"msg_stream\"}\n\ndata: [DONE]\n\n";
             mockUpstream.enqueue(
-                new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader("Content-Type", "text/event-stream")
-                    .setBody(ssePayload)
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "text/event-stream")
+                    .body(ssePayload)
+                    .build()
             );
 
             AgentJob job = createRunningJobWithApiKey("sk-ant-sse-key");
@@ -448,17 +451,18 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
             assertThat(upstream).isNotNull();
-            assertThat(upstream.getHeader("x-api-key")).isEqualTo("sk-ant-sse-key");
+            assertThat(upstream.getHeaders().get("x-api-key")).isEqualTo("sk-ant-sse-key");
         }
 
         @Test
         @DisplayName("should forward query parameters to upstream")
         void shouldForwardQueryParameters() throws Exception {
             mockUpstream.enqueue(
-                new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader("Content-Type", "application/json")
-                    .setBody("{\"data\":[]}")
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "application/json")
+                    .body("{\"data\":[]}")
+                    .build()
             );
 
             AgentJob job = createRunningJobWithApiKey("sk-query-key");
@@ -473,14 +477,14 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
             assertThat(upstream).isNotNull();
-            assertThat(upstream.getPath()).contains("limit=10");
-            assertThat(upstream.getPath()).contains("order=desc");
+            assertThat(upstream.getTarget()).contains("limit=10");
+            assertThat(upstream.getTarget()).contains("order=desc");
         }
 
         @Test
         @DisplayName("should forward upstream error status codes transparently")
         void shouldForwardUpstreamErrors() throws Exception {
-            mockUpstream.enqueue(new MockResponse().setResponseCode(429).setBody("{\"error\":\"rate_limited\"}"));
+            mockUpstream.enqueue(new MockResponse.Builder().code(429).body("{\"error\":\"rate_limited\"}").build());
 
             AgentJob job = createRunningJobWithApiKey("sk-test-key");
 

@@ -14,9 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 import tools.jackson.core.JacksonException;
-import tools.jackson.core.JsonParser;
+import tools.jackson.core.json.JsonReadFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Parses structured agent output into validated practice findings and optional delivery content.
@@ -70,7 +71,11 @@ public class PracticeDetectionResultParser {
         this.objectMapper = objectMapper;
         // Lenient mapper for agent output: LLMs produce JSON with literal newlines,
         // tabs, and other control chars inside string values that strict JSON rejects.
-        this.lenientMapper = objectMapper.copy().configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
+        // Jackson 3: ObjectMapper is immutable; JsonMapper.builder() is the rebuild path.
+        // Production injects a JsonMapper (Boot 4 autoconfig); unit tests may pass a plain
+        // ObjectMapper, so fall back to a fresh JsonMapper.builder() in that case.
+        JsonMapper base = (objectMapper instanceof JsonMapper jm) ? jm : JsonMapper.builder().build();
+        this.lenientMapper = base.rebuild().enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS).build();
     }
 
     /**

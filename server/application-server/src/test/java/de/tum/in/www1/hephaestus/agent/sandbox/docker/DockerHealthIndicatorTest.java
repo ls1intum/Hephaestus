@@ -10,8 +10,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import org.springframework.boot.actuate.health.Status;
 import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.Status;
 
 @DisplayName("DockerHealthIndicator")
 class DockerHealthIndicatorTest extends BaseUnitTest {

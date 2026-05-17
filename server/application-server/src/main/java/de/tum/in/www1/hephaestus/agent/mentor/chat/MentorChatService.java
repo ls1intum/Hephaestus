@@ -24,7 +24,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
 import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
 import io.micrometer.core.instrument.Timer;
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +42,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -569,7 +569,8 @@ public class MentorChatService {
         }
         try {
             return objectMapper.readTree(bytes);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
+            // Jackson 3 throws unchecked JacksonException for all parse failures.
             throw new IllegalStateException("Failed to parse aspect JSON for path " + path, e);
         }
     }

@@ -27,8 +27,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.http.codec.json.Jackson2JsonDecoder;
-import org.springframework.http.codec.json.Jackson2JsonEncoder;
+import org.springframework.http.codec.json.JacksonJsonDecoder;
+import org.springframework.http.codec.json.JacksonJsonEncoder;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -38,6 +38,7 @@ import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 import reactor.util.retry.Retry;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Configuration for GitLab GraphQL API client.
@@ -68,11 +69,15 @@ public class GitLabGraphQlConfig {
     @Bean
     @Qualifier("gitLabGraphQlWebClient")
     public WebClient gitLabGraphQlWebClient(ObjectMapper baseObjectMapper) {
+        // Spring 7 ships both Jackson2JsonEncoder/Decoder (Jackson 2) and JacksonJsonEncoder/Decoder
+        // (Jackson 3). We're on Jackson 3 — register the new codecs via customCodecs().register().
+        // Production wires a JsonMapper (Boot 4 autoconfig); tests may pass a plain ObjectMapper.
+        JsonMapper jsonMapper = (baseObjectMapper instanceof JsonMapper jm) ? jm : JsonMapper.builder().build();
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
-                config.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(baseObjectMapper));
-                config.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(baseObjectMapper));
+                config.customCodecs().register(new JacksonJsonEncoder(jsonMapper));
+                config.customCodecs().register(new JacksonJsonDecoder(jsonMapper));
             })
             .build();
 

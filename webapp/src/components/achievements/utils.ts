@@ -115,7 +115,9 @@ export function generateSkillTreeData(
 		visiting.add(id);
 		const ach = achievementMap.get(id);
 		const parentId = ach?.parent;
-		if (!ach || parentId === undefined || parentId === id) {
+		// Generated OpenAPI client now types `parent` as `string | null` (springdoc 3 emits
+		// nullable fields as `type: [string, "null"]`). Treat null and undefined identically.
+		if (!ach || parentId == null || parentId === id) {
 			nodeDepths.set(id, 0);
 			visiting.delete(id);
 			return 0;
@@ -229,7 +231,7 @@ export function generateSkillTreeData(
 
 			if (parentId === achievement.id) {
 				// Standalone achievement: No edges at all (not even to avatar)
-			} else if (parentId !== undefined) {
+			} else if (parentId != null) {
 				const parent = achievementMap.get(parentId);
 				if (parent) {
 					// Active only when both parent and child are unlocked

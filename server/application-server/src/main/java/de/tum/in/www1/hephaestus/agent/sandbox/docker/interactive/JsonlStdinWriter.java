@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -99,7 +100,9 @@ final class JsonlStdinWriter {
         byte[] payload;
         try {
             payload = mapper.writeValueAsBytes(frame);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
+            // Jackson 3 throws unchecked JacksonException; mapper.writeValueAsBytes no longer
+            // declares IOException.
             throw new InteractiveSandboxException("Failed to encode frame as JSON", e);
         }
         CompletableFuture<Void> ack = new CompletableFuture<>();

@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.IntNode;
-import tools.jackson.databind.node.TextNode;
+import tools.jackson.databind.node.StringNode;
 
 @DisplayName("JsonlStdinWriter")
 class JsonlStdinWriterTest extends BaseUnitTest {
@@ -72,7 +72,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         );
         writer.start();
 
-        writer.send(TextNode.valueOf("hello"));
+        writer.send(StringNode.valueOf("hello"));
         writer.send(IntNode.valueOf(42));
 
         await()
@@ -131,7 +131,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
 
         Thread firstSender = new Thread(() -> {
             try {
-                writer.send(TextNode.valueOf("first"));
+                writer.send(StringNode.valueOf("first"));
             } catch (Exception ignored) {}
         });
         firstSender.start();
@@ -142,12 +142,12 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         // Queue capacity = 2. Two more queued sends; the fourth must reject — queue_full or timeout.
         Thread secondSender = new Thread(() -> {
             try {
-                writer.send(TextNode.valueOf("second"));
+                writer.send(StringNode.valueOf("second"));
             } catch (Exception ignored) {}
         });
         Thread thirdSender = new Thread(() -> {
             try {
-                writer.send(TextNode.valueOf("third"));
+                writer.send(StringNode.valueOf("third"));
             } catch (Exception ignored) {}
         });
         secondSender.start();
@@ -157,7 +157,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
             .atMost(Duration.ofSeconds(5))
             .untilAsserted(() -> {
                 try {
-                    writer.send(TextNode.valueOf("fourth"));
+                    writer.send(StringNode.valueOf("fourth"));
                 } catch (InteractiveSandboxException expected) {
                     assertThat(c.queueFull().count() + c.writeTimeout().count()).isGreaterThan(0.0);
                     return;
@@ -194,7 +194,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         );
         writer.start();
         writer.close();
-        assertThatThrownBy(() -> writer.send(TextNode.valueOf("x")))
+        assertThatThrownBy(() -> writer.send(StringNode.valueOf("x")))
             .isInstanceOf(InteractiveSandboxException.class)
             .hasMessageContaining("Session is closed");
         assertThat(c.closed().count()).isEqualTo(1.0);
@@ -240,7 +240,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         writer.start();
         Thread t = new Thread(() -> {
             try {
-                writer.send(TextNode.valueOf("stalled"));
+                writer.send(StringNode.valueOf("stalled"));
             } catch (Exception ignored) {}
         });
         t.start();

@@ -62,13 +62,28 @@ spring:
 
     # Jackson 3 defaults. Replaces the former JacksonConfig.java bean (deleted): JavaTimeModule
     # is auto-registered when on classpath; we just need to tweak inclusion + date format + tz.
+    # Jackson 3 split datatype-specific features into their own buckets:
+    #   - WRITE_DATES_AS_TIMESTAMPS moved from SerializationFeature to DateTimeFeature
+    #     (Spring property: spring.jackson.datatype.datetime.*)
+    #   - READ/WRITE_ENUMS_USING_TO_STRING moved to EnumFeature
+    #     (Spring property: spring.jackson.datatype.enum.*)
+    # Both READ_ENUMS_USING_TO_STRING and WRITE_ENUMS_USING_TO_STRING flipped to true by default in
+    # Jackson 3 — disable both so enums that override toString() with a snake-case representation
+    # (e.g. ActivityEventType) keep round-tripping by Java identifier as they did under Jackson 2.
+    # FAIL_ON_NULL_FOR_PRIMITIVES default flipped to true; disable for backward-compat with v1
+    # snapshot payloads that omit primitive fields.
     jackson:
         default-property-inclusion: non_null
         deserialization:
             fail-on-unknown-properties: false
-        serialization:
-            write-dates-as-timestamps: false
+            fail-on-null-for-primitives: false
         time-zone: UTC
+        datatype:
+            datetime:
+                write-dates-as-timestamps: false
+            enum:
+                read-enums-using-to-string: false
+                write-enums-using-to-string: false
 
     # GraphQL client configuration for GitHub API operations
     # Operations are colocated with the schema at graphql/github/operations/

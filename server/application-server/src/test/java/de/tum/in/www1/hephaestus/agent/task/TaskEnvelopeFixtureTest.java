@@ -10,16 +10,17 @@ import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Byte-identical snapshot test for {@link TaskEnvelopeWriter} output. The fixture lives at
  * {@code src/test/resources/task-fixtures/v1/practice-review.json} — see the adjacent
  * {@code REGENERATE.md} for the regen workflow.
  *
- * <p>Uses {@link Jackson2ObjectMapperBuilder#json()} to construct an {@link ObjectMapper} that
- * matches the production bean configuration (JavaTime, NON_NULL inclusion, ISO-8601 dates).
+ * <p>Uses {@link JsonMapper#builder()} to construct an {@link ObjectMapper} that
+ * matches the production bean configuration (JavaTime built into databind core,
+ * NON_NULL inclusion, ISO-8601 dates).
  * A future change to that configuration that alters byte output is intentionally caught here.
  */
 @DisplayName("TaskEnvelope fixture (v1)")
@@ -30,7 +31,10 @@ class TaskEnvelopeFixtureTest extends BaseUnitTest {
     @Test
     @DisplayName("PracticeReview envelope matches the committed fixture byte-for-byte")
     void matchesFixture() throws IOException {
-        ObjectMapper productionMapper = Jackson2ObjectMapperBuilder.json().build();
+        // Jackson 3: JsonMapper.builder() replaces Spring's Jackson2ObjectMapperBuilder for tests.
+        // Production now autoconfigures a JsonMapper via spring.jackson.* properties; this test
+        // mirrors the default-bean configuration as closely as possible.
+        ObjectMapper productionMapper = JsonMapper.builder().build();
         TaskEnvelopeWriter writer = new TaskEnvelopeWriter(productionMapper);
 
         TaskEnvelope envelope = new TaskEnvelope(

@@ -21,6 +21,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.dataformat.yaml.YAMLMapper;
 
 /**
@@ -44,8 +45,14 @@ public class AchievementRegistry {
     public AchievementRegistry() {
         // Jackson 3: ObjectMapper is immutable; build via YAMLMapper.builder().
         // ParameterNamesModule was removed in Jackson 3 — parameter-name discovery is built in.
+        // Jackson 3 flipped EnumFeature.READ_ENUMS_USING_TO_STRING to true by default, which
+        // breaks our YAML config that uses Java enum identifiers (e.g. PULL_REQUEST_MERGED)
+        // against enums that override toString() with snake-case values (e.g. pull_request.merged).
+        // Disable it so name() matching wins again.
         this.yamlMapper = YAMLMapper.builder()
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+            .disable(EnumFeature.READ_ENUMS_USING_TO_STRING)
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
             .build();
     }

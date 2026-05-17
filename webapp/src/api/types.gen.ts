@@ -1017,7 +1017,7 @@ export type PracticeFindingList = {
     /**
      * Practice category
      */
-    category?: string;
+    category?: string | null;
     /**
      * AI confidence score (0.0–1.0)
      */
@@ -1067,7 +1067,7 @@ export type PracticeFindingDetail = {
     /**
      * Practice category
      */
-    category?: string;
+    category?: string | null;
     /**
      * AI confidence score (0.0–1.0)
      */
@@ -1079,11 +1079,11 @@ export type PracticeFindingDetail = {
     /**
      * Structured evidence (locations, snippets, references)
      */
-    evidence?: unknown;
+    evidence?: null;
     /**
      * Actionable guidance for the contributor
      */
-    guidance?: string;
+    guidance?: string | null;
     /**
      * Finding ID
      */
@@ -1099,7 +1099,7 @@ export type PracticeFindingDetail = {
     /**
      * AI reasoning behind the verdict
      */
-    reasoning?: string;
+    reasoning?: string | null;
     /**
      * Severity level
      */
@@ -1133,7 +1133,7 @@ export type Practice = {
     /**
      * Practice category
      */
-    category?: string;
+    category?: string | null;
     /**
      * Timestamp when the practice was created
      */
@@ -1141,7 +1141,7 @@ export type Practice = {
     /**
      * Practice evaluation criteria
      */
-    criteria?: string;
+    criteria?: string | null;
     /**
      * Practice description
      */
@@ -1157,7 +1157,7 @@ export type Practice = {
     /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */
-    precomputeScript?: string;
+    precomputeScript?: string | null;
     /**
      * URL-safe identifier unique within workspace
      */
@@ -1322,7 +1322,7 @@ export type LinkedAccount = {
     /**
      * Username on the external provider, if connected
      */
-    linkedUsername?: string;
+    linkedUsername?: string | null;
     /**
      * Identity provider alias (e.g. 'github', 'gitlab-lrz')
      */
@@ -1453,15 +1453,15 @@ export type GitLabPreflightResponse = {
     /**
      * Error message if validation failed
      */
-    error?: string;
+    error?: string | null;
     /**
      * GitLab user ID or group ID
      */
-    userId?: number;
+    userId?: number | null;
     /**
      * Username of the token owner (personal tokens) or group name (group tokens)
      */
-    username?: string;
+    username?: string | null;
     /**
      * Whether the token is valid
      */
@@ -1493,7 +1493,7 @@ export type GitLabGroup = {
     /**
      * Group avatar URL
      */
-    avatarUrl?: string;
+    avatarUrl?: string | null;
     /**
      * Full group path including parent groups
      */
@@ -1509,11 +1509,11 @@ export type GitLabGroup = {
     /**
      * Group visibility: public, internal, or private
      */
-    visibility?: string;
+    visibility?: string | null;
     /**
      * Group web URL
      */
-    webUrl?: string;
+    webUrl?: string | null;
 };
 
 /**
@@ -1727,11 +1727,11 @@ export type ContributorPracticeSummary = {
     /**
      * Practice category
      */
-    category?: string;
+    category?: string | null;
     /**
      * Timestamp of most recent finding
      */
-    lastFindingAt?: Date;
+    lastFindingAt?: Date | null;
     /**
      * Number of NEGATIVE findings
      */
@@ -1790,7 +1790,7 @@ export type Contributor = {
 export type ChatThreadSummary = {
     createdAt?: Date;
     id?: string;
-    title?: string;
+    title?: string | null;
 };
 
 /**
@@ -1800,7 +1800,7 @@ export type ChatThreadDetail = {
     createdAt?: Date;
     id?: string;
     messages?: Array<ChatMessage>;
-    title?: string;
+    title?: string | null;
 };
 
 /**
@@ -1814,8 +1814,8 @@ export type ChatMessage = {
      */
     metadata?: {
         [key: string]: unknown;
-    };
-    parentMessageId?: string;
+    } | null;
+    parentMessageId?: string | null;
     parts?: Array<unknown>;
     role?: string;
 };
@@ -1936,7 +1936,7 @@ export type Achievement = {
     /**
      * Parent achievement in progression chain
      */
-    parent?: string;
+    parent?: string | null;
     /**
      * The structured progress data based on the achievements evaluator
      */

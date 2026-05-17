@@ -10,13 +10,20 @@ import de.tum.in.www1.hephaestus.workspace.Workspace;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("ConfigSnapshot")
 class ConfigSnapshotTest extends BaseUnitTest {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    // Jackson 3 default FAIL_ON_NULL_FOR_PRIMITIVES = true, so v1 snapshots that omit
+    // schemaVersion would fail to deserialize. Production matches via spring.jackson.deserialization
+    // in application.yml; tests reconstruct the same default here.
+    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
+        .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+        .build();
 
     private AgentConfig createConfig() {
         Workspace ws = new Workspace();

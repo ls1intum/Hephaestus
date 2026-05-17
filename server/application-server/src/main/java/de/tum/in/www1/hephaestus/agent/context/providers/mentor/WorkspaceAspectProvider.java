@@ -11,7 +11,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,6 +24,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -162,8 +162,9 @@ public class WorkspaceAspectProvider implements ContentProvider {
             String text = extractText(parts);
             if (text == null) return "";
             return text.length() > MESSAGE_PREVIEW_LENGTH ? text.substring(0, MESSAGE_PREVIEW_LENGTH) : text;
-        } catch (IOException e) {
-            // Malformed parts JSON shouldn't poison the aspect — log and degrade.
+        } catch (JacksonException e) {
+            // Jackson 3 throws unchecked JacksonException. Malformed parts JSON shouldn't poison
+            // the aspect — log and degrade.
             return "";
         }
     }
@@ -173,7 +174,8 @@ public class WorkspaceAspectProvider implements ContentProvider {
         if (parts == null || !parts.isArray()) {
             return null;
         }
-        Iterator<JsonNode> it = parts.elements();
+        // Jackson 3: JsonNode.elements() was renamed to JsonNode.values() (Collection<JsonNode>).
+        Iterator<JsonNode> it = parts.values().iterator();
         while (it.hasNext()) {
             JsonNode part = it.next();
             if (part.has("type") && "text".equals(part.get("type").asText()) && part.has("text")) {

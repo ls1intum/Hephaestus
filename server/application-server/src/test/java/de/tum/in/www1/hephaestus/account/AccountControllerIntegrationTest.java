@@ -9,11 +9,9 @@ import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
-@AutoConfigureWebTestClient
 @DisplayName("Account controller integration")
 class AccountControllerIntegrationTest extends BaseIntegrationTest {
 

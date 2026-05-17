@@ -138,6 +138,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
+        <!-- Boot 4 split WebClient autoconfig into its own module that's NOT transitive via
+             the webflux starter. Without this, WebClient.Builder isn't autoconfigured and beans
+             like GitLabTokenService fail to start. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webclient</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -307,6 +314,15 @@
             <groupId>com.slack.api</groupId>
             <artifactId>bolt</artifactId>
             <version>${slack-bolt.version}</version>
+            <exclusions>
+                <!-- Slack pulls okhttp:4.12.0 transitively; we use okhttp-jvm:5.x. Without this
+                     exclusion both jars land on the classpath and the older one wins for
+                     okhttp3.internal.concurrent.TaskRunner, breaking mockwebserver3. -->
+                <exclusion>
+                    <groupId>com.squareup.okhttp3</groupId>
+                    <artifactId>okhttp</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- OkHttp 5.x: Maven consumers must use the -jvm classifier artifact;
              the bare okhttp:5.x JAR is a near-empty KMP shim (see square/okhttp#8913). -->
@@ -808,7 +824,11 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
-                    <argLine>@{argLine} -Xmx1024m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
+                    <!-- Bumped from 1GB to 4GB: Spring Boot 4 + Jackson 3 + Hibernate 7 carry larger
+                         classloader baselines, and full-context @SpringBootTest scans tens of thousands
+                         of classes (Modulith + ArchUnit reflective bookkeeping). 1GB OOMs immediately;
+                         2GB also OOMs on integration tests with the new BOMs. -->
+                    <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
                     <!-- Tag filtering: run integration tests, exclude live tests -->
                     <groups>${failsafe.includedGroups}</groups>
                     <excludedGroups>${failsafe.excludedGroups}</excludedGroups>
@@ -1037,6 +1057,21 @@
                 <failsafe.excludedGroups></failsafe.excludedGroups>
                 <failsafe.includedGroups></failsafe.includedGroups>
             </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <!-- ArchUnit + Spring Modulith verify() are heavy class-scanning ops.
+                                 Override the default 2GB heap for arch runs; they OOM otherwise. -->
+                            <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
+                                -XX:+EnableDynamicAgentLoading
+                            </argLine>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
 
         <!--

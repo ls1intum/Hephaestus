@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.agent.runtime;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -99,7 +98,7 @@ public class PiResultParser {
                 costUsd,
                 totalCalls
             );
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             recordFailure("usage", e);
             return null;
         }
@@ -111,7 +110,7 @@ public class PiResultParser {
         }
         try {
             output.put("runnerDebug", objectMapper.readValue(runnerDebugFile, Object.class));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             recordFailure("runner_debug", e);
         }
     }
@@ -122,7 +121,7 @@ public class PiResultParser {
         }
         try {
             output.put("watchdogKilled", objectMapper.readValue(watchdogFile, Object.class));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             recordFailure("watchdog", e);
         }
     }
@@ -148,7 +147,7 @@ public class PiResultParser {
                 }
             }
             return objectMapper.writeValueAsBytes(assembled);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             recordFailure("review_state", e);
             return null;
         }
@@ -197,12 +196,18 @@ public class PiResultParser {
                 break;
             }
             attempts++;
-            try (var parser = objectMapper.getFactory().createParser(chars, bracePos, chars.length - bracePos)) {
+            // Jackson 3: ObjectMapper.getFactory() was renamed to tokenStreamFactory();
+            // the no-context createParser(char[], int, int) overload is the direct replacement
+            // for JsonFactory.createParser(char[], int, int).
+            try (
+                var parser = objectMapper.tokenStreamFactory().createParser(chars, bracePos, chars.length - bracePos)
+            ) {
                 JsonNode node = objectMapper.readTree(parser);
                 if (node != null && node.isObject() && node.has("findings")) {
                     return objectMapper.writeValueAsString(node);
                 }
-            } catch (IOException e) {
+            } catch (JacksonException e) {
+                // Jackson 3 throws unchecked JacksonException for all parser failures.
                 log.trace("No JSON object at position {}: {}", bracePos, e.getMessage());
             }
             searchFrom = bracePos + 1;
@@ -219,7 +224,7 @@ public class PiResultParser {
         }
     }
 
-    private void recordFailure(String stage, IOException e) {
+    private void recordFailure(String stage, JacksonException e) {
         log.warn("Failed to parse Pi {} output: {}", stage, e.getMessage());
         meterRegistry.counter(METRIC_PARSE_FAILURE, Tags.of("stage", stage)).increment();
     }

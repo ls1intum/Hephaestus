@@ -39,8 +39,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.http.codec.json.Jackson2JsonDecoder;
-import org.springframework.http.codec.json.Jackson2JsonEncoder;
+import org.springframework.http.codec.json.JacksonJsonDecoder;
+import org.springframework.http.codec.json.JacksonJsonEncoder;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -51,6 +51,7 @@ import reactor.netty.resources.ConnectionProvider;
 import reactor.util.retry.Retry;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Production-grade configuration for GitHub GraphQL API client.
@@ -112,12 +113,16 @@ public class GitHubGraphQlConfig {
 
     @Bean
     public WebClient gitHubGraphQlWebClient(ObjectMapper baseObjectMapper) {
-        // Create a custom ObjectMapper for GitHub GraphQL that:
+        // Create a custom JsonMapper for GitHub GraphQL that:
         // 1. Uses Long for integers (GitHub databaseId values exceed 32-bit int range)
         // 2. Registers mixins for polymorphic interface deserialization (Actor, RequestedReviewer, RepositoryOwner)
-        ObjectMapper graphQlObjectMapper = baseObjectMapper
-            .copy()
-            .configure(DeserializationFeature.USE_LONG_FOR_INTS, true)
+        // Jackson 3: ObjectMapper is immutable; rebuild() returns a JsonMapper$Builder.
+        // Production wires a JsonMapper (Boot 4 autoconfig); test contexts that inject a
+        // plain ObjectMapper fall back to a fresh builder.
+        JsonMapper baseMapper = (baseObjectMapper instanceof JsonMapper jm) ? jm : JsonMapper.builder().build();
+        JsonMapper graphQlObjectMapper = baseMapper
+            .rebuild()
+            .enable(DeserializationFeature.USE_LONG_FOR_INTS)
             .addMixIn(GHActor.class, GitHubActorMixin.class)
             .addMixIn(GHRequestedReviewer.class, GitHubRequestedReviewerMixin.class)
             .addMixIn(GHRepositoryOwner.class, GitHubRepositoryOwnerMixin.class)
@@ -126,13 +131,17 @@ public class GitHubGraphQlConfig {
             .addMixIn(GHProjectV2ItemContent.class, GitHubProjectV2ItemContentMixin.class)
             .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class)
             .addMixIn(GHIssue.class, GitHubIssueMixin.class)
-            .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class);
+            .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class)
+            .build();
 
+        // Spring 7 ships both Jackson2JsonEncoder/Decoder (Jackson 2) and JacksonJsonEncoder/Decoder
+        // (Jackson 3). We're on Jackson 3 — register the new codecs via customCodecs().register()
+        // since ClientDefaultCodecs.jackson2JsonEncoder/Decoder only accept the Jackson 2 variants.
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
-                config.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(graphQlObjectMapper));
-                config.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(graphQlObjectMapper));
+                config.customCodecs().register(new JacksonJsonEncoder(graphQlObjectMapper));
+                config.customCodecs().register(new JacksonJsonDecoder(graphQlObjectMapper));
             })
             .build();
 

@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectWriter;
 import tools.jackson.databind.SerializationFeature;
 
 /**
@@ -17,21 +18,26 @@ import tools.jackson.databind.SerializationFeature;
 public class TaskEnvelopeWriter {
 
     /**
-     * Output JSON key order. Locked because the byte representation participates in fixture
-     * snapshots — see {@code WorkspaceContextSnapshotTest}.
+     * Output JSON writer. Configured with sorted-keys + pretty-print so the byte representation
+     * is stable across runs and JVMs — the fixture snapshot in
+     * {@code WorkspaceContextSnapshotTest} byte-compares against it.
      */
-    private final ObjectMapper writer;
+    private final ObjectWriter writer;
 
     public TaskEnvelopeWriter(ObjectMapper baseObjectMapper) {
-        // Copy the central mapper to inherit JavaTimeModule + null-handling, then enable
-        // sorted keys for deterministic byte output across runs and JVMs.
-        this.writer = baseObjectMapper.copy().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+        // Jackson 3: ObjectMapper is immutable. Inherit the central mapper's modules and
+        // null-handling, then derive an ObjectWriter with sorted keys + pretty printing.
+        // ObjectMapper.writer(SerializationFeature, ...) avoids the (JsonMapper) cast that
+        // breaks when tests pass a plain ObjectMapper instead of a JsonMapper subtype.
+        this.writer = baseObjectMapper
+            .writer(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+            .withDefaultPrettyPrinter();
     }
 
     /** Serialize the envelope to pretty-printed UTF-8 bytes. */
     public byte[] write(TaskEnvelope envelope) {
         try {
-            return writer.writerWithDefaultPrettyPrinter().writeValueAsBytes(envelope);
+            return writer.writeValueAsBytes(envelope);
         } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize TaskEnvelope", e);
         }

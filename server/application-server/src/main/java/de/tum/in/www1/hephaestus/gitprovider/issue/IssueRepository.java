@@ -114,11 +114,26 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @param currentType the current (incorrect) discriminator value (e.g., 'ISSUE')
      * @param newType the correct discriminator value (e.g., 'PULL_REQUEST')
      * @return 1 if updated, 0 if no matching row exists
+     *
+     * <p>Sets PullRequest-specific primitive columns ({@code is_draft, is_merged, commits,
+     * additions, deletions, changed_files}) to safe zero defaults in the same UPDATE.
+     * Hibernate 7 generates a strict {@code CHECK (issue_type != 'PULL_REQUEST' OR (...primitive
+     * PR cols IS NOT NULL))} constraint for single-table-inheritance subclasses with NOT NULL
+     * fields (Hibernate 6 did not). Without seeding placeholders, the discriminator UPDATE
+     * violates the check constraint immediately. The subsequent {@code upsertCore} in
+     * {@code GitHubPullRequestProcessor} overwrites these placeholders with real values.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-        value = "UPDATE issue SET issue_type = :newType WHERE repository_id = :repositoryId AND number = :number AND issue_type = :currentType",
+        value = "UPDATE issue SET issue_type = :newType, " +
+            "is_draft = COALESCE(is_draft, false), " +
+            "is_merged = COALESCE(is_merged, false), " +
+            "commits = COALESCE(commits, 0), " +
+            "additions = COALESCE(additions, 0), " +
+            "deletions = COALESCE(deletions, 0), " +
+            "changed_files = COALESCE(changed_files, 0) " +
+            "WHERE repository_id = :repositoryId AND number = :number AND issue_type = :currentType",
         nativeQuery = true
     )
     int correctDiscriminator(
