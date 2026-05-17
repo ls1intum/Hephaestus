@@ -96,9 +96,11 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          # Need: composite action, Node version, lockfile (for actions/setup-node cache key).
           sparse-checkout: |
             .github/actions/setup-pnpm-node
             .node-version
+            pnpm-lock.yaml
           sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:

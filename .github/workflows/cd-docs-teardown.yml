@@ -28,6 +28,7 @@ jobs:
           sparse-checkout: |
             .github/actions/setup-pnpm-node
             .node-version
+            pnpm-lock.yaml
           sparse-checkout-cone-mode: false
 
       - name: Setup pnpm + Node.js
