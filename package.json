@@ -80,19 +80,6 @@
 		"node": ">=24.0"
 	},
 	"pnpm": {
-		"overrides": {
-			"//": "Force single vitest/hono instance across workspaces so @storybook/addon-vitest, @vitest/coverage-v8, and @hono/node-server share the version we directly depend on.",
-			"vitest": "4.1.6",
-			"@vitest/browser": "4.1.6",
-			"@vitest/runner": "4.1.6",
-			"hono": "4.12.19"
-		},
-		"peerDependencyRules": {
-			"allowedVersions": {
-				"@mermaid-js/layout-elk": "0.2.x",
-				"tailwindcss": "4.x",
-				"vite": "8.x"
-			}
-		}
+		"//": "overrides + peerDependencyRules live in pnpm-workspace.yaml — pnpm 11's documented location."
 	}
 }

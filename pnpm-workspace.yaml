@@ -20,6 +20,34 @@ publicHoistPattern:
 autoInstallPeers: true
 strictPeerDependencies: false
 
+# pnpm 11 reads overrides from pnpm-workspace.yaml (was package.json#pnpm.overrides
+# in pnpm <= 10; both still work but workspace yaml is the documented home).
+# vitest/hono: force a single instance across the workspace so addon-vitest +
+#   coverage-v8 + hono/node-server share the version we directly depend on.
+# Security pins (override transitives that ship known-vulnerable versions):
+#   dompurify  – monaco-editor pins 3.2.7 / mermaid ^3.3.1 → XSS bypasses
+#                (GHSA-crv5-9vww-q3g8 etc.); 3.4.4 is the patched line.
+#   lodash(-es) – java-parser/chevrotain still ride on 4.17.21 with proto-pollution CVEs;
+#                4.18.1 ships the patches.
+#   serialize-javascript – copy-webpack-plugin (via @docusaurus) pulls older
+#                versions with XSS via __proto__ (GHSA-1113686, GHSA-1115723).
+#                7.0.5 is the safe baseline.
+overrides:
+  vitest: 4.1.6
+  '@vitest/browser': 4.1.6
+  '@vitest/runner': 4.1.6
+  hono: 4.12.19
+  dompurify: 3.4.4
+  lodash: 4.18.1
+  lodash-es: 4.18.1
+  serialize-javascript: 7.0.5
+
+peerDependencyRules:
+  allowedVersions:
+    '@mermaid-js/layout-elk': 0.2.x
+    tailwindcss: 4.x
+    vite: 8.x
+
 # Record platform-specific optional deps (rolldown/lightningcss/biome native bindings)
 # for every OS+arch we run dev or CI on. Without this, a `pnpm install` on macOS
 # would silently drop the Linux binaries from the lockfile, breaking CI.

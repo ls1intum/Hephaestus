@@ -2,7 +2,6 @@ import {
 	Cpu,
 	Database,
 	Eye,
-	Github,
 	GitPullRequest,
 	Globe,
 	Shield,
@@ -11,6 +10,7 @@ import {
 	Zap,
 } from "lucide-react";
 import type { UIAchievement } from "@/components/achievements/types";
+import { Github } from "@/components/icons/brand";
 
 export type MockUIAchievement = Omit<UIAchievement, "id" | "unlockedAt"> & {
 	id: string;

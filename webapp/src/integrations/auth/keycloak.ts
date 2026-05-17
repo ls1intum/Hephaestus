@@ -117,7 +117,7 @@ class KeycloakService {
 	 * Check if the token is expired
 	 */
 	public isTokenExpired(): boolean {
-		if (!this.keycloak || !this.keycloak.tokenParsed) {
+		if (!this.keycloak?.tokenParsed) {
 			return true;
 		}
 

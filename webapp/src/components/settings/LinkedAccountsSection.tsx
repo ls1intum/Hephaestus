@@ -1,5 +1,6 @@
-import { GithubIcon, GitlabIcon, LinkIcon, type LucideIcon, UnlinkIcon } from "lucide-react";
+import { LinkIcon, type LucideIcon, UnlinkIcon } from "lucide-react";
 import type { LinkedAccount } from "@/api/types.gen";
+import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import {
 	AlertDialog,
 	AlertDialogAction,
