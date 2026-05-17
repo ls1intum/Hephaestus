@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.runtime.AgentImageProperties;
-import de.tum.in.www1.hephaestus.agent.runtime.PiAgentProperties;
 import de.tum.in.www1.hephaestus.agent.runtime.PiResultParser;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi;
@@ -30,7 +29,6 @@ class PracticePiAdapterTest extends BaseUnitTest {
         adapter = new PracticePiAdapter(
             new PiRuntimeFactory(mapper),
             new PiResultParser(mapper, metrics),
-            new PiAgentProperties("pi-runner.mjs"),
             new AgentImageProperties(IMAGE, ImagePullPolicy.IF_NOT_PRESENT, false)
         );
     }

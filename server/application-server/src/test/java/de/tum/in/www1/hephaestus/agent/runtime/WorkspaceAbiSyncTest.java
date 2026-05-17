@@ -36,12 +36,42 @@ class WorkspaceAbiSyncTest extends BaseUnitTest {
             .contains("SUPPORTED_SCHEMA_VERSION = " + TaskEnvelope.SCHEMA_VERSION);
 
         assertThat(body)
-            .as("runner exits %d on envelope mismatch", WorkspaceAbi.EXIT_ENVELOPE_MISMATCH)
+            .as("runner pins ENVELOPE_MISMATCH_EXIT to WorkspaceAbi.EXIT_ENVELOPE_MISMATCH")
             .contains("ENVELOPE_MISMATCH_EXIT = " + WorkspaceAbi.EXIT_ENVELOPE_MISMATCH);
 
         assertThat(body)
             .as("runner writes its output under WorkspaceAbi.OUTPUT_PATH")
             .contains("\"" + WorkspaceAbi.OUTPUT_PATH + "\"");
+
+        assertThat(body)
+            .as("runner reads the practices index under WorkspaceAbi.PRACTICES_PREFIX")
+            .contains("/" + WorkspaceAbi.PRACTICES_PREFIX + "index.json");
+    }
+
+    @Test
+    @DisplayName(
+        "pi-mentor-runner.mjs pins MENTOR_SYSTEM_PROMPT_PATH, SESSIONS_DIR_PREFIX, PI_AGENT_DIR, and the envelope exit"
+    )
+    void mentorRunnerLiteralsMatchAbi() throws IOException {
+        Path runner = resolveResource("agent/pi-mentor-runner.mjs");
+        assertThat(runner).isRegularFile();
+        String body = Files.readString(runner, StandardCharsets.UTF_8);
+
+        assertThat(body)
+            .as("mentor runner references WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH literally")
+            .contains("\"" + WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH + "\"");
+
+        assertThat(body)
+            .as("mentor runner references WorkspaceAbi.SESSIONS_DIR_PREFIX dir name (.sessions)")
+            .contains("/" + WorkspaceAbi.SESSIONS_DIR_PREFIX.replaceFirst("/$", ""));
+
+        assertThat(body)
+            .as("mentor runner falls back to WorkspaceAbi.PI_AGENT_DIR when PI_CODING_AGENT_DIR is unset")
+            .contains("\"" + WorkspaceAbi.PI_AGENT_DIR + "\"");
+
+        assertThat(body)
+            .as("mentor runner pins ENVELOPE_MISMATCH_EXIT to WorkspaceAbi.EXIT_ENVELOPE_MISMATCH")
+            .contains("ENVELOPE_MISMATCH_EXIT = " + WorkspaceAbi.EXIT_ENVELOPE_MISMATCH);
     }
 
     private static Path resolveResource(String relativePath) {

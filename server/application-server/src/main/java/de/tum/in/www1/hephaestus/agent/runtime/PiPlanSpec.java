@@ -8,24 +8,11 @@ import org.springframework.lang.Nullable;
 
 /**
  * Inputs for {@link PiRuntimeFactory#build(PiPlanSpec)}. Validation lives in the compact
- * constructor — there is no builder; callers construct positionally.
+ * constructor; callers construct positionally.
  *
- * @param provider        LLM provider; required
- * @param credentialMode  PROXY (job-token), API_KEY, or OAUTH; required
- * @param credential      API key in API_KEY/OAUTH modes; must be non-blank in those modes
- * @param modelName       optional model override
- * @param baseUrl         optional OpenAI-compatible base URL override. Exported as
- *                        {@code OPENAI_BASE_URL} / {@code ANTHROPIC_BASE_URL} only in API_KEY/OAUTH
- *                        modes — PROXY mode resolves its base URL from the sandbox-injected
- *                        {@code $LLM_PROXY_URL}, so a baseUrl here would be silently shadowed.
- *                        Production runs leave this {@code null}; live tests use it to point Pi at
- *                        a non-default OpenAI-compatible endpoint (e.g. the TUM gateway).
- * @param jobToken        PROXY mode job token; must be non-blank in PROXY mode
- * @param allowInternet   PROXY mode internet flag; ignored otherwise (always true)
- * @param timeoutSeconds  total sandbox timeout (must be {@code > TIMEOUT_BUFFER_SECONDS})
- * @param runnerScript    filename of the Pi runner under {@code resources/agent/}; required
- * @param extraInputs     additional workspace files keyed by relative path (e.g. {@code task.json})
- * @param precomputeStep  shell fragment ending in {@code " && "} (or empty)
+ * <p><b>baseUrl trap:</b> exported as {@code OPENAI_BASE_URL} / {@code ANTHROPIC_BASE_URL} only in
+ * API_KEY/OAUTH modes — PROXY mode resolves its base URL from the sandbox-injected
+ * {@code $LLM_PROXY_URL}, so a baseUrl here would be silently shadowed.
  */
 public record PiPlanSpec(
     LlmProvider provider,
@@ -36,16 +23,16 @@ public record PiPlanSpec(
     @Nullable String jobToken,
     boolean allowInternet,
     int timeoutSeconds,
-    String runnerScript,
+    PiRunnerProfile runnerProfile,
     Map<String, byte[]> extraInputs,
     String precomputeStep
 ) {
     public PiPlanSpec {
         Objects.requireNonNull(provider, "provider");
         Objects.requireNonNull(credentialMode, "credentialMode");
-        Objects.requireNonNull(runnerScript, "runnerScript");
-        if (runnerScript.isBlank()) {
-            throw new IllegalArgumentException("runnerScript must not be blank");
+        Objects.requireNonNull(runnerProfile, "runnerProfile");
+        if (runnerProfile.runnerScript() == null || runnerProfile.runnerScript().isBlank()) {
+            throw new IllegalArgumentException("runnerProfile.runnerScript() must not be blank");
         }
         if (timeoutSeconds <= PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS) {
             throw new IllegalArgumentException(
@@ -68,6 +55,20 @@ public record PiPlanSpec(
             }
         }
         extraInputs = extraInputs != null ? Map.copyOf(extraInputs) : Map.of();
+        for (String path : extraInputs.keySet()) {
+            boolean ok =
+                WorkspaceAbi.allowedExtraInputPaths().contains(path) ||
+                WorkspaceAbi.allowedExtraInputPrefixes().stream().anyMatch(path::startsWith);
+            if (!ok) {
+                throw new IllegalArgumentException(
+                    "extraInputs path '" +
+                        path +
+                        "' is not a recognised workspace path: must appear in " +
+                        "WorkspaceAbi.allowedExtraInputPaths() or be prefixed by one of " +
+                        WorkspaceAbi.allowedExtraInputPrefixes()
+                );
+            }
+        }
         precomputeStep = precomputeStep != null ? precomputeStep : "";
     }
 }

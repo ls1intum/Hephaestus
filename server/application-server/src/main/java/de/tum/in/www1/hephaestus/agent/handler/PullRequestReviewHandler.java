@@ -59,7 +59,8 @@ import org.slf4j.LoggerFactory;
  * ├── .practices/{index.json, {slug}.md, all-criteria.md}
  * ├── .precompute/practices/{slug}.ts
  * ├── .precompute-out/
- * ├── .pi/AGENTS.md, .pi-runtime/settings.json, .run-pi.mjs
+ * ├── .pi/{AGENTS.md, settings.json, extensions/} # Pi SDK agent dir ($PI_CODING_AGENT_DIR)
+ * ├── .run-pi.mjs                          # runner entry point
  * └── .output/
  * </pre>
  */

@@ -290,9 +290,8 @@ class PracticeRunnerLiveLlmTest {
         // Copy the production runner verbatim — same bytes that ship to the agent container.
         Files.copy(RUNNER, WORKSPACE.resolve("pi-runner.mjs"), StandardCopyOption.REPLACE_EXISTING);
 
-        // Orchestrator instructions: the runner expects /workspace/.pi/AGENTS.md on disk (production
-        // PiRuntimeFactory copies it into ~/.pi). We stage both locations so either lookup path
-        // works.
+        // Orchestrator instructions live at WORKSPACE/.pi/AGENTS.md — same layout production uses
+        // now that PI_CODING_AGENT_DIR points inside the workspace.
         Path piDir = WORKSPACE.resolve(WorkspaceAbi.PI_AGENT_PREFIX);
         Files.createDirectories(piDir);
         Files.copy(

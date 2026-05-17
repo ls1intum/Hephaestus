@@ -131,7 +131,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         // Instance-level LLM config — all three required fields set so resolveLlmConfig takes
         // the instance path and does not need the agentConfigRepository.
         MentorAgentProperties mentorProps = new MentorAgentProperties(
-            "pi-mentor-runner.mjs",
             100_000,
             "",
             LlmProvider.OPENAI,

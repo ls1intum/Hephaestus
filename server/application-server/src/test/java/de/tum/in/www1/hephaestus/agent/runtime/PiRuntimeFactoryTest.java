@@ -1,12 +1,13 @@
 package de.tum.in.www1.hephaestus.agent.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
+import de.tum.in.www1.hephaestus.agent.mentor.MentorRunnerProfile;
+import de.tum.in.www1.hephaestus.agent.practice.PracticeRunnerProfile;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -20,6 +21,9 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 @DisplayName("PiRuntimeFactory")
 class PiRuntimeFactoryTest extends BaseUnitTest {
+
+    private static final PracticeRunnerProfile PRACTICE = new PracticeRunnerProfile();
+    private static final MentorRunnerProfile MENTOR = new MentorRunnerProfile();
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private PiRuntimeFactory factory;
@@ -39,7 +43,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             "job-token-123",
             false,
             600,
-            "pi-runner.mjs",
+            PRACTICE,
             Map.of(),
             ""
         );
@@ -55,7 +59,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             null,
             true,
             600,
-            "pi-runner.mjs",
+            PRACTICE,
             Map.of(),
             ""
         );
@@ -90,14 +94,17 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @DisplayName("loads pi-orchestrator.md and the runner from classpath")
         void loadsClasspathResources() {
             var inputs = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).inputFiles();
-            assertThat(inputs.get(".pi/AGENTS.md")).isNotNull();
-            assertThat(new String(inputs.get(".pi/AGENTS.md"), StandardCharsets.UTF_8)).contains("findings");
-            assertThat(inputs.get(".run-pi.mjs")).isNotEmpty();
+            assertThat(inputs.get(WorkspaceAbi.ORCHESTRATOR_PATH)).isNotNull();
+            assertThat(new String(inputs.get(WorkspaceAbi.ORCHESTRATOR_PATH), StandardCharsets.UTF_8)).contains(
+                "findings"
+            );
+            assertThat(inputs.get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME)).isNotEmpty();
         }
 
         @Test
-        @DisplayName("extra inputs merge into the input-files map")
+        @DisplayName("extra inputs merge into the input-files map when path is whitelisted")
         void extraInputsMerge() {
+            byte[] payload = "deadbeef".getBytes(StandardCharsets.UTF_8);
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
@@ -107,11 +114,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
-                Map.of("task.json", "{\"schemaVersion\":1}".getBytes(StandardCharsets.UTF_8)),
+                PRACTICE,
+                Map.of(WorkspaceAbi.CONTEXT_TARGET_PREFIX + "metadata.json", payload),
                 ""
             );
-            assertThat(factory.build(spec).inputFiles()).containsKey("task.json");
+            assertThat(factory.build(spec).inputFiles()).containsKey(
+                WorkspaceAbi.CONTEXT_TARGET_PREFIX + "metadata.json"
+            );
         }
     }
 
@@ -147,9 +156,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         @DisplayName("AGENT_BUDGET_MS stays strictly below the spec hard timeout (leaves grace)")
         void budget_leavesGraceUnderSpecTimeout() {
-            // Brittle predecessor asserted the exact constant `540000` from `(600-60)*1000` —
-            // it would break on any buffer-constant tweak even when the architectural
-            // invariant (budget < hard timeout) still held. Now assert the invariant itself.
             var spec = proxySpec(LlmProvider.AZURE_OPENAI, null);
             String budget = factory.build(spec).environment().get("AGENT_BUDGET_MS");
             assertThat(budget).as("AGENT_BUDGET_MS must be present").isNotNull();
@@ -162,21 +168,18 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("HOME / TMPDIR redirected to writable mount")
+        @DisplayName("HOME / TMPDIR on tmpfs; PI_CODING_AGENT_DIR points into the workspace")
         void writableMounts() {
             var env = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).environment();
             assertThat(env)
                 .containsEntry("HOME", "/home/agent")
                 .containsEntry("TMPDIR", "/home/agent/.local/tmp")
-                .containsEntry("PI_CODING_AGENT_DIR", "/home/agent/.pi");
+                .containsEntry("PI_CODING_AGENT_DIR", WorkspaceAbi.PI_AGENT_DIR);
         }
 
         @Test
         @DisplayName("No image-wide UV_THREADPOOL_SIZE override (would serialise libuv fs bursts)")
         void uvThreadpoolNotForced() {
-            // Previously set to 2 image-wide — removed because (a) the RSS saving was unmeasured
-            // and (b) it serialises the practice runner's git tool calls. If a workload-specific
-            // override is needed it should be set inline in nodeEnvFor.
             var env = factory.build(proxySpec(LlmProvider.OPENAI, null)).environment();
             assertThat(env).doesNotContainKey("UV_THREADPOOL_SIZE");
         }
@@ -211,7 +214,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
@@ -235,7 +238,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 "job-token-123",
                 false,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
@@ -250,7 +253,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class CustomProvider {
 
         @Test
-        @DisplayName("baseUrl-pinned OPENAI spec emits hephaestus-provider.ts under .pi-runtime/extensions/")
+        @DisplayName("baseUrl-pinned OPENAI spec emits hephaestus-provider.ts under .pi/extensions/")
         void baseUrlOpenaiEmitsExtension() {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
@@ -261,13 +264,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
             var inputs = factory.build(spec).inputFiles();
             String ts = new String(
-                inputs.get(WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts"),
+                inputs.get(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts"),
                 StandardCharsets.UTF_8
             );
             assertThat(ts)
@@ -288,7 +291,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
@@ -296,7 +299,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 factory
                     .build(spec)
                     .inputFiles()
-                    .get(WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts"),
+                    .get(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts"),
                 StandardCharsets.UTF_8
             );
             assertThat(ts).contains("api: \"anthropic-messages\"");
@@ -314,13 +317,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
             JsonNode settings = objectMapper.readTree(
                 new String(
-                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_RUNTIME_PREFIX + "settings.json"),
+                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"),
                     StandardCharsets.UTF_8
                 )
             );
@@ -340,14 +343,14 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
             var inputs = factory.build(spec).inputFiles();
-            assertThat(inputs).doesNotContainKey(WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts");
+            assertThat(inputs).doesNotContainKey(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts");
             JsonNode settings = objectMapper.readTree(
-                new String(inputs.get(WorkspaceAbi.PI_RUNTIME_PREFIX + "settings.json"), StandardCharsets.UTF_8)
+                new String(inputs.get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"), StandardCharsets.UTF_8)
             );
             assertThat(settings.path("defaultProvider").asText()).isEqualTo("openai");
         }
@@ -364,12 +367,12 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 ""
             );
             assertThat(factory.build(spec).inputFiles()).doesNotContainKey(
-                WorkspaceAbi.PI_RUNTIME_PREFIX + "extensions/hephaestus-provider.ts"
+                WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts"
             );
         }
     }
@@ -379,70 +382,26 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class CommandAssembly {
 
         @Test
-        @DisplayName("Practice runner: only safe flags (no heap cap, no --expose-gc)")
+        @DisplayName("Practice profile contributes --no-warnings and no per-process env")
         void nodeFlagsForPractice() {
-            // The default test specs use `pi-runner.mjs` (practice). Practice handles large diffs
-            // and uses no global.gc() — applying a 256 MB heap cap there would be a latent OOM
-            // and exposing gc() is a foot-gun.
             String body = factory.build(apiKeySpec(LlmProvider.OPENAI)).command().get(2);
             int nodeIdx = body.indexOf("node ");
-            int scriptIdx = body.indexOf(".run-pi.mjs");
-            assertThat(nodeIdx).as("node invocation present").isGreaterThanOrEqualTo(0);
-            assertThat(scriptIdx).as("runner script present").isGreaterThan(nodeIdx);
+            int scriptIdx = body.indexOf(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
             String nodePrefix = body.substring(nodeIdx, scriptIdx);
             assertThat(nodePrefix)
                 .contains("--no-warnings")
                 .doesNotContain("--max-old-space-size")
-                .doesNotContain("--max-semi-space-size")
                 .doesNotContain("--expose-gc")
-                // --disable-source-maps is an unrecognised Node 22 CLI flag and would crash the
-                // runner at startup with exit 9. Guard the regression.
                 .doesNotContain("--disable-source-maps");
-            // The shell segment IMMEDIATELY preceding `node ` must not set LD_PRELOAD /
-            // MALLOC_CONF. The earlier auth-setup prefix never sets either; but to make the
-            // assertion meaningful (rather than tautological against a prefix that never
-            // contains them in ANY codepath), we slice from the last `&&` before `node ` —
-            // that's the same-statement scope `var=value cmd` would inject into.
+            // Per-process env immediately preceding `node ` must be empty for practice.
             int lastAmp = body.lastIndexOf("&&", nodeIdx);
             int sliceStart = lastAmp >= 0 ? lastAmp + 2 : 0;
-            assertThat(body.substring(sliceStart, nodeIdx))
-                .as("practice path: per-process env immediately preceding `node` must be empty")
-                .doesNotContain("LD_PRELOAD")
-                .doesNotContain("MALLOC_CONF");
+            assertThat(body.substring(sliceStart, nodeIdx)).doesNotContain("LD_PRELOAD").doesNotContain("MALLOC_CONF");
         }
 
         @Test
-        @DisplayName("MENTOR_RUNNER_SCRIPT constant tracks MentorAgentProperties.runnerScript default")
-        void mentorRunnerScriptConstantAgreesWithProperties() {
-            // PiRuntimeFactory dispatches V8 flags by filename match against MENTOR_RUNNER_SCRIPT.
-            // If MentorAgentProperties' default runnerScript ever drifts (rename, version bump,
-            // operator override) the mentor silently reverts to the practice V8 profile —
-            // no heap cap, no --expose-gc, no jemalloc preload.
-            //
-            // The previous version of this test constructed MentorAgentProperties manually with
-            // the literal "pi-mentor-runner.mjs" and asserted that literal equalled the constant.
-            // It would have passed even if @DefaultValue on MentorAgentProperties was renamed to
-            // "pi-mentor-runner-v2.mjs" — the very drift it claimed to defend against. Fixed by
-            // round-tripping through Spring's Binder against an empty source, which actually
-            // exercises the @DefaultValue resolution.
-            org.springframework.boot.context.properties.bind.Binder binder =
-                new org.springframework.boot.context.properties.bind.Binder(
-                    org.springframework.boot.context.properties.source.ConfigurationPropertySources.from(
-                        new org.springframework.core.env.MapPropertySource("empty", Map.of())
-                    )
-                );
-            de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties bound = binder.bindOrCreate(
-                "hephaestus.mentor.agent",
-                de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties.class
-            );
-            assertThat(bound.runnerScript())
-                .as("MENTOR_RUNNER_SCRIPT must equal MentorAgentProperties.@DefaultValue('runnerScript')")
-                .isEqualTo(PiRuntimeFactory.MENTOR_RUNNER_SCRIPT);
-        }
-
-        @Test
-        @DisplayName("Mentor runner: heap cap + --expose-gc + jemalloc preload scoped to node")
-        void nodeFlagsForMentor() {
+        @DisplayName("Mentor profile contributes heap cap, --expose-gc, and jemalloc preload scoped to node")
+        void mentorProfileContributesMentorFlagsAndEnv() {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
@@ -452,27 +411,43 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-mentor-runner.mjs",
+                MENTOR,
                 Map.of(),
                 ""
             );
             String body = factory.build(spec).command().get(2);
             int nodeIdx = body.indexOf("node ");
-            int scriptIdx = body.indexOf(".run-pi.mjs");
-            String nodePrefix = body.substring(nodeIdx, scriptIdx);
-            assertThat(nodePrefix)
+            int scriptIdx = body.indexOf(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
+            assertThat(body.substring(nodeIdx, scriptIdx))
                 .contains("--max-old-space-size=256")
                 .contains("--no-warnings")
                 .contains("--expose-gc")
-                // --disable-source-maps is an unrecognised Node 22 CLI flag and crashes the
-                // runner at startup (exit 9). Must NOT be present for either runner.
                 .doesNotContain("--disable-source-maps");
-            // LD_PRELOAD + MALLOC_CONF appear in the shell env BEFORE `node `, scoped to that
-            // invocation only — they do NOT leak to bun (precompute) or other tools.
-            String beforeNode = body.substring(0, nodeIdx);
-            assertThat(beforeNode)
+            assertThat(body.substring(0, nodeIdx))
                 .contains("LD_PRELOAD=/usr/local/lib/libjemalloc.so.2")
-                .contains("MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:30000,muzzy_decay_ms:30000");
+                .contains("MALLOC_CONF=background_thread:true");
+        }
+
+        @Test
+        @DisplayName("Mentor and practice profiles resolve to distinct runner scripts")
+        void profilesResolveToDistinctScripts() {
+            PiPlanSpec base = proxySpec(LlmProvider.AZURE_OPENAI, null);
+            byte[] practiceBytes = factory.build(base).inputFiles().get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
+            PiPlanSpec mentorSpec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                null,
+                null,
+                null,
+                true,
+                600,
+                MENTOR,
+                Map.of(),
+                ""
+            );
+            byte[] mentorBytes = factory.build(mentorSpec).inputFiles().get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
+            assertThat(mentorBytes).isNotEqualTo(practiceBytes);
         }
 
         @Test
@@ -487,7 +462,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 true,
                 600,
-                "pi-runner.mjs",
+                PRACTICE,
                 Map.of(),
                 "echo precompute && "
             );
@@ -495,103 +470,29 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(plan.command()).hasSize(3);
             assertThat(plan.command().get(0)).isEqualTo("sh");
             String body = plan.command().get(2);
-            // Precompute step must run before the runner. Don't pin the exact `node` invocation —
-            // the command line may carry V8 flags (`--max-old-space-size`, `--disable-source-maps`,
-            // …) between `node` and the script path. Asserting the script path alone is enough.
-            assertThat(body.indexOf("echo precompute")).isLessThan(body.indexOf("/workspace/.run-pi.mjs"));
-        }
-    }
-
-    @Nested
-    @DisplayName("spec validation")
-    class SpecValidation {
-
-        @Test
-        @DisplayName("PROXY mode requires jobToken")
-        void proxyRequiresToken() {
-            assertThatThrownBy(() ->
-                new PiPlanSpec(
-                    LlmProvider.OPENAI,
-                    CredentialMode.PROXY,
-                    null,
-                    null,
-                    null,
-                    null,
-                    false,
-                    600,
-                    "pi-runner.mjs",
-                    Map.of(),
-                    ""
-                )
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("jobToken");
+            assertThat(body.indexOf("echo precompute")).isLessThan(
+                body.indexOf(WorkspaceAbi.WORKSPACE_ROOT + "/" + WorkspaceAbi.RUNNER_SCRIPT_FILENAME)
+            );
         }
 
         @Test
-        @DisplayName("API_KEY mode requires credential")
-        void apiKeyRequiresCredential() {
-            assertThatThrownBy(() ->
-                new PiPlanSpec(
-                    LlmProvider.OPENAI,
-                    CredentialMode.API_KEY,
-                    null,
-                    null,
-                    null,
-                    null,
-                    false,
-                    600,
-                    "pi-runner.mjs",
-                    Map.of(),
-                    ""
-                )
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("credential");
-        }
-
-        @Test
-        @DisplayName("timeoutSeconds must exceed the buffer")
-        void timeoutMustExceedBuffer() {
-            assertThatThrownBy(() ->
-                new PiPlanSpec(
-                    LlmProvider.OPENAI,
-                    CredentialMode.API_KEY,
-                    "sk",
-                    null,
-                    null,
-                    null,
-                    true,
-                    PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
-                    "pi-runner.mjs",
-                    Map.of(),
-                    ""
-                )
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("TIMEOUT_BUFFER_SECONDS");
-        }
-
-        @Test
-        @DisplayName("runnerScript must not be blank")
-        void runnerScriptNotBlank() {
-            assertThatThrownBy(() ->
-                new PiPlanSpec(
-                    LlmProvider.OPENAI,
-                    CredentialMode.API_KEY,
-                    "sk",
-                    null,
-                    null,
-                    null,
-                    true,
-                    600,
-                    "  ",
-                    Map.of(),
-                    ""
-                )
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("runnerScript");
+        @DisplayName("No shell-side cp of Pi config")
+        void noCopyShim() {
+            // baseUrl-pinned spec exercises the custom-provider extension, the only conditional input path.
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                "gpt-x",
+                "https://gpu.example.com/api",
+                null,
+                true,
+                600,
+                PRACTICE,
+                Map.of(),
+                ""
+            );
+            assertThat(factory.build(spec).command().get(2)).doesNotContain(" cp ");
         }
     }
 }

@@ -768,7 +768,7 @@ class MentorSandboxStressTest {
             null,
             true,
             300,
-            "pi-mentor-runner.mjs",
+            new de.tum.in.www1.hephaestus.agent.mentor.MentorRunnerProfile(),
             Map.of(),
             ""
         );

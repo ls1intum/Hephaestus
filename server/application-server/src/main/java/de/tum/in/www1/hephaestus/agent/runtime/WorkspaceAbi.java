@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.runtime;
 
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -42,11 +43,14 @@ public final class WorkspaceAbi {
     /** Workspace-relative path of the practices-analysis marker directory. */
     public static final String ANALYSIS_PRACTICES_PREFIX = ANALYSIS_PREFIX + "practices/";
 
-    /** Workspace-relative path the Pi runtime config (settings.json) is staged into. */
-    public static final String PI_RUNTIME_PREFIX = ".pi-runtime/";
+    /** Workspace-relative directory name of the Pi SDK agent dir. */
+    private static final String PI_AGENT_NAME = ".pi";
 
-    /** Workspace-relative path the orchestrator instructions ({@code .pi/AGENTS.md}) live under. */
-    public static final String PI_AGENT_PREFIX = ".pi/";
+    /** Workspace-relative path of the Pi SDK agent dir — settings.json, AGENTS.md, extensions/. */
+    public static final String PI_AGENT_PREFIX = PI_AGENT_NAME + "/";
+
+    /** Absolute container path of the Pi SDK agent dir — value of {@code PI_CODING_AGENT_DIR}. */
+    public static final String PI_AGENT_DIR = WORKSPACE_ROOT + "/" + PI_AGENT_NAME;
 
     /** Workspace-relative filename of the runner script copied from the classpath. */
     public static final String RUNNER_SCRIPT_FILENAME = ".run-pi.mjs";
@@ -57,9 +61,25 @@ public final class WorkspaceAbi {
     /** Workspace-relative path of the orchestrator instructions (combination of prefix + filename). */
     public static final String ORCHESTRATOR_PATH = PI_AGENT_PREFIX + ORCHESTRATOR_FILENAME;
 
+    /** Mentor system prompt path — pinned by {@code WorkspaceAbiSyncTest} against pi-mentor-runner.mjs. */
+    public static final String MENTOR_SYSTEM_PROMPT_PATH = "agent/mentor/system.md";
+
+    /** Workspace-relative directory for restored Pi SDK session JSONL files (matches the mentor runner's {@code SESSIONS_DIR}). */
+    public static final String SESSIONS_DIR_PREFIX = ".sessions/";
+
     /** Exit code emitted by the Pi runner on envelope/image drift (unsupported {@code schemaVersion} or {@code kind}). */
     public static final int EXIT_ENVELOPE_MISMATCH = 42;
 
     /** Practice slug pattern enforced at the handler boundary as defense-in-depth against FS-path injection. */
     public static final Pattern PRACTICE_SLUG = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
+
+    /** Exact workspace paths an adapter may pass in {@link PiPlanSpec#extraInputs()}. */
+    public static Set<String> allowedExtraInputPaths() {
+        return Set.of(MENTOR_SYSTEM_PROMPT_PATH);
+    }
+
+    /** Workspace-path prefixes accepted by {@link PiPlanSpec#extraInputs()} for dynamic-suffix paths. */
+    public static Set<String> allowedExtraInputPrefixes() {
+        return Set.of(CONTEXT_TARGET_PREFIX, SESSIONS_DIR_PREFIX);
+    }
 }

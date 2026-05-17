@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.agent.mentor;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.lang.Nullable;
@@ -19,7 +18,6 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.mentor.agent")
 public record MentorAgentProperties(
-    @DefaultValue("pi-mentor-runner.mjs") @NotBlank String runnerScript,
     @DefaultValue("100000") @Min(1) int maxPromptChars,
     @DefaultValue("") String baseUrl,
     @Nullable LlmProvider llmProvider,

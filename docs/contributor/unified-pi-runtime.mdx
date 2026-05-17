@@ -1,0 +1,26 @@
+---
+id: unified-pi-runtime
+sidebar_position: 3
+title: Unified Pi Runtime
+description: Mentor replica affinity and how to disable it for debugging.
+---
+
+## Why mentor traffic is sticky
+
+The mentor SSE endpoint opens a long-lived `docker exec -i` against the user's Pi container (`PiProcessHandle`). The stdin/stdout pipes live in JVM memory; the conversation itself is persisted to Postgres (`chat_thread.session_jsonl`, BYTEA), so any replica can serve any turn — but a replica without the live pipes must rebuild the sandbox first, paying a cold-start cost tracked by `InteractiveSandboxMetrics.attachDuration`.
+
+Traefik pins workspace traffic to the originating replica via a cookie scoped to `/api/workspaces` — narrower than the full `/api` router (auth and public endpoints stay round-robin), broad enough to cover the actual mentor URL `/api/workspaces/{slug}/mentor/chat`. Labels live on the `https-application-server` service in `docker/compose.app.yaml`. Inspect with `curl -i`:
+
+- Cookie: `__Secure-hep_workspace_aff` — `Secure`, `HttpOnly`, `SameSite=Lax`, `maxAge` matches `hephaestus.mentor.idle-ttl-seconds` (300s default) so the cookie expires when the sandbox is reaped.
+- Response header: `X-Hephaestus-Replica: <container-id-prefix>` — emitted by `ReplicaIdentityFilter` from `$HOSTNAME`, CORS-exposed for the webapp.
+
+Labels are HTTPS-only; the HTTP router redirects to HTTPS, so pinning it would just double-issue cookies. The `cookie.path` attribute requires Traefik >= 3.3 (the proxy is pinned to v3.4 in `docker/compose.proxy.yaml`). Previews (`docker/preview/compose.app.yaml`) are single-replica and omit the labels.
+
+## Known limitations
+
+- **Two browsers, same user.** Two browsers can pin to two replicas, each spawning its own `(userId, workspaceId)` sandbox — `InteractiveSandboxRegistry` is per-JVM.
+- **Rolling deploys.** Each pinned user whose replica restarts pays one cold start. The `SseEmitter` timeout is 10 minutes (`MentorChatController.EMITTER_TIMEOUT_MS`); drain by refusing new turns and letting in-flight emitters complete.
+
+## Disabling affinity for debugging
+
+Delete the `traefik.http.services.https-application-server.loadbalancer.sticky.*` labels from `docker/compose.app.yaml` and redeploy. Existing sessions stay pinned until the cookie expires; new sessions round-robin. Expect transient 5xx on reconnects that land on a cold replica.
