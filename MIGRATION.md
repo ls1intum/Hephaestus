@@ -55,6 +55,7 @@ Before upgrading to any new `0.x.0` version:
 
 #### 🔴 Agent runtime: image config consolidated under `hephaestus.agent.image.*`
 
+**Version**: v0.10.0
 **Affected**: any deployment that pinned the agent-pi image via `HEPHAESTUS_AGENT_PI_IMAGE`, `HEPHAESTUS_MENTOR_AGENT_IMAGE`, or the matching Spring properties / pull-policy env vars.
 
 Pi practice sandboxes and the mentor container share the same Docker image by design (unified Pi runtime, #1066). Issue #1076 collapses the two parallel configs into one record so the defaults can't drift, and adds a startup guard that rejects un-pinned references in production.
@@ -97,7 +98,7 @@ HEPHAESTUS_AGENT_IMAGE_PULL_POLICY=IF_NOT_PRESENT
 HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST=true
 ```
 
-**Migration steps**:
+**Migration**:
 
 1. Drop the four old env vars / properties from your prod configuration.
 2. Production: the canonical pin now lives in `docker/agent-image-pin.env`, loaded by `compose.app.yaml` via `env_file:`. The release workflow rewrites it on every release. If you currently set `HEPHAESTUS_AGENT_PI_IMAGE` in the Coolify UI, **unset it** — Coolify-UI values shadow `env_file:` values, silently bypassing the pin.

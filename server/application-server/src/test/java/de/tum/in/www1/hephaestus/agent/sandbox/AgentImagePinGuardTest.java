@@ -16,15 +16,15 @@ class AgentImagePinGuardTest extends BaseUnitTest {
 
     @Test
     @DisplayName("digest-pinned reference: constructor returns normally")
-    void digestPasses() {
-        var props = new AgentImageProperties(DIGEST_REF, ImagePullPolicy.IF_NOT_PRESENT, true);
+    void shouldAllowStartupWhenReferenceIsDigestPinned() {
+        var props = new AgentImageProperties(DIGEST_REF, ImagePullPolicy.ALWAYS, true);
         assertThatCode(() -> new AgentImagePinGuard(props)).doesNotThrowAnyException();
     }
 
     @Test
     @DisplayName("tag reference: constructor throws with bad value, expected shape, and doc pointer")
-    void tagFailsFast() {
-        var props = new AgentImageProperties(TAG_REF, ImagePullPolicy.IF_NOT_PRESENT, true);
+    void shouldFailFastWhenReferenceIsTagOnly() {
+        var props = new AgentImageProperties(TAG_REF, ImagePullPolicy.ALWAYS, true);
         assertThatThrownBy(() -> new AgentImagePinGuard(props))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining(TAG_REF)

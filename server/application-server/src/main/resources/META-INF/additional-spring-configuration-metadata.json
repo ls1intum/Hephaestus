@@ -175,17 +175,17 @@
     {
       "name": "hephaestus.agent.image.reference",
       "type": "java.lang.String",
-      "description": "Fully-qualified image reference (registry/path:tag or registry/path@sha256:<digest>) used by both Pi practice sandboxes and the mentor container. Production must be digest-pinned."
+      "description": "Fully-qualified image reference (registry/path:tag or registry/path@sha256:<64 lowercase hex>) used by both Pi practice sandboxes and the mentor container. Production must be digest-pinned."
     },
     {
       "name": "hephaestus.agent.image.pull-policy",
       "type": "de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy",
-      "description": "Startup pull behaviour: ALWAYS, IF_NOT_PRESENT (default), or NEVER. With digest-pinned references, IF_NOT_PRESENT is safe; with tags, prefer ALWAYS."
+      "description": "Startup pull behaviour: ALWAYS (default — registry HEAD on every restart, cheap when digest-pinned), IF_NOT_PRESENT, or NEVER."
     },
     {
       "name": "hephaestus.agent.image.require-digest",
       "type": "java.lang.Boolean",
-      "description": "When true, the application fails to start unless 'reference' ends in @sha256:<64 hex>. Production sets this to true; dev defaults to false so :latest keeps working."
+      "description": "When true, the application fails to start unless 'reference' ends in @sha256:<64 lowercase hex>. Production sets this to true; dev defaults to false so :latest keeps working."
     }
   ],
   "hints": [

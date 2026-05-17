@@ -56,10 +56,7 @@ jobs:
           echo "- **Staging**: Deploying automatically" >> $GITHUB_STEP_SUMMARY
           echo "- **Production**: Waiting for approval" >> $GITHUB_STEP_SUMMARY
 
-  # Retag Docker images with semantic version; verify the retag preserves the
-  # source manifest digest (imagetools is content-addressed), smoke-test the
-  # agent-pi image, and commit the resulting digest to docker/agent-image-pin.env
-  # so production deploys from a digest that lives in git — not a Coolify UI value.
+  # Retag SHA→VERSION, verify digest equality, smoke-test, and pin the digest to git.
   tag-images:
     needs: release
     if: needs.release.outputs.released == 'true'
@@ -121,8 +118,6 @@ jobs:
 
             docker buildx imagetools create -t "$FULL_IMAGE:$VERSION" "$FULL_IMAGE:$SHA"
 
-            # Retag MUST preserve the digest (imagetools is content-addressed). If it
-            # doesn't, something rewrote the manifest under us — fail closed.
             DST_DIGEST=$(manifest_digest "$FULL_IMAGE:$VERSION")
             if [[ "$SRC_DIGEST" != "$DST_DIGEST" ]]; then
               echo "::error::Retag changed the digest for $img — refusing to publish."
@@ -137,11 +132,7 @@ jobs:
             echo "::endgroup::"
           done
 
-      # Pull the published digest and spot-check the two runtimes the agent
-      # entrypoint depends on. We deliberately bypass the real entrypoint here —
-      # it doesn't return — so this catches missing layers, broken jemalloc
-      # symlinks, and corrupted bun/node binaries; functional boot is the
-      # staging deploy's job, not release publication's.
+      # Spot-check bun/node binaries. Real-entrypoint boot is the staging deploy's job.
       - name: Smoke-test agent-pi
         env:
           IMAGE: ghcr.io/ls1intum/hephaestus/agent-pi@${{ steps.retag.outputs.agent-pi-digest }}
@@ -162,14 +153,17 @@ jobs:
           fi
           REF="ghcr.io/ls1intum/hephaestus/agent-pi@${DIGEST}"
           PIN_FILE="docker/agent-image-pin.env"
+          EXPECTED_LINE="HEPHAESTUS_AGENT_IMAGE_REFERENCE=${REF}"
 
-          # Rewrite the single HEPHAESTUS_AGENT_IMAGE_REFERENCE line in place;
-          # preserve the documenting header.
           tmp=$(mktemp)
-          awk -v ref="HEPHAESTUS_AGENT_IMAGE_REFERENCE=${REF}" '
-            /^HEPHAESTUS_AGENT_IMAGE_REFERENCE=/ { print ref; next }
+          awk -v ref="$EXPECTED_LINE" '
+            /^HEPHAESTUS_AGENT_IMAGE_REFERENCE=/ { print ref; found=1; next }
             { print }
-          ' "$PIN_FILE" > "$tmp"
+            END { exit (found ? 0 : 1) }
+          ' "$PIN_FILE" > "$tmp" || {
+            echo "::error::$PIN_FILE is missing the HEPHAESTUS_AGENT_IMAGE_REFERENCE= line — refusing to silently no-op."
+            exit 1
+          }
           mv "$tmp" "$PIN_FILE"
 
           if git diff --quiet -- "$PIN_FILE"; then
@@ -185,20 +179,15 @@ jobs:
           # commits, so this is belt-and-braces.
           git commit -m "chore(release): pin agent-pi to ${DIGEST} for v${VERSION} [skip ci]"
 
-          # Race-tolerant push: semantic-release already pushed to main, and an
-          # unrelated commit could land between then and now. Rebase-and-retry
-          # absorbs that without losing the pin update. The post-rebase invariant
-          # check catches the corner case where rebase swallows our commit (e.g.
-          # an in-between commit deleted the pin file).
-          EXPECTED_LINE="HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi@${DIGEST}"
+          # Race-tolerant push: rebase + retry up to 3× to absorb concurrent main
+          # commits. The post-rebase invariant catches the case where rebase
+          # swallows our commit (e.g. an in-between commit recreated the file).
           for attempt in 1 2 3; do
-            if git push origin HEAD:main; then
-              exit 0
-            fi
+            if git push origin HEAD:main; then exit 0; fi
             echo "push attempt $attempt failed — fetching + rebasing"
             git fetch origin main
             git rebase origin/main || {
-              echo "::error::rebase produced conflicts on $PIN_FILE — aborting; investigate manually."
+              echo "::error::rebase produced conflicts on $PIN_FILE — investigate manually."
               git rebase --abort
               exit 1
             }

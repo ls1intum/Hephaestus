@@ -31,7 +31,7 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
     @Test
     @DisplayName("ALWAYS: short-circuits + emits skipped counter when Docker daemon is unreachable")
-    void alwaysSkipsWhenDaemonUnreachable() {
+    void shouldSkipPullWhenDaemonUnreachableAndPolicyIsAlways() {
         var registry = new SimpleMeterRegistry();
         when(imageOps.ping()).thenReturn(false);
 
@@ -44,7 +44,11 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
     @ParameterizedTest(name = "ALWAYS: pullImage returns {0} → outcome={1}, failure-counter={2}")
     @CsvSource({ "true, success, 0", "false, failure, 1" })
-    void alwaysRecordsOutcome(boolean pullSucceeds, String outcomeTag, int expectedFailureCount) {
+    void shouldRecordOutcomeMetricWhenAlwaysPolicyRunsPull(
+        boolean pullSucceeds,
+        String outcomeTag,
+        int expectedFailureCount
+    ) {
         var registry = new SimpleMeterRegistry();
         when(imageOps.ping()).thenReturn(true);
         when(imageOps.pullImage(IMAGE)).thenReturn(pullSucceeds);
@@ -60,7 +64,7 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
     @Test
     @DisplayName("IF_NOT_PRESENT: skips pull when image already in daemon cache")
-    void ifNotPresentSkipsWhenImagePresent() {
+    void shouldSkipPullWhenImagePresentAndPolicyIsIfNotPresent() {
         when(imageOps.imageIsPresent(IMAGE)).thenReturn(true);
 
         bootstrapperWith(ImagePullPolicy.IF_NOT_PRESENT, new SimpleMeterRegistry()).pullOnStartup();
@@ -72,7 +76,7 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
     @Test
     @DisplayName("IF_NOT_PRESENT: pulls when image absent from daemon cache")
-    void ifNotPresentPullsWhenImageAbsent() {
+    void shouldPullImageWhenImageAbsentAndPolicyIsIfNotPresent() {
         when(imageOps.imageIsPresent(IMAGE)).thenReturn(false);
         when(imageOps.ping()).thenReturn(true);
         when(imageOps.pullImage(IMAGE)).thenReturn(true);
@@ -84,7 +88,7 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
     @Test
     @DisplayName("NEVER: only probes image presence to emit an operator warning; never pulls")
-    void neverOnlyProbesPresence() {
+    void shouldOnlyProbePresenceWhenPolicyIsNever() {
         bootstrapperWith(ImagePullPolicy.NEVER, new SimpleMeterRegistry()).pullOnStartup();
 
         // The contract is "no pulls", not "no probes": the probe lets us warn if the image

@@ -156,7 +156,7 @@ Confidentiality (Art. 32(1)(b))
 
 Integrity (Art. 32(1)(b))
 - Git is the authoritative source of all application code; signed commits and PR review.
-- Production images are pinned by sha256 digest (see `docker/agent-image-pin.env`, rewritten by the release workflow), keyless-cosign-signed against Sigstore, and provenance-attested via `actions/attest-build-provenance`. All three are verifiable with the recipe in [Agent image digests](../agent-image-digests.md).
+- Production images are pinned by sha256 digest once `docker/agent-image-pin.env` is loaded by Compose (rewritten by the release workflow). Images are keyless-cosign-signed against Sigstore and provenance-attested via `actions/attest-build-provenance`. All three are verifiable with the recipe in [Agent image digests](../agent-image-digests.md).
 
 Availability and resilience (Art. 32(1)(b))
 - Containers restart on failure (`restart: unless-stopped`); per-service health checks.

@@ -20,8 +20,8 @@ class AgentImagePropertiesTest extends BaseUnitTest {
         ghcr.io/x/agent-pi@sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA, false
         """
     )
-    void isDigestPinned(String reference, boolean expected) {
-        var props = new AgentImageProperties(reference, ImagePullPolicy.IF_NOT_PRESENT, false);
+    void shouldClassifyDigestPinningWhenInspectingReference(String reference, boolean expected) {
+        var props = new AgentImageProperties(reference, ImagePullPolicy.ALWAYS, false);
         assertThat(props.isDigestPinned()).isEqualTo(expected);
     }
 }
