@@ -14,7 +14,7 @@ This site is powered by [Docusaurus 3](https://docusaurus.io/) with Rspack, SWC,
 
 ```bash
 # From repo root (recommended)
-npm run docs:dev       # Start dev server at http://localhost:3000/Hephaestus/
+pnpm run docs:dev       # Start dev server at http://localhost:3000/Hephaestus/
 
 # Or from docs directory
 cd docs && npm start
@@ -28,8 +28,8 @@ cd docs && npm start
 Install dependencies:
 
 ```bash
-npm install   # in docs directory
-# or from repo root: cd docs && npm install
+pnpm install   # in docs directory
+# or from repo root: cd docs && pnpm install
 ```
 
 ## Available Scripts
@@ -37,19 +37,19 @@ npm install   # in docs directory
 Run from repo root:
 
 ```bash
-npm run docs:dev     # Start development server
-npm run docs:build   # Build for production
-npm run docs:serve   # Preview production build
-npm run docs:lint    # TypeScript + Markdown linting
+pnpm run docs:dev     # Start development server
+pnpm run docs:build   # Build for production
+pnpm run docs:serve   # Preview production build
+pnpm run docs:lint    # TypeScript + Markdown linting
 ```
 
 ## Quality Gates
 
 CI runs these checks automatically:
 
-1. **TypeScript check** – `npm run typecheck`
-2. **Markdown lint** – `npm run lint:md`
-3. **Build with strict validation** – `npm run build`
+1. **TypeScript check** – `pnpm run typecheck`
+2. **Markdown lint** – `pnpm run lint:md`
+3. **Build with strict validation** – `pnpm run build`
 
 The build fails on:
 

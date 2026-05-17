@@ -21,14 +21,11 @@ jobs:
       - name: "Checkout repository"
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: "Setup Node.js"
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "22"
-          cache: "npm"
+      - name: Setup pnpm + Node.js
+        uses: ./.github/actions/setup-pnpm-node
 
       - name: "Install dependencies"
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: "Validate PR title with commitlint"
         id: commitlint
@@ -36,7 +33,7 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           # Use commitlint to validate PR title (single source of truth)
-          echo "$PR_TITLE" | npx --no-install commitlint 2>&1 | tee /tmp/commitlint-output.txt
+          echo "$PR_TITLE" | pnpm exec commitlint 2>&1 | tee /tmp/commitlint-output.txt
           exit_code=${PIPESTATUS[1]}
 
           # Capture output for the comment

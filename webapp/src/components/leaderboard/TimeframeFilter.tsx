@@ -306,7 +306,7 @@ export function TimeframeFilter({
 							/>
 							<PopoverContent className="w-auto p-0" align="start">
 								<Calendar
-									initialFocus
+									autoFocus
 									mode="range"
 									defaultMonth={customRange?.from}
 									selected={customRange}

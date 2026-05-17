@@ -20,7 +20,15 @@
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Dependency Dashboard",
 
-  "postUpdateOptions": ["npmDedupe"],
+  "postUpdateOptions": ["pnpmDedupe"],
+
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 7am on monday"],
+    "postUpdateOptions": ["pnpmDedupe"]
+  },
+
+  "rangeStrategy": "replace",
 
   "packageRules": [
     {

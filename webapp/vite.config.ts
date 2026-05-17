@@ -1,13 +1,19 @@
 import path, { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import viteReact from "@vitejs/plugin-react";
+import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig, type PluginOption, type ViteDevServer } from "vite";
 import Terminal from "vite-plugin-terminal";
 import * as fs from "node:fs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
+
+// React Compiler runs through @rolldown/plugin-babel using the preset's
+// pre-baked Rolldown filters (default compilationMode "infer" compiles every
+// PascalCase function using JSX/hooks; no "use memo" opt-ins are used).
+const reactCompiler = await babel({ presets: [reactCompilerPreset()] });
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
@@ -16,13 +22,9 @@ export default defineConfig(({ command }) => {
 	return {
 		plugins: ([
 			tanstackRouter({ autoCodeSplitting: true }),
-			viteReact({
-				babel: {
-					plugins: ["babel-plugin-react-compiler"],
-				},
-			}),
+			viteReact(),
+			reactCompiler,
 			tailwindcss(),
-			// Only use the terminal plugin during development
 			isDevelopment &&
 			Terminal({
 				output: ["terminal", "console"],
@@ -47,7 +49,6 @@ export default defineConfig(({ command }) => {
 						req.on("end", () => {
 							try {
 								JSON.parse(body);
-								// Adjust path if your structure differs slightly
 								const filePath = path.resolve(__dirname, "src/components/achievements/coordinates.json");
 								fs.writeFileSync(filePath, body);
 								res.statusCode = 200;
@@ -63,7 +64,7 @@ export default defineConfig(({ command }) => {
 			}),
 		].filter(Boolean) as unknown as PluginOption[]),
 		build: {
-			sourcemap: false, // Disable sourcemaps for now to reduce build memory usage
+			sourcemap: false,
 		},
 		optimizeDeps: {
 			exclude: ["storybook-static"],
@@ -85,11 +86,8 @@ export default defineConfig(({ command }) => {
 			port: parseInt(process.env.WEBAPP_PORT ?? "", 10) || 4200,
 			strictPort: true,
 			fs: {
-				// Allow serving files from the monorepo root
 				allow: [resolve(__dirname, "..")],
 			},
 		},
 	};
-})
-;
-;
+});

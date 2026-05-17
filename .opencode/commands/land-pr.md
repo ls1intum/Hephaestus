@@ -29,7 +29,7 @@ Map paths to components (mirrors CI's dorny/paths-filter config):
 ## 3. Format
 
 ```bash
-npm run format
+pnpm run format
 ```
 
 Formatting must NEVER be a reason for remote CI failure. This applies formatting
@@ -38,7 +38,7 @@ in write mode, not just check mode.
 ## 4. Check (Lint + Typecheck)
 
 ```bash
-npm run check
+pnpm run check
 ```
 
 Must pass. Fix issues before continuing.
@@ -48,15 +48,15 @@ Must pass. Fix issues before continuing.
 **API endpoints changed (app-server controllers/DTOs):**
 
 ```bash
-npm run generate:api:application-server:specs
-npm run generate:api:application-server:client
+pnpm run generate:api:application-server:specs
+pnpm run generate:api:application-server:client
 ```
 
 **Database entities changed:**
 
 ```bash
-npm run db:draft-changelog
-npm run db:generate-erd-docs
+pnpm run db:draft-changelog
+pnpm run db:generate-erd-docs
 ```
 
 ## 6. Build Affected TS Services
@@ -64,7 +64,7 @@ npm run db:generate-erd-docs
 If webhook changed:
 
 ```bash
-npm run build:webhook-ingest
+pnpm run build:webhook-ingest
 ```
 
 Build failures catch path alias and import issues that typecheck alone misses.
@@ -76,13 +76,13 @@ Run ONLY tests for changed components. Order: fastest first.
 If webhook changed:
 
 ```bash
-npm run test:webhook-ingest
+pnpm run test:webhook-ingest
 ```
 
 If webapp changed:
 
 ```bash
-npm run test:webapp
+pnpm run test:webapp
 ```
 
 If app-server changed (and mvn available):
@@ -98,7 +98,7 @@ ALL tests must pass before proceeding.
 If app-server changed:
 
 ```bash
-npm run generate:api
+pnpm run generate:api
 git diff --quiet || echo "WARNING: OpenAPI specs were out of sync - staging changes"
 ```
 
@@ -109,8 +109,8 @@ Stage any drift that was caught.
 Regeneration can produce unformatted code. Run one final pass:
 
 ```bash
-npm run format
-npm run check
+pnpm run format
+pnpm run check
 ```
 
 Both must pass.

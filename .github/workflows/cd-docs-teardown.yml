@@ -22,11 +22,20 @@ jobs:
     env:
       PREVIEW_URL: ls1intum-hephaestus-docs-pr-${{ github.event.number }}.surge.sh
     steps:
-      - name: Install Surge
-        run: npm install -g surge
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          sparse-checkout: |
+            .github/actions/setup-pnpm-node
+            .node-version
+            pnpm-lock.yaml
+          sparse-checkout-cone-mode: false
+
+      - name: Setup pnpm + Node.js
+        uses: ./.github/actions/setup-pnpm-node
 
       - name: Teardown Surge.sh preview
-        run: surge teardown ${{ env.PREVIEW_URL }} --token ${{ secrets.SURGE_TOKEN }}
+        run: pnpm dlx surge teardown ${{ env.PREVIEW_URL }} --token ${{ secrets.SURGE_TOKEN }}
         continue-on-error: true
 
       - name: Update PR comment

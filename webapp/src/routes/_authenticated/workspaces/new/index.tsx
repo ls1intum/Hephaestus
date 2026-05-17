@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeftIcon, GithubIcon, GitlabIcon, OctagonXIcon } from "lucide-react";
+import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
 import { getProvidersOptions } from "@/api/@tanstack/react-query.gen";
+import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";

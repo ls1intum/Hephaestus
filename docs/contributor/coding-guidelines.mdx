@@ -9,11 +9,11 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 ## Contributor checklist
 
-- Run the formatter and linter for the area you touched. Examples: `npm run format:webapp`, `npm run lint:server`.
-- Smoke-test the critical scripts. `npm run build:webapp` must pass. If you changed migrations, run `npm run db:generate-erd-docs`.
+- Run the formatter and linter for the area you touched. Examples: `pnpm run format:webapp`, `pnpm run lint:server`.
+- Smoke-test the critical scripts. `pnpm run build:webapp` must pass. If you changed migrations, run `pnpm run db:generate-erd-docs`.
 - Update Chromatic snapshots when you change UI components.
 - Regenerate clients and documentation when you change an API contract.
-- Rerun the quality gates that match your changes: `npm run check`, `npm run generate:api`, or `./mvnw -pl server/application-server test`.
+- Rerun the quality gates that match your changes: `pnpm run check`, `pnpm run generate:api`, or `./mvnw -pl server/application-server test`.
 - Document what you verified in the pull request template. Link failing checks to tickets if you must defer.
 
 ## Webapp (`/webapp`)
@@ -37,15 +37,15 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Subscribe to Zustand stores with selectors (`useDocumentsStore((state) => state.documents[id])`). Keep store actions pure.
 - Respect React Compiler requirements. No conditional hooks. No prop mutation. Check React DevTools for the `Memo ✨` badge or inspect builds for `react/compiler-runtime` when you need assurance. Use `'use no memo'` only while debugging.
 - Stay inside the Tailwind token scale. Reach for shadcn/ui primitives before adding new component libraries. Use `@apply` sparingly and only for wrapper primitives you reuse widely.
-- Co-locate `*.stories.tsx` files. Show default, loading, empty, and error states with realistic data. Run `npm -w webapp run chromatic:ci` whenever stories change.
+- Co-locate `*.stories.tsx` files. Show default, loading, empty, and error states with realistic data. Run `pnpm --filter webapp run chromatic:ci` whenever stories change.
 - Push heavy routes behind `React.lazy` and Suspense. Virtualise long lists with `@tanstack/react-virtual`. Defer analytics work to effects that run after paint.
 
 ### Quality gates
 
-- Install dependencies with `npm install` at the repo root so optional binaries resolve.
-- Run `npm run check:webapp` and `npm run build:webapp` before opening a pull request.
-- Execute Vitest suites with `npm run test:webapp`. Add unit tests beside the feature you touched.
-- Keep Storybook stories in sync with design. Launch `npm -w webapp run storybook` when pairing with design reviews.
+- Install dependencies with `pnpm install` at the repo root so optional binaries resolve.
+- Run `pnpm run check:webapp` and `pnpm run build:webapp` before opening a pull request.
+- Execute Vitest suites with `pnpm run test:webapp`. Add unit tests beside the feature you touched.
+- Keep Storybook stories in sync with design. Launch `pnpm --filter webapp run storybook` when pairing with design reviews.
 - Validate bundle impact by checking the Vite build stats when you add large libraries.
 
 ## Spring Boot application server (`/server/application-server`)
@@ -70,7 +70,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 - Configuration overrides stay in `application-*.yml`. Do not commit `application-local.yml`.
 - Share long-lived infrastructure in tests. Lean on Testcontainers and GitHub fixtures where possible.
-- After updating Liquibase migrations, regenerate the REST client with `npm run generate:api` and rerun `npm run db:generate-erd-docs`.
+- After updating Liquibase migrations, regenerate the REST client with `pnpm run generate:api` and rerun `pnpm run db:generate-erd-docs`.
 - Run the modular test suites with `./mvnw verify`. The build uses ArchUnit checks to enforce package boundaries.
 - Prefer integration tests that extend `AbstractSpringIntegrationTest` when you touch persistence logic.
 
@@ -79,14 +79,14 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Uses Hono for HTTP routing and `@nats-io/jetstream` for NATS publishing.
 - Verify GitHub signatures via HMAC-SHA256 and GitLab tokens via constant-time comparison.
 - Configure settings via Zod in `src/env.ts` and keep `.env.example` up to date.
-- Format and lint with Biome (`npm run check:webhook-ingest`) and run tests with Vitest.
+- Format and lint with Biome (`pnpm run check:webhook-ingest`) and run tests with Vitest.
 
 ## Docs site (`/docs`)
 
-- Docusaurus 3 powers the documentation. Install dependencies with `npm install` and run `npm run start` to preview.
+- Docusaurus 3 powers the documentation. Install dependencies with `pnpm install` and run `pnpm run start` to preview.
 - Keep front matter fields (`id`, `title`, `sidebar_position`) unique. Update `sidebars.*.ts` when adding new pages.
 - Use MDX components from `docs/src/components/**` to keep styling consistent.
-- Run `npm run build` before committing structural changes to confirm the static export succeeds.
+- Run `pnpm run build` before committing structural changes to confirm the static export succeeds.
 
 ## Database and migrations
 

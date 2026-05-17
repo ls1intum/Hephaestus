@@ -15,29 +15,29 @@
     "format:check": "biome check --formatter-enabled=true --linter-enabled=false src test",
     "lint": "biome lint src test",
     "lint:fix": "biome lint --write src test",
-    "typecheck": "tsc --noEmit",
-    "validate": "npm run typecheck && npm run lint && npm run test"
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "validate": "pnpm run typecheck && pnpm run lint && pnpm run test"
   },
   "dependencies": {
-    "@hono/node-server": "1.19.7",
-    "@nats-io/jetstream": "3.3.1",
-    "@nats-io/nats-core": "3.3.1",
-    "@nats-io/transport-node": "3.3.1",
-    "dotenv": "17.2.3",
-    "dotenv-expand": "12.0.3",
-    "hono": "4.11.7",
-    "pino": "10.1.0",
-    "zod": "4.2.1"
+    "@hono/node-server": "2.0.2",
+    "@nats-io/jetstream": "3.4.0",
+    "@nats-io/nats-core": "3.4.0",
+    "@nats-io/transport-node": "3.4.0",
+    "dotenv": "17.4.2",
+    "dotenv-expand": "13.0.0",
+    "hono": "4.12.19",
+    "pino": "10.3.1",
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@types/node": "22.19.17",
-    "@vitest/coverage-v8": "4.0.16",
+    "@types/node": "24.12.4",
+    "@vitest/coverage-v8": "4.1.6",
     "tsc-alias": "1.8.17",
-    "tsx": "4.21.0",
-    "typescript": "5.9.3",
-    "vitest": "4.0.16"
+    "tsx": "4.22.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.6"
   },
   "engines": {
-    "node": ">=22.10.0"
+    "node": ">=24.0"
   }
 }

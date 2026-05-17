@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Paperclip, Square } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { useWindowSize } from "usehooks-ts";

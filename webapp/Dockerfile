@@ -1,23 +1,33 @@
 # syntax=docker/dockerfile:1.4
 
 # Stage 1: Build
-FROM node:22-alpine AS build
-WORKDIR /app
+FROM node:24-alpine AS build
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+WORKDIR /repo
 
-# Copy package.json for dependency installation
-COPY webapp/package.json /app/
+# Enable Corepack-managed pnpm and bake the pinned version into the image so the
+# first `pnpm install` does not need network access to resolve packageManager.
+# Version explicit (not `--activate` alone) because package.json is COPYed later.
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
-# Install dependencies with BuildKit cache mount for npm
-# Note: Using npm install instead of npm ci because this is a workspace package
-# and the package-lock.json is at the monorepo root, not in this folder
-RUN --mount=type=cache,target=/root/.npm \
-    npm install --ignore-scripts --prefer-offline
+# Copy the workspace manifests first to maximize layer caching
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc /repo/
+COPY webapp/package.json /repo/webapp/
+COPY server/webhook-ingest/package.json /repo/server/webhook-ingest/
+COPY server/application-server/agent-extensions/package.json /repo/server/application-server/agent-extensions/
+COPY docs/package.json /repo/docs/
+
+# Install webapp deps (no internal workspace deps, so no `...` needed)
+RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
+    pnpm install --frozen-lockfile --filter webapp
 
 # Copy the webapp application code
-COPY webapp/ /app/
+COPY webapp/ /repo/webapp/
 
 # Build the React application
-RUN npm run build
+WORKDIR /repo/webapp
+RUN pnpm run build
 
 # Stage 2: Serve
 FROM nginx:stable-alpine
@@ -33,7 +43,7 @@ RUN apk update && apk upgrade && \
     apk add --no-cache bash sed grep curl && \
     rm -rf /var/cache/apk/*
 
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /repo/webapp/dist /usr/share/nginx/html
 COPY webapp/docker/entrypoint.sh /entrypoint.sh
 COPY webapp/docker/nginx.conf /etc/nginx/conf.d/default.conf
 

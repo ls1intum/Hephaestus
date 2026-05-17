@@ -80,15 +80,9 @@ jobs:
           # Other quality checks only need HEAD for faster checkout
           fetch-depth: ${{ matrix.check == 'database-validation' && 0 || 1 }}
 
-      - name: Setup Node.js
+      - name: Setup pnpm + Node.js
         if: steps.should_run.outputs.run == 'true'
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version-file: ".node-version"
-          cache: "npm"
-          cache-dependency-path: |
-            package-lock.json
-            webapp/package-lock.json
+        uses: ./.github/actions/setup-pnpm-node
 
       - name: Setup caches
         if: steps.should_run.outputs.run == 'true'
@@ -100,14 +94,14 @@ jobs:
       - name: Application-server formatting + Pi extension typecheck + runner smoke
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
-          npm ci --prefer-offline --no-audit
+          pnpm install --frozen-lockfile
 
           ISSUES_FOUND=()
           FMT_OK=true; TS_OK=true; RUNNER_OK=true
 
-          npm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: npm run format:java"); }
-          npm -w server/application-server/agent-extensions run typecheck \
-            || { TS_OK=false; ISSUES_FOUND+=("Pi extension TS failed typecheck against @earendil-works/pi-coding-agent. Run: npm -w server/application-server/agent-extensions run typecheck"); }
+          pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
+          pnpm --filter @hephaestus/agent-extensions run typecheck \
+            || { TS_OK=false; ISSUES_FOUND+=("Pi extension TS failed typecheck against @earendil-works/pi-coding-agent. Run: pnpm --filter @hephaestus/agent-extensions run typecheck"); }
           node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
             || { RUNNER_OK=false; ISSUES_FOUND+=("Pi mentor runner smoke test failed. Run: node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs"); }
 
@@ -115,8 +109,8 @@ jobs:
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`npm run format:java\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TS_OK" == "false" ]] && echo "| Pi extension TS | :x: Failed | \`npm -w server/application-server/agent-extensions run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TS_OK" == "false" ]] && echo "| Pi extension TS | :x: Failed | \`pnpm --filter @hephaestus/agent-extensions run typecheck\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$RUNNER_OK" == "false" ]] && echo "| Pi mentor runner smoke | :x: Failed | \`node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
@@ -127,23 +121,22 @@ jobs:
         working-directory: ./webapp
         run: |
           cd ..
-          npm ci --no-audit --progress=false
-          node scripts/install-platform-binaries.mjs
+          pnpm install --frozen-lockfile
           cd webapp
 
           ISSUES_FOUND=()
           BIOME_OK=true
           TYPES_OK=true
 
-          npm run check || { BIOME_OK=false; ISSUES_FOUND+=("Biome checks failed. Run: cd webapp && npm run check -- --write"); }
-          npm run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && npm run typecheck"); }
+          pnpm run check || { BIOME_OK=false; ISSUES_FOUND+=("Biome checks failed. Run: cd webapp && pnpm run check -- --write"); }
+          pnpm run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && pnpm run typecheck"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### Webapp Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$BIOME_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`cd webapp && npm run check -- --write\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`cd webapp && npm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$BIOME_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`cd webapp && pnpm run check -- --write\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`cd webapp && pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
@@ -151,26 +144,24 @@ jobs:
       - name: Webhook-ingest quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'webhook-ingest-quality'
         run: |
-          # npm ci already handles node_modules cleanup when package-lock.json changes
-          npm ci --no-audit --progress=false
-          node scripts/install-platform-binaries.mjs
+          pnpm install --frozen-lockfile
 
           ISSUES_FOUND=()
           CHECK_OK=true; TYPES_OK=true; TEST_OK=true; BUILD_OK=true
 
-          npm -w server/webhook-ingest run check || { CHECK_OK=false; ISSUES_FOUND+=("Biome check failed. Run: npm -w server/webhook-ingest run check"); }
-          npm -w server/webhook-ingest run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript failed. Run: npm run typecheck:webhook-ingest"); }
-          npm -w server/webhook-ingest run test || { TEST_OK=false; ISSUES_FOUND+=("Tests failed. Run: npm run test:webhook-ingest"); }
-          npm -w server/webhook-ingest run build || { BUILD_OK=false; ISSUES_FOUND+=("Build failed. Run: npm run build:webhook-ingest"); }
+          pnpm --filter webhook-ingest run check || { CHECK_OK=false; ISSUES_FOUND+=("Biome check failed. Run: pnpm --filter webhook-ingest run check"); }
+          pnpm --filter webhook-ingest run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript failed. Run: pnpm run typecheck:webhook-ingest"); }
+          pnpm --filter webhook-ingest run test || { TEST_OK=false; ISSUES_FOUND+=("Tests failed. Run: pnpm run test:webhook-ingest"); }
+          pnpm --filter webhook-ingest run build || { BUILD_OK=false; ISSUES_FOUND+=("Build failed. Run: pnpm run build:webhook-ingest"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### Webhook Ingest Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$CHECK_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`npm -w server/webhook-ingest run check\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`npm run typecheck:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TEST_OK" == "false" ]] && echo "| Tests | :x: Failed | \`npm run test:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$BUILD_OK" == "false" ]] && echo "| Build | :x: Failed | \`npm run build:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$CHECK_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`pnpm --filter webhook-ingest run check\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`pnpm run typecheck:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TEST_OK" == "false" ]] && echo "| Tests | :x: Failed | \`pnpm run test:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$BUILD_OK" == "false" ]] && echo "| Build | :x: Failed | \`pnpm run build:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
@@ -181,28 +172,27 @@ jobs:
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
           MODEL_NAME: fake:model
         run: |
-          npm ci --prefer-offline --no-audit
+          pnpm install --frozen-lockfile
           cd server/application-server
           mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
           cd ../..
 
-          npm run generate:api
+          pnpm run generate:api
           git add .
           if ! git diff --cached --quiet; then
-            echo "::error::OpenAPI out of sync. Run: npm run generate:api"
+            echo "::error::OpenAPI out of sync. Run: pnpm run generate:api"
             echo "### OpenAPI Validation" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            echo "| API specs sync | :x: Out of sync | \`npm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| API specs sync | :x: Out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
       - name: Database validation (schema + ERD + models)
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-validation'
         run: |
-          # Install dependencies (npm + platform binaries needed for models check)
-          npm ci --prefer-offline --no-audit
-          node scripts/install-platform-binaries.mjs
+          # Install dependencies (pnpm + platform binaries needed for models check)
+          pnpm install --frozen-lockfile
 
           # Start a single shared Postgres instance for all DB checks
           docker run -d --name postgres-db \
@@ -229,18 +219,18 @@ jobs:
           ISSUES_FOUND=()
 
           # Check 1: Schema drift
-          scripts/db-utils.sh draft-changelog || ISSUES_FOUND+=("Schema check script failed. Run: npm run db:draft-changelog")
+          scripts/db-utils.sh draft-changelog || ISSUES_FOUND+=("Schema check script failed. Run: pnpm run db:draft-changelog")
           if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
-            echo "::error::Schema drift detected. Run: npm run db:draft-changelog"
+            echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
             cat server/application-server/src/main/resources/db/changelog_new.xml
             ISSUES_FOUND+=("Schema drift detected")
           fi
 
           # Check 2: ERD documentation
-          scripts/db-utils.sh generate-erd || ISSUES_FOUND+=("ERD generation failed. Run: npm run db:generate-erd-docs")
+          scripts/db-utils.sh generate-erd || ISSUES_FOUND+=("ERD generation failed. Run: pnpm run db:generate-erd-docs")
           git add docs/contributor/erd/schema.mmd
           if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
-            echo "::error::ERD outdated. Run: npm run db:generate-erd-docs"
+            echo "::error::ERD outdated. Run: pnpm run db:generate-erd-docs"
             ISSUES_FOUND+=("ERD outdated")
           fi
 

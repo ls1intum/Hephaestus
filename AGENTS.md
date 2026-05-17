@@ -29,27 +29,27 @@ Run the relevant commands locally before opening a PR:
 
 | Concern           | Command                | Description                                    |
 | ----------------- | ---------------------- | ---------------------------------------------- |
-| Format everything | `npm run format`       | Apply formatting to Java + TypeScript + webapp |
-| Check formatting  | `npm run format:check` | Verify formatting without changes (CI)         |
-| Lint everything   | `npm run lint`         | Lint all server + client packages              |
-| Full check        | `npm run check`        | Comprehensive: format + lint + typecheck       |
+| Format everything | `pnpm run format`       | Apply formatting to Java + TypeScript + webapp |
+| Check formatting  | `pnpm run format:check` | Verify formatting without changes (CI)         |
+| Lint everything   | `pnpm run lint`         | Lint all server + client packages              |
+| Full check        | `pnpm run check`        | Comprehensive: format + lint + typecheck       |
 
 ### Per-service commands
 
 | Service                  | Format                                | Format Check                                | Lint                                | Check                                |
 | ------------------------ | ------------------------------------- | ------------------------------------------- | ----------------------------------- | ------------------------------------ |
-| **Webapp**               | `npm run format:webapp`               | `npm run format:webapp:check`               | `npm run lint:webapp`               | `npm run check:webapp`               |
-| **Java**                 | `npm run format:java`                 | `npm run format:java:check`                 | —                                   | —                                    |
-| **Webhook Ingest**       | `npm run format:webhook-ingest`       | `npm run format:webhook-ingest:check`       | `npm run lint:webhook-ingest`       | `npm run check:webhook-ingest`       |
+| **Webapp**               | `pnpm run format:webapp`               | `pnpm run format:webapp:check`               | `pnpm run lint:webapp`               | `pnpm run check:webapp`               |
+| **Java**                 | `pnpm run format:java`                 | `pnpm run format:java:check`                 | —                                   | —                                    |
+| **Webhook Ingest**       | `pnpm run format:webhook-ingest`       | `pnpm run format:webhook-ingest:check`       | `pnpm run lint:webhook-ingest`       | `pnpm run check:webhook-ingest`       |
 
 ### Additional commands
 
 | Concern                  | Command                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Webapp build             | `npm run build:webapp`                                                                                                                                                                                                                                                                                                                                                                                                |
-| Webapp tests             | `npm run test:webapp`                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Webapp typecheck         | `npm run typecheck:webapp`                                                                                                                                                                                                                                                                                                                                                                                            |
-| Webapp Storybook         | `npm -w webapp run build-storybook`                                                                                                                                                                                                                                                                                                                                                                                   |
+| Webapp build             | `pnpm run build:webapp`                                                                                                                                                                                                                                                                                                                                                                                                |
+| Webapp tests             | `pnpm run test:webapp`                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Webapp typecheck         | `pnpm run typecheck:webapp`                                                                                                                                                                                                                                                                                                                                                                                            |
+| Webapp Storybook         | `pnpm --filter webapp run build-storybook`                                                                                                                                                                                                                                                                                                                                                                                   |
 | Application-server tests | **Three test tiers:** <br>• `mvn test` runs unit tests (`@Tag("unit")`) <br>• `mvn verify` runs unit + integration tests (`@Tag("integration")`) <br>• `mvn test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). The Maven profile is the single guard—tests only run when explicitly activated. |
 
 **Script naming conventions:**
@@ -62,7 +62,7 @@ Run the relevant commands locally before opening a PR:
 - `check:fix` = apply all fixes
 - `ci` = CI-optimized output
 
-Document any skipped gate in the PR description with a rationale. Always finish a change set by running `npm run format` followed by `npm run check` so both styling and type checks reflect the final state.
+Document any skipped gate in the PR description with a rationale. Always finish a change set by running `pnpm run format` followed by `pnpm run check` so both styling and type checks reflect the final state.
 
 ## 4. Code generation & forbidden edits
 
@@ -70,21 +70,21 @@ We rely heavily on generated artifacts. Never hand-edit these directories—rege
 
 | Artifact                                                                                                                            | Source command                                                                                                    |
 | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `server/application-server/openapi.yaml`                                                                                            | `npm run generate:api:application-server:specs` (runs `mvn verify -DskipTests=true -Dapp.profiles=specs`).        |
-| `webapp/src/api/**/*`, `webapp/src/api/@tanstack/react-query.gen.ts`, `webapp/src/api/client.gen.ts`, `webapp/src/api/types.gen.ts` | `npm run generate:api:application-server:client` (wraps `npm -w webapp run openapi-ts`).                          |
-| `docs/contributor/erd/schema.mmd`                                                                                                   | `npm run db:generate-erd-docs` (connects to the same Postgres instance).                                          |
+| `server/application-server/openapi.yaml`                                                                                            | `pnpm run generate:api:application-server:specs` (runs `mvn verify -DskipTests=true -Dapp.profiles=specs`).        |
+| `webapp/src/api/**/*`, `webapp/src/api/@tanstack/react-query.gen.ts`, `webapp/src/api/client.gen.ts`, `webapp/src/api/types.gen.ts` | `pnpm run generate:api:application-server:client` (wraps `pnpm --filter webapp run openapi-ts`).                          |
+| `docs/contributor/erd/schema.mmd`                                                                                                   | `pnpm run db:generate-erd-docs` (connects to the same Postgres instance).                                          |
 
 Regeneration is destructive; stash local edits before running these commands. Check diffs carefully—generated clients must be committed alongside API changes.
 
 ## 5. Database workflow (Liquibase)
 
 - Liquibase changelog files live under `server/application-server/src/main/resources/db/changelog/` and are included via `master.xml`.
-- Use `npm run db:draft-changelog` after changing JPA entities. The script will:
+- Use `pnpm run db:draft-changelog` after changing JPA entities. The script will:
   1. Spin up PostgreSQL through Docker (ensure Docker is running or set `CI=true` with a ready Postgres).
   2. Snapshot the schema, run Liquibase diff, and create a timestamped changelog file.
   3. Tear down the temporary container.
 - Trim the generated changelog to only the real schema deltas (e.g., new columns). Never commit the raw diff wholesale—prune back to the minimal change set before renaming it into `db/changelog/`.
-- After drafting a changelog, run `npm run db:generate-erd-docs` to keep ERD docs in sync.
+- After drafting a changelog, run `pnpm run db:generate-erd-docs` to keep ERD docs in sync.
 - Never manually edit generated Liquibase diff sections unless you fully understand the implications. Prefer creating a follow-up changelog to fix mistakes.
 
 ## 6. Frontend (webapp) expectations
@@ -96,7 +96,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - TypeScript style: explicit prop interfaces, no `React.FC`, favour `type` aliases for composite shapes, prefer discriminated unions or Zod guards when needed, keep imports using the `@/*` alias, avoid deep relative paths. See `webapp/AGENTS.md` for full patterns.
 - Styling: Tailwind utility classes + shadcn primitives in `src/components/ui`. Compose class names with `clsx`/`tailwind-merge`; use tokenized colors (`bg-surface`, `text-muted`, etc.).
 - Accessibility: follow shadcn patterns, wire up ARIA roles, and manage focus for dialogs/menus. Storybook stories should cover default/variant/edge states. See `webapp/AGENTS.md` for Storybook patterns.
-- Tests: extend Vitest coverage when you change behaviour (`npm run test:webapp`). Use Testing Library queries that mirror user intent (`getByRole`, `findByText`).
+- Tests: extend Vitest coverage when you change behaviour (`pnpm run test:webapp`). Use Testing Library queries that mirror user intent (`getByRole`, `findByText`).
 - Routing: declare new routes via `createFileRoute`, respect loader/guard conventions, and keep loader side effects out of render paths.
 - Never hand-edit `routeTree.gen.ts`; it is generated by TanStack Router tooling.
 - **React Compiler**: The webapp uses React Compiler (via `babel-plugin-react-compiler` in `vite.config.js`) which automatically optimizes components at build time. This means:
@@ -123,26 +123,26 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Uses Hono as the HTTP framework with `@nats-io/jetstream` for NATS publishing. Keep NATS subject naming consistent (`github.<owner>.<repo>.<event>`, `gitlab.<namespace>.<project>.<event>`).
 - Security: HMAC-SHA256 signature verification for GitHub, token verification for GitLab. Uses `crypto.timingSafeEqual()` to prevent timing attacks.
 - Configuration via environment variables with Zod validation (see `src/env.ts`). When adding config, extend the Zod schema.
-- Uses Biome for linting/formatting. Run `npm run check:webhook-ingest` for full validation.
-- Tests: Run `npm run test:webhook-ingest` (Vitest).
+- Uses Biome for linting/formatting. Run `pnpm run check:webhook-ingest` for full validation.
+- Tests: Run `pnpm run test:webhook-ingest` (Vitest).
 
 ## 9. Documentation & assets
 
-- ERD diagrams live under `docs/contributor/erd/`. Regenerate via `npm run db:generate-erd-docs` after schema changes.
+- ERD diagrams live under `docs/contributor/erd/`. Regenerate via `pnpm run db:generate-erd-docs` after schema changes.
 - Contributor documentation should stay in `docs/` (GitHub Pages). Keep README/CONTRIBUTING updates concise and actionable.
 - Screenshots or large binary assets belong under `docs/images/` or the Storybook stories, not inside source directories.
 
 ## 10. Pull requests
 
-Before opening a PR, run `npm run format && npm run check`. The PR template (`.github/PULL_REQUEST_TEMPLATE.md`) guides you through title format and checklists. Key points:
+Before opening a PR, run `pnpm run format && pnpm run check`. The PR template (`.github/PULL_REQUEST_TEMPLATE.md`) guides you through title format and checklists. Key points:
 
 - **Title**: Follow Conventional Commits—see `CONTRIBUTING.md` for types/scopes.
 - **Generated files**: Regenerate and commit OpenAPI specs, clients, and ERD docs when APIs or entities change.
-- **Database changes**: Run `npm run db:draft-changelog` and prune to minimal deltas.
+- **Database changes**: Run `pnpm run db:draft-changelog` and prune to minimal deltas.
 
 ## 11. Known command caveats
 
-- `npm run db:draft-changelog` requires Docker to be installed and available on PATH. In CI we set `CI=true`; locally ensure Docker Desktop/daemon is running before invoking the script.
-- `npm run generate:api:application-server:specs` performs a full Maven `verify` against the specs profile. The initial run downloads the entire Spring Boot dependency tree (~hundreds of MB); expect several minutes on a cold cache.
+- `pnpm run db:draft-changelog` requires Docker to be installed and available on PATH. In CI we set `CI=true`; locally ensure Docker Desktop/daemon is running before invoking the script.
+- `pnpm run generate:api:application-server:specs` performs a full Maven `verify` against the specs profile. The initial run downloads the entire Spring Boot dependency tree (~hundreds of MB); expect several minutes on a cold cache.
 
 Stay consistent with the existing patterns and prefer improving the structure rather than introducing ad-hoc shortcuts.

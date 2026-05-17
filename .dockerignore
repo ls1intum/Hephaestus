@@ -1,0 +1,17 @@
+**/node_modules
+.git
+**/target
+**/dist
+**/build
+**/.cache
+**/.docusaurus
+**/coverage
+**/test-results
+**/storybook-static
+**/playwright-report
+.vscode
+.idea
+**/*.log
+.env
+.env.*
+!.env.example

@@ -5,8 +5,8 @@ Welcome to your new TanStack app!
 To run this application:
 
 ```bash
-npm install
-npm run start  
+pnpm install
+pnpm run start  
 ```
 
 # Building For Production
@@ -14,7 +14,7 @@ npm run start
 To build this application for production:
 
 ```bash
-npm run build:prod
+pnpm run build:prod
 ```
 
 ## Testing
@@ -22,7 +22,7 @@ npm run build:prod
 This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
 
 ```bash
-npm run test
+pnpm run test
 ```
 
 ## Styling
@@ -35,22 +35,22 @@ This project uses [Biome](https://biomejs.dev/) for linting and formatting. The 
 
 ```bash
 # Formatting
-npm run format          # Apply formatting fixes
-npm run format:check    # Check formatting (read-only)
+pnpm run format          # Apply formatting fixes
+pnpm run format:check    # Check formatting (read-only)
 
 # Linting
-npm run lint            # Run linting checks only
-npm run lint:fix        # Apply lint fixes
+pnpm run lint            # Run linting checks only
+pnpm run lint:fix        # Apply lint fixes
 
 # Comprehensive (format + lint + imports)
-npm run check           # Check all (formatting, linting, import organization)
-npm run check:fix       # Apply all fixes
+pnpm run check           # Check all (formatting, linting, import organization)
+pnpm run check:fix       # Apply all fixes
 
 # Type checking
-npm run typecheck       # Run TypeScript type checking
+pnpm run typecheck       # Run TypeScript type checking
 
 # CI-optimized
-npm run ci              # Run all checks with CI-friendly output
+pnpm run ci              # Run all checks with CI-friendly output
 ```
 
 ## Shadcn
@@ -58,7 +58,7 @@ npm run ci              # Run all checks with CI-friendly output
 Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
 
 ```bash
-npx shadcn@latest add button
+pnpm exec shadcn@latest add button
 ```
 
 
@@ -165,7 +165,7 @@ React-Query is an excellent addition or alternative to route loading and integra
 First add your dependencies:
 
 ```bash
-npm install @tanstack/react-query @tanstack/react-query-devtools
+pnpm install @tanstack/react-query @tanstack/react-query-devtools
 ```
 
 Next we'll need to create a query client and provider. We recommend putting those in `main.tsx`.

@@ -55,16 +55,16 @@ Before fixing anything, categorize every failure into this table.
 
 | Priority | Category | Symptoms | Fix Command |
 |----------|----------|----------|-------------|
-| 1 | Formatting | "Formatting failed", biome/prettier diff | `npm run format` |
-| 2 | Lint | Biome lint errors | `npm run check:fix` |
+| 1 | Formatting | "Formatting failed", biome/prettier diff | `pnpm run format` |
+| 2 | Lint | Biome lint errors | `pnpm run check:fix` |
 | 3 | TypeScript | TS2xxx errors, type mismatch | Fix the type error in source |
-| 4 | Build failure | Compilation errors, missing exports | Fix imports/exports, verify with `npm run build:webhook-ingest` |
-| 5 | Webapp tests | "FAIL" in webapp test output | Fix test or source, verify with `npm run test:webapp` |
+| 4 | Build failure | Compilation errors, missing exports | Fix imports/exports, verify with `pnpm run build:webhook-ingest` |
+| 5 | Webapp tests | "FAIL" in webapp test output | Fix test or source, verify with `pnpm run test:webapp` |
 | 5 | App server tests | Maven test failures, assertion errors | Fix test or source, verify with `cd server/application-server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q` |
-| 5 | Webhook tests | Vitest failures in webhook-ingest | Fix test or source, verify with `npm run test:webhook-ingest` |
-| 6 | OpenAPI sync | "OpenAPI out of sync" | `npm run generate:api` |
-| 6 | DB schema | "Schema drift detected" | `npm run db:draft-changelog` |
-| 6 | DB ERD | "ERD outdated" | `npm run db:generate-erd-docs` |
+| 5 | Webhook tests | Vitest failures in webhook-ingest | Fix test or source, verify with `pnpm run test:webhook-ingest` |
+| 6 | OpenAPI sync | "OpenAPI out of sync" | `pnpm run generate:api` |
+| 6 | DB schema | "Schema drift detected" | `pnpm run db:draft-changelog` |
+| 6 | DB ERD | "ERD outdated" | `pnpm run db:generate-erd-docs` |
 
 ## 5. Fix ALL Issues
 
@@ -78,18 +78,18 @@ Fix everything first.
 After ALL fixes are applied, run local validation:
 
 ```bash
-npm run format
-npm run check
+pnpm run format
+pnpm run check
 ```
 
 Then run tests for ALL components that had failures:
 
 ```bash
 # If webapp tests failed:
-npm run test:webapp
+pnpm run test:webapp
 
 # If webhook-ingest tests failed:
-npm run test:webhook-ingest
+pnpm run test:webhook-ingest
 
 # If app-server tests failed:
 cd server/application-server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q && cd ../..
@@ -102,15 +102,15 @@ ALL must pass locally before pushing.
 If any OpenAPI or DB validation failed:
 
 ```bash
-npm run generate:api
-npm run db:generate-erd-docs
+pnpm run generate:api
+pnpm run db:generate-erd-docs
 ```
 
 Run format + check again after regeneration:
 
 ```bash
-npm run format
-npm run check
+pnpm run format
+pnpm run check
 ```
 
 ## 8. Commit and Push (ONCE)

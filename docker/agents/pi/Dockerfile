@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-ARG NODE_TAG=22-slim
+ARG NODE_TAG=24-slim
 FROM node:${NODE_TAG}
 
 ARG TARGETARCH
@@ -8,9 +8,16 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends git finduti
     rm -rf /var/lib/apt/lists/*
 
 # renovate: datasource=npm depName=@earendil-works/pi-coding-agent
-ARG PI_VERSION=0.74.0
-RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
-    npm cache clean --force && \
+ARG PI_VERSION=0.74.1
+ENV PNPM_HOME=/usr/local/pnpm
+# pnpm 11 installs globals into $PNPM_HOME/bin (the v10 flat layout was
+# deprecated); both PNPM_HOME and PNPM_HOME/bin need to be in PATH so corepack
+# can find the pnpm shim and pnpm can find the binaries it installs globally.
+ENV PATH=$PNPM_HOME/bin:$PNPM_HOME:$PATH
+RUN corepack enable && \
+    corepack prepare pnpm@11.1.2 --activate && \
+    pnpm add -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
+    pnpm store prune && \
     mkdir -p /home/agent /workspace && \
     chown -R 1000:1000 /home/agent /workspace
 

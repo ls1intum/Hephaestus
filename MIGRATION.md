@@ -44,7 +44,7 @@ Before upgrading to any new `0.x.0` version:
 1. ✅ Read the [release notes](https://github.com/ls1intum/Hephaestus/releases)
 2. ✅ Check this migration guide for breaking changes
 3. ✅ Verify in staging first (auto-deployed on every release)
-4. ✅ Regenerate API clients: `npm run generate:api`
+4. ✅ Regenerate API clients: `pnpm run generate:api`
 5. ✅ Approve production deployment after staging verification
 
 ---
@@ -138,7 +138,7 @@ When breaking changes occur, they're documented like this:
 
 | Component | How | Notes |
 |-----------|-----|-------|
-| API clients | `npm run generate:api` | After any OpenAPI spec change |
+| API clients | `pnpm run generate:api` | After any OpenAPI spec change |
 | Environment variables | Check release notes | New config may be required |
 | Docker compose | Check `docker/` files | Image versions may change |
 
@@ -163,7 +163,7 @@ Until then, expect rapid iteration and occasional breaking changes.
 
 ### API Response Shape Changed
 
-1. Regenerate client: `npm run generate:api`
+1. Regenerate client: `pnpm run generate:api`
 2. Fix TypeScript errors
 3. Update any manual type assertions
 

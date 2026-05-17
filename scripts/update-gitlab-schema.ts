@@ -1,7 +1,7 @@
 /**
  * Update GitLab GraphQL schema via introspection
  *
- * Usage: npm run gitlab:update-schema [-- --url <other-gitlab-url>]
+ * Usage: pnpm run gitlab:update-schema [-- --url <other-gitlab-url>]
  *
  * Fetches the GitLab GraphQL schema via introspection and converts it to SDL format.
  * Default instance: https://gitlab.lrz.de (public introspection, no auth needed)
@@ -43,7 +43,7 @@ function parseArgs(): { url: string; token?: string } {
 	if (args.includes("--help") || args.includes("-h")) {
 		console.log(`Update GitLab GraphQL schema via introspection
 
-Usage: npm run gitlab:update-schema [-- --url <gitlab-url>] [-- --token <pat>]
+Usage: pnpm run gitlab:update-schema [-- --url <gitlab-url>] [-- --token <pat>]
 
 Default: ${DEFAULT_GITLAB_URL} (public introspection)
 
