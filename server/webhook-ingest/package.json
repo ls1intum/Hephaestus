@@ -15,7 +15,7 @@
     "format:check": "biome check --formatter-enabled=true --linter-enabled=false src test",
     "lint": "biome lint src test",
     "lint:fix": "biome lint --write src test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "validate": "pnpm run typecheck && pnpm run lint && pnpm run test"
   },
   "dependencies": {

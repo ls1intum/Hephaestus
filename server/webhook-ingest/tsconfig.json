@@ -24,6 +24,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "outDir": "./dist",
+    "rootDir": "./src",
     "declaration": true,
     "sourceMap": true,
     "types": [
@@ -32,9 +33,7 @@
     "skipLibCheck": true
   },
   "include": [
-    "src/**/*",
-    "test/**/*",
-    "*.config.ts"
+    "src/**/*"
   ],
   "exclude": [
     "node_modules",
