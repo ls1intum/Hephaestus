@@ -5,16 +5,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Runner profile for the one-shot practice-review agent.
- *
- * <p><b>V8 flags:</b> only {@code --no-warnings}. We do NOT cap the heap because practice
- * routinely parses 30-file diff patches that allocate transiently; a 256 MB cap would convert
- * worst-case-input OOMs from "rare" to "regular." We do NOT {@code --expose-gc} because the
- * practice runner never calls {@code global.gc()} and exposing the global is a foot-gun.
- *
- * <p><b>Per-process env:</b> empty. Practice's bursty allocations don't benefit from jemalloc's
- * page-decay tuning, and forcing {@code LD_PRELOAD} on a short-lived process is unmeasured
- * overhead.
+ * Runner profile for the one-shot practice-review agent. Conservative tuning: no heap cap (30-file
+ * diff patches allocate transiently and 256 MB would convert worst-case OOMs from rare to regular)
+ * and no jemalloc LD_PRELOAD (page-decay tuning helps long-lived heaps, not bursty one-shots).
  */
 public final class PracticeRunnerProfile implements PiRunnerProfile {
 

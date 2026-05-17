@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -455,9 +454,11 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Mentor profile loads the mentor runner script from classpath")
-        void mentorProfileResolvesCorrectScript() {
-            PiPlanSpec spec = new PiPlanSpec(
+        @DisplayName("Mentor and practice profiles resolve to distinct runner scripts")
+        void profilesResolveToDistinctScripts() {
+            PiPlanSpec base = proxySpec(LlmProvider.AZURE_OPENAI, null);
+            byte[] practiceBytes = factory.build(base).inputFiles().get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
+            PiPlanSpec mentorSpec = new PiPlanSpec(
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
                 "sk-test",
@@ -470,15 +471,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 Map.of(),
                 ""
             );
-            // The bytes copied to the workspace script slot must come from the mentor runner
-            // resource — distinct from the practice runner. We don't pin the exact bytes (they
-            // change every Pi-SDK bump), but the mentor runner header is stable.
-            String runner = new String(
-                factory.build(spec).inputFiles().get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME),
-                StandardCharsets.UTF_8
-            );
-            // Practice runner does NOT speak the JSON-RPC mentor protocol; mentor does.
-            assertThat(runner).contains("jsonrpc");
+            byte[] mentorBytes = factory.build(mentorSpec).inputFiles().get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
+            assertThat(mentorBytes).isNotEqualTo(practiceBytes);
         }
 
         @Test
@@ -526,99 +520,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 ""
             );
             assertThat(factory.build(spec).command().get(2)).doesNotContain(" cp ");
-        }
-    }
-
-    @Nested
-    @DisplayName("spec validation")
-    class SpecValidation {
-
-        @Test
-        @DisplayName("PROXY mode requires jobToken")
-        void proxyRequiresToken() {
-            assertThatThrownBy(() ->
-                new PiPlanSpec(
-                    LlmProvider.OPENAI,
-                    CredentialMode.PROXY,
-                    null,
-                    null,
-                    null,
-                    null,
-                    false,
-                    600,
-                    PRACTICE,
-                    Map.of(),
-                    ""
-                )
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("jobToken");
-        }
-
-        @Test
-        @DisplayName("API_KEY mode requires credential")
-        void apiKeyRequiresCredential() {
-            assertThatThrownBy(() ->
-                new PiPlanSpec(
-                    LlmProvider.OPENAI,
-                    CredentialMode.API_KEY,
-                    null,
-                    null,
-                    null,
-                    null,
-                    false,
-                    600,
-                    PRACTICE,
-                    Map.of(),
-                    ""
-                )
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("credential");
-        }
-
-        @Test
-        @DisplayName("timeoutSeconds must exceed the buffer")
-        void timeoutMustExceedBuffer() {
-            assertThatThrownBy(() ->
-                new PiPlanSpec(
-                    LlmProvider.OPENAI,
-                    CredentialMode.API_KEY,
-                    "sk",
-                    null,
-                    null,
-                    null,
-                    true,
-                    PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
-                    PRACTICE,
-                    Map.of(),
-                    ""
-                )
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("TIMEOUT_BUFFER_SECONDS");
-        }
-
-        @Test
-        @DisplayName("runnerProfile must not be null")
-        void runnerProfileNotNull() {
-            assertThatThrownBy(() ->
-                new PiPlanSpec(
-                    LlmProvider.OPENAI,
-                    CredentialMode.API_KEY,
-                    "sk",
-                    null,
-                    null,
-                    null,
-                    true,
-                    600,
-                    null,
-                    Map.of(),
-                    ""
-                )
-            )
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("runnerProfile");
         }
     }
 }

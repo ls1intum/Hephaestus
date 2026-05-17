@@ -100,11 +100,6 @@ public class PiRuntimeFactory {
         }
 
         String workspaceRoot = WorkspaceAbi.WORKSPACE_ROOT;
-
-        // Per-agent Node flags + envs come from the spec's runner profile. The kernel knows
-        // nothing about practice vs mentor — the profile knows nothing about the spec. This was
-        // previously a runner-script filename dispatch inside the kernel, forcing every new
-        // runner kind to edit four switches in this file.
         PiRunnerProfile profile = spec.runnerProfile();
         String nodeFlagsFragment = renderNodeFlags(profile.nodeFlags());
         String nodeEnvFragment = renderNodeEnv(profile.additionalEnv());

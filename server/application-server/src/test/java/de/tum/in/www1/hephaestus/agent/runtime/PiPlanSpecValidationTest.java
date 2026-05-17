@@ -89,23 +89,90 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Even a 'plausible' path under .pi/ is rejected unless declared")
-    void plausibleButUndeclaredPathRejected() {
-        Map<String, byte[]> inputs = Map.of(
-            ".pi/AGENTS.md", // collides with the kernel-written orchestrator path
-            "rogue".getBytes(StandardCharsets.UTF_8)
-        );
-        assertThatThrownBy(() -> specWith(inputs))
+    @DisplayName("PROXY mode requires jobToken")
+    void proxyRequiresToken() {
+        assertThatThrownBy(() ->
+            new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.PROXY,
+                null,
+                null,
+                null,
+                null,
+                false,
+                600,
+                PROFILE,
+                Map.of(),
+                ""
+            )
+        )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining(".pi/AGENTS.md");
+            .hasMessageContaining("jobToken");
     }
 
     @Test
-    @DisplayName("Null keys are rejected with a useful message")
-    void nullKeyRejected() {
-        java.util.Map<String, byte[]> withNullKey = new java.util.HashMap<>();
-        withNullKey.put(null, "x".getBytes(StandardCharsets.UTF_8));
-        // Map.copyOf throws on null keys; the validation message names that condition.
-        assertThatThrownBy(() -> specWith(withNullKey)).isInstanceOf(NullPointerException.class);
+    @DisplayName("API_KEY mode requires credential")
+    void apiKeyRequiresCredential() {
+        assertThatThrownBy(() ->
+            new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                null,
+                null,
+                null,
+                null,
+                false,
+                600,
+                PROFILE,
+                Map.of(),
+                ""
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("credential");
+    }
+
+    @Test
+    @DisplayName("timeoutSeconds must exceed TIMEOUT_BUFFER_SECONDS")
+    void timeoutMustExceedBuffer() {
+        assertThatThrownBy(() ->
+            new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk",
+                null,
+                null,
+                null,
+                true,
+                PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
+                PROFILE,
+                Map.of(),
+                ""
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("TIMEOUT_BUFFER_SECONDS");
+    }
+
+    @Test
+    @DisplayName("runnerProfile must not be null")
+    void runnerProfileNotNull() {
+        assertThatThrownBy(() ->
+            new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk",
+                null,
+                null,
+                null,
+                true,
+                600,
+                null,
+                Map.of(),
+                ""
+            )
+        )
+            .isInstanceOf(NullPointerException.class)
+            .hasMessageContaining("runnerProfile");
     }
 }

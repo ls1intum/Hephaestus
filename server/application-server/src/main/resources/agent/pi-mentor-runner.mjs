@@ -46,25 +46,15 @@ async function loadSdk() {
     return sdk;
 }
 
-// Production paths are pinned to the container layout (/workspace/...). PROTOCOL_ONLY tests
-// and CI smoke-test invocations run the runner as a plain Node process where /workspace is
-// unwritable; MENTOR_RUNNER_SESSIONS_DIR / MENTOR_RUNNER_SYSTEM_PROMPT_PATH let callers point
-// at a tmpdir without forking the runner code.
-//
-// Workspace ABI: these literals are pinned by `WorkspaceAbiSyncTest` against
-// `de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi`. Don't introduce a string template
-// that hides the constant value — the test grep is exact.
+// PROTOCOL_ONLY tests / CI smoke-test invocations run the runner as a plain Node process where
+// /workspace is unwritable; MENTOR_RUNNER_* env overrides let callers point at a tmpdir without
+// forking the runner code. The workspace literals below are pinned by `WorkspaceAbiSyncTest` —
+// keep them quoted strings, not template expressions, so the grep stays exact.
 const WORKSPACE_ROOT = "/workspace";
-const CONTEXT_TARGET_PREFIX = "context/target/"; // WorkspaceAbi.CONTEXT_TARGET_PREFIX
 const MENTOR_SYSTEM_PROMPT_PATH = "agent/mentor/system.md"; // WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH
 const CWD = process.env.MENTOR_RUNNER_CWD ?? WORKSPACE_ROOT;
 const SESSIONS_DIR = process.env.MENTOR_RUNNER_SESSIONS_DIR ?? `${WORKSPACE_ROOT}/.sessions`;
 const SYSTEM_PROMPT_PATH = process.env.MENTOR_RUNNER_SYSTEM_PROMPT_PATH ?? `${WORKSPACE_ROOT}/${MENTOR_SYSTEM_PROMPT_PATH}`;
-// Aspect JSON inputs (workspace.json, user.json, ...) are materialised under this prefix by
-// the Java content providers. The runner never reads them directly — they arrive via the
-// `fetch_context` callback — but pinning the prefix here keeps the ABI contract documented.
-const ASPECT_INPUT_DIR = `${WORKSPACE_ROOT}/${CONTEXT_TARGET_PREFIX}`;
-void ASPECT_INPUT_DIR; // intentionally referenced for ABI documentation
 // The SDK's `getAgentDir()` is the canonical default ("~/.pi/agent"). We resolve it lazily
 // inside `ensureRuntime()` so the module loads without the SDK in protocol-only test mode.
 const AGENT_DIR_OVERRIDE = process.env.PI_CODING_AGENT_DIR ?? null;

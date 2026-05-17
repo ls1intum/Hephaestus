@@ -10,28 +10,14 @@ import org.springframework.lang.Nullable;
  * Inputs for {@link PiRuntimeFactory#build(PiPlanSpec)}. Validation lives in the compact
  * constructor — there is no builder; callers construct positionally.
  *
- * @param provider        LLM provider; required
- * @param credentialMode  PROXY (job-token), API_KEY, or OAUTH; required
- * @param credential      API key in API_KEY/OAUTH modes; must be non-blank in those modes
- * @param modelName       optional model override
- * @param baseUrl         optional OpenAI-compatible base URL override. Exported as
- *                        {@code OPENAI_BASE_URL} / {@code ANTHROPIC_BASE_URL} only in API_KEY/OAUTH
- *                        modes — PROXY mode resolves its base URL from the sandbox-injected
- *                        {@code $LLM_PROXY_URL}, so a baseUrl here would be silently shadowed.
- *                        Production runs leave this {@code null}; live tests use it to point Pi at
- *                        a non-default OpenAI-compatible endpoint (e.g. the TUM gateway).
- * @param jobToken        PROXY mode job token; must be non-blank in PROXY mode
- * @param allowInternet   PROXY mode internet flag; ignored otherwise (always true)
- * @param timeoutSeconds  total sandbox timeout (must be {@code > TIMEOUT_BUFFER_SECONDS})
- * @param runnerProfile   per-runner-kind strategy (script filename, V8 flags, per-process env);
- *                        the kernel reads three properties off it instead of dispatching by
- *                        filename match
+ * @param baseUrl         OpenAI-compatible base URL override. Exported as {@code OPENAI_BASE_URL}
+ *                        / {@code ANTHROPIC_BASE_URL} only in API_KEY/OAUTH modes — PROXY mode
+ *                        resolves its base URL from the sandbox-injected {@code $LLM_PROXY_URL},
+ *                        so a baseUrl here would be silently shadowed.
  * @param extraInputs     additional workspace files keyed by relative path. Each key MUST appear
  *                        in {@link WorkspaceAbi#allowedExtraInputPaths()} or be prefixed by one
- *                        of {@link WorkspaceAbi#allowedExtraInputPrefixes()} — the validation
- *                        prevents adapters from writing to arbitrary workspace paths and forces
- *                        new mount points to be declared on {@link WorkspaceAbi}
- * @param precomputeStep  shell fragment ending in {@code " && "} (or empty)
+ *                        of {@link WorkspaceAbi#allowedExtraInputPrefixes()}.
+ * @param precomputeStep  shell fragment ending in {@code " && "} (or empty).
  */
 public record PiPlanSpec(
     LlmProvider provider,
@@ -74,22 +60,12 @@ public record PiPlanSpec(
             }
         }
         extraInputs = extraInputs != null ? Map.copyOf(extraInputs) : Map.of();
-        // Fail-fast at construction: every extraInputs key must be a recognised workspace path.
-        // Adapters caught writing to arbitrary paths surface here at boot/test time instead of
-        // silently overwriting a future workspace mount-point.
+        // Fail-fast: adapters writing to undeclared workspace paths surface here at test/boot time
+        // instead of silently overwriting a future mount-point.
         for (String path : extraInputs.keySet()) {
-            if (path == null) {
-                throw new IllegalArgumentException("extraInputs keys must not be null");
-            }
-            boolean ok = WorkspaceAbi.allowedExtraInputPaths().contains(path);
-            if (!ok) {
-                for (String prefix : WorkspaceAbi.allowedExtraInputPrefixes()) {
-                    if (path.startsWith(prefix)) {
-                        ok = true;
-                        break;
-                    }
-                }
-            }
+            boolean ok =
+                WorkspaceAbi.allowedExtraInputPaths().contains(path) ||
+                WorkspaceAbi.allowedExtraInputPrefixes().stream().anyMatch(path::startsWith);
             if (!ok) {
                 throw new IllegalArgumentException(
                     "extraInputs path '" +

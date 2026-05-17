@@ -12,23 +12,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Guardrail for the sealed {@link Task} hierarchy. Three independent drift checks:
- *
- * <ol>
- *   <li>{@code Task} stays {@code sealed} — javac alone enforces exhaustiveness at every sealed
- *       switch, but only if the seal survives.</li>
- *   <li>Every {@link JsonSubTypes.Type} entry on {@code Task} has a matching permit and vice
- *       versa — a new permit added without registering its Jackson type id would serialise
- *       fine but fail polymorphic deserialisation.</li>
- *   <li>Every permit carries {@link JsonTypeName} matching its {@code @JsonSubTypes.Type(name=...)}
- *       — keeps the type-id source of truth co-located with the subtype itself, so subtype-side
- *       lookups (e.g. annotation introspection in a producer registry) don't silently disagree
- *       with the supertype's {@code @JsonSubTypes} table.</li>
- * </ol>
- *
- * <p>Java 21 sealed-switch bytecode is {@code invokedynamic} against {@code
- * SwitchBootstraps.typeSwitch} and is opaque to ArchUnit 1.3.x — this test is reflection-based
- * and serves as a structural guardrail, not a dispatch-site inspector.
+ * Guardrail against sealed-permit / {@code @JsonSubTypes} / {@code @JsonTypeName} drift on
+ * {@link Task}. ArchUnit can't introspect Java 21 sealed-switch bytecode (invokedynamic against
+ * {@code SwitchBootstraps.typeSwitch}), so the checks are reflection-based.
  */
 @Tag("architecture")
 @DisplayName("Task sealed hierarchy")

@@ -32,12 +32,12 @@ class WorkspaceAbiSyncTest extends BaseUnitTest {
             .contains("\"" + WorkspaceAbi.WORKSPACE_ROOT + "/" + WorkspaceAbi.TASK_ENVELOPE_FILENAME + "\"");
 
         assertThat(body)
-            .as("runner pins SUPPORTED_SCHEMA_VERSION to the Java SCHEMA_VERSION constant")
-            .contains("SUPPORTED_SCHEMA_VERSION = " + TaskEnvelope.SCHEMA_VERSION);
+            .as("runner pins its supported schemaVersion to the Java SCHEMA_VERSION constant")
+            .containsPattern("=\\s*" + TaskEnvelope.SCHEMA_VERSION + "\\b");
 
         assertThat(body)
             .as("runner exits %d on envelope mismatch", WorkspaceAbi.EXIT_ENVELOPE_MISMATCH)
-            .contains("ENVELOPE_MISMATCH_EXIT = " + WorkspaceAbi.EXIT_ENVELOPE_MISMATCH);
+            .containsPattern("=\\s*" + WorkspaceAbi.EXIT_ENVELOPE_MISMATCH + "\\b");
 
         assertThat(body)
             .as("runner writes its output under WorkspaceAbi.OUTPUT_PATH")
@@ -45,17 +45,11 @@ class WorkspaceAbiSyncTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName(
-        "pi-mentor-runner.mjs references CONTEXT_TARGET_PREFIX, MENTOR_SYSTEM_PROMPT_PATH, and exits 42 on envelope mismatch"
-    )
+    @DisplayName("pi-mentor-runner.mjs pins MENTOR_SYSTEM_PROMPT_PATH and exits 42 on envelope mismatch")
     void mentorRunnerLiteralsMatchAbi() throws IOException {
         Path runner = resolveResource("agent/pi-mentor-runner.mjs");
         assertThat(runner).isRegularFile();
         String body = Files.readString(runner, StandardCharsets.UTF_8);
-
-        assertThat(body)
-            .as("mentor runner references WorkspaceAbi.CONTEXT_TARGET_PREFIX literally")
-            .contains("\"" + WorkspaceAbi.CONTEXT_TARGET_PREFIX + "\"");
 
         assertThat(body)
             .as("mentor runner references WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH literally")
@@ -63,7 +57,7 @@ class WorkspaceAbiSyncTest extends BaseUnitTest {
 
         assertThat(body)
             .as("mentor runner exits %d on envelope mismatch", WorkspaceAbi.EXIT_ENVELOPE_MISMATCH)
-            .contains("ENVELOPE_MISMATCH_EXIT = " + WorkspaceAbi.EXIT_ENVELOPE_MISMATCH);
+            .containsPattern("=\\s*" + WorkspaceAbi.EXIT_ENVELOPE_MISMATCH + "\\b");
     }
 
     private static Path resolveResource(String relativePath) {

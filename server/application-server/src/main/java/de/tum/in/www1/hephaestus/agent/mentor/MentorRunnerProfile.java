@@ -1,43 +1,24 @@
 package de.tum.in.www1.hephaestus.agent.mentor;
 
 import de.tum.in.www1.hephaestus.agent.runtime.PiRunnerProfile;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Runner profile for the long-lived mentor chat agent.
+ * Runner profile for the long-lived mentor chat agent. Tuning is set for ~100 MB V8 heap floor
+ * and predictable page-decay over hours-long sessions.
  *
- * <p><b>V8 flags:</b>
- * <ul>
- *   <li>{@code --max-old-space-size=256} — cap V8 old-gen at 256 MB. Empirically the mentor
- *       runtime sits at ~100 MB V8 heap; 2.5× headroom defends against a leaky session OOM-ing
- *       the host instead of itself. Default ~1.4 GB on 64-bit lets one bad runner take the host
- *       down.</li>
- *   <li>{@code --no-warnings} — keeps stderr clean for ops grep against our own log prefix.</li>
- *   <li>{@code --expose-gc} — exposes {@code global.gc()} so the runner can force a post-turn
- *       compaction in {@code pi-mentor-runner.mjs:forwardEvent}. The flag costs nothing on its
- *       own and is only effective when {@code global.gc()} is actually called.</li>
- * </ul>
+ * <p>V8 flags: {@code --max-old-space-size=256} caps the heap so a leaky session OOMs itself
+ * (default ~1.4 GB lets one bad runner take the host); {@code --expose-gc} backs
+ * {@code pi-mentor-runner.mjs}'s post-turn compaction call to {@code global.gc()}.
  *
- * <p>Note: {@code --disable-source-maps} was removed in Node 22 (source maps are off by default;
- * the flag itself no longer exists and causes {@code bad option} exit 9). Do not re-add.
- *
- * <p>We deliberately removed {@code --max-semi-space-size=16} and {@code UV_THREADPOOL_SIZE=2}
- * from prior revisions: the former matches the Node 22 default on 64-bit (so it was a no-op),
- * and the latter risks serialising libuv fs/crypto bursts.
- *
- * <p><b>Per-process env:</b> {@code LD_PRELOAD=libjemalloc.so.2} +
- * {@code MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:30000,muzzy_decay_ms:30000}.
- * Mentor's long-lived heap benefits from jemalloc's page-decay tuning; precompute's bursty
- * allocations don't. {@code background_thread:true} runs jemalloc's page-decay sweep on a
- * dedicated thread — without it the mutator must re-enter the allocator to trigger decay, which
- * a long-idle Node loop rarely does (cf. jemalloc TUNING.md). Decay window 30 s matches
- * jemalloc upstream's "long-lived process" recommendation.
- *
- * <p>The path matches the {@code /usr/local/lib/libjemalloc.so.2} symlink created by the Pi
- * Dockerfile ({@code docker/agents/pi/Dockerfile}). The symlink is per-arch by design; the env
- * literal here is arch-independent.
+ * <p>Per-process env preloads jemalloc and tunes page decay because mentor's long-lived heap
+ * benefits from background-thread decay sweeps (cf. jemalloc TUNING.md "long-lived process");
+ * practice's bursty allocations don't, hence kernel-scoped LD_PRELOAD on the node invocation
+ * only. {@code /usr/local/lib/libjemalloc.so.2} is the per-arch symlink the Pi Dockerfile
+ * creates so this literal stays arch-independent.
  */
 public final class MentorRunnerProfile implements PiRunnerProfile {
 
@@ -46,15 +27,15 @@ public final class MentorRunnerProfile implements PiRunnerProfile {
 
     private static final List<String> FLAGS = List.of("--max-old-space-size=256", "--no-warnings", "--expose-gc");
 
+    // Iteration order is load-bearing: renderNodeEnv emits `KEY=value` pairs in iteration order,
+    // so a non-deterministic Map yields a non-deterministic command line across builds.
     private static final Map<String, String> ENV;
 
     static {
-        // LinkedHashMap preserves declaration order — the assembled command line is the same
-        // every build, which simplifies cross-build diff inspection.
         LinkedHashMap<String, String> env = new LinkedHashMap<>();
         env.put("LD_PRELOAD", "/usr/local/lib/libjemalloc.so.2");
         env.put("MALLOC_CONF", "background_thread:true,narenas:2,dirty_decay_ms:30000,muzzy_decay_ms:30000");
-        ENV = Map.copyOf(env);
+        ENV = Collections.unmodifiableMap(env);
     }
 
     @Override
