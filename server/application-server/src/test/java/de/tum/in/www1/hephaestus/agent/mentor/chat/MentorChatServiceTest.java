@@ -133,7 +133,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         // the instance path and does not need the agentConfigRepository.
         MentorAgentProperties mentorProps = new MentorAgentProperties(
             "test-image",
-            "pi-mentor-runner.mjs",
             100_000,
             "",
             LlmProvider.OPENAI,

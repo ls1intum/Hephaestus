@@ -50,13 +50,47 @@ async function loadSdk() {
 // and CI smoke-test invocations run the runner as a plain Node process where /workspace is
 // unwritable; MENTOR_RUNNER_SESSIONS_DIR / MENTOR_RUNNER_SYSTEM_PROMPT_PATH let callers point
 // at a tmpdir without forking the runner code.
-const CWD = process.env.MENTOR_RUNNER_CWD ?? "/workspace";
-const SESSIONS_DIR = process.env.MENTOR_RUNNER_SESSIONS_DIR ?? "/workspace/.sessions";
-const SYSTEM_PROMPT_PATH = process.env.MENTOR_RUNNER_SYSTEM_PROMPT_PATH ?? "/workspace/agent/mentor/system.md";
+//
+// Workspace ABI: these literals are pinned by `WorkspaceAbiSyncTest` against
+// `de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi`. Don't introduce a string template
+// that hides the constant value — the test grep is exact.
+const WORKSPACE_ROOT = "/workspace";
+const CONTEXT_TARGET_PREFIX = "context/target/"; // WorkspaceAbi.CONTEXT_TARGET_PREFIX
+const MENTOR_SYSTEM_PROMPT_PATH = "agent/mentor/system.md"; // WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH
+const CWD = process.env.MENTOR_RUNNER_CWD ?? WORKSPACE_ROOT;
+const SESSIONS_DIR = process.env.MENTOR_RUNNER_SESSIONS_DIR ?? `${WORKSPACE_ROOT}/.sessions`;
+const SYSTEM_PROMPT_PATH = process.env.MENTOR_RUNNER_SYSTEM_PROMPT_PATH ?? `${WORKSPACE_ROOT}/${MENTOR_SYSTEM_PROMPT_PATH}`;
+// Aspect JSON inputs (workspace.json, user.json, ...) are materialised under this prefix by
+// the Java content providers. The runner never reads them directly — they arrive via the
+// `fetch_context` callback — but pinning the prefix here keeps the ABI contract documented.
+const ASPECT_INPUT_DIR = `${WORKSPACE_ROOT}/${CONTEXT_TARGET_PREFIX}`;
+void ASPECT_INPUT_DIR; // intentionally referenced for ABI documentation
 // The SDK's `getAgentDir()` is the canonical default ("~/.pi/agent"). We resolve it lazily
 // inside `ensureRuntime()` so the module loads without the SDK in protocol-only test mode.
 const AGENT_DIR_OVERRIDE = process.env.PI_CODING_AGENT_DIR ?? null;
 const PROTOCOL_VERSION = 1;
+
+// WorkspaceAbi.EXIT_ENVELOPE_MISMATCH — exit code on protocol-version / image / config drift
+// that makes this runner incompatible with the calling Java side. Java's launcher distinguishes
+// this exit from a generic crash so deploy regressions surface as a structured failure.
+const ENVELOPE_MISMATCH_EXIT = 42;
+
+// Startup envelope check: if the Java launcher pins an expected protocol version via env,
+// fail-fast with a structured exit so the deploy doesn't silently downgrade to a stub.
+{
+    const expectedRaw = process.env.MENTOR_RUNNER_EXPECTED_PROTOCOL_VERSION;
+    if (expectedRaw !== undefined && expectedRaw !== "") {
+        const expected = Number(expectedRaw);
+        if (!Number.isFinite(expected) || expected !== PROTOCOL_VERSION) {
+            process.stderr.write(
+                `[pi-mentor-runner] FATAL envelope mismatch: ` +
+                    `MENTOR_RUNNER_EXPECTED_PROTOCOL_VERSION=${expectedRaw}, runner PROTOCOL_VERSION=${PROTOCOL_VERSION}. ` +
+                    `Exiting ${ENVELOPE_MISMATCH_EXIT}.\n`,
+            );
+            process.exit(ENVELOPE_MISMATCH_EXIT);
+        }
+    }
+}
 
 const FETCH_CONTEXT_TIMEOUT_MS = 10_000;
 const TURN_BUDGET_MS = (() => {
@@ -969,15 +1003,18 @@ function start() {
     });
     process.stdin.on("error", (e) => {
         log("stdin error:", e);
-        process.exit(2);
+        // Distinct from ENVELOPE_MISMATCH_EXIT (42): this is a transport-layer failure, not a
+        // structured protocol/image drift. Node default fatal exit code is 1.
+        process.exit(1);
     });
 
     process.on("uncaughtException", (e) => {
         log("uncaughtException:", e);
         try {
-            process.stdout.write("", () => process.exit(2));
+            // Same rationale: uncaught is a runtime crash, not an envelope mismatch.
+            process.stdout.write("", () => process.exit(1));
         } catch {
-            process.exit(2);
+            process.exit(1);
         }
     });
     process.on("unhandledRejection", (e) => {

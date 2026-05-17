@@ -75,7 +75,7 @@ public class PiRuntimeFactory {
             buildPiSettingsJson(spec.provider(), spec.modelName(), useCustomProvider)
         );
         inputFiles.put(WorkspaceAbi.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
-        inputFiles.put(WorkspaceAbi.RUNNER_SCRIPT_FILENAME, loadClasspathResource(spec.runnerScript()));
+        inputFiles.put(WorkspaceAbi.RUNNER_SCRIPT_FILENAME, loadClasspathResource(spec.runnerProfile().runnerScript()));
         inputFiles.putAll(spec.extraInputs());
 
         long agentTimeoutMs = Math.max(60_000L, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
@@ -100,6 +100,15 @@ public class PiRuntimeFactory {
         }
 
         String workspaceRoot = WorkspaceAbi.WORKSPACE_ROOT;
+
+        // Per-agent Node flags + envs come from the spec's runner profile. The kernel knows
+        // nothing about practice vs mentor — the profile knows nothing about the spec. This was
+        // previously a runner-script filename dispatch inside the kernel, forcing every new
+        // runner kind to edit four switches in this file.
+        PiRunnerProfile profile = spec.runnerProfile();
+        String nodeFlagsFragment = renderNodeFlags(profile.nodeFlags());
+        String nodeEnvFragment = renderNodeEnv(profile.additionalEnv());
+
         String command =
             authSetup +
             "mkdir -p " +
@@ -110,12 +119,9 @@ public class PiRuntimeFactory {
             workspaceRoot +
             "/node_modules && " +
             spec.precomputeStep() +
-            // Per-agent Node flags + envs. We deliberately do NOT apply the same flags to both
-            // the long-lived mentor runner and the one-shot practice runner — see the rationale
-            // in {@link #nodeFlagsFor(String)} and {@link #nodeEnvFor(String)}.
-            nodeEnvFor(spec.runnerScript()) +
+            nodeEnvFragment +
             "node " +
-            nodeFlagsFor(spec.runnerScript()) +
+            nodeFlagsFragment +
             workspaceRoot +
             "/" +
             WorkspaceAbi.RUNNER_SCRIPT_FILENAME;
@@ -137,70 +143,36 @@ public class PiRuntimeFactory {
         return new PiPlan(List.of("sh", "-c", command), Map.copyOf(env), Map.copyOf(inputFiles), networkPolicy);
     }
 
-    /** Mentor uses a long-lived runner; the script filename is the dispatch key. */
-    static final String MENTOR_RUNNER_SCRIPT = "pi-mentor-runner.mjs";
-
     /**
-     * Per-runner Node CLI flags. We split mentor (long-lived JSONL pump, 50+ concurrent containers
-     * on a single host) from practice (one-shot review, reads large diffs, runs precompute).
-     *
-     * <p><b>Mentor flags:</b>
-     * <ul>
-     *   <li>{@code --max-old-space-size=256} — cap V8 old-gen at 256 MB. Empirically the mentor
-     *       runtime sits at ~100 MB V8 heap; 2.5× headroom defends against a leaky session OOM-ing
-     *       the host instead of itself. Default ~1.4 GB on 64-bit lets one bad runner take the
-     *       host down.</li>
-     *   <li>{@code --no-warnings} — keeps stderr clean for ops grep against our own log prefix.</li>
-     *   <li>{@code --expose-gc} — exposes {@code global.gc()} so the runner can force a post-turn
-     *       compaction in {@code pi-mentor-runner.mjs:forwardEvent}. The flag costs nothing on its
-     *       own and is only effective when {@code global.gc()} is actually called.</li>
-     * </ul>
-     *
-     * <p><b>Practice flags:</b> only {@code --no-warnings}. We do NOT cap the heap because practice
-     * routinely parses 30-file diff patches that allocate transiently; a 256 MB cap would convert
-     * worst-case-input OOMs from "rare" to "regular." We do NOT {@code --expose-gc} because the
-     * practice runner never calls {@code global.gc()} and exposing the global is a foot-gun.
-     *
-     * <p>Note: {@code --disable-source-maps} was removed — the flag was dropped in Node 22 (source
-     * maps are off by default; the flag itself no longer exists and causes {@code bad option} exit 9).
-     *
-     * <p>We deliberately removed {@code --max-semi-space-size=16} and {@code UV_THREADPOOL_SIZE=2}
-     * from prior revisions: the former matches the Node 22 default on 64-bit (so it was a no-op),
-     * and the latter risks serialising libuv fs/crypto bursts (notably the practice runner's
-     * git tool calls) for an unmeasured ~MB-scale RSS reservation reduction.
+     * Render the profile's node flags as a trailing-space-terminated fragment so the kernel can
+     * interpolate without conditional whitespace. Empty profiles render to the empty string.
      */
-    private static String nodeFlagsFor(String runnerScript) {
-        if (MENTOR_RUNNER_SCRIPT.equals(runnerScript)) {
-            return "--max-old-space-size=256 --no-warnings --expose-gc ";
+    private static String renderNodeFlags(List<String> flags) {
+        if (flags == null || flags.isEmpty()) {
+            return "";
         }
-        return "--no-warnings ";
+        return String.join(" ", flags) + " ";
     }
 
     /**
-     * Per-runner environment fragments injected as {@code VAR=value} pairs into the shell
-     * {@code node …} invocation. This scopes {@code LD_PRELOAD=libjemalloc.so.2} +
-     * {@code MALLOC_CONF=…} to the Node process only — NOT image-wide ENV — so the precompute
-     * runner ({@code bun}), {@code git}, {@code jq}, and short-lived tool invocations all keep
-     * their default glibc allocators. Mentor's long-lived heap benefits from jemalloc's
-     * page-decay tuning; precompute's bursty allocations don't.
+     * Render the profile's per-process env fragment as {@code KEY=value} pairs. Each pair is
+     * trailing-space terminated; the assembled fragment is emitted IMMEDIATELY preceding the
+     * {@code node} keyword so the shell scopes the env to the node invocation only — NOT image-
+     * wide ENV. Other binaries in the same shell ({@code bun}, {@code git}) keep their default
+     * environment.
      *
-     * <p>The path matches the {@code /usr/local/lib/libjemalloc.so.2} symlink created by the Pi
-     * Dockerfile (see {@code docker/agents/pi/Dockerfile}). The symlink is per-arch by design;
-     * the env literal here is arch-independent.
+     * <p>Values are NOT shell-quoted because no profile today emits values containing whitespace
+     * or shell metacharacters; a future profile that needs to MUST add quoting here.
      */
-    private static String nodeEnvFor(String runnerScript) {
-        if (MENTOR_RUNNER_SCRIPT.equals(runnerScript)) {
-            // `background_thread:true` runs jemalloc's page-decay sweep on a dedicated thread —
-            // without it the mutator must re-enter the allocator to trigger decay, which a
-            // long-idle Node loop rarely does (cf. jemalloc TUNING.md). Decay window 30s
-            // matches jemalloc upstream's "long-lived process" recommendation; 10s was
-            // aggressive without buying anything once background_thread is on.
-            return (
-                "LD_PRELOAD=/usr/local/lib/libjemalloc.so.2 " +
-                "MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:30000,muzzy_decay_ms:30000 "
-            );
+    private static String renderNodeEnv(Map<String, String> env) {
+        if (env == null || env.isEmpty()) {
+            return "";
         }
-        return "";
+        StringBuilder b = new StringBuilder();
+        for (Map.Entry<String, String> e : env.entrySet()) {
+            b.append(e.getKey()).append('=').append(e.getValue()).append(' ');
+        }
+        return b.toString();
     }
 
     /**

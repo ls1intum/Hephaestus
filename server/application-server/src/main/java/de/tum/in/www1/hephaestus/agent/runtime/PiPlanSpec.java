@@ -23,8 +23,14 @@ import org.springframework.lang.Nullable;
  * @param jobToken        PROXY mode job token; must be non-blank in PROXY mode
  * @param allowInternet   PROXY mode internet flag; ignored otherwise (always true)
  * @param timeoutSeconds  total sandbox timeout (must be {@code > TIMEOUT_BUFFER_SECONDS})
- * @param runnerScript    filename of the Pi runner under {@code resources/agent/}; required
- * @param extraInputs     additional workspace files keyed by relative path (e.g. {@code task.json})
+ * @param runnerProfile   per-runner-kind strategy (script filename, V8 flags, per-process env);
+ *                        the kernel reads three properties off it instead of dispatching by
+ *                        filename match
+ * @param extraInputs     additional workspace files keyed by relative path. Each key MUST appear
+ *                        in {@link WorkspaceAbi#allowedExtraInputPaths()} or be prefixed by one
+ *                        of {@link WorkspaceAbi#allowedExtraInputPrefixes()} — the validation
+ *                        prevents adapters from writing to arbitrary workspace paths and forces
+ *                        new mount points to be declared on {@link WorkspaceAbi}
  * @param precomputeStep  shell fragment ending in {@code " && "} (or empty)
  */
 public record PiPlanSpec(
@@ -36,16 +42,16 @@ public record PiPlanSpec(
     @Nullable String jobToken,
     boolean allowInternet,
     int timeoutSeconds,
-    String runnerScript,
+    PiRunnerProfile runnerProfile,
     Map<String, byte[]> extraInputs,
     String precomputeStep
 ) {
     public PiPlanSpec {
         Objects.requireNonNull(provider, "provider");
         Objects.requireNonNull(credentialMode, "credentialMode");
-        Objects.requireNonNull(runnerScript, "runnerScript");
-        if (runnerScript.isBlank()) {
-            throw new IllegalArgumentException("runnerScript must not be blank");
+        Objects.requireNonNull(runnerProfile, "runnerProfile");
+        if (runnerProfile.runnerScript() == null || runnerProfile.runnerScript().isBlank()) {
+            throw new IllegalArgumentException("runnerProfile.runnerScript() must not be blank");
         }
         if (timeoutSeconds <= PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS) {
             throw new IllegalArgumentException(
@@ -68,6 +74,32 @@ public record PiPlanSpec(
             }
         }
         extraInputs = extraInputs != null ? Map.copyOf(extraInputs) : Map.of();
+        // Fail-fast at construction: every extraInputs key must be a recognised workspace path.
+        // Adapters caught writing to arbitrary paths surface here at boot/test time instead of
+        // silently overwriting a future workspace mount-point.
+        for (String path : extraInputs.keySet()) {
+            if (path == null) {
+                throw new IllegalArgumentException("extraInputs keys must not be null");
+            }
+            boolean ok = WorkspaceAbi.allowedExtraInputPaths().contains(path);
+            if (!ok) {
+                for (String prefix : WorkspaceAbi.allowedExtraInputPrefixes()) {
+                    if (path.startsWith(prefix)) {
+                        ok = true;
+                        break;
+                    }
+                }
+            }
+            if (!ok) {
+                throw new IllegalArgumentException(
+                    "extraInputs path '" +
+                        path +
+                        "' is not a recognised workspace path: must appear in " +
+                        "WorkspaceAbi.allowedExtraInputPaths() or be prefixed by one of " +
+                        WorkspaceAbi.allowedExtraInputPrefixes()
+                );
+            }
+        }
         precomputeStep = precomputeStep != null ? precomputeStep : "";
     }
 }

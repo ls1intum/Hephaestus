@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.runtime;
 
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -60,9 +61,43 @@ public final class WorkspaceAbi {
     /** Workspace-relative path of the orchestrator instructions (combination of prefix + filename). */
     public static final String ORCHESTRATOR_PATH = PI_AGENT_PREFIX + ORCHESTRATOR_FILENAME;
 
+    /**
+     * Workspace-relative path of the mentor runner's system prompt file. Single-sourced so the
+     * Java materialiser (writing the bytes) and the JavaScript runner (reading them) cannot drift.
+     */
+    public static final String MENTOR_SYSTEM_PROMPT_PATH = "agent/mentor/system.md";
+
+    /** Workspace-relative directory for restored Pi SDK session JSONL files (matches the mentor runner's {@code SESSIONS_DIR}). */
+    public static final String SESSIONS_DIR_PREFIX = ".sessions/";
+
     /** Exit code emitted by the Pi runner on envelope/image drift (unsupported {@code schemaVersion} or {@code kind}). */
     public static final int EXIT_ENVELOPE_MISMATCH = 42;
 
     /** Practice slug pattern enforced at the handler boundary as defense-in-depth against FS-path injection. */
     public static final Pattern PRACTICE_SLUG = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
+
+    /**
+     * Allowlist of {@link PiPlanSpec#extraInputs()} workspace paths that do NOT live under
+     * {@link #CONTEXT_TARGET_PREFIX}. Every adapter writing one of these paths must declare it
+     * here, so the next reader sees the complete set of mount points an adapter can plant in the
+     * workspace.
+     *
+     * <p>The set is the wire contract between {@code PiPlanSpec}'s compact-constructor validator
+     * (which rejects unknown paths fail-fast at boot/test time) and the {@code MentorPiAdapter}
+     * (which writes {@link #MENTOR_SYSTEM_PROMPT_PATH}). A future adapter adding a new path will
+     * fail validation until the path is added here — forcing the architectural review.
+     */
+    public static Set<String> allowedExtraInputPaths() {
+        return Set.of(MENTOR_SYSTEM_PROMPT_PATH);
+    }
+
+    /**
+     * Returns workspace-path prefixes accepted by {@code PiPlanSpec.extraInputs} for dynamic-suffix
+     * paths. Mentor's per-thread session JSONL restores ({@code .sessions/&lt;threadId&gt;.jsonl})
+     * are accepted via {@link #SESSIONS_DIR_PREFIX}; provider-emitted aspect JSON via
+     * {@link #CONTEXT_TARGET_PREFIX}.
+     */
+    public static Set<String> allowedExtraInputPrefixes() {
+        return Set.of(CONTEXT_TARGET_PREFIX, SESSIONS_DIR_PREFIX);
+    }
 }

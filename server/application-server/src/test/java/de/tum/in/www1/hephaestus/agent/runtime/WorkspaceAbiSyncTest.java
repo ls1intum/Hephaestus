@@ -44,6 +44,28 @@ class WorkspaceAbiSyncTest extends BaseUnitTest {
             .contains("\"" + WorkspaceAbi.OUTPUT_PATH + "\"");
     }
 
+    @Test
+    @DisplayName(
+        "pi-mentor-runner.mjs references CONTEXT_TARGET_PREFIX, MENTOR_SYSTEM_PROMPT_PATH, and exits 42 on envelope mismatch"
+    )
+    void mentorRunnerLiteralsMatchAbi() throws IOException {
+        Path runner = resolveResource("agent/pi-mentor-runner.mjs");
+        assertThat(runner).isRegularFile();
+        String body = Files.readString(runner, StandardCharsets.UTF_8);
+
+        assertThat(body)
+            .as("mentor runner references WorkspaceAbi.CONTEXT_TARGET_PREFIX literally")
+            .contains("\"" + WorkspaceAbi.CONTEXT_TARGET_PREFIX + "\"");
+
+        assertThat(body)
+            .as("mentor runner references WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH literally")
+            .contains("\"" + WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH + "\"");
+
+        assertThat(body)
+            .as("mentor runner exits %d on envelope mismatch", WorkspaceAbi.EXIT_ENVELOPE_MISMATCH)
+            .contains("ENVELOPE_MISMATCH_EXIT = " + WorkspaceAbi.EXIT_ENVELOPE_MISMATCH);
+    }
+
     private static Path resolveResource(String relativePath) {
         Path candidate = Path.of("src/main/resources").resolve(relativePath);
         return Files.exists(candidate)

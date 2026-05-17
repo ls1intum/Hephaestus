@@ -96,6 +96,27 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
     }
 
     @Nested
+    @DisplayName("PiRunnerProfile placement")
+    class PiRunnerProfilePlacement {
+
+        @Test
+        @DisplayName("PiRunnerProfile implementations reside in agent.practice or agent.mentor")
+        void profilesInDomainPackages() {
+            // The profile interface is intentionally NOT sealed (a sealed interface with
+            // `permits PracticeRunnerProfile, MentorRunnerProfile` would force agent.runtime to
+            // import its domain implementations — exactly the dependency the boundary rules
+            // above forbid). Enforce the same constraint architecturally instead.
+            ArchRule rule = classes()
+                .that()
+                .implement("de.tum.in.www1.hephaestus.agent.runtime.PiRunnerProfile")
+                .should()
+                .resideInAnyPackage(PRACTICE, MENTOR)
+                .because("Each runner kind owns its profile next to its adapter; the kernel sees only the interface");
+            rule.check(classes);
+        }
+    }
+
+    @Nested
     @DisplayName("context module boundary")
     class ContextBoundary {
 
