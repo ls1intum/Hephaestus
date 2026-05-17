@@ -58,6 +58,12 @@ services:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
     ports:
       - "8080"
+    # Long-form env_file requires Compose v2.24+. See docs/admin/agent-image-digests.md.
+    env_file:
+      - path: ./agent-image-pin.env
+        required: false
+      - path: ./agent-image-pin.local.env
+        required: false
     environment:
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod

@@ -259,3 +259,25 @@ jobs:
             done
             exit 1
           fi
+
+  # Needle built at runtime so this guard file doesn't self-match.
+  legacy-cleanup-guard:
+    name: "No legacy agent image"
+    if: inputs.should_skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 1
+      - name: Assert no legacy agent-image references
+        run: |
+          set -euo pipefail
+          NEEDLE="agent-$(printf 'open\x63ode')"
+          if grep -rEnI "$NEEDLE" \
+                --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \
+                . \
+              | grep -vE '^\./(MIGRATION\.md|docs/admin/agent-image-digests\.md):' ; then
+            echo "::error::Legacy agent image is removed in issue #1076; relocate any new references to MIGRATION.md."
+            exit 1
+          fi

@@ -156,7 +156,7 @@ Confidentiality (Art. 32(1)(b))
 
 Integrity (Art. 32(1)(b))
 - Git is the authoritative source of all application code; signed commits and PR review.
-- Production images are pinned to the source-commit SHA, cosign-signed, and pulled from GHCR.
+- Production images are pinned by sha256 digest, cosign-signed (Sigstore keyless), and provenance-attested via `actions/attest-build-provenance`; verification recipe in [Agent image digests](../agent-image-digests.md).
 
 Availability and resilience (Art. 32(1)(b))
 - Containers restart on failure (`restart: unless-stopped`); per-service health checks.

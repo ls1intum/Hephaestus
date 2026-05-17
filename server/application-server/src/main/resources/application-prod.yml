@@ -107,6 +107,15 @@ hephaestus:
     git:
         storage-path: ${GIT_STORAGE_PATH:/data/git-repos}
 
+    # Production must run a digest-pinned agent image. The reference itself comes
+    # from docker/agent-image-pin.env (mounted via compose.app.yaml's env_file),
+    # which the release workflow rewrites on every release. Setting
+    # require-digest=true here makes the application-server refuse to start on a
+    # tag reference — see docs/admin/agent-image-digests.md.
+    agent:
+        image:
+            require-digest: true
+
     # ═══════════════════════════════════════════════════════════════════════════
     # SLACK INTEGRATION (Production)
     # ═══════════════════════════════════════════════════════════════════════════

@@ -1,13 +1,14 @@
 package de.tum.in.www1.hephaestus.agent.practice;
 
+import de.tum.in.www1.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.in.www1.hephaestus.agent.runtime.AgentResult;
-import de.tum.in.www1.hephaestus.agent.runtime.PiAgentProperties;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.in.www1.hephaestus.agent.runtime.PiResultParser;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
@@ -16,23 +17,14 @@ import org.springframework.stereotype.Service;
  * {@link PracticeSandboxSpec}.
  */
 @Service
+@RequiredArgsConstructor
 public class PracticePiAdapter {
 
     private static final PracticeRunnerProfile PROFILE = new PracticeRunnerProfile();
 
     private final PiRuntimeFactory runtimeFactory;
     private final PiResultParser resultParser;
-    private final PiAgentProperties properties;
-
-    public PracticePiAdapter(
-        PiRuntimeFactory runtimeFactory,
-        PiResultParser resultParser,
-        PiAgentProperties properties
-    ) {
-        this.runtimeFactory = runtimeFactory;
-        this.resultParser = resultParser;
-        this.properties = properties;
-    }
+    private final AgentImageProperties imageProperties;
 
     public PracticeSandboxSpec buildSandboxSpec(PracticeAgentRequest request) {
         PiRuntimeFactory.PiPlan plan = runtimeFactory.build(
@@ -51,7 +43,7 @@ public class PracticePiAdapter {
             )
         );
         return new PracticeSandboxSpec(
-            properties.image(),
+            imageProperties.reference(),
             plan.command(),
             plan.environment(),
             plan.inputFiles(),

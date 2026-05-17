@@ -10,7 +10,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
-import de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
@@ -32,15 +31,13 @@ class MentorChatControllerTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final MentorAgentProperties TEST_PROPERTIES = new MentorAgentProperties(
-        "ghcr.io/ls1intum/hephaestus/agent-pi:latest",
         100_000,
         "",
         null,
         null,
         null,
         null,
-        600,
-        ImagePullPolicy.IF_NOT_PRESENT
+        600
     );
 
     @Mock

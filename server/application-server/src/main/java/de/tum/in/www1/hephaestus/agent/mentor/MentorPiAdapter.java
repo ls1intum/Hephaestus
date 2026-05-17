@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.mentor;
 
+import de.tum.in.www1.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.in.www1.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.in.www1.hephaestus.agent.runtime.PiRuntimeFactory.PiPlan;
@@ -32,6 +33,7 @@ public class MentorPiAdapter {
 
     private final PiRuntimeFactory runtimeFactory;
     private final MentorAgentProperties mentorProperties;
+    private final AgentImageProperties imageProperties;
 
     /**
      * Build the interactive sandbox spec for a mentor chat session. Sandbox is keyed by
@@ -79,7 +81,7 @@ public class MentorPiAdapter {
             UUID.randomUUID(),
             Long.toString(request.contributorId()),
             Long.toString(request.workspaceId()),
-            mentorProperties.image(),
+            imageProperties.reference(),
             plan.command(),
             plan.environment(),
             plan.networkPolicy(),

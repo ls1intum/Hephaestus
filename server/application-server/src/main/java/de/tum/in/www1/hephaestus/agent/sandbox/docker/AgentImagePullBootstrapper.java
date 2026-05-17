@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker;
 
-import de.tum.in.www1.hephaestus.agent.runtime.PiAgentProperties;
+import de.tum.in.www1.hephaestus.agent.runtime.AgentImageProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,17 +12,17 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.sandbox", name = "enabled", havingValue = "true")
-public class PiImagePullBootstrapper {
+public class AgentImagePullBootstrapper {
 
-    private static final Logger log = LoggerFactory.getLogger(PiImagePullBootstrapper.class);
+    private static final Logger log = LoggerFactory.getLogger(AgentImagePullBootstrapper.class);
 
     private final DockerImageOperations imageOps;
-    private final PiAgentProperties properties;
+    private final AgentImageProperties properties;
     private final MeterRegistry meterRegistry;
 
-    public PiImagePullBootstrapper(
+    public AgentImagePullBootstrapper(
         DockerImageOperations imageOps,
-        PiAgentProperties properties,
+        AgentImageProperties properties,
         MeterRegistry meterRegistry
     ) {
         this.imageOps = imageOps;
@@ -31,13 +31,13 @@ public class PiImagePullBootstrapper {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Order(0) // before AgentJobExecutor (Order 2)
+    @Order(0)
     public void pullOnStartup() {
         ImagePullBootstrapperSupport.applyPolicy(
-            properties.image(),
+            properties.reference(),
             properties.pullPolicy(),
             imageOps,
-            "agent.pi.image.pull",
+            "agent.image.pull",
             meterRegistry,
             log
         );

@@ -14,16 +14,16 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  packages: write
+permissions: {}
 
 jobs:
   release:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write       # semantic-release pushes the version tag
+      issues: write         # semantic-release closes resolved issues
+      pull-requests: write  # semantic-release comments on merged PRs
     outputs:
       new_version: ${{ steps.release.outputs.new_release_version }}
       released: ${{ steps.release.outputs.new_release_published }}
@@ -37,7 +37,7 @@ jobs:
 
       - name: Create Release
         id: release
-        uses: cycjimmy/semantic-release-action@v4
+        uses: cycjimmy/semantic-release-action@16ca923e6ccbb50770c415a0ccd43709a8c5f7a4 # v4.2.2
         with:
           extra_plugins: |
             @semantic-release/commit-analyzer
@@ -55,12 +55,22 @@ jobs:
           echo "- **Staging**: Deploying automatically" >> $GITHUB_STEP_SUMMARY
           echo "- **Production**: Waiting for approval" >> $GITHUB_STEP_SUMMARY
 
-  # Retag Docker images with semantic version
   tag-images:
     needs: release
     if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # commit the digest pin back to main
+      packages: write   # retag images in GHCR
+    outputs:
+      agent-pi-digest: ${{ steps.retag.outputs.agent-pi-digest }}
     steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+          persist-credentials: true
+          ref: main
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
@@ -68,32 +78,114 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Retag Images
+      - name: Retag images and capture digests
+        id: retag
+        env:
+          VERSION: ${{ needs.release.outputs.new_version }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          VERSION="${{ needs.release.outputs.new_version }}"
-          SHA="${{ github.event.workflow_run.head_sha }}"
-          IMAGES=("webapp" "application-server" "webhook-ingest" "agent-pi")
+          set -euo pipefail
 
+          manifest_digest() {
+            printf 'sha256:%s\n' "$(docker buildx imagetools inspect --raw "$1" | sha256sum | awk '{print $1}')"
+          }
+
+          IMAGES=("webapp" "application-server" "webhook-ingest" "agent-pi")
           for img in "${IMAGES[@]}"; do
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
-            echo "Checking for $FULL_IMAGE:$SHA..."
+            echo "::group::$img"
 
-            # Retry up to 24 times (2 minutes) with 5s interval
-            RETRIES=24
-            COUNT=0
-            until docker buildx imagetools inspect "$FULL_IMAGE:$SHA" > /dev/null 2>&1; do
-              COUNT=$((COUNT+1))
-              if [ "$COUNT" -ge "$RETRIES" ]; then
-                echo "::error::Image $FULL_IMAGE:$SHA not found after $((RETRIES*5)) seconds"
+            for i in $(seq 1 24); do
+              if docker buildx imagetools inspect "$FULL_IMAGE:$SHA" > /dev/null 2>&1; then break; fi
+              if [ "$i" -ge 24 ]; then
+                echo "::error::Image $FULL_IMAGE:$SHA not found after 120 s"
                 exit 1
               fi
-              echo "Image not found yet. Retrying in 5s... ($COUNT/$RETRIES)"
               sleep 5
             done
 
-            echo "Retagging $FULL_IMAGE:$SHA → $FULL_IMAGE:$VERSION"
+            SRC_DIGEST=$(manifest_digest "$FULL_IMAGE:$SHA")
+            [[ "$SRC_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || {
+              echo "::error::$img source digest is malformed: ${SRC_DIGEST:-<empty>}"; exit 1; }
+            echo "$img source digest: $SRC_DIGEST"
+
             docker buildx imagetools create -t "$FULL_IMAGE:$VERSION" "$FULL_IMAGE:$SHA"
+
+            DST_DIGEST=$(manifest_digest "$FULL_IMAGE:$VERSION")
+            if [[ "$SRC_DIGEST" != "$DST_DIGEST" ]]; then
+              echo "::error::Retag changed the digest for $img — refusing to publish."
+              echo "::error::  source ($FULL_IMAGE:$SHA): $SRC_DIGEST"
+              echo "::error::  retagged ($FULL_IMAGE:$VERSION): $DST_DIGEST"
+              exit 1
+            fi
+
+            if [ "$img" = "agent-pi" ]; then
+              echo "agent-pi-digest=$DST_DIGEST" >> "$GITHUB_OUTPUT"
+            fi
+            echo "::endgroup::"
           done
+
+      - name: Smoke-test agent-pi
+        env:
+          IMAGE: ghcr.io/ls1intum/hephaestus/agent-pi@${{ steps.retag.outputs.agent-pi-digest }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE"
+          docker run --rm --entrypoint /bin/sh "$IMAGE" -c 'bun --version && node --version'
+
+      - name: Update docker/agent-image-pin.env
+        env:
+          DIGEST: ${{ steps.retag.outputs.agent-pi-digest }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DIGEST" ]; then
+            echo "::error::agent-pi digest is empty — refusing to commit."
+            exit 1
+          fi
+          REF="ghcr.io/ls1intum/hephaestus/agent-pi@${DIGEST}"
+          PIN_FILE="docker/agent-image-pin.env"
+          EXPECTED_LINE="HEPHAESTUS_AGENT_IMAGE_REFERENCE=${REF}"
+
+          tmp=$(mktemp)
+          awk -v ref="$EXPECTED_LINE" '
+            /^HEPHAESTUS_AGENT_IMAGE_REFERENCE=/ { print ref; found=1; next }
+            { print }
+            END { exit (found ? 0 : 1) }
+          ' "$PIN_FILE" > "$tmp" || {
+            echo "::error::$PIN_FILE is missing the HEPHAESTUS_AGENT_IMAGE_REFERENCE= line — refusing to silently no-op."
+            exit 1
+          }
+          mv "$tmp" "$PIN_FILE"
+
+          if git diff --quiet -- "$PIN_FILE"; then
+            echo "agent-pi digest unchanged — skipping commit."
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$PIN_FILE"
+          # [skip ci] keeps cicd.yml from re-firing on this commit.
+          git commit -m "chore(release): pin agent-pi to ${DIGEST} for v${VERSION} [skip ci]"
+
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then exit 0; fi
+            echo "push attempt $attempt failed — fetching + rebasing"
+            git fetch origin main
+            git rebase origin/main || {
+              echo "::error::rebase produced conflicts on $PIN_FILE — investigate manually."
+              git rebase --abort
+              exit 1
+            }
+            if ! grep -qxF "$EXPECTED_LINE" "$PIN_FILE"; then
+              echo "::error::pin line was lost during rebase; refusing to push a no-op."
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+          echo "::error::push to main failed after 3 attempts"
+          exit 1
 
   # Deploy to staging automatically after images are tagged
   deploy-staging:
