@@ -24,17 +24,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MentorPiAdapter {
 
-    /**
-     * Workspace-relative path of the system prompt file the runner loads. Routed through
-     * {@link WorkspaceAbi#MENTOR_SYSTEM_PROMPT_PATH} so the Java materialiser and JS runner
-     * share one source of truth — see {@code WorkspaceAbiSyncTest}.
-     */
     public static final String SYSTEM_PROMPT_PATH = WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH;
-
-    /** Workspace-relative directory the aspect JSON files land in (matches {@link WorkspaceAbi#CONTEXT_TARGET_PREFIX}). */
     public static final String ASPECT_INPUT_PREFIX = WorkspaceAbi.CONTEXT_TARGET_PREFIX;
-
-    /** Workspace-relative directory for restored Pi SDK session JSONL files (matches the runner's {@code SESSIONS_DIR}). */
     public static final String SESSIONS_DIR_PREFIX = WorkspaceAbi.SESSIONS_DIR_PREFIX;
 
     private static final MentorRunnerProfile PROFILE = new MentorRunnerProfile();
@@ -79,7 +70,7 @@ public class MentorPiAdapter {
             llmConfig.timeoutSeconds(),
             PROFILE,
             extraInputs,
-            "" /* no precompute step — mentor analytics arrive as aspect JSON */
+            ""
         );
 
         PiPlan plan = runtimeFactory.build(planSpec);

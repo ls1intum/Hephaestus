@@ -8,16 +8,11 @@ import org.springframework.lang.Nullable;
 
 /**
  * Inputs for {@link PiRuntimeFactory#build(PiPlanSpec)}. Validation lives in the compact
- * constructor — there is no builder; callers construct positionally.
+ * constructor; callers construct positionally.
  *
- * @param baseUrl         OpenAI-compatible base URL override. Exported as {@code OPENAI_BASE_URL}
- *                        / {@code ANTHROPIC_BASE_URL} only in API_KEY/OAUTH modes — PROXY mode
- *                        resolves its base URL from the sandbox-injected {@code $LLM_PROXY_URL},
- *                        so a baseUrl here would be silently shadowed.
- * @param extraInputs     additional workspace files keyed by relative path. Each key MUST appear
- *                        in {@link WorkspaceAbi#allowedExtraInputPaths()} or be prefixed by one
- *                        of {@link WorkspaceAbi#allowedExtraInputPrefixes()}.
- * @param precomputeStep  shell fragment ending in {@code " && "} (or empty).
+ * <p><b>baseUrl trap:</b> exported as {@code OPENAI_BASE_URL} / {@code ANTHROPIC_BASE_URL} only in
+ * API_KEY/OAUTH modes — PROXY mode resolves its base URL from the sandbox-injected
+ * {@code $LLM_PROXY_URL}, so a baseUrl here would be silently shadowed.
  */
 public record PiPlanSpec(
     LlmProvider provider,
@@ -60,8 +55,6 @@ public record PiPlanSpec(
             }
         }
         extraInputs = extraInputs != null ? Map.copyOf(extraInputs) : Map.of();
-        // Fail-fast: adapters writing to undeclared workspace paths surface here at test/boot time
-        // instead of silently overwriting a future mount-point.
         for (String path : extraInputs.keySet()) {
             boolean ok =
                 WorkspaceAbi.allowedExtraInputPaths().contains(path) ||

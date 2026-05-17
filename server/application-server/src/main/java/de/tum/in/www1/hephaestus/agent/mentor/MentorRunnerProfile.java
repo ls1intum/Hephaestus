@@ -22,7 +22,6 @@ import java.util.Map;
  */
 public final class MentorRunnerProfile implements PiRunnerProfile {
 
-    /** Filename of the mentor runner under {@code resources/agent/}. */
     public static final String SCRIPT = "pi-mentor-runner.mjs";
 
     private static final List<String> FLAGS = List.of("--max-old-space-size=256", "--no-warnings", "--expose-gc");

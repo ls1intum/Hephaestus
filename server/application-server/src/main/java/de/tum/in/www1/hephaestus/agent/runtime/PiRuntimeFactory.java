@@ -30,13 +30,11 @@ public class PiRuntimeFactory {
 
     private static final Logger log = LoggerFactory.getLogger(PiRuntimeFactory.class);
 
-    /** Default workspace output directory inside the container — see {@link WorkspaceAbi#OUTPUT_PATH}. */
     public static final String OUTPUT_PATH = WorkspaceAbi.OUTPUT_PATH;
 
-    /** Reserved for retries + container cleanup before the sandbox kills the runner. */
+    /** Grace window before the sandbox hard-kills the runner — must fire before that deadline. */
     public static final int TIMEOUT_BUFFER_SECONDS = 60;
 
-    /** Classpath prefix for all Pi-related resources ({@code pi-runner.mjs}, {@code pi-orchestrator.md}). */
     static final String AGENT_RESOURCE_PREFIX = "agent/";
 
     private final ObjectMapper objectMapper;
@@ -58,10 +56,6 @@ public class PiRuntimeFactory {
             env
         );
 
-        // The custom-provider extension is only emitted when the caller pinned a baseUrl on a
-        // non-Azure provider in API_KEY/OAUTH mode (production keeps baseUrl null → built-in
-        // provider; live tests set it → custom hephaestus provider). PROXY mode never needs the
-        // extension because the proxy is already on the standard OPENAI_BASE_URL.
         boolean useCustomProvider = shouldRegisterHephaestusProvider(spec);
         if (useCustomProvider) {
             inputFiles.put(
@@ -81,21 +75,17 @@ public class PiRuntimeFactory {
         long agentTimeoutMs = Math.max(60_000L, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
         env.put("AGENT_BUDGET_MS", Long.toString(agentTimeoutMs));
 
-        // TMPDIR resolves under the mandatory /home/agent/.local tmpfs (see ContainerSecurityPolicy);
-        // Pi runs as uid 1000 and the Dockerfile pre-creates and chowns /home/agent so $HOME writes work.
         env.put("HOME", "/home/agent");
         env.put("XDG_CONFIG_HOME", "/home/agent/.config");
         env.put("TMPDIR", "/home/agent/.local/tmp");
         env.put("PI_CODING_AGENT_DIR", WorkspaceAbi.PI_AGENT_DIR);
 
-        // Pi's azure-openai-responses provider hard-defaults the model to "gpt-5.2" — the deployment
-        // map routes both that and the configured model to the correct Azure deployment.
+        // Azure's `azure-openai-responses` provider hard-defaults the model id to "gpt-5.2"; route
+        // both that and the configured model to the same Azure deployment.
         if (spec.provider() == LlmProvider.AZURE_OPENAI) {
             String deployment = (spec.modelName() != null && !spec.modelName().isBlank())
                 ? spec.modelName()
                 : "gpt-5.4-mini";
-            // Model name flows to the shell via the env map (not interpolated into a shell string),
-            // so docker-java handles the quoting. The map *value* is then read by the agent.
             env.put("AZURE_OPENAI_DEPLOYMENT_NAME_MAP", deployment + "=" + deployment + ",gpt-5.2=" + deployment);
         }
 
@@ -138,10 +128,6 @@ public class PiRuntimeFactory {
         return new PiPlan(List.of("sh", "-c", command), Map.copyOf(env), Map.copyOf(inputFiles), networkPolicy);
     }
 
-    /**
-     * Render the profile's node flags as a trailing-space-terminated fragment so the kernel can
-     * interpolate without conditional whitespace. Empty profiles render to the empty string.
-     */
     private static String renderNodeFlags(List<String> flags) {
         if (flags == null || flags.isEmpty()) {
             return "";
@@ -149,16 +135,7 @@ public class PiRuntimeFactory {
         return String.join(" ", flags) + " ";
     }
 
-    /**
-     * Render the profile's per-process env fragment as {@code KEY=value} pairs. Each pair is
-     * trailing-space terminated; the assembled fragment is emitted IMMEDIATELY preceding the
-     * {@code node} keyword so the shell scopes the env to the node invocation only — NOT image-
-     * wide ENV. Other binaries in the same shell ({@code bun}, {@code git}) keep their default
-     * environment.
-     *
-     * <p>Values are NOT shell-quoted because no profile today emits values containing whitespace
-     * or shell metacharacters; a future profile that needs to MUST add quoting here.
-     */
+    /** Renders env as {@code KEY=value} pairs. Values are NOT shell-quoted — add quoting here if a profile ever needs whitespace/metachars. */
     private static String renderNodeEnv(Map<String, String> env) {
         if (env == null || env.isEmpty()) {
             return "";
@@ -170,11 +147,7 @@ public class PiRuntimeFactory {
         return b.toString();
     }
 
-    /**
-     * Map the Hephaestus {@link LlmProvider} enum to its Pi provider token.
-     * Identical across all known agent roles today; when mentor introduces different
-     * provider mappings, extract this into a strategy.
-     */
+    /** Map {@link LlmProvider} to its Pi provider token. */
     static String providerToken(LlmProvider provider) {
         return switch (provider) {
             case AZURE_OPENAI -> "azure-openai-responses";
@@ -183,21 +156,15 @@ public class PiRuntimeFactory {
         };
     }
 
-    /**
-     * Build settings JSON shared by every Pi-based agent (practice review and mentor chat alike).
-     * Two-arg overload kept for the test surface that doesn't care about custom provider routing.
-     */
+    /** Two-arg overload for tests that don't exercise custom-provider routing. */
     byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName) {
         return buildPiSettingsJson(provider, modelName, false);
     }
 
     /**
-     * When {@code useCustomProvider} is true, {@code defaultProvider} routes to the
-     * hephaestus extension (see {@link #buildExtensionFile}). The {@code defaultModel} is then
-     * the configured model id — the extension is registered with exactly that model.
-     *
-     * <p>Public so live tests in {@code agent.mentor.live} can reuse the production bytes
-     * verbatim instead of duplicating the JSON shape.
+     * Build the settings JSON Pi loads at session start. When {@code useCustomProvider} is true,
+     * {@code defaultProvider} routes through the {@code hephaestus} extension (see
+     * {@link #buildExtensionFile}).
      */
     public byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName, boolean useCustomProvider) {
         Map<String, Object> settings = new LinkedHashMap<>();
@@ -233,20 +200,13 @@ public class PiRuntimeFactory {
     }
 
     /**
-     * Emit a Pi extension that registers a custom provider named {@code hephaestus}. The
-     * provider reads its base URL, API key, and model id from the env (set by
-     * {@link LlmProxyAuthShell}). Pi auto-discovers extensions in {@code ~/.pi/extensions/} via
-     * jiti at session start — no TypeScript compile step needed.
-     *
-     * <p>{@code api: "openai-completions"} routes to Pi's chat-completions implementation for
-     * OpenAI; {@code anthropic-messages} routes to the Anthropic Messages API. {@code authHeader:
-     * true} attaches {@code Authorization: Bearer $PI_HEPHAESTUS_API_KEY}.
+     * Emit the Pi extension that registers the {@code hephaestus} custom provider. The provider
+     * reads its base URL, API key, and model id from env vars set by {@link LlmProxyAuthShell};
+     * Pi auto-discovers extensions in the agent dir via jiti at session start.
      */
     public byte[] buildExtensionFile(PiPlanSpec spec) {
-        // The TS source lives at server/application-server/src/main/resources/agent/extensions/.
-        // It is typechecked at CI time against @earendil-works/pi-coding-agent@0.74.0 via the
-        // sibling npm workspace `agent-extensions` (npm -w server/application-server/agent-extensions
-        // run typecheck). Bump in lockstep with MentorLiveLlmTest.PI_SDK_VERSION.
+        // TS source typechecked at CI time via the agent-extensions npm workspace; bump in
+        // lockstep with MentorLiveLlmTest.PI_SDK_VERSION.
         String resource =
             spec.provider() == LlmProvider.ANTHROPIC
                 ? "extensions/provider-anthropic.ts"
@@ -254,10 +214,7 @@ public class PiRuntimeFactory {
         return loadClasspathResource(resource);
     }
 
-    /**
-     * Network policy: PROXY mode forwards {@code allowInternet} + {@code jobToken}; direct modes
-     * always allow internet. The sandbox layer fills in {@code llmProxyUrl} during PREPARE.
-     */
+    /** Sandbox-layer fills in {@code llmProxyUrl} during PREPARE; this only emits the policy shape. */
     static NetworkPolicy buildNetworkPolicy(
         CredentialMode mode,
         LlmProvider provider,

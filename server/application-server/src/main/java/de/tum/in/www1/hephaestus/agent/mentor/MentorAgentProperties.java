@@ -13,10 +13,6 @@ import org.springframework.validation.annotation.Validated;
 /**
  * When llmProvider + credentialMode + modelName are all set, mentor uses them directly and
  * skips the workspace-scoped AgentConfig table. Omit any one to fall back to AgentConfig.
- *
- * <p>The runner script name is owned by {@link MentorRunnerProfile} — operator overrides for it
- * were never used in practice and risked drifting from the V8 flags / per-process env that the
- * kernel pairs with the script. Bumping the runner is a code change.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.mentor.agent")

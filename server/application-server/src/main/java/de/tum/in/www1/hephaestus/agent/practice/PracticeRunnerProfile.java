@@ -11,7 +11,6 @@ import java.util.Map;
  */
 public final class PracticeRunnerProfile implements PiRunnerProfile {
 
-    /** Filename of the practice runner under {@code resources/agent/}. */
     public static final String SCRIPT = "pi-runner.mjs";
 
     private static final List<String> FLAGS = List.of("--no-warnings");

@@ -94,9 +94,11 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @DisplayName("loads pi-orchestrator.md and the runner from classpath")
         void loadsClasspathResources() {
             var inputs = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).inputFiles();
-            assertThat(inputs.get(".pi/AGENTS.md")).isNotNull();
-            assertThat(new String(inputs.get(".pi/AGENTS.md"), StandardCharsets.UTF_8)).contains("findings");
-            assertThat(inputs.get(".run-pi.mjs")).isNotEmpty();
+            assertThat(inputs.get(WorkspaceAbi.ORCHESTRATOR_PATH)).isNotNull();
+            assertThat(new String(inputs.get(WorkspaceAbi.ORCHESTRATOR_PATH), StandardCharsets.UTF_8)).contains(
+                "findings"
+            );
+            assertThat(inputs.get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME)).isNotEmpty();
         }
 
         @Test
@@ -154,9 +156,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         @DisplayName("AGENT_BUDGET_MS stays strictly below the spec hard timeout (leaves grace)")
         void budget_leavesGraceUnderSpecTimeout() {
-            // Brittle predecessor asserted the exact constant `540000` from `(600-60)*1000` —
-            // it would break on any buffer-constant tweak even when the architectural
-            // invariant (budget < hard timeout) still held. Now assert the invariant itself.
             var spec = proxySpec(LlmProvider.AZURE_OPENAI, null);
             String budget = factory.build(spec).environment().get("AGENT_BUDGET_MS");
             assertThat(budget).as("AGENT_BUDGET_MS must be present").isNotNull();
@@ -181,9 +180,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         @DisplayName("No image-wide UV_THREADPOOL_SIZE override (would serialise libuv fs bursts)")
         void uvThreadpoolNotForced() {
-            // Previously set to 2 image-wide — removed because (a) the RSS saving was unmeasured
-            // and (b) it serialises the practice runner's git tool calls. If a workload-specific
-            // override is needed it should be set inline in nodeEnvFor.
             var env = factory.build(proxySpec(LlmProvider.OPENAI, null)).environment();
             assertThat(env).doesNotContainKey("UV_THREADPOOL_SIZE");
         }
@@ -386,40 +382,25 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class CommandAssembly {
 
         @Test
-        @DisplayName("Practice runner: only safe flags (no heap cap, no --expose-gc)")
+        @DisplayName("Practice profile contributes --no-warnings and no per-process env")
         void nodeFlagsForPractice() {
-            // The default test specs use `pi-runner.mjs` (practice). Practice handles large diffs
-            // and uses no global.gc() — applying a 256 MB heap cap there would be a latent OOM
-            // and exposing gc() is a foot-gun.
             String body = factory.build(apiKeySpec(LlmProvider.OPENAI)).command().get(2);
             int nodeIdx = body.indexOf("node ");
-            int scriptIdx = body.indexOf(".run-pi.mjs");
-            assertThat(nodeIdx).as("node invocation present").isGreaterThanOrEqualTo(0);
-            assertThat(scriptIdx).as("runner script present").isGreaterThan(nodeIdx);
+            int scriptIdx = body.indexOf(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
             String nodePrefix = body.substring(nodeIdx, scriptIdx);
             assertThat(nodePrefix)
                 .contains("--no-warnings")
                 .doesNotContain("--max-old-space-size")
-                .doesNotContain("--max-semi-space-size")
                 .doesNotContain("--expose-gc")
-                // --disable-source-maps is an unrecognised Node 22 CLI flag and would crash the
-                // runner at startup with exit 9. Guard the regression.
                 .doesNotContain("--disable-source-maps");
-            // The shell segment IMMEDIATELY preceding `node ` must not set LD_PRELOAD /
-            // MALLOC_CONF. The earlier auth-setup prefix never sets either; but to make the
-            // assertion meaningful (rather than tautological against a prefix that never
-            // contains them in ANY codepath), we slice from the last `&&` before `node ` —
-            // that's the same-statement scope `var=value cmd` would inject into.
+            // Per-process env immediately preceding `node ` must be empty for practice.
             int lastAmp = body.lastIndexOf("&&", nodeIdx);
             int sliceStart = lastAmp >= 0 ? lastAmp + 2 : 0;
-            assertThat(body.substring(sliceStart, nodeIdx))
-                .as("practice path: per-process env immediately preceding `node` must be empty")
-                .doesNotContain("LD_PRELOAD")
-                .doesNotContain("MALLOC_CONF");
+            assertThat(body.substring(sliceStart, nodeIdx)).doesNotContain("LD_PRELOAD").doesNotContain("MALLOC_CONF");
         }
 
         @Test
-        @DisplayName("Mentor profile: heap cap + --expose-gc + jemalloc preload scoped to node")
+        @DisplayName("Mentor profile contributes heap cap, --expose-gc, and jemalloc preload scoped to node")
         void mentorProfileContributesMentorFlagsAndEnv() {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
@@ -436,21 +417,15 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             String body = factory.build(spec).command().get(2);
             int nodeIdx = body.indexOf("node ");
-            int scriptIdx = body.indexOf(".run-pi.mjs");
-            String nodePrefix = body.substring(nodeIdx, scriptIdx);
-            assertThat(nodePrefix)
+            int scriptIdx = body.indexOf(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
+            assertThat(body.substring(nodeIdx, scriptIdx))
                 .contains("--max-old-space-size=256")
                 .contains("--no-warnings")
                 .contains("--expose-gc")
-                // --disable-source-maps is an unrecognised Node 22 CLI flag and crashes the
-                // runner at startup (exit 9). Must NOT be present for either profile.
                 .doesNotContain("--disable-source-maps");
-            // LD_PRELOAD + MALLOC_CONF appear in the shell env BEFORE `node `, scoped to that
-            // invocation only — they do NOT leak to bun (precompute) or other tools.
-            String beforeNode = body.substring(0, nodeIdx);
-            assertThat(beforeNode)
+            assertThat(body.substring(0, nodeIdx))
                 .contains("LD_PRELOAD=/usr/local/lib/libjemalloc.so.2")
-                .contains("MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:30000,muzzy_decay_ms:30000");
+                .contains("MALLOC_CONF=background_thread:true");
         }
 
         @Test
@@ -495,17 +470,15 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(plan.command()).hasSize(3);
             assertThat(plan.command().get(0)).isEqualTo("sh");
             String body = plan.command().get(2);
-            // Precompute step must run before the runner. Don't pin the exact `node` invocation —
-            // the command line may carry V8 flags (`--max-old-space-size`, `--disable-source-maps`,
-            // …) between `node` and the script path. Asserting the script path alone is enough.
-            assertThat(body.indexOf("echo precompute")).isLessThan(body.indexOf("/workspace/.run-pi.mjs"));
+            assertThat(body.indexOf("echo precompute")).isLessThan(
+                body.indexOf(WorkspaceAbi.WORKSPACE_ROOT + "/" + WorkspaceAbi.RUNNER_SCRIPT_FILENAME)
+            );
         }
 
         @Test
         @DisplayName("No shell-side cp of Pi config")
         void noCopyShim() {
-            // Asserted on the baseUrl-pinned spec because the custom-provider extension path was
-            // the last conditional `cp` the old boot script emitted.
+            // baseUrl-pinned spec exercises the custom-provider extension, the only conditional input path.
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,

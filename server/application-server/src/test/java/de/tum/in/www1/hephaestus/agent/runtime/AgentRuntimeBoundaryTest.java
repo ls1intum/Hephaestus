@@ -34,28 +34,15 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
     class RuntimeBoundary {
 
         @Test
-        @DisplayName("agent.runtime must not depend on agent.practice")
-        void runtimeIndependentOfPractice() {
+        @DisplayName("agent.runtime must not depend on agent.practice or agent.mentor")
+        void runtimeIndependentOfDomains() {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage(RUNTIME)
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage(PRACTICE)
-                .because("agent.runtime is the shared Pi kernel reused by mentor — it must stay practice-agnostic");
-            rule.check(classes);
-        }
-
-        @Test
-        @DisplayName("agent.runtime must not depend on agent.mentor")
-        void runtimeIndependentOfMentor() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage(RUNTIME)
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage(MENTOR)
-                .because("agent.runtime is the shared Pi kernel reused by practice — it must stay mentor-agnostic");
+                .resideInAnyPackage(PRACTICE, MENTOR)
+                .because("agent.runtime is the shared Pi kernel reused by both domains — it must stay role-agnostic");
             rule.check(classes);
         }
     }
