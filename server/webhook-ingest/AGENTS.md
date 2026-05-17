@@ -6,19 +6,19 @@ High-performance Hono service that receives GitHub/GitLab webhooks and publishes
 
 | Task | Command |
 |------|---------|
-| Dev server | `npm run dev` (port 4200) |
-| Build | `npm run build` |
-| Tests | `npm run test` |
-| Type check | `npm run typecheck` |
-| Lint + format | `npm run check` |
-| Full validation | `npm run validate` |
+| Dev server | `pnpm run dev` (port 4200) |
+| Build | `pnpm run build` |
+| Tests | `pnpm run test` |
+| Type check | `pnpm run typecheck` |
+| Lint + format | `pnpm run check` |
+| Full validation | `pnpm run validate` |
 
 ## Boundaries
 
 ### Always
 - Verify signatures on raw bytes BEFORE JSON parsing
 - Use `crypto.timingSafeEqual()` for all secret comparisons
-- Run `npm run validate` before committing
+- Run `pnpm run validate` before committing
 - Return 503 if NATS publish fails after retries
 
 ### Ask First

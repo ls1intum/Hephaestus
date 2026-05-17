@@ -21,7 +21,7 @@ sudo ./scripts/codex-setup.sh
 What the script does:
 
 - Installs PostgreSQL server/client packages via `apt-get` when they are missing.
-- Installs top-level npm dependencies (`npm install`).
+- Installs top-level npm dependencies (`pnpm install`).
 - Creates and initialises a managed database cluster in `server/application-server/postgres-data-local/` using `scripts/local-postgres.sh`.
 
 > If `sudo` is unavailable, run the script as the root user. The script exits early rather than attempting a partial install.
@@ -34,11 +34,11 @@ Codex reboots the VM between sessions, so use the lightweight helper whenever th
 ./scripts/codex-maintenance.sh
 ```
 
-It ensures the local cluster is running (`scripts/local-postgres.sh start`) and refreshes npm dependencies with cached modules (`npm install --prefer-offline`).
+It ensures the local cluster is running (`scripts/local-postgres.sh start`) and refreshes npm dependencies with cached modules (`pnpm install --prefer-offline`).
 
 ## Database helpers and tests
 
-- All `npm run db:*` utilities automatically fall back to the managed cluster when Docker is missing. Set `HEPHAESTUS_DB_MODE=local` to force that behaviour even on hosts that have Docker installed.
+- All `pnpm run db:*` utilities automatically fall back to the managed cluster when Docker is missing. Set `HEPHAESTUS_DB_MODE=local` to force that behaviour even on hosts that have Docker installed.
 - The Maven Surefire/Failsafe configuration extends the fork timeout to 180 seconds when `HEPHAESTUS_DB_MODE=local`, giving the local cluster enough time to warm up during integration tests.
 - The integration-test harness (`PostgreSQLTestContainer`) connects to the managed cluster whenever Docker is unavailable.
 

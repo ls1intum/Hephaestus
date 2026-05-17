@@ -1,5 +1,5 @@
-import { motion, useReducedMotion } from "framer-motion";
 import { ClipboardList } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {

@@ -1,0 +1,48 @@
+packages:
+  - webapp
+  - server/webhook-ingest
+  - server/application-server/agent-extensions
+  - docs
+
+# Hoist patterns target packages found via Node module resolution from
+# directories *outside* a pnpm package boundary. Keep narrow — broad globs
+# leak phantom deps that no manifest declares.
+publicHoistPattern:
+  # React internals reachable from Storybook / vite-plugin-react / React Compiler
+  - '*react*'
+  # @types/* searched by TypeScript from source files in any subtree
+  - '@types/*'
+  # @earendil-works pi-coding-agent imported from
+  # server/application-server/src/main/resources/agent/extensions/*.ts
+  # (sits under Maven classpath resources, outside agent-extensions/).
+  - '@earendil-works/*'
+
+autoInstallPeers: true
+strictPeerDependencies: false
+
+# Record platform-specific optional deps (rolldown/lightningcss/biome native bindings)
+# for every OS+arch we run dev or CI on. Without this, a `pnpm install` on macOS
+# would silently drop the Linux binaries from the lockfile, breaking CI.
+supportedArchitectures:
+  os:
+    - linux
+    - darwin
+  cpu:
+    - x64
+    - arm64
+  libc:
+    - glibc
+    - musl
+
+allowBuilds:
+  # Trusted: build is required at runtime
+  '@swc/core': true
+  esbuild: true
+  koffi: true
+  '@openapitools/openapi-generator-cli': true
+  # Trusted: postinstall is a no-op preinstall shim or transitive build
+  '@google/genai': true
+  '@nestjs/core': true
+  # Denied: postinstall scripts only print ads / collect telemetry
+  core-js: false
+  protobufjs: false

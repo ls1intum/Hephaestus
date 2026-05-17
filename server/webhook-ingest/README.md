@@ -34,26 +34,26 @@ For GitLab events, the full group path (including subgroups) is flattened using 
 
 ```bash
 # Install dependencies (from monorepo root)
-npm install
+pnpm install
 
 # Copy environment file
 cp .env.example .env
 
 # Run in development mode
-npm run dev
+pnpm run dev
 ```
 
 ### Scripts
 
 | Script             | Description                       |
 | ------------------ | --------------------------------- |
-| `npm run dev`      | Start with hot reload (tsx watch) |
-| `npm run build`    | Build for production              |
-| `npm run start`    | Run production build              |
-| `npm run test`     | Run unit tests (Vitest)           |
-| `npm run validate` | Run typecheck + lint + test       |
-| `npm run check`    | Run Biome check                   |
-| `npm run format`   | Format with Biome                 |
+| `pnpm run dev`      | Start with hot reload (tsx watch) |
+| `pnpm run build`    | Build for production              |
+| `pnpm run start`    | Run production build              |
+| `pnpm run test`     | Run unit tests (Vitest)           |
+| `pnpm run validate` | Run typecheck + lint + test       |
+| `pnpm run check`    | Run Biome check                   |
+| `pnpm run format`   | Format with Biome                 |
 
 ## API Endpoints
 

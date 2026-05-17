@@ -20,7 +20,15 @@
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Dependency Dashboard",
 
-  "postUpdateOptions": ["npmDedupe"],
+  "postUpdateOptions": ["pnpmDedupe"],
+
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 7am on monday"],
+    "postUpdateOptions": ["pnpmDedupe"]
+  },
+
+  "rangeStrategy": "replace",
 
   "packageRules": [
     {
@@ -56,6 +64,12 @@
       "matchUpdateTypes": ["major"],
       "minimumReleaseAge": "7 days",
       "labels": ["dependencies", "breaking"]
+    },
+    {
+      "description": "Pin lucide-react at 0.x and recharts at 2.x until the shadcn primitives (icon set + chart wrapper) are rewritten against their respective major versions.",
+      "matchPackageNames": ["lucide-react", "recharts"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     },
     {
       "description": "Core frameworks",

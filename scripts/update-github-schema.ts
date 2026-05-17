@@ -1,7 +1,7 @@
 /**
  * Update GitHub GraphQL schema from official docs
  *
- * Usage: npm run github:update-schema
+ * Usage: pnpm run github:update-schema
  *
  * This script fetches the official GitHub GraphQL schema and updates the local copy.
  * It includes validation to ensure the downloaded content is a valid GraphQL schema.

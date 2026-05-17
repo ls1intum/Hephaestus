@@ -13,7 +13,7 @@ Liquibase manages schema changes in the application server. Follow this workflow
 2. Generate a draft changelog:
 
    ```bash
-   npm run db:draft-changelog
+   pnpm run db:draft-changelog
    ```
 
 3. **Review `changelog_new.xml` carefully** – check for destructive operations.
@@ -21,7 +21,7 @@ Liquibase manages schema changes in the application server. Follow this workflow
 5. Regenerate docs:
 
    ```bash
-   npm run db:generate-erd-docs
+   pnpm run db:generate-erd-docs
    ```
 
 6. Commit the migration and documentation (`docs/contributor/erd/schema.mmd`).
@@ -36,7 +36,7 @@ Generated migrations can drop or rename columns unexpectedly. Double-check each 
 - Prefer `renameColumn` over drop/add sequences when renaming fields to avoid data loss.
 - Ensure new sequences start at `1` unless you have a data migration plan.
 - Confirm destructive statements (`dropTable`, `dropColumn`) are intentional and safe.
-- Run `npm run db:generate-erd-docs` and inspect the diff before committing.
+- Run `pnpm run db:generate-erd-docs` and inspect the diff before committing.
 
 ### Safe rename example
 

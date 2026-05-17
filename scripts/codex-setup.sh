@@ -144,7 +144,7 @@ install_postgres() {
 
 install_node_dependencies() {
     echo "ℹ️  Installing npm dependencies..."
-    (cd "$ROOT_DIR" && npm install)
+    (cd "$ROOT_DIR" && pnpm install)
 }
 
 

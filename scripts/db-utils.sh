@@ -162,12 +162,12 @@ check_environment() {
     fi
 
     if ! node -e "require.resolve('tsx')" >/dev/null 2>&1; then
-        log_error "Missing node dependency 'tsx'. Run 'npm install' before generating the ERD."
+        log_error "Missing node dependency 'tsx'. Run 'pnpm install' before generating the ERD."
         exit 1
     fi
 
     if ! node -e "require.resolve('pg')" >/dev/null 2>&1; then
-        log_error "Missing node dependency 'pg'. Run 'npm install' before generating the ERD."
+        log_error "Missing node dependency 'pg'. Run 'pnpm install' before generating the ERD."
         exit 1
     fi
 }

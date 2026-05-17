@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import type { Survey as PostHogSurveyRaw } from "posthog-js";
 import { usePostHog } from "posthog-js/react";
 import { useEffect, useRef, useState } from "react";

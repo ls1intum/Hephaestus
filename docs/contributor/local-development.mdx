@@ -65,7 +65,7 @@ Every host-side port is configurable so multiple Hephaestus instances (or other 
 | Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env or `webapp/.env`       |
 
 :::tip Pre-flight check
-Run `npm run check:ports` before starting the stack to verify all ports are free.
+Run `pnpm run check:ports` before starting the stack to verify all ports are free.
 :::
 
 #### How it works
@@ -111,7 +111,7 @@ VITE_APPLICATION_SERVER_URL=http://localhost:18080
 The Vite dev server reads `WEBAPP_PORT` from the shell environment (not from `server/application-server/.env`):
 
 ```bash
-WEBAPP_PORT=5200 npm -w webapp run dev
+WEBAPP_PORT=5200 pnpm --filter webapp run dev
 ```
 
 When changing the webapp port, the server's CORS origin must also be updated so API calls are not rejected:
@@ -270,8 +270,8 @@ To run the webhook ingest service locally:
 ```bash
 cd server/webhook-ingest
 cp .env.example .env
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 ## Web client (`webapp`)
@@ -279,13 +279,13 @@ npm run dev
 1. Install dependencies:
 
    ```bash
-   npm install
+   pnpm install
    ```
 
 2. Start Vite (defaults to port 4200):
 
    ```bash
-   npm -w webapp run dev
+   pnpm --filter webapp run dev
    ```
 
 3. Visit `http://localhost:4200` (or your custom `WEBAPP_PORT`).
@@ -301,9 +301,9 @@ npm run dev
 Storybook is the source of truth for presentational components.
 
 ```bash
-npm -w webapp run storybook           # Local playground on http://localhost:6006
-npm -w webapp run build-storybook     # Static bundle for Chromatic
-npm -w webapp run chromatic:ci        # Visual regression in CI
+pnpm --filter webapp run storybook           # Local playground on http://localhost:6006
+pnpm --filter webapp run build-storybook     # Static bundle for Chromatic
+pnpm --filter webapp run chromatic:ci        # Visual regression in CI
 ```
 
 - Every new UI component ships with at least one story covering empty, loading, and error states.
@@ -315,7 +315,7 @@ npm -w webapp run chromatic:ci        # Visual regression in CI
 The generated client in `src/api` is the only way the webapp talks to server services.
 
 ```bash
-npm -w webapp run openapi-ts
+pnpm --filter webapp run openapi-ts
 ```
 
 - Generated types drop the `Dto` suffix and mirror the Spring Boot API responses.

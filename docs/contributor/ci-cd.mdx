@@ -227,34 +227,34 @@ Before pushing, run the same checks that CI runs:
 
 ```bash
 # Format and check all services
-npm run format && npm run check
+pnpm run format && pnpm run check
 ```
 
 ### Per-Service Commands
 
 ```bash
 # Webapp
-npm run check:webapp          # Full check (format + lint + typecheck)
-npm run test:webapp           # Unit tests
+pnpm run check:webapp          # Full check (format + lint + typecheck)
+pnpm run test:webapp           # Unit tests
 
 # Application Server (Java)
-npm run format:java:check     # Check formatting
+pnpm run format:java:check     # Check formatting
 cd server/application-server && ./mvnw test -Dgroups="unit"  # Unit tests
 
 # Webhook Ingest
-npm run check:webhook-ingest
-cd server/webhook-ingest && npm run test
+pnpm run check:webhook-ingest
+cd server/webhook-ingest && pnpm run test
 ```
 
 ### Common Issues
 
 | Issue                 | Solution                                      |
 | --------------------- | --------------------------------------------- |
-| Formatting errors     | Run `npm run format`                          |
-| TypeScript errors     | Run `npm run typecheck:webapp` to see details |
+| Formatting errors     | Run `pnpm run format`                          |
+| TypeScript errors     | Run `pnpm run typecheck:webapp` to see details |
 | Test failures         | Check the specific test output for details    |
-| OpenAPI out of sync   | Run `npm run generate:api`                    |
-| Database schema drift | Run `npm run db:draft-changelog`              |
+| OpenAPI out of sync   | Run `pnpm run generate:api`                    |
+| Database schema drift | Run `pnpm run db:draft-changelog`              |
 
 ## 📊 CI Features
 

@@ -6,18 +6,18 @@ React 19 single-page application with TanStack Router/Query and Tailwind CSS.
 
 | Task | Command |
 |------|---------|
-| Dev server | `npm run dev` (port 4200) |
-| Build | `npm run build:webapp` |
-| Type check | `npm run typecheck:webapp` |
-| Lint + format | `npm run check:webapp` |
-| Tests | `npm run test:webapp` |
-| Storybook | `npm -w webapp run storybook` |
-| Regenerate API | `npm run generate:api:application-server` |
+| Dev server | `pnpm run dev` (port 4200) |
+| Build | `pnpm run build:webapp` |
+| Type check | `pnpm run typecheck:webapp` |
+| Lint + format | `pnpm run check:webapp` |
+| Tests | `pnpm run test:webapp` |
+| Storybook | `pnpm --filter webapp run storybook` |
+| Regenerate API | `pnpm run generate:api:application-server` |
 
 ## Boundaries
 
 ### Always
-- Run `npm run check:webapp` before committing
+- Run `pnpm run check:webapp` before committing
 - Export prop interfaces from components
 - Create colocated stories for new components
 - Use generated TanStack Query options
@@ -334,7 +334,7 @@ Use play functions for interaction testing.
 
 | Path | Regenerate With |
 |------|-----------------|
-| `src/api/**/*` | `npm run generate:api:application-server` |
+| `src/api/**/*` | `pnpm run generate:api:application-server` |
 | `src/routeTree.gen.ts` | TanStack Router plugin (automatic) |
 
 ## Available Skills
@@ -349,8 +349,8 @@ Use play functions for interaction testing.
 
 | Mistake | Fix |
 |---------|-----|
-| Edited generated file | Discard, run `npm run generate:api:application-server` |
+| Edited generated file | Discard, run `pnpm run generate:api:application-server` |
 | Route not appearing | Check file naming: `my-route.tsx` with `createFileRoute` |
 | Added `useMemo` | Remove—React Compiler handles memoization |
 | Manual `queryKey` array | Use generated `...Options()` helpers |
-| Type error after API change | Run `npm run generate:api:application-server` |
+| Type error after API change | Run `pnpm run generate:api:application-server` |

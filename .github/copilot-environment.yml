@@ -6,16 +6,22 @@
 # Set up all required tools and dependencies
 preinstall: |
   set -e
-  
+
   echo "🔧 Setting up Hephaestus development environment..."
-  
-  # Install Node.js 22.10.0 (exact version from .node-version)
-  echo "📦 Installing Node.js 22.10.0..."
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+
+  # Install Node.js (exact version from .node-version)
+  NODE_MAJOR=$(cut -d. -f1 .node-version)
+  echo "📦 Installing Node.js $NODE_MAJOR.x..."
+  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
   apt-get install -y nodejs
   node --version
-  npm --version
-  
+
+  # Activate Corepack-managed pnpm pinned via root package.json packageManager field
+  echo "📦 Activating pnpm via Corepack..."
+  corepack enable
+  corepack prepare --activate
+  pnpm --version
+
   # Install Java 21 (OpenJDK via Adoptium/Eclipse Temurin)
   echo "☕ Installing Java 21..."
   apt-get install -y wget apt-transport-https gnupg
@@ -24,32 +30,27 @@ preinstall: |
   echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | tee /etc/apt/sources.list.d/adoptium.list
   apt-get update
   apt-get install -y temurin-21-jdk
-  
+
   # Set Java 21 as default and verify
   update-alternatives --set java /usr/lib/jvm/temurin-21-jdk-amd64/bin/java || true
   export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64
   export PATH=$JAVA_HOME/bin:$PATH
   java -version
-  
+
   # Verify Docker is available (usually pre-installed in GitHub environments)
   echo "🐳 Checking Docker availability..."
   docker --version || echo "⚠️ Docker not available, some database operations may fail"
-  
-  # Install project npm dependencies (includes all workspaces: webapp, webhook-ingest)
-  echo "📦 Installing npm dependencies..."
-  # Always remove node_modules to ensure a clean install
-  if [ -d "node_modules" ]; then
-    echo "Removing existing node_modules directory..."
-    rm -rf node_modules
-  fi
-  npm ci --prefer-offline --no-audit
-  
+
+  # Install project dependencies (all workspaces from pnpm-lock.yaml)
+  echo "📦 Installing pnpm dependencies..."
+  pnpm install --frozen-lockfile --prefer-offline
+
   # Install Beads CLI for AI agent issue tracking
   echo "📋 Installing Beads CLI (bd)..."
-  npm install -g @beads/bd
+  pnpm add -g @beads/bd
   # The @beads/bd postinstall script skips binary download when CI=true
   # Run postinstall manually without CI flag to download the native binary
-  BD_POSTINSTALL_SCRIPT="$(npm root -g)/@beads/bd/scripts/postinstall.js"
+  BD_POSTINSTALL_SCRIPT="$(pnpm root -g)/@beads/bd/scripts/postinstall.js"
   if [ -f "$BD_POSTINSTALL_SCRIPT" ]; then
     CI="" node "$BD_POSTINSTALL_SCRIPT"
     bd --version
@@ -57,7 +58,7 @@ preinstall: |
     echo "⚠️ Beads postinstall script not found at $BD_POSTINSTALL_SCRIPT"
     echo "⚠️ bd commands may not work properly"
   fi
-  
+
   # Initialize beads database from JSONL if present (required for fresh clones)
   echo "📋 Initializing Beads database..."
   if [ -f ".beads/issues.jsonl" ]; then
@@ -65,22 +66,22 @@ preinstall: |
   else
     echo "ℹ️ No .beads/issues.jsonl found, skipping bd init (not a beads-enabled project)"
   fi
-  
+
   # Verify Maven is available
   echo "✅ Verifying Maven..."
   mvn --version || apt-get install -y maven && mvn --version
-  
+
   echo "✅ Environment setup complete!"
 
 # Environment variables for development sessions
 environment:
   # Java 21 configuration - required for Spring Boot 3.5 and Liquibase
   JAVA_HOME: /usr/lib/jvm/temurin-21-jdk-amd64
-  
+
   # Database connection for local development
   SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/hephaestus
   SPRING_DATASOURCE_USERNAME: root
   SPRING_DATASOURCE_PASSWORD: root
-  
+
   # Add Java 21 to PATH
   PATH: /usr/lib/jvm/temurin-21-jdk-amd64/bin:$PATH

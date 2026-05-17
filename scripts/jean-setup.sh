@@ -30,6 +30,6 @@ else
 fi
 
 echo "Installing npm dependencies..."
-npm install
+pnpm install
 
 echo "✅ Jean worktree setup complete."

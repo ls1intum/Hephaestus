@@ -1,8 +1,8 @@
 {
-  // This file is not used in compilation. It is here just for a nice editor experience.
   "extends": "@docusaurus/tsconfig",
   "compilerOptions": {
-    "baseUrl": ".",
+    // @docusaurus/tsconfig 3.10.1 still sets the deprecated baseUrl.
+    // Drop this hatch once Docusaurus ships a TS-6-clean tsconfig.
     "ignoreDeprecations": "6.0"
   },
   "exclude": [".docusaurus", "build"]

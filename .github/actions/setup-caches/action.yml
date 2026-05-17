@@ -1,5 +1,5 @@
-name: "Setup Advanced Caches"
-description: "Sets up intelligent caching for CI/CD pipeline optimization"
+name: "Setup CI caches"
+description: "Caches Maven repo + generated sources, Playwright browsers, and Storybook builds. Node/pnpm setup happens in the calling workflow via pnpm/action-setup + actions/setup-node (cache: pnpm)."
 inputs:
   cache-type:
     description: "Type of cache to setup"
@@ -12,38 +12,14 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # Node.js caching
-    - name: Setup Node.js
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "openapi-validation", "webhook-ingest-quality", "webhook-ingest-unit", "database-validation"]'), inputs.cache-type)
-      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-      with:
-        node-version-file: ".node-version"
-        cache: "npm"
-
-    - name: Cache Node.js dependencies
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "openapi-validation", "webhook-ingest-quality", "webhook-ingest-unit", "database-validation"]'), inputs.cache-type)
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-      with:
-        path: |
-          ~/.npm
-          webapp/node_modules
-          server/webhook-ingest/node_modules
-          node_modules
-        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package.json', 'server/webhook-ingest/package.json') }}
-        restore-keys: |
-          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json') }}-
-          ${{ inputs.os }}-node-
-
-    # Java/Maven caching
     - name: Set up JDK 21
       if: contains(fromJSON('["application-server-unit-arch", "application-server-integration", "application-server-quality", "openapi-validation", "database-validation"]'), inputs.cache-type)
       uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
       with:
         distribution: "temurin"
         java-version: "21"
-        cache: maven
 
-    - name: Cache Maven dependencies
+    - name: Cache Maven repo + generated sources
       if: contains(fromJSON('["application-server-unit-arch", "application-server-integration", "application-server-quality", "openapi-validation", "database-validation"]'), inputs.cache-type)
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
@@ -55,35 +31,15 @@ runs:
         restore-keys: |
           ${{ inputs.os }}-maven-
 
-    # Playwright browser caching for Storybook tests
     - name: Cache Playwright browsers
-      id: playwright-cache
       if: inputs.cache-type == 'webapp-storybook'
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ inputs.os }}-playwright-${{ hashFiles('webapp/package-lock.json') }}
+        key: ${{ inputs.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
           ${{ inputs.os }}-playwright-
 
-    # NOTE: Playwright browser installation happens in ci-tests.yml after npm ci
-    # This cache just restores browsers from previous runs if available
-
-    # Platform-specific binary caching for Linux runners
-    # These packages (@rollup/rollup-linux-x64-gnu, lightningcss-linux-x64-gnu, @biomejs/cli-linux-x64)
-    # are installed via scripts/install-platform-binaries.mjs after npm ci.
-    # We cache them in ~/.cache/platform-binaries and restore after npm ci wipes node_modules.
-    - name: Cache platform binaries
-      id: platform-cache
-      if: contains(fromJSON('["webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "webhook-ingest-quality", "webhook-ingest-unit", "database-validation"]'), inputs.cache-type) && runner.os == 'Linux'
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-      with:
-        path: ~/.cache/platform-binaries
-        key: ${{ inputs.os }}-platform-binaries-${{ hashFiles('package.json') }}
-        restore-keys: |
-          ${{ inputs.os }}-platform-binaries-
-
-    # Storybook build cache for visual tests
     - name: Cache Storybook build
       if: contains(fromJSON('["webapp-visual", "webapp-storybook"]'), inputs.cache-type)
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -91,6 +47,6 @@ runs:
         path: |
           webapp/storybook-static
           webapp/.storybook/.cache
-        key: ${{ inputs.os }}-storybook-${{ hashFiles('webapp/**/*.stories.tsx', 'webapp/.storybook/**', 'webapp/package-lock.json') }}
+        key: ${{ inputs.os }}-storybook-${{ hashFiles('webapp/**/*.stories.tsx', 'webapp/.storybook/**', 'pnpm-lock.yaml') }}
         restore-keys: |
           ${{ inputs.os }}-storybook-

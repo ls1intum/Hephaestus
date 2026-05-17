@@ -246,12 +246,12 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Issue | Fix Command |" >> $GITHUB_STEP_SUMMARY
               echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
-              echo "| Formatting errors | \`npm run format\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| TypeScript errors | \`npm run typecheck:webapp\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Biome lint errors | \`npm run lint:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Java formatting | \`npm run format:java\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| OpenAPI out of sync | \`npm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Database schema drift | \`npm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Formatting errors | \`pnpm run format\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| TypeScript errors | \`pnpm run typecheck:webapp\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Biome lint errors | \`pnpm run lint:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java formatting | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| OpenAPI out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Database schema drift | \`pnpm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "</details>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -263,10 +263,10 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Test Suite | Run Locally |" >> $GITHUB_STEP_SUMMARY
               echo "|------------|-------------|" >> $GITHUB_STEP_SUMMARY
-              echo "| Webapp unit | \`npm run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Webapp Storybook | \`npm -w webapp run test:storybook\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp unit | \`pnpm run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp Storybook | \`pnpm --filter webapp run test:storybook\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Application server | \`cd server/application-server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Webhook ingest | \`npm -w server/webhook-ingest run test\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webhook ingest | \`pnpm --filter server/webhook-ingest run test\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -301,7 +301,7 @@ jobs:
 
             echo "---" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Quick fix:** Run \`npm run format && npm run check\` before pushing." >> $GITHUB_STEP_SUMMARY
+            echo "**Quick fix:** Run \`pnpm run format && pnpm run check\` before pushing." >> $GITHUB_STEP_SUMMARY
           fi
 
           # Performance note for successful runs

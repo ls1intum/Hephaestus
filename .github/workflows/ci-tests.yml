@@ -87,15 +87,9 @@ jobs:
           # Other tests only need HEAD for faster checkout
           fetch-depth: ${{ matrix.test-type == 'webapp-visual' && '0' || '1' }}
 
-      - name: Setup Node.js
+      - name: Setup pnpm + Node.js
         if: steps.should_run.outputs.run == 'true'
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version-file: ".node-version"
-          cache: "npm"
-          cache-dependency-path: |
-            package-lock.json
-            webapp/package-lock.json
+        uses: ./.github/actions/setup-pnpm-node
 
       - name: Setup caches
         if: steps.should_run.outputs.run == 'true'
@@ -120,34 +114,29 @@ jobs:
       - name: Run tests
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'webapp-')
         run: |
-          # Use npm ci only - it clears node_modules automatically when lock file changed
-          # No manual rm -rf needed (saves 60-90s of reinstalling cached packages)
-          npm ci --no-audit --progress=false
-          node scripts/install-platform-binaries.mjs
+          pnpm install --frozen-lockfile
           cd webapp
 
           case "${{ matrix.test-type }}" in
             "webapp-unit")
-              npm run test
+              pnpm run test
               ;;
             "webapp-storybook")
               # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
-              npx playwright install chromium --with-deps
-              npm run test:storybook
+              pnpm exec playwright install chromium --with-deps
+              pnpm run test:storybook
               ;;
             "webapp-visual")
-              npm run build-storybook
+              pnpm run build-storybook
               ;;
           esac
 
       - name: Run tests
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webhook-ingest-unit'
         run: |
-          # Use npm ci - automatically handles node_modules when lock file changed
-          npm ci --no-audit --progress=false
-          node scripts/install-platform-binaries.mjs
+          pnpm install --frozen-lockfile
           cd server/webhook-ingest
-          npm run test
+          pnpm run test
 
       # Chromatic visual testing
       - name: "Chromatic Visual Testing"
@@ -194,7 +183,7 @@ jobs:
       # Test result aggregation
       - name: Upload application-server test results
         if: steps.should_run.outputs.run == 'true' && always() && startsWith(matrix.test-type, 'application-server-')
-        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "server/application-server/target/surefire-reports/TEST-*.xml"
@@ -203,7 +192,7 @@ jobs:
 
       - name: Upload webapp test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-unit'
-        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "webapp/test-results/junit-*.xml"
@@ -212,7 +201,7 @@ jobs:
 
       - name: Upload webapp-storybook test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-storybook'
-        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "webapp/test-results/junit-storybook.xml"
@@ -221,7 +210,7 @@ jobs:
 
       - name: Upload Chromatic test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-visual' && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
-        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "webapp/chromatic-build-*.xml"
@@ -230,7 +219,7 @@ jobs:
 
       - name: Upload webhook-ingest test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webhook-ingest-unit'
-        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "server/webhook-ingest/test-results/junit-*.xml"

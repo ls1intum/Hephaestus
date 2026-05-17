@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import Header from "@/components/core/Header";
 import { useSurveyNotificationStore } from "@/stores/survey-notification-store";

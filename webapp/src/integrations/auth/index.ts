@@ -1,3 +1,4 @@
 import { type AuthContextType, AuthProvider, useAuth } from "./AuthContext";
 import keycloakService from "./keycloak";
-export { AuthProvider, useAuth, keycloakService, type AuthContextType };
+
+export { type AuthContextType, AuthProvider, keycloakService, useAuth };

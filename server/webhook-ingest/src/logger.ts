@@ -51,7 +51,7 @@ export const logger = pino({
 		censor: "[REDACTED]",
 	},
 	// In production, use JSON logs (default pino output)
-	// For local dev, set LOG_LEVEL=debug and use: npm run dev 2>&1 | npx pino-pretty
+	// For local dev, set LOG_LEVEL=debug and use: pnpm run dev 2>&1 | pnpm exec pino-pretty
 });
 
 export default logger;

@@ -4,7 +4,7 @@ Utility scripts for Hephaestus development. All TypeScript scripts run via `tsx`
 
 ## Prerequisites
 
-Scripts use dependencies from the root `package.json`. Run `npm install` at the repo root first.
+Scripts use dependencies from the root `package.json`. Run `pnpm install` at the repo root first.
 
 ## Available Scripts
 
@@ -13,8 +13,8 @@ Scripts use dependencies from the root `package.json`. Run `npm install` at the 
 All database-related commands are accessed via `db-utils.sh` which handles database setup, migrations, and cleanup:
 
 ```bash
-npm run db:generate-erd-docs                    # Generate Mermaid ERD diagram
-npm run db:draft-changelog                       # Generate Liquibase changelog diff
+pnpm run db:generate-erd-docs                    # Generate Mermaid ERD diagram
+pnpm run db:draft-changelog                       # Generate Liquibase changelog diff
 ```
 
 **ERD Generation Environment Variables:**
@@ -30,9 +30,9 @@ npm run db:draft-changelog                       # Generate Liquibase changelog 
 Extract webhook payloads from NATS JetStream for test fixtures:
 
 ```bash
-npm run nats:extract-examples
+pnpm run nats:extract-examples
 # With options:
-npm run nats:extract-examples -- --event push --event pull_request:opened
+pnpm run nats:extract-examples -- --event push --event pull_request:opened
 ```
 
 **Environment variables:**

@@ -1,18 +1,8 @@
 # Documentation Deployment Pipeline
 #
-# Separation of Concerns:
-# - CI: Quality gate in ci-quality-gates.yml validates docs build
-# - CD: This workflow handles deployment only (GitHub Pages + PR previews)
-#
-# Triggers:
-# - push to main with docs changes: Deploy to GitHub Pages
-# - PR with docs changes: Deploy preview to Surge.sh with comment
-#
-# Best Practices (2025):
-# - Path filtering prevents unnecessary runs
-# - Surge.sh teardown removes preview when PR closes
-# - Uses upload-pages-artifact@v3 and deploy-pages@v4 per GitHub requirements
-# - Docusaurus build caching for faster deploys
+# - PR with docs changes: build a /-rooted bundle, deploy preview to Surge.sh
+# - push to main with docs changes: build /Hephaestus/-rooted bundle, deploy to GitHub Pages
+# - PR close: cd-docs-teardown.yml removes the preview (path filters are unreliable on close)
 
 name: CD / Docs
 
@@ -22,16 +12,12 @@ on:
     paths:
       - "docs/**"
       - ".github/workflows/cd-docs.yml"
-  # PR events for build/preview (path-filtered)
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - "docs/**"
       - ".github/workflows/cd-docs.yml"
   workflow_dispatch:
-
-# Separate workflow for teardown - see cd-docs-teardown.yml
-# Path filters are unreliable for 'closed' events, so teardown is in a separate workflow
 
 concurrency:
   group: docs-deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref }}
@@ -45,96 +31,72 @@ permissions:
   statuses: write
 
 jobs:
-  # Build docs for PR preview (baseUrl = '/')
-  build-preview:
-    name: Build (Preview)
-    if: github.event_name == 'pull_request'
+  build:
+    name: Build (${{ matrix.flavor }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: preview
+            condition: pull_request
+            base_url: "/"
+          - flavor: production
+            condition: push
+            base_url: "/Hephaestus/"
     steps:
+      - name: Gate by event
+        id: gate
+        run: |
+          if [[ "${{ matrix.condition }}" == "pull_request" && "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ matrix.condition }}" == "push" && ! ( "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ) ]]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repository
+        if: steps.gate.outputs.run == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version-file: ".node-version"
-          cache: npm
-          cache-dependency-path: docs/package-lock.json
+      - name: Setup pnpm + Node.js
+        if: steps.gate.outputs.run == 'true'
+        uses: ./.github/actions/setup-pnpm-node
 
       - name: Cache Docusaurus build
+        if: steps.gate.outputs.run == 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             docs/.docusaurus
             docs/node_modules/.cache
-          key: ${{ runner.os }}-docusaurus-preview-${{ hashFiles('docs/package-lock.json') }}-${{ hashFiles('docs/**/*.md', 'docs/**/*.mdx', 'docs/**/*.ts') }}
+          key: ${{ runner.os }}-docusaurus-${{ matrix.flavor }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('docs/**/*.md', 'docs/**/*.mdx', 'docs/**/*.ts') }}
           restore-keys: |
-            ${{ runner.os }}-docusaurus-preview-${{ hashFiles('docs/package-lock.json') }}-
-            ${{ runner.os }}-docusaurus-preview-
+            ${{ runner.os }}-docusaurus-${{ matrix.flavor }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-docusaurus-${{ matrix.flavor }}-
 
       - name: Install dependencies
-        run: npm ci --no-audit --progress=false
-        working-directory: docs
+        if: steps.gate.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
 
-      - name: Build documentation (preview)
-        run: npm run build
-        working-directory: docs
+      - name: Build documentation
+        if: steps.gate.outputs.run == 'true'
+        run: pnpm --filter docs run build
         env:
-          DOCUSAURUS_BASE_URL: "/"
+          DOCUSAURUS_BASE_URL: ${{ matrix.base_url }}
 
       - name: Upload build artifact
+        if: steps.gate.outputs.run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: docs-build-preview
+          name: docs-build-${{ matrix.flavor }}
           path: docs/build
           retention-days: 1
 
-  # Build docs for production (baseUrl = '/Hephaestus/')
-  build-production:
-    name: Build (Production)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version-file: ".node-version"
-          cache: npm
-          cache-dependency-path: docs/package-lock.json
-
-      - name: Cache Docusaurus build
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            docs/.docusaurus
-            docs/node_modules/.cache
-          key: ${{ runner.os }}-docusaurus-prod-${{ hashFiles('docs/package-lock.json') }}-${{ hashFiles('docs/**/*.md', 'docs/**/*.mdx', 'docs/**/*.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-docusaurus-prod-${{ hashFiles('docs/package-lock.json') }}-
-            ${{ runner.os }}-docusaurus-prod-
-
-      - name: Install dependencies
-        run: npm ci --no-audit --progress=false
-        working-directory: docs
-
-      - name: Build documentation (production)
-        run: npm run build
-        working-directory: docs
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: docs-build-production
-          path: docs/build
-          retention-days: 1
-
-  # PR Preview: Deploy to Surge.sh with custom comment
   preview:
     name: PR Preview
-    needs: build-preview
+    needs: build
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     env:
@@ -146,11 +108,11 @@ jobs:
           name: docs-build-preview
           path: docs-build
 
-      - name: Install Surge
-        run: npm install -g surge
+      - name: Setup pnpm + Node.js
+        uses: ./.github/actions/setup-pnpm-node
 
       - name: Deploy to Surge.sh
-        run: surge ./docs-build ${{ env.PREVIEW_URL }} --token ${{ secrets.SURGE_TOKEN }}
+        run: pnpm dlx surge ./docs-build ${{ env.PREVIEW_URL }} --token ${{ secrets.SURGE_TOKEN }}
 
       - name: Comment on PR
         uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
@@ -180,12 +142,9 @@ jobs:
               context: 'Preview / Docs'
             });
 
-  # Teardown handled by cd-docs-teardown.yml (separate workflow for reliability)
-
-  # Production: Deploy to GitHub Pages
   deploy:
     name: GitHub Pages
-    needs: build-production
+    needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:

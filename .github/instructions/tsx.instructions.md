@@ -45,7 +45,7 @@ Follow the [general coding guidelines](./general-coding.instructions.md) in addi
 ## Tooling integrations
 - Keep stories colocated (`Component.stories.tsx`) and represent the real UI states that Chromatic validates.
 - The React Compiler is enabled through `babel-plugin-react-compiler`. Write pure components, avoid conditional hooks, and remove hand-written memoization unless profiling demands it. Use `'use no memo'` only while debugging.
-- Format and lint with Biome (`npm run check`) before pushing. Fix warnings or explain them in the pull request.
+- Format and lint with Biome (`pnpm run check`) before pushing. Fix warnings or explain them in the pull request.
 - Keep Vitest configs minimal. Add path-specific overrides in `vitest.workspace.js` when a suite needs a browser runtime.
 
 ## Testing and stories

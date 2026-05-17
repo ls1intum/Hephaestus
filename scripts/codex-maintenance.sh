@@ -99,7 +99,7 @@ fi
 
 if [[ -d "$ROOT_DIR" ]]; then
     echo "ℹ️  Refreshing npm dependencies..."
-    (cd "$ROOT_DIR" && npm install --prefer-offline --no-fund --no-audit >/dev/null)
+    (cd "$ROOT_DIR" && pnpm install --prefer-offline --no-fund --no-audit >/dev/null)
 fi
 
 echo "✅ Maintenance tasks finished."

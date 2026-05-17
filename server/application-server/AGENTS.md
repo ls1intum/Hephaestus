@@ -10,8 +10,8 @@ Spring Boot 3.5 backend providing the REST API for Hephaestus.
 | Unit tests        | `mvn test`                                      |
 | Integration tests | `mvn verify`                                    |
 | Live GitHub tests | `mvn test -Plive-tests`                         |
-| Format            | `npm run format:java`                           |
-| Generate OpenAPI  | `npm run generate:api:application-server:specs` |
+| Format            | `pnpm run format:java`                           |
+| Generate OpenAPI  | `pnpm run generate:api:application-server:specs` |
 
 ### Port Conflicts (OpenAPI Generation)
 
@@ -24,7 +24,7 @@ SERVER_PORT=8090 MANAGEMENT_SERVER_PORT=8092 mvn verify -DskipTests=true -Dapp.p
 Then regenerate the client:
 
 ```bash
-npm run generate:api:application-server:client
+pnpm run generate:api:application-server:client
 ```
 
 ## Boundaries
@@ -246,10 +246,10 @@ Migrations live in `src/main/resources/db/changelog/`.
 ### Adding Schema Changes
 
 1. Modify JPA entities
-2. Run `npm run db:draft-changelog`
+2. Run `pnpm run db:draft-changelog`
 3. Review and prune the generated changelog to minimal deltas
 4. Rename to `<timestamp>_<description>.xml`
-5. Run `npm run db:generate-erd-docs` to update ERD
+5. Run `pnpm run db:generate-erd-docs` to update ERD
 
 ### Changelog Format
 

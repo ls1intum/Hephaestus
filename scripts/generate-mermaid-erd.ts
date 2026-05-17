@@ -476,7 +476,7 @@ class MermaidErdGenerator {
 			"    %% Generated automatically from PostgreSQL database schema",
 		);
 		lines.push("    %% using scripts/generate-mermaid-erd.ts");
-		lines.push("    %% To regenerate: npm run db:generate-erd-docs");
+		lines.push("    %% To regenerate: pnpm run db:generate-erd-docs");
 		lines.push("");
 		lines.push("    direction LR");
 		lines.push("");

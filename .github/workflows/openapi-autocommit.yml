@@ -19,6 +19,9 @@ jobs:
           token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Setup pnpm + Node.js
+        uses: ./.github/actions/setup-pnpm-node
+
       - name: Setup caches
         uses: ./.github/actions/setup-caches
         with:
@@ -26,9 +29,7 @@ jobs:
           os: ${{ runner.os }}
 
       - name: Install Node.js dependencies
-        run: |
-          # Always install to avoid half-restored caches
-          npm ci --prefer-offline --no-audit
+        run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Setup Application Server directories
         working-directory: server/application-server
@@ -41,7 +42,7 @@ jobs:
         run: mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
 
       - name: Generate OpenAPI specs and clients
-        run: npm run generate:api
+        run: pnpm run generate:api
 
       - name: Check for changes in the API
         id: check_changes
@@ -94,7 +95,7 @@ jobs:
           else
             COMMENT="🤖 OpenAPI specs and clients have been automatically updated and committed."
           fi
-          
+
           curl -s -X POST \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/json" \

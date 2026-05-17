@@ -6,7 +6,7 @@ import { useAuth } from "@/integrations/auth/AuthContext";
 /**
  * Feature flag name type derived from the generated OpenAPI types.
  * Adding a new flag to the backend FeatureFlag enum + FeatureFlagsDTO
- * and running `npm run openapi-ts` automatically updates this type.
+ * and running `pnpm run openapi-ts` automatically updates this type.
  */
 export type FeatureFlagName = keyof Required<FeatureFlags>;
 

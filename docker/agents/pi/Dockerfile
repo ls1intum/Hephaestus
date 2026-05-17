@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-ARG NODE_TAG=22-slim
+ARG NODE_TAG=24-slim
 FROM node:${NODE_TAG}
 
 ARG TARGETARCH
@@ -8,9 +8,13 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends git finduti
     rm -rf /var/lib/apt/lists/*
 
 # renovate: datasource=npm depName=@earendil-works/pi-coding-agent
-ARG PI_VERSION=0.74.0
-RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
-    npm cache clean --force && \
+ARG PI_VERSION=0.74.1
+ENV PNPM_HOME=/usr/local/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+RUN corepack enable && \
+    corepack prepare pnpm@11.1.2 --activate && \
+    pnpm add -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
+    pnpm store prune && \
     mkdir -p /home/agent /workspace && \
     chown -R 1000:1000 /home/agent /workspace
 
