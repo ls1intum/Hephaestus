@@ -1017,7 +1017,7 @@ export type PracticeFindingList = {
     /**
      * Practice category
      */
-    category?: string | null;
+    category?: string;
     /**
      * AI confidence score (0.0–1.0)
      */
@@ -1067,7 +1067,7 @@ export type PracticeFindingDetail = {
     /**
      * Practice category
      */
-    category?: string | null;
+    category?: string;
     /**
      * AI confidence score (0.0–1.0)
      */
@@ -1081,11 +1081,11 @@ export type PracticeFindingDetail = {
      */
     evidence?: {
         [key: string]: unknown;
-    } | null;
+    };
     /**
      * Actionable guidance for the contributor
      */
-    guidance?: string | null;
+    guidance?: string;
     /**
      * Finding ID
      */
@@ -1101,7 +1101,7 @@ export type PracticeFindingDetail = {
     /**
      * AI reasoning behind the verdict
      */
-    reasoning?: string | null;
+    reasoning?: string;
     /**
      * Severity level
      */
@@ -1135,7 +1135,7 @@ export type Practice = {
     /**
      * Practice category
      */
-    category?: string | null;
+    category?: string;
     /**
      * Timestamp when the practice was created
      */
@@ -1143,7 +1143,7 @@ export type Practice = {
     /**
      * Practice evaluation criteria
      */
-    criteria?: string | null;
+    criteria?: string;
     /**
      * Practice description
      */
@@ -1159,7 +1159,7 @@ export type Practice = {
     /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */
-    precomputeScript?: string | null;
+    precomputeScript?: string;
     /**
      * URL-safe identifier unique within workspace
      */
@@ -1324,7 +1324,7 @@ export type LinkedAccount = {
     /**
      * Username on the external provider, if connected
      */
-    linkedUsername?: string | null;
+    linkedUsername?: string;
     /**
      * Identity provider alias (e.g. 'github', 'gitlab-lrz')
      */
@@ -1455,15 +1455,15 @@ export type GitLabPreflightResponse = {
     /**
      * Error message if validation failed
      */
-    error?: string | null;
+    error?: string;
     /**
      * GitLab user ID or group ID
      */
-    userId?: number | null;
+    userId?: number;
     /**
      * Username of the token owner (personal tokens) or group name (group tokens)
      */
-    username?: string | null;
+    username?: string;
     /**
      * Whether the token is valid
      */
@@ -1495,7 +1495,7 @@ export type GitLabGroup = {
     /**
      * Group avatar URL
      */
-    avatarUrl?: string | null;
+    avatarUrl?: string;
     /**
      * Full group path including parent groups
      */
@@ -1511,11 +1511,11 @@ export type GitLabGroup = {
     /**
      * Group visibility: public, internal, or private
      */
-    visibility?: string | null;
+    visibility?: string;
     /**
      * Group web URL
      */
-    webUrl?: string | null;
+    webUrl?: string;
 };
 
 /**
@@ -1729,11 +1729,11 @@ export type ContributorPracticeSummary = {
     /**
      * Practice category
      */
-    category?: string | null;
+    category?: string;
     /**
      * Timestamp of most recent finding
      */
-    lastFindingAt?: Date | null;
+    lastFindingAt?: Date;
     /**
      * Number of NEGATIVE findings
      */
@@ -1792,7 +1792,7 @@ export type Contributor = {
 export type ChatThreadSummary = {
     createdAt?: Date;
     id?: string;
-    title?: string | null;
+    title?: string;
 };
 
 /**
@@ -1802,7 +1802,7 @@ export type ChatThreadDetail = {
     createdAt?: Date;
     id?: string;
     messages?: Array<ChatMessage>;
-    title?: string | null;
+    title?: string;
 };
 
 /**
@@ -1816,8 +1816,8 @@ export type ChatMessage = {
      */
     metadata?: {
         [key: string]: unknown;
-    } | null;
-    parentMessageId?: string | null;
+    };
+    parentMessageId?: string;
     parts?: Array<unknown>;
     role?: string;
 };
@@ -1938,7 +1938,7 @@ export type Achievement = {
     /**
      * Parent achievement in progression chain
      */
-    parent?: string | null;
+    parent?: string;
     /**
      * The structured progress data based on the achievements evaluator
      */

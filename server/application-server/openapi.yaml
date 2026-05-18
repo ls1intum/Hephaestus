@@ -2425,9 +2425,7 @@ components:
           type: boolean
           description: Whether the achievement should be hidden until unlocked
         parent:
-          type:
-          - string
-          - "null"
+          type: string
           description: Parent achievement in progression chain
           example: first_pull
         progressData:
@@ -2739,15 +2737,11 @@ components:
           type: string
           format: uuid
         metadata:
-          type:
-          - object
-          - "null"
+          type: object
           additionalProperties: {}
           description: "Per-turn metadata: status, model, costUsd, usage, …"
         parentMessageId:
-          type:
-          - string
-          - "null"
+          type: string
           format: uuid
         parts:
           type: array
@@ -2791,9 +2785,7 @@ components:
           items:
             $ref: "#/components/schemas/ChatMessage"
         title:
-          type:
-          - string
-          - "null"
+          type: string
     ChatThreadSummary:
       type: object
       description: Mentor chat thread summary (no messages).
@@ -2805,9 +2797,7 @@ components:
           type: string
           format: uuid
         title:
-          type:
-          - string
-          - "null"
+          type: string
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -2844,14 +2834,10 @@ components:
       description: Per-practice finding summary for a contributor
       properties:
         category:
-          type:
-          - string
-          - "null"
+          type: string
           description: Practice category
         lastFindingAt:
-          type:
-          - string
-          - "null"
+          type: string
           format: date-time
           description: Timestamp of most recent finding
         negativeCount:
@@ -3156,9 +3142,7 @@ components:
       description: GitLab group accessible to the provided PAT
       properties:
         avatarUrl:
-          type:
-          - string
-          - "null"
+          type: string
           description: Group avatar URL
         fullPath:
           type: string
@@ -3172,14 +3156,10 @@ components:
           type: string
           description: Group display name
         visibility:
-          type:
-          - string
-          - "null"
+          type: string
           description: "Group visibility: public, internal, or private"
         webUrl:
-          type:
-          - string
-          - "null"
+          type: string
           description: Group web URL
       required:
       - fullPath
@@ -3211,20 +3191,14 @@ components:
       description: Result of GitLab PAT validation
       properties:
         error:
-          type:
-          - string
-          - "null"
+          type: string
           description: Error message if validation failed
         userId:
-          type:
-          - integer
-          - "null"
+          type: integer
           format: int64
           description: GitLab user ID or group ID
         username:
-          type:
-          - string
-          - "null"
+          type: string
           description: Username of the token owner (personal tokens) or group name
             (group tokens)
         valid:
@@ -3418,9 +3392,7 @@ components:
           type: boolean
           description: Whether the user has linked this provider
         linkedUsername:
-          type:
-          - string
-          - "null"
+          type: string
           description: "Username on the external provider, if connected"
         providerAlias:
           type: string
@@ -3522,18 +3494,14 @@ components:
           type: boolean
           description: Whether this practice is actively being detected
         category:
-          type:
-          - string
-          - "null"
+          type: string
           description: Practice category
         createdAt:
           type: string
           format: date-time
           description: Timestamp when the practice was created
         criteria:
-          type:
-          - string
-          - "null"
+          type: string
           description: Practice evaluation criteria
         description:
           type: string
@@ -3546,9 +3514,7 @@ components:
           type: string
           description: Human-readable name
         precomputeScript:
-          type:
-          - string
-          - "null"
+          type: string
           description: TypeScript/Bun precompute script for static analysis before
             AI review
         slug:
@@ -3577,9 +3543,7 @@ components:
       description: Full practice finding detail including guidance and evidence
       properties:
         category:
-          type:
-          - string
-          - "null"
+          type: string
           description: Practice category
         confidence:
           type: number
@@ -3590,16 +3554,12 @@ components:
           format: date-time
           description: When the finding was detected
         evidence:
-          type:
-          - object
-          - "null"
+          type: object
           additionalProperties: {}
           description: "Structured evidence: {\"locations\":[{\"path\",\"startLine\"\
             ,\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
         guidance:
-          type:
-          - string
-          - "null"
+          type: string
           description: Actionable guidance for the contributor
         id:
           type: string
@@ -3612,9 +3572,7 @@ components:
           type: string
           description: Practice slug
         reasoning:
-          type:
-          - string
-          - "null"
+          type: string
           description: AI reasoning behind the verdict
         severity:
           type: string
@@ -3659,9 +3617,7 @@ components:
       description: Practice finding summary for list views
       properties:
         category:
-          type:
-          - string
-          - "null"
+          type: string
           description: Practice category
         confidence:
           type: number
