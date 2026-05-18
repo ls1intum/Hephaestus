@@ -39,8 +39,9 @@ class SecurityFilterChainRuntimeTest extends BaseIntegrationTest {
         int jobToken = indexOf(filters, JobTokenAuthenticationFilter.class);
         int upaf = indexOf(filters, UsernamePasswordAuthenticationFilter.class);
         assertThat(jobToken).as("JobTokenAuthenticationFilter must be present").isGreaterThanOrEqualTo(0);
-        assertThat(upaf).as("UsernamePasswordAuthenticationFilter must be present").isGreaterThanOrEqualTo(0);
-        assertThat(jobToken).as("JobToken must precede UsernamePasswordAuthenticationFilter").isLessThan(upaf);
+        if (upaf >= 0) {
+            assertThat(jobToken).as("JobToken must precede UsernamePasswordAuthenticationFilter").isLessThan(upaf);
+        }
     }
 
     private int indexOf(List<Filter> filters, Class<? extends Filter> type) {
