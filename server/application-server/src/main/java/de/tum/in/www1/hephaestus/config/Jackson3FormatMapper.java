@@ -6,7 +6,7 @@ import org.hibernate.type.descriptor.WrapperOptions;
 import org.hibernate.type.descriptor.java.JavaType;
 import org.hibernate.type.format.FormatMapper;
 import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Hibernate {@link FormatMapper} backed by Jackson 3. Bridges JSONB columns typed as
@@ -16,9 +16,9 @@ import tools.jackson.databind.ObjectMapper;
  */
 public final class Jackson3FormatMapper implements FormatMapper {
 
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
-    public Jackson3FormatMapper(ObjectMapper objectMapper) {
+    public Jackson3FormatMapper(JsonMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 

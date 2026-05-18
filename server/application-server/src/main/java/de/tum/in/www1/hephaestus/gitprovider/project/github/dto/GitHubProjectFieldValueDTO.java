@@ -63,8 +63,8 @@ public record GitHubProjectFieldValueDTO(
     @JsonProperty("single_select_option_id") String singleSelectOptionId,
     @JsonProperty("iteration_id") String iterationId
 ) {
-    // Jackson 3: JSR-310 (LocalDate / Instant / OffsetDateTime) support is built into
-    // tools.jackson.databind core — no separate JavaTimeModule registration needed.
+    // Static mapper: serializes List<String> values to JSON string columns. No mixins or
+    // modules needed, so bypassing the Spring-managed JsonMapper is intentional.
     private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
 
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========

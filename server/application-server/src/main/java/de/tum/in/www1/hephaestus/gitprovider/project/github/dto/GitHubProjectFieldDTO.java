@@ -34,7 +34,8 @@ public record GitHubProjectFieldDTO(
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
-    // Jackson 3: JSR-310 module is built in, no explicit registration needed.
+    // Static mapper: serializes a List<Option> to a JSON string column. No mixins or modules
+    // needed beyond Jackson 3 core, so bypassing the Spring-managed JsonMapper is intentional.
     private static final ObjectMapper objectMapper = JsonMapper.builder().build();
 
     /**

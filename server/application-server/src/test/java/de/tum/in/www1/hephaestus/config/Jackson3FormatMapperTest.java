@@ -9,6 +9,7 @@ import org.hibernate.type.descriptor.java.JavaType;
 import org.hibernate.type.descriptor.java.spi.JavaTypeRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -41,11 +42,11 @@ class Jackson3FormatMapperTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("malformed JSON throws HibernateException (not raw JacksonException)")
+    @DisplayName("malformed JSON throws HibernateException wrapping a JacksonException cause")
     void malformedJsonWrapsException() {
         assertThatThrownBy(() -> mapper.fromString("{not json", javaTypeOf(JsonNode.class), null))
             .isInstanceOf(HibernateException.class)
-            .hasMessageContaining("Could not deserialize");
+            .hasRootCauseInstanceOf(JacksonException.class);
     }
 
     @SuppressWarnings("unchecked")
