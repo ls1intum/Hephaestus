@@ -33,8 +33,10 @@ const parseRepositoryIds = (value?: string): number[] => {
 
 	return value
 		.split(",")
-		.map((id) => Number.parseInt(id, 10))
-		.filter((id) => Number.isFinite(id));
+		.map((id) => id.trim())
+		.filter((id) => /^\d+$/.test(id))
+		.map((id) => Number(id))
+		.filter((id) => Number.isSafeInteger(id) && id > 0);
 };
 
 const serializeRepositoryIds = (repositoryIds: number[]) => {
@@ -78,8 +80,8 @@ function UserProfile() {
 
 		return {
 			day: scheduledDay,
-			hour: hours || 9,
-			minute: minutes || 0,
+			hour: Number.isNaN(hours) ? 9 : hours,
+			minute: Number.isNaN(minutes) ? 0 : minutes,
 		};
 	};
 	const schedule = getSchedule();

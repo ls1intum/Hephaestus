@@ -981,7 +981,7 @@ export type ProfileActivityMonitor = {
      */
     activityStats: ProfileActivityStats;
     /**
-     * Authored pull requests after applying monitor filters and limit
+     * Open pull requests authored in the selected timeframe, after repository filters and limit
      */
     authoredPullRequests: Array<PullRequestInfo>;
     /**
@@ -993,7 +993,7 @@ export type ProfileActivityMonitor = {
      */
     reviewActivity: Array<ProfileReviewActivity>;
     /**
-     * Total authored pull requests after filters, before limit
+     * Total open authored pull requests after filters, before limit
      */
     totalAuthoredPullRequestCount: number;
     /**

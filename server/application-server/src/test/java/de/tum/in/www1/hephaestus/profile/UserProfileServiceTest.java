@@ -125,9 +125,9 @@ class UserProfileServiceTest {
             PullRequestReview review = createReview(400L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // ActivityEvent is the source of truth
@@ -175,9 +175,9 @@ class UserProfileServiceTest {
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // No ActivityEvents in ledger
@@ -215,9 +215,9 @@ class UserProfileServiceTest {
             IssueComment comment = createIssueComment(500L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // ActivityEvents for 2 reviews + 1 comment
@@ -271,9 +271,9 @@ class UserProfileServiceTest {
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // ActivityEvent exists but entity was deleted
@@ -311,9 +311,9 @@ class UserProfileServiceTest {
             PullRequestReviewComment reviewComment = createReviewComment(600L, actor, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(actor));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             ActivityEvent event = createActivityEvent(
@@ -355,9 +355,9 @@ class UserProfileServiceTest {
             PullRequestReviewComment reviewComment = createReviewComment(600L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             ActivityEvent event = createActivityEvent(
@@ -397,9 +397,9 @@ class UserProfileServiceTest {
             IssueComment comment = createIssueComment(500L, user, issue);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             ActivityEvent event = createActivityEvent(
@@ -438,9 +438,9 @@ class UserProfileServiceTest {
             PullRequestReviewComment reviewComment = createReviewComment(700L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             ActivityEvent issueCommentEvent = createActivityEvent(

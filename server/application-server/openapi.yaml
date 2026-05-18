@@ -3779,7 +3779,8 @@ components:
           description: Aggregated activity stats after applying monitor filters
         authoredPullRequests:
           type: array
-          description: Authored pull requests after applying monitor filters and limit
+          description: "Open pull requests authored in the selected timeframe, after\
+            \ repository filters and limit"
           items:
             $ref: "#/components/schemas/PullRequestInfo"
         repositories:
@@ -3797,7 +3798,7 @@ components:
         totalAuthoredPullRequestCount:
           type: integer
           format: int32
-          description: "Total authored pull requests after filters, before limit"
+          description: "Total open authored pull requests after filters, before limit"
         totalReviewActivityCount:
           type: integer
           format: int32
