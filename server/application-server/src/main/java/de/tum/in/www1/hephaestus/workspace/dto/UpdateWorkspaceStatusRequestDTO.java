@@ -10,9 +10,6 @@ import jakarta.validation.constraints.NotNull;
 @Schema(description = "Request to update the workspace lifecycle status")
 public record UpdateWorkspaceStatusRequestDTO(
     @NotNull(message = "status is required")
-    @Schema(
-        description = "New lifecycle status (PENDING, ACTIVE, ARCHIVED)",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
+    @Schema(description = "New lifecycle status (PENDING, ACTIVE, ARCHIVED)")
     WorkspaceStatus status
 ) {}

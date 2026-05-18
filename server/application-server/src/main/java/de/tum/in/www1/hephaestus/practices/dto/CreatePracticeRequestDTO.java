@@ -19,20 +19,12 @@ public record CreatePracticeRequestDTO(
         message = "Slug must contain only lowercase alphanumeric characters and hyphens," +
             " must not start or end with a hyphen, and must not contain consecutive hyphens"
     )
-    @Schema(
-        description = "URL-safe identifier unique within the workspace",
-        example = "pr-description-quality",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
+    @Schema(description = "URL-safe identifier unique within the workspace", example = "pr-description-quality")
     String slug,
 
     @NotBlank(message = "Name is required")
     @Size(min = 3, max = 128, message = "Name must be between 3 and 128 characters")
-    @Schema(
-        description = "Human-readable name",
-        example = "PR Description Quality",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
+    @Schema(description = "Human-readable name", example = "PR Description Quality")
     String name,
 
     @Size(max = 64, message = "Category must be at most 64 characters")
@@ -43,8 +35,7 @@ public record CreatePracticeRequestDTO(
     @Size(max = 10000, message = "Description must be at most 10000 characters")
     @Schema(
         description = "Practice description",
-        example = "Ensures pull request descriptions are detailed and informative",
-        requiredMode = Schema.RequiredMode.REQUIRED
+        example = "Ensures pull request descriptions are detailed and informative"
     )
     String description,
 
@@ -53,8 +44,7 @@ public record CreatePracticeRequestDTO(
     @ValidTriggerEvents
     @Schema(
         description = "Domain events that trigger detection",
-        example = "[\"PullRequestCreated\", \"ReviewSubmitted\"]",
-        requiredMode = Schema.RequiredMode.REQUIRED
+        example = "[\"PullRequestCreated\", \"ReviewSubmitted\"]"
     )
     List<String> triggerEvents,
 

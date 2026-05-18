@@ -11,9 +11,6 @@ import jakarta.validation.constraints.NotNull;
 @Schema(description = "Request to update repository contribution visibility settings in a workspace")
 public record UpdateRepositorySettingsRequestDTO(
     @NotNull(message = "hiddenFromContributions is required")
-    @Schema(
-        description = "Whether contributions from this repository should be hidden from leaderboard calculations",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
+    @Schema(description = "Whether contributions from this repository should be hidden from leaderboard calculations")
     Boolean hiddenFromContributions
 ) {}

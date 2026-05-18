@@ -13,20 +13,14 @@ import jakarta.validation.constraints.Size;
 public record CreateAgentConfigRequestDTO(
     @NotBlank(message = "Name is required")
     @Size(max = 100, message = "Name must not exceed 100 characters")
-    @Schema(
-        description = "Unique name within the workspace",
-        example = "pi-pr-reviewer",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
+    @Schema(description = "Unique name within the workspace", example = "pi-pr-reviewer")
     String name,
     @Schema(description = "Whether the agent is enabled") Boolean enabled,
     @Size(max = 128, message = "Model name must not exceed 128 characters")
     @Schema(description = "LLM model name", example = "gpt-5.4-mini")
     String modelName,
     @Schema(description = "LLM API key") String llmApiKey,
-    @NotNull(message = "LLM provider is required")
-    @Schema(description = "LLM provider", requiredMode = Schema.RequiredMode.REQUIRED)
-    LlmProvider llmProvider,
+    @NotNull(message = "LLM provider is required") @Schema(description = "LLM provider") LlmProvider llmProvider,
     @Min(value = 30, message = "Timeout must be at least 30 seconds")
     @Max(value = 3600, message = "Timeout must not exceed 3600 seconds")
     @Schema(description = "Job timeout in seconds", example = "600", minimum = "30", maximum = "3600")

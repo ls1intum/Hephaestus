@@ -24,33 +24,21 @@ public record CreateWorkspaceRequestDTO(
         regexp = "^[a-z0-9][a-z0-9-]{2,50}$",
         message = "Slug must be 3-51 characters, start with a lowercase letter or digit, and contain only lowercase letters, digits, or hyphens"
     )
-    @Schema(
-        description = "URL-friendly identifier for the workspace",
-        example = "my-workspace",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
+    @Schema(description = "URL-friendly identifier for the workspace", example = "my-workspace")
     String workspaceSlug,
 
     @NotBlank(message = "Display name is required")
     @Size(max = 120, message = "Display name must not exceed 120 characters")
-    @Schema(
-        description = "Human-readable name of the workspace",
-        example = "My Workspace",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
+    @Schema(description = "Human-readable name of the workspace", example = "My Workspace")
     String displayName,
 
     @NotBlank(message = "Account login is required")
     @Size(max = 255, message = "Account login must not exceed 255 characters")
-    @Schema(
-        description = "Git provider account login (GitHub org/user or GitLab group path)",
-        example = "my-org",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
+    @Schema(description = "Git provider account login (GitHub org/user or GitLab group path)", example = "my-org")
     String accountLogin,
 
     @NotNull(message = "Account type is required")
-    @Schema(description = "Type of account (USER or ORG)", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Type of account (USER or ORG)")
     AccountType accountType,
 
     @Deprecated(forRemoval = true)

@@ -9,6 +9,6 @@ import jakarta.validation.constraints.NotBlank;
 @Schema(description = "Request to update the workspace's GitHub Personal Access Token")
 public record UpdateWorkspaceTokenRequestDTO(
     @NotBlank(message = "Personal access token is required")
-    @Schema(description = "GitHub Personal Access Token for API access", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "GitHub Personal Access Token for API access")
     String personalAccessToken
 ) {}
