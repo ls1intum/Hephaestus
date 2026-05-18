@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.testconfig;
 import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -15,14 +16,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Import(
-    {
-        TestSecurityConfig.class,
-        GitHubIntegrationPostgresShutdown.class,
-        TestAsyncConfiguration.class,
-        WebTestClientTestConfig.class,
-    }
-)
+@AutoConfigureWebTestClient
+@Import({ TestSecurityConfig.class, GitHubIntegrationPostgresShutdown.class, TestAsyncConfiguration.class })
 @Testcontainers
 @Tag("integration")
 public abstract class BaseIntegrationTest {

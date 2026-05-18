@@ -22,34 +22,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.csrf.CsrfFilter;
 
 /**
- * Locks in the security posture across the application's filter chains.
- *
- * <h2>What this guards against</h2>
- * <ul>
- *   <li>Spring Security 7 / Spring Boot 4 flipped CSRF defaults for browser-form flows. This server
- *       is a stateless OAuth2 resource server (Authorization: Bearer …) with no HTML form posts —
- *       the explicit {@code .csrf(csrf -> csrf.disable())} call must remain effective. If a future
- *       autoconfig change re-enables CSRF, every {@code @RestController} POST/PUT/DELETE would
- *       start 403-ing in production.</li>
- *   <li>The LLM-proxy chain authenticates internal sandbox traffic with job tokens, NOT JWTs.
- *       {@link JobTokenAuthenticationFilter} must remain installed before
- *       {@link UsernamePasswordAuthenticationFilter} on that chain.</li>
- *   <li>Filter-chain bean drift: only the two known config classes may declare
- *       {@link SecurityFilterChain} beans.</li>
- * </ul>
- *
- * <p>The slice nest boots a real Spring context (cheap — reuses the shared Postgres testcontainer)
- * so we observe the actual resolved filter list, not a static guess. The {@link Drift} nest uses
- * ArchUnit on production classes only.
+ * Guards the resolved filter chain composition (CSRF disabled, JobToken precedes JWT)
+ * and prevents drift of {@link SecurityFilterChain} bean ownership.
  */
 @DisplayName("Security filter chain posture")
 class SecurityFilterChainArchitectureTest {
 
-    /**
-     * Runtime assertions on the actual filter chains as Spring wired them up. Slice-test
-     * style (full Spring context) because no static analysis can answer "is CsrfFilter
-     * in the resolved chain?" — the answer depends on autoconfig + bean ordering.
-     */
     @Nested
     @DisplayName("Runtime filter composition")
     @Tag("integration")
@@ -61,11 +39,10 @@ class SecurityFilterChainArchitectureTest {
         @Test
         @DisplayName("no CsrfFilter on any chain (stateless bearer-token API)")
         void csrfIsDisabledOnEveryChain() {
-            assertThat(filterChains).as("at least one SecurityFilterChain must exist").isNotEmpty();
+            assertThat(filterChains).isNotEmpty();
             for (SecurityFilterChain chain : filterChains) {
-                List<Filter> filters = chain.getFilters();
-                assertThat(filters)
-                    .as("chain %s must not contain CsrfFilter — see SecurityConfig.csrf().disable()", chain)
+                assertThat(chain.getFilters())
+                    .as("chain %s must not contain CsrfFilter", chain)
                     .noneMatch(CsrfFilter.class::isInstance);
             }
         }
@@ -75,43 +52,29 @@ class SecurityFilterChainArchitectureTest {
             "LLM-proxy chain installs JobTokenAuthenticationFilter before UsernamePasswordAuthenticationFilter"
         )
         void llmProxyChainHasJobTokenFilterInOrder() {
-            SecurityFilterChain llmProxyChain = filterChains
+            SecurityFilterChain llmProxy = filterChains
                 .stream()
                 .filter(c -> c.getFilters().stream().anyMatch(JobTokenAuthenticationFilter.class::isInstance))
                 .findFirst()
-                .orElseThrow(() ->
-                    new AssertionError(
-                        "No SecurityFilterChain installs JobTokenAuthenticationFilter — LLM proxy is unprotected"
-                    )
-                );
+                .orElseThrow(() -> new AssertionError("LLM proxy chain missing JobTokenAuthenticationFilter"));
 
-            List<Filter> filters = llmProxyChain.getFilters();
-            int jobTokenIdx = -1;
-            int upafIdx = -1;
+            List<Filter> filters = llmProxy.getFilters();
+            int jobToken = indexOf(filters, JobTokenAuthenticationFilter.class);
+            int upaf = indexOf(filters, UsernamePasswordAuthenticationFilter.class);
+            assertThat(jobToken).isGreaterThanOrEqualTo(0);
+            if (upaf >= 0) {
+                assertThat(jobToken).as("JobToken must precede UsernamePasswordAuthenticationFilter").isLessThan(upaf);
+            }
+        }
+
+        private int indexOf(List<Filter> filters, Class<? extends Filter> type) {
             for (int i = 0; i < filters.size(); i++) {
-                Filter f = filters.get(i);
-                if (f instanceof JobTokenAuthenticationFilter) {
-                    jobTokenIdx = i;
-                } else if (f instanceof UsernamePasswordAuthenticationFilter) {
-                    upafIdx = i;
-                }
+                if (type.isInstance(filters.get(i))) return i;
             }
-            assertThat(jobTokenIdx)
-                .as("JobTokenAuthenticationFilter present on llmProxy chain")
-                .isGreaterThanOrEqualTo(0);
-            if (upafIdx >= 0) {
-                assertThat(jobTokenIdx)
-                    .as("JobToken filter must precede UsernamePasswordAuthenticationFilter")
-                    .isLessThan(upafIdx);
-            }
+            return -1;
         }
     }
 
-    /**
-     * Static-analysis guard: only {@code SecurityConfig} and {@code LlmProxySecurityConfig}
-     * may produce {@link SecurityFilterChain} beans. Prevents an accidental new
-     * {@code @Configuration} class from quietly inserting a permissive chain.
-     */
     @Nested
     @DisplayName("Filter chain bean drift")
     @Tag("architecture")

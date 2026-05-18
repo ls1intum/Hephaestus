@@ -16,7 +16,7 @@ import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.Nullable;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Registers all {@link JobTypeHandler} beans and the {@link JobTypeHandlerRegistry}.
@@ -29,14 +29,14 @@ import tools.jackson.databind.ObjectMapper;
 @Configuration
 public class JobTypeHandlerConfiguration {
 
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
     private final PracticeReviewProperties reviewProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
 
     JobTypeHandlerConfiguration(
-        ObjectMapper objectMapper,
+        JsonMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PracticeReviewProperties reviewProperties,
         WorkspaceContextBuilder workspaceContextBuilder,

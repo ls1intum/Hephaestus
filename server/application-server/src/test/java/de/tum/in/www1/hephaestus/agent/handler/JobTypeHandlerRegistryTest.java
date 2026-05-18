@@ -18,7 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("JobTypeHandlerRegistry")
 class JobTypeHandlerRegistryTest extends BaseUnitTest {
@@ -41,7 +41,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     @Mock
     private FeedbackDeliveryService feedbackService;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private JobTypeHandler prReviewHandler() {
         var parser = new PracticeDetectionResultParser(objectMapper);

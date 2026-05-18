@@ -50,7 +50,6 @@ import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 import reactor.util.retry.Retry;
 import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -112,15 +111,10 @@ public class GitHubGraphQlConfig {
     }
 
     @Bean
-    public WebClient gitHubGraphQlWebClient(ObjectMapper baseObjectMapper) {
-        // Create a custom JsonMapper for GitHub GraphQL that:
-        // 1. Uses Long for integers (GitHub databaseId values exceed 32-bit int range)
-        // 2. Registers mixins for polymorphic interface deserialization (Actor, RequestedReviewer, RepositoryOwner)
-        // Jackson 3: ObjectMapper is immutable; rebuild() returns a JsonMapper$Builder.
-        // Production wires a JsonMapper (Boot 4 autoconfig); test contexts that inject a
-        // plain ObjectMapper fall back to a fresh builder.
-        JsonMapper baseMapper = (baseObjectMapper instanceof JsonMapper jm) ? jm : JsonMapper.builder().build();
-        JsonMapper graphQlObjectMapper = baseMapper
+    public WebClient gitHubGraphQlWebClient(JsonMapper baseObjectMapper) {
+        // USE_LONG_FOR_INTS: GitHub databaseId values exceed 32-bit int range.
+        // Mixins drive polymorphic deserialization for GraphQL union types.
+        JsonMapper graphQlObjectMapper = baseObjectMapper
             .rebuild()
             .enable(DeserializationFeature.USE_LONG_FOR_INTS)
             .addMixIn(GHActor.class, GitHubActorMixin.class)
@@ -134,9 +128,8 @@ public class GitHubGraphQlConfig {
             .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class)
             .build();
 
-        // Spring 7 ships both Jackson2JsonEncoder/Decoder (Jackson 2) and JacksonJsonEncoder/Decoder
-        // (Jackson 3). We're on Jackson 3 — register the new codecs via customCodecs().register()
-        // since ClientDefaultCodecs.jackson2JsonEncoder/Decoder only accept the Jackson 2 variants.
+        // ClientDefaultCodecs.jackson2JsonEncoder accepts only Jackson 2; register the Jackson 3
+        // codecs through customCodecs instead.
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);

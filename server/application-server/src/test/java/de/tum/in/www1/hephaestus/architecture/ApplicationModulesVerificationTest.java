@@ -1,70 +1,114 @@
 package de.tum.in.www1.hephaestus.architecture;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import de.tum.in.www1.hephaestus.Application;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeMap;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.core.Violations;
 
 /**
- * Smoke test for the Spring Modulith 2 module structure across the application.
- *
- * <h2>What this gates today</h2>
- * <ul>
- *   <li>The application's package graph is analyzable by Spring Modulith without throwing.
- *       (Module misdeclarations or unresolvable references blow up before {@code detectViolations}.)
- *   <li>Every package annotated with {@code @ApplicationModule} is discovered.
- * </ul>
- *
- * <h2>What this DOES NOT yet enforce</h2>
- * <p>The 11 packages declared in epic #1096 carry {@code @ApplicationModule} but deliberately leave
- * {@code allowedDependencies} open. The 3000+ cross-module references that exist today
- * (achievements depending on activity types, gitprovider/agent overlap, etc.) are an architectural
- * finding for the consolidation epic, not a regression introduced by this dependency upgrade. The
- * architecture epic owns narrowing {@code allowedDependencies} per module and emptying the violation
- * set; this test will be tightened to {@code modules.verify()} at that point.
- *
- * <p>Violations are logged at INFO level so they show up in CI output without blocking the build.
+ * Asserts the Modulith violation set against a checked-in SHA-256 baseline. Each line in
+ * {@code modulith-violation-baseline.txt} is the hex digest of one tolerated violation message
+ * (Liquibase change-log style: opaque to humans, exact to the test). Any new violation hash
+ * fails CI; any stale hash fails CI. The architecture epic shrinks the file as it narrows
+ * per-module {@code allowedDependencies}.
  */
 @Tag("architecture")
 @DisplayName("Spring Modulith 2 module verification")
 class ApplicationModulesVerificationTest {
 
-    private static final Logger log = LoggerFactory.getLogger(ApplicationModulesVerificationTest.class);
+    private static final Path BASELINE = Path.of("src/test/resources/modulith-violation-baseline.txt");
 
     @Test
-    @DisplayName("Application's @ApplicationModule packages are analyzable and discoverable")
-    void modulesAreDiscoverable() {
+    @DisplayName("Modulith violation hashes match the committed baseline exactly")
+    void verifyModuleStructure() throws IOException {
         ApplicationModules modules = ApplicationModules.of(Application.class);
+        List<String> messages = collectViolations(modules);
+        TreeMap<String, String> observed = new TreeMap<>();
+        for (String message : messages) {
+            observed.put(hash(message), message);
+        }
+        Set<String> allowed = loadBaseline();
 
-        // Smoke: at least the 11 explicit @ApplicationModule packages must show up.
-        // (Spring Modulith also discovers implicit packages; expect ≥ 11 but don't pin exactly.)
-        assertThat(modules.stream().count())
-            .as("Spring Modulith must discover all explicit @ApplicationModule packages")
-            .isGreaterThanOrEqualTo(11);
+        Set<String> unexpected = new LinkedHashSet<>(observed.keySet());
+        unexpected.removeAll(allowed);
 
-        // Detect cross-module violations but DO NOT fail the build today — the architecture
-        // epic is responsible for narrowing allowedDependencies. Log a one-line summary so CI
-        // operators can see the current count and watch for drift.
-        Violations violations = modules.detectViolations();
-        int violationCount = violations.getMessages().size();
-        log.info(
-            "Spring Modulith analysis: {} violation(s) detected across {} module(s). " +
-                "Tightening to ApplicationModules.verify() is deferred to the architecture epic.",
-            violationCount,
-            modules.stream().count()
-        );
+        Set<String> stale = new LinkedHashSet<>(allowed);
+        stale.removeAll(observed.keySet());
 
-        // Ratchet: ensure the count doesn't somehow exceed a sane ceiling (catches dramatic
-        // regressions if someone accidentally drops a module annotation). Today's count is ~3092;
-        // 6000 is a safe upper bound that still catches a 2x explosion.
-        assertThat(violationCount)
-            .as("Modulith violation count must not regress dramatically (current ~3000; ceiling 6000)")
-            .isLessThan(6000);
+        if (unexpected.isEmpty() && stale.isEmpty()) {
+            return;
+        }
+
+        StringBuilder report = new StringBuilder("\nModulith baseline drift.\n");
+        if (!unexpected.isEmpty()) {
+            report.append("\nNEW violations (").append(unexpected.size()).append("):\n");
+            unexpected.forEach(h ->
+                report.append("  + ").append(h).append("  ").append(preview(observed.get(h))).append('\n')
+            );
+        }
+        if (!stale.isEmpty()) {
+            report.append("\nSTALE baseline entries (").append(stale.size()).append("):\n");
+            stale.forEach(h -> report.append("  - ").append(h).append('\n'));
+        }
+        report
+            .append("\nUpdate ")
+            .append(BASELINE)
+            .append(" after intentionally tightening or widening the module graph.\n");
+        throw new AssertionError(report.toString());
+    }
+
+    private static List<String> collectViolations(ApplicationModules modules) {
+        try {
+            modules.verify();
+            return List.of();
+        } catch (Violations v) {
+            return v.getMessages();
+        }
+    }
+
+    private static String hash(String message) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(message.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    /** First line + truncation to keep CI failure output readable. */
+    private static String preview(String message) {
+        if (message == null) return "<unknown>";
+        int newline = message.indexOf('\n');
+        String head = newline >= 0 ? message.substring(0, newline) : message;
+        return head.length() > 140 ? head.substring(0, 137) + "..." : head;
+    }
+
+    private static Set<String> loadBaseline() throws IOException {
+        if (!Files.exists(BASELINE)) {
+            return Set.of();
+        }
+        Set<String> out = new LinkedHashSet<>();
+        for (String line : Files.readAllLines(BASELINE, StandardCharsets.UTF_8)) {
+            String trimmed = line.strip();
+            if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
+                out.add(trimmed);
+            }
+        }
+        return out;
     }
 }

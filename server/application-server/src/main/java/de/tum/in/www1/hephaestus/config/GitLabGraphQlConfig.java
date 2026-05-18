@@ -37,7 +37,6 @@ import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 import reactor.util.retry.Retry;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -68,16 +67,14 @@ public class GitLabGraphQlConfig {
 
     @Bean
     @Qualifier("gitLabGraphQlWebClient")
-    public WebClient gitLabGraphQlWebClient(ObjectMapper baseObjectMapper) {
-        // Spring 7 ships both Jackson2JsonEncoder/Decoder (Jackson 2) and JacksonJsonEncoder/Decoder
-        // (Jackson 3). We're on Jackson 3 — register the new codecs via customCodecs().register().
-        // Production wires a JsonMapper (Boot 4 autoconfig); tests may pass a plain ObjectMapper.
-        JsonMapper jsonMapper = (baseObjectMapper instanceof JsonMapper jm) ? jm : JsonMapper.builder().build();
+    public WebClient gitLabGraphQlWebClient(JsonMapper baseObjectMapper) {
+        // ClientDefaultCodecs.jackson2JsonEncoder accepts only Jackson 2; register the Jackson 3
+        // codecs through customCodecs instead.
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
-                config.customCodecs().register(new JacksonJsonEncoder(jsonMapper));
-                config.customCodecs().register(new JacksonJsonDecoder(jsonMapper));
+                config.customCodecs().register(new JacksonJsonEncoder(baseObjectMapper));
+                config.customCodecs().register(new JacksonJsonDecoder(baseObjectMapper));
             })
             .build();
 

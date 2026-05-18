@@ -60,18 +60,11 @@ spring:
     mustache:
         check-template-location: false
 
-    # Jackson 3 defaults. Replaces the former JacksonConfig.java bean (deleted): JavaTimeModule
-    # is auto-registered when on classpath; we just need to tweak inclusion + date format + tz.
-    # Jackson 3 split datatype-specific features into their own buckets:
-    #   - WRITE_DATES_AS_TIMESTAMPS moved from SerializationFeature to DateTimeFeature
-    #     (Spring property: spring.jackson.datatype.datetime.*)
-    #   - READ/WRITE_ENUMS_USING_TO_STRING moved to EnumFeature
-    #     (Spring property: spring.jackson.datatype.enum.*)
-    # Both READ_ENUMS_USING_TO_STRING and WRITE_ENUMS_USING_TO_STRING flipped to true by default in
-    # Jackson 3 — disable both so enums that override toString() with a snake-case representation
-    # (e.g. ActivityEventType) keep round-tripping by Java identifier as they did under Jackson 2.
-    # FAIL_ON_NULL_FOR_PRIMITIVES default flipped to true; disable for backward-compat with v1
-    # snapshot payloads that omit primitive fields.
+    # Jackson 3 default flips:
+    #   * READ/WRITE_ENUMS_USING_TO_STRING off — ActivityEventType.toString() returns a snake-case
+    #     form; defaulting to it would break YAML/JSON round-trips that use the Java identifier.
+    #   * FAIL_ON_NULL_FOR_PRIMITIVES off — AgentJob v1 configSnapshot rows omit schemaVersion.
+    #   * DateTimeFeature is the new home for WRITE_DATES_AS_TIMESTAMPS (was SerializationFeature).
     jackson:
         default-property-inclusion: non_null
         deserialization:

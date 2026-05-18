@@ -98,33 +98,15 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     Optional<Issue> findByIdWithBlockedBy(@Param("id") Long id);
 
     /**
-     * Corrects the discriminator column for a mistyped stub entity.
-     * <p>
-     * When a GitHub {@code issue_comment} webhook arrives before the {@code pull_request}
-     * webhook, a stub may be created with {@code issue_type='ISSUE'} instead of
-     * {@code 'PULL_REQUEST'}. This method fixes the discriminator so the subsequent
-     * upsert correctly matches on {@code ON CONFLICT (repository_id, issue_type, number)}.
-     * <p>
-     * <b>Safety:</b> Only corrects rows where {@code issue_type = :currentType} to avoid
-     * accidentally modifying the wrong entity in providers where issues and PRs share the
-     * same number namespace (e.g., GitHub).
+     * Promotes a stub {@code ISSUE} row (created when an issue-comment webhook arrives before the
+     * pull-request webhook) to {@code PULL_REQUEST} ahead of the upsert. The {@code COALESCE}s
+     * seed the PR-specific NOT-NULL primitives because Hibernate 7's single-table-inheritance
+     * CHECK constraint rejects the discriminator flip otherwise; {@code upsertCore} overwrites
+     * them with real values immediately after.
      *
-     * @param repositoryId the repository ID
-     * @param number the entity number within the repository
-     * @param currentType the current (incorrect) discriminator value (e.g., 'ISSUE')
-     * @param newType the correct discriminator value (e.g., 'PULL_REQUEST')
      * @return 1 if updated, 0 if no matching row exists
-     *
-     * <p>Sets PullRequest-specific primitive columns ({@code is_draft, is_merged, commits,
-     * additions, deletions, changed_files}) to safe zero defaults in the same UPDATE.
-     * Hibernate 7 generates a strict {@code CHECK (issue_type != 'PULL_REQUEST' OR (...primitive
-     * PR cols IS NOT NULL))} constraint for single-table-inheritance subclasses with NOT NULL
-     * fields (Hibernate 6 did not). Without seeding placeholders, the discriminator UPDATE
-     * violates the check constraint immediately. The subsequent {@code upsertCore} in
-     * {@code GitHubPullRequestProcessor} overwrites these placeholders with real values.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Transactional
     @Query(
         value = "UPDATE issue SET issue_type = :newType, " +
             "is_draft = COALESCE(is_draft, false), " +

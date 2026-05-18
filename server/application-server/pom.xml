@@ -69,7 +69,6 @@
              Override with -DskipCleanStaleClasses=true only for local iterative dev. -->
         <skipCleanStaleClasses>false</skipCleanStaleClasses>
 
-        <!-- Versions for deps not managed by Spring Boot parent -->
         <resilience4j.version>2.4.0</resilience4j.version>
         <okhttp.version>5.3.2</okhttp.version>
         <docker-java.version>3.7.1</docker-java.version>
@@ -86,7 +85,7 @@
         <graphql-codegen.version>5.10.0</graphql-codegen.version>
         <postgresql.version>42.7.11</postgresql.version>
         <therapi.version>0.15.0</therapi.version>
-        <!-- spring-retry is no longer in Spring Boot's dependency management; pin explicitly. -->
+        <!-- spring-retry: not in Boot 4's dependency management. -->
         <spring-retry.version>2.0.12</spring-retry.version>
     </properties>
     <dependencies>
@@ -123,8 +122,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <!-- Spring Boot 4 split RestTemplateBuilder + RestClient autoconfig into their own
-             module; it's no longer transitive via spring-boot-starter-web. -->
+        <!-- Boot 4: RestTemplateBuilder autoconfig is not transitive via starter-web. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-restclient</artifactId>
@@ -154,11 +152,7 @@
             <groupId>org.liquibase</groupId>
             <artifactId>liquibase-core</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.liquibase.ext</groupId>
-            <artifactId>liquibase-hibernate7</artifactId>
-            <version>${liquibase-hibernate7.version}</version>
-        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-logging</artifactId>
@@ -177,8 +171,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
-        <!-- Spring Retry for transient failure handling in activity event recording.
-             Spring Boot 4 dropped this from its dependency-managed set; pin explicitly. -->
         <dependency>
             <groupId>org.springframework.retry</groupId>
             <artifactId>spring-retry</artifactId>
@@ -217,6 +209,12 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        <!-- @AutoConfigureWebTestClient lives in this module in Boot 4 (split out of spring-boot-test-autoconfigure). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webtestclient</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
@@ -230,9 +228,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Testcontainers for integration testing.
-             Testcontainers 2.0 renamed module artifacts: junit-jupiter → testcontainers-junit-jupiter,
-             postgresql → testcontainers-postgresql. The core artifact stays `testcontainers`. -->
+        <!-- Testcontainers 2.0 renamed: junit-jupiter → testcontainers-junit-jupiter, etc. -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-junit-jupiter</artifactId>
@@ -267,10 +263,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Jackson 3 is managed by Spring Boot 4 BOM (jackson-bom 3.x). JSR-310 date/time support
-             (LocalDate, Instant, OffsetDateTime, …) and parameter-name handling are built into
-             tools.jackson.databind in 3.x — no jackson-datatype-jsr310 / jackson-module-paramnames
-             modules are needed. We DO need the YAML dataformat for AchievementRegistry. -->
+        <!-- YAML dataformat for AchievementRegistry; Jackson 3 BOM managed by Boot 4. -->
         <dependency>
             <groupId>tools.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
@@ -315,17 +308,15 @@
             <artifactId>bolt</artifactId>
             <version>${slack-bolt.version}</version>
             <exclusions>
-                <!-- Slack pulls okhttp:4.12.0 transitively; we use okhttp-jvm:5.x. Without this
-                     exclusion both jars land on the classpath and the older one wins for
-                     okhttp3.internal.concurrent.TaskRunner, breaking mockwebserver3. -->
+                <!-- Slack pulls okhttp:4.12.0; conflicts with okhttp-jvm:5.x on
+                     okhttp3.internal.concurrent.TaskRunner. -->
                 <exclusion>
                     <groupId>com.squareup.okhttp3</groupId>
                     <artifactId>okhttp</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
-        <!-- OkHttp 5.x: Maven consumers must use the -jvm classifier artifact;
-             the bare okhttp:5.x JAR is a near-empty KMP shim (see square/okhttp#8913). -->
+        <!-- okhttp-jvm: bare okhttp:5.x is a KMP shim (square/okhttp#8913). -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp-jvm</artifactId>
@@ -342,9 +333,6 @@
             <version>${okhttp.version}</version>
             <scope>test</scope>
         </dependency>
-        <!-- jakarta.ws.rs-api is consumed by Keycloak admin client (RESTEasy) plus
-             5 callers in account/notification/resilience that reference WebApplicationException
-             and friends directly. -->
         <dependency>
             <groupId>jakarta.ws.rs</groupId>
             <artifactId>jakarta.ws.rs-api</artifactId>
@@ -390,12 +378,6 @@
             <artifactId>resilience4j-micrometer</artifactId>
             <version>${resilience4j.version}</version>
         </dependency>
-        <!-- spring-boot-starter-aop was removed in Spring Boot 4 (the artifact no longer exists).
-             AOP infrastructure is now pulled transitively via spring-boot-starter-data-jpa
-             (for @Transactional), spring-boot-starter-security, and friends. We have no @Aspect
-             classes of our own. If we ever need explicit AspectJ weaving, add aspectjweaver from
-             Boot's BOM directly. -->
-        <!-- (intentionally no aop starter dependency) -->
         <!-- JGit for local git repository operations -->
         <dependency>
             <groupId>org.eclipse.jgit</groupId>
@@ -824,10 +806,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
-                    <!-- Bumped from 1GB to 4GB: Spring Boot 4 + Jackson 3 + Hibernate 7 carry larger
-                         classloader baselines, and full-context @SpringBootTest scans tens of thousands
-                         of classes (Modulith + ArchUnit reflective bookkeeping). 1GB OOMs immediately;
-                         2GB also OOMs on integration tests with the new BOMs. -->
+                    <!-- 4GB: Boot 4 + Hibernate 7 + full @SpringBootTest OOMs at 2GB. -->
                     <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
                     <!-- Tag filtering: run integration tests, exclude live tests -->
                     <groups>${failsafe.includedGroups}</groups>
@@ -943,9 +922,7 @@
                     <url>jdbc:postgresql://localhost:${postgres.port}/hephaestus</url>
                     <username>root</username>
                     <password>root</password>
-                    <!-- Hibernate URL for reference schema using the Hibernate 7 dialect.
-                         SpringImplicitNamingStrategy moved from `org.springframework.boot.orm.jpa.hibernate`
-                         to `org.springframework.boot.hibernate` in Spring Boot 4. -->
+                    <!-- Boot 4: SpringImplicitNamingStrategy moved to org.springframework.boot.hibernate. -->
                     <referenceUrl>
                         hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
                     </referenceUrl>
@@ -960,8 +937,6 @@
                     <dependency>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-data-jpa</artifactId>
-                        <!-- Plugin dependencies do NOT inherit the project's dependencyManagement,
-                             so the version must be explicit. Tracks the Boot parent version. -->
                         <version>${project.parent.version}</version>
                     </dependency>
                     <dependency>
@@ -1063,8 +1038,7 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
-                            <!-- ArchUnit + Spring Modulith verify() are heavy class-scanning ops.
-                                 Override the default 2GB heap for arch runs; they OOM otherwise. -->
+                            <!-- 4GB: ArchUnit + Modulith.verify() OOM at 2GB. -->
                             <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
                                 -XX:+EnableDynamicAgentLoading
                             </argLine>

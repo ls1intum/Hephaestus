@@ -16,7 +16,6 @@ import org.springframework.lang.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.json.JsonReadFeature;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -64,18 +63,14 @@ public class PracticeDetectionResultParser {
     /** Maximum number of inline delivery notes per job. This bounds comment API fan-out, not finding detection. */
     static final int MAX_DELIVERY_DIFF_NOTES = 30;
 
-    private final ObjectMapper objectMapper;
-    private final ObjectMapper lenientMapper;
+    private final JsonMapper objectMapper;
+    private final JsonMapper lenientMapper;
 
-    public PracticeDetectionResultParser(ObjectMapper objectMapper) {
+    public PracticeDetectionResultParser(JsonMapper objectMapper) {
         this.objectMapper = objectMapper;
-        // Lenient mapper for agent output: LLMs produce JSON with literal newlines,
-        // tabs, and other control chars inside string values that strict JSON rejects.
-        // Jackson 3: ObjectMapper is immutable; JsonMapper.builder() is the rebuild path.
-        // Production injects a JsonMapper (Boot 4 autoconfig); unit tests may pass a plain
-        // ObjectMapper, so fall back to a fresh JsonMapper.builder() in that case.
-        JsonMapper base = (objectMapper instanceof JsonMapper jm) ? jm : JsonMapper.builder().build();
-        this.lenientMapper = base.rebuild().enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS).build();
+        // Lenient mapper for agent output: LLMs produce JSON with literal newlines/tabs/control
+        // chars inside string values that strict JSON rejects.
+        this.lenientMapper = objectMapper.rebuild().enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS).build();
     }
 
     /**
