@@ -33,7 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -73,7 +73,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     private static final Logger log = LoggerFactory.getLogger(PullRequestReviewHandler.class);
 
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
     private final PracticeRepository practiceRepository;
     private final WorkspaceContextBuilder workspaceContextBuilder;
@@ -84,7 +84,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final FeedbackDeliveryService feedbackService;
 
     PullRequestReviewHandler(
-        ObjectMapper objectMapper,
+        JsonMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PracticeRepository practiceRepository,
         WorkspaceContextBuilder workspaceContextBuilder,

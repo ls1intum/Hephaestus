@@ -107,6 +107,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @return 1 if updated, 0 if no matching row exists
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
     @Query(
         value = "UPDATE issue SET issue_type = :newType, " +
             "is_draft = COALESCE(is_draft, false), " +

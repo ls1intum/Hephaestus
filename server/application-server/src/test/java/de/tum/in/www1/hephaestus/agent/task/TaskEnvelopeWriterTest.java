@@ -9,17 +9,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("TaskEnvelopeWriter")
 class TaskEnvelopeWriterTest extends BaseUnitTest {
 
     private TaskEnvelopeWriter writer;
-    private ObjectMapper reader;
+    private JsonMapper reader;
 
     @BeforeEach
     void setUp() {
-        ObjectMapper mapper = new ObjectMapper();
+        JsonMapper mapper = JsonMapper.builder().build();
         writer = new TaskEnvelopeWriter(mapper);
         reader = mapper;
     }
