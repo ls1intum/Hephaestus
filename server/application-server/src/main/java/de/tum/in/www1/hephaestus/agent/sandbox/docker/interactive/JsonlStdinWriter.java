@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import io.micrometer.core.instrument.Counter;
 import java.io.IOException;
@@ -18,6 +16,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Serialised JSONL writer with bounded queueing and watchdog-driven recovery. {@link #send}
@@ -99,7 +100,7 @@ final class JsonlStdinWriter {
         byte[] payload;
         try {
             payload = mapper.writeValueAsBytes(frame);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new InteractiveSandboxException("Failed to encode frame as JSON", e);
         }
         CompletableFuture<Void> ack = new CompletableFuture<>();

@@ -1,12 +1,12 @@
 package de.tum.in.www1.hephaestus.agent.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import java.util.Objects;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Immutable projection of {@link AgentConfig} frozen at job submission time.

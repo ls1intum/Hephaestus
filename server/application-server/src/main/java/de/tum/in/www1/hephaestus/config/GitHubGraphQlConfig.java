@@ -4,8 +4,6 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubActorMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubIssueMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2FieldConfigurationMixin;
@@ -41,8 +39,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.http.codec.json.Jackson2JsonDecoder;
-import org.springframework.http.codec.json.Jackson2JsonEncoder;
+import org.springframework.http.codec.json.JacksonJsonDecoder;
+import org.springframework.http.codec.json.JacksonJsonEncoder;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -51,6 +49,8 @@ import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 import reactor.util.retry.Retry;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Production-grade configuration for GitHub GraphQL API client.
@@ -111,13 +111,11 @@ public class GitHubGraphQlConfig {
     }
 
     @Bean
-    public WebClient gitHubGraphQlWebClient(ObjectMapper baseObjectMapper) {
-        // Create a custom ObjectMapper for GitHub GraphQL that:
-        // 1. Uses Long for integers (GitHub databaseId values exceed 32-bit int range)
-        // 2. Registers mixins for polymorphic interface deserialization (Actor, RequestedReviewer, RepositoryOwner)
-        ObjectMapper graphQlObjectMapper = baseObjectMapper
-            .copy()
-            .configure(DeserializationFeature.USE_LONG_FOR_INTS, true)
+    public WebClient gitHubGraphQlWebClient(JsonMapper baseObjectMapper) {
+        // GitHub databaseId values exceed 32-bit int range.
+        JsonMapper graphQlObjectMapper = baseObjectMapper
+            .rebuild()
+            .enable(DeserializationFeature.USE_LONG_FOR_INTS)
             .addMixIn(GHActor.class, GitHubActorMixin.class)
             .addMixIn(GHRequestedReviewer.class, GitHubRequestedReviewerMixin.class)
             .addMixIn(GHRepositoryOwner.class, GitHubRepositoryOwnerMixin.class)
@@ -126,13 +124,14 @@ public class GitHubGraphQlConfig {
             .addMixIn(GHProjectV2ItemContent.class, GitHubProjectV2ItemContentMixin.class)
             .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class)
             .addMixIn(GHIssue.class, GitHubIssueMixin.class)
-            .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class);
+            .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class)
+            .build();
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
-                config.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(graphQlObjectMapper));
-                config.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(graphQlObjectMapper));
+                config.customCodecs().register(new JacksonJsonEncoder(graphQlObjectMapper));
+                config.customCodecs().register(new JacksonJsonDecoder(graphQlObjectMapper));
             })
             .build();
 

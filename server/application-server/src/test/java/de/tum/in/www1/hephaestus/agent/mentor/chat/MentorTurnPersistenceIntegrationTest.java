@@ -3,9 +3,6 @@ package de.tum.in.www1.hephaestus.agent.mentor.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
@@ -33,6 +30,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Validates the {@link MentorTurnPersistence} REQUIRES_NEW contract end-to-end against a real

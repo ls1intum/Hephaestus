@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.14</version>
+        <version>4.0.6</version>
         <relativePath/>
         <!-- lookup parent from repository -->
     </parent>
@@ -68,6 +68,23 @@
         <!-- Stale class cleanup: always enabled to prevent ghost .class files from CI caches.
              Override with -DskipCleanStaleClasses=true only for local iterative dev. -->
         <skipCleanStaleClasses>false</skipCleanStaleClasses>
+
+        <resilience4j.version>2.4.0</resilience4j.version>
+        <okhttp.version>5.3.2</okhttp.version>
+        <docker-java.version>3.7.1</docker-java.version>
+        <archunit.version>1.4.2</archunit.version>
+        <liquibase-hibernate7.version>5.0.3</liquibase-hibernate7.version>
+        <springdoc.version>3.0.3</springdoc.version>
+        <springdoc-maven-plugin.version>1.5</springdoc-maven-plugin.version>
+        <sentry.version>8.41.0</sentry.version>
+        <slack-bolt.version>1.48.1</slack-bolt.version>
+        <jnats.version>2.25.2</jnats.version>
+        <jgit.version>7.6.0.202603022253-r</jgit.version>
+        <keycloak-admin.version>26.0.9</keycloak-admin.version>
+        <java-jwt.version>4.5.2</java-jwt.version>
+        <graphql-codegen.version>5.10.0</graphql-codegen.version>
+        <postgresql.version>42.7.11</postgresql.version>
+        <therapi.version>0.15.0</therapi.version>
     </properties>
     <dependencies>
         <dependency>
@@ -104,28 +121,33 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-restclient</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.auth0</groupId>
             <artifactId>java-jwt</artifactId>
-            <version>4.5.2</version>
+            <version>${java-jwt.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
+        <!-- WebClient.Builder autoconfig; not transitive via spring-boot-starter-webflux. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webclient</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.8.15</version>
+            <version>${springdoc.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.liquibase</groupId>
-            <artifactId>liquibase-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-liquibase</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.liquibase.ext</groupId>
-            <artifactId>liquibase-hibernate6</artifactId>
-            <version>4.33.0</version>
-        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-logging</artifactId>
@@ -144,10 +166,9 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
-        <!-- Spring Retry for transient failure handling in activity event recording -->
         <dependency>
-            <groupId>org.springframework.retry</groupId>
-            <artifactId>spring-retry</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -155,16 +176,10 @@
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
-        <!-- Override plexus-utils to fix CVE-2017-1000487 and CVE-2022-4244 -->
-        <dependency>
-            <groupId>org.codehaus.plexus</groupId>
-            <artifactId>plexus-utils</artifactId>
-            <version>3.6.1</version>
-        </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.11</version>
+            <version>${postgresql.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -189,6 +204,11 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webtestclient</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
@@ -201,15 +221,14 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Testcontainers for integration testing -->
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
+            <artifactId>testcontainers-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -225,126 +244,71 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Jackson JSR-310 support for Java 8 date/time types -->
+
         <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
+            <groupId>tools.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
         </dependency>
 
-        <!-- ArchUnit for architecture testing -->
+<!-- ArchUnit for architecture testing -->
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
             <artifactId>archunit-junit5</artifactId>
-            <version>1.4.2</version>
+            <version>${archunit.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>com.github.therapi</groupId>
             <artifactId>therapi-runtime-javadoc</artifactId>
-            <version>0.15.0</version>
-        </dependency>
-        <dependency>
-            <groupId>io.hypersistence</groupId>
-            <artifactId>hypersistence-utils-hibernate-63</artifactId>
-            <version>3.15.2</version>
+            <version>${therapi.version}</version>
         </dependency>
         <dependency>
             <groupId>io.nats</groupId>
             <artifactId>jnats</artifactId>
-            <version>2.25.2</version>
+            <version>${jnats.version}</version>
         </dependency>
         <!-- Docker Java SDK for sandbox container management -->
         <dependency>
             <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java-api</artifactId>
-            <version>3.7.1</version>
+            <version>${docker-java.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java-core</artifactId>
-            <version>3.7.1</version>
+            <version>${docker-java.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java-transport-httpclient5</artifactId>
-            <version>3.7.1</version>
+            <version>${docker-java.version}</version>
         </dependency>
         <dependency>
             <groupId>com.slack.api</groupId>
             <artifactId>bolt</artifactId>
-            <version>1.48.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openapitools</groupId>
-            <artifactId>openapi-generator-maven-plugin</artifactId>
-            <version>7.19.0</version>
+            <version>${slack-bolt.version}</version>
             <exclusions>
+                <!-- Slack pulls okhttp:4.12.0; conflicts with our okhttp-jvm:5.x on TaskRunner. -->
                 <exclusion>
-                    <groupId>com.github.jknack</groupId>
-                    <artifactId>handlebars</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.github.jknack</groupId>
-                    <artifactId>handlebars-jackson2</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.github.java-json-tools</groupId>
-                    <artifactId>jackson-coreutils</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-simple</artifactId>
+                    <groupId>com.squareup.okhttp3</groupId>
+                    <artifactId>okhttp</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
-        <dependency>
-            <groupId>org.openapitools</groupId>
-            <artifactId>openapi-generator</artifactId>
-            <version>7.19.0</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-simple</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.github.jknack</groupId>
-                    <artifactId>handlebars</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.github.jknack</groupId>
-                    <artifactId>handlebars-jackson2</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.github.java-json-tools</groupId>
-                    <artifactId>jackson-coreutils</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
+        <!-- okhttp 5.x: bare 'okhttp' is a KMP shim (square/okhttp#8913); use okhttp-jvm. -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
-            <artifactId>okhttp</artifactId>
-            <version>4.12.0</version>
+            <artifactId>okhttp-jvm</artifactId>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>logging-interceptor</artifactId>
-            <version>4.12.0</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
-            <artifactId>mockwebserver</artifactId>
-            <version>4.12.0</version>
+            <artifactId>mockwebserver3</artifactId>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.gsonfire</groupId>
-            <artifactId>gson-fire</artifactId>
-            <version>1.9.0</version>
         </dependency>
         <dependency>
             <groupId>jakarta.ws.rs</groupId>
@@ -355,27 +319,18 @@
             <artifactId>jakarta.annotation-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.openapitools</groupId>
-            <artifactId>jackson-databind-nullable</artifactId>
-            <version>0.2.10</version>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.core</groupId>
-            <artifactId>jersey-client</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.hibernate.validator</groupId>
             <artifactId>hibernate-validator</artifactId>
         </dependency>
         <dependency>
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-admin-client</artifactId>
-            <version>26.0.9</version>
+            <version>${keycloak-admin.version}</version>
         </dependency>
         <dependency>
             <groupId>io.sentry</groupId>
-            <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
-            <version>8.40.0</version>
+            <artifactId>sentry-spring-boot-4-starter</artifactId>
+            <version>${sentry.version}</version>
         </dependency>
         <!-- Spring GraphQL Client for GitHub GraphQL API -->
         <dependency>
@@ -386,52 +341,35 @@
         <dependency>
             <groupId>io.github.kobylynskyi</groupId>
             <artifactId>graphql-java-codegen</artifactId>
-            <version>5.10.0</version>
+            <version>${graphql-codegen.version}</version>
         </dependency>
-        <!-- Resilience4j for Circuit Breaker pattern on external API calls -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-spring-boot3</artifactId>
-            <version>2.4.0</version>
+            <artifactId>resilience4j-spring-boot4</artifactId>
+            <version>${resilience4j.version}</version>
         </dependency>
         <!-- Resilience4j Micrometer integration for circuit breaker metrics -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-micrometer</artifactId>
-            <version>2.4.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
-        </dependency>
-        <!--
-            Netty native DNS resolver for macOS Apple Silicon (M1/M2/M3).
-            Resolves: "Unable to load io.netty.resolver.dns.macos.MacOSDnsServerAddressStreamProvider"
-            The x86_64 classifier is already included transitively via reactor-netty.
-            Version managed by Spring Boot's netty-bom.
-        -->
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-resolver-dns-native-macos</artifactId>
-            <classifier>osx-aarch_64</classifier>
+            <version>${resilience4j.version}</version>
         </dependency>
         <!-- JGit for local git repository operations -->
         <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
-            <version>7.6.0.202603022253-r</version>
+            <version>${jgit.version}</version>
         </dependency>
     </dependencies>
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>org.springframework.modulith</groupId>
-                <artifactId>spring-modulith-bom</artifactId>
-                <version>1.4.11</version>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp-bom</artifactId>
+                <version>${okhttp.version}</version>
                 <scope>import</scope>
                 <type>pom</type>
             </dependency>
-            <!-- Spring Boot BOM already includes testcontainers-bom with version 1.20.5 -->
         </dependencies>
     </dependencyManagement>
     <build>
@@ -466,11 +404,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <!-- Override Spring Boot parent (3.14.1) to fix MCOMPILER-540: generated sources
-                     incorrectly added to compilation with useIncrementalCompilation=false.
-                     TODO: Remove when Spring Boot parent ships >= 3.15.0.
-                     See: https://issues.apache.org/jira/browse/MCOMPILER-540 -->
-                <version>3.15.0</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
@@ -502,7 +435,7 @@
                         <path>
                             <groupId>com.github.therapi</groupId>
                             <artifactId>therapi-runtime-javadoc-scribe</artifactId>
-                            <version>0.15.0</version>
+                            <version>${therapi.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
@@ -535,7 +468,7 @@
             <plugin>
                 <groupId>io.github.kobylynskyi</groupId>
                 <artifactId>graphql-codegen-maven-plugin</artifactId>
-                <version>5.10.0</version>
+                <version>${graphql-codegen.version}</version>
                 <executions>
                     <execution>
                         <id>generate-github-graphql-client</id>
@@ -848,7 +781,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
-                    <argLine>@{argLine} -Xmx1024m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
+                    <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
                     <!-- Tag filtering: run integration tests, exclude live tests -->
                     <groups>${failsafe.includedGroups}</groups>
                     <excludedGroups>${failsafe.excludedGroups}</excludedGroups>
@@ -914,7 +847,7 @@
             <plugin>
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-maven-plugin</artifactId>
-                <version>1.5</version>
+                <version>${springdoc-maven-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>integration-test</id>
@@ -963,22 +896,21 @@
                     <url>jdbc:postgresql://localhost:${postgres.port}/hephaestus</url>
                     <username>root</username>
                     <password>root</password>
-                    <!-- Hibernate URL for reference schema using the Hibernate 6 dialect -->
                     <referenceUrl>
-                        hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+                        hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
                     </referenceUrl>
                     <verbose>true</verbose>
                 </configuration>
                 <dependencies>
                     <dependency>
                         <groupId>org.liquibase.ext</groupId>
-                        <artifactId>liquibase-hibernate6</artifactId>
-                        <version>4.33.0</version>
+                        <artifactId>liquibase-hibernate7</artifactId>
+                        <version>${liquibase-hibernate7.version}</version>
                     </dependency>
                     <dependency>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-data-jpa</artifactId>
-                        <version>3.5.14</version>
+                        <version>${project.parent.version}</version>
                     </dependency>
                     <dependency>
                         <groupId>jakarta.validation</groupId>
@@ -1073,6 +1005,20 @@
                 <failsafe.excludedGroups></failsafe.excludedGroups>
                 <failsafe.includedGroups></failsafe.includedGroups>
             </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <!-- 4GB: ArchUnit OOMs at 2GB. -->
+                            <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
+                                -XX:+EnableDynamicAgentLoading
+                            </argLine>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
 
         <!--

@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.account.UserPreferencesRepository;
 import de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.in.www1.hephaestus.agent.context.providers.GitDiffOperations;
@@ -17,6 +16,7 @@ import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Registers all {@link JobTypeHandler} beans and the {@link JobTypeHandlerRegistry}.
@@ -29,14 +29,14 @@ import org.springframework.lang.Nullable;
 @Configuration
 public class JobTypeHandlerConfiguration {
 
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
     private final PracticeReviewProperties reviewProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
 
     JobTypeHandlerConfiguration(
-        ObjectMapper objectMapper,
+        JsonMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PracticeReviewProperties reviewProperties,
         WorkspaceContextBuilder workspaceContextBuilder,

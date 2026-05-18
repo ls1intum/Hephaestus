@@ -1,9 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.nio.charset.StandardCharsets;
@@ -17,6 +13,10 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.json.JsonReadFeature;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Parses structured agent output into validated practice findings and optional delivery content.
@@ -63,14 +63,14 @@ public class PracticeDetectionResultParser {
     /** Maximum number of inline delivery notes per job. This bounds comment API fan-out, not finding detection. */
     static final int MAX_DELIVERY_DIFF_NOTES = 30;
 
-    private final ObjectMapper objectMapper;
-    private final ObjectMapper lenientMapper;
+    private final JsonMapper objectMapper;
+    private final JsonMapper lenientMapper;
 
-    public PracticeDetectionResultParser(ObjectMapper objectMapper) {
+    public PracticeDetectionResultParser(JsonMapper objectMapper) {
         this.objectMapper = objectMapper;
-        // Lenient mapper for agent output: LLMs produce JSON with literal newlines,
-        // tabs, and other control chars inside string values that strict JSON rejects.
-        this.lenientMapper = objectMapper.copy().configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
+        // Lenient mapper for agent output: LLMs produce JSON with literal newlines/tabs/control
+        // chars inside string values that strict JSON rejects.
+        this.lenientMapper = objectMapper.rebuild().enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS).build();
     }
 
     /**
@@ -100,9 +100,8 @@ public class PracticeDetectionResultParser {
         String sanitizedText = sanitizeJsonEscapes(rawOutputText);
         JsonNode root;
         try {
-            // Use lenient mapper: LLMs produce JSON with literal newlines/tabs in strings
             root = lenientMapper.readTree(sanitizedText);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             // Fallback: try to extract JSON from mixed text (e.g., "[PHASE0]...\n{...}")
             root = extractJsonFromText(sanitizedText);
             if (root == null) {
@@ -430,7 +429,7 @@ public class PracticeDetectionResultParser {
                 } else {
                     log.debug("Evidence exceeds {} bytes, dropping: slug={}", MAX_EVIDENCE_BYTES, practiceSlug);
                 }
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 log.debug("Failed to parse evidence JSON, dropping: slug={}, error={}", practiceSlug, e.getMessage());
             }
         }
@@ -573,7 +572,7 @@ public class PracticeDetectionResultParser {
                 if (node != null && node.isObject() && node.has("findings")) {
                     return node;
                 }
-            } catch (JsonProcessingException ignored) {
+            } catch (JacksonException ignored) {
                 // Not valid JSON from this position, try next '{'
             }
             startIdx = braceIdx + 1;

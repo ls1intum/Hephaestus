@@ -3,9 +3,6 @@ package de.tum.in.www1.hephaestus.agent.practice.live;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.runtime.AgentResult;
 import de.tum.in.www1.hephaestus.agent.runtime.PiResultParser;
 import de.tum.in.www1.hephaestus.agent.runtime.WorkspaceAbi;
@@ -35,6 +32,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Live end-to-end test for the practice-review {@code pi-runner.mjs} against a real LLM.

@@ -1,11 +1,11 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.spi;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Consumer;
 import reactor.core.Disposable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Live handle to one attached sandbox session: bidirectional JSONL channel plus fan-out and idle

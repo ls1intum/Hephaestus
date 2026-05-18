@@ -6,9 +6,6 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
@@ -34,6 +31,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @DisplayName("PullRequestContentProvider")
 class PullRequestContentProviderTest extends BaseUnitTest {

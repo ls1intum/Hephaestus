@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.runtime;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.NetworkPolicy;
@@ -17,6 +15,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Shared Pi-agent kernel. Builds the sandbox-level scaffolding (settings, auth, env, workspace
@@ -183,7 +183,7 @@ public class PiRuntimeFactory {
         settings.put("compaction", compaction);
         try {
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(settings);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize Pi practice settings", e);
         }
     }

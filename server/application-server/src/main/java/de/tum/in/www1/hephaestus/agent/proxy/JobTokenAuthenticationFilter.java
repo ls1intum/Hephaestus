@@ -28,7 +28,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p>Defense-in-depth: rejects requests from non-private IPs (only Docker-internal
  * traffic should reach these endpoints).
  */
-class JobTokenAuthenticationFilter extends OncePerRequestFilter {
+public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JobTokenAuthenticationFilter.class);
 

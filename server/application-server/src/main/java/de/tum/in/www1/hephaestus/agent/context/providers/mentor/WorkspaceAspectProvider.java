@@ -1,10 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.context.providers.mentor;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.context.ContentProvider;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest.MentorChatRequest;
@@ -16,7 +11,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -30,6 +24,12 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Materialises {@code context/target/workspace.json} for {@link MentorChatRequest}.
@@ -83,7 +83,7 @@ public class WorkspaceAspectProvider implements ContentProvider {
             : buildPayload(req.workspaceId(), req.contributorId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize workspace aspect", e);
         }
     }
@@ -162,8 +162,8 @@ public class WorkspaceAspectProvider implements ContentProvider {
             String text = extractText(parts);
             if (text == null) return "";
             return text.length() > MESSAGE_PREVIEW_LENGTH ? text.substring(0, MESSAGE_PREVIEW_LENGTH) : text;
-        } catch (IOException e) {
-            // Malformed parts JSON shouldn't poison the aspect — log and degrade.
+        } catch (JacksonException e) {
+            // Malformed parts JSON: degrade silently rather than poison the aspect.
             return "";
         }
     }
@@ -173,7 +173,7 @@ public class WorkspaceAspectProvider implements ContentProvider {
         if (parts == null || !parts.isArray()) {
             return null;
         }
-        Iterator<JsonNode> it = parts.elements();
+        Iterator<JsonNode> it = parts.values().iterator();
         while (it.hasNext()) {
             JsonNode part = it.next();
             if (part.has("type") && "text".equals(part.get("type").asText()) && part.has("text")) {

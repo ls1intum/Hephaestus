@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.testconfig.WorkspaceTestFactory;
@@ -16,6 +15,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("PracticeRepository Integration")
 class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {

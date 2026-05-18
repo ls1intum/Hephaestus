@@ -6,7 +6,6 @@ import de.tum.in.www1.hephaestus.testconfig.WithUser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -16,7 +15,6 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * {@code @TestPropertySource} only works on top-level test classes (not {@code @Nested}),
  * so CONFIG overrides need their own class to get a dedicated application context.
  */
-@AutoConfigureWebTestClient
 @TestPropertySource(properties = "hephaestus.features.flags.gitlab-workspace-creation=true")
 @DisplayName("Feature flag controller — CONFIG flags integration")
 class FeatureFlagConfigIntegrationTest extends BaseIntegrationTest {

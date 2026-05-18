@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.context;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobPreparationException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -14,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Orchestrates {@link ContentProvider}s to materialise the AI-readable workspace context under

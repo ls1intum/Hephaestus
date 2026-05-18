@@ -2,10 +2,6 @@ package de.tum.in.www1.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DiscardedEntry;
@@ -19,11 +15,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 @DisplayName("PracticeDetectionResultParser")
 class PracticeDetectionResultParserTest extends BaseUnitTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
     private PracticeDetectionResultParser parser;
 
     @BeforeEach

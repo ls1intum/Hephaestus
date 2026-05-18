@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.agent.handler.spi;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Objects;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Result of {@link JobTypeHandler#createSubmission} — lightweight data to persist on the

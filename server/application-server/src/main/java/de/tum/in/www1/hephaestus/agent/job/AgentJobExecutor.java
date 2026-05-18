@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
@@ -55,6 +54,7 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * NATS pull consumer that executes agent jobs through the full pipeline.

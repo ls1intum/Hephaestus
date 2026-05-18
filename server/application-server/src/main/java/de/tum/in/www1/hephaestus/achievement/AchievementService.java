@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.achievement;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
@@ -24,10 +22,11 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
+import org.springframework.resilience.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Service for evaluating and unlocking achievements via incremental progress updates.
@@ -160,9 +159,11 @@ public class AchievementService {
      * @return list of newly unlocked achievement types (empty if none)
      */
     @Retryable(
-        retryFor = { ObjectOptimisticLockingFailureException.class },
-        maxAttempts = 5,
-        backoff = @Backoff(delay = 100, multiplier = 2.0, maxDelay = 2000)
+        includes = { ObjectOptimisticLockingFailureException.class },
+        maxRetries = 4,
+        delay = 100,
+        multiplier = 2.0,
+        maxDelay = 2000
     )
     @Transactional
     public List<AchievementDefinition> checkAndUnlock(ActivitySavedEvent event) {
@@ -272,7 +273,7 @@ public class AchievementService {
         String progressJson;
         try {
             progressJson = objectMapper.writeValueAsString(uaProgress.getProgressData());
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException(
                 "Failed to serialize achievement progress for user=" +
                     uaProgress.getUser().getId() +

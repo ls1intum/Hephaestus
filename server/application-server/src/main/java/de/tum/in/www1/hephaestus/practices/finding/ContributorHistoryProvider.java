@@ -1,9 +1,5 @@
 package de.tum.in.www1.hephaestus.practices.finding;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.time.Instant;
 import java.util.Comparator;
@@ -14,6 +10,10 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Builds aggregated contributor practice history JSON for the review agent context.
@@ -101,7 +101,7 @@ public class ContributorHistoryProvider {
                 workspaceId
             );
             return Optional.of(json);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             // Should never happen for ObjectNode serialization
             log.error("Failed to serialize contributor history JSON", e);
             return Optional.empty();

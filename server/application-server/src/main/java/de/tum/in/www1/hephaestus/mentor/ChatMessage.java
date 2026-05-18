@@ -1,8 +1,6 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.databind.JsonNode;
-import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -14,9 +12,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.Type;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Message in a conversation tree structure that maps to AI SDK UI Message format.
@@ -111,7 +111,7 @@ public class ChatMessage {
      * Shape is enforced by the {@code chk_chat_message_metadata_shape} CHECK constraint
      * (must be NULL or object).
      */
-    @Type(JsonType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private JsonNode metadata;
 
@@ -120,16 +120,8 @@ public class ChatMessage {
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
-    /**
-     * AI SDK UIMessage parts as a JSONB array. Written verbatim by MentorChatService. NOT NULL +
-     * JSONB-array CHECK enforced at the column level (changeset {@code mentor-1071-enforce-parts-shape}).
-     * DB-side default {@code '[]'::jsonb} is applied by Liquibase; the JPA-level
-     * {@link org.hibernate.annotations.ColumnDefault} is intentionally omitted because the
-     * Postgres typecast literal trips liquibase-hibernate6 4.33.0's diff snapshot (NPE on
-     * {@code LiquibaseDataType.getName()}). MentorChatService writes the column explicitly on
-     * every insert, so we never rely on Hibernate's omit-from-INSERT optimization.
-     */
-    @Type(JsonType.class)
+    // UIMessage parts. Liquibase enforces NOT NULL + JSONB-array CHECK; MentorChatService always writes explicitly.
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "parts", columnDefinition = "jsonb", nullable = false)
     private JsonNode parts;
 

@@ -20,14 +20,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * Integration tests for workspace purge (deletion) covering data cleanup completeness,
  * idempotency, shared entity protection, credential clearing, and authorization.
  */
-@AutoConfigureWebTestClient
 @DisplayName("Workspace purge integration")
 class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 

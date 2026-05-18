@@ -1,12 +1,10 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
@@ -33,7 +31,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.hibernate.annotations.Type;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Generic execution record for agent jobs.
@@ -87,15 +87,15 @@ public class AgentJob {
     @Column(name = "status", nullable = false, length = 20)
     private AgentJobStatus status = AgentJobStatus.QUEUED;
 
-    @Type(JsonType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     private JsonNode metadata;
 
-    @Type(JsonType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "output", columnDefinition = "jsonb")
     private JsonNode output;
 
-    @Type(JsonType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "config_snapshot", columnDefinition = "jsonb", nullable = false)
     private JsonNode configSnapshot;
 

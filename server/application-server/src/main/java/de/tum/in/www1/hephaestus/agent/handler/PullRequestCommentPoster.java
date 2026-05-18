@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
@@ -17,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Posts agent review results as comments on GitHub PRs or GitLab MRs.

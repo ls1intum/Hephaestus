@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.in.www1.hephaestus.agent.context.providers.GitDiffOperations;
@@ -19,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("JobTypeHandlerRegistry")
 class JobTypeHandlerRegistryTest extends BaseUnitTest {
@@ -41,7 +41,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     @Mock
     private FeedbackDeliveryService feedbackService;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private JobTypeHandler prReviewHandler() {
         var parser = new PracticeDetectionResultParser(objectMapper);

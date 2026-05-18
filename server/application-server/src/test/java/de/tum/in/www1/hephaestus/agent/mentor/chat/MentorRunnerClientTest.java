@@ -3,10 +3,6 @@ package de.tum.in.www1.hephaestus.agent.mentor.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
@@ -27,6 +23,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import reactor.core.Disposable;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Wire-level contract for {@link MentorRunnerClient}. The fake sandbox below is a hand-rolled

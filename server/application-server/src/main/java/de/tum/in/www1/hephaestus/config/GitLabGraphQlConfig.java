@@ -8,7 +8,6 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabRateLimitTracker;
@@ -28,8 +27,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.http.codec.json.Jackson2JsonDecoder;
-import org.springframework.http.codec.json.Jackson2JsonEncoder;
+import org.springframework.http.codec.json.JacksonJsonDecoder;
+import org.springframework.http.codec.json.JacksonJsonEncoder;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -38,6 +37,7 @@ import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 import reactor.util.retry.Retry;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Configuration for GitLab GraphQL API client.
@@ -67,12 +67,12 @@ public class GitLabGraphQlConfig {
 
     @Bean
     @Qualifier("gitLabGraphQlWebClient")
-    public WebClient gitLabGraphQlWebClient(ObjectMapper baseObjectMapper) {
+    public WebClient gitLabGraphQlWebClient(JsonMapper baseObjectMapper) {
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
-                config.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(baseObjectMapper));
-                config.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(baseObjectMapper));
+                config.customCodecs().register(new JacksonJsonEncoder(baseObjectMapper));
+                config.customCodecs().register(new JacksonJsonDecoder(baseObjectMapper));
             })
             .build();
 

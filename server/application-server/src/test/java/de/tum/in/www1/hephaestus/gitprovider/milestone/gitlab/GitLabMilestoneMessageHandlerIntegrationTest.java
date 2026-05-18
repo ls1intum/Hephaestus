@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.gitlab;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
@@ -35,6 +34,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.test.context.TestPropertySource;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Integration tests for GitLabMilestoneMessageHandler.

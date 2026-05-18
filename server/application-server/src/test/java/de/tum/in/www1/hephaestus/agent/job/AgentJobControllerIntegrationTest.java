@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
@@ -18,10 +17,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import tools.jackson.databind.ObjectMapper;
 
-@AutoConfigureWebTestClient
 @DisplayName("Agent job controller integration")
 class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 

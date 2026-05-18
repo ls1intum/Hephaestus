@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.practices.finding;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
@@ -23,10 +22,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import tools.jackson.databind.ObjectMapper;
 
-@AutoConfigureWebTestClient
 @DisplayName("Practice finding controller integration")
 class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 

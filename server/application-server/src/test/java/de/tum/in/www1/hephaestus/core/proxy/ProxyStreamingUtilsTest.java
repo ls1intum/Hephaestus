@@ -117,7 +117,7 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
 
             HttpHeaders filtered = ProxyStreamingUtils.filterHopByHopHeaders(headers);
 
-            assertThat(filtered).isEmpty();
+            assertThat(filtered.size()).isZero();
         }
 
         @Test
@@ -136,7 +136,7 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
 
             HttpHeaders filtered = ProxyStreamingUtils.filterHopByHopHeaders(headers);
 
-            assertThat(filtered).hasSize(1);
+            assertThat(filtered.size()).isEqualTo(1);
             assertThat(filtered.getFirst("X-Survive")).isEqualTo("yes");
         }
     }

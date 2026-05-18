@@ -10,10 +10,10 @@ import jakarta.validation.constraints.NotBlank;
 @Schema(description = "Request to update Slack integration credentials")
 public record UpdateWorkspaceSlackCredentialsRequestDTO(
     @NotBlank(message = "Slack token is required")
-    @Schema(description = "Slack Bot User OAuth Token for API access", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Slack Bot User OAuth Token for API access")
     String slackToken,
 
     @NotBlank(message = "Slack signing secret is required")
-    @Schema(description = "Slack Signing Secret for webhook verification", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Slack Signing Secret for webhook verification")
     String slackSigningSecret
 ) {}

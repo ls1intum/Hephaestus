@@ -98,27 +98,22 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     Optional<Issue> findByIdWithBlockedBy(@Param("id") Long id);
 
     /**
-     * Corrects the discriminator column for a mistyped stub entity.
-     * <p>
-     * When a GitHub {@code issue_comment} webhook arrives before the {@code pull_request}
-     * webhook, a stub may be created with {@code issue_type='ISSUE'} instead of
-     * {@code 'PULL_REQUEST'}. This method fixes the discriminator so the subsequent
-     * upsert correctly matches on {@code ON CONFLICT (repository_id, issue_type, number)}.
-     * <p>
-     * <b>Safety:</b> Only corrects rows where {@code issue_type = :currentType} to avoid
-     * accidentally modifying the wrong entity in providers where issues and PRs share the
-     * same number namespace (e.g., GitHub).
-     *
-     * @param repositoryId the repository ID
-     * @param number the entity number within the repository
-     * @param currentType the current (incorrect) discriminator value (e.g., 'ISSUE')
-     * @param newType the correct discriminator value (e.g., 'PULL_REQUEST')
-     * @return 1 if updated, 0 if no matching row exists
+     * Promotes a stub {@code ISSUE} row to {@code PULL_REQUEST} ahead of the upsert. The
+     * {@code COALESCE}s seed PR-specific NOT-NULL primitives so the discriminator flip survives
+     * the single-table-inheritance CHECK constraint; {@code upsertCore} overwrites them with
+     * real values immediately after.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-        value = "UPDATE issue SET issue_type = :newType WHERE repository_id = :repositoryId AND number = :number AND issue_type = :currentType",
+        value = "UPDATE issue SET issue_type = :newType, " +
+            "is_draft = COALESCE(is_draft, false), " +
+            "is_merged = COALESCE(is_merged, false), " +
+            "commits = COALESCE(commits, 0), " +
+            "additions = COALESCE(additions, 0), " +
+            "deletions = COALESCE(deletions, 0), " +
+            "changed_files = COALESCE(changed_files, 0) " +
+            "WHERE repository_id = :repositoryId AND number = :number AND issue_type = :currentType",
         nativeQuery = true
     )
     int correctDiscriminator(

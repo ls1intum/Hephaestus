@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.agent.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,15 +10,14 @@ import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Byte-identical snapshot test for {@link TaskEnvelopeWriter} output. The fixture lives at
  * {@code src/test/resources/task-fixtures/v1/practice-review.json} — see the adjacent
  * {@code REGENERATE.md} for the regen workflow.
  *
- * <p>Uses {@link Jackson2ObjectMapperBuilder#json()} to construct an {@link ObjectMapper} that
- * matches the production bean configuration (JavaTime, NON_NULL inclusion, ISO-8601 dates).
+ * <p>Uses {@link JsonMapper#builder()} to mirror the production bean configuration.
  * A future change to that configuration that alters byte output is intentionally caught here.
  */
 @DisplayName("TaskEnvelope fixture (v1)")
@@ -30,7 +28,7 @@ class TaskEnvelopeFixtureTest extends BaseUnitTest {
     @Test
     @DisplayName("PracticeReview envelope matches the committed fixture byte-for-byte")
     void matchesFixture() throws IOException {
-        ObjectMapper productionMapper = Jackson2ObjectMapperBuilder.json().build();
+        JsonMapper productionMapper = JsonMapper.builder().build();
         TaskEnvelopeWriter writer = new TaskEnvelopeWriter(productionMapper);
 
         TaskEnvelope envelope = new TaskEnvelope(

@@ -9,10 +9,6 @@ import jakarta.validation.constraints.NotNull;
  */
 @Schema(description = "Request to assign or update a user's role in a workspace")
 public record AssignRoleRequestDTO(
-    @NotNull
-    @Schema(description = "User ID of the member to update", requiredMode = Schema.RequiredMode.REQUIRED)
-    Long userId,
-    @NotNull
-    @Schema(description = "New role to assign (OWNER, ADMIN, MEMBER)", requiredMode = Schema.RequiredMode.REQUIRED)
-    WorkspaceRole role
+    @NotNull @Schema(description = "User ID of the member to update") Long userId,
+    @NotNull @Schema(description = "New role to assign (OWNER, ADMIN, MEMBER)") WorkspaceRole role
 ) {}

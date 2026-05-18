@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
@@ -28,6 +25,9 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Per-turn persistence helper for mentor chat. Uses {@code REQUIRES_NEW} so a turn-internal

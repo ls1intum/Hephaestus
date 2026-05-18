@@ -9,6 +9,6 @@ import jakarta.validation.constraints.NotNull;
 @Schema(description = "Request to set a practice's active state")
 public record UpdatePracticeActiveRequestDTO(
     @NotNull(message = "Active state is required")
-    @Schema(description = "Whether the practice should be active", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Whether the practice should be active")
     Boolean active
 ) {}

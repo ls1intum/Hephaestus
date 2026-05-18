@@ -63,7 +63,7 @@ export type WorkspaceProviders = {
  */
 export type GitLabProvider = {
     /**
-     * Default GitLab server URL for this deployment
+     * Default GitLab server URL
      */
     defaultServerUrl?: string;
 };
@@ -1077,9 +1077,11 @@ export type PracticeFindingDetail = {
      */
     detectedAt: Date;
     /**
-     * Structured evidence (locations, snippets, references)
+     * Structured evidence: {"locations":[{"path","startLine","endLine"}], "snippets":[...], "references":[...]}
      */
-    evidence?: unknown;
+    evidence?: {
+        [key: string]: unknown;
+    };
     /**
      * Actionable guidance for the contributor
      */

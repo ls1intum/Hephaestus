@@ -1,8 +1,6 @@
 package de.tum.in.www1.hephaestus.practices.model;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -23,7 +21,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.hibernate.annotations.Type;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Workspace-scoped practice definition for evaluating developer contributions.
@@ -75,7 +75,7 @@ public class Practice {
     @Column(name = "description", columnDefinition = "TEXT", nullable = false)
     private String description;
 
-    @Type(JsonType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "trigger_events", columnDefinition = "jsonb", nullable = false)
     private JsonNode triggerEvents;
 

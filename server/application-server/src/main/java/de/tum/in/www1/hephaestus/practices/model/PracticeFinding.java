@@ -1,8 +1,6 @@
 package de.tum.in.www1.hephaestus.practices.model;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -24,9 +22,11 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.hibernate.annotations.Type;
+import org.hibernate.type.SqlTypes;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Immutable record of a practice evaluation for a specific contribution.
@@ -148,7 +148,7 @@ public class PracticeFinding {
      * (PR description quality, review thoroughness) have no file location, and
      * multi-location findings need arrays.
      */
-    @Type(JsonType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "evidence", columnDefinition = "jsonb")
     private JsonNode evidence;
 

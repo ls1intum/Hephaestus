@@ -11,14 +11,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-@AutoConfigureWebTestClient
 @Import(WorkspaceScopedControllerIntegrationTest.ScopedEchoController.class)
 class WorkspaceScopedControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 

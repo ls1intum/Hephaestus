@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.agent.handler;
 
 import static de.tum.in.www1.hephaestus.agent.handler.PullRequestCommentPoster.GRAPHQL_TIMEOUT;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
@@ -19,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Posts inline diff notes on GitHub PRs (via pull request review threads) or GitLab MRs

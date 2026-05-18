@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.context.ContextRequest;
@@ -27,7 +24,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.mentor.ChatThread;
 import de.tum.in.www1.hephaestus.mentor.ChatThreadRepository;
 import io.micrometer.core.instrument.Timer;
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +42,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 /**
  * Runs one mentor chat turn: persist → attach sandbox → handshake → translate runner events
@@ -569,7 +569,7 @@ public class MentorChatService {
         }
         try {
             return objectMapper.readTree(bytes);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to parse aspect JSON for path " + path, e);
         }
     }

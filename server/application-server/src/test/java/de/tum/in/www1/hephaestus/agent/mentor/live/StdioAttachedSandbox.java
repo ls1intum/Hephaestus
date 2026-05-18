@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.mentor.live;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import java.io.BufferedReader;
@@ -19,6 +17,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import reactor.core.Disposable;
 import reactor.core.Disposables;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * {@link AttachedSandbox} implementation that wraps a locally-spawned {@link Process} instead

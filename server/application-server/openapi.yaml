@@ -678,6 +678,7 @@ paths:
         required: true
         schema:
           type: string
+          minLength: 1
       - description: Determines the ranking metric. In TEAM mode SCORE uses summed
           contribution scores; LEAGUE_POINTS uses total league points.
         in: query
@@ -3048,6 +3049,7 @@ components:
           type: string
           description: URL-friendly identifier for the workspace
           example: my-workspace
+          minLength: 1
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - accountLogin
@@ -3177,6 +3179,7 @@ components:
           type: string
           description: GitLab Personal Access Token to validate
           example: your-gitlab-token
+          minLength: 1
         serverUrl:
           type: string
           description: GitLab server URL. Defaults to https://gitlab.com if not specified.
@@ -3209,7 +3212,7 @@ components:
       properties:
         defaultServerUrl:
           type: string
-          description: Default GitLab server URL for this deployment
+          description: Default GitLab server URL
           example: https://gitlab.lrz.de
     IdentityProvider:
       type: object
@@ -3551,7 +3554,10 @@ components:
           format: date-time
           description: When the finding was detected
         evidence:
-          description: "Structured evidence (locations, snippets, references)"
+          type: object
+          additionalProperties: {}
+          description: "Structured evidence: {\"locations\":[{\"path\",\"startLine\"\
+            ,\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
         guidance:
           type: string
           description: Actionable guidance for the contributor
@@ -4024,6 +4030,7 @@ components:
           type: string
           description: New URL-friendly identifier for the workspace
           example: new-workspace-slug
+          minLength: 1
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - newSlug
@@ -4373,9 +4380,11 @@ components:
         slackSigningSecret:
           type: string
           description: Slack Signing Secret for webhook verification
+          minLength: 1
         slackToken:
           type: string
           description: Slack Bot User OAuth Token for API access
+          minLength: 1
       required:
       - slackSigningSecret
       - slackToken
@@ -4399,6 +4408,7 @@ components:
         personalAccessToken:
           type: string
           description: GitHub Personal Access Token for API access
+          minLength: 1
       required:
       - personalAccessToken
     UserInfo:

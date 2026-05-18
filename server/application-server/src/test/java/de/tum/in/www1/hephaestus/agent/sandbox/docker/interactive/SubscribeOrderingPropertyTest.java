@@ -3,8 +3,6 @@ package de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.IntNode;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
@@ -13,6 +11,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.IntNode;
 
 /** Snapshot replay must strictly precede live frames for a subscriber that races the pump. */
 @DisplayName("Subscribe ordering: snapshot precedes live frames")

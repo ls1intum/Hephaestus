@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.exception.ClientDisconnectedException;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import java.io.IOException;
@@ -15,6 +13,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
 /**
@@ -165,7 +165,7 @@ final class MentorSseChannel implements AutoCloseable {
         String payload;
         try {
             payload = objectMapper.writeValueAsString(chunk);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialise UIMessageChunk", e);
         }
         writeLock.lock();

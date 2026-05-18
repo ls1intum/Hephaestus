@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.mentor.chat.wire;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -13,6 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Translates Pi {@code AgentSessionEvent} JSON into AI SDK {@link UIMessageChunk}s. Stateful

@@ -5,8 +5,8 @@ import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  *   <li>{@code circuitBreaker}: Current circuit breaker state</li>
  * </ul>
  *
- * @see org.springframework.boot.actuate.health.HealthIndicator
+ * @see org.springframework.boot.health.contributor.HealthIndicator
  */
 @Component
 public class KeycloakHealthIndicator implements HealthIndicator {

@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.gitlab.dto;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
@@ -10,6 +9,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
+import tools.jackson.databind.ObjectMapper;
 
 @Tag("unit")
 @DisplayName("GitLabPushEventDTO")

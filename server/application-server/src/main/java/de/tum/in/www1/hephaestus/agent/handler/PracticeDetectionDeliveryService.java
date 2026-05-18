@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
@@ -24,6 +21,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Persists validated practice findings and publishes a completion event.
@@ -137,7 +137,7 @@ public class PracticeDetectionDeliveryService {
             if (finding.evidence() != null) {
                 try {
                     evidenceJson = objectMapper.writeValueAsString(finding.evidence());
-                } catch (JsonProcessingException e) {
+                } catch (JacksonException e) {
                     log.debug("Failed to serialize evidence, storing null: jobId={}", job.getId());
                 }
             }

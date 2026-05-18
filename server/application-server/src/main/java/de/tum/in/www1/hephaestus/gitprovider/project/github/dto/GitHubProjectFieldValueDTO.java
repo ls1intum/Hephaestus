@@ -2,9 +2,6 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabel;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestone;
@@ -35,6 +32,9 @@ import java.util.List;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Domain DTO for GitHub Projects V2 field values.
@@ -63,7 +63,8 @@ public record GitHubProjectFieldValueDTO(
     @JsonProperty("single_select_option_id") String singleSelectOptionId,
     @JsonProperty("iteration_id") String iterationId
 ) {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
+    // Trivial serialization (List<String> → JSON string column); no global mapper config needed.
+    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
 
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
@@ -306,7 +307,7 @@ public record GitHubProjectFieldValueDTO(
     private static String serializeToJson(Object value) {
         try {
             return OBJECT_MAPPER.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.warn("Failed to serialize value to JSON: {}", value, e);
             return "[]";
         }

@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.practices.finding;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
@@ -30,6 +29,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("PracticeFindingRepository Integration")
 class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {

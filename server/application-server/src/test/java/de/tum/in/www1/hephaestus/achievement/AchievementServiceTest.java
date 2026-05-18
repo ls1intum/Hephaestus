@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator;
 import de.tum.in.www1.hephaestus.achievement.progress.LinearAchievementProgress;
@@ -26,6 +25,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.cache.CacheManager;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Unit tests for {@link AchievementService}.

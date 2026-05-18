@@ -9,10 +9,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-@AutoConfigureWebTestClient
 @DisplayName("Feature flag controller integration")
 class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
 

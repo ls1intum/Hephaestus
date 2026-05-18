@@ -1,12 +1,8 @@
 package de.tum.in.www1.hephaestus.agent.runtime;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -14,6 +10,9 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Parse Pi-runner output into an {@link AgentResult}.
@@ -99,7 +98,7 @@ public class PiResultParser {
                 costUsd,
                 totalCalls
             );
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             recordFailure("usage", e);
             return null;
         }
@@ -111,7 +110,7 @@ public class PiResultParser {
         }
         try {
             output.put("runnerDebug", objectMapper.readValue(runnerDebugFile, Object.class));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             recordFailure("runner_debug", e);
         }
     }
@@ -122,7 +121,7 @@ public class PiResultParser {
         }
         try {
             output.put("watchdogKilled", objectMapper.readValue(watchdogFile, Object.class));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             recordFailure("watchdog", e);
         }
     }
@@ -148,7 +147,7 @@ public class PiResultParser {
                 }
             }
             return objectMapper.writeValueAsBytes(assembled);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             recordFailure("review_state", e);
             return null;
         }
@@ -197,12 +196,14 @@ public class PiResultParser {
                 break;
             }
             attempts++;
-            try (var parser = objectMapper.getFactory().createParser(chars, bracePos, chars.length - bracePos)) {
+            try (
+                var parser = objectMapper.tokenStreamFactory().createParser(chars, bracePos, chars.length - bracePos)
+            ) {
                 JsonNode node = objectMapper.readTree(parser);
                 if (node != null && node.isObject() && node.has("findings")) {
                     return objectMapper.writeValueAsString(node);
                 }
-            } catch (IOException e) {
+            } catch (JacksonException e) {
                 log.trace("No JSON object at position {}: {}", bracePos, e.getMessage());
             }
             searchFrom = bracePos + 1;
@@ -214,12 +215,12 @@ public class PiResultParser {
         try {
             JsonNode node = objectMapper.readTree(text);
             return node != null && node.isObject() && node.has("findings");
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return false;
         }
     }
 
-    private void recordFailure(String stage, IOException e) {
+    private void recordFailure(String stage, JacksonException e) {
         log.warn("Failed to parse Pi {} output: {}", stage, e.getMessage());
         meterRegistry.counter(METRIC_PARSE_FAILURE, Tags.of("stage", stage)).increment();
     }
