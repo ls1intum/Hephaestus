@@ -120,13 +120,7 @@ public class ChatMessage {
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
-    /**
-     * AI SDK UIMessage parts as a JSONB array. Written verbatim by MentorChatService. NOT NULL +
-     * JSONB-array CHECK enforced at the column level (changeset {@code mentor-1071-enforce-parts-shape}).
-     * DB-side default {@code '[]'::jsonb} is applied by Liquibase; MentorChatService writes the
-     * column explicitly on every insert, so we never rely on Hibernate's omit-from-INSERT
-     * optimization.
-     */
+    // UIMessage parts. Liquibase enforces NOT NULL + JSONB-array CHECK; MentorChatService always writes explicitly.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "parts", columnDefinition = "jsonb", nullable = false)
     private JsonNode parts;

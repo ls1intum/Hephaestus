@@ -73,7 +73,7 @@
         <okhttp.version>5.3.2</okhttp.version>
         <docker-java.version>3.7.1</docker-java.version>
         <archunit.version>1.4.2</archunit.version>
-        <liquibase-hibernate7.version>5.0.2-rc1</liquibase-hibernate7.version>
+        <liquibase-hibernate7.version>5.0.3</liquibase-hibernate7.version>
         <springdoc.version>3.0.3</springdoc.version>
         <springdoc-maven-plugin.version>1.5</springdoc-maven-plugin.version>
         <sentry.version>8.41.0</sentry.version>
@@ -176,6 +176,10 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
             <scope>runtime</scope>
             <optional>true</optional>
@@ -225,7 +229,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Testcontainers 2.0 renamed: junit-jupiter → testcontainers-junit-jupiter, etc. -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-junit-jupiter</artifactId>
@@ -294,29 +297,25 @@
             <artifactId>bolt</artifactId>
             <version>${slack-bolt.version}</version>
             <exclusions>
-                <!-- Slack pulls okhttp:4.12.0; conflicts with okhttp-jvm:5.x on
-                     okhttp3.internal.concurrent.TaskRunner. -->
+                <!-- Slack pulls okhttp:4.12.0; conflicts with our okhttp-jvm:5.x on TaskRunner. -->
                 <exclusion>
                     <groupId>com.squareup.okhttp3</groupId>
                     <artifactId>okhttp</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
-        <!-- okhttp-jvm: bare okhttp:5.x is a KMP shim (square/okhttp#8913). -->
+        <!-- okhttp 5.x: bare 'okhttp' is a KMP shim (square/okhttp#8913); use okhttp-jvm. -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp-jvm</artifactId>
-            <version>${okhttp.version}</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>logging-interceptor</artifactId>
-            <version>${okhttp.version}</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>mockwebserver3</artifactId>
-            <version>${okhttp.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -373,13 +372,12 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>org.springframework.modulith</groupId>
-                <artifactId>spring-modulith-bom</artifactId>
-                <version>2.0.6</version>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp-bom</artifactId>
+                <version>${okhttp.version}</version>
                 <scope>import</scope>
                 <type>pom</type>
             </dependency>
-            <!-- Spring Boot BOM already includes testcontainers-bom -->
         </dependencies>
     </dependencyManagement>
     <build>
@@ -1021,7 +1019,7 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
-                            <!-- 4GB: ArchUnit + Modulith.verify() OOM at 2GB. -->
+                            <!-- 4GB: ArchUnit OOMs at 2GB. -->
                             <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
                                 -XX:+EnableDynamicAgentLoading
                             </argLine>

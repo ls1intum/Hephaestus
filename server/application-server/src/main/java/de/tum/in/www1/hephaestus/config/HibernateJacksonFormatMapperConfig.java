@@ -3,15 +3,14 @@ package de.tum.in.www1.hephaestus.config;
 import java.util.Map;
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.context.annotation.Configuration;
-import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.ObjectMapper;
 
-/** Registers {@link Jackson3FormatMapper} as Hibernate's JSON {@code FormatMapper}. */
 @Configuration
 public class HibernateJacksonFormatMapperConfig implements HibernatePropertiesCustomizer {
 
-    private final JsonMapper objectMapper;
+    private final ObjectMapper objectMapper;
 
-    public HibernateJacksonFormatMapperConfig(JsonMapper objectMapper) {
+    public HibernateJacksonFormatMapperConfig(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 

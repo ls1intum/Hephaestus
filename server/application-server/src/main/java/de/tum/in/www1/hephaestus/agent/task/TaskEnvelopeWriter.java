@@ -11,8 +11,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class TaskEnvelopeWriter {
 
-    // Sorted keys + pretty printing make the output deterministic across runs/JVMs so
-    // WorkspaceContextSnapshotTest can byte-compare against the committed fixture.
+    // Deterministic byte output for fixture snapshots.
     private final ObjectWriter writer;
 
     public TaskEnvelopeWriter(JsonMapper baseObjectMapper) {

@@ -84,8 +84,6 @@ public class SecurityConfig {
             .sessionManagement(sessions -> {
                 sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
             })
-            // Stateless OAuth2 resource server (Authorization: Bearer …). No browser-form flows;
-            // CsrfFilter absence is asserted by SecurityFilterChainArchitectureTest.
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 

@@ -40,9 +40,6 @@ public record PracticeFindingDetailDTO(
     @Nullable @Schema(description = "Actionable guidance for the contributor") String guidance,
     @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
 ) {
-    /**
-     * Maps a {@link PracticeFinding} entity (with eagerly fetched practice) to a detail DTO.
-     */
     public static PracticeFindingDetailDTO from(PracticeFinding f, tools.jackson.databind.ObjectMapper mapper) {
         var practice = f.getPractice();
         return new PracticeFindingDetailDTO(
@@ -65,7 +62,7 @@ public record PracticeFindingDetailDTO(
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> toMap(JsonNode node, tools.jackson.databind.ObjectMapper mapper) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
+        if (node == null) {
             return null;
         }
         return mapper.convertValue(node, Map.class);

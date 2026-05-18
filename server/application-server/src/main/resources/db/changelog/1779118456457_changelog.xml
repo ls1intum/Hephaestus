@@ -1,6 +1,9 @@
 <?xml version="1.1" encoding="UTF-8" standalone="no"?>
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
     <changeSet author="boot4-upgrade" id="1779118456457-1">
+        <preConditions onFail="HALT" onFailMessage="workspace.account_login has NULL rows; backfill before promoting to NOT NULL">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM workspace WHERE account_login IS NULL</sqlCheck>
+        </preConditions>
         <addNotNullConstraint columnDataType="varchar(120)" columnName="account_login" tableName="workspace" validate="true"/>
     </changeSet>
     <changeSet author="boot4-upgrade" id="1779118456457-2">
@@ -118,6 +121,9 @@
         <dropDefaultValue columnDataType="int" columnName="retry_count" tableName="agent_job"/>
     </changeSet>
     <changeSet author="boot4-upgrade" id="1779118456457-40">
+        <preConditions onFail="HALT" onFailMessage="organization_membership.role has NULL rows; backfill before promoting to NOT NULL">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM organization_membership WHERE role IS NULL</sqlCheck>
+        </preConditions>
         <addNotNullConstraint columnDataType="varchar(32)" columnName="role" tableName="organization_membership" validate="true"/>
     </changeSet>
     <changeSet author="boot4-upgrade" id="1779118456457-41">
@@ -163,6 +169,9 @@
         <setColumnRemarks columnDataType="bigint" columnName="workspace_id" tableName="chat_thread"/>
     </changeSet>
     <changeSet author="boot4-upgrade" id="1779118456457-55">
+        <preConditions onFail="HALT" onFailMessage="repository_to_monitor.workspace_id has NULL rows; backfill before promoting to NOT NULL">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM repository_to_monitor WHERE workspace_id IS NULL</sqlCheck>
+        </preConditions>
         <addNotNullConstraint columnDataType="bigint" columnName="workspace_id" tableName="repository_to_monitor" validate="true"/>
     </changeSet>
     <changeSet author="boot4-upgrade" id="1779118456457-56">

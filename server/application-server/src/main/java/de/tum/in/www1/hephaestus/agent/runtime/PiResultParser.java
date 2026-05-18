@@ -196,9 +196,6 @@ public class PiResultParser {
                 break;
             }
             attempts++;
-            // Jackson 3: ObjectMapper.getFactory() was renamed to tokenStreamFactory();
-            // the no-context createParser(char[], int, int) overload is the direct replacement
-            // for JsonFactory.createParser(char[], int, int).
             try (
                 var parser = objectMapper.tokenStreamFactory().createParser(chars, bracePos, chars.length - bracePos)
             ) {

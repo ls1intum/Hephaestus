@@ -112,8 +112,7 @@ public class GitHubGraphQlConfig {
 
     @Bean
     public WebClient gitHubGraphQlWebClient(JsonMapper baseObjectMapper) {
-        // USE_LONG_FOR_INTS: GitHub databaseId values exceed 32-bit int range.
-        // Mixins drive polymorphic deserialization for GraphQL union types.
+        // GitHub databaseId values exceed 32-bit int range.
         JsonMapper graphQlObjectMapper = baseObjectMapper
             .rebuild()
             .enable(DeserializationFeature.USE_LONG_FOR_INTS)

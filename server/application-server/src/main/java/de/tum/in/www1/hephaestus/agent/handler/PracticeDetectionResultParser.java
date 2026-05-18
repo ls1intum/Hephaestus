@@ -100,7 +100,6 @@ public class PracticeDetectionResultParser {
         String sanitizedText = sanitizeJsonEscapes(rawOutputText);
         JsonNode root;
         try {
-            // Use lenient mapper: LLMs produce JSON with literal newlines/tabs in strings
             root = lenientMapper.readTree(sanitizedText);
         } catch (JacksonException e) {
             // Fallback: try to extract JSON from mixed text (e.g., "[PHASE0]...\n{...}")

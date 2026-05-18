@@ -60,8 +60,6 @@ spring:
     mustache:
         check-template-location: false
 
-    # Enums round-trip by Java identifier (ActivityEventType.toString() returns snake_case);
-    # primitive fields on v1 configSnapshot payloads tolerate nulls.
     jackson:
         default-property-inclusion: non_null
         deserialization:
@@ -71,9 +69,6 @@ spring:
         datatype:
             datetime:
                 write-dates-as-timestamps: false
-            enum:
-                read-enums-using-to-string: false
-                write-enums-using-to-string: false
 
     # GraphQL client configuration for GitHub API operations
     # Operations are colocated with the schema at graphql/github/operations/

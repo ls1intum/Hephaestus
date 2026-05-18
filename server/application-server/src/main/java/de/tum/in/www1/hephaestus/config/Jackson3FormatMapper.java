@@ -6,14 +6,14 @@ import org.hibernate.type.descriptor.WrapperOptions;
 import org.hibernate.type.descriptor.java.JavaType;
 import org.hibernate.type.format.FormatMapper;
 import tools.jackson.core.JacksonException;
-import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.ObjectMapper;
 
-/** Jackson 3 implementation of Hibernate's JSON {@link FormatMapper} SPI. */
+// TODO: replace with org.hibernate.type.format.jackson.Jackson3JsonFormatMapper once on Hibernate 7.3+ (HHH-19890).
 public final class Jackson3FormatMapper implements FormatMapper {
 
-    private final JsonMapper objectMapper;
+    private final ObjectMapper objectMapper;
 
-    public Jackson3FormatMapper(JsonMapper objectMapper) {
+    public Jackson3FormatMapper(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
@@ -27,7 +27,7 @@ public final class Jackson3FormatMapper implements FormatMapper {
             return objectMapper.readValue(charSequence.toString(), objectMapper.constructType(rawType));
         } catch (JacksonException e) {
             throw new HibernateException(
-                "Could not deserialize JSON to " + javaType.getJavaTypeClass().getName() + ": " + e.getMessage(),
+                "JSON deserialize failed for " + javaType.getJavaTypeClass().getSimpleName(),
                 e
             );
         }
@@ -41,10 +41,7 @@ public final class Jackson3FormatMapper implements FormatMapper {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JacksonException e) {
-            throw new HibernateException(
-                "Could not serialize " + javaType.getJavaTypeClass().getName() + " to JSON: " + e.getMessage(),
-                e
-            );
+            throw new HibernateException("JSON serialize failed for " + javaType.getJavaTypeClass().getSimpleName(), e);
         }
     }
 }
