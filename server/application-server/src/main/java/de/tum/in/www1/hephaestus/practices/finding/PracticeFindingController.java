@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Read-only REST API for practice findings.
@@ -43,6 +44,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class PracticeFindingController {
 
     private final PracticeFindingService practiceFindingService;
+    private final JsonMapper objectMapper;
 
     @GetMapping
     @Operation(
@@ -106,7 +108,7 @@ public class PracticeFindingController {
         @PathVariable UUID findingId
     ) {
         var finding = practiceFindingService.getFinding(workspaceContext.id(), findingId);
-        return ResponseEntity.ok(PracticeFindingDetailDTO.from(finding));
+        return ResponseEntity.ok(PracticeFindingDetailDTO.from(finding, objectMapper));
     }
 
     @GetMapping("/pull-request/{prId}")

@@ -13,5 +13,4 @@
  *       compatibility and works without {@code CAP_CHOWN} (which the security policy drops).
  * </ul>
  */
-@org.springframework.modulith.ApplicationModule(displayName = "Agent Interactive Sandbox")
 package de.tum.in.www1.hephaestus.agent.sandbox.docker.interactive;

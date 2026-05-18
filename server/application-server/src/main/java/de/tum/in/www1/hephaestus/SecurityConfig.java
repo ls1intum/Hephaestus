@@ -26,9 +26,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-// @EnableWebSecurity intentionally NOT present: Spring Security 6+ auto-enables it whenever
-// a SecurityFilterChain bean is declared, and Spring Security 7 removed the historical reason
-// to keep it explicit (debug filter discovery). The auto-enable path is what's used here.
 @Configuration
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
@@ -87,10 +84,8 @@ public class SecurityConfig {
             .sessionManagement(sessions -> {
                 sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
             })
-            // CSRF stays explicitly disabled: this server is a stateless OAuth2 resource server
-            // (Authorization: Bearer …). Spring Boot 4 / Spring Security 7 flipped the CSRF default
-            // for browser-form flows; the explicit disable here is load-bearing and asserted by
-            // SecurityFilterChainArchitectureTest so a future autoconfig flip can't silently re-enable it.
+            // Stateless OAuth2 resource server (Authorization: Bearer …). No browser-form flows;
+            // CsrfFilter absence is asserted by SecurityFilterChainArchitectureTest.
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 

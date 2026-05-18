@@ -14,7 +14,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Locks the FormatMapper contract since Hibernate 7.2 ships only a Jackson-2 mapper. */
+/** Contract for the Jackson 3 ↔ Hibernate JSON {@link Jackson3FormatMapper} bridge. */
 @DisplayName("Jackson3FormatMapper")
 class Jackson3FormatMapperTest extends BaseUnitTest {
 

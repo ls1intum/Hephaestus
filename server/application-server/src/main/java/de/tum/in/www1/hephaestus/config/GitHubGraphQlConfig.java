@@ -128,8 +128,6 @@ public class GitHubGraphQlConfig {
             .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class)
             .build();
 
-        // ClientDefaultCodecs.jackson2JsonEncoder accepts only Jackson 2; register the Jackson 3
-        // codecs through customCodecs instead.
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);

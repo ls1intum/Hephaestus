@@ -34,8 +34,7 @@ public record GitHubProjectFieldDTO(
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
-    // Static mapper: serializes a List<Option> to a JSON string column. No mixins or modules
-    // needed beyond Jackson 3 core, so bypassing the Spring-managed JsonMapper is intentional.
+    // Trivial serialization (List<Option> → JSON string column); no global mapper config needed.
     private static final ObjectMapper objectMapper = JsonMapper.builder().build();
 
     /**

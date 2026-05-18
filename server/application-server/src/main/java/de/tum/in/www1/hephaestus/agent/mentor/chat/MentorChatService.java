@@ -570,7 +570,6 @@ public class MentorChatService {
         try {
             return objectMapper.readTree(bytes);
         } catch (JacksonException e) {
-            // Jackson 3 throws unchecked JacksonException for all parse failures.
             throw new IllegalStateException("Failed to parse aspect JSON for path " + path, e);
         }
     }

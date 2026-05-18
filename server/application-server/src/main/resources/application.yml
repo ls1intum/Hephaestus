@@ -60,11 +60,8 @@ spring:
     mustache:
         check-template-location: false
 
-    # Jackson 3 default flips:
-    #   * READ/WRITE_ENUMS_USING_TO_STRING off — ActivityEventType.toString() returns a snake-case
-    #     form; defaulting to it would break YAML/JSON round-trips that use the Java identifier.
-    #   * FAIL_ON_NULL_FOR_PRIMITIVES off — AgentJob v1 configSnapshot rows omit schemaVersion.
-    #   * DateTimeFeature is the new home for WRITE_DATES_AS_TIMESTAMPS (was SerializationFeature).
+    # Enums round-trip by Java identifier (ActivityEventType.toString() returns snake_case);
+    # primitive fields on v1 configSnapshot payloads tolerate nulls.
     jackson:
         default-property-inclusion: non_null
         deserialization:

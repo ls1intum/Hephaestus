@@ -101,8 +101,6 @@ final class JsonlStdinWriter {
         try {
             payload = mapper.writeValueAsBytes(frame);
         } catch (JacksonException e) {
-            // Jackson 3 throws unchecked JacksonException; mapper.writeValueAsBytes no longer
-            // declares IOException.
             throw new InteractiveSandboxException("Failed to encode frame as JSON", e);
         }
         CompletableFuture<Void> ack = new CompletableFuture<>();

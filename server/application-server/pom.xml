@@ -85,7 +85,6 @@
         <graphql-codegen.version>5.10.0</graphql-codegen.version>
         <postgresql.version>42.7.11</postgresql.version>
         <therapi.version>0.15.0</therapi.version>
-        <!-- spring-retry: not in Boot 4's dependency management. -->
         <spring-retry.version>2.0.12</spring-retry.version>
     </properties>
     <dependencies>
@@ -122,7 +121,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <!-- Boot 4: RestTemplateBuilder autoconfig is not transitive via starter-web. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-restclient</artifactId>
@@ -148,8 +146,6 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
         </dependency>
-        <!-- Boot 4: LiquibaseAutoConfiguration moved to spring-boot-liquibase (split out of the
-             omnibus spring-boot-autoconfigure). Without this dep Liquibase is silently inert. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-liquibase</artifactId>
@@ -211,7 +207,6 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <!-- @AutoConfigureWebTestClient lives in this module in Boot 4 (split out of spring-boot-test-autoconfigure). -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-webtestclient</artifactId>
@@ -254,18 +249,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Spring Modulith verification — drives ApplicationModulesVerificationTest. -->
-        <dependency>
-            <groupId>org.springframework.modulith</groupId>
-            <artifactId>spring-modulith-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.modulith</groupId>
-            <artifactId>spring-modulith-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
 
-        <!-- YAML dataformat for AchievementRegistry; Jackson 3 BOM managed by Boot 4. -->
         <dependency>
             <groupId>tools.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
@@ -368,7 +352,6 @@
             <artifactId>graphql-java-codegen</artifactId>
             <version>${graphql-codegen.version}</version>
         </dependency>
-        <!-- Resilience4j for Circuit Breaker pattern on external API calls (Spring Boot 4 variant). -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot4</artifactId>
@@ -808,7 +791,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
-                    <!-- 4GB: Boot 4 + Hibernate 7 + full @SpringBootTest OOMs at 2GB. -->
                     <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
                     <!-- Tag filtering: run integration tests, exclude live tests -->
                     <groups>${failsafe.includedGroups}</groups>
@@ -924,7 +906,6 @@
                     <url>jdbc:postgresql://localhost:${postgres.port}/hephaestus</url>
                     <username>root</username>
                     <password>root</password>
-                    <!-- Boot 4: SpringImplicitNamingStrategy moved to org.springframework.boot.hibernate. -->
                     <referenceUrl>
                         hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
                     </referenceUrl>

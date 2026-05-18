@@ -163,8 +163,7 @@ public class WorkspaceAspectProvider implements ContentProvider {
             if (text == null) return "";
             return text.length() > MESSAGE_PREVIEW_LENGTH ? text.substring(0, MESSAGE_PREVIEW_LENGTH) : text;
         } catch (JacksonException e) {
-            // Jackson 3 throws unchecked JacksonException. Malformed parts JSON shouldn't poison
-            // the aspect — log and degrade.
+            // Malformed parts JSON: degrade silently rather than poison the aspect.
             return "";
         }
     }
@@ -174,7 +173,6 @@ public class WorkspaceAspectProvider implements ContentProvider {
         if (parts == null || !parts.isArray()) {
             return null;
         }
-        // Jackson 3: JsonNode.elements() was renamed to JsonNode.values() (Collection<JsonNode>).
         Iterator<JsonNode> it = parts.values().iterator();
         while (it.hasNext()) {
             JsonNode part = it.next();

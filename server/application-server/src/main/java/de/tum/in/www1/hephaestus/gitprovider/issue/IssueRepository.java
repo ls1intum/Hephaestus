@@ -98,13 +98,10 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     Optional<Issue> findByIdWithBlockedBy(@Param("id") Long id);
 
     /**
-     * Promotes a stub {@code ISSUE} row (created when an issue-comment webhook arrives before the
-     * pull-request webhook) to {@code PULL_REQUEST} ahead of the upsert. The {@code COALESCE}s
-     * seed the PR-specific NOT-NULL primitives because Hibernate 7's single-table-inheritance
-     * CHECK constraint rejects the discriminator flip otherwise; {@code upsertCore} overwrites
-     * them with real values immediately after.
-     *
-     * @return 1 if updated, 0 if no matching row exists
+     * Promotes a stub {@code ISSUE} row to {@code PULL_REQUEST} ahead of the upsert. The
+     * {@code COALESCE}s seed PR-specific NOT-NULL primitives so the discriminator flip survives
+     * the single-table-inheritance CHECK constraint; {@code upsertCore} overwrites them with
+     * real values immediately after.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional

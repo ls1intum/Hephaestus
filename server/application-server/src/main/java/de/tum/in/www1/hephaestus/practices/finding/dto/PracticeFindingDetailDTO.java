@@ -6,9 +6,11 @@ import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Detail-view DTO for a single practice finding. Includes guidance, reasoning,
@@ -29,7 +31,11 @@ public record PracticeFindingDetailDTO(
     @NonNull @Schema(description = "Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE") Verdict verdict,
     @NonNull @Schema(description = "Severity level") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
-    @Nullable @Schema(description = "Structured evidence (locations, snippets, references)") Object evidence,
+    @Nullable
+    @Schema(
+        description = "Structured evidence: {\"locations\":[{\"path\",\"startLine\",\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
+    )
+    Map<String, Object> evidence,
     @Nullable @Schema(description = "AI reasoning behind the verdict") String reasoning,
     @Nullable @Schema(description = "Actionable guidance for the contributor") String guidance,
     @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
@@ -37,7 +43,7 @@ public record PracticeFindingDetailDTO(
     /**
      * Maps a {@link PracticeFinding} entity (with eagerly fetched practice) to a detail DTO.
      */
-    public static PracticeFindingDetailDTO from(PracticeFinding f) {
+    public static PracticeFindingDetailDTO from(PracticeFinding f, tools.jackson.databind.ObjectMapper mapper) {
         var practice = f.getPractice();
         return new PracticeFindingDetailDTO(
             f.getId(),
@@ -50,10 +56,18 @@ public record PracticeFindingDetailDTO(
             f.getVerdict(),
             f.getSeverity(),
             f.getConfidence(),
-            f.getEvidence(),
+            toMap(f.getEvidence(), mapper),
             f.getReasoning(),
             f.getGuidance(),
             f.getDetectedAt()
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> toMap(JsonNode node, tools.jackson.databind.ObjectMapper mapper) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        return mapper.convertValue(node, Map.class);
     }
 }

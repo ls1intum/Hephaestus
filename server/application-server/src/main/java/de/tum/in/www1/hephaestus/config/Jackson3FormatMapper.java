@@ -8,12 +8,7 @@ import org.hibernate.type.format.FormatMapper;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Hibernate {@link FormatMapper} backed by Jackson 3. Bridges JSONB columns typed as
- * {@code tools.jackson.databind.JsonNode} until Hibernate 7.3 ships its own Jackson 3 mapper
- * (HHH-19890) — at that point this class is deletable in favour of
- * {@code org.hibernate.type.format.jackson.Jackson3JsonFormatMapper}.
- */
+/** Jackson 3 implementation of Hibernate's JSON {@link FormatMapper} SPI. */
 public final class Jackson3FormatMapper implements FormatMapper {
 
     private final JsonMapper objectMapper;

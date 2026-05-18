@@ -18,9 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 @DisplayName("ConfigSnapshot")
 class ConfigSnapshotTest extends BaseUnitTest {
 
-    // Jackson 3 default FAIL_ON_NULL_FOR_PRIMITIVES = true, so v1 snapshots that omit
-    // schemaVersion would fail to deserialize. Production matches via spring.jackson.deserialization
-    // in application.yml; tests reconstruct the same default here.
+    // Mirrors spring.jackson.deserialization.fail-on-null-for-primitives=false from application.yml.
     private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
         .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
         .build();

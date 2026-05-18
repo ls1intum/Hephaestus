@@ -14,5 +14,4 @@
  * <p>Model pricing was originally nested here; it now lives at {@link de.tum.in.www1.hephaestus.agent.pricing}
  * because the practice review pipeline will record cost on the same table.
  */
-@org.springframework.modulith.ApplicationModule(displayName = "Agent Mentor")
 package de.tum.in.www1.hephaestus.agent.mentor;

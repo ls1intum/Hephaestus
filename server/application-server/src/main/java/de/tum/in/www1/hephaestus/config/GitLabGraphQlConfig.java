@@ -68,8 +68,6 @@ public class GitLabGraphQlConfig {
     @Bean
     @Qualifier("gitLabGraphQlWebClient")
     public WebClient gitLabGraphQlWebClient(JsonMapper baseObjectMapper) {
-        // ClientDefaultCodecs.jackson2JsonEncoder accepts only Jackson 2; register the Jackson 3
-        // codecs through customCodecs instead.
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);

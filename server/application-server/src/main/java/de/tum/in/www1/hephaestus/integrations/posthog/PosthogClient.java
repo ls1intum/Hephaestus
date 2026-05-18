@@ -78,7 +78,6 @@ public class PosthogClient {
                 return false;
             }
 
-            // Jackson 3: JsonNode.elements() was renamed to JsonNode.values() (Collection<JsonNode>).
             Iterator<JsonNode> iterator = response.get("results").values().iterator();
             if (!iterator.hasNext()) {
                 log.info("Received empty PostHog result set: distinctId={}", distinctId);

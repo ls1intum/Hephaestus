@@ -207,7 +207,6 @@ public class PiResultParser {
                     return objectMapper.writeValueAsString(node);
                 }
             } catch (JacksonException e) {
-                // Jackson 3 throws unchecked JacksonException for all parser failures.
                 log.trace("No JSON object at position {}: {}", bracePos, e.getMessage());
             }
             searchFrom = bracePos + 1;

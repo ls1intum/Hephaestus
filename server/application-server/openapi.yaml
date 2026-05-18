@@ -3238,7 +3238,7 @@ components:
       properties:
         defaultServerUrl:
           type: string
-          description: Default GitLab server URL for this deployment
+          description: Default GitLab server URL
           example: https://gitlab.lrz.de
     IdentityProvider:
       type: object
@@ -3590,8 +3590,12 @@ components:
           format: date-time
           description: When the finding was detected
         evidence:
-          type: "null"
-          description: "Structured evidence (locations, snippets, references)"
+          type:
+          - object
+          - "null"
+          additionalProperties: {}
+          description: "Structured evidence: {\"locations\":[{\"path\",\"startLine\"\
+            ,\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
         guidance:
           type:
           - string
@@ -4762,11 +4766,9 @@ components:
       description: Available workspace creation providers and their configuration
       properties:
         github:
-          type: "null"
           $ref: "#/components/schemas/GitHubProvider"
           description: "GitHub workspace provider config, null if not available"
         gitlab:
-          type: "null"
           $ref: "#/components/schemas/GitLabProvider"
           description: "GitLab workspace provider config, null if not available"
     WorkspaceTeamRepositorySettings:
