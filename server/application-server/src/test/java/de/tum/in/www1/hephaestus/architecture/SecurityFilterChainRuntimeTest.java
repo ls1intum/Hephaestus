@@ -6,14 +6,12 @@ import de.tum.in.www1.hephaestus.agent.proxy.JobTokenAuthenticationFilter;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import jakarta.servlet.Filter;
 import java.util.List;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CsrfFilter;
 
-@Tag("integration")
 class SecurityFilterChainRuntimeTest extends BaseIntegrationTest {
 
     @Autowired
@@ -40,10 +38,9 @@ class SecurityFilterChainRuntimeTest extends BaseIntegrationTest {
         List<Filter> filters = llmProxy.getFilters();
         int jobToken = indexOf(filters, JobTokenAuthenticationFilter.class);
         int upaf = indexOf(filters, UsernamePasswordAuthenticationFilter.class);
-        assertThat(jobToken).isGreaterThanOrEqualTo(0);
-        if (upaf >= 0) {
-            assertThat(jobToken).as("JobToken must precede UsernamePasswordAuthenticationFilter").isLessThan(upaf);
-        }
+        assertThat(jobToken).as("JobTokenAuthenticationFilter must be present").isGreaterThanOrEqualTo(0);
+        assertThat(upaf).as("UsernamePasswordAuthenticationFilter must be present").isGreaterThanOrEqualTo(0);
+        assertThat(jobToken).as("JobToken must precede UsernamePasswordAuthenticationFilter").isLessThan(upaf);
     }
 
     private int indexOf(List<Filter> filters, Class<? extends Filter> type) {

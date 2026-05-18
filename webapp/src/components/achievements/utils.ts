@@ -115,8 +115,6 @@ export function generateSkillTreeData(
 		visiting.add(id);
 		const ach = achievementMap.get(id);
 		const parentId = ach?.parent;
-		// Generated OpenAPI client now types `parent` as `string | null` (springdoc 3 emits
-		// nullable fields as `type: [string, "null"]`). Treat null and undefined identically.
 		if (!ach || parentId == null || parentId === id) {
 			nodeDepths.set(id, 0);
 			visiting.delete(id);

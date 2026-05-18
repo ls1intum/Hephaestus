@@ -117,8 +117,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
 
             HttpHeaders filtered = ProxyStreamingUtils.filterHopByHopHeaders(headers);
 
-            // Spring 7: HttpHeaders no longer implements Map; AssertJ's collection assertions
-            // don't apply. Assert size via HttpHeaders.size().
             assertThat(filtered.size()).isZero();
         }
 

@@ -85,7 +85,6 @@
         <graphql-codegen.version>5.10.0</graphql-codegen.version>
         <postgresql.version>42.7.11</postgresql.version>
         <therapi.version>0.15.0</therapi.version>
-        <spring-retry.version>2.0.12</spring-retry.version>
     </properties>
     <dependencies>
         <dependency>
@@ -134,9 +133,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
-        <!-- Boot 4 split WebClient autoconfig into its own module that's NOT transitive via
-             the webflux starter. Without this, WebClient.Builder isn't autoconfigured and beans
-             like GitLabTokenService fail to start. -->
+        <!-- WebClient.Builder autoconfig; not transitive via spring-boot-starter-webflux. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-webclient</artifactId>
@@ -168,11 +165,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.retry</groupId>
-            <artifactId>spring-retry</artifactId>
-            <version>${spring-retry.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
