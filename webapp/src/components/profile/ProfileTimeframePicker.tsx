@@ -183,7 +183,7 @@ export function ProfileTimeframePicker({
 				onValueChange={(value) => value && handlePresetChange(value)}
 				items={items}
 			>
-				<SelectTrigger className="w-auto min-w-[260px]">
+				<SelectTrigger className="w-65">
 					<SelectValue placeholder="Select timeframe" />
 				</SelectTrigger>
 				<SelectContent>

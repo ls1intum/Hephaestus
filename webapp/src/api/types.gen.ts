@@ -973,6 +973,36 @@ export type ProfileActivityStats = {
 };
 
 /**
+ * Configurable activity monitor data for a contributor profile
+ */
+export type ProfileActivityMonitor = {
+    /**
+     * Aggregated activity stats after applying monitor filters
+     */
+    activityStats: ProfileActivityStats;
+    /**
+     * Authored pull requests after applying monitor filters and limit
+     */
+    authoredPullRequests: Array<PullRequestInfo>;
+    /**
+     * Repositories with monitor-relevant activity in the selected timeframe
+     */
+    repositories: Array<RepositoryInfo>;
+    /**
+     * Review activity entries after applying monitor filters and limit
+     */
+    reviewActivity: Array<ProfileReviewActivity>;
+    /**
+     * Total authored pull requests after filters, before limit
+     */
+    totalAuthoredPullRequestCount: number;
+    /**
+     * Total review activity entries after filters, before limit
+     */
+    totalReviewActivityCount: number;
+};
+
+/**
  * Complete user profile including contribution history and activity
  */
 export type Profile = {
@@ -3311,6 +3341,33 @@ export type GetUserProfileResponses = {
 };
 
 export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
+
+export type GetActivityMonitorData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: {
+        after?: Date;
+        before?: Date;
+        repositoryIds?: Array<number>;
+        limit?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/profile/{login}/activity-monitor';
+};
+
+export type GetActivityMonitorResponses = {
+    /**
+     * OK
+     */
+    200: ProfileActivityMonitor;
+};
+
+export type GetActivityMonitorResponse = GetActivityMonitorResponses[keyof GetActivityMonitorResponses];
 
 export type UpdatePublicVisibilityData = {
     body: UpdateWorkspacePublicVisibilityRequest;

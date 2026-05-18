@@ -148,7 +148,7 @@ const mockActivityStats = {
 	numberOfUnknowns: 0,
 	numberOfOwnReplies: 2,
 	numberOfOpenPullRequests: 2,
-	numberOfMergedPullRequests: 1,
+	numberOfMergedPullRequests: 0,
 	numberOfClosedPullRequests: 0,
 	numberOfOpenedIssues: 1,
 	numberOfClosedIssues: 1,
@@ -181,6 +181,45 @@ const emptyActivityStats = {
 	numberOfClosedPullRequests: 0,
 	numberOfOpenedIssues: 0,
 	numberOfClosedIssues: 0,
+};
+
+const mockActivityMonitorData = {
+	activityStats: mockActivityStats,
+	reviewActivity: mockReviewActivity,
+	authoredPullRequests: mockOpenPullRequests,
+	repositories: [
+		{
+			id: 1,
+			name: "Hephaestus",
+			nameWithOwner: "ls1intum/Hephaestus",
+			htmlUrl: "https://github.com/ls1intum/Hephaestus",
+			hiddenFromContributions: false,
+		},
+		{
+			id: 2,
+			name: "Artemis",
+			nameWithOwner: "ls1intum/Artemis",
+			htmlUrl: "https://github.com/ls1intum/Artemis",
+			hiddenFromContributions: false,
+		},
+		{
+			id: 3,
+			name: "Athena",
+			nameWithOwner: "ls1intum/Athena",
+			htmlUrl: "https://github.com/ls1intum/Athena",
+			hiddenFromContributions: false,
+		},
+	],
+	totalReviewActivityCount: 8,
+	totalAuthoredPullRequestCount: 6,
+};
+
+const mockRepositoryFilteredActivityMonitorData = {
+	...mockActivityMonitorData,
+	reviewActivity: mockReviewActivity.slice(0, 1),
+	authoredPullRequests: mockOpenPullRequests.slice(0, 1),
+	totalReviewActivityCount: 1,
+	totalAuthoredPullRequestCount: 1,
 };
 
 /**
@@ -253,6 +292,48 @@ export const Default: Story = {
 		workspaceSlug: "aet",
 		afterDate: defaultAfter,
 		beforeDate: defaultBefore,
+		onTimeframeChange: fn(),
+	},
+};
+
+/**
+ * Filled monitor state using the activity-monitor DTO shape.
+ */
+export const ActivityMonitorFilled: Story = {
+	args: {
+		activityMonitorData: mockActivityMonitorData,
+		activityMonitorFilters: {
+			repositoryIds: [],
+			limit: 5,
+		},
+		isLoading: false,
+		username: "johndoe",
+		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
+		afterDate: defaultAfter,
+		beforeDate: defaultBefore,
+		onActivityMonitorFiltersChange: fn(),
+		onTimeframeChange: fn(),
+	},
+};
+
+/**
+ * Monitor after selecting one repository in the configure popover.
+ */
+export const ActivityMonitorRepositoryFiltered: Story = {
+	args: {
+		activityMonitorData: mockRepositoryFilteredActivityMonitorData,
+		activityMonitorFilters: {
+			repositoryIds: [1],
+			limit: 5,
+		},
+		isLoading: false,
+		username: "johndoe",
+		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
+		afterDate: defaultAfter,
+		beforeDate: defaultBefore,
+		onActivityMonitorFiltersChange: fn(),
 		onTimeframeChange: fn(),
 	},
 };

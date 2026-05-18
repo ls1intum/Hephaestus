@@ -1,7 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { getUserProfileOptions, getWorkspaceOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getActivityMonitorOptions,
+	getUserProfileOptions,
+	getWorkspaceOptions,
+} from "@/api/@tanstack/react-query.gen";
+import type { ActivityMonitorFilters } from "@/components/profile/ProfileContent";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -17,15 +22,31 @@ import {
 const profileSearchSchema = z.object({
 	after: z.string().optional(),
 	before: z.string().optional(),
+	monitorRepositories: z.string().optional(),
+	monitorLimit: z.coerce.number().int().min(1).max(100).default(5),
 });
 
 type ProfileSearchParams = z.infer<typeof profileSearchSchema>;
+
+const parseRepositoryIds = (value?: string): number[] => {
+	if (!value) return [];
+
+	return value
+		.split(",")
+		.map((id) => Number.parseInt(id, 10))
+		.filter((id) => Number.isFinite(id));
+};
+
+const serializeRepositoryIds = (repositoryIds: number[]) => {
+	if (repositoryIds.length === 0) return undefined;
+	return repositoryIds.join(",");
+};
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$username/")({
 	component: UserProfile,
 	validateSearch: profileSearchSchema,
 	search: {
-		middlewares: [retainSearchParams(["after", "before"])],
+		middlewares: [retainSearchParams(["after", "before", "monitorRepositories", "monitorLimit"])],
 	},
 });
 
@@ -33,7 +54,7 @@ function UserProfile() {
 	const { username, workspaceSlug } = Route.useParams();
 	const { isCurrentUser } = useAuth();
 	const { achievementsEnabled, progressionEnabled, leaguesEnabled } = useWorkspaceFeatures();
-	const { after, before } = Route.useSearch();
+	const { after, before, monitorRepositories, monitorLimit } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
 	// Query for workspace to get leaderboard schedule
@@ -79,6 +100,9 @@ function UserProfile() {
 		const parsed = new Date(value);
 		return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 	};
+	const parsedAfter = parseDateParam(effectiveDates.after);
+	const parsedBefore = parseDateParam(effectiveDates.before);
+	const selectedRepositoryIds = parseRepositoryIds(monitorRepositories);
 
 	// Check if current user is the dashboard user
 	const currUserIsDashboardUser = isCurrentUser(username);
@@ -88,8 +112,22 @@ function UserProfile() {
 		...getUserProfileOptions({
 			path: { workspaceSlug, login: username },
 			query: {
-				after: parseDateParam(effectiveDates.after),
-				before: parseDateParam(effectiveDates.before),
+				after: parsedAfter,
+				before: parsedBefore,
+			},
+		}),
+		placeholderData: (previousData) => previousData,
+		enabled: Boolean(username) && Boolean(workspaceSlug),
+	});
+
+	const activityMonitorQuery = useQuery({
+		...getActivityMonitorOptions({
+			path: { workspaceSlug, login: username },
+			query: {
+				after: parsedAfter,
+				before: parsedBefore,
+				repositoryIds: selectedRepositoryIds.length > 0 ? selectedRepositoryIds : undefined,
+				limit: monitorLimit,
 			},
 		}),
 		placeholderData: (previousData) => previousData,
@@ -106,10 +144,26 @@ function UserProfile() {
 		});
 	};
 
+	const handleActivityMonitorFiltersChange = (filters: ActivityMonitorFilters) => {
+		navigate({
+			search: (prev: ProfileSearchParams) => ({
+				...prev,
+				monitorRepositories: serializeRepositoryIds(filters.repositoryIds),
+				monitorLimit: filters.limit === 5 ? undefined : filters.limit,
+			}),
+		});
+	};
+
 	return (
 		<ProfilePage
 			providerType={workspaceQuery.data?.providerType ?? "GITHUB"}
 			profileData={profileQuery.data}
+			activityMonitorData={activityMonitorQuery.data}
+			activityMonitorFilters={{
+				repositoryIds: selectedRepositoryIds,
+				limit: monitorLimit,
+			}}
+			onActivityMonitorFiltersChange={handleActivityMonitorFiltersChange}
 			isLoading={
 				(profileQuery.isPending && !profileQuery.data) ||
 				(workspaceQuery.isPending && !workspaceQuery.data)

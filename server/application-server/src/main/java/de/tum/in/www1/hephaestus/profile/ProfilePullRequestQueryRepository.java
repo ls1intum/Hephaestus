@@ -7,6 +7,7 @@ import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -27,6 +28,8 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE p.author.login ILIKE :authorLogin
             AND p.state IN :states
+            AND (:since IS NULL OR p.createdAt >= :since)
+            AND (:until IS NULL OR p.createdAt < :until)
             AND rtm.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
         """
@@ -34,7 +37,9 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
     List<PullRequest> findAuthoredByLoginAndStates(
         @Param("authorLogin") String authorLogin,
         @Param("states") Set<PullRequest.State> states,
-        @Param("workspaceId") Long workspaceId
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") @Nullable Instant since,
+        @Param("until") @Nullable Instant until
     );
 
     @Query(
