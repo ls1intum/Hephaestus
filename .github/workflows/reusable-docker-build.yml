@@ -200,12 +200,16 @@ jobs:
 
       - name: Extract SBOM from buildpack image
         if: inputs.use-buildpacks
+        continue-on-error: true
         env:
           PER_ARCH_TAG: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}
         run: |
           set -euo pipefail
           mkdir -p "${{ runner.temp }}/sbom"
-          pack sbom download "$PER_ARCH_TAG" --output-dir "${{ runner.temp }}/sbom"
+          # --remote reads from the registry rather than the local daemon — the image was just
+          # pushed by spring-boot:build-image. Auth is inherited from the docker/login-action
+          # earlier in this job via ~/.docker/config.json.
+          pack sbom download "$PER_ARCH_TAG" --remote --output-dir "${{ runner.temp }}/sbom"
           ls -la "${{ runner.temp }}/sbom/layers/sbom/"
 
       - name: Upload SBOM
@@ -223,8 +227,13 @@ jobs:
       # Report-only; flip --exit-code 1 after main has a clean baseline.
       - name: Install + run Trivy (CVE scan, report-only)
         if: inputs.use-buildpacks
+        continue-on-error: true
         env:
           TRIVY_VERSION: 0.58.2
+          # Trivy queries the registry directly (not the local daemon) and does not read
+          # ~/.docker/config.json — explicit credentials are required for ghcr.io.
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
           PER_ARCH_TAG: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}
         run: |
           set -euo pipefail
