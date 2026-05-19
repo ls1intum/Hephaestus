@@ -171,12 +171,6 @@
             <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
-            <scope>runtime</scope>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>${postgresql.version}</version>
@@ -258,6 +252,9 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- springdoc-openapi reads class/method Javadoc via therapi-runtime-javadoc to inject
+             description="..." into the generated openapi.yaml. Removing this strips descriptions
+             from the public API contract, so it stays load-bearing despite no in-source callers. -->
         <dependency>
             <groupId>com.github.therapi</groupId>
             <artifactId>therapi-runtime-javadoc</artifactId>
@@ -405,8 +402,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release>${java.version}</release>
                     <!--
                         IMPORTANT: Set to false for ACTUAL incremental compilation!
                         Due to Maven bug MCOMPILER-209, the behavior is inverted:
@@ -705,9 +701,13 @@
                 <version>0.8.14</version>
                 <executions>
                     <execution>
+                        <id>default-prepare-agent</id>
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                        <configuration>
+                            <skip>${skipCoverage}</skip>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>report</id>
@@ -715,6 +715,9 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
+                        <configuration>
+                            <skip>${skipCoverage}</skip>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>check-coverage</id>
@@ -1048,6 +1051,29 @@
                 <!-- maven.main.skip deliberately NOT set — we want incremental compile -->
                 <maven.test.skip>true</maven.test.skip>
             </properties>
+        </profile>
+
+        <!-- `mvn -P aot package` runs the Spring Boot AOT processor; output is inert until the
+             runtime sets `-Dspring.aot.enabled=true` (handled separately in #1282 Buildpacks).
+             https://docs.spring.io/spring-boot/maven-plugin/aot.html -->
+        <profile>
+            <id>aot</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>process-aot</id>
+                                <goals>
+                                    <goal>process-aot</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>

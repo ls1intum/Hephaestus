@@ -24,9 +24,8 @@
     <!-- MAIN CONFIGURATION                                             -->
     <!-- ============================================================== -->
     <configuration>
-        <!-- Enable/disable the build cache
-             DISABLED by default for development (spring-boot:run doesn't work well with cache)
-             Enable in CI with: -Dmaven.build.cache.enabled=true -->
+        <!-- Opt in per invocation with `-Dmaven.build.cache.enabled=true` (used in CI).
+             Default off until MBUILDCACHE-118 (IntelliJ generate-sources NPE) is fixed. -->
         <enabled>false</enabled>
 
         <!-- Hash algorithm for cache keys
@@ -300,6 +299,8 @@
                 <plugin groupId="org.apache.maven.plugins" artifactId="maven-failsafe-plugin"></plugin>
                 <!-- JaCoCo must run to set argLine for test coverage -->
                 <plugin groupId="org.jacoco" artifactId="jacoco-maven-plugin"></plugin>
+                <!-- spring-boot:run is long-running; spring-boot:repackage produces release artefacts. -->
+                <plugin groupId="org.springframework.boot" artifactId="spring-boot-maven-plugin"></plugin>
             </plugins>
             <executions>
                 <!-- Test resources and compile must run to ensure test classes can find main classes -->

@@ -19,19 +19,19 @@ spring:
 
     jpa:
         hibernate:
-            # Liquibase handles DDL migrations; Hibernate validates the schema.
-            # Use 'update' for development convenience (adds missing columns/tables).
-            # If you hit a Hibernate NPE in EnumHelper.getEnumeratedValues on startup,
-            # the database schema is stale — recreate the database from scratch.
-            ddl-auto: update
-        # Disable open-in-view to prevent lazy loading during view rendering
-        # and avoid the warning. Database queries should be completed in the service layer.
+            # Liquibase owns DDL across every profile. `validate` makes drift fail-fast at boot;
+            # prod overrides to `none` in application-prod.yml. Fresh local DB after schema change:
+            # `docker compose down -v && docker compose up -d`.
+            ddl-auto: validate
+        # Repository queries complete in the service layer; no lazy loading during view rendering.
         open-in-view: false
 
         # show-sql: "true"
         properties:
             hibernate:
-                format_sql: "true"
+                # `show-sql: true` is the trigger; `format_sql` only matters then. Default off avoids
+                # the formatter pass on every statement.
+                format_sql: "false"
                 jdbc:
                     batch_size: 50
                 order_inserts: true
@@ -39,16 +39,8 @@ spring:
 
     liquibase:
         change-log: classpath:db/master.xml
-
-    devtools:
-        add-properties: false
-        restart:
-            # Use trigger file for controlled restarts - touch .reloadtrigger to restart
-            # This prevents NoClassDefFoundError issues with synthetic classes during automatic restarts
-            trigger-file: .reloadtrigger
-            # Increase quiet period to ensure full compilation before restart
-            quiet-period: 1000
-            poll-interval: 2000
+        # Gates `context="backfill"` one-shot changesets; prod overrides to `prod`.
+        contexts: dev
 
     security:
         oauth2:
@@ -533,3 +525,30 @@ resilience4j:
                 baseConfig: default
             gitlabGraphQl:
                 baseConfig: default
+
+# Local profile (tracked defaults; per-developer secrets stay in gitignored application-local.yml).
+---
+spring:
+    config:
+        activate:
+            on-profile: local
+
+    docker:
+        compose:
+            # `pnpm dev` brings compose up explicitly; spring.datasource.url is set, so Spring
+            # never needs to parse compose.yaml.
+            enabled: false
+
+management:
+    endpoints:
+        web:
+            exposure:
+                include: health,info,prometheus,metrics,startup
+    endpoint:
+        startup:
+            access: read_only
+
+logging:
+    level:
+        # Silence SpringDoc's "endpoint enabled by default — disable in production" banner.
+        org.springdoc.core.events.SpringDocAppInitializer: ERROR

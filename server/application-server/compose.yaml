@@ -1,7 +1,6 @@
-# Used for local development
-#
-# IMPORTANT: After updating .env or realm config, run `docker compose down -v && docker compose up`
-# to clear Keycloak data and re-import the realm with new settings.
+# Local development stack. From the repo root: `pnpm dev` runs `docker compose up -d --wait`
+# then starts the server + webapp. After .env or realm-config changes:
+# `docker compose down -v && docker compose up -d`.
 
 services:
   postgres:
@@ -16,6 +15,12 @@ services:
       - app-network
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U root -d hephaestus']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.5
@@ -49,6 +54,9 @@ services:
       - keycloak-data:/opt/keycloak/data
     networks:
       - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
     # Keycloak 26+ exposes health endpoints on management port 9000, not the main port 8080
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3"]

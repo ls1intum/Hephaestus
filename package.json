@@ -54,7 +54,13 @@
 		"docs:build": "pnpm --filter docs run build",
 		"docs:serve": "pnpm --filter docs run serve",
 		"docs:lint": "pnpm --filter docs run lint",
-		"prepare": "husky"
+		"prepare": "husky",
+		"dev:compose": "cd server/application-server && docker compose up -d --wait",
+		"dev:compose:down": "cd server/application-server && docker compose down",
+		"dev:server": "cd server/application-server && ./mvnw spring-boot:run",
+		"dev:webapp": "pnpm --filter webapp run dev",
+		"dev": "run-s dev:compose dev:run",
+		"dev:run": "run-p dev:server dev:webapp"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.15",

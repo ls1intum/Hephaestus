@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus;
 import java.util.TimeZone;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.metrics.buffering.BufferingApplicationStartup;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.resilience.annotation.EnableResilientMethods;
@@ -17,6 +18,8 @@ public class Application {
 
     public static void main(String[] args) {
         TimeZone.setDefault(TimeZone.getTimeZone("Europe/Berlin"));
-        SpringApplication.run(Application.class, args);
+        SpringApplication application = new SpringApplication(Application.class);
+        application.setApplicationStartup(new BufferingApplicationStartup(2048));
+        application.run(args);
     }
 }

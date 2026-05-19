@@ -1,17 +1,31 @@
 # Application Server
 
-Spring Boot 3.5 backend providing the REST API for Hephaestus.
+Spring Boot 4 backend providing the REST API for Hephaestus.
+
+## Local development loop
+
+From the repo root: `pnpm dev`. It brings compose up with healthchecks, then runs `mvn spring-boot:run` + `pnpm --filter webapp dev` in parallel.
+
+### Conventions
+
+- **No devtools.** Hot reload uses JVM HotSwap via the IDE — IntelliJ's Spring Boot run config with *Update Classes and Resources* on save (or *On Frame Deactivation*). Method-body edits reload; signature changes, new methods, and `@Configuration` edits require a full restart ([Spring Boot 4 hot-swapping ref](https://docs.spring.io/spring-boot/how-to/hotswapping.html)).
+- **`ddl-auto: validate`** for local. Liquibase owns DDL. If the validator fails on boot, your DB has drifted — recreate with `docker compose down -v && docker compose up -d`.
+- **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`, `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step regressions in CI.
+- **Maven build cache** is opt-in: `-Dmaven.build.cache.enabled=true` (CI does this). Default off until [MBUILDCACHE-118](https://issues.apache.org/jira/browse/MBUILDCACHE-118) lands.
+- **Pre-commit hook** (optional, install manually): `printf '#!/usr/bin/env sh\npnpm run format:check\n' > .husky/pre-commit && chmod +x .husky/pre-commit`. The existing `pre-push` hook runs the heavier `format:check && check` chain.
 
 ## Commands
 
-| Task              | Command                                         |
-| ----------------- | ----------------------------------------------- |
-| Run locally       | `mvn spring-boot:run`                           |
-| Unit tests        | `mvn test`                                      |
-| Integration tests | `mvn verify`                                    |
-| Live GitHub tests | `mvn test -Plive-tests`                         |
+| Task              | Command                                          |
+| ----------------- | ------------------------------------------------ |
+| Run full stack    | `pnpm dev` (from repo root)                      |
+| Run server only   | `mvn spring-boot:run` (in `server/application-server/`) |
+| Unit tests        | `mvn test`                                       |
+| Integration tests | `mvn verify`                                     |
+| Live GitHub tests | `mvn test -Plive-tests`                          |
 | Format            | `pnpm run format:java`                           |
 | Generate OpenAPI  | `pnpm run generate:api:application-server:specs` |
+| Startup timeline  | `curl http://localhost:8080/actuator/startup`    |
 
 ### Port Conflicts (OpenAPI Generation)
 

@@ -11,6 +11,8 @@ spring:
     jpa:
         hibernate:
             ddl-auto: none
+    liquibase:
+        contexts: prod
 
     security:
         oauth2:
