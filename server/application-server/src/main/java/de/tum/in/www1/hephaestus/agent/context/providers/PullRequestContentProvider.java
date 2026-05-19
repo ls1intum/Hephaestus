@@ -278,10 +278,7 @@ public class PullRequestContentProvider implements ContentProvider {
         String headSha = jobMetadata.has("commit_sha") ? jobMetadata.get("commit_sha").asText() : null;
 
         String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
-        String logOutput =
-            range != null
-                ? gitDiffOperations.runGit(repoPath, "log", "--format=%h\t%s", range[0] + ".." + range[1])
-                : null;
+        String logOutput = range != null ? gitDiffOperations.shortLog(repoPath, range[0], range[1]) : null;
 
         if (logOutput == null || logOutput.isBlank()) {
             log.debug("No commit log available for MR, skipping commit injection");
@@ -384,9 +381,8 @@ public class PullRequestContentProvider implements ContentProvider {
                 );
                 return;
             }
-            String rangeSpec = range[0] + ".." + range[1];
-            String diffStat = gitDiffOperations.runGit(repoPath, "diff", "--stat", rangeSpec);
-            String diff = gitDiffOperations.runGit(repoPath, "diff", rangeSpec);
+            String diffStat = gitDiffOperations.diffStat(repoPath, range[0], range[1]);
+            String diff = gitDiffOperations.diff(repoPath, range[0], range[1]);
             if (diff != null && !diff.isBlank()) {
                 String annotatedDiff = GitDiffOperations.annotateDiffWithLineNumbers(diff);
                 files.put(OUTPUT_PREFIX + "diff.patch", annotatedDiff.getBytes(StandardCharsets.UTF_8));
