@@ -90,11 +90,8 @@ spring:
         client:
             document-locations: classpath:graphql/github/operations/
 
-    # ═══════════════════════════════════════════════════════════════════════════
-    # GRACEFUL SHUTDOWN
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Enable graceful shutdown to drain in-flight requests before terminating.
-    # Critical for zero-downtime deployments in Kubernetes.
+    # Graceful shutdown drains in-flight requests before terminating; pairs with server.shutdown
+    # below. Coolify's default stop-grace is 10s — bump to 30s in the deploy substrate.
     lifecycle:
         timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
 
@@ -102,11 +99,7 @@ server:
     port: ${SERVER_PORT:8080}
     shutdown: graceful
 
-# ═══════════════════════════════════════════════════════════════════════════
-# ACTUATOR & HEALTH PROBES
-# ═══════════════════════════════════════════════════════════════════════════
-# Configure health endpoints for Kubernetes liveness/readiness probes.
-# Security: Run actuator on separate management port in production.
+# Actuator on the management port; health probes for Kubernetes liveness/readiness.
 management:
     server:
         port: ${MANAGEMENT_PORT:8080}
