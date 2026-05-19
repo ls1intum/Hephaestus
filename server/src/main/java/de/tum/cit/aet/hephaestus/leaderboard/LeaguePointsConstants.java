@@ -1,15 +1,10 @@
-package de.tum.cit.aet.hephaestus.shared;
+package de.tum.cit.aet.hephaestus.leaderboard;
 
 /**
  * Constants for the league points (Elo-style rating) system.
  *
- * <p>These constants are shared between:
- * <ul>
- *   <li>{@code workspace} - For initializing new member league points</li>
- *   <li>{@code leaderboard} - For calculating league point changes</li>
- * </ul>
- *
- * <p>Placed in the {@code shared} package to avoid coupling between modules.
+ * <p>Lives in the {@code leaderboard} module since league points are leaderboard-owned.
+ * {@code workspace} consumes via a one-way import (no cycle).
  */
 public final class LeaguePointsConstants {
 
