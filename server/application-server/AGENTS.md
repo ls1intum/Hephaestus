@@ -30,7 +30,7 @@ From the repo root: `pnpm dev`. It brings compose up with healthchecks, then run
 
 ### Container image
 
-The production image is built with Paketo Cloud Native Buildpacks (Application CDS enabled). The `<image>` block in `pom.xml` references `paketobuildpacks/builder-noble-java-tiny`; digest-pinning is a follow-up. See `docs/admin/buildpacks-cds-decision.md` for rationale (CDS-only on Java 21; Spring AOT processing deferred to Java 25 + JEP 483). There is no `Dockerfile` — local builds use the same Maven goal.
+The production image is built with Paketo Cloud Native Buildpacks (Application CDS enabled). The `<image>` block in `pom.xml` pins `paketobuildpacks/builder-noble-java-tiny` + `paketobuildpacks/ubuntu-noble-run-tiny` by sha256 digest; refresh with `docker buildx imagetools inspect ... --format '{{.Manifest.Digest}}'`. CI extracts Paketo SBOMs and runs Trivy in report-only mode. See `docs/admin/buildpacks-cds-decision.md` for rationale (CDS-only on Java 21; Spring AOT processing deferred to Java 25 + JEP 483). There is no `Dockerfile` — local builds use the same Maven goal.
 
 ### JPA conventions
 

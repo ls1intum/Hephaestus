@@ -185,6 +185,59 @@ jobs:
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
           echo "Per-arch digest: $DIGEST"
 
+      # SBOMs are emitted by Paketo into /layers/sbom/ during the build; pack downloads them via
+      # the OCI label io.buildpacks.lifecycle.metadata. Sigstore-pinned binary, sha256-verified.
+      - name: Install pack CLI (Buildpacks SBOM extraction)
+        if: inputs.use-buildpacks
+        env:
+          PACK_VERSION: v0.40.6
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/pack.tgz \
+            "https://github.com/buildpacks/pack/releases/download/${PACK_VERSION}/pack-${PACK_VERSION}-linux$([ "${{ runner.arch }}" = "ARM64" ] && echo "-arm64" || echo "").tgz"
+          tar -xzf /tmp/pack.tgz -C /usr/local/bin pack
+          pack version
+
+      - name: Extract SBOM from buildpack image
+        if: inputs.use-buildpacks
+        env:
+          PER_ARCH_TAG: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/sbom"
+          pack sbom download "$PER_ARCH_TAG" --output-dir "${{ runner.temp }}/sbom"
+          ls -la "${{ runner.temp }}/sbom/layers/sbom/"
+
+      - name: Upload SBOM
+        if: inputs.use-buildpacks
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom-${{ steps.prep.outputs.image_name }}-${{ steps.prep.outputs.platform_pair }}
+          path: ${{ runner.temp }}/sbom/
+          if-no-files-found: error
+          retention-days: 90
+
+      # Report-only on first PR; flip exit-code to 1 after a clean baseline run on main.
+      - name: CVE scan (Trivy)
+        if: inputs.use-buildpacks
+        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.28.0
+        with:
+          image-ref: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}
+          format: sarif
+          output: ${{ runner.temp }}/trivy.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 0
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: inputs.use-buildpacks
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: trivy-${{ steps.prep.outputs.image_name }}-${{ steps.prep.outputs.platform_pair }}
+          path: ${{ runner.temp }}/trivy.sarif
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Export digest
         env:
           DOCKERFILE_DIGEST: ${{ steps.build.outputs.digest }}

@@ -29,18 +29,10 @@ public class SentryConfiguration {
         this.sentryProperties = sentryProperties;
     }
 
-    /**
-     * Init sentry with the correct environment and version
-     */
     @PostConstruct
     public void init() {
         if (environment.matchesProfiles("specs")) {
             log.info("Skipped Sentry initialization: reason=specs_profile");
-            return;
-        }
-
-        if (!sentryProperties.isConfigured()) {
-            log.info("Skipped Sentry initialization: reason=missing_dsn");
             return;
         }
 
@@ -71,11 +63,6 @@ public class SentryConfiguration {
         }
     }
 
-    /**
-     * Get the traces sample rate based on the environment.
-     *
-     * @return 0% for local, 100% for test, 20% for production environments
-     */
     private double getTracesSampleRate() {
         return switch (getEnvironment()) {
             case "test" -> 1.0;

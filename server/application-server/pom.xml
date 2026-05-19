@@ -820,11 +820,13 @@
                     </excludes>
                     <wait>1000</wait>
                     <maxAttempts>100</maxAttempts>
-                    <!-- See docs/admin/buildpacks-cds-decision.md. BP_JVM_AOTCACHE_ENABLED is the
-                         Java 25 / JEP 483 successor, deferred to epic #1096. -->
+                    <!-- See docs/admin/buildpacks-cds-decision.md for rationale, digest refresh
+                         procedure, and the BP_JVM_AOTCACHE_ENABLED migration path (deferred to
+                         Java 25 + JEP 483, epic #1096). The run image is the one builder.toml
+                         declares: paketobuildpacks/ubuntu-noble-run-tiny. -->
                     <image>
-                        <builder>paketobuildpacks/builder-noble-java-tiny:latest</builder>
-                        <runImage>paketobuildpacks/run-noble-java-tiny:latest</runImage>
+                        <builder>paketobuildpacks/builder-noble-java-tiny@sha256:c8b5f936e6d9af492af4a493b4a03eaf496fe51f206c5d53ccddab7871ed4ef5</builder>
+                        <runImage>paketobuildpacks/ubuntu-noble-run-tiny@sha256:b5a167cf9a8021e289e5701a82f7c6b430ba85bb8360e9ddc767340e3f8824c3</runImage>
                         <env>
                             <BP_JVM_VERSION>21</BP_JVM_VERSION>
                             <BP_JVM_CDS_ENABLED>true</BP_JVM_CDS_ENABLED>
