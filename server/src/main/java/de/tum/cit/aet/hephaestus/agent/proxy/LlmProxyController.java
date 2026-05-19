@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils;
 import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils.UpstreamResult;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -17,6 +18,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -53,11 +55,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Hidden
 @RequestMapping("/internal/llm")
 @PreAuthorize("isAuthenticated()")
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
-    name = de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole.SANDBOX_LLM_PROXY_PROPERTY,
-    havingValue = "true",
-    matchIfMissing = true
-)
+@ConditionalOnProperty(name = RuntimeRole.SANDBOX_LLM_PROXY_PROPERTY, havingValue = "true", matchIfMissing = true)
 class LlmProxyController {
 
     private static final Logger log = LoggerFactory.getLogger(LlmProxyController.class);

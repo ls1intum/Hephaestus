@@ -408,27 +408,14 @@ public class AgentJobService {
             }
         }
 
-        // Sandbox cancel happens on whichever JVM hosts the worker runtime role. When server
-        // and worker share a JVM (today's default), SandboxManager is autowired directly and
-        // we call it inline. When they split (hephaestus.runtime.worker.enabled=false on the
-        // server pod), SandboxManager is absent here; the DB row goes CANCELLED, the worker's
-        // SandboxReconciler reaps the orphan container on its next sweep (~60s), and
-        // AgentJobZombieSweeper backstops within ackWait + 5min. Documented eventual-
-        // consistency semantics — cancel was already async wrt the container.
-        //
-        // TODO(#1097-follow-up): replace this inline call with an AgentJobCancelRequested
-        // NATS event so cancel is uniformly best-effort across topologies.
+        // Best-effort inline sandbox cancel when worker is co-located. When worker runs in a
+        // separate JVM, SandboxManager is null and reconciler/zombie-sweeper backstops apply.
         if (sandboxManager != null) {
             try {
                 sandboxManager.cancel(jobId);
             } catch (Exception e) {
                 log.warn("Sandbox cancel failed for job {} (status already CANCELLED): {}", jobId, e.getMessage());
             }
-        } else if (log.isDebugEnabled()) {
-            log.debug(
-                "Cancel for job {} skipped local sandbox interaction — worker role not active in this JVM",
-                jobId
-            );
         }
 
         // Reload to return fresh state

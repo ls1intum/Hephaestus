@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive.StdinWriteWatc
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -43,11 +44,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Configuration
 @ConditionalOnProperty(prefix = "hephaestus.sandbox", name = "enabled", havingValue = "true", matchIfMissing = false)
-@ConditionalOnProperty(
-    name = de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole.WORKER_PROPERTY,
-    havingValue = "true",
-    matchIfMissing = true
-)
+@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 @ConditionalOnClass(DockerClient.class)
 @EnableConfigurationProperties({ SandboxProperties.class, InteractiveSandboxProperties.class })
 public class DockerSandboxConfiguration {

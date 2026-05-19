@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,11 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  */
 @Configuration
 @EnableConfigurationProperties(LlmProxyProperties.class)
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
-    name = de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole.SANDBOX_LLM_PROXY_PROPERTY,
-    havingValue = "true",
-    matchIfMissing = true
-)
+@ConditionalOnProperty(name = RuntimeRole.SANDBOX_LLM_PROXY_PROPERTY, havingValue = "true", matchIfMissing = true)
 class LlmProxySecurityConfig {
 
     @Bean
