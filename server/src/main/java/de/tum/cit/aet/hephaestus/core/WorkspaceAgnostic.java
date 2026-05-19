@@ -10,7 +10,9 @@ import java.lang.annotation.Target;
  * Marks a repository or repository method as intentionally workspace-agnostic.
  *
  * <p>Use this to indicate that the annotated element legitimately does not filter by workspace.
- * Architecture tests will skip validation for these.
+ * Architecture tests skip validation for annotated elements, and at runtime
+ * {@code WorkspaceAgnosticAspect} opens a bypass on the thread so
+ * {@code WorkspaceStatementInspector} does not flag the emitted SQL.
  *
  * <p><b>When to use:</b>
  *
@@ -21,6 +23,10 @@ import java.lang.annotation.Target;
  * </ul>
  *
  * <p><b>Provide a reason:</b> Always document why this is workspace-agnostic.
+ *
+ * <p><b>Load-bearing at runtime:</b> dropping the annotation from a repository that issues
+ * cross-workspace queries will cause {@code TenancyViolationException} under
+ * {@code hephaestus.tenancy.enforcement=throw}. The annotation is not just documentation.
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
@@ -28,4 +34,12 @@ import java.lang.annotation.Target;
 public @interface WorkspaceAgnostic {
     /** Reason why this is intentionally workspace-agnostic. */
     String value();
+
+    /**
+     * Whether the AOP aspect should open a runtime bypass on
+     * {@code WorkspaceContextHolder} for the duration of the annotated call.
+     *
+     * <p>Set to {@code false} ONLY if the annotated code path provably never emits SQL.
+     */
+    boolean runtimeBypass() default true;
 }
