@@ -11,6 +11,9 @@ spring:
     jpa:
         hibernate:
             ddl-auto: none
+        # Without metadata-access Hibernate can't introspect the dialect from a JDBC connection;
+        # pin it explicitly so EntityManagerFactory builds and context refresh completes.
+        database-platform: org.hibernate.dialect.PostgreSQLDialect
         properties:
             hibernate:
                 boot:
