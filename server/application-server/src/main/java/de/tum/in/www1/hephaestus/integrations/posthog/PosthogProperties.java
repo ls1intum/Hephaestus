@@ -7,30 +7,16 @@ import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe configuration properties for PostHog analytics integration.
+ * PostHog analytics integration properties under {@code hephaestus.posthog}.
  *
- * <p>Binds to the {@code hephaestus.posthog} prefix in application configuration.
- * Controls whether PostHog analytics are enabled and connection details.
- *
- * <h2>Configuration Example</h2>
- * <pre>{@code
- * hephaestus:
- *   posthog:
- *     enabled: true
- *     api-host: https://app.posthog.com
- *     project-id: 12345
- *     personal-api-key: phx_xxx
- * }</pre>
- *
- * @param enabled        whether PostHog integration is enabled
- * @param apiHost        PostHog API host URL
- * @param projectId      PostHog project ID
- * @param personalApiKey PostHog personal API key for server-side operations
+ * <p>The {@code enabled} property is consumed by {@link PosthogClient}'s
+ * {@code @ConditionalOnProperty(name = "enabled", havingValue = "true")} — it does not need a
+ * binding here because the bean is absent unless it is set, and {@link PosthogClient}'s
+ * constructor enforces the credential requirements when the bean is instantiated.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.posthog")
 public record PosthogProperties(
-    @DefaultValue("false") boolean enabled,
     @Nullable
     @URL(message = "PostHog API host must be a valid URL if provided")
     @DefaultValue("https://app.posthog.com")

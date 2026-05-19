@@ -2,7 +2,10 @@ package de.tum.in.www1.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.BASE_PACKAGE;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
+import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +24,21 @@ class TaskSchedulerInjectionArchitectureTest extends HephaestusArchitectureTest 
 
     @Test
     void productionCodeMustNotDependOnConcreteThreadPoolTaskScheduler() {
-        ArchRule rule = noClasses()
+        rule().check(classes);
+    }
+
+    @Test
+    void negativeFixtureTriggersTheRule() {
+        // Imports a deliberate violation under this test package so the rule has a documented
+        // failure path. If a future refactor breaks the rule's matcher (e.g., upstream package
+        // rename, accidental @Disabled), this assertion goes red instead of the production rule
+        // passing vacuously.
+        JavaClasses fixture = new ClassFileImporter().importClasses(ViolatingFixture.class);
+        assertThatExceptionOfType(AssertionError.class).isThrownBy(() -> rule().check(fixture));
+    }
+
+    private static ArchRule rule() {
+        return noClasses()
             .that()
             .resideInAPackage(BASE_PACKAGE + "..")
             .should()
@@ -31,7 +48,16 @@ class TaskSchedulerInjectionArchitectureTest extends HephaestusArchitectureTest 
                 "spring.threads.virtual.enabled=true swaps the auto-configured TaskScheduler to " +
                     "SimpleAsyncTaskScheduler; concrete-type injection breaks bean wiring"
             );
+    }
 
-        rule.check(classes);
+    /** Negative fixture — exists only so {@link #negativeFixtureTriggersTheRule} can prove the rule fires. */
+    @SuppressWarnings("unused")
+    private static final class ViolatingFixture {
+
+        private final ThreadPoolTaskScheduler scheduler;
+
+        ViolatingFixture(ThreadPoolTaskScheduler scheduler) {
+            this.scheduler = scheduler;
+        }
     }
 }

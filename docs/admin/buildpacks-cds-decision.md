@@ -62,7 +62,7 @@ Revert the workflow change in `.github/workflows/ci-docker-build.yml` (the `use-
 
 - **Coolify graceful shutdown** — `application.yml` sets `SHUTDOWN_TIMEOUT:20s`. Coolify's default container stop-grace is 10s; bump it to 30s in the deploy substrate so SIGTERM has time to drain in-flight requests. The Paketo launcher `exec`s the JVM so signal forwarding is native; no `tini` needed.
 - **JVM memory** — do NOT set `MaxRAMPercentage`, `-Xmx`, or `-Xss` in Coolify env. Paketo's memory calculator computes them from container memory minus reserved headroom. Override only `BPL_JVM_HEAD_ROOM` if needed.
-- **SBOM** — Paketo emits Syft + SPDX + CycloneDX SBOMs at `/layers/sbom/`. CI extracts them via `pack sbom download` and attaches them as workflow artifacts.
+- **SBOM** — Paketo emits Syft + SPDX + CycloneDX SBOMs at `/layers/sbom/` inside the image. CI does not yet extract them; `pack sbom download <image>` is the path when this becomes a release-gate requirement.
 - **CI build time** — expect +60-120s per build vs the prior Dockerfile baseline (CDS training run dominates). The Maven cache action shaves dependency resolution.
 
 ## Sources

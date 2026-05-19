@@ -261,6 +261,8 @@ public class GitDiffOperations {
         formatter.setDiffAlgorithm(DiffAlgorithm.getAlgorithm(DiffAlgorithm.SupportedAlgorithm.HISTOGRAM));
         formatter.setDiffComparator(RawTextComparator.DEFAULT);
         formatter.setDetectRenames(true);
+        // Match `git diff -M` default (50% similarity); JGit's RenameDetector defaults to 60%.
+        formatter.getRenameDetector().setRenameScore(50);
         return formatter;
     }
 

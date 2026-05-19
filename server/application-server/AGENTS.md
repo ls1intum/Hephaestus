@@ -26,11 +26,19 @@ From the repo root: `pnpm dev`. It brings compose up with healthchecks, then run
 | Format            | `pnpm run format:java`                           |
 | Generate OpenAPI  | `pnpm run generate:api:application-server:specs` |
 | Startup timeline  | `curl http://localhost:8080/actuator/startup`    |
-| Build prod image  | `mvn spring-boot:build-image -Pproduction`       |
+| Build prod image  | `mvn spring-boot:build-image`                    |
 
 ### Container image
 
-The production image is built with Paketo Cloud Native Buildpacks (Application CDS enabled). The `<image>` block in `pom.xml` pins the builder; CI overrides by digest for reproducibility. See `docs/admin/buildpacks-cds-decision.md` for rationale (CDS-only on Java 21; Spring AOT processing deferred to Java 25 + JEP 483). There is no `Dockerfile` — local builds use the same Maven goal.
+The production image is built with Paketo Cloud Native Buildpacks (Application CDS enabled). The `<image>` block in `pom.xml` references `paketobuildpacks/builder-noble-java-tiny`; digest-pinning is a follow-up. See `docs/admin/buildpacks-cds-decision.md` for rationale (CDS-only on Java 21; Spring AOT processing deferred to Java 25 + JEP 483). There is no `Dockerfile` — local builds use the same Maven goal.
+
+### JPA conventions
+
+`EntityManager` is the one sanctioned field injection in this codebase — use `@PersistenceContext` on the field as in `WorkspaceMembershipService` / `GitHubUserProcessor`. Constructor injection works mechanically but the JPA spec carve-out (Spring Framework reference §JPA) is what `@PersistenceContext` exists for and stays correct under `spring.data.jpa.repositories.bootstrap-mode=deferred`.
+
+### Optional integrations
+
+Slack and PostHog are class-level `@ConditionalOnProperty` (`hephaestus.slack.token` and `hephaestus.posthog.enabled=true` respectively). Consumers that tolerate absence inject via `ObjectProvider<T>` (see `AccountService`). `SlackMessageService` injects `App` directly — this is intentional: `notification.enabled=true` with `slack.token` unset is a deploy-time misconfiguration that crashes context refresh rather than silently no-op'ing every cron tick.
 
 ### Port Conflicts (OpenAPI Generation)
 
