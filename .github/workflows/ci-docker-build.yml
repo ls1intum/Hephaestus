@@ -59,8 +59,10 @@ jobs:
     uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/application-server"
-      docker-file: "./server/application-server/Dockerfile"
-      docker-context: "./server/application-server"
+      # Paketo Cloud Native Buildpacks via spring-boot:build-image, with Application CDS.
+      # See docs/admin/buildpacks-cds-decision.md and pom.xml's <image> block.
+      use-buildpacks: true
+      maven-module: "server/application-server"
       registry: "ghcr.io"
       tags: |
         ${{ github.ref_name }}
