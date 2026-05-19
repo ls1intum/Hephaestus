@@ -2,12 +2,15 @@ package de.tum.in.www1.hephaestus.config;
 
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.AppConfig;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+// @ConditionalOnProperty(name = "token") matches an empty string — application.yml defaults the
+// token to "" when SLACK_BOT_TOKEN is unset, so the bean would always exist. Match only when the
+// token is non-blank.
 @Configuration
-@ConditionalOnProperty(prefix = "hephaestus.slack", name = "token")
+@ConditionalOnExpression("!'${hephaestus.slack.token:}'.isBlank()")
 public class SlackAppConfig {
 
     private final SlackProperties slackProperties;

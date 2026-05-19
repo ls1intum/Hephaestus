@@ -5,12 +5,14 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
+// `dsn` defaults to "" when SENTRY_DSN is unset; @ConditionalOnProperty(name = "dsn") would
+// still match the empty string. Match only when the DSN is non-blank.
 @Configuration
-@ConditionalOnProperty(prefix = "hephaestus.sentry", name = "dsn")
+@ConditionalOnExpression("!'${hephaestus.sentry.dsn:}'.isBlank()")
 public class SentryConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(SentryConfiguration.class);
