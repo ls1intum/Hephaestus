@@ -14,9 +14,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
 /**
- * Locks the {@link org.springframework.boot.autoconfigure.condition.ConditionalOnProperty}
- * contract on the Slack and PostHog beans without spinning a full Spring Boot context: when their
- * gating properties are unset, neither bean is registered.
+ * Pins the SlackAppConfig factory: with the token set it constructs an {@link App}, with the
+ * token unset both gated beans drop out together (proves the two gates haven't been re-tangled).
  */
 class OptionalIntegrationsContextTest extends BaseUnitTest {
 
@@ -27,13 +26,8 @@ class OptionalIntegrationsContextTest extends BaseUnitTest {
         .withUserConfiguration(GatedConfig.class);
 
     @Test
-    void slackAppBeanIsAbsentWhenHephaestusSlackTokenUnset() {
-        runner.run(context -> assertThat(context).doesNotHaveBean(App.class));
-    }
-
-    @Test
-    void posthogClientBeanIsAbsentWhenHephaestusPosthogEnabledUnset() {
-        runner.run(context -> assertThat(context).doesNotHaveBean(PosthogClient.class));
+    void gatedBeansAreAbsentWhenPropertiesUnset() {
+        runner.run(context -> assertThat(context).doesNotHaveBean(App.class).doesNotHaveBean(PosthogClient.class));
     }
 
     @Test
@@ -41,6 +35,16 @@ class OptionalIntegrationsContextTest extends BaseUnitTest {
         runner
             .withPropertyValues("hephaestus.slack.token=xoxb-test", "hephaestus.slack.signing-secret=signing-secret")
             .run(context -> assertThat(context).hasSingleBean(App.class));
+    }
+
+    /** Pins {@code @ConditionalOnExpression("!isBlank()")} on {@link SlackAppConfig}: a token
+     *  defaulted to the empty string (e.g. {@code SLACK_BOT_TOKEN} unset, the yml default fires)
+     *  must NOT register the bean — plain {@code @ConditionalOnProperty(name="token")} would. */
+    @Test
+    void slackAppBeanIsAbsentWhenHephaestusSlackTokenIsEmptyString() {
+        runner
+            .withPropertyValues("hephaestus.slack.token=", "hephaestus.slack.signing-secret=")
+            .run(context -> assertThat(context).doesNotHaveBean(App.class));
     }
 
     @Configuration(proxyBeanMethods = false)

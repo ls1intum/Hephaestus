@@ -170,7 +170,8 @@
         </sql>
     </changeSet>
 
-    <!-- Step 5: Add NOT NULL constraint -->
+    <!-- Step 5: Add NOT NULL constraint. Safe pre-#1071 drop: `document` is dropped in changelog
+         1778756946278; this changeset runs first against the existing table on fresh DBs. -->
     <changeSet id="1764514002516-7e" author="FelixTJDietrich">
         <addNotNullConstraint tableName="document" columnName="workspace_id"/>
     </changeSet>

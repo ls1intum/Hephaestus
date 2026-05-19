@@ -7,12 +7,9 @@ import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * PostHog analytics integration properties under {@code hephaestus.posthog}.
- *
- * <p>The {@code enabled} property is consumed by {@link PosthogClient}'s
- * {@code @ConditionalOnProperty(name = "enabled", havingValue = "true")} — it does not need a
- * binding here because the bean is absent unless it is set, and {@link PosthogClient}'s
- * constructor enforces the credential requirements when the bean is instantiated.
+ * PostHog analytics integration properties under {@code hephaestus.posthog}. The {@code enabled}
+ * property is read directly by {@code @ConditionalOnProperty} on {@link PosthogClient} — no
+ * record component for it, the bean is just absent when the flag is unset.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.posthog")

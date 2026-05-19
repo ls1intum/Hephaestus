@@ -30,15 +30,19 @@ From the repo root: `pnpm dev`. It brings compose up with healthchecks, then run
 
 ### Container image
 
-The production image is built with Paketo Cloud Native Buildpacks (Application CDS enabled). The `<image>` block in `pom.xml` pins `paketobuildpacks/builder-noble-java-tiny` + `paketobuildpacks/ubuntu-noble-run-tiny` by sha256 digest; refresh with `docker buildx imagetools inspect ... --format '{{.Manifest.Digest}}'`. CI extracts Paketo SBOMs and runs Trivy in report-only mode. See `docs/admin/buildpacks-cds-decision.md` for rationale (CDS-only on Java 21; Spring AOT processing deferred to Java 25 + JEP 483). There is no `Dockerfile` — local builds use the same Maven goal.
+Built with Paketo Cloud Native Buildpacks (Application CDS enabled); `pom.xml` `<image>` pins builder + run image by digest. See `docs/admin/buildpacks-cds-decision.md`. No `Dockerfile` — local builds use `mvn spring-boot:build-image`.
 
 ### JPA conventions
 
-`EntityManager` is the one sanctioned field injection in this codebase — use `@PersistenceContext` on the field as in `WorkspaceMembershipService` / `GitHubUserProcessor`. Constructor injection works mechanically but the JPA spec carve-out (Spring Framework reference §JPA) is what `@PersistenceContext` exists for and stays correct under `spring.data.jpa.repositories.bootstrap-mode=deferred`.
+`EntityManager`: inject as `@PersistenceContext` field (see `WorkspaceMembershipService`, `GitHubUserProcessor`). All other deps: constructor injection.
 
 ### Optional integrations
 
-Slack and PostHog are class-level `@ConditionalOnProperty` (`hephaestus.slack.token` and `hephaestus.posthog.enabled=true` respectively). Consumers that tolerate absence inject via `ObjectProvider<T>` (see `AccountService`). `SlackMessageService` injects `App` directly — this is intentional: `notification.enabled=true` with `slack.token` unset is a deploy-time misconfiguration that crashes context refresh rather than silently no-op'ing every cron tick.
+`SlackAppConfig`, `PosthogClient` are gated by `@ConditionalOnProperty`. Tolerant consumers (`AccountService`, `LeaderboardTaskScheduler`) take `ObjectProvider<T>`. `SlackMessageService` injects `App` directly on purpose: `notification.enabled=true` with `slack.token` unset must crash context refresh, not silently no-op cron ticks.
+
+### Removing Liquibase changesets
+
+Liquibase 5.x logs a warning but continues when `DATABASECHANGELOG` references unknown IDs — deleting a changeset is safe **only** when its schema effect is enforced by a later changeset (e.g. a NOT NULL constraint makes its own backfill validator obsolete). Never delete a changeset whose effect isn't enforced elsewhere.
 
 ### Port Conflicts (OpenAPI Generation)
 
