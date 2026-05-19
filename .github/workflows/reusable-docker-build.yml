@@ -160,6 +160,16 @@ jobs:
           restore-keys: |
             m2-${{ runner.os }}-${{ runner.arch }}-
 
+      # Fail fast if a downstream caller flips use-buildpacks=true without supplying maven-module.
+      # `working-directory: ""` would silently run from the repo root, where there is no ./mvnw.
+      - name: Validate buildpacks inputs
+        if: inputs.use-buildpacks
+        run: |
+          if [ -z "${{ inputs.maven-module }}" ]; then
+            echo "::error::use-buildpacks=true requires maven-module (e.g. server/application-server)"
+            exit 1
+          fi
+
       - name: Build and push (Paketo Buildpacks + CDS)
         id: build-buildpacks
         if: inputs.use-buildpacks

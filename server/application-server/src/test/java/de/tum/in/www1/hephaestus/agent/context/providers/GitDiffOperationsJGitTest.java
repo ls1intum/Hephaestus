@@ -108,6 +108,29 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("diffNameOnly() returns only the new path for renames (matches `git diff --name-only`)")
+    void diffNameOnlyReturnsNewPathForRenames() throws GitAPIException, IOException {
+        write("renamed-from.txt", "stable\n");
+        String addSha = commit("add file");
+
+        Files.delete(repoDir.resolve("renamed-from.txt"));
+        write("renamed-to.txt", "stable\n");
+        git.rm().addFilepattern("renamed-from.txt").call();
+        git.add().addFilepattern("renamed-to.txt").call();
+        String renameSha = git
+            .commit()
+            .setMessage("rename")
+            .setAuthor("t", "t@e")
+            .setCommitter("t", "t@e")
+            .call()
+            .getName();
+
+        String names = ops.diffNameOnly(repoDir, addSha, renameSha);
+        assertThat(names).isNotNull();
+        assertThat(names.trim().split("\n")).containsExactly("renamed-to.txt");
+    }
+
+    @Test
     @DisplayName("shortLog() emits abbreviated SHA + subject for each commit in range, newest first")
     void shortLogEmitsAbbreviatedShaAndSubject() throws GitAPIException, IOException {
         write("c.txt", "c\n");
