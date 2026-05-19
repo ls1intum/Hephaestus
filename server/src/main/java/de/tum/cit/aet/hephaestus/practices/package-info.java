@@ -1,44 +1,14 @@
 /**
- * Code Health Module - AI-powered detection and analysis of code quality issues.
+ * Code-health module — AI-driven practice detection and contributor findings.
  *
- * <h2>Bounded Context</h2>
- * <p>This module represents a distinct bounded context from the activity module. While activity
- * focuses on <em>recording developer actions</em> for gamification, code health focuses on
- * <em>analyzing code quality</em> through AI-powered detection.
+ * <p>Listens for {@code DomainEvent}s from {@link de.tum.cit.aet.hephaestus.gitprovider}
+ * processors, gates new reviews via {@code PracticeReviewDetectionGate}, dispatches agent
+ * jobs through {@link de.tum.cit.aet.hephaestus.agent}, and persists results as
+ * {@link de.tum.cit.aet.hephaestus.practices.finding.PracticeFinding}. Contributor feedback
+ * lives in the same module.
  *
- * <h2>Architecture</h2>
- * <pre>
- * ┌─────────────────────────────────────────────────────────────────────────────┐
- * │                          CODE HEALTH MODULE                                  │
- * │                                                                              │
- * │  Domain Events → AgentJobEventListener → Agent Pipeline (Docker sandbox)    │
- * │                                                       ↓                      │
- * │                    PracticeDetectionDeliveryService → PracticeFinding        │
- * │                                                       ↓                      │
- * │                    FindingFeedbackController → FindingFeedback               │
- * └─────────────────────────────────────────────────────────────────────────────┘
- * </pre>
- *
- * <h2>Key Components</h2>
- * <ul>
- *   <li>{@link de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingController} - Contributor findings API</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.practices.finding.feedback.FindingFeedbackController} - Contributor feedback API</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.practices.PracticeCatalogController} - Practice catalog CRUD</li>
- * </ul>
- *
- * <h2>SPI (Service Provider Interfaces)</h2>
- * <ul>
- *   <li>{@link de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker} - User role verification abstraction</li>
- * </ul>
- *
- * <h2>Design Principles</h2>
- * <ul>
- *   <li><strong>Bounded Context Isolation</strong>: Separate from activity module (event log vs. analysis)</li>
- *   <li><strong>Infrastructure Abstraction</strong>: AI service calls via anti-corruption layer</li>
- *   <li><strong>SPI Pattern</strong>: Decoupled via service provider interfaces (e.g. UserRoleChecker)</li>
- * </ul>
- *
- * @see de.tum.cit.aet.hephaestus.activity Activity module (event log for gamification)
+ * <p>Distinct bounded context from {@link de.tum.cit.aet.hephaestus.activity} (which
+ * gamifies developer actions rather than analyzing code quality).
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Practices (Code Health)",

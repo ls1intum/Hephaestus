@@ -1,75 +1,22 @@
 /**
- * Git provider integration layer for Hephaestus.
- * <p>
- * This module handles all interactions with external Git hosting providers (currently GitHub,
- * with GitLab planned). It provides a clean abstraction that isolates provider-specific details
- * from the rest of the application.
+ * Provider-agnostic git domain model + provider-specific ingest pipelines.
  *
- * <h2>Architecture Overview</h2>
+ * <p>Domain entities (PullRequest, Issue, Review, …) live at the top level of each
+ * subdomain. Provider implementations (GitHub, GitLab) live under {@code github/} and
+ * {@code gitlab/} subdirectories within each subdomain and share a single processor that
+ * handles both webhook events and GraphQL sync — entities are upserted idempotently.
  *
- * <pre>
- * gitprovider/
- * ├── common/                    # Shared infrastructure
- * │   ├── events/                # Domain events for reactive features
- * │   ├── exception/             # Exceptions definitions for gitprovider
- * │   ├── github/                # GitHub-specific utilities (GraphQL client, parsers)
- * │   └── spi/                   # Service Provider Interfaces for module isolation
- * │
- * ├── {domain}/                    # Provider-agnostic domain modules
- * │   ├── {Entity}.java            # JPA entity (e.g., PullRequest, Issue)
- * │   ├── {Entity}Repository.java  # Spring Data repository
- * │   ├── {Entity}InfoDTO.java     # API response DTO
- * │   └── github/                  # GitHub-specific implementation
- * │       ├── dto/                 # GitHub webhook/GraphQL DTOs
- * │       ├── GitHub{Entity}MessageHandler.java  # Webhook handler
- * │       ├── GitHub{Entity}Processor.java       # Entity processing logic
- * │       └── GitHub{Entity}SyncService.java     # GraphQL sync service
- * │
- * └── sync/                             # Orchestration layer
- *     ├── GitHubDataSyncScheduler.java  # Scheduled sync jobs
- *     ├── GitHubDataSyncService.java    # Coordinates full scope sync
- *     └── NatsConsumerService.java      # Webhook event consumption
- * </pre>
- *
- * <h2>Design Principles</h2>
+ * <p>Cross-module coupling goes through:
  * <ul>
- *   <li><b>Provider Isolation</b>: Domain entities are provider-agnostic. Provider-specific code
- *       lives in {@code github/} (or future {@code gitlab/}) subdirectories.</li>
- *   <li><b>Single Processing Path</b>: Processors handle both webhook events and GraphQL sync,
- *       ensuring consistent entity creation/updates.</li>
- *   <li><b>Idempotent Operations</b>: All operations are idempotent via upsert patterns.</li>
- *   <li><b>Domain Events</b>: Processors publish events for reactive features (activity tracking,
- *       leaderboard updates, etc.).</li>
- *   <li><b>Module Boundaries</b>: SPI interfaces in {@code common/spi/} define contracts with
- *       the host application, preventing circular dependencies.</li>
+ *   <li>{@link de.tum.cit.aet.hephaestus.gitprovider.common.spi} — service-provider
+ *       interfaces consumed by feature modules</li>
+ *   <li>{@link de.tum.cit.aet.hephaestus.gitprovider.common.events} — {@code DomainEvent}s
+ *       published by processors; consumers react in-process</li>
  * </ul>
  *
- * <h2>Adding GitLab Support</h2>
- * <p>
- * To add GitLab support:
- * <ol>
- *   <li>Create {@code gitlab/} subdirectories in each domain module</li>
- *   <li>Implement GitLab-specific DTOs matching webhook payloads</li>
- *   <li>Create GitLab processors that convert DTOs to domain entities</li>
- *   <li>Add GitLab GraphQL client in {@code common/gitlab/}</li>
- *   <li>Implement GitLab message handlers for webhook events</li>
- * </ol>
- * <p>
- * The domain entities, repositories, and SPI interfaces remain unchanged.
- *
- * <h2>Security Considerations</h2>
- * <ul>
- *   <li>All user-controllable data is sanitized via
- *       {@link de.tum.cit.aet.hephaestus.core.LoggingUtils#sanitizeForLog} before logging</li>
- *   <li>String fields are sanitized via
- *       {@link de.tum.cit.aet.hephaestus.gitprovider.common.PostgresStringUtils} before
- *       database storage</li>
- *   <li>GraphQL queries use {@code fullDatabaseId} (BigInt) to avoid integer overflow</li>
- * </ul>
- *
- * @see de.tum.cit.aet.hephaestus.gitprovider.common.spi Service Provider Interfaces
- * @see de.tum.cit.aet.hephaestus.gitprovider.common.events Domain Events
- * @see de.tum.cit.aet.hephaestus.gitprovider.sync Sync Orchestration
+ * <p>Logging always sanitizes external strings via
+ * {@link de.tum.cit.aet.hephaestus.core.LoggingUtils#sanitizeForLog}; DB inserts go
+ * through {@link de.tum.cit.aet.hephaestus.gitprovider.common.PostgresStringUtils}.
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Git Provider",
