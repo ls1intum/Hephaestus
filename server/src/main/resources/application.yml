@@ -128,6 +128,28 @@ hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # RUNTIME ROLES (single JAR, multiple deployable modes)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Two roles today (see ADR 0005):
+    #   server — HTTP API, sync NATS consumer, mentor SSE, scheduled tasks, agent dispatch
+    #   worker — agent NATS pull consumer, Docker sandbox, reconcilers, zombie sweepers
+    # Both default true → single-JVM monolith (the dev + initial prod topology).
+    # To split: server pod sets hephaestus.runtime.worker.enabled=false; worker pod
+    # sets hephaestus.runtime.server.enabled=false. JAR is bit-identical.
+    runtime:
+        server:
+            enabled: ${HEPHAESTUS_RUNTIME_SERVER_ENABLED:true}
+        worker:
+            enabled: ${HEPHAESTUS_RUNTIME_WORKER_ENABLED:true}
+
+    # Capability flag (not a role): worker-internal LLM proxy controller. Stays on
+    # the coordinator by default (BYO trust model — see ADR 0006). Future managed-mode
+    # workers may opt in by setting this on the worker pod and false on the server pod.
+    sandbox:
+        llm-proxy:
+            enabled: ${HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED:true}
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # TENANCY ENFORCEMENT (WorkspaceStatementInspector)
     # ═══════════════════════════════════════════════════════════════════════════
     # SQL-layer enforcement that every query against a workspace-scoped table
