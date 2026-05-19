@@ -4,46 +4,15 @@ Spring Boot 4 backend providing the REST API for Hephaestus.
 
 ## Local development loop
 
-The fastest way to a working dev stack is **from the repo root**:
+From the repo root: `pnpm dev`. It brings compose up with healthchecks, then runs `mvn spring-boot:run` + `pnpm --filter webapp dev` in parallel.
 
-```bash
-pnpm dev
-```
+### Conventions
 
-It runs `docker compose --profile minimal up -d --wait` (Postgres + Keycloak, with healthchecks), then `mvn spring-boot:run` (server) + `pnpm --filter webapp dev` (webapp) in parallel. A single Ctrl-C terminates all three children.
-
-### What changed (vs the prior loop)
-
-- **`spring-boot-devtools` removed.** It was disabled (`restart.enabled=false`) but still on the classpath, paying the dual-classloader cost for no benefit. Replacement: a checked-in IntelliJ run configuration with **Update Classes and Resources** on save. Per [Spring Boot 4 hot-swapping reference](https://docs.spring.io/spring-boot/how-to/hotswapping.html), JVM HotSwap reloads **method-body edits** automatically; **signature changes, new methods, new fields, and `@Configuration` edits still require a full restart**.
-- **`spring.docker.compose.lifecycle-management: none`** in `application-local.yml`. Spring no longer manages container lifecycle — you run `docker compose --profile minimal up -d` yourself (or via `pnpm dev`).
-- **`ddl-auto: validate`** for local (was `update`). Matches production's `none` discipline. If you see Hibernate `SchemaValidator` failures on boot, your local DB has drifted — bootstrap fresh with `docker compose --profile minimal down -v && docker compose --profile minimal up -d`.
-- **`spring.data.jpa.repositories.bootstrap-mode: deferred`** — Hibernate `EntityManagerFactory` builds off the critical path; safe in every profile.
-- **Maven build cache enabled** (`.mvn/maven-build-cache-config.xml`). Cold `mvn clean compile` drops from ~49 s to ~5 s on a cache hit. Escape hatches: `-Dmaven.build.cache.enabled=false` per-invocation; `rm -rf ~/.m2/build-cache/v1` to nuke.
-- **`BufferingApplicationStartup`** wired in `Application.main()`. In local profile only, `GET /actuator/startup` returns the full timeline so you can find slow beans. `StartupBudgetIntegrationTest` is the regression guard in CI.
-- **`pre-commit` hook** (recommended, manual install) runs `pnpm run format:check` only — must stay under 2 s. Heavier checks (compile, lint) run in `pre-push` via the existing hook. To install:
-  ```bash
-  cat > .husky/pre-commit <<'EOF'
-  #!/usr/bin/env sh
-  pnpm run format:check
-  EOF
-  chmod +x .husky/pre-commit
-  ```
-- **IntelliJ run configuration** (recommended, manual install). Drop the following into `.idea/runConfigurations/Application__local_.xml` to get a checked-in, team-shared Run/Debug that auto-reloads classes on save:
-  ```xml
-  <component name="ProjectRunConfigurationManager">
-    <configuration default="false" name="Application (local)" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
-      <module name="hephaestus" />
-      <option name="ACTIVE_PROFILES" value="local" />
-      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="false" />
-      <option name="MAIN_CLASS_NAME" value="de.tum.in.www1.hephaestus.Application" />
-      <option name="UPDATE_ACTION_UPDATE_VALUE" value="UpdateClassesAndResources" />
-      <option name="FRAME_DEACTIVATION_UPDATE_VALUE" value="UpdateResources" />
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
-  </component>
-  ```
+- **No devtools.** Hot reload uses JVM HotSwap via the IDE — IntelliJ's Spring Boot run config with *Update Classes and Resources* on save (or *On Frame Deactivation*). Method-body edits reload; signature changes, new methods, and `@Configuration` edits require a full restart ([Spring Boot 4 hot-swapping ref](https://docs.spring.io/spring-boot/how-to/hotswapping.html)).
+- **`ddl-auto: validate`** for local. Liquibase owns DDL. If the validator fails on boot, your DB has drifted — recreate with `docker compose down -v && docker compose up -d`.
+- **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`, `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step regressions in CI.
+- **Maven build cache** is opt-in: `-Dmaven.build.cache.enabled=true` (CI does this). Default off until [MBUILDCACHE-118](https://issues.apache.org/jira/browse/MBUILDCACHE-118) lands.
+- **Pre-commit hook** (optional, install manually): `printf '#!/usr/bin/env sh\npnpm run format:check\n' > .husky/pre-commit && chmod +x .husky/pre-commit`. The existing `pre-push` hook runs the heavier `format:check && check` chain.
 
 ## Commands
 

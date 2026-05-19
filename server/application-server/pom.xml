@@ -393,8 +393,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <!-- `release` pins the bootclasspath to the chosen JDK and is strictly
-                         better than the legacy source/target pair on JDK 9+. -->
                     <release>${java.version}</release>
                     <!--
                         IMPORTANT: Set to false for ACTUAL incremental compilation!
@@ -694,10 +692,6 @@
                             <goal>prepare-agent</goal>
                         </goals>
                         <configuration>
-                            <!-- Skip attaching the JaCoCo agent (and its argLine substitution)
-                                 when coverage is off — which is the default for every
-                                 `mvn spring-boot:run` and most `mvn verify` invocations.
-                                 Saves agent class-load instrumentation overhead at boot. -->
                             <skip>${skipCoverage}</skip>
                         </configuration>
                     </execution>

@@ -1,24 +1,10 @@
-# Local development stack.
-#
-# Profiles:
-#   minimal (default) — postgres + keycloak. Daily driver.
-#   full              — additionally pulls in optional services (currently none; reserved
-#                       for nats/pgadmin/mailhog as they get added).
-#
-# Bring up:
-#   docker compose --profile minimal up -d
-#   docker compose --profile full up -d
-#
-# Or, from the repo root: `pnpm dev` orchestrates compose + server + webapp.
-#
-# IMPORTANT: After updating .env or realm config, run
-#   `docker compose --profile minimal down -v && docker compose --profile minimal up -d`
-# to clear Keycloak data and re-import the realm with new settings.
+# Local development stack. From the repo root: `pnpm dev` runs `docker compose up -d --wait`
+# then starts the server + webapp. After .env or realm-config changes:
+# `docker compose down -v && docker compose up -d`.
 
 services:
   postgres:
     image: 'postgres:16'
-    profiles: ['minimal', 'full']
     environment:
       POSTGRES_DB: hephaestus
       POSTGRES_PASSWORD: root
@@ -29,9 +15,6 @@ services:
       - app-network
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
-      # Idempotent init script: creates pg_trgm / uuid-ossp extensions on first boot.
-      # Only runs when the data directory is empty (Postgres' standard behaviour).
-      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U root -d hephaestus']
       interval: 5s
@@ -41,7 +24,6 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.5
-    profiles: ['minimal', 'full']
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin

@@ -19,24 +19,12 @@ spring:
 
     jpa:
         hibernate:
-            # Liquibase is the sole owner of schema migrations across every profile.
-            # `validate` makes any drift between the JPA model and the database fail-fast at
-            # boot (matching production's `none` discipline) instead of silently mutating dev
-            # DBs the way `update` did — which caused orphan Hibernate-synthesized UNIQUE
-            # constraints to accumulate on dev laptops. Prod overrides to `none` in
-            # `application-prod.yml`. To bootstrap a fresh local DB after schema changes:
-            # `docker compose --profile minimal down -v && docker compose --profile minimal up -d`.
+            # Liquibase owns DDL across every profile. `validate` makes drift fail-fast at boot;
+            # prod overrides to `none` in application-prod.yml. Fresh local DB after schema change:
+            # `docker compose down -v && docker compose up -d`.
             ddl-auto: validate
-        # Disable open-in-view to prevent lazy loading during view rendering
-        # and avoid the warning. Database queries should be completed in the service layer.
+        # Repository queries complete in the service layer; no lazy loading during view rendering.
         open-in-view: false
-
-        # spring.data.jpa.repositories.bootstrap-mode: deferred — tried during this audit
-        # and reverted. A servlet filter (WorkspaceContextFilter → WorkspaceMembershipService)
-        # injects jakarta.persistence.EntityManager via constructor. With `deferred` the
-        # EntityManager bean isn't ready when servlet filter beans resolve, and context refresh
-        # fails with NoSuchBeanDefinitionException. Re-enable only after migrating direct
-        # EntityManager constructor injections to @PersistenceContext or ObjectProvider<>.
 
         # show-sql: "true"
         properties:
@@ -49,9 +37,7 @@ spring:
 
     liquibase:
         change-log: classpath:db/master.xml
-        # Default to the `dev` context; prod overrides this in application-prod.yml.
-        # Used to gate one-shot data-backfill changesets (`context="backfill"`) so they
-        # don't fire on every boot. https://docs.liquibase.com/concepts/changelogs/attributes/contexts.html
+        # Gates `context="backfill"` one-shot changesets; prod overrides to `prod`.
         contexts: dev
 
     security:
@@ -538,10 +524,7 @@ resilience4j:
             gitlabGraphQl:
                 baseConfig: default
 
-# ═══════════════════════════════════════════════════════════════════════════
-# LOCAL PROFILE OVERRIDES (tracked defaults; per-developer secrets stay in the
-# gitignored application-local.yml)
-# ═══════════════════════════════════════════════════════════════════════════
+# Local profile (tracked defaults; per-developer secrets stay in gitignored application-local.yml).
 ---
 spring:
     config:
@@ -550,21 +533,14 @@ spring:
 
     docker:
         compose:
-            # Developers run `docker compose --profile minimal up -d` themselves (via
-            # `pnpm dev`). `spring.datasource.url` is set explicitly, so Spring does NOT
-            # need to parse compose.yaml. Disabling the compose integration entirely
-            # avoids both the ~0.3 s `docker compose ps` check on every boot AND the
-            # "No services defined ... with active profiles []" warning Spring emits
-            # when compose services declare a `profiles:` key.
+            # `pnpm dev` brings compose up explicitly; spring.datasource.url is set, so Spring
+            # never needs to parse compose.yaml.
             enabled: false
 
 management:
     endpoints:
         web:
             exposure:
-                # `startup` exposes the BufferingApplicationStartup timeline at
-                # `/actuator/startup`. Local-only — production stays unexposed.
-                # https://docs.spring.io/spring-boot/reference/features/spring-application.html#features.spring-application.startup-tracking
                 include: health,info,prometheus,metrics,startup
     endpoint:
         startup:
@@ -572,6 +548,5 @@ management:
 
 logging:
     level:
-        # Silence SpringDoc's two-line nag at boot ("/v3/api-docs enabled by default …").
-        # The endpoints are intentionally exposed in dev; the prod-disable instruction is irrelevant locally.
-        org.springframework.core.events.SpringDocAppInitializer: ERROR
+        # Silence SpringDoc's "endpoint enabled by default — disable in production" banner.
+        org.springdoc.core.events.SpringDocAppInitializer: ERROR

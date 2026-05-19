@@ -5,27 +5,13 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <!--
-        Drop orphan Hibernate-synthesized UNIQUE constraints on discussion / discussion_category.
-
-        Background: prior `Discussion`/`DiscussionCategory` entities declared `@UniqueConstraint`
-        WITHOUT an explicit `name`. Under `ddl-auto: update` (dev local) Hibernate's
-        `ImplicitNamingStrategy` synthesized hash-style names such as
-            uknlcwyn2relkgw95s8okgpkqrt   (discussion.repository_id+number)
-            uk6cjmvjyh5jc9bfnn8i9wggbo5   (discussion_category.repository_id+slug)
-        in parallel with the Liquibase-managed `uq_discussion_repo_number` and
-        `uq_discussion_category_repo_slug`. With `validate` mode and explicit `name=` on the
-        entities (introduced alongside this changeset), the orphans must go.
-
-        Idempotent: `IF EXISTS` for the known names, plus a defensive scan dropping any
-        `uk[a-z0-9]{20,}` named UNIQUE constraint on the two tables that may exist from
-        earlier `ddl-auto: update` runs against revisions we no longer have.
-
-        Production never had these constraints (prod runs `ddl-auto: none`); on prod this
-        changeset is a no-op. On dev DBs it cleans up the accumulated drift.
-    -->
-    <changeSet author="FelixTJDietrich" id="1779173113243-1" context="dev or prod">
-        <comment>Drop orphan Hibernate-synthesized UNIQUE constraints on discussion / discussion_category</comment>
+    <changeSet author="FelixTJDietrich" id="1779173113243-1">
+        <comment>
+            Drop orphan Hibernate-synthesized UNIQUE constraints on discussion / discussion_category
+            that accumulated under ddl-auto:update alongside the Liquibase-managed
+            uq_discussion_repo_number / uq_discussion_category_repo_slug. Idempotent (IF EXISTS);
+            no-op on production (which always ran ddl-auto:none).
+        </comment>
         <sql dbms="postgresql" splitStatements="false">
             ALTER TABLE discussion DROP CONSTRAINT IF EXISTS uknlcwyn2relkgw95s8okgpkqrt;
             ALTER TABLE discussion_category DROP CONSTRAINT IF EXISTS uk6cjmvjyh5jc9bfnn8i9wggbo5;
@@ -49,11 +35,7 @@
             END
             $$;
         </sql>
-        <rollback>
-            <!-- Intentionally empty: the orphan constraints are duplicates of named ones;
-                 there is no meaningful rollback. Restore from backup if absolutely needed. -->
-            <comment>No rollback: dropped constraints were duplicates of the named uq_* constraints</comment>
-        </rollback>
+        <rollback/>
     </changeSet>
 
 </databaseChangeLog>
