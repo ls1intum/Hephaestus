@@ -31,23 +31,15 @@ public class SpringAsyncConfig implements AsyncConfigurer {
 
     /**
      * Default async executor for @Async methods (e.g., activity event listeners).
-     * <p>
-     * Uses ThreadPoolTaskExecutor with graceful shutdown to prevent race conditions
-     * where async tasks attempt to access EntityManagerFactory after it's closed.
-     * <p>
-     * <b>Graceful shutdown behavior:</b>
-     * <ul>
-     *   <li>On shutdown, executor stops accepting new tasks</li>
-     *   <li>Waits up to 30 seconds for running tasks to complete</li>
-     *   <li>EntityManagerFactory stays open until all async tasks finish</li>
-     * </ul>
-     * <p>
-     * Pool sizing rationale:
-     * <ul>
-     *   <li>Core 10: Handles steady stream of activity events</li>
-     *   <li>Max 50: Bursts during sync operations with many domain events</li>
-     *   <li>Queue 500: Buffer for spikes, prevents rejection under load</li>
-     * </ul>
+     *
+     * <p>Intentionally a bounded ThreadPoolTaskExecutor even when
+     * {@code spring.threads.virtual.enabled=true} flips the auto-configured one to
+     * {@code SimpleAsyncTaskExecutor}; auto-config backs off via {@code @ConditionalOnMissingBean}.
+     * Boundedness here is load-shedding: a runaway burst of activity events cannot create
+     * thousands of in-flight tasks racing the EntityManagerFactory close.
+     *
+     * <p>{@code setWaitForTasksToCompleteOnShutdown(true)} keeps EMF open until in-flight tasks
+     * finish — prevents "EntityManagerFactory is closed" races at shutdown.
      */
     @Bean(name = TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME)
     public AsyncTaskExecutor applicationTaskExecutor() {
