@@ -191,7 +191,7 @@ public class GitDiffOperations {
         });
     }
 
-    /** One path per line; renames return the new path. */
+    /** One path per line; renames return the new path (matches {@code git diff --name-only}). */
     @Nullable
     public String diffNameOnly(Path repoPath, String baseRef, String headRef) {
         return withRepo(repoPath, "diffNameOnly", repo -> {
@@ -208,7 +208,7 @@ public class GitDiffOperations {
                     treeIterator(reader, walk, range[0]),
                     treeIterator(reader, walk, range[1])
                 )) {
-                    out.append(displayPath(entry)).append('\n');
+                    out.append(singlePath(entry)).append('\n');
                 }
             }
             return out.toString();
@@ -280,6 +280,15 @@ public class GitDiffOperations {
             case RENAME, COPY -> entry.getOldPath() + " => " + entry.getNewPath();
             default -> entry.getNewPath();
         };
+    }
+
+    /**
+     * Single-path form for {@code --name-only}-style output: renames return only the new path
+     * (deletes return the old path), so downstream {@code diffFiles.contains(path)} checks against
+     * concrete file paths succeed even when the file was renamed.
+     */
+    private static String singlePath(DiffEntry entry) {
+        return entry.getChangeType() == DiffEntry.ChangeType.DELETE ? entry.getOldPath() : entry.getNewPath();
     }
 
     /**
