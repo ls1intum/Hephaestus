@@ -144,7 +144,7 @@ public class AgentJobExecutor {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Order(2) // Must run after AgentNatsConfiguration.ensureStreamAndConsumer() which uses @Order(1)
+    @Order(2) // Must run after AgentNatsConsumerConfig.ensureStreamAndConsumer() which uses @Order(1)
     public void start() {
         if (!running.compareAndSet(false, true)) {
             return;

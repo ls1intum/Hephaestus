@@ -62,8 +62,9 @@ public class WorkspaceScopedTables {
         SessionFactoryImplementor sf = entityManagerFactory
             .unwrap(SessionFactory.class)
             .unwrap(SessionFactoryImplementor.class);
+        Set<EntityType<?>> entities = entityManagerFactory.getMetamodel().getEntities();
         Set<String> tables = new TreeSet<>();
-        for (EntityType<?> entity : entityManagerFactory.getMetamodel().getEntities()) {
+        for (EntityType<?> entity : entities) {
             Class<?> javaType = entity.getJavaType();
             if (javaType == null) continue;
             EntityPersister persister = sf.getMappingMetamodel().getEntityDescriptor(javaType);
@@ -71,6 +72,17 @@ public class WorkspaceScopedTables {
             if (!GLOBAL_TABLES.contains(tableName)) {
                 tables.add(tableName);
             }
+        }
+        // Fail-fast: an empty result with entities present means the Hibernate API call
+        // chain (currently @Incubating MappingMetamodel) silently regressed. Silently
+        // empty scopedTables turns the WorkspaceStatementInspector into a no-op, which
+        // is the worst possible failure mode for a security control.
+        if (tables.isEmpty() && !entities.isEmpty()) {
+            throw new IllegalStateException(
+                "WorkspaceScopedTables populated zero scoped tables from " + entities.size()
+                    + " entities. Tenancy enforcement would silently disable. "
+                    + "Check Hibernate MappingMetamodel API compatibility."
+            );
         }
         this.scopedTables = Set.copyOf(tables);
         log.info(

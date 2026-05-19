@@ -16,42 +16,20 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 
 /**
  * Agent NATS stream + durable pull consumer setup. Worker-only.
  *
- * <p>Split out from the original {@code AgentNatsConfiguration} so that the connection
- * bean can stay always-on for publishers while the stream + consumer setup is gated by
- * the worker runtime role. With the previous monolithic config:
- * <ul>
- *   <li>A worker-only deploy (server role disabled) would still try to publish via the
- *       same configuration class — circular gating.</li>
- *   <li>A server-only deploy would attempt to create the agent NATS consumer it doesn't
- *       run — noisy logs and wasted bootstrap.</li>
- * </ul>
- *
- * <p>This split aligns with the {@code hephaestus.runtime.worker.enabled} flag — the
- * collapsed gate identified in the principal-engineer pressure-test (two flags for one
- * concern = config bug). The legacy {@code hephaestus.agent.nats.enabled} still scopes
- * the CONNECTION (separate from consumer wiring) for the rare case where NATS is offline
- * entirely; in normal operation worker enabled implies consumer setup runs.
- *
- * <p>Stream bootstrap is idempotent ({@code updateStream}/{@code addStream} fallback) and
- * logs an ERROR on config-mismatch races. For multi-replica worker scaling, gate
- * bootstrap with {@code hephaestus.agent.nats.bootstrap-stream=false} on replicas N+1
- * (future operator decision; default true today since worker is single-replica).
+ * <p>Stream bootstrap is idempotent ({@code updateStream} → {@code addStream} fallback);
+ * config-mismatch races are logged at ERROR. Multi-replica workers should gate stream
+ * creation via {@code hephaestus.agent.nats.bootstrap-stream=false} on replicas N+1 (not
+ * needed today — worker is single-replica).
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
-@ConditionalOnProperty(
-    name = RuntimeRole.WORKER_PROPERTY,
-    havingValue = "true",
-    matchIfMissing = true
-)
-@Profile("!specs")
+@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class AgentNatsConsumerConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AgentNatsConsumerConfig.class);

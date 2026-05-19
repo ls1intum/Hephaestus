@@ -30,7 +30,4 @@ public final class RuntimeRole {
      * credentials on the coordinator (see ADR 0006).
      */
     public static final String SANDBOX_LLM_PROXY_PROPERTY = "hephaestus.sandbox.llm-proxy.enabled";
-
-    /** {@code matchIfMissing} value used on every role-level @ConditionalOnProperty. */
-    public static final boolean DEFAULT_ENABLED = true;
 }

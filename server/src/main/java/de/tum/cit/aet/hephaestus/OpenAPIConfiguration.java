@@ -27,9 +27,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * OpenAPI configuration: processes application-server DTOs (strips the {@code DTO}
- * suffix from schema names and {@code $ref}s) and normalises paths (workspace-slug
- * parameter, tag cleanup, WorkspaceContext filtering).
+ * OpenAPI configuration: processes server DTOs (strips the {@code DTO} suffix from schema
+ * names and {@code $ref}s) and normalises paths (workspace-slug parameter, tag cleanup,
+ * WorkspaceContext filtering).
  */
 @Configuration
 @OpenAPIDefinition(
@@ -94,12 +94,12 @@ public class OpenAPIConfiguration {
     }
 
     /**
-     * Process application-server schemas: include DTOs and remove suffix.
+     * Process server schemas: include DTOs and remove suffix.
      */
     private void processApplicationServerSchemas(OpenAPI openApi) {
         var components = openApi.getComponents();
         if (components == null || components.getSchemas() == null) {
-            log.warn("No schemas found in application-server spec");
+            log.warn("No schemas found in server OpenAPI spec");
             return;
         }
 

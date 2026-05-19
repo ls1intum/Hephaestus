@@ -9,24 +9,25 @@ import java.lang.annotation.Target;
 /**
  * Marks a repository or repository method as intentionally workspace-agnostic.
  *
- * <p>Use this to indicate that the annotated element legitimately does not filter by workspace.
- * Architecture tests skip validation for annotated elements, and at runtime
- * {@code WorkspaceAgnosticAspect} opens a bypass on the thread so
- * {@code WorkspaceStatementInspector} does not flag the emitted SQL.
+ * <p>Effects:
+ * <ul>
+ *   <li>Architecture tests skip workspace-filter validation for annotated elements.</li>
+ *   <li>{@link de.tum.cit.aet.hephaestus.core.tenancy.WorkspaceAgnosticAspect} opens a
+ *       {@code TenancyBypass} scope for the duration of the annotated call, so
+ *       {@code WorkspaceStatementInspector} does not flag the emitted SQL.</li>
+ * </ul>
  *
  * <p><b>When to use:</b>
  *
  * <ul>
- *   <li>Lookup tables (UserRepository, LabelRepository)
- *   <li>Sync operations that find by external GitHub ID
- *   <li>Cross-workspace queries for admin operations
+ *   <li>Lookup tables (UserRepository, LabelRepository)</li>
+ *   <li>Sync operations that find by external GitHub ID</li>
+ *   <li>Cross-workspace queries for admin operations</li>
  * </ul>
  *
- * <p><b>Provide a reason:</b> Always document why this is workspace-agnostic.
- *
- * <p><b>Load-bearing at runtime:</b> dropping the annotation from a repository that issues
- * cross-workspace queries will cause {@code TenancyViolationException} under
- * {@code hephaestus.tenancy.enforcement=throw}. The annotation is not just documentation.
+ * <p>The annotation is load-bearing at runtime: dropping it from a repository that queries
+ * a workspace-scoped table causes {@code TenancyViolationException} under
+ * {@code hephaestus.tenancy.enforcement=throw}.
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
@@ -34,11 +35,4 @@ import java.lang.annotation.Target;
 public @interface WorkspaceAgnostic {
     /** Reason why this is intentionally workspace-agnostic. */
     String value();
-
-    /**
-     * Whether the AOP aspect should open a {@code TenancyBypass} scope for the duration of
-     * the annotated call. Set to {@code false} ONLY if the annotated code path provably
-     * never emits SQL against a workspace-scoped table.
-     */
-    boolean runtimeBypass() default true;
 }

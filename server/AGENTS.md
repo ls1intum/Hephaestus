@@ -1,4 +1,4 @@
-# Application Server
+# Server
 
 Spring Boot 4 backend providing the REST API for Hephaestus.
 

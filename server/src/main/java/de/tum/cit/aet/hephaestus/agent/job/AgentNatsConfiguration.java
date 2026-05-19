@@ -11,22 +11,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 
 /**
- * Agent NATS connection bean — always-on whenever {@code hephaestus.agent.nats.enabled}
- * is true. Used by anyone who publishes to the agent subjects (server-side
- * {@code AgentJobSubmitter}, worker-side cancel handler, future zombie sweeper republish).
- *
- * <p>Split out from the original {@code AgentNatsConfiguration} so that publishers can
- * acquire the connection without dragging in the worker-only stream + consumer setup
- * (see {@link AgentNatsConsumerConfig}). Per ADR 0005 + pressure-test finding: gating
- * publishers behind the worker role would break server-side agent dispatch the moment
- * server and worker run as separate JVMs.
+ * Agent NATS connection bean — always on when {@code hephaestus.agent.nats.enabled=true}.
+ * Acquired by publishers (server-side {@code AgentJobSubmitter}) and consumers
+ * (worker-side {@link AgentNatsConsumerConfig}); kept separate from consumer wiring so a
+ * server-only deploy can still publish without spinning up the stream + pull consumer.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
-@Profile("!specs")
 @EnableConfigurationProperties(AgentNatsProperties.class)
 public class AgentNatsConfiguration {
 

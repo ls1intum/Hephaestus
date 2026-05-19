@@ -6,21 +6,23 @@
 
 ## Context
 
-The Java code under `server/src/main/java/` used `de.tum.in.www1.hephaestus` —
-a legacy TUM naming convention referencing the "Informatics, chair www1" structure.
-That chair structure has since been reorganized; the current owner is the AET
-(Applied Education Technologies) chair at the CIT department, with research website
-`aet.cit.tum.de` and prod domain `hephaestus.aet.cit.tum.de`.
+The Java code under `server/src/main/java/` used `de.tum.in.www1.hephaestus` — a legacy
+TUM naming convention referencing the "Informatics, chair www1" structure. That structure
+has since been reorganized into CIT (Computation, Information and Technology) with
+multiple chairs at `*.cit.tum.de`. The legacy package name no longer reflects organisation
+or ownership.
 
-The mismatch between the source-tree package name and the chair / prod-domain name
-was a small but durable papercut: every new contributor asked about it; every PR
-review touched lines that don't match the org any more.
+The current `hephaestus` host URL (`application.yml#host-url`) is
+`hephaestus.ase.cit.tum.de` (Applied Software Engineering chair). The research-group
+website the maintainers identify with is `aet.cit.tum.de` (Applied Education Technologies).
+The two TUM chair acronyms aren't interchangeable; aligning the package with one of them
+is an explicit ownership statement.
 
 ## Decision drivers
 
-- Vanity is real: prod domain alignment matters to the maintainers
-- One-shot rename minimizes blast radius
-- Modulith adoption is the right moment (we're already touching every package-info)
+- The legacy `de.tum.in.www1` name is unambiguously stale (org structure no longer exists).
+- One-shot rename minimises blast radius.
+- Modulith adoption is the right moment (we already touch every `package-info`).
 
 ## Considered options
 
@@ -40,8 +42,11 @@ all 1,121 Java source files in one mechanical commit.
 - Forks / external consumers (none today) would need to rebase — acceptable cost.
 - Dynamic FQN references (Spring config `logging.level` keys, OpenAPI codegen targets, achievements-schema JSON `$ref`s) were swept in the same commit.
 - `git log --follow` still tracks individual files across the rename.
+- The host URL in `application.yml` still points at `hephaestus.ase.cit.tum.de`. Aligning
+  it with the chosen package (e.g. `hephaestus.aet.cit.tum.de`) is a deploy-side decision
+  with DNS, certificate, and link-rot implications — tracked separately from this rename.
 
 ## Revisit trigger
 
-Next chair reorganization at TUM (would re-trigger the same papercut). Until then,
-this is locked in.
+A future chair reorganisation, or a decision to move the deploy domain (which would close
+the package-vs-host-URL gap noted above).
