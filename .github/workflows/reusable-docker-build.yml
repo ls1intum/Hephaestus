@@ -171,16 +171,17 @@ jobs:
             MODULE_FLAG="-pl ${{ inputs.maven-module }} -am"
           fi
           ./mvnw -B -ntp $MODULE_FLAG \
-            spring-boot:build-image -Pproduction -DskipTests=true \
+            spring-boot:build-image -DskipTests=true \
             -Dspring-boot.build-image.imageName="$PER_ARCH_TAG" \
             -Dspring-boot.build-image.imagePlatform="${{ matrix.platform }}" \
             -Dspring-boot.build-image.publish=true \
             -Ddocker.publishRegistry.url="$DOCKER_PUBLISH_REGISTRY_URL" \
             -Ddocker.publishRegistry.username="$DOCKER_PUBLISH_REGISTRY_USERNAME" \
             -Ddocker.publishRegistry.password="$DOCKER_PUBLISH_REGISTRY_PASSWORD"
-          # Resolve the per-arch manifest digest from the registry — used by the merge job to build
-          # a multi-arch manifest list, exactly as the Dockerfile path does.
-          DIGEST="sha256:$(docker buildx imagetools inspect --raw "$PER_ARCH_TAG" | sha256sum | awk '{print $1}')"
+          # Read the registry's per-arch manifest digest. `imagetools inspect --format` returns the
+          # canonical digest the registry indexed; sha256-summing --raw output is unsafe because any
+          # whitespace normalization yields a different digest than the registry's.
+          DIGEST=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$PER_ARCH_TAG")
           if [[ ! "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "::error::Refusing to publish: per-arch digest is not a sha256:<64 hex>"
             exit 1
@@ -299,7 +300,7 @@ jobs:
           IMAGE_TAG_REF: ${{ inputs.registry }}/${{ inputs.image-name }}:${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
-          DIGEST="sha256:$(docker buildx imagetools inspect --raw "$IMAGE_TAG_REF" | sha256sum | awk '{print $1}')"
+          DIGEST=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$IMAGE_TAG_REF")
           if [[ ! "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "::error::Refusing to publish: manifest digest is not a sha256:<64 lowercase hex> value (got: ${DIGEST:-<empty>})"
             exit 1

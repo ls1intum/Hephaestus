@@ -35,9 +35,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class StartupBudgetIntegrationTest {
 
     private static final Duration PER_BEAN_CEILING = Duration.ofSeconds(3);
-    // Smoke ceiling: catches dramatic regressions only. Production target is ~8s warm; CI noise
-    // and Testcontainers Postgres cold-start make a tight bound flaky here.
+    // Catches dramatic regressions; CI noise + Testcontainers Postgres cold-start preclude a
+    // tight upper bound. Prod target is ~8s warm.
     private static final Duration WHOLE_APP_CEILING = Duration.ofSeconds(30);
+    // Catches accidental work removal — a successful Liquibase + bean graph boot can't complete
+    // in under this. Tripping the floor means something fundamental is skipped.
+    private static final Duration WHOLE_APP_FLOOR = Duration.ofSeconds(2);
     // spring.beans.instantiate is the per-bean creation step; each fires once per bean. See
     // https://docs.spring.io/spring-framework/reference/core/aot.html#spring-startup-events
     private static final String BEAN_INSTANTIATE = "spring.beans.instantiate";
@@ -84,6 +87,6 @@ class StartupBudgetIntegrationTest {
             .orElseThrow(() -> new AssertionError("no terminated startup events captured"));
 
         Duration wallClock = Duration.between(earliest, latest);
-        assertThat(wallClock).isLessThan(WHOLE_APP_CEILING);
+        assertThat(wallClock).isBetween(WHOLE_APP_FLOOR, WHOLE_APP_CEILING);
     }
 }

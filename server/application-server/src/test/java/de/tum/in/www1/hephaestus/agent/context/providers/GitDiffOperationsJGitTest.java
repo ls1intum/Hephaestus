@@ -112,8 +112,8 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
         assertThat(log).isNotNull();
         String[] lines = log.trim().split("\n");
         assertThat(lines).hasSize(2);
-        assertThat(lines[0]).matches("[0-9a-f]{7,}\tadd c");
-        assertThat(lines[1]).matches("[0-9a-f]{7,}\tchange a, add b");
+        assertThat(lines[0]).matches("[0-9a-f]{7}\tadd c");
+        assertThat(lines[1]).matches("[0-9a-f]{7}\tchange a, add b");
         assertThat(laterSha).startsWith(lines[0].split("\t")[0]);
     }
 
