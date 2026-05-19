@@ -129,7 +129,6 @@ celerybeat.pid
 # Environments
 .env
 .venv
-docker/agent-image-pin.local.env
 env/
 venv/
 ENV/

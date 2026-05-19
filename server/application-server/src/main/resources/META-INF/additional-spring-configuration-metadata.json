@@ -180,12 +180,12 @@
     {
       "name": "hephaestus.agent.image.pull-policy",
       "type": "de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy",
-      "description": "Startup pull behaviour: IF_NOT_PRESENT (default), ALWAYS, or NEVER."
+      "description": "Startup pull behaviour."
     },
     {
       "name": "hephaestus.agent.image.require-digest",
       "type": "java.lang.Boolean",
-      "description": "When true, AgentImagePinGuard fails startup unless 'reference' is digest-pinned. Production sets this to true."
+      "description": "When true, AgentImagePinGuard fails startup unless 'reference' is digest-pinned."
     }
   ],
   "hints": [
@@ -240,7 +240,7 @@
         },
         {
           "value": "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:0000000000000000000000000000000000000000000000000000000000000000",
-          "description": "Production — digest-pinned (replace zeros with the release digest from docker/agent-image-pin.env)"
+          "description": "Production — digest-pinned. Imported by spring.config.import from the signed release asset."
         }
       ]
     }

@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(prefix = "hephaestus.agent.image", name = "require-digest", havingValue = "true")
 public class AgentImagePinGuard {
 
-    private static final Pattern DIGEST = Pattern.compile(".+@sha256:[a-f0-9]{64}$");
+    private static final Pattern DIGEST = Pattern.compile("^[a-z0-9][a-z0-9.\\-_/:]*@sha256:[a-f0-9]{64}$");
 
     public AgentImagePinGuard(AgentImageProperties properties) {
         if (!DIGEST.matcher(properties.reference()).matches()) {
