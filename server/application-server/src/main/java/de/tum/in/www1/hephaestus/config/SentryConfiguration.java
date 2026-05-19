@@ -5,10 +5,22 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
 
+/**
+ * Initializes Sentry error reporting at startup when {@code hephaestus.sentry.dsn} is configured.
+ *
+ * <p>{@link ConditionalOnProperty} keeps the bean out of the container entirely when no DSN is
+ * set, which is the common local-dev / specs-profile case. {@code @Lazy(false)} ensures the
+ * {@code Sentry.init} call runs during context refresh rather than at first reference, so the
+ * very first exception is captured.
+ */
 @Configuration
+@ConditionalOnProperty(prefix = "hephaestus.sentry", name = "dsn")
+@Lazy(false)
 public class SentryConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(SentryConfiguration.class);

@@ -84,7 +84,6 @@
         <java-jwt.version>4.5.2</java-jwt.version>
         <graphql-codegen.version>5.10.0</graphql-codegen.version>
         <postgresql.version>42.7.11</postgresql.version>
-        <therapi.version>0.15.0</therapi.version>
     </properties>
     <dependencies>
         <dependency>
@@ -171,12 +170,6 @@
             <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
-            <scope>runtime</scope>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>${postgresql.version}</version>
@@ -258,11 +251,6 @@
             <scope>test</scope>
         </dependency>
 
-        <dependency>
-            <groupId>com.github.therapi</groupId>
-            <artifactId>therapi-runtime-javadoc</artifactId>
-            <version>${therapi.version}</version>
-        </dependency>
         <dependency>
             <groupId>io.nats</groupId>
             <artifactId>jnats</artifactId>
@@ -405,8 +393,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <!-- `release` pins the bootclasspath to the chosen JDK and is strictly
+                         better than the legacy source/target pair on JDK 9+. -->
+                    <release>${java.version}</release>
                     <!--
                         IMPORTANT: Set to false for ACTUAL incremental compilation!
                         Due to Maven bug MCOMPILER-209, the behavior is inverted:
@@ -431,11 +420,6 @@
                         <path>
                             <groupId>org.springframework.boot</groupId>
                             <artifactId>spring-boot-configuration-processor</artifactId>
-                        </path>
-                        <path>
-                            <groupId>com.github.therapi</groupId>
-                            <artifactId>therapi-runtime-javadoc-scribe</artifactId>
-                            <version>${therapi.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
@@ -705,9 +689,17 @@
                 <version>0.8.14</version>
                 <executions>
                     <execution>
+                        <id>default-prepare-agent</id>
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                        <configuration>
+                            <!-- Skip attaching the JaCoCo agent (and its argLine substitution)
+                                 when coverage is off — which is the default for every
+                                 `mvn spring-boot:run` and most `mvn verify` invocations.
+                                 Saves agent class-load instrumentation overhead at boot. -->
+                            <skip>${skipCoverage}</skip>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>report</id>
@@ -715,6 +707,9 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
+                        <configuration>
+                            <skip>${skipCoverage}</skip>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>check-coverage</id>

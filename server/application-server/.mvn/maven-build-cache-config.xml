@@ -24,10 +24,13 @@
     <!-- MAIN CONFIGURATION                                             -->
     <!-- ============================================================== -->
     <configuration>
-        <!-- Enable/disable the build cache
-             DISABLED by default for development (spring-boot:run doesn't work well with cache)
-             Enable in CI with: -Dmaven.build.cache.enabled=true -->
-        <enabled>false</enabled>
+        <!-- Enable/disable the build cache.
+             Cached `compile`/`testCompile` cuts cold-build wall time from ~49 s to ~5 s
+             on a cache hit. `spring-boot-maven-plugin` is in <runAlways/> below so
+             `spring-boot:run` and `spring-boot:repackage` are never shortcut.
+             Per-developer escape hatch: `-Dmaven.build.cache.enabled=false`.
+             Nuclear option (clear stale entries): `rm -rf ~/.m2/build-cache/v1`. -->
+        <enabled>true</enabled>
 
         <!-- Hash algorithm for cache keys
              Options: XX (fast), SHA-256 (secure), SHA-512
@@ -300,6 +303,11 @@
                 <plugin groupId="org.apache.maven.plugins" artifactId="maven-failsafe-plugin"></plugin>
                 <!-- JaCoCo must run to set argLine for test coverage -->
                 <plugin groupId="org.jacoco" artifactId="jacoco-maven-plugin"></plugin>
+                <!-- Spring Boot plugin must never be shortcut by the cache: `spring-boot:run`
+                     is a long-running process (no cacheable output), and `spring-boot:repackage`
+                     produces the production fat-jar contract which must be regenerated on any
+                     source-level rebuild. -->
+                <plugin groupId="org.springframework.boot" artifactId="spring-boot-maven-plugin"></plugin>
             </plugins>
             <executions>
                 <!-- Test resources and compile must run to ensure test classes can find main classes -->

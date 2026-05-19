@@ -1,17 +1,62 @@
 # Application Server
 
-Spring Boot 3.5 backend providing the REST API for Hephaestus.
+Spring Boot 4 backend providing the REST API for Hephaestus.
+
+## Local development loop
+
+The fastest way to a working dev stack is **from the repo root**:
+
+```bash
+pnpm dev
+```
+
+It runs `docker compose --profile minimal up -d --wait` (Postgres + Keycloak, with healthchecks), then `mvn spring-boot:run` (server) + `pnpm --filter webapp dev` (webapp) in parallel. A single Ctrl-C terminates all three children.
+
+### What changed (vs the prior loop)
+
+- **`spring-boot-devtools` removed.** It was disabled (`restart.enabled=false`) but still on the classpath, paying the dual-classloader cost for no benefit. Replacement: a checked-in IntelliJ run configuration with **Update Classes and Resources** on save. Per [Spring Boot 4 hot-swapping reference](https://docs.spring.io/spring-boot/how-to/hotswapping.html), JVM HotSwap reloads **method-body edits** automatically; **signature changes, new methods, new fields, and `@Configuration` edits still require a full restart**.
+- **`spring.docker.compose.lifecycle-management: none`** in `application-local.yml`. Spring no longer manages container lifecycle — you run `docker compose --profile minimal up -d` yourself (or via `pnpm dev`).
+- **`ddl-auto: validate`** for local (was `update`). Matches production's `none` discipline. If you see Hibernate `SchemaValidator` failures on boot, your local DB has drifted — bootstrap fresh with `docker compose --profile minimal down -v && docker compose --profile minimal up -d`.
+- **`spring.data.jpa.repositories.bootstrap-mode: deferred`** — Hibernate `EntityManagerFactory` builds off the critical path; safe in every profile.
+- **Maven build cache enabled** (`.mvn/maven-build-cache-config.xml`). Cold `mvn clean compile` drops from ~49 s to ~5 s on a cache hit. Escape hatches: `-Dmaven.build.cache.enabled=false` per-invocation; `rm -rf ~/.m2/build-cache/v1` to nuke.
+- **`BufferingApplicationStartup`** wired in `Application.main()`. In local profile only, `GET /actuator/startup` returns the full timeline so you can find slow beans. `StartupBudgetIntegrationTest` is the regression guard in CI.
+- **`pre-commit` hook** (recommended, manual install) runs `pnpm run format:check` only — must stay under 2 s. Heavier checks (compile, lint) run in `pre-push` via the existing hook. To install:
+  ```bash
+  cat > .husky/pre-commit <<'EOF'
+  #!/usr/bin/env sh
+  pnpm run format:check
+  EOF
+  chmod +x .husky/pre-commit
+  ```
+- **IntelliJ run configuration** (recommended, manual install). Drop the following into `.idea/runConfigurations/Application__local_.xml` to get a checked-in, team-shared Run/Debug that auto-reloads classes on save:
+  ```xml
+  <component name="ProjectRunConfigurationManager">
+    <configuration default="false" name="Application (local)" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <module name="hephaestus" />
+      <option name="ACTIVE_PROFILES" value="local" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="false" />
+      <option name="MAIN_CLASS_NAME" value="de.tum.in.www1.hephaestus.Application" />
+      <option name="UPDATE_ACTION_UPDATE_VALUE" value="UpdateClassesAndResources" />
+      <option name="FRAME_DEACTIVATION_UPDATE_VALUE" value="UpdateResources" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  ```
 
 ## Commands
 
-| Task              | Command                                         |
-| ----------------- | ----------------------------------------------- |
-| Run locally       | `mvn spring-boot:run`                           |
-| Unit tests        | `mvn test`                                      |
-| Integration tests | `mvn verify`                                    |
-| Live GitHub tests | `mvn test -Plive-tests`                         |
+| Task              | Command                                          |
+| ----------------- | ------------------------------------------------ |
+| Run full stack    | `pnpm dev` (from repo root)                      |
+| Run server only   | `mvn spring-boot:run` (in `server/application-server/`) |
+| Unit tests        | `mvn test`                                       |
+| Integration tests | `mvn verify`                                     |
+| Live GitHub tests | `mvn test -Plive-tests`                          |
 | Format            | `pnpm run format:java`                           |
 | Generate OpenAPI  | `pnpm run generate:api:application-server:specs` |
+| Startup timeline  | `curl http://localhost:8080/actuator/startup`    |
 
 ### Port Conflicts (OpenAPI Generation)
 

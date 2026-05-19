@@ -30,7 +30,10 @@ import org.springframework.lang.NonNull;
  * GitHub's GraphQL API doesn't expose databaseId for DiscussionCategory.
  */
 @Entity
-@Table(name = "discussion_category", uniqueConstraints = @UniqueConstraint(columnNames = { "repository_id", "slug" }))
+@Table(
+    name = "discussion_category",
+    uniqueConstraints = @UniqueConstraint(name = "uq_discussion_category_repo_slug", columnNames = { "repository_id", "slug" })
+)
 @Getter
 @Setter
 @NoArgsConstructor
