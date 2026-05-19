@@ -159,6 +159,7 @@ jobs:
       - name: Build and push (Paketo Buildpacks + CDS)
         id: build-buildpacks
         if: inputs.use-buildpacks
+        working-directory: ${{ inputs.maven-module }}
         env:
           DOCKER_PUBLISH_REGISTRY_URL: https://${{ inputs.registry }}
           DOCKER_PUBLISH_REGISTRY_USERNAME: ${{ github.actor }}
@@ -166,12 +167,7 @@ jobs:
         run: |
           set -euo pipefail
           PER_ARCH_TAG="${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}"
-          MODULE_FLAG=""
-          if [ -n "${{ inputs.maven-module }}" ]; then
-            MODULE_FLAG="-pl ${{ inputs.maven-module }} -am"
-          fi
-          ./mvnw -B -ntp $MODULE_FLAG \
-            spring-boot:build-image -DskipTests=true \
+          ./mvnw -B -ntp spring-boot:build-image -DskipTests=true \
             -Dspring-boot.build-image.imageName="$PER_ARCH_TAG" \
             -Dspring-boot.build-image.imagePlatform="${{ matrix.platform }}" \
             -Dspring-boot.build-image.publish=true \
