@@ -830,6 +830,11 @@
                         <env>
                             <BP_JVM_VERSION>21</BP_JVM_VERSION>
                             <BP_JVM_CDS_ENABLED>true</BP_JVM_CDS_ENABLED>
+                            <!-- Build-time only (not baked into the launcher). Activates the
+                                 cds-training profile so the training run's context refresh
+                                 succeeds without a Postgres reachable from the builder; Coolify's
+                                 runtime SPRING_PROFILES_ACTIVE=prod takes precedence in prod. -->
+                            <SPRING_PROFILES_ACTIVE>cds-training</SPRING_PROFILES_ACTIVE>
                         </env>
                     </image>
                 </configuration>
