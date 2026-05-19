@@ -10,7 +10,6 @@ import java.nio.file.Path;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeCommand;
 import org.eclipse.jgit.api.MergeResult;
-import org.eclipse.jgit.api.ResetCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -87,7 +86,13 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
         write("renamed-to.txt", "stable\n");
         git.rm().addFilepattern("renamed-from.txt").call();
         git.add().addFilepattern("renamed-to.txt").call();
-        String renameSha = git.commit().setMessage("rename").setAuthor("t", "t@e").setCommitter("t", "t@e").call().getName();
+        String renameSha = git
+            .commit()
+            .setMessage("rename")
+            .setAuthor("t", "t@e")
+            .setCommitter("t", "t@e")
+            .call()
+            .getName();
 
         String stat = ops.diffStat(repoDir, addSha, renameSha);
         assertThat(stat).isNotNull();

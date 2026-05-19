@@ -227,6 +227,9 @@ services:
       timeout: 10s
       retries: 10
       start_period: 10s
+    # Matches application.yml's SHUTDOWN_TIMEOUT default (20s) plus headroom so SIGTERM has time
+    # to drain in-flight requests before Docker SIGKILLs the launcher.
+    stop_grace_period: 30s
     logging:
       driver: "json-file"
       options:

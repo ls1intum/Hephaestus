@@ -4,7 +4,7 @@ import de.tum.in.www1.hephaestus.leaderboard.tasks.LeaguePointsUpdateTask;
 import de.tum.in.www1.hephaestus.leaderboard.tasks.SlackWeeklyLeaderboardTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
@@ -29,18 +29,18 @@ public class LeaderboardTaskScheduler {
 
     private final LeaderboardProperties leaderboardProperties;
     private final TaskScheduler taskScheduler;
-    private final SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask;
+    private final ObjectProvider<SlackWeeklyLeaderboardTask> slackWeeklyLeaderboardTaskProvider;
     private final LeaguePointsUpdateTask leaguePointsUpdateTask;
 
     public LeaderboardTaskScheduler(
         LeaderboardProperties leaderboardProperties,
         TaskScheduler taskScheduler,
-        @Autowired(required = false) SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask,
+        ObjectProvider<SlackWeeklyLeaderboardTask> slackWeeklyLeaderboardTaskProvider,
         LeaguePointsUpdateTask leaguePointsUpdateTask
     ) {
         this.leaderboardProperties = leaderboardProperties;
         this.taskScheduler = taskScheduler;
-        this.slackWeeklyLeaderboardTask = slackWeeklyLeaderboardTask;
+        this.slackWeeklyLeaderboardTaskProvider = slackWeeklyLeaderboardTaskProvider;
         this.leaguePointsUpdateTask = leaguePointsUpdateTask;
     }
 
@@ -65,27 +65,25 @@ public class LeaderboardTaskScheduler {
         scheduleLeaguePointsUpdate(cron);
     }
 
-    /**
-     * Schedule a Slack message to be sent at the end of every leaderboard cycle.
-     */
     private void scheduleSlackMessage(String cron) {
         if (!leaderboardProperties.notification().enabled()) {
             log.info("Skipped Slack message scheduling: reason=notificationsDisabled");
             return;
         }
 
-        if (slackWeeklyLeaderboardTask == null) {
+        SlackWeeklyLeaderboardTask task = slackWeeklyLeaderboardTaskProvider.getIfAvailable();
+        if (task == null) {
             log.warn("Skipped Slack message scheduling: reason=beanNotAvailable");
             return;
         }
 
-        if (!slackWeeklyLeaderboardTask.testSlackConnection()) {
+        if (!task.testSlackConnection()) {
             log.error("Failed to schedule Slack message: reason=connectionTestFailed");
             return;
         }
 
         log.info("Scheduled Slack message: cronExpression={}", cron);
-        scheduleSafely(slackWeeklyLeaderboardTask, new CronTrigger(cron), "Slack weekly leaderboard message");
+        scheduleSafely(task, new CronTrigger(cron), "Slack weekly leaderboard message");
     }
 
     private void scheduleLeaguePointsUpdate(String cron) {
