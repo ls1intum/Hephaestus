@@ -141,6 +141,17 @@ public class GlobalControllerAdvice {
     // FALLBACK HANDLER
     // ========================================================================
 
+    @ExceptionHandler(de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException.class)
+    ProblemDetail handleTenancyViolation(de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException ex) {
+        // Server bug — log full SQL context server-side, sanitize client-facing message.
+        log.error("Tenancy violation: unguardedTables={}", ex.unguardedTables(), ex);
+        return problem(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Internal server error",
+            "An unexpected error occurred. Please try again later."
+        );
+    }
+
     @ExceptionHandler(Exception.class)
     ProblemDetail handleGeneric(Exception exception) {
         // Log the full exception for debugging, but don't expose details to client

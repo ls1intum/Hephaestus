@@ -60,6 +60,11 @@ github:
 
 # Disable workspace bootstrapping during tests to prevent API calls
 hephaestus:
+    # Loud enforcement under test: any unguarded scoped-table query throws.
+    # Production runs in 'log' mode for the staging canary period; this override
+    # ensures tenancy bugs surface in CI rather than being masked.
+    tenancy:
+        enforcement: throw
     workspace:
         init-default: false # Disable PAT workspace bootstrap
     cors:
