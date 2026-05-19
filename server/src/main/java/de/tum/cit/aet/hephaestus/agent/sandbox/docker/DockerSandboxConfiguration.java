@@ -43,6 +43,11 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Configuration
 @ConditionalOnProperty(prefix = "hephaestus.sandbox", name = "enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnProperty(
+    name = de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole.WORKER_PROPERTY,
+    havingValue = "true",
+    matchIfMissing = true
+)
 @ConditionalOnClass(DockerClient.class)
 @EnableConfigurationProperties({ SandboxProperties.class, InteractiveSandboxProperties.class })
 public class DockerSandboxConfiguration {
