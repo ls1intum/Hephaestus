@@ -26,6 +26,11 @@ From the repo root: `pnpm dev`. It brings compose up with healthchecks, then run
 | Format            | `pnpm run format:java`                           |
 | Generate OpenAPI  | `pnpm run generate:api:application-server:specs` |
 | Startup timeline  | `curl http://localhost:8080/actuator/startup`    |
+| Build prod image  | `mvn spring-boot:build-image -Pproduction`       |
+
+### Container image
+
+The production image is built with Paketo Cloud Native Buildpacks (Application CDS enabled). The `<image>` block in `pom.xml` pins the builder; CI overrides by digest for reproducibility. See `docs/admin/buildpacks-cds-decision.md` for rationale (CDS-only on Java 21; Spring AOT processing deferred to Java 25 + JEP 483). There is no `Dockerfile` — local builds use the same Maven goal.
 
 ### Port Conflicts (OpenAPI Generation)
 
