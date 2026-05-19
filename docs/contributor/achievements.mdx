@@ -61,7 +61,7 @@ Each achievement definition specifies its evaluation criteria and progression re
 - **`parent`**: Allows defining achievement "chains" (e.g., needing 1 PR merged before unlocking the 3 PRs merged achievement).
 - **`isHidden`**: Used for secret achievements.
 - **`triggerEvents`**: The specific activity event types that should wake the evaluator.
-- **`evaluatorClass`**: The Java class in `de.tum.in.www1.hephaestus.achievement.evaluator` that handles progress parsing.
+- **`evaluatorClass`**: The Java class in `de.tum.cit.aet.hephaestus.achievement.evaluator` that handles progress parsing.
 - **`requirements`**: Determines the progress type. Typically `LinearAchievementProgress` (requires a target count) or `BinaryAchievementProgress` (unlocks immediately when conditions match).
 
 To add a new achievement, add it to `achievements.yml` and provide the corresponding `evaluatorClass` logic in the codebase if relying on custom logic.

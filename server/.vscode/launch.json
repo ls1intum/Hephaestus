@@ -14,7 +14,7 @@
       "type": "java",
       "name": "Application",
       "request": "launch",
-      "mainClass": "de.tum.in.www1.hephaestus.Application",
+      "mainClass": "de.tum.cit.aet.hephaestus.Application",
       "projectName": "hephaestus",
       "env": {
         "SPRING_PROFILES_ACTIVE": "local"

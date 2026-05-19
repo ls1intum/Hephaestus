@@ -1,0 +1,70 @@
+package de.tum.cit.aet.hephaestus.gitprovider.label;
+
+import de.tum.cit.aet.hephaestus.gitprovider.common.BaseGitServiceEntity;
+import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
+import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.springframework.lang.NonNull;
+
+@Entity
+@Table(
+    name = "label",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_label_repository_name", columnNames = { "repository_id", "name" }),
+        @UniqueConstraint(name = "uq_label_provider_native_id", columnNames = { "provider_id", "native_id" }),
+    }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@ToString(callSuper = true)
+public class Label extends BaseGitServiceEntity {
+
+    @NonNull
+    private String name;
+
+    private String description;
+
+    // 6-character hex code, without the leading #, identifying the color
+    @NonNull
+    private String color;
+
+    @ManyToMany(mappedBy = "labels")
+    @ToString.Exclude
+    private Set<Issue> issues = new HashSet<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "repository_id")
+    @ToString.Exclude
+    private Repository repository;
+
+    /**
+     * Timestamp of the last successful sync for this label from the Git provider.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this label
+     * was last synchronized via GraphQL. Used to implement sync cooldown logic
+     * and detect stale data.
+     */
+    private Instant lastSyncAt;
+
+    /**
+     * Removes this label from all referencing issues (required before deletion).
+     */
+    public void removeAllIssues() {
+        this.issues.forEach(issue -> issue.getLabels().remove(this));
+        this.issues.clear();
+    }
+}

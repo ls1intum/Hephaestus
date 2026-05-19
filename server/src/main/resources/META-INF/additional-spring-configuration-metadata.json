@@ -179,7 +179,7 @@
     },
     {
       "name": "hephaestus.agent.image.pull-policy",
-      "type": "de.tum.in.www1.hephaestus.agent.sandbox.ImagePullPolicy",
+      "type": "de.tum.cit.aet.hephaestus.agent.sandbox.ImagePullPolicy",
       "description": "Startup pull behaviour."
     },
     {

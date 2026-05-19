@@ -83,7 +83,7 @@ pnpm run generate:api:application-server:client
 ## Project Structure
 
 ```
-src/main/java/de/tum/in/www1/hephaestus/
+src/main/java/de/tum/cit/aet/hephaestus/
 ├── Application.java              # Entry point (@SpringBootApplication)
 ├── config/                       # @Configuration beans
 ├── workspace/                    # Multi-tenant workspace management

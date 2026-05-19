@@ -10,7 +10,7 @@
         <relativePath/>
         <!-- lookup parent from repository -->
     </parent>
-    <groupId>de.tum.in.www1</groupId>
+    <groupId>de.tum.cit.aet</groupId>
     <artifactId>hephaestus</artifactId>
     <version>0.0.0-development</version>
     <name>Hephaestus</name>
@@ -484,9 +484,9 @@
 
                             <!-- Output configuration -->
                             <outputDir>${project.build.directory}/generated-sources/graphql-github</outputDir>
-                            <packageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github</packageName>
-                            <apiPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.api</apiPackageName>
-                            <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.model
+                            <packageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.github</packageName>
+                            <apiPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.github.api</apiPackageName>
+                            <modelPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model
                             </modelPackageName>
                             <modelNamePrefix>GH</modelNamePrefix>
 
@@ -569,9 +569,9 @@
 
                             <!-- Output configuration (separate dir to avoid codegen cleanup conflicts) -->
                             <outputDir>${project.build.directory}/generated-sources/graphql-gitlab</outputDir>
-                            <packageName>de.tum.in.www1.hephaestus.gitprovider.graphql.gitlab</packageName>
-                            <apiPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.gitlab.api</apiPackageName>
-                            <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.gitlab.model
+                            <packageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.gitlab</packageName>
+                            <apiPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.gitlab.api</apiPackageName>
+                            <modelPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.gitlab.model
                             </modelPackageName>
                             <modelNamePrefix>GL</modelNamePrefix>
 
@@ -670,7 +670,7 @@
                                 <!-- Delete Relay files that depend on missing Query root type -->
                                 <delete failonerror="false">
                                     <fileset
-                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/gitprovider/graphql/github/model">
                                         <include name="RelayQueryRequest.java"/>
                                         <include name="RelayQueryResponse.java"/>
                                     </fileset>
@@ -682,7 +682,7 @@
                                     <substitution
                                             expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1"/>
                                     <fileset
-                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/gitprovider/graphql/github/model">
                                         <include name="ProjectPendingCardsParametrizedInput.java"/>
                                         <include name="IssueProjectCardsParametrizedInput.java"/>
                                         <include name="PullRequestProjectCardsParametrizedInput.java"/>
@@ -912,7 +912,7 @@
                     <username>root</username>
                     <password>root</password>
                     <referenceUrl>
-                        hibernate:spring:de.tum.in.www1.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
+                        hibernate:spring:de.tum.cit.aet.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
                     </referenceUrl>
                     <verbose>true</verbose>
                 </configuration>
