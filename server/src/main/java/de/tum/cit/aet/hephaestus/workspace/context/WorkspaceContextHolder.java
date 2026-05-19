@@ -18,48 +18,8 @@ public final class WorkspaceContextHolder {
 
     private static final ThreadLocal<WorkspaceContext> contextHolder = new ThreadLocal<>();
 
-    /**
-     * Counts nested bypass scopes opened by {@code @WorkspaceAgnostic} (or programmatic
-     * {@link #openBypass(String)} calls). When the depth is &gt; 0, the
-     * {@code WorkspaceStatementInspector} treats emitted SQL as exempt from
-     * {@code workspace_id} enforcement. Depth-counted so nested calls are safe.
-     */
-    private static final ThreadLocal<Integer> bypassDepth = ThreadLocal.withInitial(() -> 0);
-
     private WorkspaceContextHolder() {
         // Utility class
-    }
-
-    /**
-     * Open a workspace-agnostic bypass scope on the current thread. SQL emitted while the
-     * returned {@link AutoCloseable} is open will NOT be flagged by
-     * {@code WorkspaceStatementInspector}.
-     *
-     * <p>Used by {@code WorkspaceAgnosticAspect} and rare admin operations that
-     * legitimately query across workspaces. Always use with try-with-resources so the
-     * depth is decremented even on exception.
-     *
-     * @param reason logged at DEBUG for traceability
-     */
-    public static AutoCloseable openBypass(String reason) {
-        int depth = bypassDepth.get() + 1;
-        bypassDepth.set(depth);
-        if (log.isDebugEnabled()) {
-            log.debug("Workspace-agnostic bypass opened (depth={}): {}", depth, reason);
-        }
-        return () -> {
-            int current = bypassDepth.get();
-            if (current <= 1) {
-                bypassDepth.remove();
-            } else {
-                bypassDepth.set(current - 1);
-            }
-        };
-    }
-
-    /** True if the current thread is inside one or more open bypass scopes. */
-    public static boolean isBypassActive() {
-        return bypassDepth.get() > 0;
     }
 
     /**

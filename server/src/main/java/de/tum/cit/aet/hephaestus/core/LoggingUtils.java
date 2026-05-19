@@ -36,4 +36,10 @@ public final class LoggingUtils {
             // Then strip remaining control characters
             .replaceAll("[\\r\\n\\t\\u0000-\\u001F\\u007F\\u0085\\u2028\\u2029]", "_");
     }
+
+    /** Truncate {@code value} to {@code limit} chars with an ellipsis when longer. */
+    public static String truncate(String value, int limit) {
+        if (value == null) return "<null>";
+        return value.length() > limit ? value.substring(0, limit) + "..." : value;
+    }
 }

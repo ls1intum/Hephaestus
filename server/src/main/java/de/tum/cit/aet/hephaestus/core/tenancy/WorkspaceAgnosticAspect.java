@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.tenancy;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -9,17 +8,18 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 
 /**
- * AOP advice that makes {@link WorkspaceAgnostic} load-bearing at runtime: when a method or
- * a method on an annotated class is invoked, this aspect opens a bypass scope on
- * {@code WorkspaceContextHolder} for the duration of the call.
+ * Makes {@link WorkspaceAgnostic} load-bearing at runtime: while an annotated method (or a
+ * method on an annotated class) is on the stack, {@link TenancyBypass} reports active and
+ * {@link WorkspaceStatementInspector} treats emitted SQL as exempt.
  *
- * <p>{@link WorkspaceStatementInspector} reads {@code WorkspaceContextHolder.isBypassActive()}
- * before parsing SQL. With bypass active, statements are passed through unmodified —
- * legitimate cross-workspace queries (workspace listing, slug history, admin maintenance)
- * don't need a hardcoded allowlist entry.
- *
- * <p>Two pointcuts: {@code @annotation} (method-level) and {@code @within} (class-level).
- * If both apply (annotated method on annotated class), the depth counter handles nesting.
+ * <p>Limitations of the Spring AOP proxy model the aspect inherits:
+ * <ul>
+ *   <li>Static methods are not advised.</li>
+ *   <li>Self-invocation ({@code this.foo()} inside the same bean) bypasses the proxy and
+ *       does not fire the aspect.</li>
+ *   <li>{@code @Async} hops onto a worker thread; the bypass scope does not propagate
+ *       unless the worker explicitly re-opens it.</li>
+ * </ul>
  */
 @Aspect
 @Component
@@ -46,7 +46,7 @@ public class WorkspaceAgnosticAspect {
         if (ann == null || !ann.runtimeBypass()) {
             return pjp.proceed();
         }
-        try (AutoCloseable ignored = WorkspaceContextHolder.openBypass(ann.value())) {
+        try (TenancyBypass.Scope ignored = TenancyBypass.open(ann.value())) {
             return pjp.proceed();
         }
     }

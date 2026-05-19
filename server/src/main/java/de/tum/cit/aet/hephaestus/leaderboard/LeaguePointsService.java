@@ -1,18 +1,18 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.DECAY_FACTOR;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.DECAY_MINIMUM;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.K_FACTOR_HIGH_POINTS;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.K_FACTOR_LOW_POINTS;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.K_FACTOR_MEDIUM_POINTS;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.K_FACTOR_NEW_PLAYER;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.NEW_PLAYER_THRESHOLD_SECONDS;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.PERFORMANCE_SCORE_MULTIPLIER;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.PLACEMENT_BONUS_PER_POSITION;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.PLACEMENT_BONUS_THRESHOLD;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.POINTS_DEFAULT;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.POINTS_THRESHOLD_HIGH;
-import static de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants.POINTS_THRESHOLD_LOW;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.DECAY_FACTOR;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.DECAY_MINIMUM;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.K_FACTOR_HIGH_POINTS;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.K_FACTOR_LOW_POINTS;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.K_FACTOR_MEDIUM_POINTS;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.K_FACTOR_NEW_PLAYER;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.NEW_PLAYER_THRESHOLD_SECONDS;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.PERFORMANCE_SCORE_MULTIPLIER;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.PLACEMENT_BONUS_PER_POSITION;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.PLACEMENT_BONUS_THRESHOLD;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_DEFAULT;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_THRESHOLD_HIGH;
+import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_THRESHOLD_LOW;
 
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
@@ -33,7 +33,7 @@ import org.springframework.stereotype.Service;
  *   <li>Placement bonuses for top ranks</li>
  * </ul>
  *
- * <p>All constants are defined in {@link de.tum.cit.aet.hephaestus.shared.LeaguePointsConstants}.
+ * <p>All constants are defined in {@link de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants}.
  */
 @Service
 public class LeaguePointsService {

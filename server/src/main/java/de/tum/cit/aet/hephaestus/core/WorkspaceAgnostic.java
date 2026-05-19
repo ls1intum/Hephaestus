@@ -36,10 +36,9 @@ public @interface WorkspaceAgnostic {
     String value();
 
     /**
-     * Whether the AOP aspect should open a runtime bypass on
-     * {@code WorkspaceContextHolder} for the duration of the annotated call.
-     *
-     * <p>Set to {@code false} ONLY if the annotated code path provably never emits SQL.
+     * Whether the AOP aspect should open a {@code TenancyBypass} scope for the duration of
+     * the annotated call. Set to {@code false} ONLY if the annotated code path provably
+     * never emits SQL against a workspace-scoped table.
      */
     boolean runtimeBypass() default true;
 }

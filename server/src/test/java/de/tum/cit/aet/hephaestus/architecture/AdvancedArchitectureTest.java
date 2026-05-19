@@ -263,10 +263,16 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                     boolean implementsSpi = javaClass
                         .getAllRawInterfaces()
                         .stream()
-                        .anyMatch(i -> i.getPackageName().contains(".spi"));
+                        .anyMatch(i -> i.getPackageName().startsWith(BASE_PACKAGE) && i.getPackageName().contains(".spi"));
 
                     if (!implementsSpi) {
-                        return; // Not an SPI implementation
+                        return; // Not an SPI implementation (or implements a third-party SPI)
+                    }
+
+                    // Sealed-record permitted variants live in the same package as the SPI; that's
+                    // not the adapter pattern, it's a value type closed over the seal.
+                    if (javaClass.isRecord()) {
+                        return;
                     }
 
                     boolean inAdapterPackage =
