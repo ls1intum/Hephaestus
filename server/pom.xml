@@ -11,7 +11,7 @@
         <!-- lookup parent from repository -->
     </parent>
     <groupId>de.tum.cit.aet</groupId>
-    <artifactId>hephaestus</artifactId>
+    <artifactId>hephaestus-server</artifactId>
     <version>0.0.0-development</version>
     <name>Hephaestus</name>
     <description>AI-driven learning for better software development</description>
