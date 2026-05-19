@@ -1,0 +1,22 @@
+# Activated during the Paketo CDS training run only (via SPRING_PROFILES_ACTIVE=cds-training set
+# in pom.xml <image><env>; Coolify's runtime SPRING_PROFILES_ACTIVE=prod takes precedence).
+# Suppresses DB-dependent beans so context refresh succeeds without a Postgres reachable from the
+# buildpack builder — Spring Boot then exits via spring.context.exit=onRefresh (set by Paketo).
+spring:
+    liquibase:
+        enabled: false
+    datasource:
+        hikari:
+            initialization-fail-timeout: -1
+    jpa:
+        hibernate:
+            ddl-auto: none
+        properties:
+            hibernate:
+                boot:
+                    allow_jdbc_metadata_access: false
+                temp:
+                    use_jdbc_metadata_defaults: false
+    docker:
+        compose:
+            enabled: false
