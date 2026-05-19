@@ -50,6 +50,15 @@ spring:
                 order_inserts: true
                 order_updates: true
 
+    # Defer Spring Data repository proxy verification until ContextRefreshedEvent so that the
+    # repository wiring runs in parallel with the rest of bean instantiation rather than on the
+    # critical path. Per Spring Data JPA reference, DEFERRED still verifies every repository at
+    # startup (before ApplicationReadyEvent fires) — readiness probes see fully-validated repos.
+    data:
+        jpa:
+            repositories:
+                bootstrap-mode: deferred
+
     liquibase:
         change-log: classpath:db/master.xml
         # Gates `context="backfill"` one-shot changesets; prod overrides to `prod`.
