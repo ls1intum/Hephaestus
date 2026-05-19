@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.leaderboard;
 
 import de.tum.in.www1.hephaestus.leaderboard.tasks.LeaguePointsUpdateTask;
 import de.tum.in.www1.hephaestus.leaderboard.tasks.SlackWeeklyLeaderboardTask;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,7 +11,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.task.TaskRejectedException;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Component;
@@ -29,13 +28,13 @@ public class LeaderboardTaskScheduler {
     private static final Logger log = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);
 
     private final LeaderboardProperties leaderboardProperties;
-    private final ThreadPoolTaskScheduler taskScheduler;
+    private final TaskScheduler taskScheduler;
     private final SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask;
     private final LeaguePointsUpdateTask leaguePointsUpdateTask;
 
     public LeaderboardTaskScheduler(
         LeaderboardProperties leaderboardProperties,
-        ThreadPoolTaskScheduler taskScheduler,
+        TaskScheduler taskScheduler,
         @Autowired(required = false) SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask,
         LeaguePointsUpdateTask leaguePointsUpdateTask
     ) {
@@ -47,7 +46,6 @@ public class LeaderboardTaskScheduler {
 
     @EventListener(ApplicationReadyEvent.class)
     public void activateTaskScheduler() {
-        // Schedule always on app ready; guard per-task below
         var timeParts = leaderboardProperties.schedule().time().split(":");
 
         // CRON for the end of every leaderboard cycle
@@ -96,20 +94,10 @@ public class LeaderboardTaskScheduler {
     }
 
     private void scheduleSafely(Runnable task, CronTrigger trigger, String description) {
-        if (isSchedulerShuttingDown()) {
-            log.info("Skipped scheduling: reason=schedulerShuttingDown, task={}", description);
-            return;
-        }
-
         try {
             taskScheduler.schedule(task, trigger);
         } catch (TaskRejectedException ex) {
             log.warn("Skipped scheduling: reason=taskRejected, task={}", description, ex);
         }
-    }
-
-    private boolean isSchedulerShuttingDown() {
-        ScheduledThreadPoolExecutor executor = taskScheduler.getScheduledThreadPoolExecutor();
-        return executor == null || executor.isShutdown() || executor.isTerminating();
     }
 }
