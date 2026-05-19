@@ -25,12 +25,26 @@ on:
         description: "Full image name (e.g., ls1intum/hephaestus/webapp)"
       docker-file:
         type: string
-        required: true
-        description: "Path to Dockerfile"
+        required: false
+        default: ""
+        description: "Path to Dockerfile (required unless use-buildpacks=true)"
       docker-context:
         type: string
         default: "."
         description: "Docker build context"
+      use-buildpacks:
+        type: boolean
+        required: false
+        default: false
+        description: |
+          If true, build via Paketo Cloud Native Buildpacks using
+          spring-boot:build-image instead of a Dockerfile. Used for the application
+          server to enable Application CDS — see docs/admin/buildpacks-cds-decision.md.
+      maven-module:
+        type: string
+        required: false
+        default: ""
+        description: "Maven module path passed as -pl when use-buildpacks=true (e.g. server/application-server)"
       registry:
         type: string
         default: "ghcr.io"
@@ -104,11 +118,12 @@ jobs:
           image="${{ inputs.image-name }}"
           echo "image_name=${image//\//-}" >> $GITHUB_OUTPUT
 
-      # Build with registry cache
+      # Build with registry cache (Dockerfile path — unchanged)
       # - cache-from: Pull cache from registry (main branch cache + current branch)
       # - cache-to: Push cache to registry (only for non-PR builds to avoid cache pollution)
-      - name: Build and push
+      - name: Build and push (Dockerfile)
         id: build
+        if: ${{ !inputs.use-buildpacks }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ${{ inputs.docker-context }}
@@ -117,19 +132,74 @@ jobs:
           build-args: ${{ inputs.build-args }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,"name=${{ inputs.registry }}/${{ inputs.image-name }}",push-by-digest=true,name-canonical=true,push=true
-          # Registry cache: stores cache in ghcr.io alongside images
-          # Use main branch cache as fallback, then current ref
           cache-from: |
             type=registry,ref=${{ inputs.registry }}/${{ inputs.image-name }}:cache-${{ steps.prep.outputs.platform_pair }}
             type=registry,ref=${{ inputs.registry }}/${{ inputs.image-name }}:cache-main-${{ steps.prep.outputs.platform_pair }}
-          # Only write cache on main branch or when explicitly building (not PRs)
-          # This prevents cache pollution from experimental PR changes
           cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref={0}/{1}:cache-main-{2},mode=max', inputs.registry, inputs.image-name, steps.prep.outputs.platform_pair) || format('type=registry,ref={0}/{1}:cache-{2},mode=max', inputs.registry, inputs.image-name, steps.prep.outputs.platform_pair) }}
 
+      # Buildpacks path: spring-boot:build-image produces an OCI image with Application CDS,
+      # publishes it to the registry, then we capture the per-platform digest so the merge job
+      # can manifest-create exactly like the Dockerfile path. The buildkit registry mirror does
+      # not apply here — Paketo talks to the Docker daemon directly, not buildkitd.
+      - name: Set up JDK 21
+        if: inputs.use-buildpacks
+        uses: actions/setup-java@7a6d8a8234af8eb26422e24e3006232cccaa061b # v4.6.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Cache Maven dependencies
+        if: inputs.use-buildpacks
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+        with:
+          path: ~/.m2/repository
+          key: m2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            m2-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Build and push (Paketo Buildpacks + CDS)
+        id: build-buildpacks
+        if: inputs.use-buildpacks
+        env:
+          DOCKER_PUBLISH_REGISTRY_URL: https://${{ inputs.registry }}
+          DOCKER_PUBLISH_REGISTRY_USERNAME: ${{ github.actor }}
+          DOCKER_PUBLISH_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PER_ARCH_TAG="${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}"
+          MODULE_FLAG=""
+          if [ -n "${{ inputs.maven-module }}" ]; then
+            MODULE_FLAG="-pl ${{ inputs.maven-module }} -am"
+          fi
+          ./mvnw -B -ntp $MODULE_FLAG \
+            spring-boot:build-image -Pproduction -DskipTests=true \
+            -Dspring-boot.build-image.imageName="$PER_ARCH_TAG" \
+            -Dspring-boot.build-image.imagePlatform="${{ matrix.platform }}" \
+            -Dspring-boot.build-image.publish=true \
+            -Ddocker.publishRegistry.url="$DOCKER_PUBLISH_REGISTRY_URL" \
+            -Ddocker.publishRegistry.username="$DOCKER_PUBLISH_REGISTRY_USERNAME" \
+            -Ddocker.publishRegistry.password="$DOCKER_PUBLISH_REGISTRY_PASSWORD"
+          # Resolve the per-arch manifest digest from the registry — used by the merge job to build
+          # a multi-arch manifest list, exactly as the Dockerfile path does.
+          DIGEST="sha256:$(docker buildx imagetools inspect --raw "$PER_ARCH_TAG" | sha256sum | awk '{print $1}')"
+          if [[ ! "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::Refusing to publish: per-arch digest is not a sha256:<64 hex>"
+            exit 1
+          fi
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "Per-arch digest: $DIGEST"
+
       - name: Export digest
+        env:
+          DOCKERFILE_DIGEST: ${{ steps.build.outputs.digest }}
+          BUILDPACKS_DIGEST: ${{ steps.build-buildpacks.outputs.digest }}
         run: |
           mkdir -p ${{ runner.temp }}/digests
-          digest="${{ steps.build.outputs.digest }}"
+          digest="${BUILDPACKS_DIGEST:-$DOCKERFILE_DIGEST}"
+          if [ -z "$digest" ]; then
+            echo "::error::No digest produced by either build path"
+            exit 1
+          fi
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
