@@ -15,4 +15,5 @@
  *       — entities backing {@code chat_thread}, {@code chat_message}</li>
  * </ul>
  */
+@org.springframework.modulith.ApplicationModule(displayName = "Mentor")
 package de.tum.cit.aet.hephaestus.mentor;

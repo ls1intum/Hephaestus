@@ -49,4 +49,5 @@
  * @see de.tum.cit.aet.hephaestus.activity.ActivityEventService
  */
 @org.springframework.lang.NonNullApi
+@org.springframework.modulith.ApplicationModule(displayName = "Achievement")
 package de.tum.cit.aet.hephaestus.achievement;

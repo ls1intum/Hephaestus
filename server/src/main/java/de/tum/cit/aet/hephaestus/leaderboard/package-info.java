@@ -56,4 +56,5 @@
  *
  * @see de.tum.cit.aet.hephaestus.activity Activity module (write side)
  */
+@org.springframework.modulith.ApplicationModule(displayName = "Leaderboard")
 package de.tum.cit.aet.hephaestus.leaderboard;
