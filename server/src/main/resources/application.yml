@@ -142,13 +142,6 @@ hephaestus:
         worker:
             enabled: ${HEPHAESTUS_RUNTIME_WORKER_ENABLED:true}
 
-    # Capability flag (not a role): worker-internal LLM proxy controller. Stays on
-    # the coordinator by default (BYO trust model — see ADR 0006). Future managed-mode
-    # workers may opt in by setting this on the worker pod and false on the server pod.
-    sandbox:
-        llm-proxy:
-            enabled: ${HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED:true}
-
     # ═══════════════════════════════════════════════════════════════════════════
     # TENANCY ENFORCEMENT (WorkspaceStatementInspector)
     # ═══════════════════════════════════════════════════════════════════════════
@@ -434,6 +427,11 @@ hephaestus:
         azure-openai-use-bearer-prefix: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:false}
 
     sandbox:
+        # Capability flag (not a role): worker-internal LLM proxy controller. Stays on
+        # the coordinator by default (BYO trust model — see ADR 0006). Future managed-mode
+        # workers opt in by setting this on the worker pod and false on the server pod.
+        llm-proxy:
+            enabled: ${HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED:true}
         enabled: ${SANDBOX_ENABLED:false}
         docker-host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
         tls-verify: ${SANDBOX_TLS_VERIFY:false}
