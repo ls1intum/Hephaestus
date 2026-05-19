@@ -32,7 +32,10 @@ import org.springframework.lang.NonNull;
 @Entity
 @Table(
     name = "discussion_category",
-    uniqueConstraints = @UniqueConstraint(name = "uq_discussion_category_repo_slug", columnNames = { "repository_id", "slug" })
+    uniqueConstraints = @UniqueConstraint(
+        name = "uq_discussion_category_repo_slug",
+        columnNames = { "repository_id", "slug" }
+    )
 )
 @Getter
 @Setter

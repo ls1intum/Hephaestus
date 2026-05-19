@@ -43,8 +43,8 @@ class JpaEntityNamingArchitectureTest extends HephaestusArchitectureTest {
             .should(haveNamedUniqueConstraintsOnly())
             .because(
                 "Unnamed @UniqueConstraint causes Hibernate to synthesize hash-style names that drift from " +
-                "the Liquibase-recorded constraint names, producing duplicate uniques on dev DBs running ddl-auto:update. " +
-                "Always set name=\"uq_<table>_<columns>\" matching the Liquibase changeset."
+                    "the Liquibase-recorded constraint names, producing duplicate uniques on dev DBs running ddl-auto:update. " +
+                    "Always set name=\"uq_<table>_<columns>\" matching the Liquibase changeset."
             );
 
         rule.check(classes);

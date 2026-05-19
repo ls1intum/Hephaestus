@@ -56,14 +56,16 @@ class StartupBudgetIntegrationTest extends BaseIntegrationTest {
         assertThat(applicationStartup)
             .as(
                 "Application.main() must invoke setApplicationStartup(new BufferingApplicationStartup(...));" +
-                " if this fails, the /actuator/startup endpoint is broken in local profile too"
+                    " if this fails, the /actuator/startup endpoint is broken in local profile too"
             )
             .isInstanceOf(BufferingApplicationStartup.class);
 
         var buffering = (BufferingApplicationStartup) applicationStartup;
         var events = buffering.getBufferedTimeline().getEvents();
         assertThat(events)
-            .as("BufferingApplicationStartup captured no events — buffer capacity may be too small, or wiring is broken")
+            .as(
+                "BufferingApplicationStartup captured no events — buffer capacity may be too small, or wiring is broken"
+            )
             .isNotEmpty();
     }
 
@@ -87,8 +89,8 @@ class StartupBudgetIntegrationTest extends BaseIntegrationTest {
         assertThat(slowest.getDuration())
             .as(
                 "Top-level startup step '%s' took %s, exceeding the %s ceiling." +
-                " A new bean or @PostConstruct likely landed on the critical path." +
-                " Inspect /actuator/startup in the local profile to identify the culprit.",
+                    " A new bean or @PostConstruct likely landed on the critical path." +
+                    " Inspect /actuator/startup in the local profile to identify the culprit.",
                 slowest.getStartupStep().getName(),
                 slowest.getDuration(),
                 PER_STEP_CEILING
