@@ -20,3 +20,15 @@ spring:
     docker:
         compose:
             enabled: false
+
+# NATS validators reject a blank `server` even when `enabled=false`; supply non-blank placeholders
+# so context refresh reaches `spring.context.exit=onRefresh` without binding errors.
+hephaestus:
+    sync:
+        nats:
+            enabled: false
+            server: nats://cds-training-placeholder:4222
+    agent:
+        nats:
+            enabled: false
+            server: nats://cds-training-placeholder:4222
