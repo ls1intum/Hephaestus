@@ -820,33 +820,11 @@
                     </excludes>
                     <wait>1000</wait>
                     <maxAttempts>100</maxAttempts>
-                    <!--
-                        Container image build via Paketo Buildpacks. Invoked from CI:
-                            mvn spring-boot:build-image -Pproduction
-                                -Dspring-boot.build-image.imageName=ghcr.io/.../application-server:<sha>-<arch>
-                                -Dspring-boot.build-image.imagePlatform=linux/<arch>
-                                -Dspring-boot.build-image.publish=true
-                        Local devs can invoke without overrides; the produced image is named
-                        ${project.artifactId}:${project.version} by default.
-
-                        Builder and run image are tag-referenced here so local builds get the
-                        latest stable Paketo release; CI pins them by digest via
-                        -Dspring-boot.build-image.builder=...@sha256:<DIGEST> for reproducibility.
-
-                        BP_JVM_CDS_ENABLED triggers the Application CDS training run during the
-                        build, archiving loaded class metadata to /workspace/application.jsa.
-                        Runtime startup is ~1.5x faster as a result. The new env var name
-                        BP_JVM_AOTCACHE_ENABLED is reserved for Java 25 + JEP 483 AOT cache
-                        and is deferred to epic #1096.
-
-                        Sources:
-                          https://docs.spring.io/spring-boot/maven-plugin/build-image.html
-                          https://docs.spring.io/spring-boot/how-to/class-data-sharing.html
-                          https://github.com/paketo-buildpacks/spring-boot
-                    -->
+                    <!-- See docs/admin/buildpacks-cds-decision.md. BP_JVM_AOTCACHE_ENABLED is the
+                         Java 25 / JEP 483 successor, deferred to epic #1096. -->
                     <image>
-                        <builder>paketobuildpacks/builder-jammy-tiny:latest</builder>
-                        <runImage>paketobuildpacks/run-jammy-tiny:latest</runImage>
+                        <builder>paketobuildpacks/builder-noble-java-tiny:latest</builder>
+                        <runImage>paketobuildpacks/run-noble-java-tiny:latest</runImage>
                         <env>
                             <BP_JVM_VERSION>21</BP_JVM_VERSION>
                             <BP_JVM_CDS_ENABLED>true</BP_JVM_CDS_ENABLED>

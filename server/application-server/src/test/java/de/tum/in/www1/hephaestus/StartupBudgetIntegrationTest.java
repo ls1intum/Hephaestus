@@ -35,8 +35,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class StartupBudgetIntegrationTest {
 
     private static final Duration PER_BEAN_CEILING = Duration.ofSeconds(3);
-    // CI ceiling — well above prod target (~8s warm post-#1282) to absorb GitHub Actions noise
-    // and Testcontainers Postgres cold-start without flaking. Tightens after a few weeks of data.
+    // Smoke ceiling: catches dramatic regressions only. Production target is ~8s warm; CI noise
+    // and Testcontainers Postgres cold-start make a tight bound flaky here.
     private static final Duration WHOLE_APP_CEILING = Duration.ofSeconds(30);
     // spring.beans.instantiate is the per-bean creation step; each fires once per bean. See
     // https://docs.spring.io/spring-framework/reference/core/aot.html#spring-startup-events
@@ -68,7 +68,7 @@ class StartupBudgetIntegrationTest {
     }
 
     @Test
-    void wholeAppReadinessUnderCeiling() {
+    void bootCompletesWithinSmokeCeiling() {
         var events = ((BufferingApplicationStartup) applicationStartup).getBufferedTimeline().getEvents();
 
         Instant earliest = events

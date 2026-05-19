@@ -34,8 +34,6 @@ public class AccountService {
     private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 
     private final UserPreferencesRepository userPreferencesRepository;
-    // ObjectProvider so that the absent-when-hephaestus.posthog.enabled!=true case stays clean:
-    // getIfAvailable() returns null, callers short-circuit. No dummy bean, no internal flag.
     private final ObjectProvider<PosthogClient> posthogClientProvider;
     private final Keycloak keycloak;
     private final KeycloakProperties keycloakProperties;

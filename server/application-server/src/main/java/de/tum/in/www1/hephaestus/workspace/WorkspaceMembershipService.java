@@ -43,10 +43,6 @@ public class WorkspaceMembershipService {
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceRepository workspaceRepository;
 
-    // Field-injected via @PersistenceContext: documented Spring JPA carve-out from the
-    // "prefer constructor injection" rule. The SharedEntityManagerCreator proxy this binds to is
-    // lifecycle-independent of EntityManagerFactory bootstrap, so this stays correct under
-    // spring.data.jpa.repositories.bootstrap-mode=deferred and any future async EMF init.
     @PersistenceContext
     private EntityManager entityManager;
 

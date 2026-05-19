@@ -29,13 +29,9 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Diff and commit-log operations on local git clones, used by the workspace-context build phase
- * ({@link PullRequestContentProvider}) and the post-agent delivery phase
- * ({@code PullRequestReviewHandler}).
- *
- * <p>Implemented on JGit. Diff output is pinned to {@link DiffAlgorithm.SupportedAlgorithm#HISTOGRAM}
- * to match git CLI 2.34+ defaults and the {@code core.autocrlf=false core.eol=lf} invariants the
- * repository clone is configured with elsewhere.
+ * Diff and commit-log operations on local git clones, used by {@link PullRequestContentProvider}
+ * and {@code PullRequestReviewHandler}. Diff output uses
+ * {@link DiffAlgorithm.SupportedAlgorithm#HISTOGRAM} to match git CLI 2.34+ defaults.
  */
 @Component
 public class GitDiffOperations {
@@ -46,66 +42,57 @@ public class GitDiffOperations {
     private static final Pattern HUNK_HEADER = Pattern.compile("^@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@");
 
     /**
-     * Resolve the diff base/head pair using the 3-strategy approach:
+     * Resolve {@code [baseSha, headSha]} for a PR/MR diff. Tries, in order:
      * <ol>
-     *   <li>Branch-based: {@code origin/target..origin/source} — used when the source branch ref
-     *       still resolves to {@code headSha} (within an 12-char prefix).</li>
-     *   <li>Merge-commit parent: walk merges between {@code headSha..origin/target} looking for a
-     *       commit whose second parent matches {@code headSha} (8-char prefix); the first parent
-     *       is the base.</li>
-     *   <li>Merge-base: last resort, accepted only if it differs from {@code headSha}.</li>
+     *   <li>origin/source matches {@code headSha} → {@code [origin/target, origin/source]}.</li>
+     *   <li>A merge commit reachable from origin/target has {@code headSha} as its second parent
+     *       → {@code [firstParent, headSha]}. Handles squash-and-merge / post-merge force-push.</li>
+     *   <li>Merge-base of origin/target and {@code headSha}, accepted only when it differs from
+     *       {@code headSha}.</li>
      * </ol>
-     *
-     * @return {@code [baseSha, headSha]} (both resolved to 40-char SHAs) or {@code null} if all
-     *         strategies fail
      */
     @Nullable
     public String[] resolveDiffRange(Path repoPath, String targetBranch, String sourceBranch, String headSha) {
+        if (headSha == null || headSha.isBlank()) {
+            return null;
+        }
         try (Git git = Git.open(repoPath.toFile())) {
             Repository repo = git.getRepository();
+            ObjectId head = repo.resolve(headSha);
+            if (head == null) {
+                return null;
+            }
 
-            // Strategy 1: Branch-based
             ObjectId branchBase = repo.resolve("refs/remotes/origin/" + targetBranch);
             ObjectId branchHead = repo.resolve("refs/remotes/origin/" + sourceBranch);
-            if (branchBase != null && branchHead != null && headSha != null && !headSha.isBlank()) {
-                String prefix = headSha.substring(0, Math.min(headSha.length(), 12));
-                if (branchHead.getName().startsWith(prefix)) {
+            if (branchBase != null && branchHead != null) {
+                if (branchHead.equals(head)) {
                     return new String[] { branchBase.getName(), branchHead.getName() };
                 }
                 log.warn(
-                    "Stale branch ref detected: branch=origin/{}, expected={}, actual={}",
+                    "Stale branch ref: branch=origin/{}, expected={}, actual={}",
                     sourceBranch,
                     headSha,
                     branchHead.getName()
                 );
             }
 
-            if (headSha == null || headSha.isBlank()) {
-                return null;
-            }
-            ObjectId head = repo.resolve(headSha);
-            if (head == null) {
-                return null;
-            }
             ObjectId target = branchBase != null ? branchBase : repo.resolve(targetBranch);
             if (target == null) {
                 return null;
             }
 
-            // Strategy 2: Merge commit with headSha as second parent
-            String headPrefix = headSha.substring(0, Math.min(headSha.length(), 8));
             try (RevWalk walk = new RevWalk(repo)) {
                 walk.markStart(walk.parseCommit(target));
                 walk.markUninteresting(walk.parseCommit(head));
                 for (RevCommit commit : walk) {
                     RevCommit[] parents = commit.getParents();
-                    if (parents.length >= 2 && parents[1].getId().getName().startsWith(headPrefix)) {
+                    if (parents.length >= 2 && parents[1].getId().equals(head)) {
                         return new String[] { parents[0].getId().getName(), head.getName() };
                     }
                 }
             }
 
-            // Strategy 3: Merge-base
             try (RevWalk walk = new RevWalk(repo)) {
                 walk.setRevFilter(RevFilter.MERGE_BASE);
                 walk.markStart(walk.parseCommit(target));
@@ -156,10 +143,9 @@ public class GitDiffOperations {
     }
 
     /**
-     * Produce per-file diff statistics in {@code path | N+- } format. Matches the per-file lines of
-     * {@code git diff --stat} closely enough that {@code PullRequestContentProvider#parseDiffStatPaths}
-     * extracts the same set of paths. No summary footer is emitted; downstream consumers only parse
-     * per-file lines.
+     * Per-file diff statistics in {@code path | N+- } format. Per-file lines are shaped to match
+     * {@code git diff --stat} so {@link PullRequestReviewHandler#parseDiffStatPaths} extracts the
+     * same paths; renamed files use {@code old => new} syntax. No summary footer is emitted.
      */
     @Nullable
     public String diffStat(Path repoPath, String baseRef, String headRef) {
@@ -190,18 +176,10 @@ public class GitDiffOperations {
                             deletions += edit.getEndA() - edit.getBeginA();
                             additions += edit.getEndB() - edit.getBeginB();
                         }
-                    } catch (Exception e) {
+                    } catch (IOException e) {
                         log.debug("Skipped stat for {}: {}", path, e.getMessage());
                     }
-                    out.append(' ').append(path).append(" | ").append(additions + deletions);
-                    if (additions > 0) {
-                        out.append(' ').append("+".repeat(Math.min(additions, 40)));
-                    }
-                    if (deletions > 0) {
-                        if (additions == 0) out.append(' ');
-                        out.append("-".repeat(Math.min(deletions, 40)));
-                    }
-                    out.append('\n');
+                    out.append(' ').append(path).append(" | ").append(additions + deletions).append('\n');
                 }
             }
             return out.toString();
@@ -294,7 +272,11 @@ public class GitDiffOperations {
     }
 
     private static String displayPath(DiffEntry entry) {
-        return entry.getChangeType() == DiffEntry.ChangeType.DELETE ? entry.getOldPath() : entry.getNewPath();
+        return switch (entry.getChangeType()) {
+            case DELETE -> entry.getOldPath();
+            case RENAME, COPY -> entry.getOldPath() + " => " + entry.getNewPath();
+            default -> entry.getNewPath();
+        };
     }
 
     /**
