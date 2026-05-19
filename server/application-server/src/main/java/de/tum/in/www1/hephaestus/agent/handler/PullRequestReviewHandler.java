@@ -457,7 +457,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
         if (range == null) return Map.of();
 
-        String diff = gitDiffOperations.runGit(repoPath, "diff", range[0] + ".." + range[1]);
+        String diff = gitDiffOperations.diff(repoPath, range[0], range[1]);
         if (diff == null || diff.isBlank()) return Map.of();
 
         return DiffHunkValidator.parseValidLines(diff);
@@ -485,7 +485,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
         if (range == null) return Set.of();
 
-        String nameOnly = gitDiffOperations.runGit(repoPath, "diff", "--name-only", range[0] + ".." + range[1]);
+        String nameOnly = gitDiffOperations.diffNameOnly(repoPath, range[0], range[1]);
         if (nameOnly == null || nameOnly.isBlank()) return Set.of();
 
         return parseDiffNameOnlyPaths(nameOnly);
