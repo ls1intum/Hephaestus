@@ -7,6 +7,9 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,13 +23,18 @@ import org.springframework.stereotype.Component;
  *   <li>Activate workspaces (run full GraphQL sync for repos, issues, PRs)</li>
  * </ol>
  *
- * <p>The installation consumer needs only workspace entities to exist, not the full sync.
- * By publishing {@link WorkspacesInitializedEvent} before activation, we allow installation
- * events to be processed immediately after startup rather than waiting for a potentially
- * long sync operation.</p>
+ * <p>Phases 1-3 run on {@code applicationTaskExecutor} so {@link ApplicationReadyEvent} dispatch
+ * returns immediately. Without the hop the main thread was blocked on synchronous GitHub-App
+ * REST calls for ~7 s after Spring reported "Started Application", delaying readiness for any
+ * downstream subscribers and the perceived dev-loop start time.
+ *
+ * <p>Ordering: {@link Order#value()} is intentionally {@link Ordered#LOWEST_PRECEDENCE}; the NATS
+ * consumer's {@code @Order(1)} {@code init()} runs first to establish the connection before
+ * {@link WorkspacesInitializedEvent} could fire from the worker thread.
  */
 @Component
 @Profile("!specs & !test")
+@Order(Ordered.LOWEST_PRECEDENCE)
 public class WorkspaceStartupListener {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceStartupListener.class);
@@ -35,21 +43,28 @@ public class WorkspaceStartupListener {
     private final WorkspaceActivationService workspaceActivationService;
     private final WorkspaceRepository workspaceRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final AsyncTaskExecutor applicationTaskExecutor;
 
     public WorkspaceStartupListener(
         WorkspaceProvisioningService provisioningService,
         WorkspaceActivationService workspaceActivationService,
         WorkspaceRepository workspaceRepository,
-        ApplicationEventPublisher eventPublisher
+        ApplicationEventPublisher eventPublisher,
+        AsyncTaskExecutor applicationTaskExecutor
     ) {
         this.provisioningService = provisioningService;
         this.workspaceActivationService = workspaceActivationService;
         this.workspaceRepository = workspaceRepository;
         this.eventPublisher = eventPublisher;
+        this.applicationTaskExecutor = applicationTaskExecutor;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
+        applicationTaskExecutor.execute(this::provisionAndActivate);
+    }
+
+    private void provisionAndActivate() {
         // Phase 1: Provision workspaces (creates/loads workspace entities)
         // Each provider bootstrap is isolated so a failure in one doesn't block others
         log.info("Starting workspace provisioning");

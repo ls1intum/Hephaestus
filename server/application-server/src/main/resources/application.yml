@@ -3,6 +3,9 @@ spring:
         name: Hephaestus
         version: "${APP_VERSION:0.0.0-development}"
 
+    main:
+        banner-mode: off
+
     config:
         import: optional:file:.env[.properties]
 
@@ -29,7 +32,9 @@ spring:
         # show-sql: "true"
         properties:
             hibernate:
-                format_sql: "true"
+                # `show-sql: true` is the trigger; `format_sql` only matters then. Default off avoids
+                # the formatter pass on every statement.
+                format_sql: "false"
                 jdbc:
                     batch_size: 50
                 order_inserts: true
