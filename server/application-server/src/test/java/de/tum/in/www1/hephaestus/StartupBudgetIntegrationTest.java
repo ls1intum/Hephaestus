@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.testconfig.PostgreSQLTestContainer;
 import de.tum.in.www1.hephaestus.testconfig.TestAsyncConfiguration;
 import de.tum.in.www1.hephaestus.testconfig.TestSecurityConfig;
 import java.time.Duration;
+import java.time.Instant;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class StartupBudgetIntegrationTest {
 
     private static final Duration PER_BEAN_CEILING = Duration.ofSeconds(3);
+    // CI ceiling — well above prod target (~8s warm post-#1282) to absorb GitHub Actions noise
+    // and Testcontainers Postgres cold-start without flaking. Tightens after a few weeks of data.
+    private static final Duration WHOLE_APP_CEILING = Duration.ofSeconds(30);
     // spring.beans.instantiate is the per-bean creation step; each fires once per bean. See
     // https://docs.spring.io/spring-framework/reference/core/aot.html#spring-startup-events
     private static final String BEAN_INSTANTIATE = "spring.beans.instantiate";
@@ -61,5 +65,25 @@ class StartupBudgetIntegrationTest {
             .orElseThrow(() -> new AssertionError("no " + BEAN_INSTANTIATE + " events captured"));
 
         assertThat(slowest.getDuration()).isLessThan(PER_BEAN_CEILING);
+    }
+
+    @Test
+    void wholeAppReadinessUnderCeiling() {
+        var events = ((BufferingApplicationStartup) applicationStartup).getBufferedTimeline().getEvents();
+
+        Instant earliest = events
+            .stream()
+            .map(e -> e.getStartTime())
+            .min(Instant::compareTo)
+            .orElseThrow(() -> new AssertionError("no startup events captured"));
+        Instant latest = events
+            .stream()
+            .filter(e -> e.getEndTime() != null)
+            .map(e -> e.getEndTime())
+            .max(Instant::compareTo)
+            .orElseThrow(() -> new AssertionError("no terminated startup events captured"));
+
+        Duration wallClock = Duration.between(earliest, latest);
+        assertThat(wallClock).isLessThan(WHOLE_APP_CEILING);
     }
 }
