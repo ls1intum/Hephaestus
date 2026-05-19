@@ -6,13 +6,13 @@ This file governs the entire repository. Each service has its own `AGENTS.md` wi
 
 - `webapp/AGENTS.md` — React, TanStack, Tailwind patterns
 - `server/application-server/AGENTS.md` — Spring Boot, JPA, testing
-- `server/webhook-ingest/AGENTS.md` — Webhook processing, NATS
+- `webhook-ingest/AGENTS.md` — Webhook processing, NATS
 
 ## 1. Architecture map
 
 - `server/application-server/`: Spring Boot 3.5, Liquibase-managed PostgreSQL schema, synchronous + reactive APIs, generated OpenAPI spec in `openapi.yaml`. Hosts the Pi mentor agent in-process.
 - `webapp/`: React 19 + TanStack Router/Query, Tailwind 4 UI kit (`src/components/ui`), generated API client in `src/api/**`.
-- `server/webhook-ingest/`: Hono/TypeScript webhook intake that forwards events into NATS JetStream.
+- `webhook-ingest/`: Hono/TypeScript webhook intake that forwards events into NATS JetStream.
 - `docs/`: Contributor docs (including the ERD that `db:generate-erd-docs` regenerates).
 
 ## 2. Toolchain & environment prerequisites

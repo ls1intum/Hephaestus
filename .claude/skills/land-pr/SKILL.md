@@ -36,7 +36,7 @@ git diff --name-only HEAD
 Map paths to components (mirrors CI's dorny/paths-filter config):
 - `webapp/**` → webapp changed
 - `server/application-server/**` OR `scripts/db-utils.sh` → app-server changed
-- `server/webhook-ingest/**` → webhook changed
+- `webhook-ingest/**` → webhook changed
 - `package.json` OR `package-lock.json` OR `.node-version` → webapp + webhook changed
 - `docs/**` → docs-only (skip all validation if nothing else changed)
 

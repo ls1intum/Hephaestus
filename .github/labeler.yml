@@ -15,7 +15,7 @@ application-server:
 
 webhook-ingest:
   - changed-files:
-    - any-glob-to-any-file: "server/webhook-ingest/**"
+    - any-glob-to-any-file: "webhook-ingest/**"
 
 ci:
   - changed-files:

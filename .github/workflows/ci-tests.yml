@@ -135,7 +135,7 @@ jobs:
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webhook-ingest-unit'
         run: |
           pnpm install --frozen-lockfile
-          cd server/webhook-ingest
+          cd webhook-ingest
           pnpm run test
 
       # Chromatic visual testing
@@ -222,7 +222,7 @@ jobs:
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "Test Results - ${{ matrix.test-type }}"
-          path: "server/webhook-ingest/test-results/junit-*.xml"
+          path: "webhook-ingest/test-results/junit-*.xml"
           reporter: java-junit
           fail-on-error: false
 

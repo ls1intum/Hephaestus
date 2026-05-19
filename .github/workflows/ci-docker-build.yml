@@ -82,7 +82,7 @@ jobs:
     uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/webhook-ingest"
-      docker-file: "./server/webhook-ingest/Dockerfile"
+      docker-file: "./webhook-ingest/Dockerfile"
       # Context = repo root so the Dockerfile can COPY pnpm-lock.yaml,
       # pnpm-workspace.yaml, and the workspace package.json files needed for
       # `pnpm install --filter webhook-ingest...` to resolve the workspace graph.

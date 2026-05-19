@@ -1,6 +1,6 @@
 packages:
   - webapp
-  - server/webhook-ingest
+  - webhook-ingest
   - server/application-server/agent-extensions
   - docs
 

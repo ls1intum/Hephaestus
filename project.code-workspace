@@ -13,8 +13,8 @@
 			"path": "./server/application-server"
 		},
 		{
-			"name": "server/webhook-ingest",
-			"path": "./server/webhook-ingest"
+			"name": "webhook-ingest",
+			"path": "./webhook-ingest"
 		},
 		{
 			"name": "docs",

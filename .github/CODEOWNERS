@@ -13,7 +13,7 @@ renovate.json                    @ls1intum/hephaestus-maintainers
 server/application-server/       @ls1intum/hephaestus-maintainers
 
 # Webhook Ingest (TypeScript/Hono)
-server/webhook-ingest/           @ls1intum/hephaestus-maintainers
+webhook-ingest/           @ls1intum/hephaestus-maintainers
 
 # Webapp (React/TypeScript)
 webapp/                          @ls1intum/hephaestus-maintainers

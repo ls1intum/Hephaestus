@@ -17,7 +17,7 @@ WORKDIR /repo
 # Copy workspace manifests for layer caching
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc /repo/
 COPY webapp/package.json /repo/webapp/
-COPY server/webhook-ingest/package.json /repo/server/webhook-ingest/
+COPY webhook-ingest/package.json /repo/webhook-ingest/
 COPY server/application-server/agent-extensions/package.json /repo/server/application-server/agent-extensions/
 COPY docs/package.json /repo/docs/
 
@@ -26,8 +26,8 @@ RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
     pnpm install --frozen-lockfile --filter webhook-ingest...
 
 # Copy source + tsconfig for build
-COPY server/webhook-ingest/tsconfig.json /repo/server/webhook-ingest/
-COPY server/webhook-ingest/src /repo/server/webhook-ingest/src
+COPY webhook-ingest/tsconfig.json /repo/webhook-ingest/
+COPY webhook-ingest/src /repo/webhook-ingest/src
 
 # Build the application
 RUN pnpm --filter webhook-ingest run build

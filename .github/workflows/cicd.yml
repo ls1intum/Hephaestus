@@ -51,7 +51,7 @@ jobs:
               - 'server/application-server/**'
               - 'scripts/db-utils.sh'
             webhook-ingest:
-              - 'server/webhook-ingest/**'
+              - 'webhook-ingest/**'
               - 'package.json'
               - 'package-lock.json'
             agent-images:
@@ -266,7 +266,7 @@ jobs:
               echo "| Webapp unit | \`pnpm run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Webapp Storybook | \`pnpm --filter webapp run test:storybook\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Application server | \`cd server/application-server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Webhook ingest | \`pnpm --filter server/webhook-ingest run test\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webhook ingest | \`pnpm --filter webhook-ingest run test\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
