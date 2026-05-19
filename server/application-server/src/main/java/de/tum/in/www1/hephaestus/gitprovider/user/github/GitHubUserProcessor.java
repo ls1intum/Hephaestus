@@ -76,7 +76,6 @@ public class GitHubUserProcessor {
     private final UserRepository userRepository;
     private final TransactionTemplate requiresNewTransaction;
 
-    // Field-injected per JPA spec idiom; see WorkspaceMembershipService for the rationale.
     @PersistenceContext
     private EntityManager entityManager;
 

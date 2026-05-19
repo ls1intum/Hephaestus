@@ -17,13 +17,8 @@ import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
 
 /**
- * PostHog REST client. Class-level {@link ConditionalOnProperty} keeps the bean out of the context
- * when {@code hephaestus.posthog.enabled} is not {@code true}. Consumers inject via
- * {@code ObjectProvider<PosthogClient>} and short-circuit when the optional dependency is absent.
- *
- * <p>The constructor still throws on partial misconfiguration (enabled with no project ID or API
- * key) — that is a deploy-time failure, not a runtime branch, so we want context refresh to fail
- * loudly rather than silently disable the integration.
+ * PostHog REST client. Constructor fails loudly when the bean is enabled but {@code projectId} or
+ * {@code personalApiKey} is missing — partial misconfiguration should crash boot, not degrade.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.posthog", name = "enabled", havingValue = "true")

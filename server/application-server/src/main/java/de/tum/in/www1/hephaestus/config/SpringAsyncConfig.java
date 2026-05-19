@@ -48,8 +48,6 @@ public class SpringAsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(50);
         executor.setQueueCapacity(500);
         executor.setThreadNamePrefix("async-");
-        // CRITICAL: Wait for in-flight tasks to complete before destroying beans
-        // This prevents "EntityManagerFactory is closed" errors during shutdown
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
         executor.initialize();

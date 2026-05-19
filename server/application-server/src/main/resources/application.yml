@@ -6,16 +6,14 @@ spring:
     config:
         import: optional:file:.env[.properties]
 
-    # Java 21 virtual threads on Tomcat: one-virtual-thread-per-request. Spring Boot's
-    # TaskScheduler auto-config also swaps to SimpleAsyncTaskScheduler (virtual-thread per
-    # submission). LeaderboardTaskScheduler injects the TaskScheduler interface so this is safe.
-    # SpringAsyncConfig keeps applicationTaskExecutor as a bounded ThreadPoolTaskExecutor.
+    # Re-evaluate when Java 25 + JEP 491 lands: pgjdbc 42.7.x has synchronized blocks that pin
+    # the carrier on Java < 24 under contended I/O.
     threads:
         virtual:
             enabled: true
 
-    # Virtual threads are daemons; needed so @Scheduled cron triggers can keep the JVM alive
-    # after main() returns. See SpringApplication docs (spring.main.keep-alive).
+    # Virtual-thread Tomcat connectors are daemons; without keep-alive the JVM exits after
+    # main() returns, killing @Scheduled cron triggers.
     main:
         keep-alive: true
 
@@ -50,10 +48,7 @@ spring:
                 order_inserts: true
                 order_updates: true
 
-    # Defer Spring Data repository proxy verification until ContextRefreshedEvent so that the
-    # repository wiring runs in parallel with the rest of bean instantiation rather than on the
-    # critical path. Per Spring Data JPA reference, DEFERRED still verifies every repository at
-    # startup (before ApplicationReadyEvent fires) — readiness probes see fully-validated repos.
+    # Repository proxy verification deferred to ContextRefreshedEvent (still before readiness).
     data:
         jpa:
             repositories:

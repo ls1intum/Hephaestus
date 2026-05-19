@@ -40,15 +40,15 @@ GraalVM Native produces a single binary with sub-second startup, but pays for it
 - Closed-world model breaks runtime override of `@ConditionalOn*` — the 72-site surface in this codebase doesn't fit cleanly.
 - Three load-bearing reflective dependencies (`com.slack.api:bolt`, `io.github.kobylynskyi:graphql-java-codegen` runtime, `liquibase-core:5.x`) lack published reachability metadata.
 
-For a 5-replica HotSpot deployment with daily restart cadence, the CI cost outweighs the saving. Revisit only if the deployment grows to a meaningful cost driver (it isn't).
+For a 5-replica HotSpot deployment, the CI cost outweighs the saving.
 
-## Why not BellSoft Liberica buildpacks (or `pack` CLI directly)
+## Why not `pack` CLI directly
 
-`paketobuildpacks/builder-jammy-tiny` is the Spring Boot 4 default and is what `spring-boot:build-image` selects without override. The BellSoft Liberica fork would add an upstream dependency on a third party with no measurable speedup. `pack` CLI directly is one moving part more than `spring-boot:build-image`, with no benefit when the Maven plugin already wires `${project.version}` and the AOT profile correctly.
+`spring-boot:build-image` already wires `${project.version}` and Maven reactor state; `pack` is one moving part more for no benefit.
 
 ## Builder pinning
 
-`pom.xml` references the builder and run image by tag (`paketobuildpacks/builder-jammy-tiny:latest`, `paketobuildpacks/run-jammy-tiny:latest`). For reproducible CI builds, pass `-Dspring-boot.build-image.builder=paketobuildpacks/builder-jammy-tiny@sha256:<DIGEST>` and the same for `runImage`. Bump the pinned digest as part of release cycles; record it in CI workflow env.
+`pom.xml` references `paketobuildpacks/builder-noble-java-tiny:latest` and `paketobuildpacks/run-noble-java-tiny:latest`. The Ubuntu Noble line is the active Spring Boot 4 default; Jammy is on its way out. Digest-pinning the builder and run image in CI is a follow-up — currently the Maven plugin pulls `latest` on every build, which is reproducible-within-a-day but not across weeks.
 
 ## git CLI in the runtime image
 
