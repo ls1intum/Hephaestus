@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFA
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -41,16 +42,20 @@ public class WorkspaceMembershipService {
 
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final EntityManager entityManager;
+
+    // Field-injected via @PersistenceContext: documented Spring JPA carve-out from the
+    // "prefer constructor injection" rule. The SharedEntityManagerCreator proxy this binds to is
+    // lifecycle-independent of EntityManagerFactory bootstrap, so this stays correct under
+    // spring.data.jpa.repositories.bootstrap-mode=deferred and any future async EMF init.
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public WorkspaceMembershipService(
         WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceRepository workspaceRepository,
-        EntityManager entityManager
+        WorkspaceRepository workspaceRepository
     ) {
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceRepository = workspaceRepository;
-        this.entityManager = entityManager;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

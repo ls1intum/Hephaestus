@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.CannotAcquireLockException;
@@ -73,16 +74,14 @@ public class GitHubUserProcessor {
     private static final long DEADLOCK_RETRY_BASE_MS = 100;
 
     private final UserRepository userRepository;
-    private final EntityManager entityManager;
     private final TransactionTemplate requiresNewTransaction;
 
-    public GitHubUserProcessor(
-        UserRepository userRepository,
-        EntityManager entityManager,
-        TransactionTemplate transactionTemplate
-    ) {
+    // Field-injected per JPA spec idiom; see WorkspaceMembershipService for the rationale.
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    public GitHubUserProcessor(UserRepository userRepository, TransactionTemplate transactionTemplate) {
         this.userRepository = userRepository;
-        this.entityManager = entityManager;
         // Create a REQUIRES_NEW template so the upsert runs in its own transaction.
         // This isolates deadlock rollbacks from the caller's transaction.
         this.requiresNewTransaction = new TransactionTemplate(transactionTemplate.getTransactionManager());
