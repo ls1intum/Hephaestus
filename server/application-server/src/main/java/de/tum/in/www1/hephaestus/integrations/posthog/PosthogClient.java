@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.integrations.posthog;
 import java.net.URI;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,16 +122,11 @@ public class PosthogClient {
         return null;
     }
 
-    private String validateHost(String apiHost) {
-        String candidate = Objects.requireNonNull(apiHost, "apiHost must not be null").trim();
-        if (!StringUtils.hasText(candidate)) {
+    private String normalizeHost(String apiHost) {
+        if (!StringUtils.hasText(apiHost)) {
             throw new PosthogClientException("PostHog apiHost must not be empty");
         }
-        return candidate;
-    }
-
-    private String normalizeHost(String apiHost) {
-        String candidate = validateHost(apiHost);
+        String candidate = apiHost.trim();
         try {
             URI uri = URI.create(candidate);
             String host = uri.getHost();

@@ -133,7 +133,6 @@ class AccountServiceTest extends BaseUnitTest {
     class UpdateUserSettings {
 
         @Test
-        @DisplayName("persists aiReviewEnabled=true")
         void persistsAiReviewEnabledTrue() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -150,7 +149,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("persists aiReviewEnabled=false")
         void persistsAiReviewEnabledFalse() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -167,7 +165,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws when aiReviewEnabled is null")
         void throwsWhenAiReviewEnabledNull() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);

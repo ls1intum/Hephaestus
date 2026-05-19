@@ -48,7 +48,7 @@ For a 5-replica HotSpot deployment, the CI cost outweighs the saving.
 
 ## Builder pinning
 
-`pom.xml` references `paketobuildpacks/builder-noble-java-tiny:latest` and `paketobuildpacks/run-noble-java-tiny:latest`. The Ubuntu Noble line is the active Spring Boot 4 default; Jammy is on its way out. Digest-pinning the builder and run image in CI is a follow-up — currently the Maven plugin pulls `latest` on every build, which is reproducible-within-a-day but not across weeks.
+`pom.xml` pins the builder and run image by sha256 digest. Refresh with `docker buildx imagetools inspect paketobuildpacks/builder-noble-java-tiny:latest --format '{{.Manifest.Digest}}'` (and likewise for `paketobuildpacks/ubuntu-noble-run-tiny:latest`). Bump as part of release cycles; the digest is the source of truth, the tag is for humans. The run image is `ubuntu-noble-run-tiny` — `run-noble-java-tiny` does not exist on Docker Hub and was a fixture left over from older Paketo naming.
 
 ## git CLI in the runtime image
 
@@ -62,7 +62,8 @@ Revert the workflow change in `.github/workflows/ci-docker-build.yml` (the `use-
 
 - **Coolify graceful shutdown** — `application.yml` sets `SHUTDOWN_TIMEOUT:20s`. Coolify's default container stop-grace is 10s; bump it to 30s in the deploy substrate so SIGTERM has time to drain in-flight requests. The Paketo launcher `exec`s the JVM so signal forwarding is native; no `tini` needed.
 - **JVM memory** — do NOT set `MaxRAMPercentage`, `-Xmx`, or `-Xss` in Coolify env. Paketo's memory calculator computes them from container memory minus reserved headroom. Override only `BPL_JVM_HEAD_ROOM` if needed.
-- **SBOM** — Paketo emits Syft + SPDX + CycloneDX SBOMs at `/layers/sbom/` inside the image. CI does not yet extract them; `pack sbom download <image>` is the path when this becomes a release-gate requirement.
+- **SBOM** — Paketo emits Syft + SPDX + CycloneDX SBOMs at `/layers/sbom/` inside the image. CI extracts them via `pack sbom download` and uploads them as workflow artifacts (90-day retention).
+- **CVE scan** — Trivy runs on every PR in report-only mode and uploads a SARIF artifact. Flip `exit-code: 1` in the workflow to block merge on HIGH+ once the baseline is clean.
 - **CI build time** — expect +60-120s per build vs the prior Dockerfile baseline (CDS training run dominates). The Maven cache action shaves dependency resolution.
 
 ## Sources

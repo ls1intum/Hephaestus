@@ -48,7 +48,6 @@ public class LeaderboardTaskScheduler {
     public void activateTaskScheduler() {
         var timeParts = leaderboardProperties.schedule().time().split(":");
 
-        // CRON for the end of every leaderboard cycle
         String cron = String.format(
             "0 %s %s ? * %s",
             timeParts.length > 1 ? timeParts[1] : 0,
