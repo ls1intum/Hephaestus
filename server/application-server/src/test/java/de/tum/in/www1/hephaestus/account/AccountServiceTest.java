@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.account;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,6 +28,7 @@ import org.keycloak.representations.idm.FederatedIdentityRepresentation;
 import org.keycloak.representations.idm.IdentityProviderRepresentation;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.beans.factory.ObjectProvider;
 
 /**
  * Unit tests for {@link AccountService}.
@@ -47,6 +49,9 @@ class AccountServiceTest extends BaseUnitTest {
     private PosthogClient posthogClient;
 
     @Mock
+    private ObjectProvider<PosthogClient> posthogClientProvider;
+
+    @Mock
     private Keycloak keycloak;
 
     private AccountService accountService;
@@ -62,7 +67,15 @@ class AccountServiceTest extends BaseUnitTest {
             null,
             null
         );
-        accountService = new AccountService(userPreferencesRepository, posthogClient, keycloak, keycloakProperties);
+        // lenient: not every test in this class exercises the PostHog branch; strict-mode would flag
+        // the stub as unused. ObjectProvider#getIfAvailable returns the mock when called.
+        lenient().when(posthogClientProvider.getIfAvailable()).thenReturn(posthogClient);
+        accountService = new AccountService(
+            userPreferencesRepository,
+            posthogClientProvider,
+            keycloak,
+            keycloakProperties
+        );
     }
 
     private User createUser() {

@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -15,48 +16,43 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
 
+/**
+ * PostHog REST client. Class-level {@link ConditionalOnProperty} keeps the bean out of the context
+ * when {@code hephaestus.posthog.enabled} is not {@code true}. Consumers inject via
+ * {@code ObjectProvider<PosthogClient>} and short-circuit when the optional dependency is absent.
+ *
+ * <p>The constructor still throws on partial misconfiguration (enabled with no project ID or API
+ * key) — that is a deploy-time failure, not a runtime branch, so we want context refresh to fail
+ * loudly rather than silently disable the integration.
+ */
 @Component
+@ConditionalOnProperty(prefix = "hephaestus.posthog", name = "enabled", havingValue = "true")
 public class PosthogClient {
 
     private static final Logger log = LoggerFactory.getLogger(PosthogClient.class);
 
     private final RestClient restClient;
-    private final boolean enabled;
     private final String projectId;
 
     public PosthogClient(PosthogProperties posthogProperties) {
         boolean hasCredentials =
             StringUtils.hasText(posthogProperties.projectId()) &&
             StringUtils.hasText(posthogProperties.personalApiKey());
-        if (posthogProperties.enabled() && !hasCredentials) {
+        if (!hasCredentials) {
             log.error("Failed to initialize PostHog client: reason=missing_credentials");
             throw new PosthogClientException("PostHog configuration requires project ID and personal API key");
         }
-        this.enabled = posthogProperties.enabled() && hasCredentials;
         this.projectId = posthogProperties.projectId();
-        if (this.enabled) {
-            String resolvedHost = normalizeHost(posthogProperties.apiHost());
-            this.restClient = RestClient.builder()
-                .baseUrl(resolvedHost)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + posthogProperties.personalApiKey())
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .build();
-            log.info("Activated PostHog client: projectId={}, host={}", projectId, resolvedHost);
-        } else {
-            if (posthogProperties.enabled()) {
-                log.warn("Disabled PostHog integration: reason=missing_credentials");
-            } else {
-                log.debug("Disabled PostHog integration: reason=configuration_flag");
-            }
-            this.restClient = null;
-        }
+        String resolvedHost = normalizeHost(posthogProperties.apiHost());
+        this.restClient = RestClient.builder()
+            .baseUrl(resolvedHost)
+            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + posthogProperties.personalApiKey())
+            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .build();
+        log.info("Activated PostHog client: projectId={}, host={}", projectId, resolvedHost);
     }
 
     public boolean deletePersonData(String distinctId) {
-        if (!enabled) {
-            log.debug("Skipped PostHog deletion: reason=client_disabled");
-            return false;
-        }
         if (!StringUtils.hasText(distinctId)) {
             throw new PosthogClientException("distinctId must not be empty");
         }

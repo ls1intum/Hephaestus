@@ -16,6 +16,7 @@ import org.keycloak.representations.idm.FederatedIdentityRepresentation;
 import org.keycloak.representations.idm.IdentityProviderRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,18 +34,20 @@ public class AccountService {
     private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 
     private final UserPreferencesRepository userPreferencesRepository;
-    private final PosthogClient posthogClient;
+    // ObjectProvider so that the absent-when-hephaestus.posthog.enabled!=true case stays clean:
+    // getIfAvailable() returns null, callers short-circuit. No dummy bean, no internal flag.
+    private final ObjectProvider<PosthogClient> posthogClientProvider;
     private final Keycloak keycloak;
     private final KeycloakProperties keycloakProperties;
 
     public AccountService(
         UserPreferencesRepository userPreferencesRepository,
-        PosthogClient posthogClient,
+        ObjectProvider<PosthogClient> posthogClientProvider,
         Keycloak keycloak,
         KeycloakProperties keycloakProperties
     ) {
         this.userPreferencesRepository = userPreferencesRepository;
-        this.posthogClient = posthogClient;
+        this.posthogClientProvider = posthogClientProvider;
         this.keycloak = keycloak;
         this.keycloakProperties = keycloakProperties;
     }
@@ -327,6 +330,12 @@ public class AccountService {
     }
 
     private boolean deletePosthogIdentities(User user, String primaryDistinctId) {
+        PosthogClient client = posthogClientProvider.getIfAvailable();
+        if (client == null) {
+            log.debug("Skipped PostHog deletion: reason=clientDisabled");
+            return false;
+        }
+
         Set<String> distinctIds = new LinkedHashSet<>();
         if (StringUtils.hasText(primaryDistinctId)) {
             distinctIds.add(primaryDistinctId);
@@ -340,7 +349,7 @@ public class AccountService {
             if (!StringUtils.hasText(distinctId)) {
                 continue;
             }
-            anyDeleted = posthogClient.deletePersonData(distinctId) || anyDeleted;
+            anyDeleted = client.deletePersonData(distinctId) || anyDeleted;
         }
         return anyDeleted;
     }
