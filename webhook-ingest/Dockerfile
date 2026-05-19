@@ -18,7 +18,7 @@ WORKDIR /repo
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc /repo/
 COPY webapp/package.json /repo/webapp/
 COPY webhook-ingest/package.json /repo/webhook-ingest/
-COPY server/application-server/agent-extensions/package.json /repo/server/application-server/agent-extensions/
+COPY server/agent-extensions/package.json /repo/server/agent-extensions/
 COPY docs/package.json /repo/docs/
 
 # Install webhook-ingest + its transitive workspace deps

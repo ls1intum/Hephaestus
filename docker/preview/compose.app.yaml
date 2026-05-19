@@ -185,7 +185,7 @@ services:
   # ---------------------------------------------------------------------------
   application-server:
     build:
-      context: ./server/application-server
+      context: ./server
       dockerfile: Dockerfile
     hostname: application-server
     restart: unless-stopped

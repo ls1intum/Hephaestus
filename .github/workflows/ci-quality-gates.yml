@@ -102,8 +102,8 @@ jobs:
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
           pnpm --filter @hephaestus/agent-extensions run typecheck \
             || { TS_OK=false; ISSUES_FOUND+=("Pi extension TS failed typecheck against @earendil-works/pi-coding-agent. Run: pnpm --filter @hephaestus/agent-extensions run typecheck"); }
-          node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
-            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi mentor runner smoke test failed. Run: node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs"); }
+          node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
+            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi mentor runner smoke test failed. Run: node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
@@ -111,7 +111,7 @@ jobs:
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$TS_OK" == "false" ]] && echo "| Pi extension TS | :x: Failed | \`pnpm --filter @hephaestus/agent-extensions run typecheck\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$RUNNER_OK" == "false" ]] && echo "| Pi mentor runner smoke | :x: Failed | \`node --test server/application-server/src/test/resources/agent/pi-mentor-runner.spec.mjs\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$RUNNER_OK" == "false" ]] && echo "| Pi mentor runner smoke | :x: Failed | \`node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
@@ -173,7 +173,7 @@ jobs:
           MODEL_NAME: fake:model
         run: |
           pnpm install --frozen-lockfile
-          cd server/application-server
+          cd server
           mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
           cd ../..
 
@@ -207,12 +207,12 @@ jobs:
           export SPRING_DATASOURCE_PASSWORD="root"
 
           # Compile application-server once (shared across all checks)
-          if ! (cd server/application-server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true); then
+          if ! (cd server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true); then
             echo "::error::Maven compilation failed. This blocks all database validation checks. Fix compilation errors first."
             echo "### Database Validation" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            echo "| Maven compile | :x: Failed | Fix compilation errors in \`server/application-server\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| Maven compile | :x: Failed | Fix compilation errors in \`server\` |" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
@@ -220,9 +220,9 @@ jobs:
 
           # Check 1: Schema drift
           scripts/db-utils.sh draft-changelog || ISSUES_FOUND+=("Schema check script failed. Run: pnpm run db:draft-changelog")
-          if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
+          if [ -f "server/src/main/resources/db/changelog_new.xml" ]; then
             echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
-            cat server/application-server/src/main/resources/db/changelog_new.xml
+            cat server/src/main/resources/db/changelog_new.xml
             ISSUES_FOUND+=("Schema drift detected")
           fi
 

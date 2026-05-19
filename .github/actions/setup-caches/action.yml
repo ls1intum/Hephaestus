@@ -25,9 +25,9 @@ runs:
       with:
         path: |
           ~/.m2/repository
-          server/application-server/target/generated-sources
-          server/application-server/target/maven-status
-        key: ${{ inputs.os }}-maven-${{ hashFiles('server/application-server/pom.xml', 'server/application-server/src/main/resources/graphql/**/*.graphql', 'server/application-server/src/main/resources/graphql/**/*.ftl') || 'no-pom' }}
+          server/target/generated-sources
+          server/target/maven-status
+        key: ${{ inputs.os }}-maven-${{ hashFiles('server/pom.xml', 'server/src/main/resources/graphql/**/*.graphql', 'server/src/main/resources/graphql/**/*.ftl') || 'no-pom' }}
         restore-keys: |
           ${{ inputs.os }}-maven-
 

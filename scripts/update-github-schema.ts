@@ -16,7 +16,7 @@ const __dirname = dirname(__filename);
 
 const SCHEMA_DIR = resolve(
 	__dirname,
-	"../server/application-server/src/main/resources/graphql/github",
+	"../server/src/main/resources/graphql/github",
 );
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.github.graphql");
 // Official GitHub GraphQL schema URL - this is the only trusted source
@@ -132,7 +132,7 @@ async function main(): Promise<void> {
 		renameSync(tempFile, SCHEMA_FILE);
 
 		console.log(`Schema updated successfully: ${SCHEMA_FILE}`);
-		console.log("\nTo regenerate types: cd server/application-server && ./mvnw compile -DskipTests");
+		console.log("\nTo regenerate types: cd server && ./mvnw compile -DskipTests");
 	} catch (error) {
 		// Clean up temp file on error
 		try {

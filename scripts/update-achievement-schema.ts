@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { basename } from 'node:path';
 
-const SCHEMA_PATH = 'server/application-server/src/main/resources/achievements/achievements-schema.json';
-const EVALUATOR_PKG_PATH = 'server/application-server/src/main/java/de/tum/in/www1/hephaestus/achievement/evaluator';
+const SCHEMA_PATH = 'server/src/main/resources/achievements/achievements-schema.json';
+const EVALUATOR_PKG_PATH = 'server/src/main/java/de/tum/in/www1/hephaestus/achievement/evaluator';
 const PACKAGE_PREFIX = 'de.tum.in.www1.hephaestus.achievement.evaluator.';
 
 function updateSchema() {

@@ -10,7 +10,7 @@
 renovate.json                    @ls1intum/hephaestus-maintainers
 
 # Application Server (Java/Spring)
-server/application-server/       @ls1intum/hephaestus-maintainers
+server/       @ls1intum/hephaestus-maintainers
 
 # Webhook Ingest (TypeScript/Hono)
 webhook-ingest/           @ls1intum/hephaestus-maintainers

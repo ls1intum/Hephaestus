@@ -9,8 +9,8 @@
 			"path": "./webapp"
 		},
 		{
-			"name": "server/application-server",
-			"path": "./server/application-server"
+			"name": "server",
+			"path": "./server"
 		},
 		{
 			"name": "webhook-ingest",

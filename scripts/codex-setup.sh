@@ -116,7 +116,7 @@ install_java_maven() {
     fi
 
     # Create symlink for mvnw to use system Maven (for network-restricted environments)
-    local mvnw_path="$ROOT_DIR/server/application-server/mvnw"
+    local mvnw_path="$ROOT_DIR/server/mvnw"
     if [[ -f "$mvnw_path" ]] && command -v mvn >/dev/null 2>&1; then
         local mvn_path
         mvn_path="$(command -v mvn)"

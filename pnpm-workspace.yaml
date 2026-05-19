@@ -1,7 +1,7 @@
 packages:
   - webapp
   - webhook-ingest
-  - server/application-server/agent-extensions
+  - server/agent-extensions
   - docs
 
 # Hoist patterns target packages found via Node module resolution from
@@ -13,7 +13,7 @@ publicHoistPattern:
   # @types/* searched by TypeScript from source files in any subtree
   - '@types/*'
   # @earendil-works pi-coding-agent imported from
-  # server/application-server/src/main/resources/agent/extensions/*.ts
+  # server/src/main/resources/agent/extensions/*.ts
   # (sits under Maven classpath resources, outside agent-extensions/).
   - '@earendil-works/*'
 

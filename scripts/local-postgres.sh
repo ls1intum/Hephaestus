@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_SERVER_DIR="$PROJECT_ROOT/server/application-server"
+APP_SERVER_DIR="$PROJECT_ROOT/server"
 DATA_DIR="${APP_SERVER_DIR}/postgres-data-local"
 LOG_FILE="${DATA_DIR}/postgres.log"
 PG_HOST="${POSTGRES_HOST:-127.0.0.1}"

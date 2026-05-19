@@ -161,7 +161,7 @@ CI only runs jobs for components that actually changed:
 | Component            | Triggers On                                                   |
 | -------------------- | ------------------------------------------------------------- |
 | Webapp               | `webapp/**`, `package.json`, `package-lock.json`              |
-| Application Server   | `server/application-server/**`, `scripts/db-utils.sh`         |
+| Application Server   | `server/**`, `scripts/db-utils.sh`         |
 | Webhook Ingest       | `webhook-ingest/**`, root package files                |
 | CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
 
@@ -239,7 +239,7 @@ pnpm run test:webapp           # Unit tests
 
 # Application Server (Java)
 pnpm run format:java:check     # Check formatting
-cd server/application-server && ./mvnw test -Dgroups="unit"  # Unit tests
+cd server && ./mvnw test -Dgroups="unit"  # Unit tests
 
 # Webhook Ingest
 pnpm run check:webhook-ingest

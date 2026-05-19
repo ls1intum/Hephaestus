@@ -134,7 +134,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
-  server/application-server/agent-extensions:
+  server/agent-extensions:
     devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.74.1

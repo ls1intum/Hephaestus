@@ -44,7 +44,7 @@ on:
         type: string
         required: false
         default: ""
-        description: "Maven module path passed as -pl when use-buildpacks=true (e.g. server/application-server)"
+        description: "Maven module path passed as -pl when use-buildpacks=true (e.g. server)"
       registry:
         type: string
         default: "ghcr.io"
@@ -166,7 +166,7 @@ jobs:
         if: inputs.use-buildpacks
         run: |
           if [ -z "${{ inputs.maven-module }}" ]; then
-            echo "::error::use-buildpacks=true requires maven-module (e.g. server/application-server)"
+            echo "::error::use-buildpacks=true requires maven-module (e.g. server)"
             exit 1
           fi
 
