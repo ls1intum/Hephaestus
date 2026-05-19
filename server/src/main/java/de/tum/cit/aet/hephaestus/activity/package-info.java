@@ -76,5 +76,8 @@
  * @see <a href="https://cloudevents.io/">CloudEvents Specification</a>
  * @see <a href="https://www.w3.org/TR/activitystreams-core/">ActivityStreams 2.0</a>
  */
-@org.springframework.modulith.ApplicationModule(displayName = "Activity Event Log")
+@org.springframework.modulith.ApplicationModule(
+    displayName = "Activity Event Log",
+    type = org.springframework.modulith.ApplicationModule.Type.OPEN
+)
 package de.tum.cit.aet.hephaestus.activity;

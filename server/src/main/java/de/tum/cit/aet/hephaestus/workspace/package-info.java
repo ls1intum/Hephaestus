@@ -6,5 +6,8 @@
  * holder, request filter, scoped controller meta-annotation). Feature modules consume it
  * to bind operations to a workspace.
  */
-@org.springframework.modulith.ApplicationModule(displayName = "Workspace (Tenancy)")
+@org.springframework.modulith.ApplicationModule(
+    displayName = "Workspace (Tenancy / shared kernel)",
+    type = org.springframework.modulith.ApplicationModule.Type.OPEN
+)
 package de.tum.cit.aet.hephaestus.workspace;

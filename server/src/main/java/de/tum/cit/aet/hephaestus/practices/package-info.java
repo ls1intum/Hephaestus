@@ -40,5 +40,8 @@
  *
  * @see de.tum.cit.aet.hephaestus.activity Activity module (event log for gamification)
  */
-@org.springframework.modulith.ApplicationModule(displayName = "Practices (Code Health)")
+@org.springframework.modulith.ApplicationModule(
+    displayName = "Practices (Code Health)",
+    type = org.springframework.modulith.ApplicationModule.Type.OPEN
+)
 package de.tum.cit.aet.hephaestus.practices;
