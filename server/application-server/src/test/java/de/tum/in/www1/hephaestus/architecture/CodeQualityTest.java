@@ -478,7 +478,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "GitLabWebhookService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabHistoricalBackfillService", // Optional GitLab beans gated by @ConditionalOnProperty
-                "HistoricalBackfillScheduler" // Optional GitLab backfill service gated by @ConditionalOnProperty
+                "HistoricalBackfillScheduler", // Optional GitLab backfill service gated by @ConditionalOnProperty
+                "AccountService" // PosthogClient is optional, gated by @ConditionalOnProperty(hephaestus.posthog.enabled=true)
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {
