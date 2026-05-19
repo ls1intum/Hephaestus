@@ -20,6 +20,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  */
 @Configuration
 @EnableConfigurationProperties(LlmProxyProperties.class)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    name = de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole.SANDBOX_LLM_PROXY_PROPERTY,
+    havingValue = "true",
+    matchIfMissing = true
+)
 class LlmProxySecurityConfig {
 
     @Bean

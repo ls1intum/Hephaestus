@@ -53,6 +53,11 @@ import tools.jackson.databind.node.ObjectNode;
 @Hidden
 @RequestMapping("/internal/llm")
 @PreAuthorize("isAuthenticated()")
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    name = de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole.SANDBOX_LLM_PROXY_PROPERTY,
+    havingValue = "true",
+    matchIfMissing = true
+)
 class LlmProxyController {
 
     private static final Logger log = LoggerFactory.getLogger(LlmProxyController.class);
