@@ -13,6 +13,7 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.RawTextComparator;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -29,9 +30,9 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Diff and commit-log operations on local git clones, used by {@link PullRequestContentProvider}
- * and {@code PullRequestReviewHandler}. Diff output uses
- * {@link DiffAlgorithm.SupportedAlgorithm#HISTOGRAM} to match git CLI 2.34+ defaults.
+ * Diff and commit-log operations on local git clones. Diff output uses
+ * {@link DiffAlgorithm.SupportedAlgorithm#HISTOGRAM} to match git CLI 2.34+ defaults; renames
+ * use a 50% similarity floor (git's {@code -M} default) rather than JGit's 60%.
  */
 @Component
 public class GitDiffOperations {
@@ -40,6 +41,31 @@ public class GitDiffOperations {
 
     /** Regex matching unified diff hunk headers: {@code @@ -a,b +c,d @@}. Group 1 captures {@code c}. */
     private static final Pattern HUNK_HEADER = Pattern.compile("^@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@");
+
+    @FunctionalInterface
+    private interface RepoOp<T> {
+        T apply(Repository repo) throws IOException;
+    }
+
+    @Nullable
+    private <T> T withRepo(Path repoPath, String operation, RepoOp<T> op) {
+        try (Git git = Git.open(repoPath.toFile())) {
+            return op.apply(git.getRepository());
+        } catch (MissingObjectException e) {
+            log.debug("{}: unresolved object in {}: {}", operation, repoPath, e.getMessage());
+            return null;
+        } catch (IOException e) {
+            log.warn("{} failed for {}: {}", operation, repoPath, e.getMessage());
+            return null;
+        }
+    }
+
+    @Nullable
+    private static ObjectId[] resolveRange(Repository repo, String baseRef, String headRef) throws IOException {
+        ObjectId baseId = repo.resolve(baseRef);
+        ObjectId headId = repo.resolve(headRef);
+        return (baseId == null || headId == null) ? null : new ObjectId[] { baseId, headId };
+    }
 
     /**
      * Resolve {@code [baseSha, headSha]} for a PR/MR diff. Tries, in order:
@@ -56,8 +82,7 @@ public class GitDiffOperations {
         if (headSha == null || headSha.isBlank()) {
             return null;
         }
-        try (Git git = Git.open(repoPath.toFile())) {
-            Repository repo = git.getRepository();
+        return withRepo(repoPath, "resolveDiffRange", repo -> {
             ObjectId head = repo.resolve(headSha);
             if (head == null) {
                 return null;
@@ -83,6 +108,7 @@ public class GitDiffOperations {
             }
 
             try (RevWalk walk = new RevWalk(repo)) {
+                walk.setRetainBody(false);
                 walk.markStart(walk.parseCommit(target));
                 walk.markUninteresting(walk.parseCommit(head));
                 for (RevCommit commit : walk) {
@@ -104,10 +130,7 @@ public class GitDiffOperations {
             }
 
             return null;
-        } catch (IOException e) {
-            log.warn("Failed to resolve diff range: repo={}, error={}", repoPath, e.getMessage());
-            return null;
-        }
+        });
     }
 
     /**
@@ -116,13 +139,9 @@ public class GitDiffOperations {
      */
     @Nullable
     public String diff(Path repoPath, String baseRef, String headRef) {
-        try (Git git = Git.open(repoPath.toFile())) {
-            Repository repo = git.getRepository();
-            ObjectId baseId = repo.resolve(baseRef);
-            ObjectId headId = repo.resolve(headRef);
-            if (baseId == null || headId == null) {
-                return null;
-            }
+        return withRepo(repoPath, "diff", repo -> {
+            ObjectId[] range = resolveRange(repo, baseRef, headRef);
+            if (range == null) return null;
 
             try (
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -130,32 +149,24 @@ public class GitDiffOperations {
                 RevWalk walk = new RevWalk(repo);
                 DiffFormatter formatter = newDiffFormatter(repo, out)
             ) {
-                AbstractTreeIterator oldTree = treeIterator(reader, walk, baseId);
-                AbstractTreeIterator newTree = treeIterator(reader, walk, headId);
-                formatter.format(oldTree, newTree);
+                formatter.format(treeIterator(reader, walk, range[0]), treeIterator(reader, walk, range[1]));
                 formatter.flush();
                 return out.toString(StandardCharsets.UTF_8);
             }
-        } catch (IOException e) {
-            log.warn("Failed to compute diff: repo={}, error={}", repoPath, e.getMessage());
-            return null;
-        }
+        });
     }
 
     /**
-     * Per-file diff statistics in {@code path | N+- } format. Per-file lines are shaped to match
-     * {@code git diff --stat} so {@link PullRequestReviewHandler#parseDiffStatPaths} extracts the
-     * same paths; renamed files use {@code old => new} syntax. No summary footer is emitted.
+     * Per-file diff statistics shaped like {@code git diff --stat}: {@code  path | N} for text
+     * files, {@code  path | Bin} for binaries, renamed files as {@code old => new}. No summary
+     * footer; {@link de.tum.in.www1.hephaestus.agent.handler.PullRequestReviewHandler#parseDiffStatPaths}
+     * tolerates either shape.
      */
     @Nullable
     public String diffStat(Path repoPath, String baseRef, String headRef) {
-        try (Git git = Git.open(repoPath.toFile())) {
-            Repository repo = git.getRepository();
-            ObjectId baseId = repo.resolve(baseRef);
-            ObjectId headId = repo.resolve(headRef);
-            if (baseId == null || headId == null) {
-                return null;
-            }
+        return withRepo(repoPath, "diffStat", repo -> {
+            ObjectId[] range = resolveRange(repo, baseRef, headRef);
+            if (range == null) return null;
 
             StringBuilder out = new StringBuilder();
             try (
@@ -163,45 +174,29 @@ public class GitDiffOperations {
                 RevWalk walk = new RevWalk(repo);
                 DiffFormatter formatter = newDiffFormatter(repo, null)
             ) {
-                AbstractTreeIterator oldTree = treeIterator(reader, walk, baseId);
-                AbstractTreeIterator newTree = treeIterator(reader, walk, headId);
-                List<DiffEntry> entries = formatter.scan(oldTree, newTree);
+                List<DiffEntry> entries = formatter.scan(
+                    treeIterator(reader, walk, range[0]),
+                    treeIterator(reader, walk, range[1])
+                );
                 for (DiffEntry entry : entries) {
-                    String path = displayPath(entry);
-                    int additions = 0;
-                    int deletions = 0;
-                    try {
-                        FileHeader header = formatter.toFileHeader(entry);
-                        for (Edit edit : header.toEditList()) {
-                            deletions += edit.getEndA() - edit.getBeginA();
-                            additions += edit.getEndB() - edit.getBeginB();
-                        }
-                    } catch (IOException e) {
-                        log.debug("Skipped stat for {}: {}", path, e.getMessage());
-                    }
-                    out.append(' ').append(path).append(" | ").append(additions + deletions).append('\n');
+                    out
+                        .append(' ')
+                        .append(displayPath(entry))
+                        .append(" | ")
+                        .append(statColumn(formatter, entry))
+                        .append('\n');
                 }
             }
             return out.toString();
-        } catch (IOException e) {
-            log.warn("Failed to compute diff stat: repo={}, error={}", repoPath, e.getMessage());
-            return null;
-        }
+        });
     }
 
-    /**
-     * Produce the list of files changed between {@code baseRef..headRef}, one path per line.
-     * Equivalent to {@code git diff --name-only base..head}. For renames, returns the new path.
-     */
+    /** One path per line; renames return the new path. */
     @Nullable
     public String diffNameOnly(Path repoPath, String baseRef, String headRef) {
-        try (Git git = Git.open(repoPath.toFile())) {
-            Repository repo = git.getRepository();
-            ObjectId baseId = repo.resolve(baseRef);
-            ObjectId headId = repo.resolve(headRef);
-            if (baseId == null || headId == null) {
-                return null;
-            }
+        return withRepo(repoPath, "diffNameOnly", repo -> {
+            ObjectId[] range = resolveRange(repo, baseRef, headRef);
+            if (range == null) return null;
 
             StringBuilder out = new StringBuilder();
             try (
@@ -209,47 +204,53 @@ public class GitDiffOperations {
                 RevWalk walk = new RevWalk(repo);
                 DiffFormatter formatter = newDiffFormatter(repo, null)
             ) {
-                AbstractTreeIterator oldTree = treeIterator(reader, walk, baseId);
-                AbstractTreeIterator newTree = treeIterator(reader, walk, headId);
-                for (DiffEntry entry : formatter.scan(oldTree, newTree)) {
+                for (DiffEntry entry : formatter.scan(
+                    treeIterator(reader, walk, range[0]),
+                    treeIterator(reader, walk, range[1])
+                )) {
                     out.append(displayPath(entry)).append('\n');
                 }
             }
             return out.toString();
-        } catch (IOException e) {
-            log.warn("Failed to compute diff name-only: repo={}, error={}", repoPath, e.getMessage());
-            return null;
-        }
+        });
     }
 
-    /**
-     * Produce short log entries for commits in {@code baseRef..headRef}, formatted as
-     * {@code <shortSha>\t<subject>}, one per line. Equivalent to
-     * {@code git log --format=%h\t%s base..head}.
-     */
+    /** {@code <shortSha>\t<subject>}, one commit per line, newest first. */
     @Nullable
     public String shortLog(Path repoPath, String baseRef, String headRef) {
-        try (Git git = Git.open(repoPath.toFile())) {
-            Repository repo = git.getRepository();
-            ObjectId baseId = repo.resolve(baseRef);
-            ObjectId headId = repo.resolve(headRef);
-            if (baseId == null || headId == null) {
-                return null;
-            }
+        return withRepo(repoPath, "shortLog", repo -> {
+            ObjectId[] range = resolveRange(repo, baseRef, headRef);
+            if (range == null) return null;
 
             StringBuilder out = new StringBuilder();
             try (RevWalk walk = new RevWalk(repo)) {
-                walk.markStart(walk.parseCommit(headId));
-                walk.markUninteresting(walk.parseCommit(baseId));
+                walk.markStart(walk.parseCommit(range[1]));
+                walk.markUninteresting(walk.parseCommit(range[0]));
                 for (RevCommit commit : walk) {
                     AbbreviatedObjectId abbreviated = commit.abbreviate(7);
                     out.append(abbreviated.name()).append('\t').append(commit.getShortMessage()).append('\n');
                 }
             }
             return out.toString();
+        });
+    }
+
+    private static String statColumn(DiffFormatter formatter, DiffEntry entry) {
+        try {
+            FileHeader header = formatter.toFileHeader(entry);
+            if (header.getPatchType() == FileHeader.PatchType.BINARY) {
+                return "Bin";
+            }
+            int additions = 0;
+            int deletions = 0;
+            for (Edit edit : header.toEditList()) {
+                deletions += edit.getEndA() - edit.getBeginA();
+                additions += edit.getEndB() - edit.getBeginB();
+            }
+            return Integer.toString(additions + deletions);
         } catch (IOException e) {
-            log.warn("Failed to compute short log: repo={}, error={}", repoPath, e.getMessage());
-            return null;
+            log.debug("Skipped stat for {}: {}", entry.getNewPath(), e.getMessage());
+            return "0";
         }
     }
 

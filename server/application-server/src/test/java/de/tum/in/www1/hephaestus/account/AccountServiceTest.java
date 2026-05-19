@@ -3,9 +3,9 @@ package de.tum.in.www1.hephaestus.account;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.config.KeycloakProperties;
@@ -67,9 +67,6 @@ class AccountServiceTest extends BaseUnitTest {
             null,
             null
         );
-        // lenient: not every test in this class exercises the PostHog branch; strict-mode would flag
-        // the stub as unused. ObjectProvider#getIfAvailable returns the mock when called.
-        lenient().when(posthogClientProvider.getIfAvailable()).thenReturn(posthogClient);
         accountService = new AccountService(
             userPreferencesRepository,
             posthogClientProvider,
@@ -133,6 +130,7 @@ class AccountServiceTest extends BaseUnitTest {
     class UpdateUserSettings {
 
         @Test
+        @DisplayName("persists aiReviewEnabled=true")
         void persistsAiReviewEnabledTrue() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -149,6 +147,7 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("persists aiReviewEnabled=false")
         void persistsAiReviewEnabledFalse() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -165,6 +164,7 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("throws when aiReviewEnabled is null")
         void throwsWhenAiReviewEnabledNull() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -267,12 +267,29 @@ class AccountServiceTest extends BaseUnitTest {
             prefs.setAiReviewEnabled(true);
             when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.of(prefs));
             when(userPreferencesRepository.save(any(UserPreferences.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(posthogClientProvider.getIfAvailable()).thenReturn(posthogClient);
             when(posthogClient.deletePersonData(any())).thenReturn(true);
 
             UserSettingsDTO dto = new UserSettingsDTO(false, false);
             accountService.updateUserSettings(user, dto, KEYCLOAK_USER_ID);
 
             verify(posthogClient).deletePersonData(KEYCLOAK_USER_ID);
+        }
+
+        @Test
+        @DisplayName("skips PostHog deletion when the client bean is absent")
+        void skipsPosthogDeletionWhenBeanAbsent() {
+            User user = createUser();
+            UserPreferences prefs = createPreferences(user);
+            prefs.setParticipateInResearch(true);
+            when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.of(prefs));
+            when(userPreferencesRepository.save(any(UserPreferences.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(posthogClientProvider.getIfAvailable()).thenReturn(null);
+
+            UserSettingsDTO dto = new UserSettingsDTO(false, false);
+            accountService.updateUserSettings(user, dto, KEYCLOAK_USER_ID);
+
+            verifyNoInteractions(posthogClient);
         }
 
         @Test

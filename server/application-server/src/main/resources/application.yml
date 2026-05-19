@@ -6,14 +6,13 @@ spring:
     config:
         import: optional:file:.env[.properties]
 
-    # Re-evaluate when Java 25 + JEP 491 lands: pgjdbc 42.7.x has synchronized blocks that pin
-    # the carrier on Java < 24 under contended I/O.
     threads:
         virtual:
             enabled: true
 
-    # Virtual-thread Tomcat connectors are daemons; without keep-alive the JVM exits after
-    # main() returns, killing @Scheduled cron triggers.
+    # Virtual threads are always daemons. With virtual threads enabled, both the request executor
+    # and the @Scheduled TaskScheduler use them — so no non-daemon thread remains after main().
+    # keep-alive registers one to hold the JVM open between cron firings.
     main:
         keep-alive: true
 
@@ -506,17 +505,10 @@ hephaestus:
         token: ${SLACK_BOT_TOKEN:${SLACK_TOKEN:}}
         signing-secret: ${SLACK_SIGNING_SECRET:}
 
-    # ═══════════════════════════════════════════════════════════════════════════
-    # SENTRY ERROR TRACKING
-    # ═══════════════════════════════════════════════════════════════════════════
     sentry:
         dsn: ${SENTRY_DSN:}
 
-# ═══════════════════════════════════════════════════════════════════════════
-# RESILIENCE4J CIRCUIT BREAKER
-# ═══════════════════════════════════════════════════════════════════════════
-# Protects against cascading failures when GitHub API is unavailable
-# See ResilienceConfig.java for default values; these can be overridden here
+# Protects against cascading failures when GitHub API is unavailable; defaults in ResilienceConfig.java.
 resilience4j:
     circuitbreaker:
         configs:

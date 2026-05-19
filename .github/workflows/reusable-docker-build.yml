@@ -78,6 +78,10 @@ jobs:
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -174,27 +178,37 @@ jobs:
             -Ddocker.publishRegistry.url="$DOCKER_PUBLISH_REGISTRY_URL" \
             -Ddocker.publishRegistry.username="$DOCKER_PUBLISH_REGISTRY_USERNAME" \
             -Ddocker.publishRegistry.password="$DOCKER_PUBLISH_REGISTRY_PASSWORD"
-          # Read the registry's per-arch manifest digest. `imagetools inspect --format` returns the
-          # canonical digest the registry indexed; sha256-summing --raw output is unsafe because any
-          # whitespace normalization yields a different digest than the registry's.
-          DIGEST=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$PER_ARCH_TAG")
+          # Capture the platform-specific manifest digest. Newer Paketo lifecycle versions may
+          # publish per-arch tags as a single-entry image index; descend to the matching arch when
+          # that happens so the merge job pins the platform manifest, not the index wrapper.
+          RAW=$(docker buildx imagetools inspect "$PER_ARCH_TAG" --format '{{json .Manifest}}')
+          if echo "$RAW" | jq -e '.manifests' >/dev/null 2>&1; then
+            ARCH=$(echo "${{ matrix.platform }}" | awk -F/ '{print $2}')
+            DIGEST=$(echo "$RAW" | jq -r --arg arch "$ARCH" \
+              '.manifests[] | select(.platform.architecture == $arch and .platform.os == "linux") | .digest')
+          else
+            DIGEST=$(echo "$RAW" | jq -r '.digest')
+          fi
           if [[ ! "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-            echo "::error::Refusing to publish: per-arch digest is not a sha256:<64 hex>"
+            echo "::error::Refusing to publish: per-arch digest is not a sha256:<64 hex> (got: ${DIGEST:-<empty>})"
             exit 1
           fi
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
           echo "Per-arch digest: $DIGEST"
 
       # SBOMs are emitted by Paketo into /layers/sbom/ during the build; pack downloads them via
-      # the OCI label io.buildpacks.lifecycle.metadata. Sigstore-pinned binary, sha256-verified.
+      # the OCI label io.buildpacks.lifecycle.metadata.
       - name: Install pack CLI (Buildpacks SBOM extraction)
         if: inputs.use-buildpacks
         env:
           PACK_VERSION: v0.40.6
         run: |
           set -euo pipefail
-          curl -fsSL -o /tmp/pack.tgz \
-            "https://github.com/buildpacks/pack/releases/download/${PACK_VERSION}/pack-${PACK_VERSION}-linux$([ "${{ runner.arch }}" = "ARM64" ] && echo "-arm64" || echo "").tgz"
+          ARCH_SUFFIX=$([ "${{ runner.arch }}" = "ARM64" ] && echo "-arm64" || echo "")
+          BASE="https://github.com/buildpacks/pack/releases/download/${PACK_VERSION}"
+          curl -fsSL --proto =https -o /tmp/pack.tgz       "${BASE}/pack-${PACK_VERSION}-linux${ARCH_SUFFIX}.tgz"
+          curl -fsSL --proto =https -o /tmp/pack.sha256    "${BASE}/pack-${PACK_VERSION}-linux${ARCH_SUFFIX}.tgz.sha256"
+          ( cd /tmp && awk '{print $1"  pack.tgz"}' pack.sha256 | sha256sum -c - )
           tar -xzf /tmp/pack.tgz -C /usr/local/bin pack
           pack version
 
@@ -221,15 +235,30 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      # Direct trivy binary install: GHA resolves `uses:` references at workflow load time
-      # regardless of `if:` conditions, and aquasecurity/trivy-action's transitive setup-trivy
-      # dependency breaks every consumer of this reusable workflow when it can't resolve.
-      # Report-only; flip --exit-code 1 after main has a clean baseline.
-      - name: Install + run Trivy (CVE scan, report-only)
+      # Direct trivy binary install — aquasecurity/trivy-action's transitive setup-trivy dep
+      # breaks consumers of this reusable workflow when it can't resolve. Report-only baseline;
+      # flip --exit-code 1 once HIGH+ is at zero on main.
+      - name: Install Trivy
+        id: install-trivy
         if: inputs.use-buildpacks
         continue-on-error: true
         env:
-          TRIVY_VERSION: 0.58.2
+          TRIVY_VERSION: 0.70.0
+        run: |
+          set -euo pipefail
+          ARCH=$([ "${{ runner.arch }}" = "ARM64" ] && echo "ARM64" || echo "64bit")
+          BASE="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+          ARCHIVE="trivy_${TRIVY_VERSION}_Linux-${ARCH}.tar.gz"
+          curl -fsSL --proto =https -o "/tmp/${ARCHIVE}"          "${BASE}/${ARCHIVE}"
+          curl -fsSL --proto =https -o /tmp/trivy_checksums.txt   "${BASE}/trivy_${TRIVY_VERSION}_checksums.txt"
+          ( cd /tmp && grep " ${ARCHIVE}$" trivy_checksums.txt | sha256sum -c - )
+          tar -xzf "/tmp/${ARCHIVE}" -C /usr/local/bin trivy
+          trivy --version
+
+      - name: Run Trivy (CVE scan, report-only)
+        if: inputs.use-buildpacks && steps.install-trivy.outcome == 'success'
+        continue-on-error: true
+        env:
           # Trivy queries the registry directly (not the local daemon) and does not read
           # ~/.docker/config.json — explicit credentials are required for ghcr.io.
           TRIVY_USERNAME: ${{ github.actor }}
@@ -237,22 +266,18 @@ jobs:
           PER_ARCH_TAG: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}
         run: |
           set -euo pipefail
-          ARCH=$([ "${{ runner.arch }}" = "ARM64" ] && echo "ARM64" || echo "64bit")
-          curl -fsSL -o /tmp/trivy.tgz \
-            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${ARCH}.tar.gz"
-          tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
-          trivy --version
           trivy image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 0 \
             --format sarif --output "${{ runner.temp }}/trivy.sarif" "$PER_ARCH_TAG"
 
-      - name: Upload Trivy SARIF
-        if: inputs.use-buildpacks
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      # Surface findings in the GitHub Security tab + PR annotations rather than a 30-day artifact
+      # nobody opens. continue-on-error keeps the workflow green while the baseline is non-zero.
+      - name: Upload Trivy SARIF to GitHub code scanning
+        if: inputs.use-buildpacks && steps.install-trivy.outcome == 'success'
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@be1102e4461872bb6506cd26561a31b56671ace0 # v3.30.9
         with:
-          name: trivy-${{ steps.prep.outputs.image_name }}-${{ steps.prep.outputs.platform_pair }}
-          path: ${{ runner.temp }}/trivy.sarif
-          if-no-files-found: error
-          retention-days: 30
+          sarif_file: ${{ runner.temp }}/trivy.sarif
+          category: trivy-image-${{ steps.prep.outputs.platform_pair }}
 
       - name: Export digest
         env:

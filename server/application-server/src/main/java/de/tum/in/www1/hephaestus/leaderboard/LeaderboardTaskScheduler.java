@@ -16,10 +16,7 @@ import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Component;
 
-/**
- * Schedules tasks to run at the end of every leaderboard cycle.
- * @see SlackWeeklyLeaderboardTask
- */
+/** Wires the weekly Slack message + league-points update onto the cron defined in {@link LeaderboardProperties}. */
 @Order(value = Ordered.LOWEST_PRECEDENCE)
 @Component
 @Profile("!test")
