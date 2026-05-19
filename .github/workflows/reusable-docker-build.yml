@@ -217,17 +217,24 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      # Report-only on first PR; flip exit-code to 1 after a clean baseline run on main.
-      - name: CVE scan (Trivy)
+      # Direct trivy binary install: GHA resolves `uses:` references at workflow load time
+      # regardless of `if:` conditions, and aquasecurity/trivy-action's transitive setup-trivy
+      # dependency breaks every consumer of this reusable workflow when it can't resolve.
+      # Report-only; flip --exit-code 1 after main has a clean baseline.
+      - name: Install + run Trivy (CVE scan, report-only)
         if: inputs.use-buildpacks
-        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.28.0
-        with:
-          image-ref: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}
-          format: sarif
-          output: ${{ runner.temp }}/trivy.sarif
-          severity: CRITICAL,HIGH
-          exit-code: 0
-          ignore-unfixed: true
+        env:
+          TRIVY_VERSION: 0.58.2
+          PER_ARCH_TAG: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}
+        run: |
+          set -euo pipefail
+          ARCH=$([ "${{ runner.arch }}" = "ARM64" ] && echo "ARM64" || echo "64bit")
+          curl -fsSL -o /tmp/trivy.tgz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${ARCH}.tar.gz"
+          tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
+          trivy --version
+          trivy image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 0 \
+            --format sarif --output "${{ runner.temp }}/trivy.sarif" "$PER_ARCH_TAG"
 
       - name: Upload Trivy SARIF
         if: inputs.use-buildpacks
