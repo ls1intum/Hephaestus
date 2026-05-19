@@ -6,6 +6,19 @@ spring:
     config:
         import: optional:file:.env[.properties]
 
+    # Java 21 virtual threads on Tomcat: one-virtual-thread-per-request. Spring Boot's
+    # TaskScheduler auto-config also swaps to SimpleAsyncTaskScheduler (virtual-thread per
+    # submission). LeaderboardTaskScheduler injects the TaskScheduler interface so this is safe.
+    # SpringAsyncConfig keeps applicationTaskExecutor as a bounded ThreadPoolTaskExecutor.
+    threads:
+        virtual:
+            enabled: true
+
+    # Virtual threads are daemons; needed so @Scheduled cron triggers can keep the JVM alive
+    # after main() returns. See SpringApplication docs (spring.main.keep-alive).
+    main:
+        keep-alive: true
+
     datasource:
         url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/hephaestus
         username: ${DB_USERNAME:root}
