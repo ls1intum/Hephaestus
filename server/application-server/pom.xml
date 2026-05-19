@@ -84,6 +84,7 @@
         <java-jwt.version>4.5.2</java-jwt.version>
         <graphql-codegen.version>5.10.0</graphql-codegen.version>
         <postgresql.version>42.7.11</postgresql.version>
+        <therapi.version>0.15.0</therapi.version>
     </properties>
     <dependencies>
         <dependency>
@@ -251,6 +252,14 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- springdoc-openapi reads class/method Javadoc via therapi-runtime-javadoc to inject
+             description="..." into the generated openapi.yaml. Removing this strips descriptions
+             from the public API contract, so it stays load-bearing despite no in-source callers. -->
+        <dependency>
+            <groupId>com.github.therapi</groupId>
+            <artifactId>therapi-runtime-javadoc</artifactId>
+            <version>${therapi.version}</version>
+        </dependency>
         <dependency>
             <groupId>io.nats</groupId>
             <artifactId>jnats</artifactId>
@@ -418,6 +427,11 @@
                         <path>
                             <groupId>org.springframework.boot</groupId>
                             <artifactId>spring-boot-configuration-processor</artifactId>
+                        </path>
+                        <path>
+                            <groupId>com.github.therapi</groupId>
+                            <artifactId>therapi-runtime-javadoc-scribe</artifactId>
+                            <version>${therapi.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
