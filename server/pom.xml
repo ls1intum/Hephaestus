@@ -73,6 +73,7 @@
         <okhttp.version>5.3.2</okhttp.version>
         <docker-java.version>3.7.1</docker-java.version>
         <archunit.version>1.4.2</archunit.version>
+        <spring-modulith.version>2.0.0</spring-modulith.version>
         <liquibase-hibernate7.version>5.0.3</liquibase-hibernate7.version>
         <springdoc.version>3.0.3</springdoc.version>
         <springdoc-maven-plugin.version>1.5</springdoc-maven-plugin.version>
@@ -185,6 +186,19 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+        <!-- Spring Modulith 2.0: declares module boundaries via @ApplicationModule,
+             verified by ModulithVerificationTest in the architecture surefire group. -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-starter-core</artifactId>
+            <version>${spring-modulith.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-starter-test</artifactId>
+            <version>${spring-modulith.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
