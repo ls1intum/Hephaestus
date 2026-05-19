@@ -271,3 +271,13 @@ jobs:
             echo "::error::Legacy agent image is removed in issue #1076; relocate any new references to MIGRATION.md."
             exit 1
           fi
+      - name: Assert no legacy agent-image-pin.env references
+        run: |
+          set -euo pipefail
+          if grep -rEnI 'docker/agent-image-pin(\.local)?\.env' \
+                --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \
+                . \
+              | grep -vE '^\./(MIGRATION\.md|docs/admin/agent-image-digests\.md):' ; then
+            echo "::error::The legacy pin file was removed in v0.10.0; new references must live in MIGRATION.md only."
+            exit 1
+          fi
