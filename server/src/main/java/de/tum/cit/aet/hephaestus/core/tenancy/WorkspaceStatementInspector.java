@@ -47,17 +47,17 @@ public class WorkspaceStatementInspector implements StatementInspector {
      * containing the bare word — {@code "refers to workspace_id mapping"} — must NOT
      * short-circuit; they fall through to the JSqlParser slow path.
      */
-    private static final Pattern WORKSPACE_ID_PREDICATE_PATTERN =
-        Pattern.compile("\\bworkspace_id\\s*(=|!=|<>|>=?|<=?|IN\\b|IS\\b)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern WORKSPACE_ID_PREDICATE_PATTERN = Pattern.compile(
+        "\\bworkspace_id\\s*(=|!=|<>|>=?|<=?|IN\\b|IS\\b)",
+        Pattern.CASE_INSENSITIVE
+    );
 
     private final WorkspaceScopedTables scopedTables;
     private final TenancyEnforcement mode;
     private final TenancyViolationReporter reporter;
     private final Counter parseFailureCounter;
 
-    private final Cache<String, Decision> decisionCache = Caffeine.newBuilder()
-        .maximumSize(10_000)
-        .build();
+    private final Cache<String, Decision> decisionCache = Caffeine.newBuilder().maximumSize(10_000).build();
 
     public WorkspaceStatementInspector(
         WorkspaceScopedTables scopedTables,

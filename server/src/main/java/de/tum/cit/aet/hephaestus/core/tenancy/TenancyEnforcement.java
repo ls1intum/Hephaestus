@@ -12,5 +12,5 @@ public enum TenancyEnforcement {
     /** Log a WARN and increment {@code tenancy.violation.total}, but let the query through. */
     LOG,
     /** Disable inspection entirely. Use only to debug performance regressions. */
-    OFF
+    OFF,
 }

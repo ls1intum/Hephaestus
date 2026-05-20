@@ -11,6 +11,5 @@ import java.util.Set;
  */
 @FunctionalInterface
 public interface TenancyViolationReporter {
-
     void report(String sql, Set<String> unguardedTables, TenancyEnforcement mode);
 }

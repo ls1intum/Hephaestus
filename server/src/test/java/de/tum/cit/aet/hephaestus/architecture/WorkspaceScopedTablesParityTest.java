@@ -47,9 +47,9 @@ class WorkspaceScopedTablesParityTest {
 
         assertThat(productionTablesExcludingLiquibase)
             .as(
-                "Production allowlist must match arch-test allowlist (Liquibase tables "
-                    + "excluded — those are not @Entity classes). When this fails, update "
-                    + "BOTH lists with the same entity in the same commit."
+                "Production allowlist must match arch-test allowlist (Liquibase tables " +
+                    "excluded — those are not @Entity classes). When this fails, update " +
+                    "BOTH lists with the same entity in the same commit."
             )
             .containsExactlyInAnyOrderElementsOf(archEntitiesSnakeCase);
     }

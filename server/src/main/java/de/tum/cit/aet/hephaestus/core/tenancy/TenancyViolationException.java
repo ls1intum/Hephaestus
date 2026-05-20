@@ -16,8 +16,9 @@ public final class TenancyViolationException extends RuntimeException {
     private final Set<String> unguardedTables;
 
     public TenancyViolationException(Set<String> unguardedTables) {
-        super("Tenancy violation: workspace-scoped table(s) queried without workspace_id predicate: "
-            + unguardedTables);
+        super(
+            "Tenancy violation: workspace-scoped table(s) queried without workspace_id predicate: " + unguardedTables
+        );
         this.unguardedTables = Set.copyOf(unguardedTables);
     }
 

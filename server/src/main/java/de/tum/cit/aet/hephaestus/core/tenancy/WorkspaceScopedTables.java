@@ -90,9 +90,10 @@ public class WorkspaceScopedTables {
         // inspector into a no-op — worst failure mode for a security control.
         if (tables.isEmpty() && !entities.isEmpty()) {
             throw new IllegalStateException(
-                "WorkspaceScopedTables populated zero scoped tables from " + entities.size()
-                    + " entities. Tenancy enforcement would silently disable. "
-                    + "Check Hibernate MappingMetamodel API compatibility."
+                "WorkspaceScopedTables populated zero scoped tables from " +
+                    entities.size() +
+                    " entities. Tenancy enforcement would silently disable. " +
+                    "Check Hibernate MappingMetamodel API compatibility."
             );
         }
         this.scopedTables = Set.copyOf(tables);
@@ -110,7 +111,6 @@ public class WorkspaceScopedTables {
             tables.add(name);
         }
     }
-
 
     /** Workspace-scoped physical table names (lowercase). Empty until ApplicationReady fires. */
     public Set<String> scopedTables() {

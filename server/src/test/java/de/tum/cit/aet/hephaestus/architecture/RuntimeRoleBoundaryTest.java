@@ -38,7 +38,8 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     @Test
     @DisplayName("hephaestus.runtime.* gates use matchIfMissing=true")
     void runtimeGatesAreMatchIfMissingTrue() {
-        List<String> violations = classes.stream()
+        List<String> violations = classes
+            .stream()
             .flatMap(clazz -> conditionalOnPropertyAnnotations(clazz).map(ann -> new ConditionalRef(clazz, ann)))
             .filter(ConditionalRef::targetsRuntimeRoleProperty)
             .filter(ConditionalRef::missingMatchIfMissingTrue)
@@ -56,21 +57,26 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
      * (which {@code @Repeatable} produces when multiple occurrences are stacked).
      */
     private static Stream<JavaAnnotation<?>> conditionalOnPropertyAnnotations(JavaClass clazz) {
-        return clazz.getAnnotations().stream().flatMap(ann -> {
-            if (ann.getRawType().isEquivalentTo(ConditionalOnProperty.class)) {
-                return Stream.of(ann);
-            }
-            if (ann.getRawType().getFullName().equals(CONDITIONAL_CONTAINER)) {
-                Object value = ann.getProperties().get("value");
-                if (value instanceof JavaAnnotation<?>[] arr) {
-                    return Stream.of(arr);
+        return clazz
+            .getAnnotations()
+            .stream()
+            .flatMap(ann -> {
+                if (ann.getRawType().isEquivalentTo(ConditionalOnProperty.class)) {
+                    return Stream.of(ann);
                 }
-                if (value instanceof Object[] arr) {
-                    return Stream.of(arr).filter(JavaAnnotation.class::isInstance).map(o -> (JavaAnnotation<?>) o);
+                if (ann.getRawType().getFullName().equals(CONDITIONAL_CONTAINER)) {
+                    Object value = ann.getProperties().get("value");
+                    if (value instanceof JavaAnnotation<?>[] arr) {
+                        return Stream.of(arr);
+                    }
+                    if (value instanceof Object[] arr) {
+                        return Stream.of(arr)
+                            .filter(JavaAnnotation.class::isInstance)
+                            .map(o -> (JavaAnnotation<?>) o);
+                    }
                 }
-            }
-            return Stream.empty();
-        });
+                return Stream.empty();
+            });
     }
 
     private record ConditionalRef(JavaClass owner, JavaAnnotation<?> annotation) {

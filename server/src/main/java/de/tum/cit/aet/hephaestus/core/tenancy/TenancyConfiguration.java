@@ -6,8 +6,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.hibernate.cfg.AvailableSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -34,12 +34,17 @@ public class TenancyConfiguration {
     TenancyViolationReporter tenancyViolationReporter(MeterRegistry registry) {
         return (sql, unguardedTables, mode) -> {
             for (String table : unguardedTables) {
-                registry.counter(
-                    "tenancy.violation.total",
-                    "module", "tenancy",
-                    "table", table,
-                    "mode", mode.name().toLowerCase()
-                ).increment();
+                registry
+                    .counter(
+                        "tenancy.violation.total",
+                        "module",
+                        "tenancy",
+                        "table",
+                        table,
+                        "mode",
+                        mode.name().toLowerCase()
+                    )
+                    .increment();
             }
             log.warn(
                 "Tenancy violation ({}): scoped tables {} queried without workspace_id predicate. SQL: {}",

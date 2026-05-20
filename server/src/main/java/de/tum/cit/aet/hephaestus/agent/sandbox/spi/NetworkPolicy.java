@@ -21,7 +21,6 @@ public record NetworkPolicy(
     String llmProxyToken,
     String llmProxyProviderPath
 ) {
-
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
 
     public NetworkPolicy {

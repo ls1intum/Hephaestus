@@ -29,22 +29,23 @@ public class WorkspaceAgnosticAspect {
 
     @Around("@annotation(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic)")
     public Object aroundAnnotatedMethod(ProceedingJoinPoint pjp) throws Throwable {
-        WorkspaceAgnostic annotation = ((MethodSignature) pjp.getSignature())
-            .getMethod()
-            .getAnnotation(WorkspaceAgnostic.class);
+        WorkspaceAgnostic annotation = ((MethodSignature) pjp.getSignature()).getMethod().getAnnotation(
+            WorkspaceAgnostic.class
+        );
         return proceedWithBypass(pjp, annotation);
     }
 
-    @Around("@within(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic) "
-        + "&& !@annotation(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic)")
+    @Around(
+        "@within(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic) " +
+            "&& !@annotation(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic)"
+    )
     public Object aroundAnnotatedType(ProceedingJoinPoint pjp) throws Throwable {
         Class<?> declaringType = pjp.getSignature().getDeclaringType();
         WorkspaceAgnostic annotation = declaringType.getAnnotation(WorkspaceAgnostic.class);
         return proceedWithBypass(pjp, annotation);
     }
 
-    private static Object proceedWithBypass(ProceedingJoinPoint pjp, WorkspaceAgnostic ann)
-        throws Throwable {
+    private static Object proceedWithBypass(ProceedingJoinPoint pjp, WorkspaceAgnostic ann) throws Throwable {
         String reason = ann != null ? ann.value() : "anonymous";
         try (TenancyBypass.Scope ignored = TenancyBypass.open(reason)) {
             return pjp.proceed();

@@ -76,8 +76,6 @@ class WorkspaceAbiSyncTest extends BaseUnitTest {
 
     private static Path resolveResource(String relativePath) {
         Path candidate = Path.of("src/main/resources").resolve(relativePath);
-        return Files.exists(candidate)
-            ? candidate
-            : Path.of("server/src/main/resources").resolve(relativePath);
+        return Files.exists(candidate) ? candidate : Path.of("server/src/main/resources").resolve(relativePath);
     }
 }

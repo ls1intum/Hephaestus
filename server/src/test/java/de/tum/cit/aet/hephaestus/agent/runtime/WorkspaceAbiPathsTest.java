@@ -27,10 +27,7 @@ class WorkspaceAbiPathsTest extends HephaestusArchitectureTest {
     @Test
     @DisplayName("agent resources contain no references to the legacy .context/ prefix")
     void agentResourcesAreOnContextTarget() throws IOException {
-        Path agentResources = resolveDir(
-            "src/main/resources/agent",
-            "server/src/main/resources/agent"
-        );
+        Path agentResources = resolveDir("src/main/resources/agent", "server/src/main/resources/agent");
         assertThat(agentResources).isDirectory();
 
         try (Stream<Path> stream = Files.walk(agentResources)) {
