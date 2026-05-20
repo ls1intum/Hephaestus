@@ -25,7 +25,7 @@ module.exports = async ({ github, context }) => {
     /^webapp\/src\/routeTree\.gen\.ts$/, // TanStack Router generated
 
     // Server generated
-    /^server\/application-server\/openapi\.yaml$/, // Generated OpenAPI spec
+    /^server\/openapi\.yaml$/, // Generated OpenAPI spec
 
     // Docs generated
     /^docs\/contributor\/erd\/.*\.mmd$/, // Generated Mermaid ERD diagrams
