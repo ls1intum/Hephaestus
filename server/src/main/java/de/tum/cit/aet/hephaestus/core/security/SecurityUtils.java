@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus;
+package de.tum.cit.aet.hephaestus.core.security;
 
 import java.util.List;
 import java.util.Map;

@@ -9,8 +9,5 @@
  * <p>Distinct bounded context from {@link de.tum.cit.aet.hephaestus.practices} (code-health
  * analysis), even though both consume {@code DomainEvent}s.
  */
-@org.springframework.modulith.ApplicationModule(
-    displayName = "Activity Event Log",
-    type = org.springframework.modulith.ApplicationModule.Type.OPEN
-)
+@org.springframework.modulith.ApplicationModule(displayName = "Activity Event Log")
 package de.tum.cit.aet.hephaestus.activity;

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.authorization;
 
-import de.tum.cit.aet.hephaestus.SecurityUtils;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;

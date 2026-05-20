@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.cit.aet.hephaestus.SecurityUtils;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
