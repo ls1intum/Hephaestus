@@ -1076,10 +1076,15 @@
         <profile>
             <id>quick</id>
             <activation>
-                <!-- Uses generated-sources dir, not target/classes, because <exists> matches
-                     empty dirs and clean-stale-classes can leave target/classes empty. -->
+                <!-- Checks for a deep path the codegen actually creates (not the parent
+                     output dir). Reason: `<exists>` matches any non-empty path, and the
+                     Maven Build Cache extension (used in CI) can restore the parent dir
+                     while skipping the deep generated files, producing an empty
+                     graphql-github dir that would falsely activate `quick` and cause
+                     compile failures because the model classes don't exist. The
+                     `model` subdirectory is only present when codegen actually ran. -->
                 <file>
-                    <exists>${basedir}/target/generated-sources/graphql-github</exists>
+                    <exists>${basedir}/target/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/gitprovider/graphql/github/model</exists>
                 </file>
             </activation>
             <properties>
