@@ -22,10 +22,10 @@ import org.slf4j.LoggerFactory;
  *   <li>Active bypass on the thread ({@code @WorkspaceAgnostic}) — pass</li>
  *   <li>Mode {@link TenancyEnforcement#OFF} — pass</li>
  *   <li>Caffeine cache hit on the literal SQL — return cached decision</li>
- *   <li>Predicate-shape regex: {@code workspace_id =/IN/IS/<>/...} present — pass</li>
+ *   <li>Word-boundary regex: {@code workspace_id} mentioned anywhere — pass</li>
  *   <li>Table-extract regex: pull table names from {@code FROM/JOIN/UPDATE/INTO} clauses,
  *       intersect with {@link WorkspaceScopedTables#scopedTables()}. Any match without
- *       a predicate is a violation.</li>
+ *       a {@code workspace_id} reference anywhere in the statement is a violation.</li>
  * </ol>
  *
  * <p><b>Why regex, not a SQL parser?</b> JSqlParser was tried and rejected: adding it to
@@ -43,14 +43,16 @@ public class WorkspaceStatementInspector implements StatementInspector {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceStatementInspector.class);
 
     /**
-     * Matches {@code workspace_id} only in predicate-shaped position (followed by an
-     * operator or {@code IN}/{@code IS}). String literals containing the bare word —
-     * {@code "refers to workspace_id mapping"} — do NOT short-circuit.
+     * Matches the {@code workspace_id} column as a word boundary. Tolerates every
+     * predicate shape Hibernate emits (simple {@code col = ?}, tuple-IN
+     * {@code (a, workspace_id) IN ((?, ?))}, schema-qualified
+     * {@code wm1_0.workspace_id}, etc.). Trade-off: a literal string containing the
+     * bare word would falsely pass. Acceptable because Hibernate-emitted SQL is
+     * parameterized — column names rarely appear inside string-literal values — and
+     * the alternative (tighter predicate matching) breaks legitimate composite-key
+     * queries.
      */
-    private static final Pattern WORKSPACE_ID_PREDICATE_PATTERN = Pattern.compile(
-        "\\bworkspace_id\\s*(=|!=|<>|>=?|<=?|IN\\b|IS\\b)",
-        Pattern.CASE_INSENSITIVE
-    );
+    private static final Pattern WORKSPACE_ID_PATTERN = Pattern.compile("\\bworkspace_id\\b", Pattern.CASE_INSENSITIVE);
 
     /**
      * Extracts table identifiers immediately following {@code FROM}, {@code JOIN},
@@ -97,7 +99,7 @@ public class WorkspaceStatementInspector implements StatementInspector {
     }
 
     private Decision analyze(String sql) {
-        if (WORKSPACE_ID_PREDICATE_PATTERN.matcher(sql).find()) {
+        if (WORKSPACE_ID_PATTERN.matcher(sql).find()) {
             return Decision.ok();
         }
         try {

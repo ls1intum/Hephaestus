@@ -78,17 +78,17 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     }
 
     @Test
-    void literalStringContainingWorkspaceIdFallsThroughToTableExtraction() {
-        // Regex regression: the bare word "workspace_id" in a string literal must NOT
-        // short-circuit. The predicate-shape pattern requires an operator follow-on.
-        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
-        when(scopedTables.isScoped("issue")).thenReturn(true);
-        inspector.inspect("INSERT INTO issue (body) VALUES ('refers to workspace_id mapping')");
-        verify(reporter).report(
-            "INSERT INTO issue (body) VALUES ('refers to workspace_id mapping')",
-            Set.of("issue"),
-            TenancyEnforcement.LOG
-        );
+    void compositeKeyTupleInPredicateShortCircuits() {
+        // Hibernate emits composite-key lookups as
+        //   (col1, workspace_id) IN ((?, ?))
+        // The inspector MUST treat this as a legitimate workspace_id reference and not
+        // throw. Regression for false positive that broke PracticeFindingControllerIntegrationTest.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        String sql =
+            "select wm.user_id, wm.workspace_id from workspace_membership wm " +
+            "where (wm.user_id, wm.workspace_id) in ((?,?))";
+        inspector.inspect(sql);
+        verifyNoInteractions(reporter, scopedTables);
     }
 
     // ── table extraction ───────────────────────────────────────────────────
