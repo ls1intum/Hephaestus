@@ -9,12 +9,12 @@
 			"path": "./webapp"
 		},
 		{
-			"name": "server/application-server",
-			"path": "./server/application-server"
+			"name": "server",
+			"path": "./server"
 		},
 		{
-			"name": "server/webhook-ingest",
-			"path": "./server/webhook-ingest"
+			"name": "webhook-ingest",
+			"path": "./webhook-ingest"
 		},
 		{
 			"name": "docs",

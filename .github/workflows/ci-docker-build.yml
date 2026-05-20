@@ -59,8 +59,10 @@ jobs:
     uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/application-server"
-      docker-file: "./server/application-server/Dockerfile"
-      docker-context: "./server/application-server"
+      # Paketo Cloud Native Buildpacks via spring-boot:build-image, with Application CDS.
+      # See docs/admin/buildpacks-cds-decision.md and pom.xml's <image> block.
+      use-buildpacks: true
+      maven-module: "server"
       registry: "ghcr.io"
       tags: |
         ${{ github.ref_name }}
@@ -80,7 +82,7 @@ jobs:
     uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/webhook-ingest"
-      docker-file: "./server/webhook-ingest/Dockerfile"
+      docker-file: "./webhook-ingest/Dockerfile"
       # Context = repo root so the Dockerfile can COPY pnpm-lock.yaml,
       # pnpm-workspace.yaml, and the workspace package.json files needed for
       # `pnpm install --filter webhook-ingest...` to resolve the workspace graph.
@@ -118,3 +120,24 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=agent-pi
+
+  release-pin-fetcher-build:
+    name: "Release Pin Fetcher"
+    if: inputs.should_skip != 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image-name: "ls1intum/hephaestus/release-pin-fetcher"
+      docker-file: "./docker/release-pin-fetcher/Dockerfile"
+      docker-context: "./docker/release-pin-fetcher"
+      registry: "ghcr.io"
+      tags: |
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+      labels: |
+        org.opencontainers.image.title=Hephaestus Release Pin Fetcher
+        org.opencontainers.image.description=Init container that downloads + cosign-verifies the signed release pin asset
+        org.opencontainers.image.vendor=AET TUM
+        org.opencontainers.image.licenses=MIT
+        hephaestus.component=release-pin-fetcher

@@ -11,7 +11,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../server/application-server/.env"
+ENV_FILE="${SCRIPT_DIR}/../server/.env"
 
 # Source .env if it exists (same file Docker Compose and Spring Boot read).
 # Uses eval instead of process substitution because `source <(...)` does not
@@ -110,7 +110,7 @@ if [[ "$QUIET" == false ]]; then
     echo ""
     if [[ "$conflicts" -gt 0 ]]; then
         echo -e "${RED}${conflicts} port(s) already in use.${NC} Override with environment variables:"
-        echo "  e.g., POSTGRES_PORT=15432 in server/application-server/.env"
+        echo "  e.g., POSTGRES_PORT=15432 in server/.env"
         echo ""
     else
         echo -e "${GREEN}All ports are available.${NC}"

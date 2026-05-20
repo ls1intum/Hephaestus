@@ -2,7 +2,7 @@
 description: Format the achievements.yml file with the preferred property order
 ---
 
-This workflow enforces the standard property order in `server/application-server/src/main/resources/achievements/achievements.yml` for better readability.
+This workflow enforces the standard property order in `server/src/main/resources/achievements/achievements.yml` for better readability.
 
 Preferred Order:
 1. `id`

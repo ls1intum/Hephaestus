@@ -54,16 +54,49 @@ services:
         max-size: "50m"
         max-file: "5"
 
+  # See docs/admin/agent-image-digests.md.
+  release-pin-fetcher:
+    image: "ghcr.io/ls1intum/hephaestus/release-pin-fetcher:${IMAGE_TAG}"
+    entrypoint: ["/bin/sh", "-c"]
+    # $$ escapes prevent Compose from substituting shell vars; pass through to /bin/sh.
+    command:
+      - |
+        set -eu
+        : "$${IMAGE_TAG:?IMAGE_TAG required}"
+        if [ "$${HEPHAESTUS_RELEASE_PIN_SKIP:-false}" = "true" ]; then
+          rm -f /pin/release-pin.yaml
+          exit 0
+        fi
+        BASE="https://github.com/ls1intum/Hephaestus/releases/download/v$$IMAGE_TAG"
+        ASSET="release-v$$IMAGE_TAG.yaml"
+        TMP=$$(mktemp -d)
+        trap 'rm -rf "$$TMP"' EXIT
+        curl -fsSL --retry 3 --retry-connrefused --connect-timeout 10 --max-time 60 \
+          "$$BASE/$$ASSET"                 -o "$$TMP/pin.yaml"
+        curl -fsSL --retry 3 --retry-connrefused --connect-timeout 10 --max-time 60 \
+          "$$BASE/$$ASSET.sigstore.json"   -o "$$TMP/pin.sigstore.json"
+        cosign verify-blob \
+          --bundle "$$TMP/pin.sigstore.json" \
+          --certificate-identity-regexp '^https://github\.com/ls1intum/Hephaestus/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$$' \
+          --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+          "$$TMP/pin.yaml"
+        grep -Eq '^[[:space:]]+reference:[[:space:]]+[a-z0-9][a-z0-9.\-_/:]+@sha256:[a-f0-9]{64}$$' "$$TMP/pin.yaml" \
+          || { echo "pin asset is missing a digest-pinned reference" >&2; exit 1; }
+        install -m 0644 "$$TMP/pin.yaml" /pin/release-pin.yaml.new
+        mv /pin/release-pin.yaml.new /pin/release-pin.yaml
+    environment:
+      IMAGE_TAG: ${IMAGE_TAG}
+      HEPHAESTUS_RELEASE_PIN_SKIP: ${HEPHAESTUS_RELEASE_PIN_SKIP:-false}
+    volumes:
+      - release-pin:/pin
+    restart: "no"
+    networks:
+      - shared-network
+
   application-server:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
     ports:
       - "8080"
-    # Long-form env_file requires Compose v2.24+. See docs/admin/agent-image-digests.md.
-    env_file:
-      - path: ./agent-image-pin.env
-        required: false
-      - path: ./agent-image-pin.local.env
-        required: false
     environment:
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod
@@ -142,12 +175,16 @@ services:
       LLM_PROXY_AZURE_OPENAI_AUTH_HEADER: ${LLM_PROXY_AZURE_OPENAI_AUTH_HEADER:-api-key}
       LLM_PROXY_AZURE_OPENAI_USE_BEARER: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:-false}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_started
+      release-pin-fetcher:
+        condition: service_completed_successfully
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
       - application-server-logs:/var/log/hephaestus
+      - release-pin:/pin:ro
     networks:
       - shared-network
     labels:
@@ -190,6 +227,9 @@ services:
       timeout: 10s
       retries: 10
       start_period: 10s
+    # Matches application.yml's SHUTDOWN_TIMEOUT default (20s) plus headroom so SIGTERM has time
+    # to drain in-flight requests before Docker SIGKILLs the launcher.
+    stop_grace_period: 30s
     logging:
       driver: "json-file"
       options:
@@ -228,3 +268,4 @@ volumes:
   postgresql-data:
   git-repos:
   application-server-logs:
+  release-pin:

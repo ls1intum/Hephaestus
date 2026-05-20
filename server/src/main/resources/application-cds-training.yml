@@ -1,0 +1,41 @@
+# Activated during the Paketo CDS training run only (via SPRING_PROFILES_ACTIVE=cds-training set
+# in pom.xml <image><env>; Coolify's runtime SPRING_PROFILES_ACTIVE=prod takes precedence).
+# Suppresses DB-dependent beans so context refresh succeeds without a Postgres reachable from the
+# buildpack builder — Spring Boot then exits via spring.context.exit=onRefresh (set by Paketo).
+spring:
+    liquibase:
+        enabled: false
+    datasource:
+        hikari:
+            initialization-fail-timeout: -1
+    jpa:
+        hibernate:
+            ddl-auto: none
+        # Without metadata-access Hibernate can't introspect the dialect from a JDBC connection;
+        # pin it explicitly so EntityManagerFactory builds and context refresh completes.
+        database-platform: org.hibernate.dialect.PostgreSQLDialect
+        properties:
+            hibernate:
+                boot:
+                    allow_jdbc_metadata_access: false
+                temp:
+                    use_jdbc_metadata_defaults: false
+    docker:
+        compose:
+            enabled: false
+
+# Quiet the property validators that would otherwise fail under empty env vars during the build.
+# All knobs here gate features that the runtime profile (Coolify SPRING_PROFILES_ACTIVE=prod)
+# overrides; the placeholders only exist to let context refresh reach spring.context.exit=onRefresh.
+hephaestus:
+    sync:
+        nats:
+            enabled: false
+            server: nats://cds-training-placeholder:4222
+    agent:
+        nats:
+            enabled: false
+            server: nats://cds-training-placeholder:4222
+    workspace:
+        init-default: false
+        init-gitlab-default: false

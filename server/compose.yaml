@@ -1,0 +1,73 @@
+# Local development stack. From the repo root: `pnpm dev` runs `docker compose up -d --wait`
+# then starts the server + webapp. After .env or realm-config changes:
+# `docker compose down -v && docker compose up -d`.
+
+services:
+  postgres:
+    image: 'postgres:16'
+    environment:
+      POSTGRES_DB: hephaestus
+      POSTGRES_PASSWORD: root
+      POSTGRES_USER: root
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    networks:
+      - app-network
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U root -d hephaestus']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.5
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # GitHub OAuth credentials for identity provider (resolved by Keycloak during realm import)
+      KEYCLOAK_GITHUB_CLIENT_ID: '${KEYCLOAK_GITHUB_CLIENT_ID:?Set GitHub OAuth client ID}'
+      KEYCLOAK_GITHUB_CLIENT_SECRET: '${KEYCLOAK_GITHUB_CLIENT_SECRET:?Set GitHub OAuth client secret}'
+      KEYCLOAK_GITHUB_ADMIN_USERNAME: '${KEYCLOAK_GITHUB_ADMIN_USERNAME:?Set GitHub admin username}'
+      # GitLab OAuth credentials (optional — IdP is disabled by default)
+      KEYCLOAK_GITLAB_ENABLED: '${KEYCLOAK_GITLAB_ENABLED:-false}'
+      KEYCLOAK_GITLAB_CLIENT_ID: '${KEYCLOAK_GITLAB_CLIENT_ID:-unused}'
+      KEYCLOAK_GITLAB_CLIENT_SECRET: '${KEYCLOAK_GITLAB_CLIENT_SECRET:-unused}'
+      KEYCLOAK_GITLAB_BASE_URL: '${KEYCLOAK_GITLAB_BASE_URL:-https://gitlab.example.com}'
+      KEYCLOAK_GITLAB_ADMIN_USERNAME: '${KEYCLOAK_GITLAB_ADMIN_USERNAME:-unused}'
+      # Confidential client secret - must match what the application server uses
+      # Default: hephaestus-dev-secret (for local development only)
+      KEYCLOAK_CONFIDENTIAL_CLIENT_SECRET: '${KEYCLOAK_CLIENT_SECRET:-hephaestus-dev-secret}'
+      # Enable health endpoint for container healthcheck
+      KC_HEALTH_ENABLED: 'true'
+    command:
+      - start-dev
+      - --import-realm
+    ports:
+      - '${KEYCLOAK_PORT:-8081}:8080'
+    volumes:
+      # Mount realm config to import directory
+      - ./keycloak-hephaestus-realm-example-config.json:/opt/keycloak/data/import/hephaestus-realm.json:ro
+      # Persist Keycloak data (H2 database) for user sessions between restarts
+      - keycloak-data:/opt/keycloak/data
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Keycloak 26+ exposes health endpoints on management port 9000, not the main port 8080
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  keycloak-data:

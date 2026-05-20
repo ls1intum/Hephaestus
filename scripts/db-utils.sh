@@ -11,7 +11,7 @@ set -eo pipefail  # Exit on any error, including pipeline failures
 
 SCRIPT_DIR="$(dirname "$0")"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_SERVER_DIR="$PROJECT_ROOT/server/application-server"
+APP_SERVER_DIR="$PROJECT_ROOT/server"
 SCRIPTS_DIR="$PROJECT_ROOT/scripts"
 LOCAL_POSTGRES_SCRIPT="$SCRIPTS_DIR/local-postgres.sh"
 

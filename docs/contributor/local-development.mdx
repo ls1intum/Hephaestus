@@ -34,7 +34,7 @@ JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) w
 
 We ship three Maven profiles: `local` (default), `prod`, and `spec`. For development stick to the `local` profile.
 
-Create `application-server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
+Create `server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
 
 :::caution Keep it local
 Never commit `application-local.yml`. It may contain secrets and machine-specific configuration.
@@ -43,7 +43,7 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 ### Running the server
 
 1. Start Docker Desktop.
-2. From `server/application-server`, run:
+2. From `server`, run:
 
    ```bash
    ./mvnw spring-boot:run
@@ -59,9 +59,9 @@ Every host-side port is configurable so multiple Hephaestus instances (or other 
 
 | Service              | Default | Variable                    | Config location                  |
 | -------------------- | ------- | --------------------------- | -------------------------------- |
-| PostgreSQL           | 5432    | `POSTGRES_PORT`             | `server/application-server/.env` |
-| Keycloak             | 8081    | `KEYCLOAK_PORT`             | `server/application-server/.env` |
-| Application server   | 8080    | `SERVER_PORT`               | `server/application-server/.env` |
+| PostgreSQL           | 5432    | `POSTGRES_PORT`             | `server/.env` |
+| Keycloak             | 8081    | `KEYCLOAK_PORT`             | `server/.env` |
+| Application server   | 8080    | `SERVER_PORT`               | `server/.env` |
 | Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env or `webapp/.env`       |
 
 :::tip Pre-flight check
@@ -70,7 +70,7 @@ Run `pnpm run check:ports` before starting the stack to verify all ports are fre
 
 #### How it works
 
-The `.env` file in `server/application-server/` is read by **both** Docker Compose (for container port mappings) and Spring Boot (via `spring.config.import`). This means a single file controls the entire local stack.
+The `.env` file in `server/` is read by **both** Docker Compose (for container port mappings) and Spring Boot (via `spring.config.import`). This means a single file controls the entire local stack.
 
 Ports flow through the system like this:
 
@@ -85,7 +85,7 @@ Ports flow through the system like this:
 **Basic example** – move PostgreSQL and Keycloak to non-standard ports:
 
 ```bash
-# server/application-server/.env
+# server/.env
 POSTGRES_PORT=15432
 KEYCLOAK_PORT=18081
 ```
@@ -95,7 +95,7 @@ That's it for these two. The application server automatically picks up the new p
 **Changing the application server port:**
 
 ```bash
-# server/application-server/.env
+# server/.env
 SERVER_PORT=18080
 ```
 
@@ -108,7 +108,7 @@ VITE_APPLICATION_SERVER_URL=http://localhost:18080
 
 **Changing the webapp port:**
 
-The Vite dev server reads `WEBAPP_PORT` from the shell environment (not from `server/application-server/.env`):
+The Vite dev server reads `WEBAPP_PORT` from the shell environment (not from `server/.env`):
 
 ```bash
 WEBAPP_PORT=5200 pnpm --filter webapp run dev
@@ -117,7 +117,7 @@ WEBAPP_PORT=5200 pnpm --filter webapp run dev
 When changing the webapp port, the server's CORS origin must also be updated so API calls are not rejected:
 
 ```bash
-# server/application-server/.env
+# server/.env
 APPLICATION_HOST_URL=http://localhost:5200
 ```
 
@@ -222,10 +222,10 @@ Keycloak runs in Docker as part of the development compose stack. The bundled re
 #### Configure the GitHub identity provider
 
 1. [Create a new GitHub OAuth application](https://github.com/settings/developers) with the callback URL `http://localhost:8081/realms/hephaestus/broker/github/endpoint`.
-2. Export the generated **Client ID** and **Client secret**, then copy `server/application-server/.env.example` to `server/application-server/.env` and update the placeholders:
+2. Export the generated **Client ID** and **Client secret**, then copy `server/.env.example` to `server/.env` and update the placeholders:
 
    ```bash
-   cp server/application-server/.env.example server/application-server/.env
+   cp server/.env.example server/.env
    # Edit .env and set:
    # KEYCLOAK_GITHUB_CLIENT_ID=<github-client-id>
    # KEYCLOAK_GITHUB_CLIENT_SECRET=<github-client-secret>
@@ -246,7 +246,7 @@ Keycloak runs in Docker as part of the development compose stack. The bundled re
 If you encounter 401 Unauthorized errors or authentication issues after changing configuration:
 
 ```bash
-cd server/application-server
+cd server
 docker compose down -v  # Clear Keycloak data volume
 docker compose up       # Re-import realm with fresh settings
 ```
@@ -268,7 +268,7 @@ The value must match the secret configured on your GitHub and GitLab webhooks (v
 To run the webhook ingest service locally:
 
 ```bash
-cd server/webhook-ingest
+cd webhook-ingest
 cp .env.example .env
 pnpm install
 pnpm run dev

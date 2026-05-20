@@ -19,15 +19,19 @@ runs:
         distribution: "temurin"
         java-version: "21"
 
-    - name: Cache Maven repo + generated sources
+    - name: Cache Maven repo
+      # server/target/generated-sources is deliberately NOT cached. actions/cache's
+      # restore-keys fallback can restore a stale generated-sources tree from a prior
+      # build (e.g., from before a Java package rename); the `quick` profile in pom.xml
+      # then activates on the present directory and skips codegen, causing compile
+      # failures because the cached classes don't match the current sources. Codegen
+      # runs in ~5s — much cheaper than that failure mode.
       if: contains(fromJSON('["application-server-unit-arch", "application-server-integration", "application-server-quality", "openapi-validation", "database-validation"]'), inputs.cache-type)
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: |
           ~/.m2/repository
-          server/application-server/target/generated-sources
-          server/application-server/target/maven-status
-        key: ${{ inputs.os }}-maven-${{ hashFiles('server/application-server/pom.xml', 'server/application-server/src/main/resources/graphql/**/*.graphql', 'server/application-server/src/main/resources/graphql/**/*.ftl') || 'no-pom' }}
+        key: ${{ inputs.os }}-maven-${{ hashFiles('server/pom.xml') || 'no-pom' }}
         restore-keys: |
           ${{ inputs.os }}-maven-
 

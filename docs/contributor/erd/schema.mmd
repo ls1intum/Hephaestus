@@ -134,17 +134,17 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         INTEGER number UK "NOT NULL"
-        VARCHAR(1024) title "NOT NULL"
+        VARCHAR(1024) title
         TEXT body
-        VARCHAR(512) html_url "NOT NULL"
-        VARCHAR(16) state "NOT NULL"
+        VARCHAR(512) html_url
+        VARCHAR(16) state
         VARCHAR(32) state_reason
-        INTEGER upvote_count "NOT NULL"
-        BOOLEAN is_locked "NOT NULL"
+        INTEGER upvote_count
+        BOOLEAN is_locked
         VARCHAR(32) active_lock_reason
         TIMESTAMPTZ closed_at
         TIMESTAMPTZ answer_chosen_at
-        INTEGER comment_count "NOT NULL"
+        INTEGER comment_count
         TIMESTAMPTZ last_sync_at
         BIGINT repository_id FK,UK
         BIGINT author_id FK
@@ -157,8 +157,8 @@ erDiagram
 
     DiscussionCategory {
         VARCHAR(128) id PK
-        VARCHAR(255) name "NOT NULL"
-        VARCHAR(128) slug UK "NOT NULL"
+        VARCHAR(255) name
+        VARCHAR(128) slug UK
         VARCHAR(32) emoji
         TEXT description
         BOOLEAN is_answerable "NOT NULL"
@@ -172,7 +172,7 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         TEXT body
-        VARCHAR(512) html_url "NOT NULL"
+        VARCHAR(512) html_url
         BOOLEAN is_answer "NOT NULL"
         BOOLEAN is_minimized "NOT NULL"
         VARCHAR(64) minimized_reason
@@ -377,7 +377,7 @@ erDiagram
     OrganizationMembership {
         BIGINT organization_id PK
         BIGINT user_id PK
-        VARCHAR(32) role
+        VARCHAR(32) role "NOT NULL"
     }
 
     Practice {
@@ -549,7 +549,7 @@ erDiagram
         BIGINT id PK
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
-        VARCHAR(20) state "NOT NULL"
+        VARCHAR(20) state
         BIGINT pull_request_id FK "NOT NULL"
         BIGINT root_comment_id FK,UK
         VARCHAR(128) node_id
@@ -600,7 +600,7 @@ erDiagram
         TIMESTAMPTZ milestones_synced_at
         VARCHAR(255) name_with_owner
         TIMESTAMPTZ repository_synced_at
-        BIGINT workspace_id FK
+        BIGINT workspace_id FK "NOT NULL"
         TIMESTAMPTZ backfill_last_run_at
         TIMESTAMPTZ collaborators_synced_at
         VARCHAR(255) issue_sync_cursor
@@ -628,7 +628,7 @@ erDiagram
         TIMESTAMPTZ updated_at
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
-        VARCHAR(512) slug UK "NOT NULL"
+        VARCHAR(512) slug UK
     }
 
     TeamMembership {
@@ -676,7 +676,7 @@ erDiagram
     Workspace {
         BIGINT id PK
         TIMESTAMPTZ users_synced_at
-        VARCHAR(120) account_login
+        VARCHAR(120) account_login "NOT NULL"
         VARCHAR(255) git_provider_mode
         VARCHAR(255) repository_selection
         BIGINT installation_id

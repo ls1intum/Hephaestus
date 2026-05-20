@@ -32,13 +32,13 @@ jobs:
         run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Setup Application Server directories
-        working-directory: server/application-server
+        working-directory: server
         run: |
           mkdir -p ./keycloak-data
           chmod -R 755 ./keycloak-data
 
       - name: Compile Application Server
-        working-directory: server/application-server
+        working-directory: server
         run: mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
 
       - name: Generate OpenAPI specs and clients

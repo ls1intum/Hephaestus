@@ -4,14 +4,14 @@
 	"packageManager": "pnpm@11.1.2",
 	"scripts": {
 		"generate:api:application-server:clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('webapp/src/api', {recursive: true, force: true}))\"",
-		"generate:api:application-server:specs": "cd server/application-server && sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then ./mvnw verify -DskipTests=true -Dapp.profiles=specs; else SPRING_DOCKER_COMPOSE_ENABLED=false ./mvnw verify -DskipTests=true -Dapp.profiles=specs; fi'",
+		"generate:api:application-server:specs": "cd server && sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then ./mvnw verify -DskipTests=true -Dapp.profiles=specs; else SPRING_DOCKER_COMPOSE_ENABLED=false ./mvnw verify -DskipTests=true -Dapp.profiles=specs; fi'",
 		"generate:api:application-server:client": "pnpm run generate:api:application-server:clean && pnpm --filter webapp run openapi-ts",
 		"generate:api:application-server": "pnpm run generate:api:application-server:specs && pnpm run generate:api:application-server:client",
 		"generate:api": "pnpm run generate:api:application-server",
-		"format:java": "node --import tsx scripts/run-quiet.ts prettier --write \"server/application-server/src/**/*.java\" --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
-		"format:java:check": "node --import tsx scripts/run-quiet.ts prettier --check \"server/application-server/src/**/*.java\" --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
+		"format:java": "node --import tsx scripts/run-quiet.ts prettier --write \"server/src/**/*.java\" --config-precedence prefer-file --config server/.prettierrc.yaml --ignore-path server/.prettierignore",
+		"format:java:check": "node --import tsx scripts/run-quiet.ts prettier --check \"server/src/**/*.java\" --config-precedence prefer-file --config server/.prettierrc.yaml --ignore-path server/.prettierignore",
 		"lint:java": "node --import tsx scripts/run-mvnw.ts pmd:check -q",
-		"lint:java:report": "node --import tsx scripts/run-mvnw.ts pmd:pmd && echo 'Report: server/application-server/target/site/pmd.html'",
+		"lint:java:report": "node --import tsx scripts/run-mvnw.ts pmd:pmd && echo 'Report: server/target/site/pmd.html'",
 		"format:webhook-ingest": "pnpm --filter webhook-ingest run format",
 		"format:webhook-ingest:check": "pnpm --filter webhook-ingest run format:check",
 		"lint:webhook-ingest": "pnpm --filter webhook-ingest run lint",
@@ -54,7 +54,13 @@
 		"docs:build": "pnpm --filter docs run build",
 		"docs:serve": "pnpm --filter docs run serve",
 		"docs:lint": "pnpm --filter docs run lint",
-		"prepare": "husky"
+		"prepare": "husky",
+		"dev:compose": "cd server && docker compose up -d --wait",
+		"dev:compose:down": "cd server && docker compose down",
+		"dev:server": "cd server && ./mvnw spring-boot:run",
+		"dev:webapp": "pnpm --filter webapp run dev",
+		"dev": "run-s dev:compose dev:run",
+		"dev:run": "run-p dev:server dev:webapp"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.15",
