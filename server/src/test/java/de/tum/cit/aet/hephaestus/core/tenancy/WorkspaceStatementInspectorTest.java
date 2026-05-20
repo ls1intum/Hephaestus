@@ -78,9 +78,9 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     }
 
     @Test
-    void literalStringContainingWorkspaceIdFallsThroughToParser() {
-        // Regression test for the regex false-negative loop 3 closed: the bare word
-        // "workspace_id" in a string literal must NOT short-circuit past the parser.
+    void literalStringContainingWorkspaceIdFallsThroughToTableExtraction() {
+        // Regex regression: the bare word "workspace_id" in a string literal must NOT
+        // short-circuit. The predicate-shape pattern requires an operator follow-on.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("issue")).thenReturn(true);
         inspector.inspect("INSERT INTO issue (body) VALUES ('refers to workspace_id mapping')");
@@ -91,7 +91,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         );
     }
 
-    // ── parser slow path ───────────────────────────────────────────────────
+    // ── table extraction ───────────────────────────────────────────────────
 
     @Test
     void unguardedScopedTableIsReported() {
@@ -117,30 +117,15 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         verify(reporter).report("SELECT * FROM public.pull_request", Set.of("pull_request"), TenancyEnforcement.LOG);
     }
 
-    // ── parse failures ─────────────────────────────────────────────────────
-
     @Test
-    void parseFailureIncrementsCounterAndPassesThrough() {
-        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        // Garbage SQL that JSqlParser cannot tokenise — exercises the fail-open branch.
-        String garbage = "ANALYZE !!! not really sql ???";
-        String returned = inspector.inspect(garbage);
-        assertThat(returned).isEqualTo(garbage);
-        verify(parseFailureCounter).increment();
-        verify(reporter, never()).report(any(), any(), any());
-    }
-
-    @Test
-    void backslashEscapedPostgresCastFailsOpenInsteadOfThrowing() {
-        // Regression: @Query native queries can contain JPA-escaped Postgres casts like
-        // CONCAT(:id\:\:text, ...). JSqlParser throws TokenMgrException (a RuntimeException,
-        // not JSQLParserException) on the backslash. The inspector MUST NOT propagate —
-        // would fail every request that triggers UserRepository.tryAcquireLoginLock.
+    void backslashEscapedPostgresCastDoesNotPropagate() {
+        // Regression: @Query native queries can contain Postgres casts like
+        // CONCAT(:id\:\:text, ...). The inspector MUST NOT propagate exceptions on those —
+        // would brick UserRepository.tryAcquireLoginLock and the whole context.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
         String sql = "SELECT pg_try_advisory_xact_lock(hashtext(CONCAT(?\\:\\:text, ':', LOWER(?))))";
         String returned = inspector.inspect(sql);
         assertThat(returned).isEqualTo(sql);
-        verify(parseFailureCounter).increment();
         verify(reporter, never()).report(any(), any(), any());
     }
 
