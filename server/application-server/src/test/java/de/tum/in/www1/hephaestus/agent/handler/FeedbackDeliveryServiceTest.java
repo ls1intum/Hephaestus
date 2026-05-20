@@ -110,7 +110,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_comment123");
             when(diffNotePoster.postDiffNotes(eq(job), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
 
-            var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
+            var diffNotes = List.of(DiffNote.text("src/Foo.java", 10, null, "Fix this"));
             var delivery = new DeliveryContent("Fix the tests.", diffNotes);
             service.deliverFeedback(job, delivery);
 
@@ -261,8 +261,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(diffNotePoster.postDiffNotes(eq(job), any())).thenReturn(new DiffNotePoster.DiffNoteResult(2, 0));
 
             var diffNotes = List.of(
-                new DiffNote("src/Foo.java", 10, null, "Fix this"),
-                new DiffNote("src/Bar.java", 20, null, "And this")
+                DiffNote.text("src/Foo.java", 10, null, "Fix this"),
+                DiffNote.text("src/Bar.java", 20, null, "And this")
             );
             var delivery = new DeliveryContent(null, diffNotes);
             service.deliverFeedback(job, delivery);

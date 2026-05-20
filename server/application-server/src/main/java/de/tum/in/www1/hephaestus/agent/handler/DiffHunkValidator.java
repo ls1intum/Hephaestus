@@ -111,6 +111,11 @@ class DiffHunkValidator {
         int corrections = 0;
 
         for (DiffNote note : notes) {
+            // Image notes have no line positions — pass through as-is
+            if (note.isImageNote()) {
+                corrected.add(note);
+                continue;
+            }
             TreeSet<Integer> fileLines = validLines.get(note.filePath());
             if (fileLines == null || fileLines.isEmpty()) {
                 // File not in diff — can't validate, keep as-is
@@ -154,7 +159,7 @@ class DiffHunkValidator {
                 }
             }
 
-            corrected.add(new DiffNote(note.filePath(), nearest, correctedEnd, note.body()));
+            corrected.add(DiffNote.text(note.filePath(), nearest, correctedEnd, note.body()));
         }
 
         if (corrections > 0) {
