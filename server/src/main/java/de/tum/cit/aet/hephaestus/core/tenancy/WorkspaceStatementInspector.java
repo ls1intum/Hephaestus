@@ -7,7 +7,6 @@ import io.micrometer.core.instrument.Counter;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
-import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.util.TablesNamesFinder;
@@ -100,10 +99,19 @@ public class WorkspaceStatementInspector implements StatementInspector {
                 }
             }
             return unguarded.isEmpty() ? Decision.ok() : Decision.violation(Set.copyOf(unguarded));
-        } catch (JSQLParserException e) {
+        } catch (Exception e) {
+            // JSqlParser throws JSQLParserException for grammar failures, TokenMgrException
+            // for lexer failures (e.g., backslash-escaped Postgres casts like \:\:text in
+            // @Query native queries), and occasionally NullPointerException on edge-case
+            // inputs. The inspector must NEVER throw — fail-open with an observable counter.
             parseFailureCounter.increment();
             if (log.isDebugEnabled()) {
-                log.debug("JSqlParser could not parse SQL ({}): {}", e.getMessage(), LoggingUtils.truncate(sql, 200));
+                log.debug(
+                    "JSqlParser could not parse SQL ({}: {}): {}",
+                    e.getClass().getSimpleName(),
+                    e.getMessage(),
+                    LoggingUtils.truncate(sql, 200)
+                );
             }
             return Decision.ok();
         }

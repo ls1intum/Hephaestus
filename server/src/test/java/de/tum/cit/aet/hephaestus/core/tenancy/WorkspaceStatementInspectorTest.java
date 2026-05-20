@@ -130,6 +130,20 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         verify(reporter, never()).report(any(), any(), any());
     }
 
+    @Test
+    void backslashEscapedPostgresCastFailsOpenInsteadOfThrowing() {
+        // Regression: @Query native queries can contain JPA-escaped Postgres casts like
+        // CONCAT(:id\:\:text, ...). JSqlParser throws TokenMgrException (a RuntimeException,
+        // not JSQLParserException) on the backslash. The inspector MUST NOT propagate —
+        // would fail every request that triggers UserRepository.tryAcquireLoginLock.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        String sql = "SELECT pg_try_advisory_xact_lock(hashtext(CONCAT(?\\:\\:text, ':', LOWER(?))))";
+        String returned = inspector.inspect(sql);
+        assertThat(returned).isEqualTo(sql);
+        verify(parseFailureCounter).increment();
+        verify(reporter, never()).report(any(), any(), any());
+    }
+
     // helper: Mockito.any() shorthand
     private static <T> T any() {
         return org.mockito.ArgumentMatchers.any();
