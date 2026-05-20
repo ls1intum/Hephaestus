@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.exception;
 
+import de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -141,8 +142,8 @@ public class GlobalControllerAdvice {
     // FALLBACK HANDLER
     // ========================================================================
 
-    @ExceptionHandler(de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException.class)
-    ProblemDetail handleTenancyViolation(de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException ex) {
+    @ExceptionHandler(TenancyViolationException.class)
+    ProblemDetail handleTenancyViolation(TenancyViolationException ex) {
         // Server bug — log full SQL context server-side, sanitize client-facing message.
         log.error("Tenancy violation: unguardedTables={}", ex.unguardedTables(), ex);
         return problem(

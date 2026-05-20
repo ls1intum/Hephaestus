@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.hibernate.SessionFactory;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
+import org.hibernate.metamodel.MappingMetamodel;
 import org.hibernate.persister.entity.EntityPersister;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,12 +18,17 @@ import org.springframework.stereotype.Component;
  * Single source of truth for workspace-scoped vs. global SQL tables.
  *
  * <p>At {@link ApplicationReadyEvent}, walks Hibernate's mapping metamodel for the
- * physical table name of every {@code @Entity}; any table not in {@link #GLOBAL_TABLES}
- * is treated as workspace-scoped. Using the physical metamodel (rather than reflecting on
- * {@code @Table.name()}) avoids the silent landmine of entities without an explicit
- * {@code @Table.name} — Hibernate's naming strategy emits snake_case while
- * {@code entity.getName()} returns CamelCase, which would mis-match parser-extracted
- * table names from {@link WorkspaceStatementInspector}.
+ * physical table name of every {@code @Entity} AND every many-to-many {@code @JoinTable}
+ * collection. Any table not in {@link #GLOBAL_TABLES} is treated as workspace-scoped.
+ *
+ * <p>Join tables are critical: they have no {@code workspace_id} column of their own but
+ * still need a predicate — they share the parent entity's tenancy boundary. A bare
+ * {@code SELECT * FROM issue_label} without a join to the scoped parent leaks across
+ * workspaces, so the inspector must treat join tables as scoped.
+ *
+ * <p>Using the physical metamodel (rather than reflecting on {@code @Table.name()})
+ * avoids the silent landmine of entities without explicit {@code @Table.name} — Hibernate
+ * emits snake_case while {@code entity.getName()} returns CamelCase.
  *
  * <p>Adding to {@link #GLOBAL_TABLES} is a security decision: each entry carries a
  * one-line rationale and must be reviewed.
@@ -62,21 +68,26 @@ public class WorkspaceScopedTables {
         SessionFactoryImplementor sf = entityManagerFactory
             .unwrap(SessionFactory.class)
             .unwrap(SessionFactoryImplementor.class);
+        MappingMetamodel metamodel = sf.getMappingMetamodel();
         Set<EntityType<?>> entities = entityManagerFactory.getMetamodel().getEntities();
+
         Set<String> tables = new TreeSet<>();
         for (EntityType<?> entity : entities) {
             Class<?> javaType = entity.getJavaType();
             if (javaType == null) continue;
-            EntityPersister persister = sf.getMappingMetamodel().getEntityDescriptor(javaType);
-            String tableName = persister.getMappedTableDetails().getTableName().toLowerCase();
-            if (!GLOBAL_TABLES.contains(tableName)) {
-                tables.add(tableName);
-            }
+            EntityPersister persister = metamodel.getEntityDescriptor(javaType);
+            addIfScoped(tables, persister.getMappedTableDetails().getTableName());
         }
-        // Fail-fast: an empty result with entities present means the Hibernate API call
-        // chain (currently @Incubating MappingMetamodel) silently regressed. Silently
-        // empty scopedTables turns the WorkspaceStatementInspector into a no-op, which
-        // is the worst possible failure mode for a security control.
+        // Many-to-many join tables + element-collection tables: physical tables with no
+        // workspace_id column of their own. They inherit the parent's tenancy boundary,
+        // and a bare SELECT against them leaks cross-workspace if not joined to a scoped
+        // parent. Collections owned via a foreign-key column on the child entity resolve
+        // to the child's own table — already added in the entity walk above.
+        metamodel.forEachCollectionDescriptor(collection -> addIfScoped(tables, collection.getTableName()));
+
+        // Fail-fast: zero scoped tables from a non-empty entity set means the Hibernate
+        // mapping metamodel call chain regressed. A silently-empty set would turn the
+        // inspector into a no-op — worst failure mode for a security control.
         if (tables.isEmpty() && !entities.isEmpty()) {
             throw new IllegalStateException(
                 "WorkspaceScopedTables populated zero scoped tables from " + entities.size()
@@ -86,11 +97,20 @@ public class WorkspaceScopedTables {
         }
         this.scopedTables = Set.copyOf(tables);
         log.info(
-            "WorkspaceScopedTables populated: {} workspace-scoped, {} global",
+            "WorkspaceScopedTables populated: {} workspace-scoped tables (incl. join tables), {} global",
             scopedTables.size(),
             GLOBAL_TABLES.size()
         );
     }
+
+    private static void addIfScoped(Set<String> tables, String rawName) {
+        if (rawName == null || rawName.isBlank()) return;
+        String name = rawName.toLowerCase();
+        if (!GLOBAL_TABLES.contains(name)) {
+            tables.add(name);
+        }
+    }
+
 
     /** Workspace-scoped physical table names (lowercase). Empty until ApplicationReady fires. */
     public Set<String> scopedTables() {

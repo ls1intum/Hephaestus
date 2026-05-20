@@ -19,18 +19,27 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
  * boots an empty context — the operator becomes opt-IN to functionality instead of opt-OUT
  * to disable it.
  *
+ * <p>Unwraps {@code @ConditionalOnProperty.List} containers — Spring Boot 3.5+ makes the
+ * annotation {@link java.lang.annotation.Repeatable}, so multiple occurrences are wrapped
+ * in a {@code .List} synthetic annotation. The test that simply matches
+ * {@code @ConditionalOnProperty} without unwrapping would scan zero classes in our
+ * codebase, because every site uses stacked annotations.
+ *
  * <p>See ADR 0005.
  */
 @Tag("architecture")
 @DisplayName("Runtime Role Boundary")
 class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
 
+    /** Container annotation Spring Boot 4 uses for repeated {@code @ConditionalOnProperty}. */
+    private static final String CONDITIONAL_CONTAINER =
+        "org.springframework.boot.autoconfigure.condition.ConditionalOnProperties";
+
     @Test
     @DisplayName("hephaestus.runtime.* gates use matchIfMissing=true")
     void runtimeGatesAreMatchIfMissingTrue() {
         List<String> violations = classes.stream()
-            .flatMap(clazz -> clazz.getAnnotations().stream().map(ann -> new ConditionalRef(clazz, ann)))
-            .filter(ConditionalRef::isConditionalOnProperty)
+            .flatMap(clazz -> conditionalOnPropertyAnnotations(clazz).map(ann -> new ConditionalRef(clazz, ann)))
             .filter(ConditionalRef::targetsRuntimeRoleProperty)
             .filter(ConditionalRef::missingMatchIfMissingTrue)
             .map(ConditionalRef::describe)
@@ -41,11 +50,30 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             .isEmpty();
     }
 
-    private record ConditionalRef(JavaClass owner, JavaAnnotation<?> annotation) {
-        boolean isConditionalOnProperty() {
-            return annotation.getRawType().isEquivalentTo(ConditionalOnProperty.class);
-        }
+    /**
+     * Returns every {@code @ConditionalOnProperty} on the class — both bare occurrences
+     * and individual entries inside Spring Boot's {@code @ConditionalOnProperties} container
+     * (which {@code @Repeatable} produces when multiple occurrences are stacked).
+     */
+    private static Stream<JavaAnnotation<?>> conditionalOnPropertyAnnotations(JavaClass clazz) {
+        return clazz.getAnnotations().stream().flatMap(ann -> {
+            if (ann.getRawType().isEquivalentTo(ConditionalOnProperty.class)) {
+                return Stream.of(ann);
+            }
+            if (ann.getRawType().getFullName().equals(CONDITIONAL_CONTAINER)) {
+                Object value = ann.getProperties().get("value");
+                if (value instanceof JavaAnnotation<?>[] arr) {
+                    return Stream.of(arr);
+                }
+                if (value instanceof Object[] arr) {
+                    return Stream.of(arr).filter(JavaAnnotation.class::isInstance).map(o -> (JavaAnnotation<?>) o);
+                }
+            }
+            return Stream.empty();
+        });
+    }
 
+    private record ConditionalRef(JavaClass owner, JavaAnnotation<?> annotation) {
         boolean targetsRuntimeRoleProperty() {
             return propertyNames().anyMatch(n -> n.startsWith(RuntimeRole.PROPERTY_PREFIX));
         }

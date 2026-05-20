@@ -41,8 +41,14 @@ public class WorkspaceStatementInspector implements StatementInspector {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceStatementInspector.class);
 
-    private static final Pattern WORKSPACE_ID_PATTERN =
-        Pattern.compile("\\bworkspace_id\\b", Pattern.CASE_INSENSITIVE);
+    /**
+     * Matches {@code workspace_id} only when it appears in a predicate-shaped position
+     * (followed by a comparison operator or {@code IN}/{@code IS}). String literals
+     * containing the bare word — {@code "refers to workspace_id mapping"} — must NOT
+     * short-circuit; they fall through to the JSqlParser slow path.
+     */
+    private static final Pattern WORKSPACE_ID_PREDICATE_PATTERN =
+        Pattern.compile("\\bworkspace_id\\s*(=|!=|<>|>=?|<=?|IN\\b|IS\\b)", Pattern.CASE_INSENSITIVE);
 
     private final WorkspaceScopedTables scopedTables;
     private final TenancyEnforcement mode;
@@ -79,7 +85,7 @@ public class WorkspaceStatementInspector implements StatementInspector {
     }
 
     private Decision analyze(String sql) {
-        if (WORKSPACE_ID_PATTERN.matcher(sql).find()) {
+        if (WORKSPACE_ID_PREDICATE_PATTERN.matcher(sql).find()) {
             return Decision.ok();
         }
         try {
