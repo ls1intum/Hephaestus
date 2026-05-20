@@ -1,11 +1,9 @@
 package de.tum.cit.aet.hephaestus.architecture;
 
 import de.tum.cit.aet.hephaestus.Application;
-import java.nio.file.Path;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
-import org.springframework.modulith.docs.Documenter;
 
 /**
  * Verifies the Spring Modulith application-module structure.
@@ -18,14 +16,14 @@ import org.springframework.modulith.docs.Documenter;
  *   <li>A module declares {@code allowedDependencies} that don't match its actual imports</li>
  * </ul>
  *
- * <p>Also generates PlantUML / C4 / Application Module Canvas diagrams under
- * {@code target/modulith-docs/} so reviewers can see the topology in CI artifacts.
- * Diagrams are not committed to git (avoids review churn).
- *
  * <p>When this test fails in CI, read the error carefully — Modulith reports the exact
  * source/target packages and suggests the named-interface or {@code allowedDependencies}
- * fix. Resist the urge to "break the cycle" via events: that changes semantics. Prefer
- * named interfaces or moving code.
+ * fix. Resist the urge to "break the cycle" via events; prefer named interfaces or moving
+ * code.
+ *
+ * <p>Documenter (PlantUML / C4 / Application Module Canvas) output is generated locally
+ * via {@code mvn spring-boot:run -Pdocumenter} (not in the test path — writing diagrams
+ * adds ~57s of CI time with no assertions).
  *
  * @see org.springframework.modulith.core.ApplicationModules#verify()
  * @see <a href="https://docs.spring.io/spring-modulith/reference/verification.html">Modulith Verification</a>
@@ -33,18 +31,8 @@ import org.springframework.modulith.docs.Documenter;
 @Tag("architecture")
 class ModulithVerificationTest {
 
-    private static final ApplicationModules modules = ApplicationModules.of(Application.class);
-
     @Test
     void modulesAreCycleFreeAndRespectNamedInterfaces() {
-        modules.verify();
-    }
-
-    @Test
-    void writeDocumentation() {
-        new Documenter(modules, Path.of("target/modulith-docs").toString())
-            .writeModulesAsPlantUml()
-            .writeIndividualModulesAsPlantUml()
-            .writeModuleCanvases();
+        ApplicationModules.of(Application.class).verify();
     }
 }

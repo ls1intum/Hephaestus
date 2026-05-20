@@ -10,14 +10,14 @@ This file governs the entire repository. Each service has its own `AGENTS.md` wi
 
 ## 1. Architecture map
 
-- `server/`: Spring Boot 3.5, Liquibase-managed PostgreSQL schema, synchronous + reactive APIs, generated OpenAPI spec in `openapi.yaml`. Hosts the Pi mentor agent in-process.
+- `server/`: Spring Boot 4 + Java 21 + Spring Modulith 2, Liquibase-managed PostgreSQL schema, synchronous + reactive APIs, generated OpenAPI spec in `openapi.yaml`. SQL-layer multi-tenancy via `core/tenancy/`. Two runtime roles (`server`, `worker`) selected by `hephaestus.runtime.*` properties — see ADR 0005 and `core/runtime/`.
 - `webapp/`: React 19 + TanStack Router/Query, Tailwind 4 UI kit (`src/components/ui`), generated API client in `src/api/**`.
 - `webhook-ingest/`: Hono/TypeScript webhook intake that forwards events into NATS JetStream.
 - `docs/`: Contributor docs (including the ERD that `db:generate-erd-docs` regenerates).
 
 ## 2. Toolchain & environment prerequisites
 
-- **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces. The webapp and webhook-ingest are TypeScript packages that use npm.
+- **Node.js**: Use the exact version from `.node-version` (currently 24.15.0). The repo uses pnpm 11 with `pnpm-lock.yaml` and pnpm workspaces (`pnpm-workspace.yaml`). The webapp and webhook-ingest are TypeScript packages.
 - **Java**: JDK 21 (see `pom.xml`). Run builds with `mvn` from `server/`.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
@@ -50,7 +50,7 @@ Run the relevant commands locally before opening a PR:
 | Webapp tests             | `pnpm run test:webapp`                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Webapp typecheck         | `pnpm run typecheck:webapp`                                                                                                                                                                                                                                                                                                                                                                                            |
 | Webapp Storybook         | `pnpm --filter webapp run build-storybook`                                                                                                                                                                                                                                                                                                                                                                                   |
-| Application-server tests | **Three test tiers:** <br>• `mvn test` runs unit tests (`@Tag("unit")`) <br>• `mvn verify` runs unit + integration tests (`@Tag("integration")`) <br>• `mvn test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). The Maven profile is the single guard—tests only run when explicitly activated. |
+| Server tests | **Four test tiers:** <br>• `mvn test` runs unit tests (`@Tag("unit")`) <br>• `mvn test -Parchitecture-tests` runs ArchUnit + Modulith verification (`@Tag("architecture")`) <br>• `mvn verify` runs unit + integration tests (`@Tag("integration")`) <br>• `mvn test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). The Maven profile is the single guard—tests only run when explicitly activated. |
 
 **Script naming conventions:**
 
