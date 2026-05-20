@@ -776,8 +776,12 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <!-- Memory and JVM settings - @{argLine} is replaced by JaCoCo -->
-                    <argLine>@{argLine} -Xmx2048m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
+                    <!-- Memory and JVM settings - @{argLine} is replaced by JaCoCo.
+                         4GB heap: the unit+architecture surefire run loads ArchUnit + Spring
+                         Modulith's full class graph (1000+ classes) in the same fork as the
+                         regular unit tests. 2GB OOMs on CI under that load. The dedicated
+                         `architecture-tests` profile uses the same 4GB ceiling. -->
+                    <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
                         -XX:+EnableDynamicAgentLoading
                     </argLine>
                     <!-- Test output -->

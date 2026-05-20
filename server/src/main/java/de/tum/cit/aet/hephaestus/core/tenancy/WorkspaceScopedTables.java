@@ -10,6 +10,7 @@ import org.hibernate.metamodel.MappingMetamodel;
 import org.hibernate.persister.entity.EntityPersister;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -57,14 +58,23 @@ public class WorkspaceScopedTables {
     );
 
     private volatile Set<String> scopedTables = Set.of();
-    private final EntityManagerFactory entityManagerFactory;
+    private final ObjectProvider<EntityManagerFactory> entityManagerFactoryProvider;
 
-    public WorkspaceScopedTables(EntityManagerFactory entityManagerFactory) {
-        this.entityManagerFactory = entityManagerFactory;
+    /**
+     * Takes an {@link ObjectProvider} rather than {@link EntityManagerFactory} directly to
+     * break a startup cycle: this bean is consumed (transitively) by Spring Boot's
+     * {@code HibernatePropertiesCustomizer}, which itself is needed to BUILD the
+     * {@code EntityManagerFactory}. Lazy resolution via {@code ObjectProvider} means the
+     * EMF lookup only happens at {@link ApplicationReadyEvent}, after the EMF is fully
+     * built.
+     */
+    public WorkspaceScopedTables(ObjectProvider<EntityManagerFactory> entityManagerFactoryProvider) {
+        this.entityManagerFactoryProvider = entityManagerFactoryProvider;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     void populateFromMetamodel() {
+        EntityManagerFactory entityManagerFactory = entityManagerFactoryProvider.getObject();
         SessionFactoryImplementor sf = entityManagerFactory
             .unwrap(SessionFactory.class)
             .unwrap(SessionFactoryImplementor.class);

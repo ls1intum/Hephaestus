@@ -175,7 +175,7 @@ jobs:
           pnpm install --frozen-lockfile
           cd server
           mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
-          cd ../..
+          cd ..
 
           pnpm run generate:api
           git add .

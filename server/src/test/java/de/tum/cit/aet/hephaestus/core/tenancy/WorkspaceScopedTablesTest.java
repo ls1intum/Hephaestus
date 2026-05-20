@@ -11,8 +11,16 @@ import jakarta.persistence.metamodel.EntityType;
 import jakarta.persistence.metamodel.Metamodel;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 class WorkspaceScopedTablesTest extends BaseUnitTest {
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<EntityManagerFactory> providerOf(EntityManagerFactory emf) {
+        ObjectProvider<EntityManagerFactory> provider = mock(ObjectProvider.class);
+        lenient().when(provider.getObject()).thenReturn(emf);
+        return provider;
+    }
 
     @Test
     void globalTablesContainsTheKnownAllowlist() {
@@ -30,7 +38,7 @@ class WorkspaceScopedTablesTest extends BaseUnitTest {
     @Test
     void scopedTablesIsEmptyBeforeApplicationReady() {
         EntityManagerFactory emf = mock(EntityManagerFactory.class);
-        WorkspaceScopedTables tables = new WorkspaceScopedTables(emf);
+        WorkspaceScopedTables tables = new WorkspaceScopedTables(providerOf(emf));
         assertThat(tables.scopedTables()).isEmpty();
         assertThat(tables.isScoped("pull_request")).isFalse();
     }
@@ -49,7 +57,7 @@ class WorkspaceScopedTablesTest extends BaseUnitTest {
             .when(emf.unwrap(org.hibernate.SessionFactory.class))
             .thenThrow(new IllegalStateException("simulated Hibernate API regression"));
 
-        WorkspaceScopedTables tables = new WorkspaceScopedTables(emf);
+        WorkspaceScopedTables tables = new WorkspaceScopedTables(providerOf(emf));
         assertThatThrownBy(tables::populateFromMetamodel).isInstanceOf(IllegalStateException.class);
     }
 }

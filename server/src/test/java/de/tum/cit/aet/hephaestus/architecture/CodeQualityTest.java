@@ -480,7 +480,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "GitLabHistoricalBackfillService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "HistoricalBackfillScheduler", // Optional GitLab backfill service gated by @ConditionalOnProperty
                 "AccountService", // PosthogClient is optional, gated by @ConditionalOnProperty(hephaestus.posthog.enabled=true)
-                "LeaderboardTaskScheduler" // SlackWeeklyLeaderboardTask is optional, gated by leaderboard.notification.enabled=true
+                "LeaderboardTaskScheduler", // SlackWeeklyLeaderboardTask is optional, gated by leaderboard.notification.enabled=true
+                "WorkspaceScopedTables" // EntityManagerFactory is consumed transitively by HibernatePropertiesCustomizer — lazy lookup breaks the EMF<->tenancy startup cycle (see WorkspaceScopedTables javadoc)
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {
