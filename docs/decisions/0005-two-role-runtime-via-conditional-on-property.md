@@ -39,8 +39,13 @@ scheduler can stay single-replica. Two roles match the actual operational pressu
 
 Option 1. `core.runtime.RuntimeRole` defines the property keys:
 
-- `hephaestus.runtime.server.enabled` (default true)
-- `hephaestus.runtime.worker.enabled` (default true)
+- `hephaestus.runtime.worker.enabled` (default true; **wired**) — gates the worker chain
+  via `DockerSandboxConfiguration` and `AgentNatsConsumerConfig`
+- `hephaestus.runtime.server.enabled` (default true; **reserved**) — placeholder constant
+  for the future server-only role. Not wired in this epic: the server-side bean chain
+  (HTTP API, sync NATS, mentor SSE, scheduled tasks, agent dispatch) still loads
+  regardless. Wiring a real server-only mode lands when a concrete deploy-split need
+  surfaces (likely after the BYO-runner / Kubernetes adapter epics).
 - `hephaestus.sandbox.llm-proxy.enabled` — capability flag (not a role), see ADR 0006
 
 Every `hephaestus.runtime.*` gate uses `matchIfMissing=true`, enforced by
@@ -49,11 +54,18 @@ Every `hephaestus.runtime.*` gate uses `matchIfMissing=true`, enforced by
 ## Consequences
 
 - Zero env vars → full monolith boots.
-- Future server-only / worker-only deploys flip flags; JAR stays bit-identical.
+- Worker-only deploy is feasible today by setting `hephaestus.runtime.worker.enabled=false`
+  on the server pod — the Docker sandbox + agent NATS pull consumer drop out. The
+  server JAR remains bit-identical.
+- True server-only mode (HTTP API + sync NATS only) requires the reserved
+  `server.enabled` flag to be wired in a follow-up; this epic establishes the
+  property-key contract but defers the implementation.
 - The split surfaces concrete boundary refactors (AgentNats publisher/consumer split,
   DockerSandbox worker gate, LlmProxy capability gate) — covered in commit messages,
   not duplicated here.
-- The single role-smoke test variant is run per role; no full `mvn verify` matrix.
+- No `RuntimeSmokeIT` lands in this epic. The role-isolation invariants are enforced
+  at compile time by `RuntimeRoleBoundaryTest` (ArchUnit); end-to-end smoke per role
+  lands with the deploy-split epic that has a real operational driver.
 
 ## Revisit trigger
 

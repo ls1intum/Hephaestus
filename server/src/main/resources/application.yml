@@ -128,14 +128,17 @@ hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # RUNTIME ROLES (single JAR, multiple deployable modes)
+    # RUNTIME ROLES (single JAR, deploy-config-selected mode)
     # ═══════════════════════════════════════════════════════════════════════════
-    # Two roles today (see ADR 0005):
-    #   server — HTTP API, sync NATS consumer, mentor SSE, scheduled tasks, agent dispatch
-    #   worker — agent NATS pull consumer, Docker sandbox, reconcilers, zombie sweepers
+    # Two property keys today (see ADR 0005):
+    #   worker — WIRED. Gates DockerSandboxConfiguration + AgentNatsConsumerConfig.
+    #     Setting false removes the Docker sandbox runtime + agent NATS pull consumer
+    #     from this JVM; the rest of the monolith continues to load.
+    #   server — RESERVED. Property key established for the future server-only role,
+    #     but not wired in this epic: setting it false is currently a no-op (HTTP API,
+    #     sync NATS, mentor SSE, scheduled tasks all still load). Wiring lands with
+    #     the deploy-split epic that has a real operational driver.
     # Both default true → single-JVM monolith (the dev + initial prod topology).
-    # To split: server pod sets hephaestus.runtime.worker.enabled=false; worker pod
-    # sets hephaestus.runtime.server.enabled=false. JAR is bit-identical.
     runtime:
         server:
             enabled: ${HEPHAESTUS_RUNTIME_SERVER_ENABLED:true}

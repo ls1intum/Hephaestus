@@ -34,7 +34,7 @@ JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) w
 
 We ship three Maven profiles: `local` (default), `prod`, and `spec`. For development stick to the `local` profile.
 
-Create `application-server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
+Create `server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
 
 :::caution Keep it local
 Never commit `application-local.yml`. It may contain secrets and machine-specific configuration.

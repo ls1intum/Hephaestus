@@ -18,10 +18,20 @@ public final class RuntimeRole {
      */
     public static final String PROPERTY_PREFIX = "hephaestus.runtime";
 
-    /** HTTP API, sync NATS consumer, mentor SSE, scheduled tasks, agent dispatch chain. */
+    /**
+     * Reserved property key for the future server-only role gate. NOT wired in this epic —
+     * the server-side bean chain (HTTP API, sync NATS, mentor SSE, scheduled tasks, agent
+     * dispatch) still loads regardless of this flag. Wiring real server-only mode is a
+     * follow-up epic when a concrete deploy-split need surfaces.
+     */
     public static final String SERVER_PROPERTY = PROPERTY_PREFIX + ".server.enabled";
 
-    /** Agent NATS pull consumer + Docker sandbox runtime + worker reconcilers + sweepers. */
+    /**
+     * Wired property key for the worker-role gate. Gates {@code DockerSandboxConfiguration}
+     * and {@code AgentNatsConsumerConfig}. Setting to {@code false} removes the Docker
+     * sandbox runtime and the agent NATS pull consumer from this JVM; the rest of the
+     * monolith continues to load.
+     */
     public static final String WORKER_PROPERTY = PROPERTY_PREFIX + ".worker.enabled";
 
     /**
