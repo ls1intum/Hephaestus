@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import java.time.Instant;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Repository;
  * aggregate queries across multiple contribution types.
  */
 @Repository
+@WorkspaceAgnostic("Workspace contribution queries take workspace ID parameters")
 public interface WorkspaceContributionQueryRepository extends JpaRepository<PullRequest, Long> {
     /**
      * Finds the earliest pull request creation date for a user in a workspace.

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.project;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -10,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+@WorkspaceAgnostic("Status updates scoped through project_id -> repository.workspace_id")
 public interface ProjectStatusUpdateRepository extends JpaRepository<ProjectStatusUpdate, Long> {
     Optional<ProjectStatusUpdate> findByNodeId(String nodeId);
 

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.project;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Repository for ProjectFieldValue entities.
  */
+@WorkspaceAgnostic("Field values scoped through project_id -> repository.workspace_id")
 public interface ProjectFieldValueRepository extends JpaRepository<ProjectFieldValue, Long> {
     /**
      * Finds a field value by item ID and field ID.

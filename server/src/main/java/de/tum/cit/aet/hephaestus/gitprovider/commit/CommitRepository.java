@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.commit;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -13,8 +14,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for Commit entities.
+ *
+ * <p>Workspace-agnostic: commits are scoped through {@code repository_id} (a
+ * {@link de.tum.cit.aet.hephaestus.gitprovider.repository.Repository} belongs to exactly
+ * one workspace), not via a direct {@code workspace_id} column. All custom queries take
+ * a {@code repositoryId} parameter; Hibernate-emitted entity load/save SQL is allowed by
+ * the PK-only DML carve-out in {@code WorkspaceStatementInspector}.
  */
 @Repository
+@WorkspaceAgnostic("Commits scoped through repository_id -> repository.workspace_id")
 public interface CommitRepository extends JpaRepository<Commit, Long> {
     /**
      * Find a commit by SHA and repository ID.

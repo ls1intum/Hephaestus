@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.project;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Repository for ProjectField entities.
  */
+@WorkspaceAgnostic("Fields scoped through project_id -> repository.workspace_id")
 public interface ProjectFieldRepository extends JpaRepository<ProjectField, String> {
     /**
      * Finds a field by project ID and field name.

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.issuecomment;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import java.time.Instant;
 import java.util.Collection;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Repository;
  * Repository for IssueComment entities.
  */
 @Repository
+@WorkspaceAgnostic("Comments scoped through issue_id -> repository.workspace_id")
 public interface IssueCommentRepository extends JpaRepository<IssueComment, Long> {
     Optional<IssueComment> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 

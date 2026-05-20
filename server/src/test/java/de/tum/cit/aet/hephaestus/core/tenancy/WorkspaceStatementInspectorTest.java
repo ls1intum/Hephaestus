@@ -129,6 +129,145 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         verify(reporter, never()).report(any(), any(), any());
     }
 
+    // ── DML semantics ──────────────────────────────────────────────────────
+
+    @Test
+    void insertOnScopedTableIsAllowed() {
+        // INSERTs cannot leak existing data across workspaces. The workspace_id (or FK
+        // chain) is placed into the row by application code, not enforced by the inspector.
+        // Regression: practice_finding/finding_feedback inserts emitted at Hibernate flush
+        // time triggered TenancyViolationException despite being safe by construction.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect("insert into practice_finding (id, title, practice_id) values (?, ?, ?)");
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void pkOnlyDeleteOnScopedTableIsAllowed() {
+        // Hibernate emits delete-by-id for delete(entity)/deleteById(id). The row was
+        // loaded into the persistence context within a workspace-checked transaction;
+        // requiring an additional workspace_id predicate would force @WorkspaceAgnostic
+        // onto every repository.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect("delete from practice where id=?");
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void pkOnlyUpdateOnScopedTableIsAllowed() {
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect("update practice set name=?, updated_at=? where id=?");
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void deleteJoinTableByParentFkIsAllowed() {
+        // @ManyToMany cascade-delete on the join table when a parent is removed:
+        // Hibernate emits DELETE FROM join_table WHERE <parent>_id = ?. Safe — the caller
+        // already had the parent's PK (workspace-scoped at retrieval).
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect("delete from issue_blocking where blocked_issue_id=?");
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void optimisticLockUpdateIsAllowed() {
+        // Hibernate appends "AND version = ?" to UPDATEs for entities with @Version.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect(
+            "update chat_message set metadata=?,parts=?,role=?,status=?,thread_id=?,version=? where id=? and version=?"
+        );
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void deleteWithExtraPredicateStillRequiresWorkspaceId() {
+        // PK-only allowance MUST NOT extend to multi-column deletes — those are likely
+        // hand-written queries where we still want the workspace_id discipline.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
+        when(scopedTables.isScoped("practice")).thenReturn(true);
+        inspector.inspect("delete from practice where id=? and slug=?");
+        verify(reporter).report(
+            "delete from practice where id=? and slug=?",
+            Set.of("practice"),
+            TenancyEnforcement.LOG
+        );
+    }
+
+    @Test
+    void hibernateEntityLoadByPkIsAllowed() {
+        // Hibernate-emitted entity load / lazy fetch SQL: SELECT ... FROM table alias
+        // WHERE alias.id = ?. Safe because the caller already had the surrogate PK.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect(
+            "select r1_0.id,r1_0.archived,r1_0.created_at,r1_0.html_url,r1_0.name " +
+                "from repository r1_0 where r1_0.id=?"
+        );
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void hibernateEntityLoadByPkWithJoinsIsAllowed() {
+        // Eager @ManyToOne fetches add LEFT JOINs but the WHERE is still <alias>.id = ?.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect(
+            "select r1_0.id,o1_0.id,o1_0.login " +
+                "from repository r1_0 " +
+                "left join organization o1_0 on r1_0.organization_id=o1_0.id " +
+                "where r1_0.id=?"
+        );
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void selectWithoutPkPredicateStillEnforced() {
+        // Don't let PK-only allowance leak into broader SELECT patterns.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
+        when(scopedTables.isScoped("pull_request")).thenReturn(true);
+        inspector.inspect("select pr1_0.id from pull_request pr1_0 where pr1_0.state=?");
+        verify(reporter).report(
+            "select pr1_0.id from pull_request pr1_0 where pr1_0.state=?",
+            Set.of("pull_request"),
+            TenancyEnforcement.LOG
+        );
+    }
+
+    @Test
+    void hibernateCollectionLoadByParentFkIsAllowed() {
+        // Hibernate-emitted @ManyToMany collection initialisation queries the join table
+        // filtered by the parent's FK column. The join table inherits scope from the
+        // parent's PK, which the caller already had.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect(
+            "select i1_0.label_id,i1_1.id,i1_1.body,i1_1.title " +
+                "from issue_label i1_0 " +
+                "join issue i1_1 on i1_0.issue_id=i1_1.id " +
+                "where i1_0.label_id=?"
+        );
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void hibernateOneToManyByParentFkIsAllowed() {
+        // @OneToMany owned by the child via FK: SELECT c.* FROM comment c WHERE c.issue_id = ?
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect("select c1_0.id,c1_0.body from issue_comment c1_0 where c1_0.issue_id=?");
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void hibernateSingleTableInheritanceLoadIsAllowed() {
+        // Single-table inheritance: SELECT … FROM issue alias WHERE alias.id = ? AND
+        // alias.<discriminator> = '<subtype>'. The PK predicate still pins the result set.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect(
+            "select pr1_0.id,pr1_0.body,pr1_0.title " +
+                "from issue pr1_0 " +
+                "where pr1_0.id=? and pr1_0.issue_type='PullRequest'"
+        );
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
     // helper: Mockito.any() shorthand
     private static <T> T any() {
         return org.mockito.ArgumentMatchers.any();

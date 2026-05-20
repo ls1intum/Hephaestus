@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.profile;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import java.time.Instant;
 import java.util.List;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Repository;
  * depend on workspace entities.
  */
 @Repository
+@WorkspaceAgnostic("Profile query helper joining with RepositoryToMonitor for workspace scoping")
 public interface ProfilePullRequestQueryRepository extends JpaRepository<PullRequest, Long> {
     @Query(
         """

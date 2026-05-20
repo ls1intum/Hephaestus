@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.profile;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,6 +17,7 @@ import org.springframework.data.repository.query.Param;
  * <p>These queries are used for user profile display where workspace context is required.
  */
 @org.springframework.stereotype.Repository
+@WorkspaceAgnostic("Profile query helper joining with RepositoryToMonitor for workspace scoping")
 public interface ProfileRepositoryQueryRepository extends JpaRepository<Repository, Long> {
     /**
      * Finds all repositories a user has contributed to within a workspace.

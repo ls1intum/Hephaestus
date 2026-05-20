@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.pullrequest;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.QueryHint;
 import java.time.Instant;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  * @see de.tum.cit.aet.hephaestus.profile.ProfilePullRequestQueryRepository
  */
 @Repository
+@WorkspaceAgnostic("Pull requests scoped through repository_id -> repository.workspace_id")
 public interface PullRequestRepository extends JpaRepository<PullRequest, Long> {
     /**
      * Finds a PR by repository ID and number for sync operations.

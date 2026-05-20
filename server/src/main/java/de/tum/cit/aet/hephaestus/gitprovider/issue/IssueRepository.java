@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.issue;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>All queries filter by repository ID which inherently carries scope
  * through the Repository -> Organization relationship chain.
  */
+@WorkspaceAgnostic("Issues scoped through repository_id -> repository.workspace_id")
 public interface IssueRepository extends JpaRepository<Issue, Long> {
     /**
      * Finds an issue (not a pull request) by repository ID and number.

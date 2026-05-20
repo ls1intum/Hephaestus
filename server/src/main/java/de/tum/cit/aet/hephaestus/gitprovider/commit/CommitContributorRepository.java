@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.commit;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Repository for CommitContributor entities.
  */
 @Repository
+@WorkspaceAgnostic("Contributors scoped through commit_id -> repository.workspace_id")
 public interface CommitContributorRepository extends JpaRepository<CommitContributor, Long> {
     /**
      * Find all contributors for a commit, ordered by role and ordinal.

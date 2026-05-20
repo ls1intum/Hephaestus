@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import java.time.Instant;
 import java.util.Collection;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Repository;
  * time ranges and ensures consistency with {@link ActivityEventRepository}.
  */
 @Repository
+@WorkspaceAgnostic("Leaderboard queries take workspace ID parameters")
 public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequestReview, Long> {
     /**
      * Finds all reviews in a timeframe for specific actors, scoped to repositories monitored by the workspace.

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.repository;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -17,9 +18,15 @@ import org.springframework.transaction.annotation.Transactional;
  * entities) belong in the consuming packages (leaderboard, profile, etc.) to maintain
  * clean architecture boundaries.
  *
+ * <p>Workspace-agnostic by design: provider-domain lookups (by native ID, full name) run
+ * during sync flows that resolve the workspace later via {@code repository_to_monitor}
+ * joins or {@code WorkspaceContext}. Direct entity load/save SQL is allowed by the
+ * PK-only DML carve-out in {@code WorkspaceStatementInspector}.
+ *
  * @see de.tum.cit.aet.hephaestus.profile.ProfileRepositoryQueryRepository
  */
 @org.springframework.stereotype.Repository
+@WorkspaceAgnostic("Provider-domain lookups by native ID / full name; workspace resolved downstream")
 public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     /**
      * Finds a repository by its full name (owner/name).

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +14,7 @@ import org.springframework.data.repository.query.Param;
  * <p>Comments are scoped through their thread which has scope through
  * the Thread -> PullRequest -> Repository -> Organization chain.
  */
+@WorkspaceAgnostic("Comments scoped through review_id -> repository.workspace_id")
 public interface PullRequestReviewCommentRepository extends JpaRepository<PullRequestReviewComment, Long> {
     Optional<PullRequestReviewComment> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 

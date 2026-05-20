@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.team;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Repository;
  * through the Team.organization relationship.
  */
 @Repository
+@WorkspaceAgnostic("Teams scoped through workspace_id via organization chain")
 public interface TeamRepository extends JpaRepository<Team, Long> {
     Optional<Team> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 

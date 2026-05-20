@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.discussion;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Repository for Discussion entities.
  */
 @Repository
+@WorkspaceAgnostic("Discussions scoped through repository_id -> repository.workspace_id")
 public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
     /**
      * Find a discussion by repository ID and discussion number.

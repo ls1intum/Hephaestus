@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.discussion;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  * databaseId for DiscussionCategory - only the node ID (e.g., "DIC_kwDOBk...").
  */
 @Repository
+@WorkspaceAgnostic("Categories scoped through repository_id -> repository.workspace_id")
 public interface DiscussionCategoryRepository extends JpaRepository<DiscussionCategory, String> {
     /**
      * Find a category by repository ID and slug.

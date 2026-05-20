@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.discussioncomment;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Repository;
  * Repository for DiscussionComment entities.
  */
 @Repository
+@WorkspaceAgnostic("Comments scoped through discussion_id -> repository.workspace_id")
 public interface DiscussionCommentRepository extends JpaRepository<DiscussionComment, Long> {
     Optional<DiscussionComment> findByNativeIdAndProviderId(Long nativeId, Long providerId);
     /**

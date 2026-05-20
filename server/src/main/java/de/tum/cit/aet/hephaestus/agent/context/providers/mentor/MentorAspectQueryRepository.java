@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Repository;
  * workspace-scoped through {@code RepositoryToMonitor} or {@code Practice.workspace}.
  */
 @Repository
+@WorkspaceAgnostic("Mentor aspect queries take workspace ID parameters")
 public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
     /**
      * Single-round-trip snapshot of every counter {@code UserAspectProvider} needs. The JPQL

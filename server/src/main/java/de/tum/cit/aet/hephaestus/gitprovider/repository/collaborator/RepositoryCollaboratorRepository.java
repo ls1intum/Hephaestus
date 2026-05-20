@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.repository.collaborator;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +13,7 @@ import org.springframework.data.repository.query.Param;
  * <p>All queries filter by repository ID which inherently carries scope
  * through the Repository -> Organization relationship chain.
  */
+@WorkspaceAgnostic("Collaborators scoped through repository_id -> repository.workspace_id")
 public interface RepositoryCollaboratorRepository
     extends JpaRepository<RepositoryCollaborator, RepositoryCollaborator.Id>
 {

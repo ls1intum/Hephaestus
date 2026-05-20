@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.milestone;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  * through the Repository -> Organization relationship chain.
  */
 @Repository
+@WorkspaceAgnostic("Milestones scoped through repository_id -> repository.workspace_id")
 public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
     Optional<Milestone> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 

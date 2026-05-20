@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.project;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Repository for Project entities.
  */
+@WorkspaceAgnostic("Projects scoped through owner_id (organization/user) -> workspace context")
 public interface ProjectRepository extends JpaRepository<Project, Long> {
     /**
      * Finds a project by owner type, owner ID, and project number.

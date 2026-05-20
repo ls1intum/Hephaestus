@@ -67,6 +67,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * was unresolved at ingest. Without this, commits ingested before their GitLab authors
      * are resolved via email match stay orphaned and never award XP.
      */
+    @WorkspaceAgnostic("Scoped by repository_id (repository belongs to one workspace)")
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     @Query(

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.project;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Repository for ProjectItem entities.
  */
+@WorkspaceAgnostic("Items scoped through project_id -> repository.workspace_id")
 public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> {
     /**
      * Finds an item by project ID and GitHub node ID.

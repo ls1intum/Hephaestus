@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.organization;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>All queries filter by Organization ID which inherently carries scope
  * through the Organization relationship.
  */
+@WorkspaceAgnostic(
+    "Memberships scoped through organization_id; organization is global, membership filtered by workspace context"
+)
 public interface OrganizationMembershipRepository
     extends JpaRepository<OrganizationMembership, OrganizationMembershipId>
 {

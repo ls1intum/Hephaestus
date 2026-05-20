@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.team.membership;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Repository;
  * the Team.organization relationship.
  */
 @Repository
+@WorkspaceAgnostic("Memberships scoped through team_id -> team.workspace_id")
 public interface TeamMembershipRepository extends JpaRepository<TeamMembership, TeamMembership.Id> {
     /**
      * Delete a membership by team and user IDs.

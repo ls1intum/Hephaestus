@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Repository for workspace-scoped practice definitions.
  */
 @Repository
+@WorkspaceAgnostic(
+    "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
+)
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 

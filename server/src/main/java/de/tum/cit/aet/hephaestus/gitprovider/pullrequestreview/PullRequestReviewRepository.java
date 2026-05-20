@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -16,9 +17,15 @@ import org.springframework.stereotype.Repository;
  * Scope-filtered queries (those that join with host application entities)
  * belong in the host application to maintain clean architecture boundaries.
  *
+ * <p>Workspace-agnostic by design: reviews are scoped through
+ * {@code pull_request_id -> pull_request.repository_id -> repository.workspace_id}.
+ * Provider-domain lookups (by native ID + provider ID, by pull-request ID) run during
+ * sync flows; workspace context is established by the caller.
+ *
  * @see de.tum.cit.aet.hephaestus.leaderboard.LeaderboardReviewQueryRepository
  */
 @Repository
+@WorkspaceAgnostic("Reviews scoped through pull_request_id -> repository.workspace_id")
 public interface PullRequestReviewRepository extends JpaRepository<PullRequestReview, Long> {
     /**
      * Find a review by its provider-scoped native ID.
