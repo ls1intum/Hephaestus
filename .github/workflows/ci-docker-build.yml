@@ -62,7 +62,7 @@ jobs:
       # Paketo Cloud Native Buildpacks via spring-boot:build-image, with Application CDS.
       # See docs/admin/buildpacks-cds-decision.md and pom.xml's <image> block.
       use-buildpacks: true
-      maven-module: "server/application-server"
+      maven-module: "server"
       registry: "ghcr.io"
       tags: |
         ${{ github.ref_name }}
@@ -82,7 +82,7 @@ jobs:
     uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/webhook-ingest"
-      docker-file: "./server/webhook-ingest/Dockerfile"
+      docker-file: "./webhook-ingest/Dockerfile"
       # Context = repo root so the Dockerfile can COPY pnpm-lock.yaml,
       # pnpm-workspace.yaml, and the workspace package.json files needed for
       # `pnpm install --filter webhook-ingest...` to resolve the workspace graph.

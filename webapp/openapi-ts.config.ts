@@ -1,7 +1,7 @@
 import { defaultPlugins, defineConfig } from "@hey-api/openapi-ts";
 
 export default defineConfig({
-	input: "../server/application-server/openapi.yaml",
+	input: "../server/openapi.yaml",
 	output: "src/api",
 	plugins: [
 		...defaultPlugins,

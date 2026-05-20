@@ -1,0 +1,215 @@
+package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
+
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
+import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.mentor.ChatThread;
+import java.time.Instant;
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+/**
+ * Read-side queries for mentor aspect providers. {@code User} is the bound root only because
+ * Spring Data requires one; the queries themselves cross several entities, each
+ * workspace-scoped through {@code RepositoryToMonitor} or {@code Practice.workspace}.
+ */
+@Repository
+@WorkspaceAgnostic("Mentor aspect queries take workspace ID parameters")
+public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
+    /**
+     * Single-round-trip snapshot of every counter {@code UserAspectProvider} needs. The JPQL
+     * anchors on {@code User} so the constructor expression evaluates exactly once (one row
+     * by PK); each bucket is a {@code COALESCE((SELECT …), 0L)} so the projected longs are
+     * never null. Collapses what used to be nine separate {@code SELECT COUNT(...)}
+     * round-trips (one per metric) into one statement.
+     */
+    @Query(
+        """
+        SELECT new de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorUserCounts(
+            COALESCE((SELECT COUNT(p1)
+                FROM PullRequest p1
+                JOIN RepositoryToMonitor rtm1 ON rtm1.nameWithOwner = p1.repository.nameWithOwner
+                WHERE p1.author.id = :userId
+                  AND rtm1.workspace.id = :workspaceId
+                  AND p1.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN), 0L),
+            COALESCE((SELECT COUNT(p2)
+                FROM PullRequest p2
+                JOIN RepositoryToMonitor rtm2 ON rtm2.nameWithOwner = p2.repository.nameWithOwner
+                WHERE p2.author.id = :userId
+                  AND rtm2.workspace.id = :workspaceId
+                  AND p2.isMerged = true
+                  AND p2.mergedAt > :weekAgo
+                  AND p2.mergedAt <= :now), 0L),
+            COALESCE((SELECT COUNT(p3)
+                FROM PullRequest p3
+                JOIN RepositoryToMonitor rtm3 ON rtm3.nameWithOwner = p3.repository.nameWithOwner
+                WHERE p3.author.id = :userId
+                  AND rtm3.workspace.id = :workspaceId
+                  AND p3.isMerged = true
+                  AND p3.mergedAt > :twoWeeksAgo
+                  AND p3.mergedAt <= :weekAgo), 0L),
+            COALESCE((SELECT COUNT(i)
+                FROM Issue i
+                JOIN RepositoryToMonitor rtmi ON rtmi.nameWithOwner = i.repository.nameWithOwner
+                WHERE TYPE(i) = Issue
+                  AND i.author.id = :userId
+                  AND rtmi.workspace.id = :workspaceId
+                  AND i.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN), 0L),
+            COALESCE((SELECT COUNT(r1)
+                FROM PullRequestReview r1
+                JOIN RepositoryToMonitor rtmr1 ON rtmr1.nameWithOwner = r1.pullRequest.repository.nameWithOwner
+                WHERE r1.author.id = :userId
+                  AND rtmr1.workspace.id = :workspaceId
+                  AND r1.submittedAt > :weekAgo
+                  AND r1.submittedAt <= :now), 0L),
+            COALESCE((SELECT COUNT(r2)
+                FROM PullRequestReview r2
+                JOIN RepositoryToMonitor rtmr2 ON rtmr2.nameWithOwner = r2.pullRequest.repository.nameWithOwner
+                WHERE r2.author.id = :userId
+                  AND rtmr2.workspace.id = :workspaceId
+                  AND r2.submittedAt > :twoWeeksAgo
+                  AND r2.submittedAt <= :weekAgo), 0L),
+            COALESCE((SELECT COUNT(r3)
+                FROM PullRequestReview r3
+                JOIN RepositoryToMonitor rtmr3 ON rtmr3.nameWithOwner = r3.pullRequest.repository.nameWithOwner
+                WHERE r3.pullRequest.author.id = :userId
+                  AND rtmr3.workspace.id = :workspaceId
+                  AND r3.submittedAt > :weekAgo), 0L),
+            COALESCE((SELECT COUNT(prr)
+                FROM PullRequest prr
+                JOIN RepositoryToMonitor rtmpr ON rtmpr.nameWithOwner = prr.repository.nameWithOwner
+                JOIN prr.requestedReviewers reviewer
+                WHERE reviewer.id = :userId
+                  AND rtmpr.workspace.id = :workspaceId
+                  AND prr.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN), 0L),
+            COALESCE((SELECT COUNT(t)
+                FROM PullRequestReviewThread t
+                JOIN RepositoryToMonitor rtmt ON rtmt.nameWithOwner = t.pullRequest.repository.nameWithOwner
+                WHERE t.pullRequest.author.id = :userId
+                  AND rtmt.workspace.id = :workspaceId
+                  AND t.pullRequest.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN
+                  AND t.state = de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED), 0L)
+        )
+        FROM User u
+        WHERE u.id = :userId
+        """
+    )
+    MentorUserCounts fetchUserCounts(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId,
+        @Param("twoWeeksAgo") Instant twoWeeksAgo,
+        @Param("weekAgo") Instant weekAgo,
+        @Param("now") Instant now
+    );
+
+    /** Open issues assigned to user, ordered most recent first, scoped to workspace. */
+    @Query(
+        """
+        SELECT i
+        FROM Issue i
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = i.repository.nameWithOwner
+        JOIN i.assignees a
+        LEFT JOIN FETCH i.repository
+        LEFT JOIN FETCH i.milestone
+        WHERE a.id = :userId
+          AND rtm.workspace.id = :workspaceId
+          AND i.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN
+        ORDER BY i.createdAt DESC
+        """
+    )
+    List<Issue> findAssignedOpenIssues(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
+
+    /** Open PRs where user has been requested to review, with author + repo fetched. */
+    @Query(
+        """
+        SELECT p
+        FROM PullRequest p
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
+        JOIN p.requestedReviewers reviewer
+        LEFT JOIN FETCH p.author
+        LEFT JOIN FETCH p.repository
+        WHERE reviewer.id = :userId
+          AND rtm.workspace.id = :workspaceId
+          AND p.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN
+        ORDER BY p.createdAt DESC
+        """
+    )
+    List<PullRequest> findPendingReviewRequestPrs(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
+
+    /** Recent chat threads for the user within the workspace, newest first. Caller passes
+     *  a {@link Pageable} ({@code PageRequest.of(0, limit)}) so the DB-side LIMIT keeps power
+     *  users (hundreds of threads) from hydrating the full list just to {@code subList(0, 10)}. */
+    @Query(
+        """
+        SELECT t
+        FROM ChatThread t
+        WHERE t.workspace.id = :workspaceId
+          AND t.user.id = :userId
+        ORDER BY t.createdAt DESC
+        """
+    )
+    List<ChatThread> findRecentChatThreads(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId,
+        org.springframework.data.domain.Pageable pageable
+    );
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Findings aspect — reviews received in window
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Earliest USER-role message per thread for a batch of thread ids. One round trip instead of
+     * the N-trips loop the previous `firstUserMessagePreview(threadId)` did. Native because
+     * Postgres `DISTINCT ON` is the cheapest path; equivalent JPQL would need a correlated
+     * subquery for every thread anyway. Joins {@code chat_thread} on {@code workspace_id} so the
+     * query refuses cross-tenant ids the caller might pass — defence in depth even though the
+     * upstream id list is already user-scoped.
+     */
+    @Query(
+        value = """
+        SELECT DISTINCT ON (m.thread_id) m.thread_id, m.parts
+          FROM chat_message m
+          JOIN chat_thread t ON t.id = m.thread_id
+         WHERE m.thread_id IN (:threadIds)
+           AND t.workspace_id = :workspaceId
+           AND m.role = 'USER'
+         ORDER BY m.thread_id, m.created_at ASC
+        """,
+        nativeQuery = true
+    )
+    List<Object[]> findFirstUserMessagePartsByThreadIds(
+        @Param("workspaceId") Long workspaceId,
+        @Param("threadIds") List<java.util.UUID> threadIds
+    );
+
+    /**
+     * Reviews received on user's authored PRs within {@code since}..now, scoped to workspace.
+     * Page the cap into the DB query — a heavy reviewer's 90-day window can return hundreds of
+     * rows; surfacing more than {@code MAX_RECENT_REVIEWS} is wasted work.
+     */
+    @Query(
+        """
+        SELECT prr
+        FROM PullRequestReview prr
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = prr.pullRequest.repository.nameWithOwner
+        LEFT JOIN FETCH prr.author
+        LEFT JOIN FETCH prr.pullRequest
+        WHERE prr.pullRequest.author.id = :userId
+          AND rtm.workspace.id = :workspaceId
+          AND prr.submittedAt > :since
+        ORDER BY prr.submittedAt DESC
+        """
+    )
+    List<PullRequestReview> findReviewsReceivedSince(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId,
+        @Param("since") Instant since,
+        org.springframework.data.domain.Pageable page
+    );
+}

@@ -13,7 +13,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const mvnwDir = path.resolve(__dirname, "..", "server", "application-server");
+const mvnwDir = path.resolve(__dirname, "..", "server");
 const isWindows = process.platform === "win32";
 
 function main(): void {

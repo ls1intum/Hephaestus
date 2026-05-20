@@ -37,7 +37,7 @@ Override the property directly — no init service involved:
 
 ```bash
 echo 'hephaestus.agent.image.reference: ghcr.io/ls1intum/hephaestus/agent-pi:dev' \
-  > server/application-server/src/main/resources/application-local.yaml
+  > server/src/main/resources/application-local.yaml
 ```
 
 Or via env var: `export HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi:dev`.

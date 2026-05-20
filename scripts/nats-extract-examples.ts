@@ -40,15 +40,7 @@ const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, "..");
 
 const DEFAULT_NATS_SERVER = process.env.NATS_URL ?? "nats://localhost:4222";
-const DEFAULT_EXAMPLES_DIR = path.join(
-	REPO_ROOT,
-	"server",
-	"application-server",
-	"src",
-	"test",
-	"resources",
-	"github",
-);
+const DEFAULT_EXAMPLES_DIR = path.join(REPO_ROOT, "server", "src", "test", "resources", "github");
 const DEFAULT_NATS_SUBJECT = "github.HephaestusTest.>";
 const DEFAULT_NATS_STREAM = "github";
 

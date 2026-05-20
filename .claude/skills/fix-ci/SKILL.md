@@ -75,7 +75,7 @@ Before fixing anything, categorize every failure into this table.
 | 3 | TypeScript | TS2xxx errors, type mismatch | Fix the type error in source |
 | 4 | Build failure | Compilation errors, missing exports | Fix imports/exports, verify with `pnpm run build:webhook-ingest` |
 | 5 | Webapp tests | "FAIL" in webapp test output | Fix test or source, verify with `pnpm run test:webapp` |
-| 5 | App server tests | Maven test failures, assertion errors | Fix test or source, verify with `cd server/application-server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q` |
+| 5 | App server tests | Maven test failures, assertion errors | Fix test or source, verify with `cd server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q` |
 | 5 | Webhook tests | Vitest failures in webhook-ingest | Fix test or source, verify with `pnpm run test:webhook-ingest` |
 | 6 | OpenAPI sync | "OpenAPI out of sync" | `pnpm run generate:api` |
 | 6 | DB schema | "Schema drift detected" | `pnpm run db:draft-changelog` |
@@ -108,7 +108,7 @@ pnpm run test:webhook-ingest
 
 
 # If app-server tests failed:
-cd server/application-server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q && cd ../..
+cd server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q && cd ../..
 ```
 
 ALL must pass locally before pushing.

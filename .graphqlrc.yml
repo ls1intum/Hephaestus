@@ -6,16 +6,16 @@
 projects:
   github:
     # GitHub GraphQL API schema (downloaded from docs.github.com)
-    schema: "server/application-server/src/main/resources/graphql/github/schema.github.graphql"
+    schema: "server/src/main/resources/graphql/github/schema.github.graphql"
 
     # GraphQL operations (queries, mutations, fragments)
     documents:
-      - "server/application-server/src/main/resources/graphql/github/operations/**/*.graphql"
-      - "server/application-server/src/main/resources/graphql/github/fragments/**/*.graphql"
+      - "server/src/main/resources/graphql/github/operations/**/*.graphql"
+      - "server/src/main/resources/graphql/github/fragments/**/*.graphql"
 
     # Restrict this project to GitHub files only (prevents cross-schema validation)
     include:
-      - "server/application-server/src/main/resources/graphql/github/**"
+      - "server/src/main/resources/graphql/github/**"
 
     extensions:
       languageService:
@@ -25,14 +25,14 @@ projects:
 
   gitlab:
     # GitLab GraphQL API schema
-    schema: "server/application-server/src/main/resources/graphql/gitlab/schema.gitlab.graphql"
+    schema: "server/src/main/resources/graphql/gitlab/schema.gitlab.graphql"
 
     # GitLab GraphQL operations
-    documents: "server/application-server/src/main/resources/graphql/gitlab/operations/**/*.graphql"
+    documents: "server/src/main/resources/graphql/gitlab/operations/**/*.graphql"
 
     # Restrict this project to GitLab files only (prevents cross-schema validation)
     include:
-      - "server/application-server/src/main/resources/graphql/gitlab/**"
+      - "server/src/main/resources/graphql/gitlab/**"
 
     extensions:
       languageService:

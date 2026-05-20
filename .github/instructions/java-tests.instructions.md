@@ -1,5 +1,5 @@
 ---
-applyTo: "server/application-server/src/test/**/*.java"
+applyTo: "server/src/test/**/*.java"
 ---
 
 Follow this mantra for high-value test cases:

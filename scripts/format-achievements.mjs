@@ -8,7 +8,7 @@ import path from 'path';
  * Preferred order: id, parent, rarity, isHidden, category, triggerEvents, evaluatorClass, requirements
  */
 
-const ACHIEVEMENTS_FILE = path.join(process.cwd(), 'server/application-server/src/main/resources/achievements/achievements.yml');
+const ACHIEVEMENTS_FILE = path.join(process.cwd(), 'server/src/main/resources/achievements/achievements.yml');
 const PREFERRED_ORDER = ['id', 'parent', 'rarity', 'isHidden', 'category', 'triggerEvents', 'evaluatorClass', 'requirements'];
 
 function formatYaml() {

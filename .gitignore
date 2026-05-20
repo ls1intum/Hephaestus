@@ -134,7 +134,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-/server/application-server/src/test/resources/application-github-integration-local.yml
+/server/src/test/resources/application-github-integration-local.yml
 
 # Spyder project settings
 .spyderproject
@@ -172,11 +172,11 @@ node_modules/
 application-local.yml
 application-live-local.yml
 
-server/application-server/postgres-data/
-server/application-server/postgres-data-temp/
-server/application-server/postgres-data-local/
-server/application-server/postgres-data*.tgz
-server/application-server/logs/
+server/postgres-data/
+server/postgres-data-temp/
+server/postgres-data-local/
+server/postgres-data*.tgz
+server/logs/
 
 # Private keys
 *.pem
