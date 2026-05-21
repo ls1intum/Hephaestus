@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.webhook;
+package de.tum.cit.aet.hephaestus.gitprovider.webhook.gitlab;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

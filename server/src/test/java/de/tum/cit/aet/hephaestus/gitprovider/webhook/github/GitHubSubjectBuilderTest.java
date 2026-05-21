@@ -1,8 +1,7 @@
-package de.tum.cit.aet.hephaestus.gitprovider.webhook;
+package de.tum.cit.aet.hephaestus.gitprovider.webhook.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.github.GitHubSubjectBuilder;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;

@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.gitprovider.webhook.github;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.DedupIdResolver;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.HmacVerifier;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.PublishRequest;
 import io.micrometer.core.instrument.Counter;
@@ -124,7 +123,7 @@ public class GitHubWebhookController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error("publish-failed"));
         }
 
-        log.info("Published GitHub webhook: subject={} deliveryId={} event={}", subject, deliveryId, eventType);
+        log.debug("Published GitHub webhook: subject={} deliveryId={} event={}", subject, deliveryId, eventType);
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
 

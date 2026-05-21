@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.webhook;
+package de.tum.cit.aet.hephaestus.gitprovider.webhook.github;
 
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;

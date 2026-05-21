@@ -1,10 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.webhook;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
-import org.springframework.boot.convert.DurationUnit;
 import org.springframework.lang.Nullable;
 
 /**
@@ -75,9 +73,9 @@ public record WebhookProperties(
     }
 
     public record Publish(
-        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("9s") Duration timeout,
+        @DefaultValue("9s") Duration timeout,
         @DefaultValue("5") int maxRetries,
-        @DurationUnit(ChronoUnit.MILLIS) @DefaultValue("200ms") Duration retryBaseDelay
+        @DefaultValue("200ms") Duration retryBaseDelay
     ) {
         public Publish {
             if (timeout.isZero() || timeout.isNegative()) {
@@ -93,8 +91,8 @@ public record WebhookProperties(
     }
 
     public record Stream(
-        @DurationUnit(ChronoUnit.MINUTES) @DefaultValue("2m") Duration duplicateWindow,
-        @DurationUnit(ChronoUnit.DAYS) @DefaultValue("180d") Duration maxAge,
+        @DefaultValue("2m") Duration duplicateWindow,
+        @DefaultValue("180d") Duration maxAge,
         @DefaultValue("2000000") long maxMessages
     ) {
         public Stream {
@@ -115,7 +113,7 @@ public record WebhookProperties(
      * to Docker's {@code stop_grace_period} is:
      * {@code stop_grace_period ≥ server.shutdown=graceful timeout + drainTimeout + margin}.
      */
-    public record Shutdown(@DurationUnit(ChronoUnit.SECONDS) @DefaultValue("15s") Duration drainTimeout) {
+    public record Shutdown(@DefaultValue("15s") Duration drainTimeout) {
         public Shutdown {
             if (drainTimeout.isZero() || drainTimeout.isNegative()) {
                 throw new IllegalArgumentException("shutdown.drainTimeout must be positive, got: " + drainTimeout);

@@ -6,7 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.github.GitHubWebhookController;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.web.GitLabWebhookController;
+import de.tum.cit.aet.hephaestus.gitprovider.webhook.gitlab.GitLabWebhookController;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.micrometer.core.instrument.MeterRegistry;

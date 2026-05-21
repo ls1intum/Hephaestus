@@ -44,6 +44,8 @@ public class WebhookConfiguration {
         RetryConfig config = RetryConfig.custom()
             .maxAttempts(p.maxRetries())
             .intervalFunction(IntervalFunction.ofExponentialRandomBackoff(p.retryBaseDelay(), 2.0, 0.25))
+            // Subject misconfiguration (unknown stream prefix) is permanent; don't burn retries on it.
+            .ignoreExceptions(IllegalArgumentException.class)
             .failAfterMaxAttempts(true)
             .build();
         return Retry.of("webhook-publish", config);

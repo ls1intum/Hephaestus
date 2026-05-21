@@ -1,10 +1,8 @@
-package de.tum.cit.aet.hephaestus.gitprovider.webhook.web;
+package de.tum.cit.aet.hephaestus.gitprovider.webhook.gitlab;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.DedupIdResolver;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.GitLabSubjectBuilder;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.GitLabTokenVerifier;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.PublishRequest;
 import io.micrometer.core.instrument.Counter;
@@ -108,7 +106,7 @@ public class GitLabWebhookController {
             : DedupIdResolver.build("gitlab", body, effectiveEvent);
 
         Map<String, String> headers = new LinkedHashMap<>();
-        if (effectiveEvent != null && !effectiveEvent.isEmpty()) {
+        if (!effectiveEvent.isEmpty()) {
             headers.put(HEADER_EVENT, effectiveEvent);
         }
         if (webhookUuid != null && !webhookUuid.isBlank()) {
@@ -124,7 +122,7 @@ public class GitLabWebhookController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error("publish-failed"));
         }
 
-        log.info("Published GitLab webhook: subject={} event={}", subject, effectiveEvent);
+        log.debug("Published GitLab webhook: subject={} event={}", subject, effectiveEvent);
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
 
