@@ -21,9 +21,8 @@ git diff --name-only HEAD
 
 Map paths to components (mirrors CI's dorny/paths-filter config):
 - `webapp/**` → webapp changed
-- `server/**` OR `scripts/db-utils.sh` → app-server changed
-- `webhook-ingest/**` → webhook changed
-- `package.json` OR `package-lock.json` OR `.node-version` → webapp + webhook changed
+- `server/**` OR `scripts/db-utils.sh` → app-server changed (includes webhook receiver since ADR 0008)
+- `package.json` OR `package-lock.json` OR `.node-version` → webapp changed
 - `docs/**` → docs-only (skip all validation if nothing else changed)
 
 ## 3. Format
@@ -59,25 +58,13 @@ pnpm run db:draft-changelog
 pnpm run db:generate-erd-docs
 ```
 
-## 6. Build Affected TS Services
+## 6. Build Affected Services
 
-If webhook changed:
-
-```bash
-pnpm run build:webhook-ingest
-```
-
-Build failures catch path alias and import issues that typecheck alone misses.
+(No standalone TS services left — webhook receiver is part of `server/`.)
 
 ## 7. Unit Tests for Affected Components
 
 Run ONLY tests for changed components. Order: fastest first.
-
-If webhook changed:
-
-```bash
-pnpm run test:webhook-ingest
-```
 
 If webapp changed:
 
@@ -138,7 +125,7 @@ git commit -m "<type>(<scope>): <description>"
 
 **Scopes:**
 
-- Service: `webapp`, `server`, `ai`, `webhooks`, `docs`
+- Service: `webapp`, `server`, `docs`
 - Infra (no release): `ci`, `config`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
 - Feature: `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
 

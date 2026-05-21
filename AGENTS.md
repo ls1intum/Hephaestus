@@ -5,19 +5,17 @@
 This file governs the entire repository. Each service has its own `AGENTS.md` with service-specific patterns:
 
 - `webapp/AGENTS.md` — React, TanStack, Tailwind patterns
-- `server/AGENTS.md` — Spring Boot, JPA, testing
-- `webhook-ingest/AGENTS.md` — Webhook processing, NATS
+- `server/AGENTS.md` — Spring Boot, JPA, testing (includes the `gitprovider.webhook` receiver)
 
 ## 1. Architecture map
 
-- `server/`: Spring Boot 4 + Java 21 + Spring Modulith 2, Liquibase-managed PostgreSQL schema, synchronous + reactive APIs, generated OpenAPI spec in `openapi.yaml`. SQL-layer multi-tenancy via `core/tenancy/`. Two runtime roles (`server`, `worker`) selected by `hephaestus.runtime.*` properties — see ADR 0005 and `core/runtime/`.
+- `server/`: Spring Boot 4 + Java 21 + Spring Modulith 2, Liquibase-managed PostgreSQL schema, synchronous + reactive APIs, generated OpenAPI spec in `openapi.yaml`. SQL-layer multi-tenancy via `core/tenancy/`. Three runtime roles (`server`, `worker`, `webhook`) selected by `hephaestus.runtime.*` properties — see ADR 0005 (baseline) and ADR 0008 (webhook). The `webhook-server` production container runs the same image as `application-server` with `SPRING_PROFILES_ACTIVE=prod,webhook` so webhook reception survives an app-server restart.
 - `webapp/`: React 19 + TanStack Router/Query, Tailwind 4 UI kit (`src/components/ui`), generated API client in `src/api/**`.
-- `webhook-ingest/`: Hono/TypeScript webhook intake that forwards events into NATS JetStream.
 - `docs/`: Contributor docs (including the ERD that `db:generate-erd-docs` regenerates).
 
 ## 2. Toolchain & environment prerequisites
 
-- **Node.js**: Use the exact version from `.node-version` (currently 24.15.0). The repo uses pnpm 11 with `pnpm-lock.yaml` and pnpm workspaces (`pnpm-workspace.yaml`). The webapp and webhook-ingest are TypeScript packages.
+- **Node.js**: Use the exact version from `.node-version` (currently 24.15.0). The repo uses pnpm 11 with `pnpm-lock.yaml` and pnpm workspaces (`pnpm-workspace.yaml`). The webapp is the only TypeScript package; webhook ingest moved into the Java server (see ADR 0008).
 - **Java**: JDK 21 (see `pom.xml`). Run builds with `mvn` from `server/`.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
@@ -40,7 +38,6 @@ Run the relevant commands locally before opening a PR:
 | ------------------------ | ------------------------------------- | ------------------------------------------- | ----------------------------------- | ------------------------------------ |
 | **Webapp**               | `pnpm run format:webapp`               | `pnpm run format:webapp:check`               | `pnpm run lint:webapp`               | `pnpm run check:webapp`               |
 | **Java**                 | `pnpm run format:java`                 | `pnpm run format:java:check`                 | —                                   | —                                    |
-| **Webhook Ingest**       | `pnpm run format:webhook-ingest`       | `pnpm run format:webhook-ingest:check`       | `pnpm run lint:webhook-ingest`       | `pnpm run check:webhook-ingest`       |
 
 ### Additional commands
 
@@ -118,13 +115,13 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - When adding or changing REST endpoints, follow the centralized exception-handling rules in `docs/contributor/api-error-handling.md` so every controller returns RFC-7807 `ProblemDetail` responses via `@RestControllerAdvice`.
 - Controller-level integration tests should extend `AbstractWorkspaceIntegrationTest` (or an equivalent domain-specific base), exercise access control through `WebTestClient` + `TestAuthUtils`, and follow the contributor testing guide's checklist. This keeps authentication, validation, and persistence assertions consistent across new endpoints.
 
-## 8. Webhook ingest service expectations (TypeScript)
+## 8. Webhook receiver (Java) expectations
 
-- Uses Hono as the HTTP framework with `@nats-io/jetstream` for NATS publishing. Keep NATS subject naming consistent (`github.<owner>.<repo>.<event>`, `gitlab.<namespace>.<project>.<event>`).
-- Security: HMAC-SHA256 signature verification for GitHub, token verification for GitLab. Uses `crypto.timingSafeEqual()` to prevent timing attacks.
-- Configuration via environment variables with Zod validation (see `src/env.ts`). When adding config, extend the Zod schema.
-- Uses Biome for linting/formatting. Run `pnpm run check:webhook-ingest` for full validation.
-- Tests: Run `pnpm run test:webhook-ingest` (Vitest).
+- Lives at `server/src/main/java/de/tum/cit/aet/hephaestus/gitprovider/webhook/`. Pure verifier/builder classes (HMAC, GitLab token, subject builders, dedup-id) ported byte-equal from the prior Node service; controllers + JetStream publisher + stream bootstrap are Spring beans gated by `RuntimeRole.WEBHOOK_PROPERTY`.
+- Production runs the receiver in a dedicated `webhook-server` container (same image as `application-server`, `SPRING_PROFILES_ACTIVE=prod,webhook`). The app-server's deploy cycle therefore does not interrupt webhook reception — push events on GitHub/GitLab are not manually redeliverable.
+- NATS subject grammar: `github.<owner>.<repo>.<event>`, `gitlab.<namespace>.<project>.<event>`. Dots in path segments are replaced with `~`; nested GitLab groups join with `~`. The consumer-side prefix builder at `gitprovider.sync.NatsConsumerService#buildSubjectPrefix` must agree — `SubjectGrammarRoundTripTest` enforces this for every committed fixture.
+- HMAC / hex / locale safety enforced by ArchUnit: `HexEncodingArchTest` (only `HexFormat.of()`), `LocaleSafetyArchTest` (no naked `toLowerCase`/`toUpperCase`). Coverage gate: `gitprovider.webhook` package ≥ 0.95 branch coverage in JaCoCo.
+- Configuration: bound to `hephaestus.webhook.*` via `core.webhook.WebhookProperties` (shared with auto-registration in `workspace/GitLabWebhookService`).
 
 ## 9. Documentation & assets
 

@@ -11,11 +11,14 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests for {@link NatsConsumerService#buildSubjectPrefix(String, String)}.
  * <p>
- * These tests validate that the Java consumer-side subject building matches
- * the publisher-side logic in {@code webhook-ingest/src/utils/gitlab-subject.ts}.
+ * These tests validate that the Java consumer-side subject prefix building matches the
+ * publisher-side logic in {@link de.tum.cit.aet.hephaestus.gitprovider.webhook.GitLabSubjectBuilder}
+ * and {@link de.tum.cit.aet.hephaestus.gitprovider.webhook.github.GitHubSubjectBuilder}.
+ * <p>
+ * The cross-side parity round-trip is asserted in
+ * {@link de.tum.cit.aet.hephaestus.gitprovider.sync.SubjectGrammarRoundTripTest}.
  */
 @Tag("unit")
-@DisplayName("NatsConsumerService.buildSubjectPrefix")
 class NatsSubjectBuilderTest {
 
     @Nested
@@ -23,7 +26,6 @@ class NatsSubjectBuilderTest {
     class GitHub {
 
         @Test
-        @DisplayName("simple owner/repo produces github.owner.repo")
         void simpleOwnerRepo() {
             assertThat(NatsConsumerService.buildSubjectPrefix("github", "ls1intum/Artemis")).isEqualTo(
                 "github.ls1intum.Artemis"
@@ -31,20 +33,17 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("dots in owner name replaced with tilde")
         void dotsReplacedWithTilde() {
             assertThat(NatsConsumerService.buildSubjectPrefix("github", "tum.de/repo")).isEqualTo("github.tum~de.repo");
         }
 
         @Test
-        @DisplayName("wildcard placeholders for installation-level subjects")
         void wildcardPlaceholders() {
             // Used for installation-level subjects
             assertThat(NatsConsumerService.buildSubjectPrefix("github", "?/?")).isEqualTo("github.?.?");
         }
 
         @Test
-        @DisplayName("org wildcard for organization-level subjects")
         void orgWildcard() {
             // Used for organization-level subjects
             assertThat(NatsConsumerService.buildSubjectPrefix("github", "ls1intum/?")).isEqualTo("github.ls1intum.?");
@@ -59,7 +58,6 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("rejects single-part path without slash")
         void rejectsSinglePart() {
             assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", "noslash")).isInstanceOf(
                 IllegalArgumentException.class
@@ -72,7 +70,6 @@ class NatsSubjectBuilderTest {
     class GitLab {
 
         @Test
-        @DisplayName("simple namespace/project produces gitlab.namespace.project")
         void simpleNamespaceProject() {
             assertThat(NatsConsumerService.buildSubjectPrefix("gitlab", "group/project")).isEqualTo(
                 "gitlab.group.project"
@@ -80,7 +77,6 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("nested namespace joined with tilde")
         void nestedNamespace() {
             // group/subgroup/project → namespace parts joined with ~
             assertThat(NatsConsumerService.buildSubjectPrefix("gitlab", "group/subgroup/project")).isEqualTo(
@@ -97,7 +93,6 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("dots in namespace replaced with tilde")
         void dotsReplacedWithTilde() {
             assertThat(NatsConsumerService.buildSubjectPrefix("gitlab", "tum.de/project")).isEqualTo(
                 "gitlab.tum~de.project"
@@ -105,7 +100,6 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("dots in nested namespace segments all replaced with tilde")
         void dotsInNestedNamespace() {
             assertThat(NatsConsumerService.buildSubjectPrefix("gitlab", "tum.de/sub.group/project")).isEqualTo(
                 "gitlab.tum~de~sub~group.project"
@@ -113,13 +107,11 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("wildcard placeholders for organization-level subjects")
         void wildcardPlaceholders() {
             assertThat(NatsConsumerService.buildSubjectPrefix("gitlab", "group/?")).isEqualTo("gitlab.group.?");
         }
 
         @Test
-        @DisplayName("rejects single-part path without slash")
         void rejectsSinglePart() {
             assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("gitlab", "noslash"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -132,7 +124,6 @@ class NatsSubjectBuilderTest {
     class NameValidation {
 
         @Test
-        @DisplayName("rejects null nameWithOwner")
         void rejectsNull() {
             assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", null)).isInstanceOf(
                 IllegalArgumentException.class
@@ -140,7 +131,6 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("rejects empty nameWithOwner")
         void rejectsEmpty() {
             assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", "")).isInstanceOf(
                 IllegalArgumentException.class
@@ -148,7 +138,6 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("rejects blank nameWithOwner")
         void rejectsBlank() {
             assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", "   ")).isInstanceOf(
                 IllegalArgumentException.class
@@ -156,7 +145,6 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("rejects null nameWithOwner for GitLab stream")
         void rejectsNullForGitLab() {
             assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("gitlab", null)).isInstanceOf(
                 IllegalArgumentException.class
@@ -193,7 +181,6 @@ class NatsSubjectBuilderTest {
     class StreamNameValidation {
 
         @Test
-        @DisplayName("rejects null stream name")
         void rejectsNullStreamName() {
             assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix(null, "owner/repo"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -201,7 +188,6 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("rejects empty stream name")
         void rejectsEmptyStreamName() {
             assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("", "owner/repo"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -209,7 +195,6 @@ class NatsSubjectBuilderTest {
         }
 
         @Test
-        @DisplayName("rejects blank stream name")
         void rejectsBlankStreamName() {
             assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("   ", "owner/repo"))
                 .isInstanceOf(IllegalArgumentException.class)

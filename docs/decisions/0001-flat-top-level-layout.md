@@ -50,3 +50,10 @@ Adopt option 1 (flat top-level). `server/application-server/` → `server/`;
 
 The repo grows to 5+ top-level deployables, or someone proposes a non-trivial
 `services/` reorganization with concrete scaling justification.
+
+## Update — 2026-05-20 (issue #1110)
+
+`webhook-ingest/` has been removed from the top-level layout. Webhook reception is now part of
+the Java `server/` artifact (`gitprovider.webhook` package) and deployed as a separate
+`webhook-server` container from the same image (Spring profile `webhook`). The top-level layout
+is now: `server/`, `webapp/`, `docs/`. See **ADR 0008**.

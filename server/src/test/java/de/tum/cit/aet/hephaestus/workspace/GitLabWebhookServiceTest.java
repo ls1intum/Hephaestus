@@ -8,6 +8,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Http;
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Publish;
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Shutdown;
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Stream;
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.TokenRotation;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabTokenRotationClient;
 import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabTokenRotationClient.RotatedToken;
@@ -67,7 +73,15 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        WebhookProperties properties = new WebhookProperties(EXTERNAL_URL, SECRET, 7, 90);
+        WebhookProperties properties = new WebhookProperties(
+            EXTERNAL_URL,
+            SECRET,
+            new TokenRotation(7, 90),
+            new Publish(java.time.Duration.ofSeconds(9), 5, java.time.Duration.ofMillis(200)),
+            new Stream(java.time.Duration.ofMinutes(2), java.time.Duration.ofDays(180), 2_000_000L),
+            new Shutdown(java.time.Duration.ofSeconds(15)),
+            new Http(26_214_400L)
+        );
 
         webhookService = new GitLabWebhookService(
             webhookClientProvider,
@@ -206,7 +220,15 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("should skip when properties not configured")
         void shouldSkipWhenNotConfigured() {
-            WebhookProperties unconfigured = new WebhookProperties("", "", 7, 90);
+            WebhookProperties unconfigured = new WebhookProperties(
+                "",
+                "",
+                new TokenRotation(7, 90),
+                new Publish(java.time.Duration.ofSeconds(9), 5, java.time.Duration.ofMillis(200)),
+                new Stream(java.time.Duration.ofMinutes(2), java.time.Duration.ofDays(180), 2_000_000L),
+                new Shutdown(java.time.Duration.ofSeconds(15)),
+                new Http(26_214_400L)
+            );
             var service = new GitLabWebhookService(
                 webhookClientProvider,
                 rotationClientProvider,

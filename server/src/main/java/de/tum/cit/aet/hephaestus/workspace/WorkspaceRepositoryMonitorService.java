@@ -57,8 +57,8 @@ public class WorkspaceRepositoryMonitorService {
     private final RepositoryRepository repositoryRepository;
     private final GitProviderRepository gitProviderRepository;
 
-    // Services
-    private final NatsConsumerService natsConsumerService;
+    // Services — natsConsumerService absent under webhook profile.
+    private final ObjectProvider<NatsConsumerService> natsConsumerService;
     private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitHubAppTokenService gitHubAppTokenService;
@@ -74,7 +74,7 @@ public class WorkspaceRepositoryMonitorService {
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
         GitProviderRepository gitProviderRepository,
-        NatsConsumerService natsConsumerService,
+        ObjectProvider<NatsConsumerService> natsConsumerService,
         GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
         WorkspaceScopeFilter workspaceScopeFilter,
         GitHubAppTokenService gitHubAppTokenService,
@@ -590,7 +590,7 @@ public class WorkspaceRepositoryMonitorService {
         boolean repositoryAllowed = workspaceScopeFilter.isRepositoryAllowed(monitor);
         if (shouldUseNats(workspace) && repositoryAllowed) {
             // Update workspace consumer to include new repository subjects
-            natsConsumerService.updateScopeConsumer(workspace.getId());
+            natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspace.getId()));
         }
         if (deferSync) {
             log.debug(
@@ -615,7 +615,7 @@ public class WorkspaceRepositoryMonitorService {
         workspaceRepository.save(workspace);
         if (shouldUseNats(workspace)) {
             // Update workspace consumer to remove repository subjects
-            natsConsumerService.updateScopeConsumer(workspace.getId());
+            natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspace.getId()));
         }
     }
 

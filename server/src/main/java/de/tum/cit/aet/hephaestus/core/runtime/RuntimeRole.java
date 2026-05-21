@@ -5,8 +5,9 @@ package de.tum.cit.aet.hephaestus.core.runtime;
  * subsystems by deployment role. Single source of truth so role gating cannot drift between
  * the property file, the ArchUnit boundary test, and the smoke test.
  *
- * <p>See ADR 0005 for the topology. Defaults: every role enabled (single-JVM monolith);
- * production deploys flip the appropriate flag to {@code false} per pod.
+ * <p>See ADR 0005 (two-role baseline) and ADR 0008 (third role: webhook). Defaults: every
+ * role enabled (single-JVM monolith); production deploys flip the appropriate flag to
+ * {@code false} per pod via the corresponding profile YAML.
  */
 public final class RuntimeRole {
 
@@ -19,10 +20,11 @@ public final class RuntimeRole {
     public static final String PROPERTY_PREFIX = "hephaestus.runtime";
 
     /**
-     * Reserved property key for the future server-only role gate. NOT wired in this epic —
-     * the server-side bean chain (HTTP API, sync NATS, mentor SSE, scheduled tasks, agent
-     * dispatch) still loads regardless of this flag. Wiring real server-only mode is a
-     * follow-up epic when a concrete deploy-split need surfaces.
+     * Wired property key for the server-role gate. Gates {@code ServerSchedulingConfig}
+     * ({@code @EnableScheduling}), {@code NatsConsumerService} (sync NATS pull consumer), and
+     * {@code WorkspaceStartupListener}. Authoritative list lives in
+     * {@code RuntimeRoleBoundaryTest}; setting this flag {@code false} removes those bean
+     * clusters from this JVM while the rest of the monolith continues to load. See ADR 0008.
      */
     public static final String SERVER_PROPERTY = PROPERTY_PREFIX + ".server.enabled";
 
@@ -33,6 +35,20 @@ public final class RuntimeRole {
      * monolith continues to load.
      */
     public static final String WORKER_PROPERTY = PROPERTY_PREFIX + ".worker.enabled";
+
+    /**
+     * Wired property key for the webhook-role gate. Gates {@code WebhookConfiguration} —
+     * the inbound HTTP webhook controllers, HMAC verifier, JetStream publisher, stream
+     * bootstrap, health indicator, and graceful-shutdown lifecycle. Setting to
+     * {@code false} removes those beans; the rest of the monolith continues to load.
+     *
+     * <p>The {@code webhook-server} production container deploys with this flag {@code true}
+     * and {@link #SERVER_PROPERTY} / {@link #WORKER_PROPERTY} {@code false} so it runs
+     * webhook ingestion in isolation from the {@code application-server} container —
+     * giving restart independence (push events from GitHub/GitLab are not manually
+     * redeliverable). See ADR 0008.
+     */
+    public static final String WEBHOOK_PROPERTY = PROPERTY_PREFIX + ".webhook.enabled";
 
     /**
      * Capability flag (NOT a role): toggles the worker-internal LLM proxy controller +

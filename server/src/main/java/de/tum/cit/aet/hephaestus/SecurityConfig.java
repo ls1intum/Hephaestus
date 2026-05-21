@@ -98,6 +98,10 @@ public class SecurityConfig {
             // CORS preflight requests must be permitted for cross-origin requests to work.
             // Without this, OPTIONS requests are rejected with 403 before CORS headers can be added.
             requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+            // Webhook endpoints — authenticated by HMAC (GitHub) or shared-token (GitLab) at the
+            // controller layer. Spring Security must not block these or external providers can
+            // never reach the receiver. See gitprovider.webhook.* and ADR 0008.
+            requests.requestMatchers(HttpMethod.POST, "/gitlab", "/github").permitAll();
             // Actuator endpoints for Docker/K8s health checks and basic info
             requests.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
             // Dev-only: permit the dev trigger endpoint when explicitly enabled (defaults to false)

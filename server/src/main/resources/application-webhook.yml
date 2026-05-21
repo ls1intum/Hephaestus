@@ -1,0 +1,54 @@
+# ════════════════════════════════════════════════════════════════════════════════
+# Profile: webhook
+# Activated by SPRING_PROFILES_ACTIVE=prod,webhook on the webhook-server container.
+#
+# Disables every server-only and worker-only bean cluster; keeps only the
+# gitprovider.webhook beans + the NATS Connection bean (for publishing).
+#
+# Restart independence: the webhook-server container runs this profile so that
+# restarting application-server (server + worker roles) does not interrupt
+# inbound webhook reception. Push events on GitHub/GitLab are not manually
+# redeliverable — any drop during an application-server restart is permanent
+# data loss. See ADR 0008.
+#
+# The `webhook` Spring profile name matches the runtime-role name; the runtime
+# role flags live under `hephaestus.runtime.*` and are set explicitly here.
+# ════════════════════════════════════════════════════════════════════════════════
+spring:
+    config:
+        activate:
+            on-profile: webhook
+
+    # No migrations: only application-server owns DDL. Disabling here avoids a race between
+    # the two pods at boot.
+    liquibase:
+        enabled: false
+
+    jpa:
+        hibernate:
+            ddl-auto: none
+
+
+hephaestus:
+    runtime:
+        # ⇒ ServerSchedulingConfig, NatsConsumerService, WorkspaceStartupListener
+        #   and all server-side @Scheduled methods do NOT load.
+        server:
+            enabled: false
+        # ⇒ DockerSandboxConfiguration, AgentNatsConsumerConfig do NOT load.
+        worker:
+            enabled: false
+        # ⇒ WebhookConfiguration loads: controllers, JetStream publisher, stream
+        #   bootstrap, health indicator, graceful shutdown lifecycle.
+        webhook:
+            enabled: true
+
+    # Must stay true so config.NatsConfig contributes the @Bean Connection that
+    # the webhook publisher reuses (no second NATS connection per pod).
+    sync:
+        nats:
+            enabled: true
+
+logging:
+    level:
+        de.tum.cit.aet.hephaestus.gitprovider.webhook: INFO

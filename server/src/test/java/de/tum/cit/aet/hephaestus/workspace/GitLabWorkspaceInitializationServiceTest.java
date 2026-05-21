@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -27,6 +29,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +46,6 @@ import org.springframework.test.util.ReflectionTestUtils;
  * Unit tests for {@link GitLabWorkspaceInitializationService}.
  */
 @Tag("unit")
-@DisplayName("GitLabWorkspaceInitializationService")
 class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
     @Mock
@@ -60,6 +62,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
     @Mock
     private NatsConsumerService natsConsumerService;
+
+    @Mock
+    private ObjectProvider<NatsConsumerService> natsConsumerServiceProvider;
 
     @Mock
     private SyncTargetProvider syncTargetProvider;
@@ -93,6 +98,15 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         NatsProperties natsProperties = new NatsProperties(true, "nats://localhost:4222", null, 7, null);
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(true, 7, "0 0 3 * * *", 15, null, null);
 
+        lenient()
+            .doAnswer(invocation -> {
+                Consumer<NatsConsumerService> consumer = invocation.getArgument(0);
+                consumer.accept(natsConsumerService);
+                return null;
+            })
+            .when(natsConsumerServiceProvider)
+            .ifAvailable(any());
+
         initService = new GitLabWorkspaceInitializationService(
             workspaceRepository,
             organizationRepository,
@@ -100,7 +114,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             repositoryRepository,
             natsProperties,
             syncProps,
-            natsConsumerService,
+            natsConsumerServiceProvider,
             syncTargetProvider,
             gitLabSyncServiceHolderProvider,
             gitLabWebhookServiceProvider,
@@ -126,7 +140,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             repositoryRepository,
             disabledNats,
             syncProps,
-            natsConsumerService,
+            natsConsumerServiceProvider,
             syncTargetProvider,
             gitLabSyncServiceHolderProvider,
             gitLabWebhookServiceProvider,
@@ -166,7 +180,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     class InitializeGuards {
 
         @Test
-        @DisplayName("should skip non-GitLab workspaces")
         void shouldSkipNonGitLab() {
             workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
 
@@ -177,7 +190,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip GitHub App installations")
         void shouldSkipGitHubApp() {
             workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
 
@@ -187,7 +199,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PAT is null")
         void shouldSkipNullToken() {
             workspace.setPersonalAccessToken(null);
 
@@ -197,7 +208,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PAT is blank")
         void shouldSkipBlankToken() {
             workspace.setPersonalAccessToken("   ");
 
@@ -207,7 +217,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when accountLogin is null")
         void shouldSkipNullAccountLogin() {
             workspace.setAccountLogin(null);
 
@@ -217,7 +226,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when accountLogin is empty")
         void shouldSkipEmptyAccountLogin() {
             workspace.setAccountLogin("");
 
@@ -232,7 +240,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     class InitializeWebhook {
 
         @Test
-        @DisplayName("should continue discovery when token rotation throws")
         void shouldContinueWhenTokenRotationFails() {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(gitLabWebhookService);
             doThrow(new RuntimeException("rotation failed")).when(gitLabWebhookService).rotateTokenIfNeeded(workspace);
@@ -247,7 +254,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should continue discovery when webhook registration throws")
         void shouldContinueWhenWebhookRegistrationFails() {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(gitLabWebhookService);
             when(gitLabWebhookService.registerWebhook(workspace)).thenThrow(new RuntimeException("webhook failed"));
@@ -270,7 +276,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     class InitializeDiscovery {
 
         @Test
-        @DisplayName("should discover projects, link org, and create monitors")
         void shouldDiscoverAndCreateMonitors() {
             List<Repository> repos = List.of(createRepo("my-group/project-a"), createRepo("my-group/project-b"));
             GitLabSyncResult syncResult = GitLabSyncResult.completed(repos, 1, 0, 0);
@@ -314,7 +319,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not create monitors when sync returns empty")
         void shouldNotCreateMonitorsWhenSyncReturnsEmpty() {
             GitLabSyncResult emptyResult = GitLabSyncResult.completed(Collections.emptyList(), 1, 0, 0);
 
@@ -331,7 +335,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip discovery when sync service unavailable")
         void shouldSkipDiscoveryWhenSyncServiceUnavailable() {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(null);
@@ -342,7 +345,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not duplicate existing monitors")
         void shouldNotDuplicateExistingMonitors() {
             stubMinimalDiscovery(List.of(createRepo("my-group/existing-project"), createRepo("my-group/new-project")));
 
@@ -358,7 +360,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should complete initialization when project discovery fails")
         void shouldCompleteInitializationWhenProjectDiscoveryFails() {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
@@ -374,7 +375,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not link organization when already linked")
         void shouldSkipOrgLinkingWhenAlreadyLinked() {
             Organization existingOrg = new Organization();
             existingOrg.setLogin("my-group/subgroup");
@@ -394,7 +394,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not update NATS when no new monitors created")
         void shouldNotUpdateNatsWhenNoNewMonitors() {
             stubMinimalDiscovery(List.of(createRepo("my-group/project-a")));
 
@@ -414,7 +413,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     class InitializeAsync {
 
         @Test
-        @DisplayName("should submit task to executor")
         void shouldSubmitToExecutor() {
             initService.initializeAsync(1L);
 
@@ -422,7 +420,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should start NATS consumer after initialization")
         void shouldStartNatsConsumerAfterInit() {
             executeSubmittedTasksSynchronously();
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -435,7 +432,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not start NATS when NATS is disabled")
         void shouldNotStartNatsWhenDisabled() {
             var disabledService = createServiceWithNatsDisabled();
 
@@ -454,7 +450,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when workspace not found")
         void shouldSkipWhenNotFound() {
             executeSubmittedTasksSynchronously();
             when(workspaceRepository.findById(99L)).thenReturn(Optional.empty());
@@ -470,7 +465,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     class EnsureRepositoryMonitors {
 
         @Test
-        @DisplayName("should create monitors for all repos and return count")
         void shouldCreateAllMonitorsAndReturnCount() {
             List<Repository> repos = List.of(
                 createRepo("group/repo-1"),
@@ -487,7 +481,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return zero when all monitors already exist")
         void shouldReturnZeroWhenAllExist() {
             List<Repository> repos = List.of(createRepo("group/repo-1"), createRepo("group/repo-2"));
 
@@ -504,7 +497,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip repos with null nameWithOwner")
         void shouldSkipNullNameWithOwner() {
             Repository repoWithNullNwo = new Repository();
             // Don't call setNameWithOwner — leaves it as null (bypassing @NonNull setter)
@@ -525,7 +517,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     class LinkWorkspaceToOrganization {
 
         @Test
-        @DisplayName("should skip when organization already linked")
         void shouldSkipWhenAlreadyLinked() {
             Organization existingOrg = new Organization();
             workspace.setOrganization(existingOrg);
@@ -536,7 +527,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when accountLogin is blank")
         void shouldSkipWhenBlankLogin() {
             workspace.setAccountLogin("");
 
@@ -546,7 +536,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should link organization and update in-memory reference")
         void shouldLinkOrganization() {
             Organization organization = new Organization();
             ReflectionTestUtils.setField(organization, "id", 10L);
@@ -568,7 +557,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not link when organization not found")
         void shouldNotLinkWhenNotFound() {
             when(organizationRepository.findByLoginIgnoreCase("my-group/subgroup")).thenReturn(Optional.empty());
 
@@ -578,7 +566,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not link when workspace re-read returns empty")
         void shouldNotLinkWhenWorkspaceDeleted() {
             Organization organization = new Organization();
             when(organizationRepository.findByLoginIgnoreCase("my-group/subgroup")).thenReturn(

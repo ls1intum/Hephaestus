@@ -71,4 +71,4 @@ docker rm -f "$TEMP_CTN"
 ## Files
 
 - `compose.app.yaml` - Main Docker Compose for preview deployments
-- `compose.shared-infra.yaml` - Shared Keycloak, webhook-ingest, and NATS stack for previews
+- `compose.shared-infra.yaml` - Shared Keycloak, webhook-server (application-server image with webhook profile), and NATS stack for previews

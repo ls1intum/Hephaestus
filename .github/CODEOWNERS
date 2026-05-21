@@ -9,11 +9,9 @@
 .releaserc                       @ls1intum/hephaestus-maintainers
 renovate.json                    @ls1intum/hephaestus-maintainers
 
-# Application Server (Java/Spring)
+# Application Server (Java/Spring) — includes the gitprovider.webhook receiver
+# deployed as the webhook-server container (see ADR 0008)
 server/       @ls1intum/hephaestus-maintainers
-
-# Webhook Ingest (TypeScript/Hono)
-webhook-ingest/           @ls1intum/hephaestus-maintainers
 
 # Webapp (React/TypeScript)
 webapp/                          @ls1intum/hephaestus-maintainers

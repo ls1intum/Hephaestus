@@ -757,6 +757,24 @@
                                         </limit>
                                     </limits>
                                 </rule>
+                                <!-- ADR 0008 parity-landmine gate: the inbound webhook receiver
+                                     ports Node behaviour byte-equal — the pure-class layer must
+                                     stay at ≥95% branch coverage so refactors that change subject
+                                     grammar, dedup ID derivation, HMAC verification, or hex
+                                     encoding fail loudly. -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>de.tum.cit.aet.hephaestus.gitprovider.webhook</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.95</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
                             </rules>
                         </configuration>
                     </execution>

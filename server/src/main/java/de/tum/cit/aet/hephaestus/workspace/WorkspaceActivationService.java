@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -38,8 +37,9 @@ public class WorkspaceActivationService {
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
 
-    // Services
-    private final NatsConsumerService natsConsumerService;
+    // Services — natsConsumerService absent under webhook profile (server.enabled=false);
+    // activation paths that need it are themselves server-only.
+    private final ObjectProvider<NatsConsumerService> natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitLabWorkspaceInitializationService gitLabInitService;
 
@@ -53,7 +53,7 @@ public class WorkspaceActivationService {
         NatsProperties natsProperties,
         SyncSchedulerProperties syncSchedulerProperties,
         WorkspaceRepository workspaceRepository,
-        NatsConsumerService natsConsumerService,
+        ObjectProvider<NatsConsumerService> natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         GitLabWorkspaceInitializationService gitLabInitService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
@@ -95,9 +95,6 @@ public class WorkspaceActivationService {
             prepared.add(ensureWorkspaceMetadata(workspace));
         }
 
-        Set<String> organizationConsumersStarted = ConcurrentHashMap.newKeySet();
-
-        // Filter workspaces that will be activated
         List<Workspace> workspacesToActivate = prepared
             .stream()
             .filter(workspace -> !shouldSkipActivation(workspace))
@@ -115,10 +112,7 @@ public class WorkspaceActivationService {
         List<CompletableFuture<Void>> activationFutures = workspacesToActivate
             .stream()
             .map(workspace ->
-                CompletableFuture.runAsync(
-                    () -> activateWorkspace(workspace, organizationConsumersStarted),
-                    monitoringExecutor
-                ).exceptionally(ex -> {
+                CompletableFuture.runAsync(() -> activateWorkspace(workspace), monitoringExecutor).exceptionally(ex -> {
                     // Handle unexpected errors (e.g., thread pool rejection) with workspace context
                     log.error(
                         "Unexpected error during workspace activation: workspaceId={}, accountLogin={}",
@@ -182,14 +176,8 @@ public class WorkspaceActivationService {
         };
     }
 
-    /**
-     * Activate a single workspace: run sync operations and start NATS consumer.
-     *
-     * @param workspace                    the workspace to activate
-     * @param organizationConsumersStarted set to track which organization consumers have been started
-     *                                     (currently unused but kept for future multi-org support)
-     */
-    public void activateWorkspace(Workspace workspace, Set<String> organizationConsumersStarted) {
+    /** Activate a single workspace: run startup sync, then start its NATS consumer scope. */
+    public void activateWorkspace(Workspace workspace) {
         // Early exit for non-active workspaces - don't waste cycles
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
             log.debug(
@@ -248,7 +236,7 @@ public class WorkspaceActivationService {
         // The startup sync ensures all entities exist before NATS starts processing
         // webhook events that might reference them.
         if (shouldUseNats(workspace)) {
-            natsConsumerService.startConsumingScope(workspace.getId());
+            natsConsumerService.ifAvailable(svc -> svc.startConsumingScope(workspace.getId()));
         }
     }
 
@@ -287,19 +275,8 @@ public class WorkspaceActivationService {
         return workspace;
     }
 
-    /**
-     * Derive the account login for a workspace from available sources.
-     * Priority:
-     * 1) Existing accountLogin if set (always set during workspace provisioning)
-     * 2) Owner from first monitored repository (fallback for legacy workspaces)
-     */
+    /** Derives an account login for legacy workspaces from their first monitored repo's owner. */
     String deriveAccountLogin(Workspace workspace) {
-        // Account login is set during workspace provisioning from installation events
-        if (!isBlank(workspace.getAccountLogin())) {
-            return workspace.getAccountLogin();
-        }
-
-        // Fallback: derive from monitored repositories (for legacy workspaces)
         String repoOwner = workspace
             .getRepositoriesToMonitor()
             .stream()

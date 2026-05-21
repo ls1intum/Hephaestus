@@ -71,3 +71,12 @@ Every `hephaestus.runtime.*` gate uses `matchIfMissing=true`, enforced by
 
 A real operational need to scale `ingest`/`mentor` independently of `server`; or a third
 runtime role becomes load-bearing (likely Java `webhook-ingest`).
+
+## Update — 2026-05-20 (issue #1110)
+
+The revisit trigger has fired. `RuntimeRole.WEBHOOK_PROPERTY` is now wired (third runtime role:
+`webhook`), and `RuntimeRole.SERVER_PROPERTY` — reserved by this ADR — is wired for the first
+time. `ServerSchedulingConfig`, `NatsConsumerService`, and `WorkspaceStartupListener` are gated
+by `SERVER_PROPERTY` so they do not duplicate-run on the dedicated `webhook-server` pod.
+Webhook-ingest is no longer a TypeScript service; it ships inside the Java `server/` artifact.
+See **ADR 0008**.
