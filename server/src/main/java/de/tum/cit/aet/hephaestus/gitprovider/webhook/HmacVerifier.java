@@ -11,12 +11,9 @@ import javax.crypto.spec.SecretKeySpec;
 /**
  * Constant-time HMAC-SHA256 verifier for GitHub's {@code X-Hub-Signature-256} header.
  *
- * <p>SHA-1 ({@code X-Hub-Signature}) is intentionally NOT accepted — GitHub has sent SHA-256
- * alongside SHA-1 since 2019 and accepting SHA-1 is a known downgrade primitive.
- *
- * <p>{@link MessageDigest#isEqual(byte[], byte[])} is both constant-time AND length-tolerant in
- * the JDK, so the explicit length pre-check that Node's {@code timingSafeEqual} requires is
- * unnecessary here.
+ * <p>SHA-1 ({@code X-Hub-Signature}) is intentionally NOT accepted — accepting it alongside
+ * SHA-256 is a known downgrade primitive. Comparison uses
+ * {@link MessageDigest#isEqual(byte[], byte[])}, which is constant-time and length-tolerant.
  */
 public final class HmacVerifier {
 

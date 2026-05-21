@@ -81,8 +81,6 @@ public class JetStreamPublisher {
             .get(timeoutMs, TimeUnit.MILLISECONDS);
     }
 
-    /** Resolves the JetStream stream name from the subject prefix; {@code expectedStream} on the
-     * publish options uses this to reject sends that would land outside the named stream. */
     private static String streamFor(String subject) {
         if (subject.startsWith("gitlab.")) {
             return "gitlab";
@@ -93,7 +91,6 @@ public class JetStreamPublisher {
         throw new IllegalArgumentException("Unknown subject prefix: " + subject);
     }
 
-    /** Awaits in-flight publishes during graceful shutdown; called by {@link WebhookGracefulShutdown}. */
     void awaitInFlight(Duration timeout) {
         try {
             inFlight.awaitAdvanceInterruptibly(inFlight.arrive(), timeout.toMillis(), TimeUnit.MILLISECONDS);

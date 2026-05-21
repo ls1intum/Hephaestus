@@ -77,8 +77,8 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 ## Webhook receiver (`server/.../gitprovider/webhook/`)
 
 - Pure verifier/builder classes (`HmacVerifier`, `GitLabTokenVerifier`, `GitLabSubjectBuilder`,
-  `GitHubSubjectBuilder`, `DedupIdResolver`) — Spring-free; exercised by 1:1 ported Vitest cases
-  and parameterised tests over the captured fixtures in `server/src/test/resources/{github,gitlab}/`.
+  `GitHubSubjectBuilder`, `DedupIdResolver`) — Spring-free; exercised by JUnit unit tests plus
+  parameterised tests over the captured fixtures in `server/src/test/resources/{github,gitlab}/`.
 - HMAC verification: `MessageDigest.isEqual` (constant-time, length-tolerant); hex via
   `java.util.HexFormat.of()` only — enforced by ArchUnit (`HexEncodingArchTest`). Case-folding
   uses `Locale.ROOT` everywhere — enforced by `LocaleSafetyArchTest`.

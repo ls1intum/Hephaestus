@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Subject cases from {@code webhook-ingest/test/routes/github.test.ts}. */
 class GitHubSubjectBuilderTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

@@ -3,10 +3,9 @@ package de.tum.cit.aet.hephaestus.gitprovider.webhook.github;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Builds {@code github.<org>.<repo>.<event>} subjects. Byte-equal port of
- * {@code webhook-ingest/src/routes/github.ts}; missing or blank tokens collapse to {@code ?};
- * dots inside tokens become {@code ~}. The event is supplied by the caller (GitHub puts it in
- * {@code X-GitHub-Event}, not the body).
+ * Builds {@code github.<org>.<repo>.<event>} subjects from a GitHub webhook payload. Missing or
+ * blank tokens collapse to {@code ?}; dots inside tokens become {@code ~}. The event is supplied
+ * by the caller (GitHub puts it in {@code X-GitHub-Event}, not the body).
  */
 public final class GitHubSubjectBuilder {
 

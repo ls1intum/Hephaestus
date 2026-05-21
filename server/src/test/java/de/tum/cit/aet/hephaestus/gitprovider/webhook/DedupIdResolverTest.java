@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 
-/** Port of {@code webhook-ingest/test/utils/dedupe.test.ts}. Contract: {@code prefix-{32-hex-chars}}. */
+/** Contract: {@code prefix-{32-hex-chars}}. */
 class DedupIdResolverTest extends BaseUnitTest {
 
     @Test

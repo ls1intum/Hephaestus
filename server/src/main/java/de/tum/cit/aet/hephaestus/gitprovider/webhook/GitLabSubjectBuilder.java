@@ -6,18 +6,17 @@ import java.util.Locale;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Builds {@code gitlab.<namespace>.<project>.<event>} subjects, byte-equal to
- * {@code webhook-ingest/src/utils/gitlab-subject.ts}.
+ * Builds {@code gitlab.<namespace>.<project>.<event>} subjects from a GitLab webhook payload.
  *
- * <p>Parity landmines (each guarded by a test or arch rule):
+ * <p>Invariants pinned by tests and ArchUnit rules:
  * <ul>
- *   <li>Case-folding uses {@code Locale.ROOT}, never the JVM default — a naked {@code toLowerCase()}
- *       on a Turkish-locale JVM would corrupt subjects (dotted-i).</li>
- *   <li>{@code .} sanitised to {@code ~} via single-char replace; regex would over-match.</li>
- *   <li>Group fallback {@code firstNonBlank(full_path, path, group_path)} mirrors TS {@code ||}
- *       truthiness — empty strings fall through, not just {@code null}.</li>
- *   <li>GitLab {@code /-/} URL separator handled with raw {@code String.split} — {@link java.net.URI}
- *       escapes the dash differently.</li>
+ *   <li>Case-folding uses {@code Locale.ROOT} — a naked {@code toLowerCase()} on a Turkish-locale
+ *       JVM corrupts subjects (dotted-i).</li>
+ *   <li>{@code .} is sanitised to {@code ~} via single-char replace; regex would over-match.</li>
+ *   <li>Group fallback {@code firstNonBlank(full_path, path, group_path)} treats empty strings as
+ *       missing, not just {@code null}.</li>
+ *   <li>GitLab's {@code /-/} URL separator is handled with raw {@code String.split} —
+ *       {@link java.net.URI} escapes the dash differently.</li>
  *   <li>{@code ?} is a literal NATS subject token here, NOT a wildcard.</li>
  * </ul>
  */
@@ -112,7 +111,6 @@ public final class GitLabSubjectBuilder {
         return NamespaceAndProject.EMPTY;
     }
 
-    /** Caller passes the already-lowercased event name. */
     static String normalizeEventName(String lower) {
         if (lower.startsWith("user_") && lower.contains("_group")) {
             return "member";
@@ -146,7 +144,7 @@ public final class GitLabSubjectBuilder {
         return result;
     }
 
-    /** First non-null, non-blank input — mirrors TS {@code ||} truthiness on empty strings. */
+    /** Returns the first non-null, non-blank string; treats empty strings as missing. */
     static String firstNonBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank()) {

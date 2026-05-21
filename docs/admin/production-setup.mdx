@@ -12,7 +12,7 @@ This guide covers the minimum configuration required to deploy Hephaestus in pro
 The production stack consists of:
 
 - **Application server** (Spring Boot, runs the Pi mentor agent in-process)
-- **Webhook ingest** (Hono/TypeScript → NATS JetStream)
+- **Webhook server** (same Spring Boot artifact, `webhook` profile → NATS JetStream)
 - **React webapp** (served via nginx)
 - **PostgreSQL 16**
 - **Keycloak** (with GitHub and optional GitLab identity providers)

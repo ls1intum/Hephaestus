@@ -599,7 +599,7 @@ public class NatsConsumerService {
      *   <li><b>GitHub:</b> {@code owner/repo} → {@code github.owner.repo}
      *       (always exactly 2 parts)</li>
      *   <li><b>GitLab:</b> {@code group/subgroup/project} → {@code gitlab.group~subgroup.project}
-     *       (namespace parts joined with {@code ~}, matching webhook-ingest's gitlab-subject.ts)</li>
+     *       (namespace parts joined with {@code ~}, matching GitLabSubjectBuilder)</li>
      * </ul>
      *
      * @param streamName    the NATS stream name ("github" or "gitlab")

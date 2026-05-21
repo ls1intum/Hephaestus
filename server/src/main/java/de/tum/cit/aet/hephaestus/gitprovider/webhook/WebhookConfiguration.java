@@ -19,10 +19,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 
 /**
- * Wires the webhook receiver. Gated by {@code hephaestus.runtime.webhook.enabled}
- * (default {@code true} per ADR 0005) AND requires the {@link Connection} bean from
- * {@code config.NatsConfig} — the publisher reuses that connection rather than opening a
- * second one. See {@code package-info} and ADR 0008.
+ * Wires the webhook receiver. Gated by {@code hephaestus.runtime.webhook.enabled} (default on)
+ * AND requires the {@link Connection} bean from {@code config.NatsConfig} — the publisher
+ * reuses that connection rather than opening a second one. See ADR 0008.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.WEBHOOK_PROPERTY, havingValue = "true", matchIfMissing = true)

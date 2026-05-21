@@ -13,7 +13,7 @@ Install and configure the following tools before you attempt a local build:
 
 1. **Java JDK 21** – Required for the Spring Boot application server.
 2. **Docker Desktop** – Used for PostgreSQL, Keycloak, and NATS containers.
-3. **Node.js LTS (>= 22.10)** and **npm (>= 10.8)** – For the React client and TypeScript services.
+3. **Node.js LTS (>= 22.10)** and **npm (>= 10.8)** – For the React client.
 4. **NATS CLI (optional)** – Helpful when debugging webhook messages.
 
 ## Recommended IDE setup
@@ -255,15 +255,15 @@ This deletes the Keycloak H2 database and forces a fresh realm import with your 
 
 ### Webhook receiver
 
-Webhook reception runs as part of the Java server (`gitprovider.webhook` package) — there is no
-separate Node service. In local development the monolith default boots all three runtime roles
-(`server`, `worker`, `webhook`), so `pnpm run dev:server` exposes the `/gitlab` and `/github`
-endpoints alongside the rest of the API.
+The webhook receiver lives in the Java server (`gitprovider.webhook` package). In local
+development the monolith default boots all three runtime roles (`server`, `worker`, `webhook`),
+so `pnpm run dev:server` exposes the `/gitlab` and `/github` endpoints alongside the rest of the
+API.
 
 In production the receiver is deployed as a separate `webhook-server` container from the same
-image, activated with `SPRING_PROFILES_ACTIVE=prod,webhook`. The app-server's deploy cycle does NOT
-interrupt webhook reception — push events on GitHub/GitLab are not manually redeliverable, so
-restart-independence is operationally required. See ADR 0008.
+image, activated with `SPRING_PROFILES_ACTIVE=prod,webhook`. The app-server's deploy cycle does
+NOT interrupt webhook reception — push events on GitHub/GitLab are not manually redeliverable,
+so restart independence is operationally required. See ADR 0008.
 
 When you run `docker/compose.core.yaml` set the webhook secret up front so signature checks
 succeed (the same secret is used by both auto-registration and the receiver):

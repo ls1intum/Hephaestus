@@ -23,7 +23,6 @@ public class WebhookGracefulShutdown implements SmartLifecycle {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookGracefulShutdown.class);
 
-    /** One step after the web server's stop phase — drains publishes once HTTP has quiesced. */
     private static final int PHASE = WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE - 1024;
 
     private final JetStreamPublisher publisher;

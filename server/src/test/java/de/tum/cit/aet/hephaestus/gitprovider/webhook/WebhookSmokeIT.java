@@ -20,7 +20,6 @@ import java.util.HexFormat;
 import java.util.List;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -29,9 +28,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Wires-it-up smoke for the receiver. Uses {@code MockMvc.standaloneSetup} (no Spring context) +
- * a recording publisher to assert {@link PublishRequest} construction end-to-end, including the
- * critical byte-equality of the raw request body through Spring's {@code byte[]} binding.
+ * Wires-it-up smoke for the receiver. Uses {@code MockMvc.standaloneSetup} (no Spring context)
+ * plus a recording publisher to assert {@link PublishRequest} construction end-to-end and that
+ * Spring's {@code byte[]} binding preserves the raw request body unchanged.
  */
 @Tag("integration")
 class WebhookSmokeIT {
@@ -56,11 +55,6 @@ class WebhookSmokeIT {
         new GitHubWebhookController(properties, objectMapper, recorder, meters),
         new GitLabWebhookController(properties, objectMapper, recorder, meters)
     ).build();
-
-    @BeforeEach
-    void clearRecorder() {
-        recorder.requests.clear();
-    }
 
     @Test
     void gitlabPushPublishesByteEqualBody() throws Exception {

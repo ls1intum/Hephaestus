@@ -6,22 +6,17 @@
 
 ## Context
 
-The Node service at `webhook-ingest/` (Hono/TS, jnats) was the only TypeScript service in the
-stack: a second build pipeline, image, CI matrix, deploy unit, and observability surface for
-~600 LOC of inbound HTTP-to-NATS shim. Operating two runtimes was an ops tax; ADR 0005
-acknowledged the asymmetry and named *"Java webhook-ingest becomes a third runtime role"* as the
-explicit revisit trigger.
+Two operational facts force the design:
 
-Two operational facts force the choice:
-
-1. **Push events on GitHub and GitLab are NOT manually redeliverable.** Both providers expose a
-   redeliver button in the UI, but it is documented to NOT apply to push events. A webhook drop
-   during an `application-server` restart is permanent data loss.
+1. **Push events on GitHub and GitLab are NOT manually redeliverable.** Both providers expose
+   a redeliver button in the UI, but it is documented to NOT apply to push events. A webhook
+   drop during an `application-server` restart is permanent data loss.
 2. **App-server restarts are frequent and unavoidable.** Deploys, OOM crashes, config flips,
    schema migrations — all routinely cycle the JVM. The receiver must survive each one.
 
 Restart independence between `application-server` and the webhook receiver is therefore a hard
-operational requirement, not a nice-to-have.
+operational requirement, not a nice-to-have. ADR 0005 anticipated this and listed
+*"webhook becomes a third runtime role"* as its explicit revisit trigger.
 
 ## Decision drivers
 
@@ -35,13 +30,11 @@ operational requirement, not a nice-to-have.
 
 ## Considered options
 
-1. **Same JAR, third runtime role, separate container** *(chosen)* — Spring profile
-   `webhook` activates `WebhookConfiguration`; production deploys two containers from one image.
-2. **Keep Node service, port nothing.** Operates two runtimes forever; the TS asymmetry is the
-   exact tax this epic exists to remove.
-3. **In-process webhook handler.** Operationally unacceptable: an app-server restart drops
+1. **Same JAR, third runtime role, separate container** *(chosen)* — Spring profile `webhook`
+   activates `WebhookConfiguration`; production deploys two containers from one image.
+2. **In-process webhook handler.** Operationally unacceptable: an app-server restart drops
    webhooks. Push events lost permanently.
-4. **Multi-Maven-module.** ADR 0005 rejected this for "premature complexity." Still true.
+3. **Multi-Maven-module.** ADR 0005 rejected this for "premature complexity." Still true.
 
 ## Decision
 
@@ -55,12 +48,12 @@ Option 1. Concretely:
 - A new Docker container `webhook-server` running `ghcr.io/ls1intum/hephaestus/application-server`
   with `SPRING_PROFILES_ACTIVE=prod,webhook`. Traefik routes `/webhooks/*` (strip-prefix) to this
   container's `/gitlab` and `/github` endpoints. The `application-server` container sets
-  `HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED=false` so the receiver beans don't load there (no wasted
-  RAM, no accidental localhost traffic).
+  `HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED=false` so the receiver beans don't load there.
 - The pure verifier/builder classes (`HmacVerifier`, `GitLabTokenVerifier`, `GitLabSubjectBuilder`,
   `GitHubSubjectBuilder`, `DedupIdResolver`) live in
-  `de.tum.cit.aet.hephaestus.gitprovider.webhook` and port the Node Vitest suite 1:1. JaCoCo
-  package-coverage gate ≥ 0.95 branch on this package.
+  `de.tum.cit.aet.hephaestus.gitprovider.webhook`. JaCoCo package-coverage gate ≥ 0.95 branch on
+  this package keeps subject grammar, dedup ID derivation, HMAC verification, and hex encoding
+  honest under refactor.
 - `WebhookConfiguration` reuses the existing `Connection natsConnection` bean from
   `config.NatsConfig` — no new NATS connection per pod. Publisher uses Resilience4j Retry with
   exponential backoff + ±25% jitter; stream creation is `addStream`-or-`getStreamInfo` with
@@ -72,32 +65,32 @@ Option 1. Concretely:
   consumers, workspace bootstrap) when the same JAR runs as two containers.
 - `WebhookProperties` is moved to `core/webhook/` with a `@NamedInterface("webhook")` declaration
   so both `workspace.GitLabWebhookService` (auto-registration) and `gitprovider.webhook.*`
-  (inbound receiver) can depend on it without forming a cycle. The properties record carries
-  nested `TokenRotation`, `Publish`, `Stream`, `Shutdown`, and `Http` blocks under the existing
-  `hephaestus.webhook.*` prefix. Incoming-request size is capped by `WebhookPayloadSizeFilter`
-  (rejects requests whose declared `Content-Length` exceeds `hephaestus.webhook.http.max-payload-bytes`
-  with `413 Payload Too Large`) — Servlet `max-http-post-size` was rejected because it only
-  applies to form-encoded payloads, not the `application/json` bodies this receiver accepts.
+  (inbound receiver) can depend on it without forming a cycle. Nested `TokenRotation`, `Publish`,
+  `Stream`, `Shutdown`, and `Http` blocks sit under the existing `hephaestus.webhook.*` prefix.
+  Incoming-request size is capped by `WebhookPayloadSizeFilter` (rejects requests whose declared
+  `Content-Length` exceeds `hephaestus.webhook.http.max-payload-bytes` with
+  `413 Payload Too Large`) — Servlet `max-http-post-size` only applies to form-encoded payloads,
+  not the `application/json` bodies this receiver accepts.
 - ArchUnit boundaries: `HexEncodingArchTest` forbids `Integer.toHexString` /
   `Long.toHexString` inside `..gitprovider.webhook..`; `HexFormat.of()` is the only approved hex
   source. `LocaleSafetyArchTest` forbids no-arg `toLowerCase`/`toUpperCase` and
-  `Locale.getDefault()` inside the same scope. `RuntimeRoleBoundaryTest` is extended to assert
-  the correct gates on `WebhookConfiguration`, both webhook controllers, `ServerSchedulingConfig`,
-  `NatsConsumerService`, and `WorkspaceStartupListener`.
+  `Locale.getDefault()` inside the same scope. `RuntimeRoleBoundaryTest` asserts the correct
+  property gates on `WebhookConfiguration`, `ServerSchedulingConfig`, `NatsConsumerService`, and
+  `WorkspaceStartupListener`, plus role isolation (webhook package cannot depend on
+  workspace/leaderboard/agent) and `@EnableScheduling` uniqueness (only on
+  `ServerSchedulingConfig`).
 
 ## Consequences
 
 - **Restart independence achieved.** Restarting `application-server` no longer interrupts
   webhook reception; the sync consumer catches up on the buffered JetStream messages once it
   comes back. Webhook drops during an `application-server` restart are zero.
-- **Single-artifact CI/build cost.** One Maven build, one Docker image, no separate TS pipeline.
-  We removed ~600 LOC of TS, three CI jobs, one Renovate group, one CODEOWNERS line, and the
-  webhook-ingest Dockerfile.
+- **Single-artifact CI/build cost.** One Maven build, one Docker image, no separate pipeline.
 - **Schedulers cannot duplicate.** `@EnableScheduling` is extracted into
   `ServerSchedulingConfig` gated by `SERVER_PROPERTY=true`. The `webhook-server` container sets
-  `server.enabled=false` and consequently fires no `@Scheduled` methods — preventing the GitHub
-  and GitLab sync schedulers, agent zombie sweepers, mentor in-flight reaper, rate-limit
-  eviction, contributor cache eviction, and the GitLab webhook health check from double-running.
+  `server.enabled=false` and consequently fires no `@Scheduled` methods — preventing GitHub and
+  GitLab sync schedulers, agent zombie sweepers, mentor in-flight reaper, rate-limit eviction,
+  contributor cache eviction, and the GitLab webhook health check from double-running.
 - **Sync consumer cannot duplicate-register.** `NatsConsumerService` is gated by
   `SERVER_PROPERTY`. Two containers cannot race the same durable consumer name.
 - **Workspace bootstrap cannot race.** `WorkspaceStartupListener` is gated by
@@ -109,8 +102,8 @@ Option 1. Concretely:
   bean; the receiver itself never touches the DB. Operational cost: ~150 MB extra heap and one
   Hikari pool — acceptable.
 - **Endpoints `/gitlab` and `/github` (no `/webhooks` prefix on controllers).** Traefik already
-  strips the `/webhooks` prefix; preserving the controller paths means no mass re-registration
-  of webhooks with the provider (GitLab rate-limits at 5 req/min per group).
+  strips the `/webhooks` prefix; preserving the controller paths keeps existing provider
+  registrations valid (GitLab rate-limits webhook re-registration at 5 req/min per group).
 - **Webhook secret remains a single shared value (`hephaestus.webhook.secret` /
   `WEBHOOK_SECRET`).** Used identically by auto-registration (sent to the provider) and
   verification (incoming HMAC / token). No env var rename.
@@ -127,12 +120,6 @@ the receiver still has known failure windows that we are NOT solving here:
   `stop_grace_period ≥ server.shutdown drain + shutdown.drain-timeout + 5s`). POSTs that arrive
   AFTER Traefik routes away from the dying pod but BEFORE the new pod is in rotation hit a brief
   outage window. Multi-replica + rolling restart closes this; deferred (see Revisit trigger).
-- **Simultaneous deploy of both stacks.** Compose deploys `application-server` and `webhook-server`
-  in parallel by default. The webhook receiver only depends on NATS (declared via `depends_on`)
-  and Postgres for the workspace-context filter; it does not depend on `application-server`. Both
-  pods can come up independently. Risk: if the webhook profile re-checks `application-webhook.yml`
-  fingerprints in the deploy pipeline and the application-server is still rolling, NATS may be
-  unreachable for the receiver's first attempt — retries cover this.
 - **NATS unavailability.** Resilience4j retry (5 attempts, ±25% jitter, 9s total) absorbs short
   blips. Beyond that the controllers return 503 → provider retries per its own schedule. Push
   events on GitHub/GitLab are NOT in the provider retry set, so a sustained NATS outage drops
@@ -154,6 +141,9 @@ The receiver exposes Micrometer instruments under the `webhook.*` namespace:
   receiver's primary SLI.
 - `webhook.publish.retry` — counter per Resilience4j retry event. Spike indicates NATS pressure
   or transient broker errors.
+- `webhook.rejected{provider, reason}` — counter for every request rejected before publish
+  (bad signature, bad token, oversize, invalid JSON, etc.). Lets ops separate scan traffic from
+  misconfigured providers.
 - Spring Boot's standard `http.server.requests` covers per-endpoint latency / status counts;
   no webhook-specific HTTP histograms are added.
 
@@ -177,8 +167,7 @@ adversarial replays).
 
 ## Related
 
-- ADR 0001 — flat top-level layout (status note: `webhook-ingest/` removed by this PR).
-- ADR 0005 — two-role runtime baseline (status note: revisit trigger fired; webhook is the third
-  role).
+- ADR 0001 — flat top-level layout (updated by this ADR: see "Update" section).
+- ADR 0005 — two-role runtime baseline (revisit trigger fired here; webhook is the third role).
 - ADR 0006 — LLM proxy on coordinator (unaffected).
 - ADR 0007 — sandbox SPI shape (unaffected).

@@ -9,8 +9,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Port of {@code webhook-ingest/test/utils/gitlab-subject.test.ts}. The byte-equal parity contract
- * with the deleted Node service. Cross-side drift is covered by {@code SubjectGrammarRoundTripTest}.
+ * Producer-side subject-builder cases. Cross-side drift against the consumer is covered by
+ * {@code SubjectGrammarRoundTripTest}.
  */
 class GitLabSubjectBuilderTest extends BaseUnitTest {
 

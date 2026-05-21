@@ -15,20 +15,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Idempotently creates the {@code gitlab} and {@code github} JetStream streams at startup,
- * mirroring the prior Node service's stream config exactly.
+ * Idempotently creates the {@code gitlab} and {@code github} JetStream streams at startup.
  *
- * <p>Behaviour intentionally constrained:
  * <ul>
  *   <li>If the stream does not exist (404): {@code addStream} with our defaults.</li>
  *   <li>If the stream exists: log INFO; for any config drift compared to our defaults, log WARN
  *       — but NEVER call {@code updateStream}. Operators handle drift explicitly via
- *       {@code nats stream edit}.</li>
+ *       {@code nats stream edit} so retention or storage settings are never silently clobbered.</li>
  * </ul>
- *
- * <p>This conservative posture mirrors {@code webhook-ingest/src/nats/client.ts:104-126}; the
- * webhook-server taking over stream ownership should not silently clobber retention or storage
- * settings established by the prior Node service.
  */
 public class StreamBootstrap {
 

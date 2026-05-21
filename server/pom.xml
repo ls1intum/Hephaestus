@@ -757,11 +757,8 @@
                                         </limit>
                                     </limits>
                                 </rule>
-                                <!-- ADR 0008 parity-landmine gate: the inbound webhook receiver
-                                     ports Node behaviour byte-equal — the pure-class layer must
-                                     stay at ≥95% branch coverage so refactors that change subject
-                                     grammar, dedup ID derivation, HMAC verification, or hex
-                                     encoding fail loudly. -->
+                                <!-- Webhook receiver pure-class layer (subject grammar, dedup ID,
+                                     HMAC, hex): ≥95% branch coverage so refactors fail loudly. -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>

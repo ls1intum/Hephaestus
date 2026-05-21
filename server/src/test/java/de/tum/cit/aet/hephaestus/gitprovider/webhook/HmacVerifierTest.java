@@ -9,7 +9,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
 
-/** Port of {@code webhook-ingest/test/crypto/verify.test.ts} (HMAC portion). */
 class HmacVerifierTest extends BaseUnitTest {
 
     private static final String SECRET = "test-secret";

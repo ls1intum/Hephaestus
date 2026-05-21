@@ -7,6 +7,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests for {@link NatsConsumerService#buildSubjectPrefix(String, String)}.
@@ -123,54 +125,24 @@ class NatsSubjectBuilderTest {
     @DisplayName("nameWithOwner validation")
     class NameValidation {
 
-        @Test
-        void rejectsNull() {
-            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", null)).isInstanceOf(
+        @ParameterizedTest(name = "stream={0}, nameWithOwner={1}")
+        @CsvSource(value = { "github, null", "gitlab, null", "github, ''", "github, '   '" }, nullValues = "null")
+        void rejectsNullEmptyOrBlank(String stream, String nameWithOwner) {
+            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix(stream, nameWithOwner)).isInstanceOf(
                 IllegalArgumentException.class
             );
         }
 
-        @Test
-        void rejectsEmpty() {
-            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", "")).isInstanceOf(
-                IllegalArgumentException.class
-            );
-        }
-
-        @Test
-        void rejectsBlank() {
-            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", "   ")).isInstanceOf(
-                IllegalArgumentException.class
-            );
-        }
-
-        @Test
-        void rejectsNullForGitLab() {
-            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("gitlab", null)).isInstanceOf(
-                IllegalArgumentException.class
-            );
-        }
-
-        @Test
-        @DisplayName("rejects leading slash (empty first segment)")
-        void rejectsLeadingSlash() {
-            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", "/repo"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Empty path segments");
-        }
-
-        @Test
-        @DisplayName("rejects trailing slash (empty last segment)")
-        void rejectsTrailingSlash() {
-            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", "owner/"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Empty path segments");
-        }
-
-        @Test
-        @DisplayName("rejects consecutive slashes (empty middle segment)")
-        void rejectsConsecutiveSlashes() {
-            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("gitlab", "group//project"))
+        @ParameterizedTest(name = "{2}")
+        @CsvSource(
+            {
+                "github, /repo, leading slash",
+                "github, owner/, trailing slash",
+                "gitlab, group//project, consecutive slash",
+            }
+        )
+        void rejectsEmptySegments(String stream, String input, String description) {
+            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix(stream, input))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Empty path segments");
         }
@@ -180,23 +152,10 @@ class NatsSubjectBuilderTest {
     @DisplayName("streamName validation")
     class StreamNameValidation {
 
-        @Test
-        void rejectsNullStreamName() {
-            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix(null, "owner/repo"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Stream name");
-        }
-
-        @Test
-        void rejectsEmptyStreamName() {
-            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("", "owner/repo"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Stream name");
-        }
-
-        @Test
-        void rejectsBlankStreamName() {
-            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("   ", "owner/repo"))
+        @ParameterizedTest(name = "rejects [{0}]")
+        @CsvSource(value = { "null", "''", "'   '" }, nullValues = "null")
+        void rejectsNullOrBlank(String stream) {
+            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix(stream, "owner/repo"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Stream name");
         }

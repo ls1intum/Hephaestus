@@ -8,7 +8,7 @@ import org.springframework.lang.Nullable;
  * DTO for GitLab member webhook events (group membership changes).
  * <p>
  * Member events use {@code event_name} (not {@code object_kind}) as the discriminator.
- * The webhook-ingest normalizes all member event names to "member" for NATS routing.
+ * The webhook receiver normalizes all member event names to "member" for NATS routing.
  * <p>
  * Supported event_name values:
  * <ul>
