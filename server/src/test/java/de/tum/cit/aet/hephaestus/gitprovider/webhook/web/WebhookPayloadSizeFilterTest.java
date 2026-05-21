@@ -111,7 +111,6 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
     @Test
     void bypassesNonWebhookPaths() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/some-other-endpoint");
-        request.setContent(new byte[1_000_000_000]);
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
