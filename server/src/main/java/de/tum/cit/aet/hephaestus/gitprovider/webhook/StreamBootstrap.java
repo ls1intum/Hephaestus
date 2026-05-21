@@ -134,7 +134,7 @@ public class StreamBootstrap {
     }
 
     private static void warnIfDiffersLong(String stream, String field, long live, long expected) {
-        if (live > 0 && live != expected) {
+        if (live != expected) {
             log.warn("Stream {} live {}={} differs from expected={} — left unchanged", stream, field, live, expected);
         }
     }

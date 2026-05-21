@@ -19,8 +19,12 @@ import io.nats.client.api.StreamInfo;
 import java.io.IOException;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
+@ExtendWith(OutputCaptureExtension.class)
 class StreamBootstrapTest extends BaseUnitTest {
 
     private final WebhookProperties properties = new WebhookProperties(
@@ -82,6 +86,24 @@ class StreamBootstrapTest extends BaseUnitTest {
         assertThatThrownBy(bootstrap::bootstrap)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("Failed to inspect JetStream stream");
+    }
+
+    @Test
+    void warnsWhenLiveMaxMessagesIsUnlimited(CapturedOutput output) throws Exception {
+        StreamConfiguration config = mock(StreamConfiguration.class);
+        when(config.getDuplicateWindow()).thenReturn(Duration.ofMinutes(2));
+        when(config.getMaxAge()).thenReturn(Duration.ofDays(180));
+        when(config.getMaxMsgs()).thenReturn(-1L); // unlimited; expected = 2_000_000
+        when(config.getStorageType()).thenReturn(io.nats.client.api.StorageType.File);
+        StreamInfo info = mock(StreamInfo.class);
+        when(info.getConfiguration()).thenReturn(config);
+        JetStreamManagement jsm = mock(JetStreamManagement.class);
+        when(jsm.getStreamInfo(anyString())).thenReturn(info);
+
+        new StreamBootstrap(jsm, properties).bootstrap();
+
+        assertThat(output.getAll()).contains("maxMessages=-1 differs from expected=2000000");
+        verify(jsm, never()).addStream(any());
     }
 
     /** Mocks {@link JetStreamApiException}; its constructors require an {@code ApiResponse}. */
