@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.webhook.github;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.DedupIdResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.HmacVerifier;
@@ -14,7 +13,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -33,7 +32,7 @@ import tools.jackson.databind.ObjectMapper;
  * not at this layer. See ADR 0008.
  */
 @RestController
-@ConditionalOnProperty(name = RuntimeRole.WEBHOOK_PROPERTY, havingValue = "true", matchIfMissing = true)
+@ConditionalOnBean(JetStreamPublisher.class)
 @WorkspaceAgnostic(
     "Webhook reception is provider-keyed (org/repo). Workspace context is resolved downstream by the sync consumer."
 )
