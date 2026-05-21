@@ -757,6 +757,21 @@
                                         </limit>
                                     </limits>
                                 </rule>
+                                <!-- Webhook receiver pure-class layer (subject grammar, dedup ID,
+                                     HMAC, hex): ≥95% branch coverage so refactors fail loudly. -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>de.tum.cit.aet.hephaestus.gitprovider.webhook</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.95</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
                             </rules>
                         </configuration>
                     </execution>

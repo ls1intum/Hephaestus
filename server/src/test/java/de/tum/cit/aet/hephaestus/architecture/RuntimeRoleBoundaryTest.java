@@ -1,42 +1,63 @@
 package de.tum.cit.aet.hephaestus.architecture;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * Enforces that every {@code @ConditionalOnProperty} gating a {@code hephaestus.runtime.*}
- * key sets {@code matchIfMissing = true}. Without this, a fresh JAR with no env vars set
- * boots an empty context — the operator becomes opt-IN to functionality instead of opt-OUT
- * to disable it.
+ * Pins two invariants for {@code hephaestus.runtime.*} gates:
  *
- * <p>Unwraps {@code @ConditionalOnProperty.List} containers — Spring Boot 3.5+ makes the
- * annotation {@link java.lang.annotation.Repeatable}, so multiple occurrences are wrapped
- * in a {@code .List} synthetic annotation. The test that simply matches
- * {@code @ConditionalOnProperty} without unwrapping would scan zero classes in our
- * codebase, because every site uses stacked annotations.
+ * <ol>
+ *   <li>Every gate sets {@code matchIfMissing=true}. Without this, a fresh JAR with no env vars
+ *       set boots an empty context — operators become opt-IN to functionality instead of opt-OUT
+ *       to disable it.</li>
+ *   <li>The classes the gate is supposed to cover actually carry the right
+ *       {@code @ConditionalOnProperty}. Drift between {@code RuntimeRole} javadoc and the live
+ *       annotations is the bug class this enforces.</li>
+ * </ol>
  *
- * <p>See ADR 0005.
+ * <p>Unwraps {@code @ConditionalOnProperty.List} — Spring Boot 3.5+ makes the annotation
+ * {@link java.lang.annotation.Repeatable}, so multiple occurrences are wrapped in a {@code .List}
+ * synthetic annotation.
+ *
+ * <p>See ADR 0005 (baseline) and ADR 0008 (webhook role + SERVER_PROPERTY wiring).
  */
 @Tag("architecture")
-@DisplayName("Runtime Role Boundary")
 class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
 
     /** Container annotation Spring Boot 4 uses for repeated {@code @ConditionalOnProperty}. */
     private static final String CONDITIONAL_CONTAINER =
         "org.springframework.boot.autoconfigure.condition.ConditionalOnProperties";
 
+    /**
+     * Single property-gated config per role. Controllers inside {@code gitprovider.webhook} are
+     * implicitly gated via {@code @ConditionalOnBean(JetStreamPublisher.class)} — they auto-load
+     * iff {@link de.tum.cit.aet.hephaestus.gitprovider.webhook.WebhookConfiguration} loads, so
+     * listing them here would just duplicate the WebhookConfiguration gate.
+     */
+    private static final Map<String, String> EXPECTED_GATES = Map.of(
+        "de.tum.cit.aet.hephaestus.gitprovider.webhook.WebhookConfiguration",
+        RuntimeRole.WEBHOOK_PROPERTY,
+        "de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig",
+        RuntimeRole.SERVER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService",
+        RuntimeRole.SERVER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.workspace.WorkspaceStartupListener",
+        RuntimeRole.SERVER_PROPERTY
+    );
+
     @Test
-    @DisplayName("hephaestus.runtime.* gates use matchIfMissing=true")
     void runtimeGatesAreMatchIfMissingTrue() {
         List<String> violations = classes
             .stream()
@@ -51,11 +72,57 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             .isEmpty();
     }
 
-    /**
-     * Returns every {@code @ConditionalOnProperty} on the class — both bare occurrences
-     * and individual entries inside Spring Boot's {@code @ConditionalOnProperties} container
-     * (which {@code @Repeatable} produces when multiple occurrences are stacked).
-     */
+    @Test
+    void enableSchedulingLivesOnlyOnServerSchedulingConfig() {
+        List<String> hosts = classes
+            .stream()
+            .filter(c -> c.getFullName().startsWith("de.tum.cit.aet.hephaestus."))
+            .filter(c -> c.isAnnotatedWith(EnableScheduling.class) || c.isMetaAnnotatedWith(EnableScheduling.class))
+            .map(JavaClass::getFullName)
+            .collect(Collectors.toList());
+
+        assertThat(hosts)
+            .as(
+                "@EnableScheduling (direct or meta-annotated) must appear on exactly one class (ServerSchedulingConfig); " +
+                    "any other @Scheduled host relies on its absence on the webhook role to no-op silently — keep that invariant load-bearing."
+            )
+            .containsExactly("de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig");
+    }
+
+    @Test
+    void webhookPackageIsIsolatedFromServerWorkerConcerns() {
+        noClasses()
+            .that()
+            .resideInAPackage("de.tum.cit.aet.hephaestus.gitprovider.webhook..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "de.tum.cit.aet.hephaestus.workspace..",
+                "de.tum.cit.aet.hephaestus.leaderboard..",
+                "de.tum.cit.aet.hephaestus.agent.."
+            )
+            .because(
+                "webhook receiver is a pure publish-only role; depending on workspace/leaderboard/agent would re-introduce " +
+                    "the wiring leaks runtime testing already exposed (ObjectProvider cascade, etc.) and break role isolation"
+            )
+            .check(classes);
+    }
+
+    @Test
+    void expectedRuntimeGatesArePresent() {
+        EXPECTED_GATES.forEach((fqn, expectedProperty) -> {
+            JavaClass clazz = classes
+                .stream()
+                .filter(c -> c.getFullName().equals(fqn))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected class not found in ArchUnit scan: " + fqn));
+            boolean matched = conditionalOnPropertyAnnotations(clazz)
+                .map(ann -> new ConditionalRef(clazz, ann))
+                .anyMatch(ref -> ref.propertyNames().anyMatch(name -> name.equals(expectedProperty)));
+            assertThat(matched).as("%s must be gated by @ConditionalOnProperty('%s')", fqn, expectedProperty).isTrue();
+        });
+    }
+
     private static Stream<JavaAnnotation<?>> conditionalOnPropertyAnnotations(JavaClass clazz) {
         return clazz
             .getAnnotations()

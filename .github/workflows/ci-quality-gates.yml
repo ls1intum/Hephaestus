@@ -19,11 +19,6 @@ on:
         required: false
         type: string
         default: "true"
-      webhook_ingest_changed:
-        description: "Whether webhook-ingest files changed (or should run for other reasons)"
-        required: false
-        type: string
-        default: "true"
 
 jobs:
   quality-gates:
@@ -39,8 +34,6 @@ jobs:
             display-name: "App Server"
           - check: webapp-quality
             display-name: "Webapp"
-          - check: webhook-ingest-quality
-            display-name: "Webhook"
           - check: openapi-validation
             display-name: "OpenAPI"
           - check: database-validation
@@ -55,9 +48,6 @@ jobs:
               ;;
             "application-server-quality"|"openapi-validation"|"database-validation")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
-              ;;
-            "webhook-ingest-quality")
-              echo "run=${{ inputs.webhook_ingest_changed }}" >> $GITHUB_OUTPUT
               ;;
             *)
               # Unknown check type - fail explicitly to catch missing case statements
@@ -137,31 +127,6 @@ jobs:
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             [[ "$BIOME_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`cd webapp && pnpm run check -- --write\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`cd webapp && pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
-            for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
-            exit 1
-          fi
-
-      - name: Webhook-ingest quality
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webhook-ingest-quality'
-        run: |
-          pnpm install --frozen-lockfile
-
-          ISSUES_FOUND=()
-          CHECK_OK=true; TYPES_OK=true; TEST_OK=true; BUILD_OK=true
-
-          pnpm --filter webhook-ingest run check || { CHECK_OK=false; ISSUES_FOUND+=("Biome check failed. Run: pnpm --filter webhook-ingest run check"); }
-          pnpm --filter webhook-ingest run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript failed. Run: pnpm run typecheck:webhook-ingest"); }
-          pnpm --filter webhook-ingest run test || { TEST_OK=false; ISSUES_FOUND+=("Tests failed. Run: pnpm run test:webhook-ingest"); }
-          pnpm --filter webhook-ingest run build || { BUILD_OK=false; ISSUES_FOUND+=("Build failed. Run: pnpm run build:webhook-ingest"); }
-
-          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            echo "### Webhook Ingest Quality" >> $GITHUB_STEP_SUMMARY
-            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
-            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$CHECK_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`pnpm --filter webhook-ingest run check\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`pnpm run typecheck:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TEST_OK" == "false" ]] && echo "| Tests | :x: Failed | \`pnpm run test:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$BUILD_OK" == "false" ]] && echo "| Build | :x: Failed | \`pnpm run build:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi

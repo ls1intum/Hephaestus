@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.gitprovider.sync;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
@@ -44,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
@@ -110,6 +112,7 @@ import org.springframework.stereotype.Service;
  */
 @Order(1)
 @Service
+@ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class NatsConsumerService {
 
     private static final Logger log = LoggerFactory.getLogger(NatsConsumerService.class);
@@ -596,7 +599,7 @@ public class NatsConsumerService {
      *   <li><b>GitHub:</b> {@code owner/repo} → {@code github.owner.repo}
      *       (always exactly 2 parts)</li>
      *   <li><b>GitLab:</b> {@code group/subgroup/project} → {@code gitlab.group~subgroup.project}
-     *       (namespace parts joined with {@code ~}, matching webhook-ingest's gitlab-subject.ts)</li>
+     *       (namespace parts joined with {@code ~}, matching GitLabSubjectBuilder)</li>
      * </ul>
      *
      * @param streamName    the NATS stream name ("github" or "gitlab")

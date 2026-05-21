@@ -6,18 +6,19 @@
 # All PR preview stacks will connect to these shared services.
 #
 # Services:
-#   - nats-server: Message queue for GitHub webhook events
-#   - webhook-ingest: Receives GitHub webhooks, publishes to NATS
+#   - nats-server: Message queue for webhook + sync events
+#   - webhook-server: Java inbound webhook receiver (application-server image with
+#     SPRING_PROFILES_ACTIVE=prod,webhook so only gitprovider.webhook beans load — see ADR 0008)
 #   - keycloak + keycloak-db: Authentication (wildcard redirect URIs)
 #
 # Coolify Setup:
 #   1. Create new Service → Docker Compose
 #   2. Point to this file in the repo: docker/preview/compose.shared-infra.yaml
-#   3. Enable "Connect to Predefined Network" 
+#   3. Enable "Connect to Predefined Network"
 #   4. Configure environment variables (see .env.example)
 #   5. In Coolify UI, set domains for each service (with Strip Prefix ENABLED):
 #      - keycloak: https://example.com:8080/keycloak
-#      - webhook-ingest: https://example.com:4200/webhooks
+#      - webhook-server: https://example.com:8080/webhooks
 #
 # IMPORTANT: This shared preview infrastructure does not, by itself, prove that
 # GitLab workspace creation or GitLab practice review will work in production.
@@ -56,26 +57,38 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # Webhook Ingest - Receives GitHub webhooks, publishes to NATS
-  # Configure domain in Coolify UI: https://example.com/webhooks:4200
+  # Webhook Server - Java inbound webhook receiver. Same image as application-server
+  # but with SPRING_PROFILES_ACTIVE=prod,webhook so only gitprovider.webhook beans load.
+  # Restart-independent from application-server (push events on GitHub/GitLab are
+  # not manually redeliverable). See ADR 0008.
+  # Configure domain in Coolify UI: https://example.com/webhooks:8080
   # ---------------------------------------------------------------------------
-  webhook-ingest:
-    image: ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG:-latest}
+  webhook-server:
+    image: ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG:-latest}
     restart: unless-stopped
     expose:
-      - "4200"
+      - "8080"
     environment:
-      NATS_URL: nats://nats-server:4222
+      SPRING_PROFILES_ACTIVE: "prod,webhook"
+      HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "true"
+      HEPHAESTUS_RUNTIME_SERVER_ENABLED: "false"
+      HEPHAESTUS_RUNTIME_WORKER_ENABLED: "false"
+      SPRING_LIQUIBASE_ENABLED: "false"
+      HEPHAESTUS_SYNC_NATS_ENABLED: "true"
+      HEPHAESTUS_SYNC_NATS_SERVER: "nats://nats-server:4222"
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Required}
     depends_on:
       nats-server:
         condition: service_healthy
+    # Spring drains HTTP (20s) THEN WebhookGracefulShutdown drains NATS (up to 15s).
+    # Docker must allow ≥35s before SIGKILL, or the JVM is cut mid-drain.
+    stop_grace_period: 40s
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:4200/health"]
-      interval: 10s
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 5s
+      start_period: 30s
     logging:
       driver: "json-file"
       options:

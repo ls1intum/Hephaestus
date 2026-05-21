@@ -14,7 +14,6 @@ RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 # Copy the workspace manifests first to maximize layer caching
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc /repo/
 COPY webapp/package.json /repo/webapp/
-COPY webhook-ingest/package.json /repo/webhook-ingest/
 COPY server/agent-extensions/package.json /repo/server/agent-extensions/
 COPY docs/package.json /repo/docs/
 

@@ -130,20 +130,25 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # RUNTIME ROLES (single JAR, deploy-config-selected mode)
     # ═══════════════════════════════════════════════════════════════════════════
-    # Two property keys today (see ADR 0005):
-    #   worker — WIRED. Gates DockerSandboxConfiguration + AgentNatsConsumerConfig.
-    #     Setting false removes the Docker sandbox runtime + agent NATS pull consumer
-    #     from this JVM; the rest of the monolith continues to load.
-    #   server — RESERVED. Property key established for the future server-only role,
-    #     but not wired in this epic: setting it false is currently a no-op (HTTP API,
-    #     sync NATS, mentor SSE, scheduled tasks all still load). Wiring lands with
-    #     the deploy-split epic that has a real operational driver.
-    # Both default true → single-JVM monolith (the dev + initial prod topology).
+    # Three property keys (see ADR 0005 baseline + ADR 0008 webhook role):
+    #   server  — WIRED. Gates ServerSchedulingConfig (@EnableScheduling),
+    #     NatsConsumerService (sync NATS pull consumer), and WorkspaceStartupListener.
+    #     Setting false silences all @Scheduled methods and prevents workspace bootstrap.
+    #   worker  — WIRED. Gates DockerSandboxConfiguration + AgentNatsConsumerConfig.
+    #     Setting false removes the Docker sandbox runtime + agent NATS pull consumer.
+    #   webhook — WIRED. Gates the gitprovider.webhook receiver (controllers, HMAC
+    #     verifier, JetStream publisher, stream bootstrap, health, lifecycle).
+    #     The webhook-server production container deploys with server=false + worker=false
+    #     + webhook=true so it runs webhook reception in isolation — restart-independent
+    #     from application-server. See ADR 0008.
+    # All three default true → single-JVM monolith (the dev + initial prod topology).
     runtime:
         server:
             enabled: ${HEPHAESTUS_RUNTIME_SERVER_ENABLED:true}
         worker:
             enabled: ${HEPHAESTUS_RUNTIME_WORKER_ENABLED:true}
+        webhook:
+            enabled: ${HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED:true}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # TENANCY ENFORCEMENT (WorkspaceStatementInspector)
@@ -498,16 +503,40 @@ hephaestus:
         token-validation-cache-duration: ${GITLAB_TOKEN_CACHE_DURATION:5m}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # WEBHOOK AUTO-REGISTRATION
+    # WEBHOOK CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
-    # Shared secret with webhook-ingest for GitLab webhook auto-registration.
-    # Both services use the same WEBHOOK_SECRET: application-server registers
-    # webhooks with it, webhook-ingest verifies incoming payloads against it.
+    # Single `hephaestus.webhook` block consumed by both webhook sides (ADR 0008):
+    #   - workspace.GitLabWebhookService reads external-url, secret, token-rotation.* for
+    #     auto-registration with the provider.
+    #   - gitprovider.webhook.* reads secret (HMAC / token verification) and the nested
+    #     publish/stream/http blocks for the inbound receiver.
+    # `secret` is shared by design — same value registered with the provider and used
+    # to verify incoming bodies. The receiver runs in the `webhook-server` container.
     webhook:
         external-url: ${WEBHOOK_EXTERNAL_URL:}
         secret: ${WEBHOOK_SECRET:}
-        token-rotation-threshold-days: ${WEBHOOK_TOKEN_ROTATION_THRESHOLD_DAYS:7}
-        token-rotation-validity-days: ${WEBHOOK_TOKEN_ROTATION_VALIDITY_DAYS:90}
+        token-rotation:
+            threshold-days: ${WEBHOOK_TOKEN_ROTATION_THRESHOLD_DAYS:7}
+            validity-days: ${WEBHOOK_TOKEN_ROTATION_VALIDITY_DAYS:90}
+        # ─── Inbound receiver (gitprovider.webhook.*) ───
+        publish:
+            timeout: 9s          # fits within GitHub's 10s response budget
+            max-retries: 5
+            retry-base-delay: 200ms
+        stream:
+            duplicate-window: 2m # JetStream default; provider redelivery is by delivery-UUID
+            max-age: 180d
+            max-messages: 2000000
+        shutdown:
+            # Drain budget for in-flight publishes after HTTP closes. Docker stop_grace_period
+            # must cover: Spring HTTP drain (server.shutdown=graceful + lifecycle timeout 20s)
+            # + this drain + small margin. Compose pins stop_grace_period: 40s.
+            drain-timeout: 15s
+        http:
+            # Hard cap enforced by WebhookPayloadSizeFilter (Content-Length check before
+            # Spring buffers the body). Tomcat's max-http-post-size only enforces on
+            # form-encoded bodies, so we can't rely on it for JSON webhooks.
+            max-payload-bytes: 26214400
 
     # ═══════════════════════════════════════════════════════════════════════════
     # GITHUB AUTHENTICATION

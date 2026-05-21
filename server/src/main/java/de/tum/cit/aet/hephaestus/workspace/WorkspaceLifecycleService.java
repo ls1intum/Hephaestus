@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,7 +31,8 @@ public class WorkspaceLifecycleService {
 
     private final NatsProperties natsProperties;
     private final WorkspaceRepository workspaceRepository;
-    private final NatsConsumerService natsConsumerService;
+    /** Absent under webhook profile (server.enabled=false). */
+    private final ObjectProvider<NatsConsumerService> natsConsumerService;
 
     // Repositories for workspace-scoped data cleanup
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
@@ -46,7 +48,7 @@ public class WorkspaceLifecycleService {
     public WorkspaceLifecycleService(
         NatsProperties natsProperties,
         WorkspaceRepository workspaceRepository,
-        NatsConsumerService natsConsumerService,
+        ObjectProvider<NatsConsumerService> natsConsumerService,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceTeamSettingsRepository workspaceTeamSettingsRepository,
@@ -309,7 +311,7 @@ public class WorkspaceLifecycleService {
      */
     private void stopNatsForWorkspace(Workspace workspace) {
         if (shouldUseNats(workspace)) {
-            natsConsumerService.stopConsumingScope(workspace.getId());
+            natsConsumerService.ifAvailable(svc -> svc.stopConsumingScope(workspace.getId()));
         }
     }
 
@@ -319,7 +321,7 @@ public class WorkspaceLifecycleService {
      */
     private void startNatsForWorkspace(Workspace workspace) {
         if (shouldUseNats(workspace)) {
-            natsConsumerService.startConsumingScope(workspace.getId());
+            natsConsumerService.ifAvailable(svc -> svc.startConsumingScope(workspace.getId()));
         }
     }
 

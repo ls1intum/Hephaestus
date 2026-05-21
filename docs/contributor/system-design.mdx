@@ -18,7 +18,7 @@ Open the `.mdj` file in StarUML, adjust the relevant diagram, then export the SV
 The platform is intentionally layered. Internally we distinguish between:
 
 - **Application Server** - Spring Boot, integrates with Git providers, manages the leaderboard, exposes the primary REST API, and runs the Pi mentor agent in-process (streaming to clients via SSE).
-- **Webhook Ingest** - NATS-based ingestion for GitHub/GitLab events, decoupling external webhooks from downstream processing.
+- **Webhook Server** - same image as Application Server, activated with `SPRING_PROFILES_ACTIVE=prod,webhook` so only the inbound webhook receiver beans load. Restart-independent from Application Server; publishes to the same NATS JetStream streams that the sync consumer reads. See ADR 0008.
 - **User Management** - Keycloak identity realm configured with GitHub as identity provider.
 
 Externally we integrate with code hosting (GitHub today, GitLab planned), Slack/email notifications, and the analytics stack used for anonymised usage metrics. Data enters through webhooks, gets enriched via API calls, and surfaces in the React client.
@@ -65,6 +65,6 @@ The login flow leverages GitHub OAuth via Keycloak. Successful login grants acce
 
 ![New review activity workflow](./img/system-design/new_review_activity.svg)
 
-Webhook events trigger data ingestion via the webhook ingest service. The application server enriches the data and recalculates leaderboard standings in real time.
+Webhook events arrive at the `webhook-server` container (the application-server image running under `SPRING_PROFILES_ACTIVE=prod,webhook`), which verifies the signature/token and publishes to NATS JetStream. The application-server's sync consumer reads the stream, enriches the data, and recalculates leaderboard standings in real time. The two containers are restart-independent — see ADR 0008.
 
 These workflows highlight the two critical loops: authenticating via GitHub (producing application + mentor tokens) and streaming review events through ingest → enrichment → leaderboard updates. Keeping these diagrams current avoids surprises when we extend integrations.

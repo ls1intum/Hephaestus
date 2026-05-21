@@ -340,7 +340,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
      * Bulk-update enrichment metadata fields on a commit.
      * <p>
      * Uses {@code COALESCE} so that NULL parameters preserve existing database values.
-     * This ensures webhook-ingested data is not overwritten with NULLs if the
+     * This ensures webhook-delivered data is not overwritten with NULLs if the
      * GraphQL response omits a field.
      */
     @Modifying

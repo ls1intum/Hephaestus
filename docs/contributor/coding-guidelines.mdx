@@ -2,7 +2,7 @@
 id: coding-guidelines
 sidebar_position: 6
 title: Coding & Design Guidelines
-description: Shared principles for the React client, Spring Boot server (with the in-process Pi mentor agent), and webhook-ingest service.
+description: Shared principles for the React client and the Spring Boot server (which hosts the in-process Pi mentor agent and the inbound webhook receiver).
 ---
 
 These guidelines keep every service aligned. Keep changes focused. Mention any deviation in your pull request. Raise follow-up issues when you discover gaps.
@@ -74,12 +74,19 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Run the modular test suites with `./mvnw verify`. The build uses ArchUnit checks to enforce package boundaries.
 - Prefer integration tests that extend `AbstractSpringIntegrationTest` when you touch persistence logic.
 
-## Webhook ingest service (`/webhook-ingest`)
+## Webhook receiver (`server/.../gitprovider/webhook/`)
 
-- Uses Hono for HTTP routing and `@nats-io/jetstream` for NATS publishing.
-- Verify GitHub signatures via HMAC-SHA256 and GitLab tokens via constant-time comparison.
-- Configure settings via Zod in `src/env.ts` and keep `.env.example` up to date.
-- Format and lint with Biome (`pnpm run check:webhook-ingest`) and run tests with Vitest.
+- Pure verifier/builder classes (`HmacVerifier`, `GitLabTokenVerifier`, `GitLabSubjectBuilder`,
+  `GitHubSubjectBuilder`, `DedupIdResolver`) — Spring-free; exercised by JUnit unit tests plus
+  parameterised tests over the captured fixtures in `server/src/test/resources/{github,gitlab}/`.
+- HMAC verification: `MessageDigest.isEqual` (constant-time, length-tolerant); hex via
+  `java.util.HexFormat.of()` only — enforced by ArchUnit (`HexEncodingArchTest`). Case-folding
+  uses `Locale.ROOT` everywhere — enforced by `LocaleSafetyArchTest`.
+- Spring beans (controllers, `JetStreamPublisher`, `StreamBootstrap`, health, lifecycle) gated by
+  `RuntimeRole.WEBHOOK_PROPERTY`. Production runs them in the dedicated `webhook-server`
+  container (`SPRING_PROFILES_ACTIVE=prod,webhook`) for restart independence — see ADR 0008.
+- Configuration is shared with auto-registration: `core.webhook.WebhookProperties` bound to
+  `hephaestus.webhook.*`. JaCoCo package coverage gate ≥ 0.95 branch on `gitprovider.webhook`.
 
 ## Docs site (`/docs`)
 

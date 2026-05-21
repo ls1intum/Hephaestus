@@ -21,7 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles GitLab subgroup webhook events for real-time team structure updates.
  * <p>
  * Processes {@code subgroup_create} and {@code subgroup_destroy} events that are
- * normalized to the "subgroup" event key by the webhook-ingest layer.
+ * normalized to the "subgroup" event key by the webhook receiver.
  * <p>
  * On creation, delegates to {@link GitLabTeamProcessor#process} to upsert a Team entity.
  * On deletion, delegates to {@link GitLabTeamProcessor#delete} to remove the team and

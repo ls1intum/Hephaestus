@@ -8,7 +8,7 @@ import org.springframework.lang.Nullable;
  * DTO for GitLab project webhook events (project lifecycle changes).
  * <p>
  * Project events use {@code event_name} (not {@code object_kind}) as the discriminator.
- * The webhook-ingest normalizes all project event names to "project" for NATS routing.
+ * The webhook receiver normalizes all project event names to "project" for NATS routing.
  * <p>
  * These events are only available on group-level webhooks.
  * <p>

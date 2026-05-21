@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabTokenRotationClient;
 import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
@@ -80,7 +81,7 @@ public class GitLabWebhookService {
             return;
         }
 
-        int thresholdDays = webhookProperties.tokenRotationThresholdDays();
+        int thresholdDays = webhookProperties.tokenRotation().thresholdDays();
         if (thresholdDays <= 0) {
             return;
         }
@@ -103,7 +104,7 @@ public class GitLabWebhookService {
                 return;
             }
 
-            LocalDate newExpiry = LocalDate.now().plusDays(webhookProperties.tokenRotationValidityDays());
+            LocalDate newExpiry = LocalDate.now().plusDays(webhookProperties.tokenRotation().validityDays());
             var rotatedToken = rotationClient.rotateToken(workspace.getId(), newExpiry);
 
             // Critical: persist new token immediately — old token is already revoked

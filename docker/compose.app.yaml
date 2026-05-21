@@ -101,6 +101,10 @@ services:
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
+      # Webhook reception runs in a dedicated `webhook-server` container (see ADR 0008
+      # + docker/compose.core.yaml). Disable it here so the receiver beans don't load
+      # in application-server (saves RAM; prevents accidental localhost traffic).
+      HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "false"
       DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root

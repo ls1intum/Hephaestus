@@ -25,7 +25,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>
  * Processes {@code project_create}, {@code project_destroy}, {@code project_rename},
  * and {@code project_transfer} events that are normalized to the "project" event key
- * by the webhook-ingest layer.
+ * by the webhook receiver.
  * <p>
  * These events are only available on group-level webhooks.
  */

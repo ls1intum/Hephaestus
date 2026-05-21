@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.leaderboard.tasks.LeaguePointsUpdateTask;
 import de.tum.cit.aet.hephaestus.leaderboard.tasks.SlackWeeklyLeaderboardTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Component;
 @Order(value = Ordered.LOWEST_PRECEDENCE)
 @Component
 @Profile("!test")
+@ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class LeaderboardTaskScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);

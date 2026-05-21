@@ -45,15 +45,6 @@
       "labels": ["dependencies", "webapp"]
     },
     {
-      "description": "Group TypeScript services",
-      "matchFileNames": [
-        "webhook-ingest/**"
-      ],
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "TypeScript services",
-      "labels": ["dependencies", "services"]
-    },
-    {
       "description": "Group documentation deps",
       "matchFileNames": ["docs/package.json"],
       "groupName": "Documentation dependencies",

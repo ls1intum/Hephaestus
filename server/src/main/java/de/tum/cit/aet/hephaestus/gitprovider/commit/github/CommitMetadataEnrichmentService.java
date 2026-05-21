@@ -1035,7 +1035,7 @@ public class CommitMetadataEnrichmentService {
      * Extracts enrichment metadata from the GraphQL response and updates the commit.
      * <p>
      * Uses COALESCE in the repository query so null values don't overwrite existing data.
-     * This is important for backfilling webhook-ingested commits where some fields
+     * This is important for backfilling webhook-delivered commits where some fields
      * (e.g. additions, deletions) may have been 0 from the webhook but have real values
      * from GraphQL.
      */

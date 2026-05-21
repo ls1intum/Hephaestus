@@ -14,7 +14,7 @@ on:
       deploy-core:
         default: false
         type: boolean
-        description: (Re-)deploys NATS, Keycloak, Webhook Ingest. Usually not necessary and might cause data gaps.
+        description: (Re-)deploys NATS, Keycloak, and the Webhook Server (application-server image with the webhook profile). Usually not necessary and might cause data gaps.
       deploy-proxy:
         default: false
         type: boolean
@@ -33,7 +33,7 @@ on:
       deploy-core:
         default: false
         type: boolean
-        description: (Re-)deploys NATS, Keycloak, Webhook Ingest. Usually not necessary and might cause data gaps.
+        description: (Re-)deploys NATS, Keycloak, and the Webhook Server (application-server image with the webhook profile). Usually not necessary and might cause data gaps.
       deploy-proxy:
         default: false
         type: boolean
@@ -61,7 +61,9 @@ jobs:
     with:
       environment: Staging
       docker-compose-file: "./docker/compose.core.yaml"
-      main-image-name: ls1intum/hephaestus/webhook-ingest
+      # compose.core.yaml now runs `webhook-server` from the application-server image
+      # (SPRING_PROFILES_ACTIVE=prod,webhook). See ADR 0008.
+      main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
       deployment-base-path: "/opt/hephaestus/core"
     secrets: inherit
