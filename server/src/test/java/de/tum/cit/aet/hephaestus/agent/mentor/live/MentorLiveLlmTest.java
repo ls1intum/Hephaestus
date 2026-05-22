@@ -563,7 +563,7 @@ class MentorLiveLlmTest {
         Files.createDirectories(tmp.resolve(".sessions"));
 
         // ESM resolution walks node_modules upward from the *importing* file, not from cwd. The
-        // production container handles this by `ln -sf /usr/local/lib/node_modules
+        // production container handles this by `ln -sf /opt/pi-sdk/node_modules
         // /workspace/node_modules` and bind-mounting the runner under /workspace/.run-pi.mjs
         // (see PiRuntimeFactory). We mirror both moves here: symlink node_modules under the
         // workspace, and copy the runner into the workspace so resolution finds the symlink.

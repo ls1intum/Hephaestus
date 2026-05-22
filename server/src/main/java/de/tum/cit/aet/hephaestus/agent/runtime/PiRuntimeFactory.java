@@ -79,12 +79,6 @@ public class PiRuntimeFactory {
         env.put("XDG_CONFIG_HOME", "/home/agent/.config");
         env.put("TMPDIR", "/home/agent/.local/tmp");
         env.put("PI_CODING_AGENT_DIR", WorkspaceAbi.PI_AGENT_DIR);
-        // The runner script under /workspace/.run-pi.mjs imports the Pi SDK via bare ESM
-        // specifiers. Node's resolver only walks /workspace/node_modules → /node_modules;
-        // the SDK lives at /opt/pi-sdk/node_modules (symlinked by the agent-pi Dockerfile
-        // to pnpm's content-hashed global install). Without NODE_PATH the runner dies with
-        // `Cannot find package '@earendil-works/pi-coding-agent'`.
-        env.put("NODE_PATH", "/opt/pi-sdk/node_modules");
 
         // Azure's `azure-openai-responses` provider hard-defaults the model id to "gpt-5.2"; route
         // both that and the configured model to the same Azure deployment.
@@ -105,8 +99,11 @@ public class PiRuntimeFactory {
             "mkdir -p " +
             WorkspaceAbi.OUTPUT_PATH +
             " /home/agent/.config /home/agent/.local/tmp && " +
-            // Pi SDK ESM imports require a workspace-local node_modules.
-            "ln -sf /usr/local/lib/node_modules " +
+            // Pi SDK ESM imports resolve from /<workspace>/node_modules. The agent-pi Dockerfile
+            // exposes the SDK at /opt/pi-sdk/node_modules (a stable symlink to pnpm's
+            // content-addressed global install). NODE_PATH would NOT work here — Node's ESM
+            // resolver ignores NODE_PATH, only the CommonJS require() honors it.
+            "ln -sf /opt/pi-sdk/node_modules " +
             workspaceRoot +
             "/node_modules && " +
             spec.precomputeStep() +
