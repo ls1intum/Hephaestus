@@ -67,6 +67,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             CredentialMode.PROXY,
             null,
             null,
+            null,
             timeoutSeconds,
             false
         );

@@ -583,6 +583,10 @@ export type UpdateAgentConfigRequest = {
      */
     llmApiKey?: string;
     /**
+     * Optional LLM base URL override (omit or null to keep existing value; empty string clears it)
+     */
+    llmBaseUrl?: string;
+    /**
      * LLM provider
      */
     llmProvider?: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
@@ -1689,6 +1693,10 @@ export type CreateAgentConfigRequest = {
      */
     llmApiKey?: string;
     /**
+     * Optional LLM base URL — set for OpenAI/Anthropic-compatible endpoints that need routing through the hephaestus chat/completions provider extension (e.g. TUM GPU, on-prem gateways)
+     */
+    llmBaseUrl?: string;
+    /**
      * LLM provider
      */
     llmProvider: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
@@ -1879,6 +1887,10 @@ export type AgentConfig = {
      * Configuration ID
      */
     id: number;
+    /**
+     * Optional LLM base URL override
+     */
+    llmBaseUrl?: string;
     /**
      * LLM provider
      */

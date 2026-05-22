@@ -79,6 +79,15 @@ public class AgentConfig {
     @ToString.Exclude
     private String llmApiKey;
 
+    /**
+     * Optional base URL override for OpenAI/Anthropic-style endpoints (e.g. TUM GPU,
+     * Azure OpenAI gateway, OSS-compatible proxies). When set in {@code API_KEY} mode,
+     * the Pi runtime registers a custom {@code hephaestus} provider extension that uses
+     * the chat/completions surface — needed for providers that don't speak the Responses API.
+     */
+    @Column(name = "llm_base_url", length = 512)
+    private String llmBaseUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "llm_provider", nullable = false, length = 32)
     private LlmProvider llmProvider;

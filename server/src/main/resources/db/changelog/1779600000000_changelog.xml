@@ -1,0 +1,25 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet author="FelixTJDietrich" id="1779600000000-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_config.llm_base_url already present">
+            <not><columnExists tableName="agent_config" columnName="llm_base_url"/></not>
+        </preConditions>
+        <comment>
+            Per-workspace LLM base URL. Needed when the workspace's LLM endpoint does not
+            speak the OpenAI Responses API (e.g. TUM GPU's chat/completions-only gateway).
+            Triggers the hephaestus Pi provider extension to route via chat/completions.
+        </comment>
+        <addColumn tableName="agent_config">
+            <column name="llm_base_url" type="VARCHAR(512)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="agent_config" columnName="llm_base_url"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -475,11 +475,14 @@ public class AgentJobExecutor {
         // BYO worker pod: when the operator configures hephaestus.worker.llm.{base-url,api-key},
         // override the per-job credential mode + endpoint so agent-pi reaches the operator's LLM
         // directly. The app-pod's bundled LLM proxy is not reachable from a worker host. ADR 0009.
+        // Worker-level override wins; otherwise the per-workspace AgentConfig.llmBaseUrl applies
+        // (needed when the workspace's LLM gateway doesn't speak the OpenAI Responses API and the
+        // Pi runtime must route via chat/completions through the hephaestus provider extension).
         WorkerProperties.Llm workerLlm = workerProperties.map(WorkerProperties::llm).orElse(null);
         boolean workerLlmActive = workerLlm != null && workerLlm.isConfigured();
         CredentialMode credentialMode = workerLlmActive ? CredentialMode.API_KEY : snapshot.credentialMode();
         String credential = workerLlmActive ? workerLlm.apiKey() : job.getLlmApiKey();
-        String baseUrl = workerLlmActive ? workerLlm.baseUrl() : null;
+        String baseUrl = workerLlmActive ? workerLlm.baseUrl() : snapshot.llmBaseUrl();
 
         PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
             snapshot.llmProvider(),

@@ -137,6 +137,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             CredentialMode.PROXY,
             null,
             null,
+            null,
             600,
             false
         );

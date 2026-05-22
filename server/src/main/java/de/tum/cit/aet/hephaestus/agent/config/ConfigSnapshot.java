@@ -31,11 +31,12 @@ public record ConfigSnapshot(
     CredentialMode credentialMode,
     @Nullable String modelName,
     @Nullable String modelVersion,
+    @Nullable String llmBaseUrl,
     int timeoutSeconds,
     boolean allowInternet
 ) {
     /** Current schema version. Bump when adding/removing fields. */
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
 
     public ConfigSnapshot {
         Objects.requireNonNull(llmProvider, "llmProvider must not be null");
@@ -58,6 +59,7 @@ public record ConfigSnapshot(
             config.getCredentialMode(),
             config.getModelName(),
             config.getModelVersion(),
+            config.getLlmBaseUrl(),
             config.getTimeoutSeconds(),
             config.isAllowInternet()
         );
