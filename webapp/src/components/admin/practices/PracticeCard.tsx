@@ -102,10 +102,7 @@ export function PracticeCard({
 				)}
 
 				<div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2">
-					<FileText
-						className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5"
-						aria-hidden="true"
-					/>
+					<FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" aria-hidden="true" />
 					<p className="text-sm text-muted-foreground line-clamp-3 whitespace-pre-line">
 						{practice.criteria}
 					</p>

@@ -379,8 +379,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                         objectMapper.createArrayNode().add(objectMapper.createObjectNode().put("path", path))
                     ),
                 null,
-                null
-            , List.of());
+                null,
+                List.of()
+            );
         }
     }
 

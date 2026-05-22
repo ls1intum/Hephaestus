@@ -13,4 +13,7 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.mentor.agent")
-public record MentorAgentProperties(@DefaultValue("100000") @Min(1) int maxPromptChars, @DefaultValue("") String baseUrl) {}
+public record MentorAgentProperties(
+    @DefaultValue("100000") @Min(1) int maxPromptChars,
+    @DefaultValue("") String baseUrl
+) {}

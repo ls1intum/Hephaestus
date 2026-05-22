@@ -453,7 +453,12 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     @DisplayName("Per-finding suggestedDiffNotes parsing")
     class PerFindingSuggestedDiffNotes {
 
-        private ObjectNode findingWithSuggestedNotes(String slug, String verdict, String severity, ObjectNode... notes) {
+        private ObjectNode findingWithSuggestedNotes(
+            String slug,
+            String verdict,
+            String severity,
+            ObjectNode... notes
+        ) {
             ObjectNode finding = objectMapper.createObjectNode();
             finding.put("practiceSlug", slug);
             finding.put("title", "Issue found");
@@ -530,7 +535,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validFindings()).hasSize(1);
             assertThat(result.validFindings().get(0).suggestedDiffNotes()).hasSize(1);
-            assertThat(result.validFindings().get(0).suggestedDiffNotes().get(0).filePath()).isEqualTo("src/Valid.java");
+            assertThat(result.validFindings().get(0).suggestedDiffNotes().get(0).filePath()).isEqualTo(
+                "src/Valid.java"
+            );
         }
 
         @Test

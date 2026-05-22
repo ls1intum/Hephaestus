@@ -688,14 +688,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn400ForSlugTooShort() {
             ensureAdminMembership(workspace);
 
-            var request = new CreatePracticeRequestDTO(
-                "ab",
-                "Name",
-                null,
-                List.of("PullRequestCreated"),
-                null,
-                null
-            );
+            var request = new CreatePracticeRequestDTO("ab", "Name", null, List.of("PullRequestCreated"), null, null);
 
             webTestClient
                 .post()

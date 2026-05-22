@@ -121,8 +121,9 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
                 0.9f,
                 evidence,
                 "reasoning",
-                "guidance"
-            , List.of());
+                "guidance",
+                List.of()
+            );
         }
 
         private PracticeDetectionResultParser.ValidatedFinding makeFindingNoEvidence(String slug) {
@@ -134,8 +135,9 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
                 0.9f,
                 null,
                 "reasoning",
-                "guidance"
-            , List.of());
+                "guidance",
+                List.of()
+            );
         }
 
         @Test

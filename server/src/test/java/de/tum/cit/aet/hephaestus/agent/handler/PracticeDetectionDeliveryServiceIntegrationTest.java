@@ -287,8 +287,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                         0.8f,
                         null,
                         null,
-                        null
-                    , List.of())
+                        null,
+                        List.of()
+                    )
                 );
             }
 
