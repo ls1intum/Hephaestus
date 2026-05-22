@@ -1,0 +1,45 @@
+# Worker profile overlay — SPRING_PROFILES_ACTIVE=prod,worker.
+spring:
+    config:
+        activate:
+            on-profile: worker
+
+    main:
+        web-application-type: servlet
+
+    liquibase:
+        enabled: false
+    jpa:
+        hibernate:
+            ddl-auto: none
+    lifecycle:
+        timeout-per-shutdown-phase: 6m
+
+server:
+    # -1 disables the application HTTP connector; actuator stays on management.server.port.
+    port: -1
+
+hephaestus:
+    runtime:
+        server:
+            enabled: false
+        webhook:
+            enabled: false
+        worker:
+            enabled: true
+
+    sync:
+        nats:
+            enabled: false
+    agent:
+        nats:
+            enabled: true
+
+    worker:
+        control:
+            endpoint: ${HEPHAESTUS_HUB_URL:}
+            registration-token: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:}
+        # BYO LLM credentials override the app-pod proxy when both fields are set.
+        llm:
+            base-url: ${HEPHAESTUS_LLM_BASE_URL:}
+            api-key: ${HEPHAESTUS_LLM_API_KEY:}

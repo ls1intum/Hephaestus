@@ -141,11 +141,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
             false
         );
 
-        // Build a real AgentJob instead of a mock
         job = new AgentJob();
-        job.prePersist(); // generate ID + token
-        // Override the random ID with our test ID via reflection-free approach:
-        // We use the mock for findByIdQueuedForUpdateSkipLocked which returns our job
+        job.prePersist();
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setConfig(config);
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
@@ -171,9 +168,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             .when(transactionTemplate)
             .executeWithoutResult(any());
 
-        // The production code creates a read-only TransactionTemplate from
-        // transactionTemplate.getTransactionManager() — stub it so the real
-        // TransactionTemplate.execute() works on the readOnlyTx.
+        // readOnlyTx in prepareAndExecute is built from getTransactionManager(); stub the bridge.
         lenient().when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
     }
@@ -228,7 +223,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.executeJob(msg);
 
-            // The real job object should have RUNNING status set during claim
             verify(jobRepository).save(any(AgentJob.class));
         }
     }
@@ -248,7 +242,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             setupFullExecution();
 
-            // For the complete phase
             AgentJob freshJob = new AgentJob();
             freshJob.prePersist();
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
@@ -407,7 +400,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.executeJob(msg);
 
-            // Bug fix: only transition from RUNNING, not QUEUED
             verify(jobRepository).transitionStatus(
                 any(),
                 eq(AgentJobStatus.FAILED),

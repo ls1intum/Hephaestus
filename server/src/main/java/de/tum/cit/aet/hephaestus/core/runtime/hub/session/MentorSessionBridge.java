@@ -22,12 +22,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.JsonNode;
 
 /**
- * SSE ↔ WSS bridge for browser-facing mentor sessions. Picks the first worker with
- * {@code spareMentor > 0}; least-loaded selection is owned by the dispatcher epic (#1100).
+ * SSE ↔ WSS bridge for browser-facing mentor sessions. First-fit worker selection (least-loaded
+ * is dispatcher-owned).
  *
  * <p>Implements {@link HubSessionInbox} so the WSS handler can forward worker-originated
- * {@link SessionOutput} / {@link SessionClose} frames into here without knowing about the SSE
- * layer.
+ * {@link SessionOutput} / {@link SessionClose} frames in without knowing about the SSE layer.
  *
  * <p>Race condition (intentional MVP): two near-simultaneous opens may pick the same worker
  * with {@code spareMentor=1}; the second open arrives as {@code SessionOpen} on the worker

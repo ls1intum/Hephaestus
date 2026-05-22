@@ -112,10 +112,7 @@ public class MentorSessionRunner {
             log.warn("Mentor session {} received non-JSON input; dropping", input.sessionId());
             return;
         }
-        // Per-session serialization: the JDK WebSocket guarantees onText is single-threaded per
-        // connection, but the dispatcher may have outstanding work and {@link SessionInput} frames
-        // for different sessions interleave freely. Serialise per-session so a fast client can't
-        // outpace its sandbox stdin.
+        // Serialise per-session: SessionInput frames for different sessions interleave freely.
         synchronized (session.inputLock) {
             try {
                 sandbox.send(payload);
@@ -172,8 +169,7 @@ public class MentorSessionRunner {
             failOpen(session);
             return;
         }
-        // Assign the subscription FIRST so a synchronous emission from subscribeFromNow can't
-        // race the teardown path's `subscription != null` check and leak the disposable.
+        // Assign the sandbox before subscribing: a synchronous emission must see session.sandbox.
         session.sandbox = sandbox;
         Disposable subscription = sandbox.subscribeFromNow(frame -> publishOutput(session.sessionId, frame));
         session.subscription = subscription;
@@ -235,11 +231,7 @@ public class MentorSessionRunner {
 
     private void teardown(RunningSession session, SessionCloseReason reason) {
         if (session.subscription != null) {
-            try {
-                session.subscription.dispose();
-            } catch (RuntimeException ignored) {
-                // Disposable contract: idempotent; transient errors here don't change outcome.
-            }
+            session.subscription.dispose();
         }
         if (session.sandbox != null) {
             try {

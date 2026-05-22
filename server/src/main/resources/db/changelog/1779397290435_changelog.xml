@@ -1,0 +1,26 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet author="FelixTJDietrich" id="1779397290435-1">
+        <comment>Worker JWT revocation list (ADR 0009).</comment>
+        <createTable tableName="worker_token_denylist">
+            <column name="jti" type="varchar(64)">
+                <constraints primaryKey="true" primaryKeyName="pk_worker_token_denylist" nullable="false"/>
+            </column>
+            <column name="revoked_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="worker_token_denylist" indexName="ix_worker_token_denylist_expires_at">
+            <column name="expires_at"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

@@ -100,6 +100,27 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses
     );
 
+    /**
+     * Conditional transition to {@link AgentJobStatus#CANCELLED} that also records the
+     * cancellation reason. Used by the worker drain coordinator and explicit user-cancel paths.
+     *
+     * @return number of rows updated (0 or 1)
+     */
+    @WorkspaceAgnostic("ID-based cancel; job ID from worker-local drain or user-scoped admin call")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.CANCELLED, " +
+            "j.completedAt = :now, j.errorMessage = :error, j.cancellationReason = :reason " +
+            "WHERE j.id = :id AND j.status IN :fromStatuses"
+    )
+    int transitionToCancelled(
+        @Param("id") UUID id,
+        @Param("now") Instant now,
+        @Param("error") String error,
+        @Param("reason") AgentJobCancellationReason reason,
+        @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses
+    );
+
     /** Zombie sweeper: find QUEUED jobs older than cutoff (never picked up by NATS consumer). */
     @WorkspaceAgnostic("Cross-workspace zombie recovery; caller is @WorkspaceAgnostic sweeper")
     @Query("SELECT j FROM AgentJob j WHERE j.status = 'QUEUED' AND j.createdAt < :cutoff")

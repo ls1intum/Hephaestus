@@ -54,6 +54,14 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         "de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService",
         RuntimeRole.SERVER_PROPERTY,
         "de.tum.cit.aet.hephaestus.workspace.WorkspaceStartupListener",
+        RuntimeRole.SERVER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerConfiguration",
+        RuntimeRole.WORKER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration",
+        RuntimeRole.SERVER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
+        RuntimeRole.SERVER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.core.runtime.hub.session.BridgedMentorController",
         RuntimeRole.SERVER_PROPERTY
     );
 

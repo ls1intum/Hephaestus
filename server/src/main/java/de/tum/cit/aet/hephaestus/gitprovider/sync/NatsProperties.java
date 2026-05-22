@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.gitprovider.sync;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.time.Duration;
@@ -59,24 +58,15 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "hephaestus.sync.nats")
 public record NatsProperties(
     @DefaultValue("false") boolean enabled,
-    @NotBlank(message = "NATS server URL must not be blank when NATS is enabled") String server,
+    @Nullable String server,
     @Nullable String durableConsumerName,
     @DefaultValue("7") @Positive(message = "Replay timeframe must be positive") int replayTimeframeDays,
     @Valid Consumer consumer
 ) {
-    /**
-     * Compact constructor that applies default values for null parameters.
-     *
-     * <p>This ensures that configuration binding works correctly even when
-     * optional properties are not specified in the configuration file.
-     *
-     * @param enabled whether NATS integration is enabled
-     * @param server the NATS server URL
-     * @param durableConsumerName the durable consumer name (nullable)
-     * @param replayTimeframeDays the replay timeframe in days
-     * @param consumer the consumer configuration
-     */
     public NatsProperties {
+        if (enabled && (server == null || server.isBlank())) {
+            throw new IllegalStateException("hephaestus.sync.nats.server must be set when enabled=true");
+        }
         if (consumer == null) {
             consumer = new Consumer(
                 Duration.ofMinutes(5),

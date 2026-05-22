@@ -9,16 +9,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.lang.Nullable;
 
 /**
- * Bound to {@code hephaestus.worker.*}. Mirrors the nested-record shape of
- * {@link de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties}.
- *
- * <p>{@code capacity.reviewMax} / {@code capacity.mentorMax} accept either an integer string or
- * the literal {@code "auto"}, resolved at runtime against {@link Runtime#availableProcessors()}.
- * Resolution lives on {@link Capacity} so it stays a pure record-to-int derivation independent
- * of Spring lifecycle.
- *
- * <p>{@code control.registrationToken} is logged at {@code <redacted>} via the overridden
- * {@link #toString()} to keep accidental {@code log.info("config: {}", props)} from leaking it.
+ * Bound to {@code hephaestus.worker.*}. {@code capacity.{review,mentor}Max} accept an integer or
+ * the literal {@code "auto"}; resolution lives on {@link Capacity}. {@code toString()} redacts
+ * the registration token.
  */
 @ConfigurationProperties(prefix = "hephaestus.worker")
 public record WorkerProperties(
@@ -29,13 +22,11 @@ public record WorkerProperties(
     @DefaultValue Control control,
     @DefaultValue Llm llm
 ) {
-    /** Literal that triggers auto-derivation from {@link Runtime#availableProcessors()}. */
     public static final String AUTO = "auto";
 
     /**
-     * @return the configured worker id, or the OS hostname when unset. Hostname is the
-     *     compose-/K8s-injected pod identity, so replicas don't cannibalise each other in
-     *     {@code WorkerSessionRegistry} (which evicts on workerId collision).
+     * @return the configured worker id, or the container hostname when unset (so compose/K8s
+     *     replicas don't collide in {@code WorkerSessionRegistry}).
      */
     public String resolvedWorkerId() {
         if (workerId != null && !workerId.isBlank()) {
@@ -66,11 +57,9 @@ public record WorkerProperties(
     }
 
     /**
-     * BYO / worker-pod LLM credentials. When both fields are set, {@link
-     * de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor} switches the per-job credential mode
-     * to {@code API_KEY} and points the agent at {@link #baseUrl()} directly — bypassing the
-     * app-pod's bundled LLM proxy (which doesn't exist on a worker host). This dilutes ADR 0006
-     * by one secret per worker pod; mitigate with secrets-manager + short rotation TTL.
+     * BYO LLM credentials. When both fields are set, {@code AgentJobExecutor} overrides the
+     * per-job credential mode to {@code API_KEY} so agent-pi reaches the operator's LLM
+     * directly (the app-pod's bundled proxy is not reachable from a separate host).
      */
     public record Llm(@Nullable String baseUrl, @Nullable String apiKey) {
         public boolean isConfigured() {
@@ -79,12 +68,10 @@ public record WorkerProperties(
     }
 
     public record Capacity(@DefaultValue("auto") String reviewMax, @DefaultValue("auto") String mentorMax) {
-        /** @return resolved review-max; {@code "auto"} → {@code max(1, cpu - 1)}. */
         public int resolveReviewMax() {
             return resolve(reviewMax, Math.max(1, Runtime.getRuntime().availableProcessors() - 1));
         }
 
-        /** @return resolved mentor-max; {@code "auto"} → {@code max(1, cpu / 2)}. */
         public int resolveMentorMax() {
             return resolve(mentorMax, Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
         }

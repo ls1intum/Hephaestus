@@ -40,24 +40,10 @@ import org.springframework.context.event.EventListener;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * WSS control-channel client. Dials {@code hephaestus.worker.control.endpoint}, exchanges the
- * registration token for a JWT via {@code POST /api/workers/exchange}, and maintains a single
- * outbound JDK {@link WebSocket} connection through a state machine with exponential backoff.
- *
- * <p>Threading model — two dedicated platform threads:
- * <ul>
- *   <li><b>Outbound drain</b>: pulls from {@link #outbound} and calls
- *       {@code WebSocket.sendText}. Platform thread on purpose — JDK WebSocket callbacks pin
- *       virtual-thread carriers; we don't want the reporter or drain coordinator to OOM the
- *       carrier pool.</li>
- *   <li><b>Inbound dispatch</b>: pulls parsed {@link WorkerControlFrame}s from
- *       {@link #inbound} (queued by the {@link WebSocket.Listener#onText} callback) and
- *       executes the sealed-switch handler.</li>
- * </ul>
- * Both queues are size-bounded to keep a misbehaving hub from triggering an OOM.
- *
- * <p>Implements {@link WorkerControlPublisher}: substrate beans depend on the interface,
- * not on this class.
+ * WSS control-channel client. Single outbound JDK {@link WebSocket} with exponential backoff and
+ * silence-deadline reconnect. Two platform threads — outbound drain + inbound dispatch — so JDK
+ * WebSocket callbacks (which pin virtual-thread carriers) don't OOM the carrier pool. Both
+ * queues are bounded.
  */
 public class WorkerControlClient implements WorkerControlPublisher {
 
@@ -69,7 +55,6 @@ public class WorkerControlClient implements WorkerControlPublisher {
 
     private final WorkerProperties properties;
     private final FrameCodec codec;
-    // dispatcher accessed via dispatcherProvider.getObject() to break the bean cycle.
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final Counter framesSent;
@@ -94,8 +79,7 @@ public class WorkerControlClient implements WorkerControlPublisher {
     public WorkerControlClient(
         WorkerProperties properties,
         FrameCodec codec,
-        // Lazy via ObjectProvider: WorkerSessionDispatcher → MentorSessionRunner →
-        // WorkerControlPublisher (= this client) is a real cycle; we resolve on demand.
+        // ObjectProvider breaks a real cycle: dispatcher → MentorSessionRunner → publisher (= this).
         ObjectProvider<WorkerSessionDispatcher> dispatcherProvider,
         ObjectMapper objectMapper,
         MeterRegistry meterRegistry
