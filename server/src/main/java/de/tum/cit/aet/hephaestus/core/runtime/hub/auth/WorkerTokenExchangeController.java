@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub.auth;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import java.security.MessageDigest;
@@ -28,8 +29,11 @@ public class WorkerTokenExchangeController {
     private static final Logger log = LoggerFactory.getLogger(WorkerTokenExchangeController.class);
     private static final int MAX_FAILURES_PER_IP_PER_MINUTE = 10;
 
+    private static final String AUDIT_METRIC = "worker.token.exchange";
+
     private final WorkerJwtIssuer issuer;
     private final WorkerTokenProperties properties;
+    private final MeterRegistry meterRegistry;
     /**
      * Per-source-IP failure counter: caps brute-force attempts at {@value MAX_FAILURES_PER_IP_PER_MINUTE}
      * per minute. The registration token is high-entropy enough to make exhaustive search
@@ -40,34 +44,40 @@ public class WorkerTokenExchangeController {
         .maximumSize(10_000)
         .build();
 
-    public WorkerTokenExchangeController(WorkerJwtIssuer issuer, WorkerTokenProperties properties) {
+    public WorkerTokenExchangeController(WorkerJwtIssuer issuer, WorkerTokenProperties properties, MeterRegistry meterRegistry) {
         this.issuer = issuer;
         this.properties = properties;
+        this.meterRegistry = meterRegistry;
     }
 
     @PostMapping("/exchange")
     public ResponseEntity<?> exchange(@RequestBody ExchangeRequest request, HttpServletRequest http) {
         if (!properties.isExchangeEnabled()) {
             log.warn("worker token exchange attempted but no registration token is configured");
+            meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "disabled").increment();
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
         String sourceIp = http.getRemoteAddr();
         AtomicInteger failures = failuresByIp.get(sourceIp, k -> new AtomicInteger(0));
         if (failures.get() >= MAX_FAILURES_PER_IP_PER_MINUTE) {
             log.warn("worker token exchange throttled: too many failures from sourceIp={}", sourceIp);
+            meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "throttled").increment();
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
         }
         if (request == null || request.workerId() == null || request.workerId().isBlank()) {
             failures.incrementAndGet();
+            meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "bad-payload").increment();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
         if (!constantTimeEquals(request.registrationToken(), properties.registrationToken())) {
             failures.incrementAndGet();
             log.warn("worker token exchange rejected: bad registration token for workerId={} sourceIp={}",
                 request.workerId(), sourceIp);
+            meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "bad-token").increment();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         WorkerJwtIssuer.IssuedWorkerJwt issued = issuer.issue(request.workerId().trim());
+        meterRegistry.counter(AUDIT_METRIC, "outcome", "success").increment();
         return ResponseEntity.ok(new ExchangeResponse(issued.token(), issued.expiresAt()));
     }
 

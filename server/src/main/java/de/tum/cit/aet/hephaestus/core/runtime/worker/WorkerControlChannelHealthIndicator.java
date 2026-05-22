@@ -6,8 +6,8 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 
 /**
- * {@code DOWN} on disconnect OR when inbound silence exceeds {@code 2 × heartbeat.interval}
- * (catches silent stalls where TCP is up but no frames arrive).
+ * {@code DOWN} on disconnect OR when inbound silence exceeds {@code 3 × heartbeat.interval}
+ * (matches the silence threshold {@link WorkerControlClient} uses to trigger a reconnect).
  */
 public class WorkerControlChannelHealthIndicator implements HealthIndicator {
 
@@ -16,7 +16,7 @@ public class WorkerControlChannelHealthIndicator implements HealthIndicator {
 
     public WorkerControlChannelHealthIndicator(WorkerControlPublisher publisher, WorkerProperties properties) {
         this.publisher = publisher;
-        this.silenceThreshold = properties.heartbeat().interval().multipliedBy(2);
+        this.silenceThreshold = properties.heartbeat().interval().multipliedBy(3);
     }
 
     @Override

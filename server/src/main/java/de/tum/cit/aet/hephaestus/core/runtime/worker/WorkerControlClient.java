@@ -332,6 +332,9 @@ public class WorkerControlClient implements WorkerControlPublisher {
                 .buildAsync(endpoint, new Listener())
                 .get(properties.control().handshakeTimeout().toSeconds(), TimeUnit.SECONDS);
             webSocket.set(ws);
+            // Prime lastInboundAt so the silence-deadline check in runConnectionLoop doesn't
+            // immediately trip on a freshly-opened socket (lastInboundAt starts at Instant.EPOCH).
+            lastInboundAt.set(Instant.now());
             // Send WorkerHello immediately; connected flag flips on WorkerWelcome.
             String workerId = properties.resolvedWorkerId();
             FrameEnvelope hello = FrameEnvelope.of(

@@ -12,7 +12,9 @@ public record HubProperties(
     /** Per-session outbound buffer cap; a slow worker beyond this gets closed with code 1011. */
     @DefaultValue("8388608") int sendBufferSizeBytes,
     /** Max time a single send call may block before the decorator gives up and closes. */
-    @DefaultValue("10s") Duration sendTimeLimit
+    @DefaultValue("10s") Duration sendTimeLimit,
+    /** Max delay from WSS upgrade to first {@code WorkerHello}; missing it closes the session. */
+    @DefaultValue("10s") Duration helloTimeout
 ) {
     public HubProperties {
         if (path == null || path.isBlank()) {
@@ -30,6 +32,9 @@ public record HubProperties(
         }
         if (sendTimeLimit == null || sendTimeLimit.isZero() || sendTimeLimit.isNegative()) {
             throw new IllegalArgumentException("hub.sendTimeLimit must be positive, got: " + sendTimeLimit);
+        }
+        if (helloTimeout == null || helloTimeout.isZero() || helloTimeout.isNegative()) {
+            throw new IllegalArgumentException("hub.helloTimeout must be positive, got: " + helloTimeout);
         }
     }
 }

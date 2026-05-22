@@ -43,7 +43,7 @@ class WorkerJwtTest extends BaseUnitTest {
         issuer = new WorkerJwtIssuer(keyRing, properties);
         denylist = mock(WorkerTokenDenylist.class);
         lenient().when(denylist.isRevoked(org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
-        verifier = new JavaJwtWorkerJwtVerifier(keyRing, properties, denylist);
+        verifier = new JavaJwtWorkerJwtVerifier(keyRing, properties, denylist, new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
     }
 
     @Test
@@ -117,7 +117,7 @@ class WorkerJwtTest extends BaseUnitTest {
             issuerName, "hephaestus-worker", Duration.ofMinutes(15), "register", List.of(toEntry(keyA), toEntry(keyB)), "kid-B", null
         );
         WorkerJwtVerifier verifierAfter = new JavaJwtWorkerJwtVerifier(
-            WorkerKeyRing.fromConfig(propsAfter), propsAfter, denylist
+            WorkerKeyRing.fromConfig(propsAfter), propsAfter, denylist, new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
         );
         String tokenSignedByB = new WorkerJwtIssuer(WorkerKeyRing.fromConfig(propsAfter), propsAfter)
             .issue("worker-2").token();
@@ -129,7 +129,7 @@ class WorkerJwtTest extends BaseUnitTest {
             issuerName, "hephaestus-worker", Duration.ofMinutes(15), "register", List.of(toEntry(keyB)), "kid-B", null
         );
         WorkerJwtVerifier verifierDropA = new JavaJwtWorkerJwtVerifier(
-            WorkerKeyRing.fromConfig(propsDropA), propsDropA, denylist
+            WorkerKeyRing.fromConfig(propsDropA), propsDropA, denylist, new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
         );
         assertThatThrownBy(() -> verifierDropA.verify(tokenSignedByA))
             .isInstanceOf(WorkerJwtInvalidException.class)

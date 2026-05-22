@@ -62,9 +62,10 @@ public class HubConfiguration {
     WorkerJwtVerifier workerJwtVerifier(
         WorkerKeyRing keyRing,
         WorkerTokenProperties properties,
-        WorkerTokenDenylist denylist
+        WorkerTokenDenylist denylist,
+        MeterRegistry meterRegistry
     ) {
-        return new JavaJwtWorkerJwtVerifier(keyRing, properties, denylist);
+        return new JavaJwtWorkerJwtVerifier(keyRing, properties, denylist, meterRegistry);
     }
 
     @Bean
@@ -103,12 +104,13 @@ public class HubConfiguration {
     }
 
     /**
-     * The bridge implements {@link HubSessionInbox} directly — Spring picks it up under both
-     * the concrete type (consumed by controllers that need {@code open()}/{@code sendInput()})
-     * and the interface (consumed by {@link WorkerControlWebSocketHandler} for forwarding
-     * worker-originated SessionOutput/Close frames). No second alias bean needed.
+     * Bridge wires only when explicitly enabled. The worker-side mentor frames flow through the
+     * WSS handler even when the bridge is absent — sessions just have no inbox so SessionOutput
+     * frames are silently dropped (acceptable for boot-without-bridge monolith mode). The bridge
+     * implements {@link HubSessionInbox} so the handler picks it up under both types.
      */
     @Bean
+    @ConditionalOnProperty(name = "hephaestus.worker.hub.bridge.enabled", havingValue = "true")
     MentorSessionBridge mentorSessionBridge(
         WorkerSessionRegistry workerRegistry,
         HubSessionRegistry sessionRegistry,

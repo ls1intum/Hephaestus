@@ -23,23 +23,21 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Bridged mentor SSE — routes a browser session through {@link MentorSessionBridge} to a WSS-
- * connected worker instead of running the sandbox in-process. The existing in-process
- * {@code /mentor/chat} controller stays untouched: this is an additive endpoint for split-pod
- * (BYO) deployments.
+ * Bridged mentor SSE → WSS-connected worker. Browser POSTs an {@code OpenSessionRequest}; the
+ * response is an SSE stream of {@code SessionOutput} payloads. Subsequent input chunks go to
+ * {@code POST {sessionId}/input}; explicit close uses {@code DELETE {sessionId}}.
  *
- * <p>The browser POSTs a {@link OpenSessionRequest} body; the response is an SSE stream that
- * carries {@link de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOutput} payloads
- * as events. Subsequent input chunks go to {@code POST {sessionId}/input}; explicit close uses
- * {@code DELETE {sessionId}}.
- *
- * <p>Auth: gated by Spring Security at the {@code @PreAuthorize} layer; the registration-token
- * → JWT path is for the worker→hub direction only.
+ * <p><strong>Default-off in this PR.</strong> The endpoint forwards a user-supplied
+ * {@code context} verbatim to the worker, which uses it to choose the sandbox image / command /
+ * env. Until the hub builds a server-side context from a verified workspace membership + image
+ * allowlist, this surface is privilege-escalation territory and must be explicitly opted in via
+ * {@code hephaestus.worker.hub.bridge.enabled=true}.
  */
 @RestController
 @RequestMapping("/api/mentor/bridge")
-@Tag(name = "Mentor Bridge", description = "WSS-bridged mentor chat (opt-in; split-pod / BYO deployments)")
+@Tag(name = "Mentor Bridge", description = "WSS-bridged mentor chat (opt-in)")
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.worker.hub.bridge.enabled", havingValue = "true")
 @Hidden
 public class BridgedMentorController {
 

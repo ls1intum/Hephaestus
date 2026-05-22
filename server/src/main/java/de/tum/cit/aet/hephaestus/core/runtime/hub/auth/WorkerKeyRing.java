@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +65,6 @@ public final class WorkerKeyRing {
      * </ul>
      */
     public static WorkerKeyRing fromConfig(WorkerTokenProperties properties) {
-        Objects.requireNonNull(properties, "properties");
         List<WorkerTokenProperties.KeyEntry> entries = properties.keys() == null ? List.of() : properties.keys();
 
         if (!entries.isEmpty()) {

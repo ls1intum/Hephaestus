@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameEnvelope;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
@@ -28,6 +29,7 @@ public final class WorkerSession {
     private final Object sendLock = new Object();
     private final AtomicReference<CapacityReport> lastCapacity = new AtomicReference<>();
     private final AtomicBoolean forceReconnectSent = new AtomicBoolean(false);
+    private final AtomicReference<ScheduledFuture<?>> helloDeadline = new AtomicReference<>();
     private volatile Instant lastInboundAt;
 
     public WorkerSession(
@@ -88,6 +90,17 @@ public final class WorkerSession {
     /** @return {@code true} the first time it's called per session; subsequent calls return {@code false}. */
     boolean markForceReconnectSent() {
         return forceReconnectSent.compareAndSet(false, true);
+    }
+
+    void armHelloDeadline(ScheduledFuture<?> future) {
+        helloDeadline.set(future);
+    }
+
+    void cancelHelloDeadline() {
+        ScheduledFuture<?> f = helloDeadline.getAndSet(null);
+        if (f != null) {
+            f.cancel(false);
+        }
     }
 
     public boolean send(WorkerControlFrame frame) {

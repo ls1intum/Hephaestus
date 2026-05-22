@@ -22,6 +22,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.socket.CloseStatus;
@@ -41,6 +46,11 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
     private final HubProperties hubProperties;
     private final Optional<HubSessionInbox> sessionInbox;
     private final MeterRegistry meterRegistry;
+    private final ScheduledExecutorService helloTimeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "worker-hub-hello-timeout");
+        t.setDaemon(true);
+        return t;
+    });
 
     public WorkerControlWebSocketHandler(
         WorkerSessionRegistry registry,
@@ -76,7 +86,20 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
         String sessionId = UUID.randomUUID().toString();
         WorkerSession session = new WorkerSession(jwt.workerId(), sessionId, jwt.jti(), jwt.expiresAt(), transport, codec);
         rawTransport.getAttributes().put(ATTR_WORKER_SESSION, session);
+        // Close half-open sessions that authenticate but never send WorkerHello.
+        ScheduledFuture<?> helloDeadline = helloTimeoutScheduler.schedule(() -> {
+            if (!rawTransport.isOpen()) return;
+            log.warn("WorkerHello timeout for workerId={} sessionId={}; closing.", jwt.workerId(), sessionId);
+            meterRegistry.counter("worker.hub.hello.timeout").increment();
+            close(rawTransport, CloseStatus.SESSION_NOT_RELIABLE);
+        }, hubProperties.helloTimeout().toMillis(), TimeUnit.MILLISECONDS);
+        session.armHelloDeadline(helloDeadline);
         log.info("WSS connection opened: workerId={}, sessionId={}, jwtExpiresAt={}", jwt.workerId(), sessionId, jwt.expiresAt());
+    }
+
+    @PreDestroy
+    void shutdown() {
+        helloTimeoutScheduler.shutdownNow();
     }
 
     @Override
@@ -141,6 +164,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void handleHello(WorkerSession session, WorkerHello hello) {
+        session.cancelHelloDeadline();
         if (!hello.workerId().equals(session.workerId())) {
             log.warn(
                 "WorkerHello workerId={} does not match JWT subject {}; closing",

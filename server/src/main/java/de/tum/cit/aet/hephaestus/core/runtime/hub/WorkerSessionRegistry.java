@@ -133,9 +133,9 @@ public class WorkerSessionRegistry implements SmartLifecycle {
 
     @Override
     public int getPhase() {
-        // Stop BEFORE the embedded web server so SmartLifecycle drives the WS close, not Tomcat's
-        // SIGTERM-after-grace path. WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE is
-        // Integer.MAX_VALUE - 1024; we use one less to win the ordering.
-        return WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE - 1;
+        // SmartLifecycle stops in DESCENDING phase order — higher phase stops first. A phase
+        // greater than WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE makes the WS
+        // registry drain BEFORE the embedded server stops accepting traffic.
+        return WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE + 1;
     }
 }
