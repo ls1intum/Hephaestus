@@ -43,18 +43,20 @@ class WorkerSessionRegistryTest extends BaseUnitTest {
         // Order: connected(first) → disconnected(first, "duplicate-evicted") → connected(second)
         assertThat(captor.getAllValues()).hasSize(3);
         assertThat(captor.getAllValues().get(0)).isInstanceOf(WorkerConnectedEvent.class);
-        assertThat(captor.getAllValues().get(1))
-            .isInstanceOfSatisfying(WorkerDisconnectedEvent.class, e -> {
-                assertThat(e.reason()).isEqualTo("duplicate-evicted");
-                assertThat(e.sessionId()).isEqualTo("session-1");
-            });
+        assertThat(captor.getAllValues().get(1)).isInstanceOfSatisfying(WorkerDisconnectedEvent.class, e -> {
+            assertThat(e.reason()).isEqualTo("duplicate-evicted");
+            assertThat(e.sessionId()).isEqualTo("session-1");
+        });
         assertThat(captor.getAllValues().get(2)).isInstanceOf(WorkerConnectedEvent.class);
     }
 
     @Test
     void unregisterIsIdentityGated() {
         // Guards against a stale handler removing a fresh session installed by a reconnect.
-        WorkerSessionRegistry registry = new WorkerSessionRegistry(mock(ApplicationEventPublisher.class), new SimpleMeterRegistry());
+        WorkerSessionRegistry registry = new WorkerSessionRegistry(
+            mock(ApplicationEventPublisher.class),
+            new SimpleMeterRegistry()
+        );
         WorkerSession first = newSession("worker-1", "session-1");
         registry.register(first);
         WorkerSession second = newSession("worker-1", "session-2");
@@ -64,7 +66,14 @@ class WorkerSessionRegistryTest extends BaseUnitTest {
     }
 
     private WorkerSession sessionFor(String workerId, String sessionId, WebSocketSession transport) {
-        return new WorkerSession(workerId, sessionId, "jti-" + sessionId, Instant.now().plusSeconds(3600), transport, codec);
+        return new WorkerSession(
+            workerId,
+            sessionId,
+            "jti-" + sessionId,
+            Instant.now().plusSeconds(3600),
+            transport,
+            codec
+        );
     }
 
     private WebSocketSession newTransport() {

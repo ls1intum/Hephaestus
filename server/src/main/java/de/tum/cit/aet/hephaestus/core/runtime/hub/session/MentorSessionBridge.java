@@ -143,9 +143,8 @@ public class MentorSessionBridge implements HubSessionInbox {
         sessionRegistry
             .remove(close.sessionId())
             .ifPresent(state -> {
-                Throwable error = close.reason() == SessionCloseReason.ERROR
-                    ? new IOException("worker session error")
-                    : null;
+                Throwable error =
+                    close.reason() == SessionCloseReason.ERROR ? new IOException("worker session error") : null;
                 completeEmitter(state.emitter(), error);
             });
     }

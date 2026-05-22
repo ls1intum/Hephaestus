@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerHello;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerWelcome;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,13 +27,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
-import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
@@ -84,17 +84,33 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
             hubProperties.sendBufferSizeBytes()
         );
         String sessionId = UUID.randomUUID().toString();
-        WorkerSession session = new WorkerSession(jwt.workerId(), sessionId, jwt.jti(), jwt.expiresAt(), transport, codec);
+        WorkerSession session = new WorkerSession(
+            jwt.workerId(),
+            sessionId,
+            jwt.jti(),
+            jwt.expiresAt(),
+            transport,
+            codec
+        );
         rawTransport.getAttributes().put(ATTR_WORKER_SESSION, session);
         // Close half-open sessions that authenticate but never send WorkerHello.
-        ScheduledFuture<?> helloDeadline = helloTimeoutScheduler.schedule(() -> {
-            if (!rawTransport.isOpen()) return;
-            log.warn("WorkerHello timeout for workerId={} sessionId={}; closing.", jwt.workerId(), sessionId);
-            meterRegistry.counter("worker.hub.hello.timeout").increment();
-            close(rawTransport, CloseStatus.SESSION_NOT_RELIABLE);
-        }, hubProperties.helloTimeout().toMillis(), TimeUnit.MILLISECONDS);
+        ScheduledFuture<?> helloDeadline = helloTimeoutScheduler.schedule(
+            () -> {
+                if (!rawTransport.isOpen()) return;
+                log.warn("WorkerHello timeout for workerId={} sessionId={}; closing.", jwt.workerId(), sessionId);
+                meterRegistry.counter("worker.hub.hello.timeout").increment();
+                close(rawTransport, CloseStatus.SESSION_NOT_RELIABLE);
+            },
+            hubProperties.helloTimeout().toMillis(),
+            TimeUnit.MILLISECONDS
+        );
         session.armHelloDeadline(helloDeadline);
-        log.info("WSS connection opened: workerId={}, sessionId={}, jwtExpiresAt={}", jwt.workerId(), sessionId, jwt.expiresAt());
+        log.info(
+            "WSS connection opened: workerId={}, sessionId={}, jwtExpiresAt={}",
+            jwt.workerId(),
+            sessionId,
+            jwt.expiresAt()
+        );
     }
 
     @PreDestroy
@@ -134,7 +150,12 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
             maybeForceReconnect(session);
             return;
         } catch (RuntimeException e) {
-            log.error("Hub frame dispatch threw for workerId={}, frame={}", session.workerId(), frame.getClass().getSimpleName(), e);
+            log.error(
+                "Hub frame dispatch threw for workerId={}, frame={}",
+                session.workerId(),
+                frame.getClass().getSimpleName(),
+                e
+            );
             meterRegistry.counter("worker.hub.frame.dispatch.failed").increment();
         }
     }
@@ -159,8 +180,11 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void warnUnexpectedFrame(WorkerSession session, WorkerControlFrame frame) {
-        log.warn("Unexpected hub-bound frame {} from workerId={}",
-            frame.getClass().getSimpleName(), session.workerId());
+        log.warn(
+            "Unexpected hub-bound frame {} from workerId={}",
+            frame.getClass().getSimpleName(),
+            session.workerId()
+        );
     }
 
     private void handleHello(WorkerSession session, WorkerHello hello) {
@@ -206,7 +230,12 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
         WorkerSession session = (WorkerSession) transport.getAttributes().remove(ATTR_WORKER_SESSION);
         if (session != null) {
             registry.unregister(session, "ws-close:" + status.getCode());
-            log.info("WSS connection closed: workerId={}, sessionId={}, status={}", session.workerId(), session.sessionId(), status);
+            log.info(
+                "WSS connection closed: workerId={}, sessionId={}, status={}",
+                session.workerId(),
+                session.sessionId(),
+                status
+            );
         }
     }
 

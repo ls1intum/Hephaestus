@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.runtime.worker;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -11,8 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
-
-import jakarta.annotation.PreDestroy;
 
 /**
  * Periodic worker → hub capacity reporter. Cadence: {@code hephaestus.worker.heartbeat.interval}

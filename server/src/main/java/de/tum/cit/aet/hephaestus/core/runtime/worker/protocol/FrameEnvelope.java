@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.core.runtime.worker.protocol;
 import java.util.UUID;
 
 public record FrameEnvelope(int version, String frameId, WorkerControlFrame payload) {
-
     public static final int CURRENT_VERSION = 1;
 
     public FrameEnvelope {

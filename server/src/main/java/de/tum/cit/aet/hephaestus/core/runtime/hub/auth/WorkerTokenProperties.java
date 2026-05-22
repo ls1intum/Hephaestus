@@ -41,15 +41,20 @@ public record WorkerTokenProperties(
     @Override
     public String toString() {
         return (
-            "WorkerTokenProperties[issuer=" + issuer +
-                ", ttl=" + ttl +
-                ", registrationToken=" +
-                (registrationToken == null || registrationToken.isBlank() ? "<unset>" : "<redacted>") +
-                ", keys=" + (keys == null ? 0 : keys.size()) + " key(s)" +
-                ", activeKid=" + (activeKid == null ? "<unset>" : activeKid) +
-                ", signingKey=" +
-                (signingKey == null || signingKey.isBlank() ? "<unset>" : "<redacted>") +
-                "]"
+            "WorkerTokenProperties[issuer=" +
+            issuer +
+            ", ttl=" +
+            ttl +
+            ", registrationToken=" +
+            (registrationToken == null || registrationToken.isBlank() ? "<unset>" : "<redacted>") +
+            ", keys=" +
+            (keys == null ? 0 : keys.size()) +
+            " key(s)" +
+            ", activeKid=" +
+            (activeKid == null ? "<unset>" : activeKid) +
+            ", signingKey=" +
+            (signingKey == null || signingKey.isBlank() ? "<unset>" : "<redacted>") +
+            "]"
         );
     }
 

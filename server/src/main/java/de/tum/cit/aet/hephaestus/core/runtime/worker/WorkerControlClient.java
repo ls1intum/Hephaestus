@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.runtime.worker;
 
+import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameEnvelope;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.Heartbeat;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionClose;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionInput;
@@ -222,12 +222,17 @@ public class WorkerControlClient implements WorkerControlPublisher {
                         log.warn("Hub signalled draining — should not occur (server is never draining toward worker)");
                     }
                 }
-                case WorkerHello hello ->
-                    log.warn("Unexpected inbound WorkerHello from hub (worker is the source): workerId={}", hello.workerId());
-                case de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport report ->
-                    log.warn("Unexpected inbound CapacityReport from hub (worker is the source)");
-                case SessionOutput out ->
-                    log.warn("Unexpected inbound SessionOutput from hub (worker is the source): sessionId={}", out.sessionId());
+                case WorkerHello hello -> log.warn(
+                    "Unexpected inbound WorkerHello from hub (worker is the source): workerId={}",
+                    hello.workerId()
+                );
+                case de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport report -> log.warn(
+                    "Unexpected inbound CapacityReport from hub (worker is the source)"
+                );
+                case SessionOutput out -> log.warn(
+                    "Unexpected inbound SessionOutput from hub (worker is the source): sessionId={}",
+                    out.sessionId()
+                );
             }
         } catch (RuntimeException e) {
             log.error("Inbound dispatch threw for {}", frame.getClass().getSimpleName(), e);
@@ -273,7 +278,11 @@ public class WorkerControlClient implements WorkerControlPublisher {
                 if (failuresSinceSuccess <= 3) {
                     log.warn("Control-channel attempt failed: {} ({})", e.getClass().getSimpleName(), e.getMessage());
                 } else {
-                    log.debug("Control-channel attempt failed (suppressed; failures={}): {}", failuresSinceSuccess, e.getClass().getSimpleName());
+                    log.debug(
+                        "Control-channel attempt failed (suppressed; failures={}): {}",
+                        failuresSinceSuccess,
+                        e.getClass().getSimpleName()
+                    );
                 }
             }
             if (!running.get()) {
@@ -362,10 +371,7 @@ public class WorkerControlClient implements WorkerControlPublisher {
 
     private static String httpBaseFrom(URI wsUri) {
         String scheme = "wss".equalsIgnoreCase(wsUri.getScheme()) ? "https" : "http";
-        return scheme +
-            "://" +
-            wsUri.getHost() +
-            (wsUri.getPort() == -1 ? "" : ":" + wsUri.getPort());
+        return scheme + "://" + wsUri.getHost() + (wsUri.getPort() == -1 ? "" : ":" + wsUri.getPort());
     }
 
     private static Thread newDaemon(String name, Runnable r) {

@@ -62,9 +62,7 @@ public class BridgedMentorController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
         MentorSessionBridge.BridgeOpen open = result.get();
-        return ResponseEntity.ok()
-            .header("X-Mentor-Session-Id", open.sessionId())
-            .body(open.emitter());
+        return ResponseEntity.ok().header("X-Mentor-Session-Id", open.sessionId()).body(open.emitter());
     }
 
     @PostMapping(value = "/sessions/{sessionId}/input", consumes = MediaType.APPLICATION_JSON_VALUE)

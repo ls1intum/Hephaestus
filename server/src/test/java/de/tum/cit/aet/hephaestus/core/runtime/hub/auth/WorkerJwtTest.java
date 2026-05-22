@@ -43,7 +43,12 @@ class WorkerJwtTest extends BaseUnitTest {
         issuer = new WorkerJwtIssuer(keyRing, properties);
         denylist = mock(WorkerTokenDenylist.class);
         lenient().when(denylist.isRevoked(org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
-        verifier = new JavaJwtWorkerJwtVerifier(keyRing, properties, denylist, new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        verifier = new JavaJwtWorkerJwtVerifier(
+            keyRing,
+            properties,
+            denylist,
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
+        );
     }
 
     @Test
@@ -108,28 +113,54 @@ class WorkerJwtTest extends BaseUnitTest {
         WorkerSigningKey keyB = WorkerSigningKey.generateEphemeral("kid-B");
 
         WorkerTokenProperties propsBefore = new WorkerTokenProperties(
-            issuerName, "hephaestus-worker", Duration.ofMinutes(15), "register", List.of(toEntry(keyA)), "kid-A", null
+            issuerName,
+            "hephaestus-worker",
+            Duration.ofMinutes(15),
+            "register",
+            List.of(toEntry(keyA)),
+            "kid-A",
+            null
         );
         String tokenSignedByA = new WorkerJwtIssuer(WorkerKeyRing.fromConfig(propsBefore), propsBefore)
-            .issue("worker-1").token();
+            .issue("worker-1")
+            .token();
 
         WorkerTokenProperties propsAfter = new WorkerTokenProperties(
-            issuerName, "hephaestus-worker", Duration.ofMinutes(15), "register", List.of(toEntry(keyA), toEntry(keyB)), "kid-B", null
+            issuerName,
+            "hephaestus-worker",
+            Duration.ofMinutes(15),
+            "register",
+            List.of(toEntry(keyA), toEntry(keyB)),
+            "kid-B",
+            null
         );
         WorkerJwtVerifier verifierAfter = new JavaJwtWorkerJwtVerifier(
-            WorkerKeyRing.fromConfig(propsAfter), propsAfter, denylist, new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
+            WorkerKeyRing.fromConfig(propsAfter),
+            propsAfter,
+            denylist,
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
         );
         String tokenSignedByB = new WorkerJwtIssuer(WorkerKeyRing.fromConfig(propsAfter), propsAfter)
-            .issue("worker-2").token();
+            .issue("worker-2")
+            .token();
 
         assertThatNoException().isThrownBy(() -> verifierAfter.verify(tokenSignedByA));
         assertThatNoException().isThrownBy(() -> verifierAfter.verify(tokenSignedByB));
 
         WorkerTokenProperties propsDropA = new WorkerTokenProperties(
-            issuerName, "hephaestus-worker", Duration.ofMinutes(15), "register", List.of(toEntry(keyB)), "kid-B", null
+            issuerName,
+            "hephaestus-worker",
+            Duration.ofMinutes(15),
+            "register",
+            List.of(toEntry(keyB)),
+            "kid-B",
+            null
         );
         WorkerJwtVerifier verifierDropA = new JavaJwtWorkerJwtVerifier(
-            WorkerKeyRing.fromConfig(propsDropA), propsDropA, denylist, new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
+            WorkerKeyRing.fromConfig(propsDropA),
+            propsDropA,
+            denylist,
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
         );
         assertThatThrownBy(() -> verifierDropA.verify(tokenSignedByA))
             .isInstanceOf(WorkerJwtInvalidException.class)
@@ -150,12 +181,28 @@ class WorkerJwtTest extends BaseUnitTest {
         return Stream.of(
             Arguments.of(
                 "duplicate kid",
-                new WorkerTokenProperties("iss", "aud", Duration.ofMinutes(15), "r", List.of(toEntry(k), toEntry(k)), null, null),
+                new WorkerTokenProperties(
+                    "iss",
+                    "aud",
+                    Duration.ofMinutes(15),
+                    "r",
+                    List.of(toEntry(k), toEntry(k)),
+                    null,
+                    null
+                ),
                 "Duplicate kid"
             ),
             Arguments.of(
                 "active-kid not in ring",
-                new WorkerTokenProperties("iss", "aud", Duration.ofMinutes(15), "r", List.of(toEntry(k)), "missing-kid", null),
+                new WorkerTokenProperties(
+                    "iss",
+                    "aud",
+                    Duration.ofMinutes(15),
+                    "r",
+                    List.of(toEntry(k)),
+                    "missing-kid",
+                    null
+                ),
                 "active-kid"
             )
         );
@@ -165,7 +212,13 @@ class WorkerJwtTest extends BaseUnitTest {
     void legacySingleKeyConfigPromotesToRing() {
         WorkerSigningKey k = WorkerSigningKey.generateEphemeral("scratch");
         WorkerTokenProperties legacy = new WorkerTokenProperties(
-            "iss", "aud", Duration.ofMinutes(15), "r", List.of(), null, toPemPkcs8(k.privateKey())
+            "iss",
+            "aud",
+            Duration.ofMinutes(15),
+            "r",
+            List.of(),
+            null,
+            toPemPkcs8(k.privateKey())
         );
         WorkerKeyRing ring = WorkerKeyRing.fromConfig(legacy);
         assertThat(ring.size()).isEqualTo(1);
@@ -175,7 +228,13 @@ class WorkerJwtTest extends BaseUnitTest {
     @Test
     void propertiesToStringRedactsSecrets() {
         WorkerTokenProperties props = new WorkerTokenProperties(
-            "iss", "aud", Duration.ofMinutes(5), "the-secret", List.of(), null, "the-pem"
+            "iss",
+            "aud",
+            Duration.ofMinutes(5),
+            "the-secret",
+            List.of(),
+            null,
+            "the-pem"
         );
         String dumped = props.toString();
         assertThat(dumped).doesNotContain("the-secret");
@@ -188,8 +247,10 @@ class WorkerJwtTest extends BaseUnitTest {
     }
 
     private static String toPemPkcs8(java.security.interfaces.RSAPrivateKey key) {
-        return "-----BEGIN PRIVATE KEY-----\n" +
+        return (
+            "-----BEGIN PRIVATE KEY-----\n" +
             java.util.Base64.getMimeEncoder(64, new byte[] { '\n' }).encodeToString(key.getEncoded()) +
-            "\n-----END PRIVATE KEY-----\n";
+            "\n-----END PRIVATE KEY-----\n"
+        );
     }
 }

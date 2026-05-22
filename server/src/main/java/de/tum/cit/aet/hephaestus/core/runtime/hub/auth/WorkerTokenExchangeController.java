@@ -44,7 +44,11 @@ public class WorkerTokenExchangeController {
         .maximumSize(10_000)
         .build();
 
-    public WorkerTokenExchangeController(WorkerJwtIssuer issuer, WorkerTokenProperties properties, MeterRegistry meterRegistry) {
+    public WorkerTokenExchangeController(
+        WorkerJwtIssuer issuer,
+        WorkerTokenProperties properties,
+        MeterRegistry meterRegistry
+    ) {
         this.issuer = issuer;
         this.properties = properties;
         this.meterRegistry = meterRegistry;
@@ -71,8 +75,11 @@ public class WorkerTokenExchangeController {
         }
         if (!constantTimeEquals(request.registrationToken(), properties.registrationToken())) {
             failures.incrementAndGet();
-            log.warn("worker token exchange rejected: bad registration token for workerId={} sourceIp={}",
-                request.workerId(), sourceIp);
+            log.warn(
+                "worker token exchange rejected: bad registration token for workerId={} sourceIp={}",
+                request.workerId(),
+                sourceIp
+            );
             meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "bad-token").increment();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }

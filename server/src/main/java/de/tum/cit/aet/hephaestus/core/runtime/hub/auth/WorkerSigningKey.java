@@ -30,12 +30,7 @@ import org.slf4j.LoggerFactory;
  * @param privateKey signing side
  * @param ephemeral {@code true} when the key was generated at boot (logged as a warning)
  */
-public record WorkerSigningKey(
-    String kid,
-    RSAPublicKey publicKey,
-    RSAPrivateKey privateKey,
-    boolean ephemeral
-) {
+public record WorkerSigningKey(String kid, RSAPublicKey publicKey, RSAPrivateKey privateKey, boolean ephemeral) {
     private static final Logger log = LoggerFactory.getLogger(WorkerSigningKey.class);
 
     public WorkerSigningKey {
@@ -68,7 +63,8 @@ public record WorkerSigningKey(
             // use the wrong public key for any keypair generated with a non-standard exponent.
             if (!(privateKey instanceof RSAPrivateCrtKey rsa)) {
                 throw new IllegalArgumentException(
-                    "expected RSA CRT private key (PKCS#8 with public exponent), got: " + privateKey.getClass().getSimpleName()
+                    "expected RSA CRT private key (PKCS#8 with public exponent), got: " +
+                        privateKey.getClass().getSimpleName()
                 );
             }
             PublicKey publicKey = kf.generatePublic(new RSAPublicKeySpec(rsa.getModulus(), rsa.getPublicExponent()));

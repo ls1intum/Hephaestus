@@ -90,7 +90,8 @@ class MentorSessionRunnerTest extends BaseUnitTest {
 
         assertThat(runner.activeCount()).isZero();
         assertThat(state.snapshot().spareMentor()).isEqualTo(2);
-        long closes = publisher.sent.stream()
+        long closes = publisher.sent
+            .stream()
             .filter(f -> f instanceof SessionClose c && c.reason() == SessionCloseReason.WORKER_DRAINING)
             .count();
         assertThat(closes).isEqualTo(2);

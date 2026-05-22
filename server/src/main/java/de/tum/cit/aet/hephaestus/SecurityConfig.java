@@ -91,8 +91,15 @@ public class SecurityConfig {
         // Only paths whose auth lives at the controller / handshake layer go on this chain.
         // Other actuator endpoints (metrics, prometheus, loggers, heapdump, …) must NOT be
         // matched here — they fall through to the OAuth2 chain.
-        http.securityMatcher("/api/workers/**", "/actuator/health", "/actuator/health/**",
-                "/actuator/info", "/gitlab", "/github")
+        http
+            .securityMatcher(
+                "/api/workers/**",
+                "/actuator/health",
+                "/actuator/health/**",
+                "/actuator/info",
+                "/gitlab",
+                "/github"
+            )
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))

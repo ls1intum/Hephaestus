@@ -44,15 +44,12 @@ public class WorkerSessionRegistry implements SmartLifecycle {
      */
     public WorkerSession register(WorkerSession incoming) {
         AtomicReference<WorkerSession> evicted = new AtomicReference<>();
-        WorkerSession result = byWorkerId.compute(
-            incoming.workerId(),
-            (id, existing) -> {
-                if (existing != null && existing != incoming) {
-                    evicted.set(existing);
-                }
-                return incoming;
+        WorkerSession result = byWorkerId.compute(incoming.workerId(), (id, existing) -> {
+            if (existing != null && existing != incoming) {
+                evicted.set(existing);
             }
-        );
+            return incoming;
+        });
 
         WorkerSession loser = evicted.get();
         if (loser != null) {
@@ -65,16 +62,13 @@ public class WorkerSessionRegistry implements SmartLifecycle {
             // Close after swap so any in-flight forwarder reading byWorkerId can't pick the loser.
             loser.close(CloseStatus.NORMAL);
             events.publishEvent(
-                new WorkerDisconnectedEvent(
-                    incoming.workerId(),
-                    loser.sessionId(),
-                    "duplicate-evicted",
-                    Instant.now()
-                )
+                new WorkerDisconnectedEvent(incoming.workerId(), loser.sessionId(), "duplicate-evicted", Instant.now())
             );
         }
 
-        events.publishEvent(new WorkerConnectedEvent(incoming.workerId(), incoming.sessionId(), incoming.connectedAt()));
+        events.publishEvent(
+            new WorkerConnectedEvent(incoming.workerId(), incoming.sessionId(), incoming.connectedAt())
+        );
         return result;
     }
 

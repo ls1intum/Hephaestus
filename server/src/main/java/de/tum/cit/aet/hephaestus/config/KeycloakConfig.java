@@ -40,7 +40,8 @@ public class KeycloakConfig {
                     }
                     throw new IllegalStateException(
                         "Keycloak admin client not configured (hephaestus.keycloak.{url,realm,clientId}); " +
-                            "this role does not own user identity. Called: " + method.getName()
+                            "this role does not own user identity. Called: " +
+                            method.getName()
                     );
                 }
             );

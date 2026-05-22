@@ -141,12 +141,11 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
         } catch (Throwable t) {
             failure.set(t);
         }
-        assertThat(failure.get())
-            .as("revoked-JWT upgrade must fail; 401 manifests as a build-async error")
-            .isNotNull();
+        assertThat(failure.get()).as("revoked-JWT upgrade must fail; 401 manifests as a build-async error").isNotNull();
     }
 
     private static final class CapturingListener implements WebSocket.Listener {
+
         @Override
         public void onOpen(WebSocket webSocket) {
             webSocket.request(1);

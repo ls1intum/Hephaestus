@@ -129,7 +129,10 @@ public class WorkerConfiguration {
     }
 
     @Bean
-    WorkerControlChannelGaugeBinder workerControlChannelGaugeBinder(WorkerControlPublisher publisher, MeterRegistry meterRegistry) {
+    WorkerControlChannelGaugeBinder workerControlChannelGaugeBinder(
+        WorkerControlPublisher publisher,
+        MeterRegistry meterRegistry
+    ) {
         return new WorkerControlChannelGaugeBinder(publisher, meterRegistry);
     }
 

@@ -115,7 +115,11 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
         try {
             publisher.send(frame);
         } catch (Exception e) {
-            log.warn("Drain-time send failed for {}: {}", frame.getClass().getSimpleName(), e.getClass().getSimpleName());
+            log.warn(
+                "Drain-time send failed for {}: {}",
+                frame.getClass().getSimpleName(),
+                e.getClass().getSimpleName()
+            );
         }
     }
 

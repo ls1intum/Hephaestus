@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOutput;
  * compiles without a bridge (cold-start smoke tests, boot-without-mentor monolith).
  */
 public interface HubSessionInbox {
-
     void onSessionOutput(SessionOutput frame);
 
     void onSessionClose(SessionClose frame);

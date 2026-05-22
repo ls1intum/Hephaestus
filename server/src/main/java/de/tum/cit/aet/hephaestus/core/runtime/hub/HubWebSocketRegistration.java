@@ -25,8 +25,6 @@ public class HubWebSocketRegistration implements WebSocketConfigurer {
         // No allowed origins: non-browser workers don't send Origin and pass through; browsers
         // can't construct a Bearer-authenticated upgrade anyway, so a wildcard would only invite
         // CSWSH against a future cookie-auth path. RFC 6455 §10.2.
-        registry
-            .addHandler(handler, hubProperties.path())
-            .addInterceptors(interceptor);
+        registry.addHandler(handler, hubProperties.path()).addInterceptors(interceptor);
     }
 }

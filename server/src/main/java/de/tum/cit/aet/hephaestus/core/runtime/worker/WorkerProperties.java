@@ -46,13 +46,19 @@ public record WorkerProperties(
     @Override
     public String toString() {
         return (
-            "WorkerProperties[workerId=" + workerId +
-                ", capacity=" + capacity +
-                ", drain=" + drain +
-                ", heartbeat=" + heartbeat +
-                ", control=" + control +
-                ", llm=" + (llm.isConfigured() ? "<configured>" : "<unset>") +
-                "]"
+            "WorkerProperties[workerId=" +
+            workerId +
+            ", capacity=" +
+            capacity +
+            ", drain=" +
+            drain +
+            ", heartbeat=" +
+            heartbeat +
+            ", control=" +
+            control +
+            ", llm=" +
+            (llm.isConfigured() ? "<configured>" : "<unset>") +
+            "]"
         );
     }
 
@@ -115,28 +121,28 @@ public record WorkerProperties(
     ) {
         public Control {
             if (handshakeTimeout == null || handshakeTimeout.isZero() || handshakeTimeout.isNegative()) {
-                throw new IllegalArgumentException("control.handshakeTimeout must be positive, got: " + handshakeTimeout);
+                throw new IllegalArgumentException(
+                    "control.handshakeTimeout must be positive, got: " + handshakeTimeout
+                );
             }
         }
 
         @Override
         public String toString() {
             return (
-                "Control[endpoint=" + endpoint +
-                    ", registrationToken=" +
-                    (registrationToken == null || registrationToken.isBlank() ? "<unset>" : "<redacted>") +
-                    ", handshakeTimeout=" + handshakeTimeout +
-                    "]"
+                "Control[endpoint=" +
+                endpoint +
+                ", registrationToken=" +
+                (registrationToken == null || registrationToken.isBlank() ? "<unset>" : "<redacted>") +
+                ", handshakeTimeout=" +
+                handshakeTimeout +
+                "]"
             );
         }
 
         /** @return {@code true} iff the worker has enough config to attempt a WSS dial. */
         public boolean isConfigured() {
-            return (
-                endpoint != null &&
-                    registrationToken != null &&
-                    !registrationToken.isBlank()
-            );
+            return (endpoint != null && registrationToken != null && !registrationToken.isBlank());
         }
     }
 }

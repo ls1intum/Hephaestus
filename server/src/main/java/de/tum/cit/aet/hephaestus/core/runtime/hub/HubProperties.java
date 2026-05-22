@@ -28,7 +28,8 @@ public record HubProperties(
         }
         if (sendBufferSizeBytes < maxFrameSizeBytes) {
             throw new IllegalArgumentException(
-                "hub.sendBufferSizeBytes must be >= maxFrameSizeBytes, got: " + sendBufferSizeBytes);
+                "hub.sendBufferSizeBytes must be >= maxFrameSizeBytes, got: " + sendBufferSizeBytes
+            );
         }
         if (sendTimeLimit == null || sendTimeLimit.isZero() || sendTimeLimit.isNegative()) {
             throw new IllegalArgumentException("hub.sendTimeLimit must be positive, got: " + sendTimeLimit);

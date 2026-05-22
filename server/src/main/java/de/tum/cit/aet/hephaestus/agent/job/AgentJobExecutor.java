@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
@@ -16,7 +17,6 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerCapacityState;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerProperties;
@@ -245,13 +245,7 @@ public class AgentJobExecutor {
         for (AgentJob job : running) {
             try {
                 transactionTemplate.executeWithoutResult(status ->
-                    jobRepository.transitionToCancelled(
-                        job.getId(),
-                        now,
-                        error,
-                        reason,
-                        Set.of(AgentJobStatus.RUNNING)
-                    )
+                    jobRepository.transitionToCancelled(job.getId(), now, error, reason, Set.of(AgentJobStatus.RUNNING))
                 );
             } catch (Exception e) {
                 log.warn("Failed to cancel in-flight job {}: {}", job.getId(), e.getClass().getSimpleName());

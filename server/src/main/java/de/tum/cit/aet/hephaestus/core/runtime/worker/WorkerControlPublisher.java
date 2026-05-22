@@ -9,7 +9,6 @@ import java.time.Instant;
  * reports are latest-wins, session frames between reconnects are treated as session loss.
  */
 public interface WorkerControlPublisher {
-
     void send(WorkerControlFrame frame);
 
     boolean isConnected();

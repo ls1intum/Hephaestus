@@ -181,10 +181,9 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         boolean found = captor
             .getAllValues()
             .stream()
-            .anyMatch(e ->
-                e instanceof AvailabilityChangeEvent<?> a && a.getState() == ReadinessState.REFUSING_TRAFFIC
+            .anyMatch(
+                e -> e instanceof AvailabilityChangeEvent<?> a && a.getState() == ReadinessState.REFUSING_TRAFFIC
             );
         assertThat(found).as("expected an AvailabilityChangeEvent(REFUSING_TRAFFIC) to be published").isTrue();
     }
-
 }

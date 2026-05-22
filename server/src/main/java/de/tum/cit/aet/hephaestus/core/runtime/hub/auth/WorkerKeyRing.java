@@ -78,11 +78,7 @@ public final class WorkerKeyRing {
                 map.put(entry.kid(), WorkerSigningKey.fromPem(entry.kid(), entry.privateKey()));
             }
             WorkerSigningKey active = selectActive(map, properties.activeKid());
-            log.info(
-                "Worker JWT key ring loaded: {} key(s), activeKid={}",
-                map.size(),
-                active.kid()
-            );
+            log.info("Worker JWT key ring loaded: {} key(s), activeKid={}", map.size(), active.kid());
             return new WorkerKeyRing(map, active);
         }
 

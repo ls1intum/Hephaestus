@@ -38,8 +38,10 @@ class WorkerTokenExchangeIntegrationTest extends BaseIntegrationTest {
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$.token").exists()
-            .jsonPath("$.expiresAt").exists()
+            .jsonPath("$.token")
+            .exists()
+            .jsonPath("$.expiresAt")
+            .exists()
             .returnResult();
 
         String json = new String(response.getResponseBody());

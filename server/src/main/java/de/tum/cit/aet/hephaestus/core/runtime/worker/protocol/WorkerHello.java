@@ -7,8 +7,11 @@ import org.springframework.lang.Nullable;
  * First worker-originated frame after WSS upgrade. A non-overlapping {@code supportedVersions}
  * closes the socket with WS code 4400.
  */
-public record WorkerHello(String workerId, List<Integer> supportedVersions, @Nullable String runtimeVersion)
-    implements WorkerControlFrame {
+public record WorkerHello(
+    String workerId,
+    List<Integer> supportedVersions,
+    @Nullable String runtimeVersion
+) implements WorkerControlFrame {
     public WorkerHello {
         if (workerId == null || workerId.isBlank()) {
             throw new IllegalArgumentException("workerId must not be blank");

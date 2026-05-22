@@ -58,10 +58,16 @@ public record KeycloakProperties(
 ) {
     /** @return {@code true} when {@link #url}, {@link #realm}, and {@link #clientId} are all set. */
     public boolean isConfigured() {
-        return url != null && !url.isBlank()
-            && realm != null && !realm.isBlank()
-            && clientId != null && !clientId.isBlank();
+        return (
+            url != null &&
+            !url.isBlank() &&
+            realm != null &&
+            !realm.isBlank() &&
+            clientId != null &&
+            !clientId.isBlank()
+        );
     }
+
     /**
      * Returns whether Keycloak connectivity should be validated at startup.
      *
