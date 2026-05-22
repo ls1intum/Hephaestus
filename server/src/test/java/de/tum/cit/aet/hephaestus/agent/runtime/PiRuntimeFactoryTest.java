@@ -219,7 +219,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 ""
             );
             assertThat(factory.build(spec).environment())
-                .containsEntry("OPENAI_API_KEY", "sk-test")
+                .doesNotContainKey("OPENAI_API_KEY") // would auto-activate built-in OpenAI provider
                 .containsEntry("PI_HEPHAESTUS_BASE_URL", "https://gpu.example.com/api")
                 .containsEntry("PI_HEPHAESTUS_API_KEY", "sk-test")
                 .containsEntry("PI_HEPHAESTUS_MODEL", "gpt-x")
@@ -332,8 +332,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("slash-prefixed model id (e.g. openai/gpt-oss-120b) collapses to bare id")
-        void slashPrefixedModelIdCollapses() throws Exception {
+        @DisplayName("model id passed verbatim — gateway-routed providers need the full id on the wire")
+        void modelIdPassedVerbatim() throws Exception {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
@@ -353,9 +353,11 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     StandardCharsets.UTF_8
                 )
             );
-            // Without the strip, Pi parses the slash as `provider/model` and falls back to the
-            // built-in OpenAI provider — sending requests to api.openai.com.
-            assertThat(settings.path("defaultModel").asText()).isEqualTo("gpt-oss-120b");
+            // defaultProvider=hephaestus pins the provider explicitly, so Pi does not parse the
+            // slash in defaultModel as a provider/model reference; the full id is what the
+            // extension's models[0].id matches AND what the gateway expects on the wire.
+            assertThat(settings.path("defaultProvider").asText()).isEqualTo("hephaestus");
+            assertThat(settings.path("defaultModel").asText()).isEqualTo("openai/gpt-oss-120b");
         }
 
         @Test

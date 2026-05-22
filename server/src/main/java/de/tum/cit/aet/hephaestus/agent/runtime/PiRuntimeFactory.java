@@ -165,25 +165,13 @@ public class PiRuntimeFactory {
     }
 
     /**
-     * Drop a leading {@code provider/} segment from a model id. The TUM gateway and some other
-     * OSS routers expose models under names like {@code openai/gpt-oss-120b} — the part before
-     * the slash is the upstream provider, not the Pi model id. Keeping it would collide with
-     * Pi's provider/model reference grammar.
-     */
-    static String stripProviderPrefix(String modelName) {
-        int slash = modelName.indexOf('/');
-        return slash >= 0 ? modelName.substring(slash + 1) : modelName;
-    }
-
-    /**
      * Build the settings JSON Pi loads at session start. When {@code useCustomProvider} is true,
      * {@code defaultProvider} routes through the {@code hephaestus} extension (see
-     * {@link #buildExtensionFile}) and {@code defaultModel} is the bare model id (no provider
-     * prefix). Pi's resolver looks up {@code modelRegistry.find(defaultProvider, defaultModel)}
-     * — if either arg carries a slash, the parser reinterprets the slash as
-     * {@code provider/model} and falls back to the built-in OpenAI provider (sending requests
-     * to {@code api.openai.com}). Strip any leading {@code <provider>/} segment from the
-     * model id (e.g. {@code openai/gpt-oss-120b → gpt-oss-120b}).
+     * {@link #buildExtensionFile}). {@code defaultModel} is the verbatim model id the extension
+     * registers — both gateway-routed gateways (e.g. TUM GPU expects {@code openai/gpt-oss-120b}
+     * as the wire id) and Pi's exact-match lookup against {@code modelRegistry.find} see the
+     * same string. With {@code defaultProvider="hephaestus"} pinned explicitly, Pi does not
+     * reinterpret slashes as a provider prefix.
      */
     public byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName, boolean useCustomProvider) {
         Map<String, Object> settings = new LinkedHashMap<>();
@@ -193,8 +181,7 @@ public class PiRuntimeFactory {
             settings.put("defaultProvider", providerToken(provider));
         }
         if (modelName != null && !modelName.isBlank()) {
-            String defaultModel = useCustomProvider ? stripProviderPrefix(modelName) : modelName;
-            settings.put("defaultModel", defaultModel);
+            settings.put("defaultModel", modelName);
         }
         settings.put("transport", "sse");
         Map<String, Object> compaction = new LinkedHashMap<>();

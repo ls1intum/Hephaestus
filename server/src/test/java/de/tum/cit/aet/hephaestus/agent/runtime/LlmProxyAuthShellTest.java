@@ -127,14 +127,15 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
                 LlmProvider.OPENAI,
                 "sk-test",
                 "https://gpu.example.com/api",
-                "gpt-test",
+                "openai/gpt-oss-120b",
                 env
             );
             assertThat(env)
                 .doesNotContainKey("OPENAI_API_KEY")
                 .containsEntry("PI_HEPHAESTUS_BASE_URL", "https://gpu.example.com/api")
                 .containsEntry("PI_HEPHAESTUS_API_KEY", "sk-test")
-                .containsEntry("PI_HEPHAESTUS_MODEL", "gpt-test");
+                // Full id including any provider/ prefix — TUM-style gateways need it on the wire.
+                .containsEntry("PI_HEPHAESTUS_MODEL", "openai/gpt-oss-120b");
         }
 
         @Test

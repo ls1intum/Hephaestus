@@ -3,7 +3,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 
 import {
+    AuthStorage,
     createAgentSession,
+    ModelRegistry,
     SessionManager,
     SettingsManager,
     defineTool,
@@ -517,6 +519,12 @@ async function main() {
     // the custom tool names must be listed here too or they won't be exposed to the LLM.
     const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
     const sessionManager = SessionManager.inMemory();
+    // Per Pi SDK Quick Start: omitting authStorage + modelRegistry causes the resolver to
+    // fail with "No API key found for the selected model" because the env-var indirection
+    // registered by the hephaestus extension (apiKey: "PI_HEPHAESTUS_API_KEY") needs the
+    // ModelRegistry constructed against an AuthStorage to read it.
+    const authStorage = AuthStorage.create();
+    const modelRegistry = ModelRegistry.create(authStorage);
 
     const { session, extensionsResult } = await createAgentSession({
         cwd: CWD,
@@ -525,6 +533,8 @@ async function main() {
         customTools: [reportFindingTool],
         sessionManager,
         settingsManager,
+        authStorage,
+        modelRegistry,
     });
     // Surface extension-load diagnostics — a silently-failed extension lets the agent
     // fall through to the built-in provider's default endpoint (e.g. api.openai.com)

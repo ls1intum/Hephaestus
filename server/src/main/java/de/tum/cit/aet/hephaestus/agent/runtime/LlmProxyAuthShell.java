@@ -107,10 +107,11 @@ public final class LlmProxyAuthShell {
                     env.put("PI_HEPHAESTUS_BASE_URL", baseUrl);
                     env.put("PI_HEPHAESTUS_API_KEY", credential);
                     if (modelName != null && !modelName.isBlank()) {
-                        // Pi parses any slash in a model id as a `provider/model` reference; the
-                        // hephaestus provider registers the model under the bare id so the model
-                        // resolver can find it via `defaultProvider=hephaestus, defaultModel=<id>`.
-                        env.put("PI_HEPHAESTUS_MODEL", PiRuntimeFactory.stripProviderPrefix(modelName));
+                        // Pass the model id verbatim. Pi's resolver finds it by exact string
+                        // match against the extension's models[].id, and downstream gateways
+                        // (e.g. TUM GPU) expect the full `openai/<model>` form on the wire —
+                        // stripping the prefix breaks the upstream request.
+                        env.put("PI_HEPHAESTUS_MODEL", modelName);
                     }
                 } else {
                     env.put("OPENAI_API_KEY", credential);
@@ -122,7 +123,7 @@ public final class LlmProxyAuthShell {
                     env.put("PI_HEPHAESTUS_BASE_URL", baseUrl);
                     env.put("PI_HEPHAESTUS_API_KEY", credential);
                     if (modelName != null && !modelName.isBlank()) {
-                        env.put("PI_HEPHAESTUS_MODEL", PiRuntimeFactory.stripProviderPrefix(modelName));
+                        env.put("PI_HEPHAESTUS_MODEL", modelName);
                     }
                 } else {
                     env.put("ANTHROPIC_API_KEY", credential);
