@@ -526,6 +526,36 @@ async function main() {
     const authStorage = AuthStorage.create();
     const modelRegistry = ModelRegistry.create(authStorage);
 
+    // Register the hephaestus provider DIRECTLY on the registry. Pi 0.74.1 has a race:
+    // `createAgentSession` calls `findInitialModel` *before* the extension runner drains its
+    // pending provider registrations into the model registry. Without this direct registration,
+    // the session is created with model=undefined; the agent then crashes at first stream with
+    // "No API key found for the selected model." Keeping the extension file too lets a future
+    // CLI/TUI invocation reuse the same provider definition.
+    const hephaestusBaseUrl = process.env.PI_HEPHAESTUS_BASE_URL;
+    const hephaestusModel = process.env.PI_HEPHAESTUS_MODEL;
+    if (hephaestusBaseUrl && hephaestusModel) {
+        modelRegistry.registerProvider("hephaestus", {
+            name: "Hephaestus Gateway",
+            baseUrl: hephaestusBaseUrl,
+            apiKey: "PI_HEPHAESTUS_API_KEY",
+            authHeader: true,
+            api: "openai-completions",
+            models: [
+                {
+                    id: hephaestusModel,
+                    name: hephaestusModel,
+                    reasoning: false,
+                    input: ["text"],
+                    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                    contextWindow: 131072,
+                    maxTokens: 4096,
+                },
+            ],
+        });
+        console.error(`[pi-runner] registered hephaestus provider: baseUrl=${hephaestusBaseUrl} model=${hephaestusModel}`);
+    }
+
     const { session, extensionsResult } = await createAgentSession({
         cwd: CWD,
         agentDir: AGENT_DIR,
