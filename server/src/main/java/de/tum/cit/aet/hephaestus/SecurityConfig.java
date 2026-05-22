@@ -112,6 +112,10 @@ public class SecurityConfig {
      * {@code JwtDecoder} (worker-only pod, smoke tests, fresh dev box). Mutually exclusive with
      * {@link #resourceServerSecurityFilterChain(HttpSecurity, Converter)} via the same gate so
      * only one "any request" chain ever loads at runtime.
+     *
+     * <p>Honors {@code hephaestus.dev.trigger-enabled=true} the same way the resource-server
+     * chain does — without this, a fresh dev box has no way to fire the trigger after enabling
+     * the flag, because the lockdown chain owns the {@code anyRequest()} slot.
      */
     @Bean
     @ConditionalOnMissingBean(org.springframework.security.oauth2.jwt.JwtDecoder.class)
@@ -120,7 +124,13 @@ public class SecurityConfig {
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeHttpRequests(requests -> requests.anyRequest().denyAll());
+            .authorizeHttpRequests(requests -> {
+                requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+                if (devTriggerEnabled) {
+                    requests.requestMatchers("/api/dev/**").permitAll();
+                }
+                requests.anyRequest().denyAll();
+            });
         return http.build();
     }
 
