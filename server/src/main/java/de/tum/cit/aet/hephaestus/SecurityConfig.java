@@ -9,8 +9,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -69,7 +73,46 @@ public class SecurityConfig {
         return authenticationConverter;
     }
 
+    /**
+     * Dedicated filter chain for the worker control channel (POST exchange + WSS upgrade) and
+     * webhook ingress + actuator probes. These paths carry their own auth — worker JWT signed
+     * by {@link de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerKeyRing}, HMAC/token at
+     * the controller layer for webhooks, or no auth at all for health/info — and must NOT be
+     * processed by the user-facing OAuth2 resource server. Running BearerTokenAuthenticationFilter
+     * on the worker JWT triggers a Keycloak round-trip that either fails (issuer unreachable) or
+     * rejects (different signer), masking the real auth.
+     *
+     * <p>Always present (even when Keycloak isn't configured), so a dev / worker-only pod can
+     * boot without any Keycloak realm.
+     */
     @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    SecurityFilterChain workerHubSecurityFilterChain(HttpSecurity http) throws Exception {
+        http.securityMatcher("/api/workers/**", "/actuator/**", "/gitlab", "/github")
+            .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(requests -> requests.anyRequest().permitAll());
+        return http.build();
+    }
+
+    /**
+     * Fallback chain when no OAuth2 issuer is configured (worker-only pod, smoke tests, fresh
+     * dev box). Locks down every path not handled by {@link #workerHubSecurityFilterChain}.
+     */
+    @Bean
+    @ConditionalOnMissingBean(name = "resourceServerSecurityFilterChain")
+    SecurityFilterChain lockdownSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(requests -> requests.anyRequest().denyAll());
+        return http.build();
+    }
+
+    @Bean
+    @ConditionalOnBean(org.springframework.security.oauth2.jwt.JwtDecoder.class)
     SecurityFilterChain resourceServerSecurityFilterChain(
         HttpSecurity http,
         Converter<Jwt, AbstractAuthenticationToken> authenticationConverter
@@ -102,8 +145,12 @@ public class SecurityConfig {
             // controller layer. Spring Security must not block these or external providers can
             // never reach the receiver. See gitprovider.webhook.* and ADR 0008.
             requests.requestMatchers(HttpMethod.POST, "/gitlab", "/github").permitAll();
-            // Actuator endpoints for Docker/K8s health checks and basic info
-            requests.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
+            // Bridged mentor SSE (opt-in, split-pod / BYO): user authentication enforced by
+            // @PreAuthorize on BridgedMentorController. Keep at the same layer as /user/**.
+            requests.requestMatchers("/api/mentor/bridge/**").authenticated();
+            // NOTE: /api/workers/** and /actuator/** are handled by workerHubSecurityFilterChain
+            // (highest precedence) which skips the OAuth2 resource server entirely — the worker
+            // hub validates its own JWTs via WorkerJwtHandshakeInterceptor.
             // Dev-only: permit the dev trigger endpoint when explicitly enabled (defaults to false)
             if (devTriggerEnabled) {
                 requests.requestMatchers("/api/dev/**").permitAll();

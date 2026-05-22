@@ -11,6 +11,7 @@ import io.nats.client.Connection;
 import io.nats.client.JetStream;
 import io.nats.client.JetStreamManagement;
 import java.io.IOException;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -29,12 +30,13 @@ import org.springframework.core.Ordered;
 public class WebhookConfiguration {
 
     @Bean
-    JetStream webhookJetStream(Connection natsConnection) throws IOException {
+    JetStream webhookJetStream(@Qualifier("natsConnection") Connection natsConnection) throws IOException {
         return natsConnection.jetStream();
     }
 
     @Bean
-    JetStreamManagement webhookJetStreamManagement(Connection natsConnection) throws IOException {
+    JetStreamManagement webhookJetStreamManagement(@Qualifier("natsConnection") Connection natsConnection)
+        throws IOException {
         return natsConnection.jetStreamManagement();
     }
 
@@ -67,7 +69,10 @@ public class WebhookConfiguration {
     }
 
     @Bean
-    WebhookHealthIndicator webhookHealthIndicator(Connection connection, JetStreamManagement jsm) {
+    WebhookHealthIndicator webhookHealthIndicator(
+        @Qualifier("natsConnection") Connection connection,
+        JetStreamManagement jsm
+    ) {
         return new WebhookHealthIndicator(connection, jsm);
     }
 

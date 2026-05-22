@@ -16,6 +16,10 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.agent.CredentialMode;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerCapacityState;
+import de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerProperties;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -36,10 +40,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,6 +79,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 @WorkspaceAgnostic("NATS consumer processes jobs across all workspaces")
 public class AgentJobExecutor {
 
@@ -100,6 +107,15 @@ public class AgentJobExecutor {
     private final Counter concurrencyRejected;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile Thread pullThread;
+    /**
+     * Tracks in-flight {@link #executeJob(Message)} submissions for the drain coordinator's
+     * {@link #awaitInFlight(Duration)} call. Phaser is the right primitive here: register on
+     * submit, arriveAndDeregister on completion, await-advance to wait for all parties to
+     * deregister. Survives thread restarts and exception paths via the try-finally.
+     */
+    private final Phaser inFlight = new Phaser(1); // 1 = the executor itself; deregistered on stop
+    private final java.util.Optional<WorkerCapacityState> capacityState;
+    private final java.util.Optional<WorkerProperties> workerProperties;
 
     public AgentJobExecutor(
         @Qualifier("agentNatsConnection") Connection natsConnection,
@@ -112,7 +128,9 @@ public class AgentJobExecutor {
         @Qualifier("sandboxExecutor") AsyncTaskExecutor sandboxExecutor,
         TransactionTemplate transactionTemplate,
         ObjectMapper objectMapper,
-        MeterRegistry meterRegistry
+        MeterRegistry meterRegistry,
+        java.util.Optional<WorkerCapacityState> capacityState,
+        java.util.Optional<WorkerProperties> workerProperties
     ) {
         this.natsConnection = natsConnection;
         this.natsProperties = natsProperties;
@@ -125,6 +143,8 @@ public class AgentJobExecutor {
         this.transactionTemplate = transactionTemplate;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.capacityState = capacityState;
+        this.workerProperties = workerProperties;
 
         // Internal scheduler for NATS InProgress heartbeats — not a @Bean to avoid
         // blocking Spring's TaskScheduler auto-configuration (ConditionalOnMissingBean).
@@ -159,8 +179,13 @@ public class AgentJobExecutor {
         );
     }
 
-    @PreDestroy
-    public void stop() {
+    /**
+     * Stop the pull loop so no new jobs are claimed. Idempotent. Composable with
+     * {@link #awaitInFlight(Duration)} and {@link #cancelInFlight(AgentJobCancellationReason)}
+     * from the worker drain coordinator; called standalone from {@link #stop()} for non-worker
+     * monolith mode.
+     */
+    public void stopAcceptingNewJobs() {
         running.set(false);
         if (pullThread != null) {
             pullThread.interrupt();
@@ -174,6 +199,76 @@ public class AgentJobExecutor {
             heartbeatScheduler.shutdownNow();
             Thread.currentThread().interrupt();
         }
+    }
+
+    /**
+     * Wait up to {@code timeout} for in-flight {@link #executeJob(Message)} submissions to
+     * complete. Must be called after {@link #stopAcceptingNewJobs()} so no new parties register.
+     *
+     * @return {@code true} if all in-flight work completed within {@code timeout}; {@code false}
+     *     on timeout (caller should cancel remaining).
+     */
+    public boolean awaitInFlight(Duration timeout) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            return inFlight.getUnarrivedParties() <= 1; // only the executor party left
+        }
+        try {
+            int phase = inFlight.arriveAndDeregister();
+            inFlight.awaitAdvanceInterruptibly(phase, timeout.toMillis(), TimeUnit.MILLISECONDS);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Transition every job currently {@link AgentJobStatus#RUNNING} on this worker to
+     * {@link AgentJobStatus#CANCELLED} with the given reason. The in-flight sandbox tasks
+     * continue running locally but their terminal-state write will fail the {@code IN :fromStatuses}
+     * guard and the result will be discarded; NATS holds the message unack'd and redelivers to
+     * the next worker.
+     *
+     * <p>{@code RUNNING} is shared across workers in principle, but in practice the JetStream
+     * WorkQueue + {@code maxAckPending} bound ensures only this worker holds RUNNING messages.
+     */
+    public void cancelInFlight(AgentJobCancellationReason reason) {
+        java.util.List<AgentJob> running = jobRepository.findByStatus(AgentJobStatus.RUNNING);
+        if (running.isEmpty()) {
+            return;
+        }
+        log.info("Cancelling {} in-flight job(s) with reason {}", running.size(), reason);
+        Instant now = Instant.now();
+        String error = "worker draining";
+        for (AgentJob job : running) {
+            try {
+                transactionTemplate.executeWithoutResult(status ->
+                    jobRepository.transitionToCancelled(
+                        job.getId(),
+                        now,
+                        error,
+                        reason,
+                        Set.of(AgentJobStatus.RUNNING)
+                    )
+                );
+            } catch (Exception e) {
+                log.warn("Failed to cancel in-flight job {}: {}", job.getId(), e.getClass().getSimpleName());
+            }
+        }
+    }
+
+    /**
+     * Legacy single-method stop used when no {@code WorkerDrainCoordinator} owns the worker
+     * lifecycle (e.g., non-worker monolith mode). Slim, drain-equivalent default — fixes the
+     * latent bug where the previous {@code @PreDestroy} never awaited in-flight sandbox tasks.
+     */
+    @PreDestroy
+    public void stop() {
+        stopAcceptingNewJobs();
+        awaitInFlight(Duration.ofSeconds(30));
+        // Any survivors will be NAK'd on connection close.
     }
 
     // ── Pull loop ──
@@ -194,8 +289,16 @@ public class AgentJobExecutor {
                     while (running.get() && (msg = consumer.nextMessage()) != null) {
                         Message finalMsg = msg;
                         try {
-                            sandboxExecutor.execute(() -> executeJob(finalMsg));
+                            inFlight.register();
+                            sandboxExecutor.execute(() -> {
+                                try {
+                                    executeJob(finalMsg);
+                                } finally {
+                                    inFlight.arriveAndDeregister();
+                                }
+                            });
                         } catch (RejectedExecutionException e) {
+                            inFlight.arriveAndDeregister();
                             // Pool is full — NAK with delay to avoid tight redelivery loop
                             finalMsg.nakWithDelay(Duration.ofSeconds(10));
                             log.debug("Sandbox executor full, NAK'd with 10s delay for redelivery");
@@ -231,16 +334,22 @@ public class AgentJobExecutor {
 
         UUID jobId = parsed.get();
         MDC.put(MDC_JOB_ID, jobId.toString());
+        boolean claimed = false;
         try {
-            claimAndExecute(jobId, msg);
+            claimed = claimAndExecute(jobId, msg);
         } catch (SandboxCancelledException e) {
+            claimed = true;
             handleCancellation(jobId, msg);
         } catch (CannotAcquireLockException e) {
             msg.nakWithDelay(Duration.ofSeconds(5));
             log.debug("Lock timeout during claim for job {}, NAK'd with 5s delay", jobId);
         } catch (Exception e) {
+            claimed = true;
             handleExecutionFailure(jobId, msg, e);
         } finally {
+            if (claimed) {
+                releaseCapacity();
+            }
             MDC.remove(MDC_JOB_ID);
             MDC.remove(MDC_JOB_TYPE);
         }
@@ -264,8 +373,11 @@ public class AgentJobExecutor {
     /**
      * Claim the job, set up heartbeat, prepare sandbox inputs, execute, and complete.
      * Propagates exceptions to {@link #executeJob(Message)} for centralized error handling.
+     *
+     * @return {@code true} if the job was claimed (so the caller should release capacity);
+     *     {@code false} otherwise.
      */
-    private void claimAndExecute(UUID jobId, Message msg) {
+    private boolean claimAndExecute(UUID jobId, Message msg) {
         // ── CLAIM (micro-transaction #1) — may throw CannotAcquireLockException ──
         Optional<ClaimResult> claimed;
         try {
@@ -276,7 +388,7 @@ public class AgentJobExecutor {
             throw new ClaimFailedException(e);
         }
         if (claimed.isEmpty()) {
-            return; // Already ack'd / nak'd / left for redelivery
+            return false; // Already ack'd / nak'd / left for redelivery
         }
 
         ClaimResult claim = claimed.get();
@@ -299,6 +411,7 @@ public class AgentJobExecutor {
             Duration duration = Duration.between(startTime, Instant.now());
             executionDuration.record(duration);
             log.info("Agent job completed: jobId={}, duration={}", jobId, duration);
+            return true;
         } finally {
             heartbeat.cancel(false);
         }
@@ -362,14 +475,21 @@ public class AgentJobExecutor {
             return new PrepareResult(files, volumes);
         });
 
+        // BYO worker pod: when the operator configures hephaestus.worker.llm.{base-url,api-key},
+        // override the per-job credential mode + endpoint so agent-pi reaches the operator's LLM
+        // directly. The app-pod's bundled LLM proxy is not reachable from a worker host. ADR 0009.
+        WorkerProperties.Llm workerLlm = workerProperties.map(WorkerProperties::llm).orElse(null);
+        boolean workerLlmActive = workerLlm != null && workerLlm.isConfigured();
+        CredentialMode credentialMode = workerLlmActive ? CredentialMode.API_KEY : snapshot.credentialMode();
+        String credential = workerLlmActive ? workerLlm.apiKey() : job.getLlmApiKey();
+        String baseUrl = workerLlmActive ? workerLlm.baseUrl() : null;
+
         PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
             snapshot.llmProvider(),
-            snapshot.credentialMode(),
+            credentialMode,
             snapshot.modelName(),
-            job.getLlmApiKey(),
-            // Production resolves the LLM endpoint from the workspace's configured provider; no
-            // per-job override. Live tests construct PiPlanSpec directly with a non-null baseUrl.
-            null,
+            credential,
+            baseUrl,
             job.getJobToken(),
             snapshot.allowInternet(),
             snapshot.timeoutSeconds()
@@ -550,8 +670,14 @@ public class AgentJobExecutor {
 
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
 
+            capacityState.ifPresent(WorkerCapacityState::claimReview);
             return new ClaimResult(job, snapshot);
         });
+    }
+
+    /** Release the review-capacity slot on any terminal transition (success/failure/cancel/timeout). */
+    private void releaseCapacity() {
+        capacityState.ifPresent(WorkerCapacityState::releaseReview);
     }
 
     // ── Complete: micro-transaction #2 ──
