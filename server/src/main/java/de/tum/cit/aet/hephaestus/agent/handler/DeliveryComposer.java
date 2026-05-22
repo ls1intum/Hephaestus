@@ -190,13 +190,16 @@ class DeliveryComposer {
 
     /**
      * Check whether a finding is non-inlinable (belongs in MR summary, not a diff note).
-     * Non-inlinable if: practice is inherently non-inlinable, OR finding has no valid file location.
+     * Non-inlinable if: practice is inherently non-inlinable, OR finding has neither a
+     * usable evidence location nor an agent-supplied {@code suggestedDiffNote}.
      */
     private static boolean isNonInlinable(ValidatedFinding f) {
         if (NON_INLINABLE_PRACTICES.contains(f.practiceSlug())) {
             return true;
         }
-        // Check if there's a valid file location in evidence
+        if (!f.suggestedDiffNotes().isEmpty()) {
+            return false;
+        }
         String location = extractPrimaryLocation(f);
         return location == null || isInternalPath(location);
     }

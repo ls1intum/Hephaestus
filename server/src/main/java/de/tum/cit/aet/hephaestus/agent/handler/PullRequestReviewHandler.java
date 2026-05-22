@@ -222,8 +222,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             pullRequestNumber +
             " in " +
             repoName +
-            ". Read the context files, then persist findings via the report_finding tool " +
-            "and the final MR summary via set_review_summary. " +
+            ". Read the context files, then persist every justified finding via the report_finding tool. " +
             "Follow " +
             WorkspaceAbi.ORCHESTRATOR_PATH +
             " for the schema and rules.";

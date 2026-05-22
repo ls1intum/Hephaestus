@@ -96,16 +96,17 @@ public class HubConfiguration {
         return new HubWebSocketRegistration(handler, interceptor);
     }
 
+    /**
+     * Bridge + its session registry wire only when the bridge is explicitly enabled. When absent,
+     * the WSS handler's {@code Optional<MentorSessionBridge>} stays empty and worker-originated
+     * SessionOutput frames are silently dropped (acceptable for monolith mode without the bridge).
+     */
     @Bean
+    @ConditionalOnProperty(name = "hephaestus.worker.hub.bridge.enabled", havingValue = "true")
     HubSessionRegistry hubSessionRegistry() {
         return new HubSessionRegistry();
     }
 
-    /**
-     * Bridge wires only when explicitly enabled. When absent, the WSS handler's
-     * {@code Optional<MentorSessionBridge>} stays empty and worker-originated SessionOutput
-     * frames are silently dropped (acceptable for monolith mode without the bridge).
-     */
     @Bean
     @ConditionalOnProperty(name = "hephaestus.worker.hub.bridge.enabled", havingValue = "true")
     MentorSessionBridge mentorSessionBridge(

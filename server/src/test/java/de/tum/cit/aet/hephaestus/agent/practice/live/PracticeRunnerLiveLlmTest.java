@@ -40,9 +40,8 @@ import tools.jackson.databind.node.ObjectNode;
  * Live end-to-end test for the practice-review {@code pi-runner.mjs} against a real LLM.
  *
  * <p>Layer A coverage (per Audit 3): exercises Pi SDK ↔ LLM, the runner's two-attempt loop,
- * watchdog, custom {@code report_finding}/{@code set_review_summary} tools, and the result schema
- * the runner emits — all without Docker. The {@code DockerSandboxLiveTest} covers the sandbox SPI
- * separately.
+ * watchdog, custom {@code report_finding} tool, and the result schema the runner emits — all
+ * without Docker. The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
  *
  * <p>Mirrors {@code MentorLiveLlmTest} for the Pi SDK install and the {@code tum-openai}
  * extension that bends Pi's built-in {@code openai} provider toward the TUM gateway (Pi does not
@@ -334,8 +333,7 @@ class PracticeRunnerLiveLlmTest {
                 "Review merge request #1 in test/fixture. Read context/target/diff_summary.md, " +
                     ".practices/all-criteria.md, .practices/index.json, and context/target/metadata.json. " +
                     "Apply the hardcoded-secrets practice to context/target/diff.patch. Persist each " +
-                    "justified finding via report_finding (one tool call per finding) and the final MR " +
-                    "comment via set_review_summary. Follow " +
+                    "justified finding via report_finding (one tool call per finding). Follow " +
                     WorkspaceAbi.ORCHESTRATOR_PATH +
                     " for the schema and review rules.",
                 1,

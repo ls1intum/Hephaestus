@@ -37,8 +37,8 @@ class TaskEnvelopeFixtureTest extends BaseUnitTest {
             99L,
             new Task.PracticeReview(
                 "Review merge request #42 in owner/repo. Read the context files, " +
-                    "then persist findings via the report_finding tool and the final MR summary " +
-                    "via set_review_summary. Follow .pi/AGENTS.md for the schema and rules.",
+                    "then persist every justified finding via the report_finding tool. " +
+                    "Follow .pi/AGENTS.md for the schema and rules.",
                 42,
                 "owner/repo"
             )

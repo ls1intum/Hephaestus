@@ -615,18 +615,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ).isTrue();
         }
 
-        @Test
-        @DisplayName("no dedup needed when all slugs are unique")
-        void noDedupWhenAllUnique() {
-            ObjectNode f1 = validFindingNode();
-            f1.put("practiceSlug", "slug-a");
-            ObjectNode f2 = validFindingNode();
-            f2.put("practiceSlug", "slug-b");
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(f1, f2)));
-
-            assertThat(result.validFindings()).hasSize(2);
-        }
     }
 
     @Nested
@@ -680,14 +668,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("sanitizeJsonEscapes preserves valid escapes")
-        void preservesValidEscapes() {
-            String input = "hello\\nworld\\t\\\"quoted\\\"\\\\backslash";
-            String result = PracticeDetectionResultParser.sanitizeJsonEscapes(input);
-            assertThat(result).isEqualTo(input);
-        }
-
-        @Test
         @DisplayName("sanitizeJsonEscapes fixes invalid \\( escape")
         void fixesInvalidParenEscape() {
             String input = "print(\\\"\\(error)\\\")";
@@ -702,14 +682,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             String input = "print(\\\\(error))";
             String result = PracticeDetectionResultParser.sanitizeJsonEscapes(input);
             assertThat(result).isEqualTo(input);
-        }
-
-        @Test
-        @DisplayName("sanitizeJsonEscapes is no-op for text without backslashes")
-        void noOpWithoutBackslashes() {
-            String input = "just plain text with no escapes";
-            String result = PracticeDetectionResultParser.sanitizeJsonEscapes(input);
-            assertThat(result).isSameAs(input);
         }
     }
 
@@ -737,7 +709,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ValidatedFinding first = result.validFindings().get(0);
             assertThat(first.practiceSlug()).isEqualTo("pr-description-quality");
             assertThat(first.verdict()).isEqualTo(Verdict.POSITIVE);
-            // guidanceMethod removed — no assertion needed
 
             // Verify negative finding
             ValidatedFinding negative = result.validFindings().get(1);

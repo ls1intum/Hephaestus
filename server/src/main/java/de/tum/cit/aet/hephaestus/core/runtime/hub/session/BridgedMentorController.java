@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.core.runtime.hub.session;
 
-import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionCloseReason;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
@@ -8,7 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,8 +35,7 @@ import tools.jackson.databind.JsonNode;
 @RestController
 @RequestMapping("/api/mentor/bridge")
 @Tag(name = "Mentor Bridge", description = "WSS-bridged mentor chat (opt-in)")
-@ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
-@ConditionalOnProperty(name = "hephaestus.worker.hub.bridge.enabled", havingValue = "true")
+@ConditionalOnBean(MentorSessionBridge.class)
 @Hidden
 @de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic(
     "Bridge session is infra-level; workspace context is forwarded in the body and validated by the worker"

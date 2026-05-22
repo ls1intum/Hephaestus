@@ -155,7 +155,7 @@ function isValidFindingsPayload(p) {
 }
 
 function lenientJsonParse(text) {
-    // Strip C0 + DEL control chars (mirrors Java ALLOW_UNQUOTED_CONTROL_CHARS).
+    // Strip C0 + DEL control chars (mirrors Java ALLOW_UNESCAPED_CONTROL_CHARS).
     try {
         return JSON.parse(text);
     } catch {}

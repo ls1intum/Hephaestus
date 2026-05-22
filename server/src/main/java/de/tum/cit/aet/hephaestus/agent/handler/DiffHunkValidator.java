@@ -86,19 +86,23 @@ class DiffHunkValidator {
     }
 
     /**
+     * Snap window: maximum line delta we'll silently fix before dropping. A diff note at L42 when
+     * only L500 is valid is more confusing than no note at all — the student sees an unrelated
+     * comment and has to invert the agent's intent. Notes beyond the window are dropped (and the
+     * caller surfaces them in the MR summary if needed).
+     */
+    static final int MAX_SNAP_DELTA = 10;
+
+    /**
      * Validate and correct diff note positions against the valid line map.
      *
      * <p>For each note:
      * <ul>
      *   <li>If the line is valid → keep as-is</li>
-     *   <li>If the line is invalid but the file exists in the diff → snap to nearest valid line</li>
+     *   <li>If the line is invalid but within {@link #MAX_SNAP_DELTA} of a valid line → snap</li>
+     *   <li>If the nearest valid line is &gt; {@link #MAX_SNAP_DELTA} away → drop the note</li>
      *   <li>If the file doesn't exist in the diff → keep as-is (will fail at API level)</li>
      * </ul>
-     *
-     * @param notes     the diff notes to validate
-     * @param validLines map from file path → valid line numbers
-     * @param jobId     for logging
-     * @return corrected list (new objects for corrected notes, same objects for valid ones)
      */
     static List<DiffNote> validateAndCorrect(
         List<DiffNote> notes,
@@ -109,6 +113,7 @@ class DiffHunkValidator {
 
         List<DiffNote> corrected = new ArrayList<>(notes.size());
         int corrections = 0;
+        int dropped = 0;
 
         for (DiffNote note : notes) {
             TreeSet<Integer> fileLines = validLines.get(note.filePath());
@@ -128,6 +133,21 @@ class DiffHunkValidator {
             Integer nearest = findNearest(fileLines, note.startLine());
             if (nearest == null) {
                 corrected.add(note);
+                continue;
+            }
+
+            int delta = Math.abs(nearest - note.startLine());
+            if (delta > MAX_SNAP_DELTA) {
+                log.info(
+                    "Dropped diff note: file={}, originalLine={}, nearestValid={} (delta={} > {}), jobId={}",
+                    note.filePath(),
+                    note.startLine(),
+                    nearest,
+                    delta,
+                    MAX_SNAP_DELTA,
+                    jobId
+                );
+                dropped++;
                 continue;
             }
 
@@ -157,8 +177,13 @@ class DiffHunkValidator {
             corrected.add(new DiffNote(note.filePath(), nearest, correctedEnd, note.body()));
         }
 
-        if (corrections > 0) {
-            log.info("Corrected {} diff note positions: jobId={}", corrections, jobId);
+        if (corrections > 0 || dropped > 0) {
+            log.info(
+                "Diff note position fixup: corrected={}, dropped={}, jobId={}",
+                corrections,
+                dropped,
+                jobId
+            );
         }
 
         return corrected;

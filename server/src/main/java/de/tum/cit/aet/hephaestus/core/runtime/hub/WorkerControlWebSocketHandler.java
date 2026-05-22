@@ -163,7 +163,12 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
     private void dispatch(WorkerSession session, WorkerControlFrame frame) {
         switch (frame) {
             case WorkerHello hello -> handleHello(session, hello);
-            case CapacityReport capacity -> session.updateCapacity(capacity);
+            case CapacityReport capacity -> {
+                session.updateCapacity(capacity);
+                // Echo a non-draining Heartbeat so the worker's silence-deadline (3× heartbeat
+                // interval) doesn't trip a reconnect when the channel is otherwise idle.
+                session.send(new Heartbeat(false));
+            }
             case Heartbeat heartbeat -> {
                 if (heartbeat.draining()) {
                     log.info("Worker {} signalled draining", session.workerId());

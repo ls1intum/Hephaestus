@@ -60,9 +60,11 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         "de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration",
         RuntimeRole.SERVER_PROPERTY,
         "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
-        RuntimeRole.SERVER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.core.runtime.hub.session.BridgedMentorController",
         RuntimeRole.SERVER_PROPERTY
+        // BridgedMentorController is gated via @ConditionalOnBean(MentorSessionBridge.class).
+        // The bridge bean itself lives in HubConfiguration (already in this map) and is double-
+        // gated by hephaestus.worker.hub.bridge.enabled — so the controller can never wire
+        // outside the server role. Listing it here would conflict with the bean-condition gate.
     );
 
     @Test

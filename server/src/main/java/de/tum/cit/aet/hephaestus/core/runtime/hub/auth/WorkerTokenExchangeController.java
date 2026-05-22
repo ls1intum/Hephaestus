@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -63,7 +64,7 @@ public class WorkerTokenExchangeController {
             meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "disabled").increment();
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
-        String sourceIp = http.getRemoteAddr();
+        String sourceIp = resolveSourceIp(http);
         AtomicInteger failures = failuresByIp.get(sourceIp, k -> new AtomicInteger(0));
         if (failures.get() >= MAX_FAILURES_PER_IP_PER_MINUTE) {
             log.warn("worker token exchange throttled: too many failures from sourceIp={}", sourceIp);
@@ -87,7 +88,34 @@ public class WorkerTokenExchangeController {
         }
         WorkerJwtIssuer.IssuedWorkerJwt issued = issuer.issue(request.workerId().trim());
         meterRegistry.counter(AUDIT_METRIC, "outcome", "success").increment();
-        return ResponseEntity.ok(new ExchangeResponse(issued.token(), issued.expiresAt()));
+        log.info(
+            "worker token exchange ok: workerId={} sourceIp={} jti={} exp={}",
+            request.workerId(),
+            sourceIp,
+            issued.jti(),
+            issued.expiresAt()
+        );
+        return ResponseEntity.ok()
+            .cacheControl(CacheControl.noStore())
+            .body(new ExchangeResponse(issued.token(), issued.expiresAt()));
+    }
+
+    /**
+     * Prefer the left-most {@code X-Forwarded-For} entry when the request came through a
+     * reverse proxy (Coolify / Traefik / Nginx). Falls back to the raw socket peer. Without
+     * this, the per-IP rate limit is a per-proxy rate limit and one bad actor exhausts the
+     * counter for the entire fleet.
+     */
+    static String resolveSourceIp(HttpServletRequest http) {
+        String xff = http.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            int comma = xff.indexOf(',');
+            String first = (comma >= 0 ? xff.substring(0, comma) : xff).trim();
+            if (!first.isEmpty()) {
+                return first;
+            }
+        }
+        return http.getRemoteAddr();
     }
 
     private static boolean constantTimeEquals(String a, String b) {
