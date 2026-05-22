@@ -28,25 +28,21 @@ class WorkerTokenExchangeIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void validRegistrationTokenReturnsVerifiableJwt() throws Exception {
-        String body = "{\"workerId\":\"worker-it\",\"registrationToken\":\"integration-secret\"}";
-        var response = webTestClient
+        WorkerTokenExchangeController.ExchangeResponse response = webTestClient
             .post()
             .uri("/api/workers/exchange")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
+            .bodyValue(new WorkerTokenExchangeController.ExchangeRequest("worker-it", "integration-secret"))
             .exchange()
             .expectStatus()
             .isOk()
-            .expectBody()
-            .jsonPath("$.token")
-            .exists()
-            .jsonPath("$.expiresAt")
-            .exists()
-            .returnResult();
+            .expectBody(WorkerTokenExchangeController.ExchangeResponse.class)
+            .returnResult()
+            .getResponseBody();
 
-        String json = new String(response.getResponseBody());
-        String token = json.replaceAll(".*\"token\"\\s*:\\s*\"([^\"]+)\".*", "$1");
-        WorkerJwt jwt = verifier.verify(token);
+        assertThat(response).isNotNull();
+        assertThat(response.expiresAt()).isNotNull();
+        WorkerJwt jwt = verifier.verify(response.token());
         assertThat(jwt.workerId()).isEqualTo("worker-it");
         assertThat(jwt.jti()).isNotBlank();
     }

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.runtime.worker;
 
+import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameEnvelope;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -67,6 +69,7 @@ public class WorkerControlClient implements WorkerControlPublisher {
     private final AtomicReference<WebSocket> webSocket = new AtomicReference<>();
     private final AtomicBoolean connected = new AtomicBoolean(false);
     private final AtomicReference<Instant> lastInboundAt = new AtomicReference<>(Instant.EPOCH);
+    private final AtomicReference<CountDownLatch> welcomeLatch = new AtomicReference<>(new CountDownLatch(1));
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final Random random = new Random();
 
@@ -208,6 +211,7 @@ public class WorkerControlClient implements WorkerControlPublisher {
                         return;
                     }
                     connected.set(true);
+                    welcomeLatch.get().countDown();
                     log.info("Worker control channel connected; session={}", welcome.sessionId());
                 }
                 case ForceReconnect r -> {
@@ -217,26 +221,19 @@ public class WorkerControlClient implements WorkerControlPublisher {
                 case SessionOpen open -> dispatcherProvider.getObject().accept(open);
                 case SessionInput input -> dispatcherProvider.getObject().accept(input);
                 case SessionClose close -> dispatcherProvider.getObject().accept(close);
-                case Heartbeat h -> {
-                    if (h.draining()) {
-                        log.warn("Hub signalled draining — should not occur (server is never draining toward worker)");
-                    }
-                }
-                case WorkerHello hello -> log.warn(
-                    "Unexpected inbound WorkerHello from hub (worker is the source): workerId={}",
-                    hello.workerId()
-                );
-                case de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport report -> log.warn(
-                    "Unexpected inbound CapacityReport from hub (worker is the source)"
-                );
-                case SessionOutput out -> log.warn(
-                    "Unexpected inbound SessionOutput from hub (worker is the source): sessionId={}",
-                    out.sessionId()
-                );
+                // Hub never originates these — log once and ignore (protocol violation by the hub).
+                case Heartbeat h -> warnSourceMismatch(h);
+                case WorkerHello h -> warnSourceMismatch(h);
+                case CapacityReport r -> warnSourceMismatch(r);
+                case SessionOutput o -> warnSourceMismatch(o);
             }
         } catch (RuntimeException e) {
             log.error("Inbound dispatch threw for {}", frame.getClass().getSimpleName(), e);
         }
+    }
+
+    private void warnSourceMismatch(WorkerControlFrame frame) {
+        log.warn("Unexpected worker-source frame from hub: {}", frame.getClass().getSimpleName());
     }
 
     private void runConnectionLoop() {
@@ -258,7 +255,15 @@ public class WorkerControlClient implements WorkerControlPublisher {
                     continue;
                 }
                 String jwt = exchangeRegistrationToken();
+                CountDownLatch latch = new CountDownLatch(1);
+                welcomeLatch.set(latch);
                 openWebSocket(jwt);
+                if (!latch.await(properties.control().handshakeTimeout().toMillis(), TimeUnit.MILLISECONDS)) {
+                    forceReconnect("welcome-timeout");
+                    throw new IOException(
+                        "WorkerWelcome not received within " + properties.control().handshakeTimeout()
+                    );
+                }
                 backoff = MIN_BACKOFF;
                 failuresSinceSuccess = 0;
                 Duration silenceLimit = properties.heartbeat().interval().multipliedBy(3);

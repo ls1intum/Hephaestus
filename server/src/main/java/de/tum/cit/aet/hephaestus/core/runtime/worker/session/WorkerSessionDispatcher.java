@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionKind;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOpen;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.session.mentor.MentorSessionRunner;
-import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,33 +15,30 @@ public class WorkerSessionDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(WorkerSessionDispatcher.class);
 
-    private final Optional<MentorSessionRunner> mentorRunner;
+    private final MentorSessionRunner mentorRunner;
 
-    public WorkerSessionDispatcher(Optional<MentorSessionRunner> mentorRunner) {
+    public WorkerSessionDispatcher(MentorSessionRunner mentorRunner) {
         this.mentorRunner = mentorRunner;
     }
 
     public void accept(WorkerControlFrame frame) {
         switch (frame) {
             case SessionOpen open -> handleOpen(open);
-            case SessionInput input -> mentorRunner.ifPresent(r -> r.onInput(input));
-            case SessionClose close -> mentorRunner.ifPresent(r -> r.onClose(close));
+            case SessionInput input -> mentorRunner.onInput(input);
+            case SessionClose close -> mentorRunner.onClose(close);
             default -> log.debug("Dropping non-session frame in dispatcher: {}", frame.getClass().getSimpleName());
         }
     }
 
     private void handleOpen(SessionOpen open) {
         if (open.kind() == SessionKind.MENTOR_INTERACTIVE) {
-            mentorRunner.ifPresentOrElse(
-                r -> r.onOpen(open),
-                () -> log.warn("SessionOpen MENTOR_INTERACTIVE received but no MentorSessionRunner is wired")
-            );
+            mentorRunner.onOpen(open);
         } else {
             log.warn("Unsupported SessionKind={} on this worker; ignoring", open.kind());
         }
     }
 
     public void closeAll(SessionCloseReason reason) {
-        mentorRunner.ifPresent(r -> r.closeAll(reason));
+        mentorRunner.closeAll(reason);
     }
 }

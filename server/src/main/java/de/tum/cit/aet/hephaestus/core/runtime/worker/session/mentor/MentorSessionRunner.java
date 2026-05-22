@@ -118,7 +118,8 @@ public class MentorSessionRunner {
                 sandbox.send(payload);
             } catch (InteractiveSandboxException e) {
                 log.warn("Mentor session {} sandbox.send failed: {}", input.sessionId(), e.getMessage());
-                terminate(session, SessionCloseReason.ERROR);
+                sessions.remove(session.sessionId);
+                teardown(session, SessionCloseReason.ERROR);
             }
         }
     }
@@ -157,7 +158,7 @@ public class MentorSessionRunner {
             context = objectMapper.treeToValue(open.context(), MentorSessionContext.class);
         } catch (RuntimeException e) {
             log.warn("Mentor session {} has invalid context: {}", session.sessionId, e.getMessage());
-            failOpen(session);
+            rejectOpen(session);
             return;
         }
         InteractiveSandboxSpec spec = buildSpec(open.sessionId(), context);
@@ -166,7 +167,7 @@ public class MentorSessionRunner {
             sandbox = svc.attach(spec);
         } catch (InteractiveSandboxException e) {
             log.warn("Mentor session {} sandbox attach failed: {}", session.sessionId, e.getMessage());
-            failOpen(session);
+            rejectOpen(session);
             return;
         }
         // Assign the sandbox before subscribing: a synchronous emission must see session.sandbox.
@@ -217,16 +218,12 @@ public class MentorSessionRunner {
         }
     }
 
-    private void failOpen(RunningSession session) {
+    /** Open path failed before sandbox/subscription assignment — nothing to tear down. */
+    private void rejectOpen(RunningSession session) {
         sessions.remove(session.sessionId);
         capacityState.releaseMentor();
         rejected.increment();
         publisher.send(new SessionClose(session.sessionId, SessionCloseReason.ERROR));
-    }
-
-    private void terminate(RunningSession session, SessionCloseReason reason) {
-        sessions.remove(session.sessionId);
-        teardown(session, reason);
     }
 
     private void teardown(RunningSession session, SessionCloseReason reason) {

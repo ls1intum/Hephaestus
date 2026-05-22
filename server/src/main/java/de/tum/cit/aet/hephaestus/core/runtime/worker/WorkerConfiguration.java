@@ -20,15 +20,10 @@ import org.springframework.context.annotation.Primary;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Wires the worker-runtime substrate beans. Gated by
- * {@link RuntimeRole#WORKER_PROPERTY} with {@code matchIfMissing=true}: monolith dev mode keeps
- * the worker substrate loaded; production worker pods set the flag explicitly via
- * {@code application-worker.yml}.
- *
- * <p>The {@link WorkerControlPublisher} bean defaults to {@link LoggingWorkerControlPublisher};
- * the WSS-backed {@code WorkerControlClient} replaces it with a {@code @Primary} bean in the
- * follow-up transport commit. Substrate behavior is observable through logs and metrics in the
- * interim.
+ * Wires the worker-runtime substrate beans. Gated by {@link RuntimeRole#WORKER_PROPERTY} with
+ * {@code matchIfMissing=true}. {@link WorkerControlClient} (`@Primary`) wires when
+ * {@code hephaestus.worker.control.endpoint} is non-empty; otherwise {@link
+ * LoggingWorkerControlPublisher} stays in place as the no-op fallback.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
@@ -56,37 +51,45 @@ public class WorkerConfiguration {
         return state;
     }
 
-    private static void registerCapacityGauges(MeterRegistry meterRegistry, WorkerCapacityState state) {
-        Gauge.builder("worker.capacity.total", state, s -> s.reviewMax())
-            .description("Configured maximum concurrent review jobs")
-            .tag("type", "review")
-            .register(meterRegistry);
-        Gauge.builder("worker.capacity.total", state, s -> s.mentorMax())
-            .description("Configured maximum concurrent mentor sessions")
-            .tag("type", "mentor")
-            .register(meterRegistry);
-        Gauge.builder("worker.capacity.in_flight", state, s -> s.snapshot().inFlightReview())
-            .description("Review jobs currently executing")
-            .tag("type", "review")
-            .register(meterRegistry);
-        Gauge.builder("worker.capacity.in_flight", state, s -> s.snapshot().inFlightMentor())
-            .description("Mentor sessions currently open")
-            .tag("type", "mentor")
-            .register(meterRegistry);
-        Gauge.builder("worker.capacity.spare", state, s -> s.snapshot().spareReview())
-            .description("Spare review slots")
-            .tag("type", "review")
-            .register(meterRegistry);
-        Gauge.builder("worker.capacity.spare", state, s -> s.snapshot().spareMentor())
-            .description("Spare mentor slots")
-            .tag("type", "mentor")
-            .register(meterRegistry);
+    private static void registerCapacityGauges(MeterRegistry registry, WorkerCapacityState state) {
+        record G(String name, String type, java.util.function.ToDoubleFunction<WorkerCapacityState> f, String desc) {}
+        java.util.List.of(
+            new G("worker.capacity.total", "review", s -> s.reviewMax(), "Configured maximum concurrent review jobs"),
+            new G(
+                "worker.capacity.total",
+                "mentor",
+                s -> s.mentorMax(),
+                "Configured maximum concurrent mentor sessions"
+            ),
+            new G(
+                "worker.capacity.in_flight",
+                "review",
+                s -> s.snapshot().inFlightReview(),
+                "Review jobs currently executing"
+            ),
+            new G(
+                "worker.capacity.in_flight",
+                "mentor",
+                s -> s.snapshot().inFlightMentor(),
+                "Mentor sessions currently open"
+            ),
+            new G("worker.capacity.spare", "review", s -> s.snapshot().spareReview(), "Spare review slots"),
+            new G("worker.capacity.spare", "mentor", s -> s.snapshot().spareMentor(), "Spare mentor slots")
+        ).forEach(g ->
+            Gauge.builder(g.name(), state, g.f())
+                .description(g.desc())
+                .tag("type", g.type())
+                .strongReference(true)
+                .register(registry)
+        );
     }
 
     @Bean
     @ConditionalOnMissingBean(WorkerControlPublisher.class)
-    WorkerControlPublisher loggingWorkerControlPublisher() {
-        return new LoggingWorkerControlPublisher();
+    WorkerControlPublisher loggingWorkerControlPublisher(MeterRegistry meterRegistry) {
+        LoggingWorkerControlPublisher publisher = new LoggingWorkerControlPublisher();
+        registerChannelGauge(publisher, meterRegistry);
+        return publisher;
     }
 
     /**
@@ -108,7 +111,22 @@ public class WorkerConfiguration {
         ObjectMapper objectMapper,
         MeterRegistry meterRegistry
     ) {
-        return new WorkerControlClient(properties, frameCodec, dispatcherProvider, objectMapper, meterRegistry);
+        WorkerControlClient client = new WorkerControlClient(
+            properties,
+            frameCodec,
+            dispatcherProvider,
+            objectMapper,
+            meterRegistry
+        );
+        registerChannelGauge(client, meterRegistry);
+        return client;
+    }
+
+    private static void registerChannelGauge(WorkerControlPublisher publisher, MeterRegistry registry) {
+        Gauge.builder("worker.control.channel.connected", publisher, p -> p.isConnected() ? 1.0 : 0.0)
+            .description("1 when the worker control channel is connected, 0 otherwise")
+            .strongReference(true)
+            .register(registry);
     }
 
     @Bean
@@ -126,28 +144,6 @@ public class WorkerConfiguration {
         MeterRegistry meterRegistry
     ) {
         return new MentorSessionRunner(publisher, capacityState, sandboxService, objectMapper, meterRegistry);
-    }
-
-    @Bean
-    WorkerControlChannelGaugeBinder workerControlChannelGaugeBinder(
-        WorkerControlPublisher publisher,
-        MeterRegistry meterRegistry
-    ) {
-        return new WorkerControlChannelGaugeBinder(publisher, meterRegistry);
-    }
-
-    /** {@link MeterRegistry} keeps a weak reference to the source; this holder keeps it alive. */
-    static final class WorkerControlChannelGaugeBinder {
-
-        @SuppressWarnings("unused")
-        private final WorkerControlPublisher publisher;
-
-        WorkerControlChannelGaugeBinder(WorkerControlPublisher publisher, MeterRegistry meterRegistry) {
-            this.publisher = publisher;
-            Gauge.builder("worker.control.channel.connected", publisher, p -> p.isConnected() ? 1.0 : 0.0)
-                .description("1 when the worker control channel is connected, 0 otherwise")
-                .register(meterRegistry);
-        }
     }
 
     @Bean
@@ -170,7 +166,7 @@ public class WorkerConfiguration {
     }
 
     @Bean
-    WorkerSessionDispatcher workerSessionDispatcher(Optional<MentorSessionRunner> mentorSessionRunner) {
+    WorkerSessionDispatcher workerSessionDispatcher(MentorSessionRunner mentorSessionRunner) {
         return new WorkerSessionDispatcher(mentorSessionRunner);
     }
 

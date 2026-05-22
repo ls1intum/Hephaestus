@@ -81,7 +81,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
         WebSocketSession transport = new ConcurrentWebSocketSessionDecorator(
             rawTransport,
             (int) hubProperties.sendTimeLimit().toMillis(),
-            hubProperties.sendBufferSizeBytes()
+            HubProperties.SEND_BUFFER_SIZE_BYTES
         );
         String sessionId = UUID.randomUUID().toString();
         WorkerSession session = new WorkerSession(
@@ -101,7 +101,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
                 meterRegistry.counter("worker.hub.hello.timeout").increment();
                 close(rawTransport, CloseStatus.SESSION_NOT_RELIABLE);
             },
-            hubProperties.helloTimeout().toMillis(),
+            HubProperties.HELLO_TIMEOUT.toMillis(),
             TimeUnit.MILLISECONDS
         );
         session.armHelloDeadline(helloDeadline);

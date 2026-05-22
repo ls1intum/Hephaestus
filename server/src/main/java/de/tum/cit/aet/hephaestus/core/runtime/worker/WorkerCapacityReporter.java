@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.core.annotation.Order;
 
 /**
  * Periodic worker → hub capacity reporter. Cadence: {@code hephaestus.worker.heartbeat.interval}
@@ -49,7 +48,6 @@ public class WorkerCapacityReporter {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Order(10)
     public void start() {
         log.info("Worker capacity reporter starting (interval={})", interval);
         long ms = Math.max(1, interval.toMillis());
@@ -70,7 +68,9 @@ public class WorkerCapacityReporter {
             sent.increment();
         } catch (Exception e) {
             failed.increment();
-            log.warn("Failed to send CapacityReport: {}", e.getClass().getSimpleName(), e);
+            // Failures recur every interval against a disconnected hub — the metric is the
+            // operator surface; a stack trace per 20s would be log spam.
+            log.debug("CapacityReport send failed: {}", e.getClass().getSimpleName());
         }
     }
 }

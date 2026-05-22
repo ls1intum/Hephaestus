@@ -91,11 +91,10 @@ public class HubConfiguration {
 
     @Bean
     HubWebSocketRegistration hubWebSocketRegistration(
-        HubProperties properties,
         WorkerControlWebSocketHandler handler,
         WorkerJwtHandshakeInterceptor interceptor
     ) {
-        return new HubWebSocketRegistration(properties, handler, interceptor);
+        return new HubWebSocketRegistration(handler, interceptor);
     }
 
     @Bean

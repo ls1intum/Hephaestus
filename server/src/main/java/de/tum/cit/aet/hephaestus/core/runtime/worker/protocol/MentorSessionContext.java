@@ -37,5 +37,17 @@ public record MentorSessionContext(
         environment = environment == null ? Collections.emptyMap() : Map.copyOf(environment);
     }
 
-    public record Limits(@Nullable Long memoryBytes, @Nullable Double cpus, @Nullable Integer pidsLimit) {}
+    public record Limits(@Nullable Long memoryBytes, @Nullable Double cpus, @Nullable Integer pidsLimit) {
+        public Limits {
+            if (memoryBytes != null && memoryBytes <= 0) {
+                throw new IllegalArgumentException("Limits.memoryBytes must be positive when set");
+            }
+            if (cpus != null && cpus <= 0) {
+                throw new IllegalArgumentException("Limits.cpus must be positive when set");
+            }
+            if (pidsLimit != null && pidsLimit <= 0) {
+                throw new IllegalArgumentException("Limits.pidsLimit must be positive when set");
+            }
+        }
+    }
 }
