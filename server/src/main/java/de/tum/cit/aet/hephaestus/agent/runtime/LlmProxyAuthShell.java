@@ -103,7 +103,10 @@ public final class LlmProxyAuthShell {
                     env.put("PI_HEPHAESTUS_BASE_URL", baseUrl);
                     env.put("PI_HEPHAESTUS_API_KEY", credential);
                     if (modelName != null && !modelName.isBlank()) {
-                        env.put("PI_HEPHAESTUS_MODEL", modelName);
+                        // Pi parses any slash in a model id as a `provider/model` reference; the
+                        // hephaestus provider registers the model under the bare id so the model
+                        // resolver can find it via `hephaestus/<id>` from settings.json.
+                        env.put("PI_HEPHAESTUS_MODEL", PiRuntimeFactory.stripProviderPrefix(modelName));
                     }
                 }
                 yield "";
@@ -114,7 +117,10 @@ public final class LlmProxyAuthShell {
                     env.put("PI_HEPHAESTUS_BASE_URL", baseUrl);
                     env.put("PI_HEPHAESTUS_API_KEY", credential);
                     if (modelName != null && !modelName.isBlank()) {
-                        env.put("PI_HEPHAESTUS_MODEL", modelName);
+                        // Pi parses any slash in a model id as a `provider/model` reference; the
+                        // hephaestus provider registers the model under the bare id so the model
+                        // resolver can find it via `hephaestus/<id>` from settings.json.
+                        env.put("PI_HEPHAESTUS_MODEL", PiRuntimeFactory.stripProviderPrefix(modelName));
                     }
                 }
                 yield "";

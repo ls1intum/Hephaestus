@@ -328,7 +328,34 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 )
             );
             assertThat(settings.path("defaultProvider").asText()).isEqualTo("hephaestus");
-            assertThat(settings.path("defaultModel").asText()).isEqualTo("gpt-x");
+            assertThat(settings.path("defaultModel").asText()).isEqualTo("hephaestus/gpt-x");
+        }
+
+        @Test
+        @DisplayName("slash-prefixed model id (e.g. openai/gpt-oss-120b) collapses to hephaestus/<id>")
+        void slashPrefixedModelIdCollapses() throws Exception {
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk-test",
+                "openai/gpt-oss-120b",
+                "https://gpu.example.com/api",
+                null,
+                true,
+                600,
+                PRACTICE,
+                Map.of(),
+                ""
+            );
+            JsonNode settings = objectMapper.readTree(
+                new String(
+                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"),
+                    StandardCharsets.UTF_8
+                )
+            );
+            // Without the strip, Pi parses the slash as `provider/model` and falls back to the
+            // built-in OpenAI provider — sending requests to api.openai.com.
+            assertThat(settings.path("defaultModel").asText()).isEqualTo("hephaestus/gpt-oss-120b");
         }
 
         @Test

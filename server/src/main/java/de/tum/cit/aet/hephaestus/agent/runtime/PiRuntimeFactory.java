@@ -165,9 +165,25 @@ public class PiRuntimeFactory {
     }
 
     /**
+     * Drop a leading {@code provider/} segment from a model id. The TUM gateway and some other
+     * OSS routers expose models under names like {@code openai/gpt-oss-120b} — the part before
+     * the slash is the upstream provider, not the Pi model id. Keeping it would collide with
+     * Pi's provider/model reference grammar.
+     */
+    static String stripProviderPrefix(String modelName) {
+        int slash = modelName.indexOf('/');
+        return slash >= 0 ? modelName.substring(slash + 1) : modelName;
+    }
+
+    /**
      * Build the settings JSON Pi loads at session start. When {@code useCustomProvider} is true,
      * {@code defaultProvider} routes through the {@code hephaestus} extension (see
-     * {@link #buildExtensionFile}).
+     * {@link #buildExtensionFile}) and {@code defaultModel} becomes {@code hephaestus/<id>}.
+     * Without the {@code hephaestus/} prefix Pi's model resolver parses any slash in the model
+     * name (e.g. {@code openai/gpt-oss-120b}) as a {@code provider/model} reference, walks the
+     * built-in OpenAI provider, fails to find the model, and silently falls back to the
+     * built-in default — sending requests to {@code api.openai.com} instead of the custom
+     * gateway. The prefix forces unambiguous resolution.
      */
     public byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName, boolean useCustomProvider) {
         Map<String, Object> settings = new LinkedHashMap<>();
@@ -177,7 +193,8 @@ public class PiRuntimeFactory {
             settings.put("defaultProvider", providerToken(provider));
         }
         if (modelName != null && !modelName.isBlank()) {
-            settings.put("defaultModel", modelName);
+            String defaultModel = useCustomProvider ? "hephaestus/" + stripProviderPrefix(modelName) : modelName;
+            settings.put("defaultModel", defaultModel);
         }
         settings.put("transport", "sse");
         Map<String, Object> compaction = new LinkedHashMap<>();

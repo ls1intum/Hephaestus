@@ -564,8 +564,10 @@ async function main() {
             const stopReason = event.message.stopReason;
             const types = (event.message.content || []).map((c) => c.type);
             const toolCalls = types.filter((t) => t === "tool_use" || t === "tool_call").length;
+            const errMsg = event.message.errorMessage;
             console.error(
-                `[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, types=[${types}]`,
+                `[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, types=[${types}]` +
+                    (errMsg ? `, errorMessage=${redact(errMsg)}` : ""),
             );
         }
         events.push({ type: event.type, timestamp: Date.now() });
