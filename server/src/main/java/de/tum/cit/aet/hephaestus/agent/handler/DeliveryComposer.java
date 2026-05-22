@@ -451,8 +451,10 @@ class DeliveryComposer {
 
     /**
      * Collect inline diff notes from NEGATIVE findings.
-     * Each finding gets one diff note at its primary location.
-     * Body includes severity emoji + title header + guidance (the fix).
+     *
+     * <p>Prefer the agent's per-finding {@code suggestedDiffNotes} (richer, explicit lines/body).
+     * Fall back to a synthesized note from the first evidence location + composed body when the
+     * agent did not supply one.
      */
     private static List<DiffNote> collectDiffNotes(List<ValidatedFinding> negatives) {
         List<DiffNote> notes = new ArrayList<>();
@@ -460,6 +462,16 @@ class DeliveryComposer {
         for (ValidatedFinding f : negatives) {
             if (notes.size() >= PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES) break;
 
+            // Prefer agent-supplied suggestedDiffNotes
+            if (!f.suggestedDiffNotes().isEmpty()) {
+                for (DiffNote note : f.suggestedDiffNotes()) {
+                    if (notes.size() >= PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES) break;
+                    notes.add(note);
+                }
+                continue;
+            }
+
+            // Fallback: synthesize from evidence.locations[0]
             JsonNode evidence = f.evidence();
             if (evidence == null || evidence.isNull()) continue;
             JsonNode locations = evidence.get("locations");
@@ -480,7 +492,6 @@ class DeliveryComposer {
                 endLine = endLineNode.asInt();
             }
 
-            // Diff note body: emoji title + reasoning + guidance
             String body = composeDiffNoteBody(f);
             if (body != null && !body.isBlank()) {
                 notes.add(new DiffNote(pathNode.asText(), startLine, endLine, body));

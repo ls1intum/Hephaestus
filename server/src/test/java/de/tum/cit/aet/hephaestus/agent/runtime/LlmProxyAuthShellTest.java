@@ -31,7 +31,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         )
         void bridgesProxyEnv(LlmProvider provider, String expectedBaseUrl, String expectedApiKey) {
             Map<String, String> env = new HashMap<>();
-            String script = LlmProxyAuthShell.build(CredentialMode.PROXY, provider, null, env);
+            String script = LlmProxyAuthShell.build(CredentialMode.PROXY, provider, null, null, null, env);
             assertThat(script).contains(expectedBaseUrl).contains(expectedApiKey).endsWith(" && ");
             assertThat(env).isEmpty();
         }
@@ -40,7 +40,14 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         @DisplayName("Azure proxy sets the 2025-04-01-preview API version")
         void azureSetsApiVersion() {
             Map<String, String> env = new HashMap<>();
-            String script = LlmProxyAuthShell.build(CredentialMode.PROXY, LlmProvider.AZURE_OPENAI, null, env);
+            String script = LlmProxyAuthShell.build(
+                CredentialMode.PROXY,
+                LlmProvider.AZURE_OPENAI,
+                null,
+                null,
+                null,
+                env
+            );
             assertThat(script).contains("AZURE_OPENAI_API_VERSION=\"2025-04-01-preview\"");
         }
     }
@@ -57,6 +64,8 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
                 CredentialMode.API_KEY,
                 LlmProvider.AZURE_OPENAI,
                 "secret-key",
+                null,
+                null,
                 env
             );
             assertThat(env).doesNotContainKey("AZURE_OPENAI_API_KEY");
@@ -67,7 +76,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         @CsvSource({ "OPENAI, OPENAI_API_KEY", "ANTHROPIC, ANTHROPIC_API_KEY" })
         void nonAzureKeyInEnvMap(LlmProvider provider, String envVar) {
             Map<String, String> env = new HashMap<>();
-            String script = LlmProxyAuthShell.build(CredentialMode.API_KEY, provider, "sk-test", env);
+            String script = LlmProxyAuthShell.build(CredentialMode.API_KEY, provider, "sk-test", null, null, env);
             assertThat(env).containsEntry(envVar, "sk-test");
             assertThat(script).isEmpty();
         }
@@ -76,7 +85,14 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         @DisplayName("OAUTH mode treats credential as API key (Pi has no OAuth mode)")
         void oauthBehavesAsApiKey() {
             Map<String, String> env = new HashMap<>();
-            String script = LlmProxyAuthShell.build(CredentialMode.OAUTH, LlmProvider.OPENAI, "sk-oauth", env);
+            String script = LlmProxyAuthShell.build(
+                CredentialMode.OAUTH,
+                LlmProvider.OPENAI,
+                "sk-oauth",
+                null,
+                null,
+                env
+            );
             assertThat(env).containsEntry("OPENAI_API_KEY", "sk-oauth");
             assertThat(script).isEmpty();
         }
@@ -86,7 +102,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         void nullCredentialThrows() {
             Map<String, String> env = new HashMap<>();
             assertThatThrownBy(() ->
-                LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, null, env)
+                LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, null, null, null, env)
             ).isInstanceOf(IllegalArgumentException.class);
         }
 

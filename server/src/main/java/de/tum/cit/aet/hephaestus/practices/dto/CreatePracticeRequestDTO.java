@@ -31,14 +31,6 @@ public record CreatePracticeRequestDTO(
     @Schema(description = "Practice category", example = "code-quality")
     String category,
 
-    @NotBlank(message = "Description is required")
-    @Size(max = 10000, message = "Description must be at most 10000 characters")
-    @Schema(
-        description = "Practice description",
-        example = "Ensures pull request descriptions are detailed and informative"
-    )
-    String description,
-
     @NotNull(message = "Trigger events are required")
     @Size(min = 1, max = 10, message = "Trigger events must contain between 1 and 10 entries")
     @ValidTriggerEvents
@@ -48,6 +40,7 @@ public record CreatePracticeRequestDTO(
     )
     List<String> triggerEvents,
 
+    @NotBlank(message = "Criteria is required")
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
     @Schema(description = "Practice evaluation criteria")
     String criteria,

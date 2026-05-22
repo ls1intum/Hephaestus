@@ -56,7 +56,6 @@ const runnerDebug = { attempts: [], usageTotals };
 const reviewState = {
     findings: [],
     findingKeys: [],
-    delivery: { mrNote: null },
 };
 const verdictSchema = { type: "string", enum: ["POSITIVE", "NEGATIVE", "NOT_APPLICABLE"] };
 const severitySchema = { type: "string", enum: ["CRITICAL", "MAJOR", "MINOR", "INFO"] };
@@ -118,14 +117,7 @@ function persistRunnerDebug() {
 function persistReviewState() {
     writeFileSync(
         REVIEW_STATE_PATH,
-        JSON.stringify(
-            {
-                findings: reviewState.findings,
-                delivery: reviewState.delivery,
-            },
-            null,
-            2,
-        ),
+        JSON.stringify({ findings: reviewState.findings }, null, 2),
     );
 }
 
@@ -158,8 +150,7 @@ function isValidFindingsPayload(p) {
         typeof p === "object" &&
         Array.isArray(p.findings) &&
         p.findings.length > 0 &&
-        p.findings.some(isValidFinding) &&
-        (p.delivery == null || (typeof p.delivery === "object" && !Array.isArray(p.delivery)))
+        p.findings.some(isValidFinding)
     );
 }
 
@@ -196,24 +187,13 @@ function checkResultFile() {
 }
 
 function maybeWriteResultFile() {
-    const mrNote = typeof reviewState.delivery.mrNote === "string" ? reviewState.delivery.mrNote.trim() : "";
-    if (!mrNote || reviewState.findings.length === 0) return false;
-    writeFileSync(
-        RESULT_PATH,
-        JSON.stringify(
-            {
-                findings: reviewState.findings,
-                delivery: { mrNote },
-            },
-            null,
-            2,
-        ),
-    );
+    if (reviewState.findings.length === 0) return false;
+    writeFileSync(RESULT_PATH, JSON.stringify({ findings: reviewState.findings }, null, 2));
     return true;
 }
 
 function hasPersistedReviewState() {
-    return reviewState.findings.length > 0 || Boolean(reviewState.delivery.mrNote?.trim());
+    return reviewState.findings.length > 0;
 }
 
 function normalizeDiffNote(note) {
@@ -330,38 +310,6 @@ const reportFindingTool = defineTool({
         };
     },
 });
-
-const setReviewSummaryTool = defineTool({
-    name: "set_review_summary",
-    label: "Set Review Summary",
-    description:
-        "Persist the final delivery.mrNote markdown summary for the merge request comment. Keep it concise and call this once the review findings are already persisted.",
-    parameters: {
-        type: "object",
-        additionalProperties: false,
-        required: ["mrNote"],
-        properties: {
-            mrNote: { type: "string", minLength: 1, maxLength: 60000 },
-        },
-    },
-    execute: async (_toolCallId, params) => {
-        reviewState.delivery.mrNote = String(params.mrNote ?? "").trim();
-        persistReviewState();
-        const wroteResult = maybeWriteResultFile();
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: wroteResult
-                        ? `Stored review summary and wrote ${RESULT_PATH}.`
-                        : "Stored review summary. Result file will be written after at least one finding is reported.",
-                },
-            ],
-            details: { wroteResult, totalFindings: reviewState.findings.length },
-        };
-    },
-});
-
 
 function extractUsageFromSession(session) {
     const messages = session.messages || [];
@@ -498,8 +446,7 @@ function buildRetryScaffold(slugs) {
         `Persist every justified finding with report_finding, one finding per call. ` +
         `There is no target count and no quota. ` +
         `Only report POSITIVE findings that add real review value. ` +
-        `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem. ` +
-        `Then persist the final MR summary with set_review_summary.`
+        `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem.`
     );
 }
 
@@ -574,8 +521,8 @@ async function main() {
     const { session } = await createAgentSession({
         cwd: CWD,
         agentDir: AGENT_DIR,
-        tools: ["read", "bash", "grep", "report_finding", "set_review_summary"],
-        customTools: [reportFindingTool, setReviewSummaryTool],
+        tools: ["read", "bash", "grep", "report_finding"],
+        customTools: [reportFindingTool],
         sessionManager,
         settingsManager,
     });
@@ -598,7 +545,6 @@ async function main() {
             `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be "No change needed." ` +
             `Only keep POSITIVE findings that add real review value. ` +
             `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Then call set_review_summary exactly once. ` +
             `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
         session.steer(steerMessage).catch((err) => console.error(`[pi-runner] steer failed: ${err.message}`));
     }, SOFT_TIMEOUT_MS);
@@ -726,7 +672,6 @@ async function main() {
             `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
             `Only keep POSITIVE findings that add real review value. ` +
             `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Then call set_review_summary exactly once with the MR note. ` +
             `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
             scaffold;
     } else if (agentText) {
@@ -737,7 +682,6 @@ async function main() {
             `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
             `Only keep POSITIVE findings that add real review value. ` +
             `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Then call set_review_summary exactly once with delivery.mrNote. ` +
             `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
             scaffold;
     } else {
@@ -748,7 +692,6 @@ async function main() {
             `using \"No change needed.\" as guidance for POSITIVE or NOT_APPLICABLE findings when needed. ` +
             `Only keep POSITIVE findings that add real review value. ` +
             `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Then call set_review_summary exactly once with the MR note. ` +
             `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
             scaffold;
     }

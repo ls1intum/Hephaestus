@@ -52,7 +52,6 @@ class PracticeCatalogAspectProviderTest extends BaseUnitTest {
         Practice practice = new Practice();
         practice.setSlug("error-state-handling");
         practice.setName("Error State Handling");
-        practice.setDescription("Handle SwiftUI error state.");
         practice.setCriteria("Show an error view for failed network calls.");
         when(practiceRepository.findByWorkspaceIdAndActiveTrue(eq(1L))).thenReturn(List.of(practice));
 
@@ -69,6 +68,6 @@ class PracticeCatalogAspectProviderTest extends BaseUnitTest {
         assertThat(entry.get("slug").asText()).isEqualTo("error-state-handling");
         assertThat(entry.get("displayName").asText()).isEqualTo("Error State Handling");
         assertThat(entry.get("criteria").asText()).contains("Show an error view");
-        assertThat(entry.get("description").asText()).contains("SwiftUI");
+        assertThat(entry.has("description")).isFalse();
     }
 }

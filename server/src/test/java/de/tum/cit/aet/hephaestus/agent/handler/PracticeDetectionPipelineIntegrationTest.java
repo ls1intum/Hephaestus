@@ -214,7 +214,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         p.setSlug(slug);
         p.setName(name);
         p.setCategory("test");
-        p.setDescription("Test " + slug);
+        p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         return practiceRepository.save(p);
     }
@@ -248,23 +248,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 }
               ]""";
 
-        if (includeDelivery) {
-            return (
-                findings +
-                """
-                  ,
-                  "delivery": {
-                    "mrNote": "## Practice Review\\nPlease add null checks for safety.",
-                    "diffNotes": [{
-                      "filePath": "src/Main.java",
-                      "startLine": 10,
-                      "endLine": 15,
-                      "body": "Consider adding a null check here."
-                    }]
-                  }
-                }"""
-            );
-        }
+        // includeDelivery is preserved for call-site parity; agent no longer emits a
+        // delivery block — server composes the MR note from findings.
         return findings + "\n}";
     }
 
@@ -388,8 +373,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                       "severity": "MINOR",
                       "confidence": 0.8
                     }
-                  ],
-                  "delivery": { "mrNote": "Fix error handling." }
+                  ]
                 }""";
             setJobOutput(output);
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-456");

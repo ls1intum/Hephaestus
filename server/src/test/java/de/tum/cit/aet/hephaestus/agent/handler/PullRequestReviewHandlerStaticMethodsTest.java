@@ -122,7 +122,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
                 evidence,
                 "reasoning",
                 "guidance"
-            );
+            , List.of());
         }
 
         private PracticeDetectionResultParser.ValidatedFinding makeFindingNoEvidence(String slug) {
@@ -135,7 +135,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
                 null,
                 "reasoning",
                 "guidance"
-            );
+            , List.of());
         }
 
         @Test

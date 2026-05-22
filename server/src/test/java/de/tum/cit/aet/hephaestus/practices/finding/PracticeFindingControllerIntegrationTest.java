@@ -74,7 +74,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setSlug(slug);
         practice.setName(name);
         practice.setCategory(category);
-        practice.setDescription("Description for " + slug);
+        practice.setCriteria("Description for " + slug);
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         practice.setActive(true);
         return practiceRepository.save(practice);
@@ -464,7 +464,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
             otherPractice.setCategory("other");
-            otherPractice.setDescription("Desc");
+            otherPractice.setCriteria("Desc");
             otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             otherPractice.setActive(true);
             otherPractice = practiceRepository.save(otherPractice);
@@ -1012,7 +1012,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
             otherPractice.setSlug("ws2-practice");
             otherPractice.setName("WS2 Practice");
             otherPractice.setCategory("other");
-            otherPractice.setDescription("Desc");
+            otherPractice.setCriteria("Desc");
             otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             otherPractice.setActive(true);
             otherPractice = practiceRepository.save(otherPractice);

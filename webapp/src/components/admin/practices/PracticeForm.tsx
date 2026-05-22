@@ -33,7 +33,6 @@ interface FormState {
 	name: string;
 	slug: string;
 	category: string;
-	description: string;
 	triggerEvents: string[];
 	criteria: string;
 	precomputeScript: string;
@@ -45,9 +44,8 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 			name: initialData.name,
 			slug: initialData.slug,
 			category: initialData.category ?? "",
-			description: initialData.description,
 			triggerEvents: [...initialData.triggerEvents],
-			criteria: initialData.criteria ?? "",
+			criteria: initialData.criteria,
 			precomputeScript: initialData.precomputeScript ?? "",
 		};
 	}
@@ -55,7 +53,6 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 		name: "",
 		slug: "",
 		category: "",
-		description: "",
 		triggerEvents: [],
 		criteria: "",
 		precomputeScript: "",
@@ -102,14 +99,14 @@ export function PracticeForm({
 			: undefined;
 	const triggerError =
 		submitted && form.triggerEvents.length === 0 ? "Select at least one trigger event" : undefined;
-	const descriptionError =
-		submitted && form.description.length < 3
-			? "Description must be at least 3 characters"
+	const criteriaError =
+		submitted && form.criteria.trim().length < 3
+			? "Criteria must be at least 3 characters"
 			: undefined;
 
 	const isValid =
 		form.name.length >= 3 &&
-		form.description.length >= 3 &&
+		form.criteria.trim().length >= 3 &&
 		form.triggerEvents.length > 0 &&
 		(mode === "edit" || isValidSlug(form.slug));
 
@@ -122,20 +119,18 @@ export function PracticeForm({
 			const data: CreatePracticeRequest = {
 				name: form.name,
 				slug: form.slug,
-				description: form.description,
+				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
 				...(form.category.trim() ? { category: form.category.trim() } : {}),
-				...(form.criteria.trim() ? { criteria: form.criteria.trim() } : {}),
 				...(form.precomputeScript.trim() ? { precomputeScript: form.precomputeScript.trim() } : {}),
 			};
 			onSubmit(data);
 		} else {
 			const data: UpdatePracticeRequest = {
 				name: form.name,
-				description: form.description,
+				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
 				category: form.category.trim() || undefined,
-				criteria: form.criteria.trim() || undefined,
 				precomputeScript: form.precomputeScript.trim() || undefined,
 			};
 			onSubmit(initialData.slug, data);
@@ -242,24 +237,6 @@ export function PracticeForm({
 										maxLength={64}
 									/>
 								</div>
-
-								<div className="grid gap-2">
-									<Label htmlFor="practice-description">Description *</Label>
-									<Textarea
-										id="practice-description"
-										placeholder="Describe what this practice evaluates..."
-										value={form.description}
-										onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-										className="min-h-20"
-										aria-invalid={!!descriptionError}
-										aria-describedby={descriptionError ? "description-error" : undefined}
-									/>
-									{descriptionError && (
-										<p id="description-error" className="text-sm text-destructive">
-											{descriptionError}
-										</p>
-									)}
-								</div>
 							</div>
 						</section>
 
@@ -309,18 +286,26 @@ export function PracticeForm({
 						{/* Section: Evaluation Criteria */}
 						<section className="space-y-4">
 							<div>
-								<h2 className="text-lg font-semibold">Evaluation Criteria</h2>
+								<h2 className="text-lg font-semibold">Evaluation Criteria *</h2>
 								<p className="text-sm text-muted-foreground">
-									Markdown-formatted criteria used by the AI agent during code review.
+									Markdown-formatted criteria used by the AI agent during code review. This is the
+									single source of truth for what this practice evaluates.
 								</p>
 							</div>
 							<Textarea
 								id="practice-criteria"
-								placeholder="Evaluation criteria in markdown..."
+								placeholder="## Practice Name&#10;&#10;Describe what to evaluate, required elements, and anti-patterns..."
 								value={form.criteria}
 								onChange={(e) => setForm((prev) => ({ ...prev, criteria: e.target.value }))}
-								className="min-h-48 font-mono text-sm"
+								className="min-h-64 font-mono text-sm"
+								aria-invalid={!!criteriaError}
+								aria-describedby={criteriaError ? "criteria-error" : undefined}
 							/>
+							{criteriaError && (
+								<p id="criteria-error" className="text-sm text-destructive">
+									{criteriaError}
+								</p>
+							)}
 						</section>
 
 						<Separator />

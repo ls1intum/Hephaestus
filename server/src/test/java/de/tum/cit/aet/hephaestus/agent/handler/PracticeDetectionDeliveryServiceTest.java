@@ -131,7 +131,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     private ValidatedFinding validFinding(String slug, Verdict verdict) {
-        return new ValidatedFinding(slug, "Test finding", verdict, Severity.INFO, 0.9f, null, null, null);
+        return new ValidatedFinding(slug, "Test finding", verdict, Severity.INFO, 0.9f, null, null, null, List.of());
     }
 
     @Nested

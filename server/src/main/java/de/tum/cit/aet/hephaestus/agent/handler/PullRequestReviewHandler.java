@@ -280,8 +280,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         StringBuilder bundle = new StringBuilder();
         for (Practice p : practices) {
-            String criteria = p.getCriteria() != null ? p.getCriteria() : p.getDescription();
-            if (criteria == null) criteria = "";
+            String criteria = p.getCriteria();
             files.put(WorkspaceAbi.PRACTICES_PREFIX + p.getSlug() + ".md", criteria.getBytes(StandardCharsets.UTF_8));
             bundle.append("# ").append(p.getSlug()).append("\n\n").append(criteria).append("\n\n---\n\n");
         }
@@ -400,31 +399,19 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
 
-        PracticeDetectionResultParser.DeliveryContent delivery = parsed.delivery();
-        if (delivery == null || delivery.mrNote() == null) {
-            var composed = DeliveryComposer.compose(scopedFindings);
-            if (composed != null) {
-                var diffNotes = (delivery != null && !delivery.diffNotes().isEmpty())
-                    ? delivery.diffNotes()
-                    : composed.diffNotes();
-                delivery = new PracticeDetectionResultParser.DeliveryContent(composed.mrNote(), diffNotes);
-                log.info(
-                    "Server-side delivery composed from {} findings: jobId={}",
-                    scopedFindings.size(),
-                    job.getId()
-                );
-            }
-        }
-
-        if (delivery != null && !delivery.diffNotes().isEmpty()) {
-            var validLines = computeDiffValidLines(job);
-            if (!validLines.isEmpty()) {
-                var correctedNotes = DiffHunkValidator.validateAndCorrect(
-                    delivery.diffNotes(),
-                    validLines,
-                    job.getId().toString()
-                );
-                delivery = new PracticeDetectionResultParser.DeliveryContent(delivery.mrNote(), correctedNotes);
+        PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(scopedFindings);
+        if (delivery != null) {
+            log.info("Server-side delivery composed from {} findings: jobId={}", scopedFindings.size(), job.getId());
+            if (!delivery.diffNotes().isEmpty()) {
+                var validLines = computeDiffValidLines(job);
+                if (!validLines.isEmpty()) {
+                    var correctedNotes = DiffHunkValidator.validateAndCorrect(
+                        delivery.diffNotes(),
+                        validLines,
+                        job.getId().toString()
+                    );
+                    delivery = new PracticeDetectionResultParser.DeliveryContent(delivery.mrNote(), correctedNotes);
+                }
             }
         }
 

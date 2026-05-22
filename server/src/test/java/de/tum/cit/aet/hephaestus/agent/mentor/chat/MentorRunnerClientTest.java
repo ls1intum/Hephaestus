@@ -42,11 +42,13 @@ class MentorRunnerClientTest extends BaseUnitTest {
     private final CopyOnWriteArrayList<JsonNode> events = new CopyOnWriteArrayList<>();
     private final AtomicReference<MentorRunnerClient.FetchContextRequest> lastFetchContext = new AtomicReference<>();
     private ScheduledExecutorService scheduler;
+    private UUID threadId;
 
     @BeforeEach
     void setUp() {
         sandbox = new FakeSandbox();
         scheduler = Executors.newSingleThreadScheduledExecutor();
+        threadId = UUID.randomUUID();
         client = new MentorRunnerClient(
             sandbox,
             mapper,
@@ -55,7 +57,8 @@ class MentorRunnerClientTest extends BaseUnitTest {
                 lastFetchContext.set(req);
                 return mapper.createObjectNode().put("ok", true);
             },
-            scheduler
+            scheduler,
+            threadId
         );
         client.start();
     }
@@ -128,7 +131,7 @@ class MentorRunnerClientTest extends BaseUnitTest {
         notification.put("jsonrpc", "2.0");
         notification.put("method", "event");
         ObjectNode params = notification.putObject("params");
-        params.put("threadId", UUID.randomUUID().toString());
+        params.put("threadId", threadId.toString());
         params.set("event", mapper.createObjectNode().put("type", "runner_ready").put("protocolVersion", 1));
 
         sandbox.pushFrame(notification);

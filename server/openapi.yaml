@@ -2955,12 +2955,6 @@ components:
           description: Practice evaluation criteria
           maxLength: 50000
           minLength: 0
-        description:
-          type: string
-          description: Practice description
-          example: Ensures pull request descriptions are detailed and informative
-          maxLength: 10000
-          minLength: 0
         name:
           type: string
           description: Human-readable name
@@ -2991,7 +2985,7 @@ components:
           maxItems: 10
           minItems: 1
       required:
-      - description
+      - criteria
       - name
       - slug
       - triggerEvents
@@ -3503,9 +3497,6 @@ components:
         criteria:
           type: string
           description: Practice evaluation criteria
-        description:
-          type: string
-          description: Practice description
         id:
           type: integer
           format: int64
@@ -3532,7 +3523,7 @@ components:
       required:
       - active
       - createdAt
-      - description
+      - criteria
       - id
       - name
       - slug
@@ -4254,11 +4245,6 @@ components:
           type: string
           description: Practice evaluation criteria
           maxLength: 50000
-          minLength: 0
-        description:
-          type: string
-          description: Practice description
-          maxLength: 10000
           minLength: 0
           pattern: .*\S.*
         name:

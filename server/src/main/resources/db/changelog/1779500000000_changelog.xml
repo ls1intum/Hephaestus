@@ -1,0 +1,15 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet author="FelixTJDietrich" id="1779500000000-1">
+        <comment>Backfill practice.criteria from practice.description where empty, then drop description and make criteria NOT NULL.</comment>
+        <sql>UPDATE practice SET criteria = description WHERE criteria IS NULL OR criteria = ''</sql>
+        <dropColumn tableName="practice" columnName="description"/>
+        <addNotNullConstraint tableName="practice" columnName="criteria" columnDataType="TEXT"/>
+    </changeSet>
+
+</databaseChangeLog>

@@ -136,22 +136,15 @@ public class MentorTurnPersistence {
     }
 
     /**
-     * The partial unique index has had two names across the migration history:
-     * {@code ux_chat_message_in_flight} (legacy, keyed on metadata->>'status') and
-     * {@code ux_chat_message_in_flight_v2} (current, keyed on the status column).
-     * Match either so a concurrent-turn 409 keeps working during the migration window AND
-     * after rollback if anyone backs out.
+     * Match the partial-unique in-flight index by name so a concurrent-turn 409 distinguishes
+     * the expected race from other integrity violations.
      */
     private static boolean isInFlightUniqueViolation(DataIntegrityViolationException ex) {
         Throwable cur = ex;
         while (cur != null) {
             if (cur instanceof ConstraintViolationException cve) {
                 String name = cve.getConstraintName();
-                return (
-                    name != null &&
-                    (name.equalsIgnoreCase("ux_chat_message_in_flight") ||
-                        name.equalsIgnoreCase("ux_chat_message_in_flight_v2"))
-                );
+                return name != null && name.equalsIgnoreCase("ux_chat_message_in_flight_v2");
             }
             cur = cur.getCause();
         }

@@ -35,38 +35,6 @@ public final class LlmProxyAuthShell {
     private LlmProxyAuthShell() {}
 
     /**
-     * @param mode       PROXY (use {@code $LLM_PROXY_*}), API_KEY (use the credential), or OAUTH (treated as API_KEY)
-     * @param provider   the LLM provider; controls which env vars are exported
-     * @param credential the API key in API_KEY/OAUTH modes; ignored in PROXY mode
-     * @param env        mutable env map; non-Azure API keys are written here as a side effect
-     * @return the shell prefix ending in {@code " && "} (empty if no exports needed)
-     */
-    public static String build(
-        CredentialMode mode,
-        LlmProvider provider,
-        @Nullable String credential,
-        Map<String, String> env
-    ) {
-        return build(mode, provider, credential, null, null, env);
-    }
-
-    /**
-     * Three-arg variant that takes a {@code baseUrl} override. Kept for backwards compatibility
-     * with the older 5-arg call site shape; new callers should use the 6-arg overload that takes
-     * an explicit {@code modelName} so the hephaestus provider extension can be registered with
-     * a concrete model id.
-     */
-    public static String build(
-        CredentialMode mode,
-        LlmProvider provider,
-        @Nullable String credential,
-        @Nullable String baseUrl,
-        Map<String, String> env
-    ) {
-        return build(mode, provider, credential, baseUrl, null, env);
-    }
-
-    /**
      * Variant that writes the {@code PI_HEPHAESTUS_*} env vars for the custom provider
      * extension when {@code baseUrl} is non-blank in API_KEY/OAUTH mode for {@code OPENAI} /
      * {@code ANTHROPIC}. Azure does not get this treatment: its deployment routing is

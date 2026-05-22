@@ -194,13 +194,13 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         p.setSlug(slug);
         p.setName(name);
         p.setCategory("test");
-        p.setDescription("Test " + slug);
+        p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         return practiceRepository.save(p);
     }
 
     private ValidatedFinding finding(String slug, Verdict verdict) {
-        return new ValidatedFinding(slug, "Test: " + slug, verdict, Severity.INFO, 0.9f, null, null, null);
+        return new ValidatedFinding(slug, "Test: " + slug, verdict, Severity.INFO, 0.9f, null, null, null, List.of());
     }
 
     @Nested
@@ -288,7 +288,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                         null,
                         null,
                         null
-                    )
+                    , List.of())
                 );
             }
 

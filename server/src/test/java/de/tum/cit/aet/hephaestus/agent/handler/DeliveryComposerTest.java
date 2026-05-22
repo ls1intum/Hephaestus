@@ -65,7 +65,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             null,
             null
-        );
+        , List.of());
     }
 
     private ValidatedFinding negativeFinding(
@@ -86,7 +86,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             buildEvidence(locations, snippets),
             reasoning,
             guidance
-        );
+        , List.of());
     }
 
     private static String humanizeTitle(String slug) {
