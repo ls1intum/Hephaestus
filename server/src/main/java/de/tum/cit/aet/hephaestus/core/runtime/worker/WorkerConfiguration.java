@@ -96,7 +96,11 @@ public class WorkerConfiguration {
      */
     @Bean
     @Primary
-    @ConditionalOnProperty(prefix = "hephaestus.worker.control", name = "endpoint")
+    // havingValue+matchIfMissing won't reject empty-string; the SpEL keeps the bean from wiring
+    // when HEPHAESTUS_HUB_URL resolves to "" (the application-worker.yml default).
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression(
+        "'${hephaestus.worker.control.endpoint:}'.length() > 0"
+    )
     WorkerControlClient workerControlClient(
         WorkerProperties properties,
         FrameCodec frameCodec,
