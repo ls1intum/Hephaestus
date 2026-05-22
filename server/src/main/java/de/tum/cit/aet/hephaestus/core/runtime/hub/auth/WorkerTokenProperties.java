@@ -9,7 +9,7 @@ import org.springframework.lang.Nullable;
 /**
  * Bound to {@code hephaestus.worker.hub.token.*}. JWK rotation: list every key (active + previous)
  * in {@link #keys()} and point {@link #activeKid()} at the signing key; keep the previous key for
- * one TTL window. {@link #signingKey()} is the legacy single-key shortcut.
+ * one TTL window so already-issued tokens stay verifiable.
  */
 @ConfigurationProperties(prefix = "hephaestus.worker.hub.token")
 public record WorkerTokenProperties(
@@ -18,8 +18,7 @@ public record WorkerTokenProperties(
     @DefaultValue("1h") Duration ttl,
     @Nullable String registrationToken,
     @DefaultValue List<KeyEntry> keys,
-    @Nullable String activeKid,
-    @Nullable String signingKey
+    @Nullable String activeKid
 ) {
     public WorkerTokenProperties {
         if (issuer == null || issuer.isBlank()) {
@@ -43,6 +42,8 @@ public record WorkerTokenProperties(
         return (
             "WorkerTokenProperties[issuer=" +
             issuer +
+            ", audience=" +
+            audience +
             ", ttl=" +
             ttl +
             ", registrationToken=" +
@@ -52,8 +53,6 @@ public record WorkerTokenProperties(
             " key(s)" +
             ", activeKid=" +
             (activeKid == null ? "<unset>" : activeKid) +
-            ", signingKey=" +
-            (signingKey == null || signingKey.isBlank() ? "<unset>" : "<redacted>") +
             "]"
         );
     }

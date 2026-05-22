@@ -1,5 +1,6 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.WorkerSessionDispatcher;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
@@ -12,7 +13,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOutput;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerHello;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerWelcome;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.session.WorkerSessionDispatcher;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;

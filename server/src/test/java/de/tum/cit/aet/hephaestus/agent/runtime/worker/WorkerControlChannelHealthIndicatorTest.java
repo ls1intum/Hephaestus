@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;

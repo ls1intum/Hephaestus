@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -25,7 +26,7 @@ class WorkerJwtTest extends BaseUnitTest {
     private WorkerKeyRing keyRing;
     private WorkerTokenProperties properties;
     private WorkerJwtIssuer issuer;
-    private WorkerTokenDenylist denylist;
+    private WorkerTokenDenylistService denylist;
     private JavaJwtWorkerJwtVerifier verifier;
 
     @BeforeEach
@@ -36,23 +37,17 @@ class WorkerJwtTest extends BaseUnitTest {
             Duration.ofMinutes(15),
             "register-me",
             List.of(),
-            null,
             null
         );
         keyRing = WorkerKeyRing.fromConfig(properties);
         issuer = new WorkerJwtIssuer(keyRing, properties);
-        denylist = mock(WorkerTokenDenylist.class);
+        denylist = mock(WorkerTokenDenylistService.class);
         lenient().when(denylist.isRevoked(org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
-        verifier = new JavaJwtWorkerJwtVerifier(
-            keyRing,
-            properties,
-            denylist,
-            new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
-        );
+        verifier = new JavaJwtWorkerJwtVerifier(keyRing, properties, denylist, new SimpleMeterRegistry());
     }
 
     @Test
-    void issuedTokenVerifiesWithExpectedClaims() throws Exception {
+    void issuedTokenVerifiesWithExpectedClaims() {
         WorkerJwtIssuer.IssuedWorkerJwt issued = issuer.issue("worker-1");
         WorkerJwt jwt = verifier.verify(issued.token());
 
@@ -65,7 +60,7 @@ class WorkerJwtTest extends BaseUnitTest {
     }
 
     @Test
-    void revokedTokenRejected() throws Exception {
+    void revokedTokenRejected() {
         WorkerJwtIssuer.IssuedWorkerJwt issued = issuer.issue("worker-1");
         when(denylist.isRevoked(issued.jti())).thenReturn(true);
 
@@ -118,8 +113,7 @@ class WorkerJwtTest extends BaseUnitTest {
             Duration.ofMinutes(15),
             "register",
             List.of(toEntry(keyA)),
-            "kid-A",
-            null
+            "kid-A"
         );
         String tokenSignedByA = new WorkerJwtIssuer(WorkerKeyRing.fromConfig(propsBefore), propsBefore)
             .issue("worker-1")
@@ -131,14 +125,13 @@ class WorkerJwtTest extends BaseUnitTest {
             Duration.ofMinutes(15),
             "register",
             List.of(toEntry(keyA), toEntry(keyB)),
-            "kid-B",
-            null
+            "kid-B"
         );
         WorkerJwtVerifier verifierAfter = new JavaJwtWorkerJwtVerifier(
             WorkerKeyRing.fromConfig(propsAfter),
             propsAfter,
             denylist,
-            new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
+            new SimpleMeterRegistry()
         );
         String tokenSignedByB = new WorkerJwtIssuer(WorkerKeyRing.fromConfig(propsAfter), propsAfter)
             .issue("worker-2")
@@ -153,14 +146,13 @@ class WorkerJwtTest extends BaseUnitTest {
             Duration.ofMinutes(15),
             "register",
             List.of(toEntry(keyB)),
-            "kid-B",
-            null
+            "kid-B"
         );
         WorkerJwtVerifier verifierDropA = new JavaJwtWorkerJwtVerifier(
             WorkerKeyRing.fromConfig(propsDropA),
             propsDropA,
             denylist,
-            new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
+            new SimpleMeterRegistry()
         );
         assertThatThrownBy(() -> verifierDropA.verify(tokenSignedByA))
             .isInstanceOf(WorkerJwtInvalidException.class)
@@ -187,7 +179,6 @@ class WorkerJwtTest extends BaseUnitTest {
                     Duration.ofMinutes(15),
                     "r",
                     List.of(toEntry(k), toEntry(k)),
-                    null,
                     null
                 ),
                 "Duplicate kid"
@@ -200,8 +191,7 @@ class WorkerJwtTest extends BaseUnitTest {
                     Duration.ofMinutes(15),
                     "r",
                     List.of(toEntry(k)),
-                    "missing-kid",
-                    null
+                    "missing-kid"
                 ),
                 "active-kid"
             )
@@ -209,36 +199,17 @@ class WorkerJwtTest extends BaseUnitTest {
     }
 
     @Test
-    void legacySingleKeyConfigPromotesToRing() {
-        WorkerSigningKey k = WorkerSigningKey.generateEphemeral("scratch");
-        WorkerTokenProperties legacy = new WorkerTokenProperties(
-            "iss",
-            "aud",
-            Duration.ofMinutes(15),
-            "r",
-            List.of(),
-            null,
-            toPemPkcs8(k.privateKey())
-        );
-        WorkerKeyRing ring = WorkerKeyRing.fromConfig(legacy);
-        assertThat(ring.size()).isEqualTo(1);
-        assertThat(ring.active().kid()).isEqualTo("default");
-    }
-
-    @Test
-    void propertiesToStringRedactsSecrets() {
+    void propertiesToStringRedactsRegistrationToken() {
         WorkerTokenProperties props = new WorkerTokenProperties(
             "iss",
             "aud",
             Duration.ofMinutes(5),
             "the-secret",
             List.of(),
-            null,
-            "the-pem"
+            null
         );
         String dumped = props.toString();
         assertThat(dumped).doesNotContain("the-secret");
-        assertThat(dumped).doesNotContain("the-pem");
         assertThat(dumped).contains("<redacted>");
     }
 

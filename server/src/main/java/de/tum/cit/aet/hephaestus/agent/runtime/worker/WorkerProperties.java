@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
 import java.net.InetAddress;
 import java.net.URI;

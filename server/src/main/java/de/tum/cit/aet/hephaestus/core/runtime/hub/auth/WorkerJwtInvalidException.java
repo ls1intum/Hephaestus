@@ -5,7 +5,7 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub.auth;
  * diagnosis only — the handshake interceptor maps every variant to a single 401 to avoid
  * attack-surface enumeration. {@link #getReasonTag()} carries the metric-friendly reason.
  */
-public class WorkerJwtInvalidException extends Exception {
+public class WorkerJwtInvalidException extends RuntimeException {
 
     private final String reasonTag;
 

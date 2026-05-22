@@ -52,44 +52,27 @@ public final class WorkerKeyRing {
     }
 
     /**
-     * Build a ring from {@link WorkerTokenProperties}. Backward compatible with the legacy
-     * single-key {@code signing-key} property; if both are set, {@code keys[]} wins.
-     *
-     * <ul>
-     *   <li>Multi-key path: {@code keys[]} entries each with {@code kid} + {@code private-key};
-     *       the entry whose kid matches {@code activeKid} (or the first entry if unset) becomes
-     *       the active key.</li>
-     *   <li>Legacy single-key path: {@code signing-key} PEM string → ring with one key
-     *       (kid={@code "default"}).</li>
-     *   <li>No keys configured: ephemeral keypair (kid={@code "default"}); WARN.</li>
-     * </ul>
+     * Build a ring from {@link WorkerTokenProperties}. {@code keys[]} entries each carry
+     * {@code kid} + {@code private-key}; the entry whose kid matches {@code activeKid} (or the
+     * first entry if unset) becomes the active key. No keys configured → ephemeral 2048-bit RSA
+     * keypair (kid={@code "default"}); production must set {@code keys[]}.
      */
     public static WorkerKeyRing fromConfig(WorkerTokenProperties properties) {
         List<WorkerTokenProperties.KeyEntry> entries = properties.keys() == null ? List.of() : properties.keys();
-
-        if (!entries.isEmpty()) {
-            Map<String, WorkerSigningKey> map = new LinkedHashMap<>();
-            for (WorkerTokenProperties.KeyEntry entry : entries) {
-                if (map.containsKey(entry.kid())) {
-                    throw new IllegalStateException(
-                        "Duplicate kid in hephaestus.worker.hub.token.keys: " + entry.kid()
-                    );
-                }
-                map.put(entry.kid(), WorkerSigningKey.fromPem(entry.kid(), entry.privateKey()));
+        if (entries.isEmpty()) {
+            WorkerSigningKey ephemeral = WorkerSigningKey.generateEphemeral("default");
+            return new WorkerKeyRing(Map.of("default", ephemeral), ephemeral);
+        }
+        Map<String, WorkerSigningKey> map = new LinkedHashMap<>();
+        for (WorkerTokenProperties.KeyEntry entry : entries) {
+            if (map.containsKey(entry.kid())) {
+                throw new IllegalStateException("Duplicate kid in hephaestus.worker.hub.token.keys: " + entry.kid());
             }
-            WorkerSigningKey active = selectActive(map, properties.activeKid());
-            log.info("Worker JWT key ring loaded: {} key(s), activeKid={}", map.size(), active.kid());
-            return new WorkerKeyRing(map, active);
+            map.put(entry.kid(), WorkerSigningKey.fromPem(entry.kid(), entry.privateKey()));
         }
-
-        if (properties.signingKey() != null && !properties.signingKey().isBlank()) {
-            WorkerSigningKey legacy = WorkerSigningKey.fromPem("default", properties.signingKey());
-            log.info("Worker JWT key ring loaded from legacy 'signing-key' (kid=default)");
-            return new WorkerKeyRing(Map.of("default", legacy), legacy);
-        }
-
-        WorkerSigningKey ephemeral = WorkerSigningKey.generateEphemeral("default");
-        return new WorkerKeyRing(Map.of("default", ephemeral), ephemeral);
+        WorkerSigningKey active = selectActive(map, properties.activeKid());
+        log.info("Worker JWT key ring loaded: {} key(s), activeKid={}", map.size(), active.kid());
+        return new WorkerKeyRing(map, active);
     }
 
     private static WorkerSigningKey selectActive(Map<String, WorkerSigningKey> map, String activeKid) {

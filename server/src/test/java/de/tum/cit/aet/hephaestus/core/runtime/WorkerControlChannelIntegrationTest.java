@@ -3,16 +3,16 @@ package de.tum.cit.aet.hephaestus.core.runtime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.WorkerSessionDispatcher;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerSession;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerSessionRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylist;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylistService;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameEnvelope;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionCloseReason;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerHello;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.session.WorkerSessionDispatcher;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -63,7 +63,7 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
     ObjectMapper objectMapper;
 
     @Autowired(required = false)
-    WorkerTokenDenylist denylist;
+    WorkerTokenDenylistService denylist;
 
     @Autowired(required = false)
     WorkerSessionDispatcher dispatcher;
@@ -125,7 +125,7 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("revoked JWT cannot complete handshake — denylist hot path blocks upgrade")
     void revokedJwtIsRejected() throws Exception {
-        assertThat(denylist).as("WorkerTokenDenylist must be wired").isNotNull();
+        assertThat(denylist).as("WorkerTokenDenylistService must be wired").isNotNull();
         String workerId = "worker-rev-" + java.util.UUID.randomUUID();
         WorkerJwtIssuer.IssuedWorkerJwt jwt = jwtIssuer.issue(workerId);
         denylist.revoke(jwt.jti(), jwt.expiresAt());

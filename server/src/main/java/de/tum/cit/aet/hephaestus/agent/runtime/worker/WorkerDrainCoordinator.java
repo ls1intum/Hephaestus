@@ -1,10 +1,10 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobCancellationReason;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.WorkerSessionDispatcher;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.Heartbeat;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionCloseReason;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.session.WorkerSessionDispatcher;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;

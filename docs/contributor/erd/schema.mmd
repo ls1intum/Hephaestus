@@ -73,6 +73,7 @@ erDiagram
         INTEGER llm_cache_write_tokens
         DOUBLE llm_cost_usd
         VARCHAR(50) llm_model_version
+        VARCHAR(32) cancellation_reason
     }
 
     ChatMessage {
@@ -671,6 +672,12 @@ erDiagram
         BIGINT user_id FK,UK "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
         BOOLEAN ai_review_enabled "NOT NULL"
+    }
+
+    WorkerTokenDenylist {
+        VARCHAR(64) jti PK
+        TIMESTAMPTZ revoked_at "NOT NULL"
+        TIMESTAMPTZ expires_at "NOT NULL"
     }
 
     Workspace {

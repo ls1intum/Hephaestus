@@ -16,13 +16,13 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
     private static final String AUDIT_METRIC = "worker.jwt.verify";
 
     private final Map<String, JWTVerifier> verifiersByKid;
-    private final WorkerTokenDenylist denylist;
+    private final WorkerTokenDenylistService denylist;
     private final MeterRegistry meterRegistry;
 
     public JavaJwtWorkerJwtVerifier(
         WorkerKeyRing keyRing,
         WorkerTokenProperties properties,
-        WorkerTokenDenylist denylist,
+        WorkerTokenDenylistService denylist,
         MeterRegistry meterRegistry
     ) {
         Map<String, JWTVerifier> map = new HashMap<>();
@@ -42,7 +42,7 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
     }
 
     @Override
-    public WorkerJwt verify(String token) throws WorkerJwtInvalidException {
+    public WorkerJwt verify(String token) {
         try {
             WorkerJwt jwt = verifyInternal(token);
             meterRegistry.counter(AUDIT_METRIC, "outcome", "success").increment();
@@ -53,7 +53,7 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
         }
     }
 
-    private WorkerJwt verifyInternal(String token) throws WorkerJwtInvalidException {
+    private WorkerJwt verifyInternal(String token) {
         if (token == null || token.isBlank()) {
             throw new WorkerJwtInvalidException("token missing", "missing");
         }

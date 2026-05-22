@@ -12,5 +12,5 @@ public interface WorkerJwtVerifier {
      *     The exception's message is safe to log but not surface to remote callers — the
      *     handshake interceptor maps it to a generic 401.
      */
-    WorkerJwt verify(String token) throws WorkerJwtInvalidException;
+    WorkerJwt verify(String token);
 }

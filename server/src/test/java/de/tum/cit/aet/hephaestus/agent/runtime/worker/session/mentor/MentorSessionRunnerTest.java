@@ -1,16 +1,16 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker.session.mentor;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker.session.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerCapacityState;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.CapturingPublisher;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.WorkerPropertiesFixtures;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionClose;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionCloseReason;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionInput;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionKind;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOpen;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOutput;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.testing.CapturingPublisher;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.testing.WorkerPropertiesFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Optional;

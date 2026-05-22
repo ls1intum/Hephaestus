@@ -1,5 +1,7 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker.session.mentor;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker.session.mentor;
 
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerControlPublisher;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
@@ -7,8 +9,6 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerCapacityState;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerControlPublisher;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.MentorSessionContext;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionClose;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionCloseReason;

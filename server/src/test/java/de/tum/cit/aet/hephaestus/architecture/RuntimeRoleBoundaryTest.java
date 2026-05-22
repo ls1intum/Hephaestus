@@ -55,7 +55,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         RuntimeRole.SERVER_PROPERTY,
         "de.tum.cit.aet.hephaestus.workspace.WorkspaceStartupListener",
         RuntimeRole.SERVER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerConfiguration",
+        "de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerConfiguration",
         RuntimeRole.WORKER_PROPERTY,
         "de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration",
         RuntimeRole.SERVER_PROPERTY,

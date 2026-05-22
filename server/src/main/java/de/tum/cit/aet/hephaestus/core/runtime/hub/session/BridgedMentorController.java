@@ -39,6 +39,9 @@ import tools.jackson.databind.JsonNode;
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
 @ConditionalOnProperty(name = "hephaestus.worker.hub.bridge.enabled", havingValue = "true")
 @Hidden
+@de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic(
+    "Bridge session is infra-level; workspace context is forwarded in the body and validated by the worker"
+)
 public class BridgedMentorController {
 
     private static final Logger log = LoggerFactory.getLogger(BridgedMentorController.class);

@@ -10,9 +10,9 @@ import org.springframework.stereotype.Repository;
 
 @WorkspaceAgnostic("Worker JWT denylist spans the entire installation, not a single workspace")
 @Repository
-public interface WorkerTokenDenylistRepository extends JpaRepository<WorkerTokenDenylistEntry, String> {
+public interface WorkerTokenDenylistRepository extends JpaRepository<WorkerTokenDenylist, String> {
     /** Delete denylist rows whose original JWT has already expired — they can no longer be presented. */
     @Modifying
-    @Query("DELETE FROM WorkerTokenDenylistEntry e WHERE e.expiresAt < :cutoff")
+    @Query("DELETE FROM WorkerTokenDenylist e WHERE e.expiresAt < :cutoff")
     int deleteExpired(@Param("cutoff") Instant cutoff);
 }

@@ -6,8 +6,8 @@ import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtHandshakeInterce
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerKeyRing;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylist;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylistRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylistService;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenProperties;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.session.HubSessionInbox;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.session.HubSessionRegistry;
@@ -54,15 +54,15 @@ public class HubConfiguration {
     }
 
     @Bean
-    WorkerTokenDenylist workerTokenDenylist(WorkerTokenDenylistRepository repository) {
-        return new WorkerTokenDenylist(repository);
+    WorkerTokenDenylistService workerTokenDenylistService(WorkerTokenDenylistRepository repository) {
+        return new WorkerTokenDenylistService(repository);
     }
 
     @Bean
     WorkerJwtVerifier workerJwtVerifier(
         WorkerKeyRing keyRing,
         WorkerTokenProperties properties,
-        WorkerTokenDenylist denylist,
+        WorkerTokenDenylistService denylist,
         MeterRegistry meterRegistry
     ) {
         return new JavaJwtWorkerJwtVerifier(keyRing, properties, denylist, meterRegistry);

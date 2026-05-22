@@ -1,12 +1,12 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker.session;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker.session;
 
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.mentor.MentorSessionRunner;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionClose;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionCloseReason;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionInput;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionKind;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOpen;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.session.mentor.MentorSessionRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -11,12 +11,12 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobCancellationReason;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.WorkerSessionDispatcher;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.CapturingPublisher;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.Heartbeat;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionCloseReason;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.session.WorkerSessionDispatcher;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.testing.CapturingPublisher;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
@@ -172,7 +172,7 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
     }
 
     private static WorkerProperties propsWithDrain(Duration timeout) {
-        return de.tum.cit.aet.hephaestus.core.runtime.worker.testing.WorkerPropertiesFixtures.withDrain(timeout);
+        return de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.WorkerPropertiesFixtures.withDrain(timeout);
     }
 
     private static void verifyReadinessStateRefusingTrafficWasPublished(ApplicationEventPublisher events) {

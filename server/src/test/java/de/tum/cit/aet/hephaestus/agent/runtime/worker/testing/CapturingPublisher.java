@@ -1,6 +1,6 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker.testing;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker.testing;
 
-import de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerControlPublisher;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerControlPublisher;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
 import java.time.Instant;
 import java.util.List;

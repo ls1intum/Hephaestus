@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/workers")
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
 @Hidden
+@de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic("Fleet-wide worker registration; not workspace-scoped")
 public class WorkerTokenExchangeController {
 
     private static final Logger log = LoggerFactory.getLogger(WorkerTokenExchangeController.class);
@@ -55,6 +56,7 @@ public class WorkerTokenExchangeController {
     }
 
     @PostMapping("/exchange")
+    @org.springframework.security.access.prepost.PreAuthorize("permitAll()")
     public ResponseEntity<?> exchange(@RequestBody ExchangeRequest request, HttpServletRequest http) {
         if (!properties.isExchangeEnabled()) {
             log.warn("worker token exchange attempted but no registration token is configured");

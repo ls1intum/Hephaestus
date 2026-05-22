@@ -1,6 +1,6 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker.testing;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker.testing;
 
-import de.tum.cit.aet.hephaestus.core.runtime.worker.WorkerProperties;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import java.net.URI;
 import java.time.Duration;
 

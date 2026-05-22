@@ -1,10 +1,10 @@
-package de.tum.cit.aet.hephaestus.core.runtime.worker;
+package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.WorkerSessionDispatcher;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.mentor.MentorSessionRunner;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.session.WorkerSessionDispatcher;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.session.mentor.MentorSessionRunner;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Optional;
@@ -20,13 +20,17 @@ import org.springframework.context.annotation.Primary;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Wires the worker-runtime substrate beans. Gated by {@link RuntimeRole#WORKER_PROPERTY} with
- * {@code matchIfMissing=true}. {@link WorkerControlClient} (`@Primary`) wires when
- * {@code hephaestus.worker.control.endpoint} is non-empty; otherwise {@link
- * LoggingWorkerControlPublisher} stays in place as the no-op fallback.
+ * Wires the worker-runtime substrate beans. Gated by {@link RuntimeRole#WORKER_PROPERTY}
+ * (matchIfMissing=true) AND by a non-empty {@code hephaestus.worker.control.endpoint}: the
+ * substrate has exactly one runtime path — a WSS-connected worker pod. Monolith dev mode
+ * leaves the gate set but never points at an endpoint, so no substrate beans wire and agent
+ * jobs route through NATS exactly as before.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnExpression(
+    "'${hephaestus.worker.control.endpoint:}'.length() > 0"
+)
 @EnableConfigurationProperties(WorkerProperties.class)
 public class WorkerConfiguration {
 
@@ -85,25 +89,6 @@ public class WorkerConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean(WorkerControlPublisher.class)
-    WorkerControlPublisher loggingWorkerControlPublisher(MeterRegistry meterRegistry) {
-        LoggingWorkerControlPublisher publisher = new LoggingWorkerControlPublisher();
-        registerChannelGauge(publisher, meterRegistry);
-        return publisher;
-    }
-
-    /**
-     * WSS-backed control client. Created only when a control endpoint URL is configured;
-     * otherwise the default {@link LoggingWorkerControlPublisher} stays in place (useful for
-     * cold-start smoke tests and failure-isolation runs).
-     */
-    @Bean
-    @Primary
-    // havingValue+matchIfMissing won't reject empty-string; the SpEL keeps the bean from wiring
-    // when HEPHAESTUS_HUB_URL resolves to "" (the application-worker.yml default).
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression(
-        "'${hephaestus.worker.control.endpoint:}'.length() > 0"
-    )
     WorkerControlClient workerControlClient(
         WorkerProperties properties,
         FrameCodec frameCodec,
@@ -118,15 +103,11 @@ public class WorkerConfiguration {
             objectMapper,
             meterRegistry
         );
-        registerChannelGauge(client, meterRegistry);
-        return client;
-    }
-
-    private static void registerChannelGauge(WorkerControlPublisher publisher, MeterRegistry registry) {
-        Gauge.builder("worker.control.channel.connected", publisher, p -> p.isConnected() ? 1.0 : 0.0)
+        Gauge.builder("worker.control.channel.connected", client, c -> c.isConnected() ? 1.0 : 0.0)
             .description("1 when the worker control channel is connected, 0 otherwise")
             .strongReference(true)
-            .register(registry);
+            .register(meterRegistry);
+        return client;
     }
 
     @Bean
