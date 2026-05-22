@@ -32,7 +32,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
-@EnableConfigurationProperties({ HubProperties.class, WorkerTokenProperties.class })
+@EnableConfigurationProperties({ WorkerTokenProperties.class })
 @EnableWebSocket
 public class HubConfiguration {
 
@@ -81,11 +81,10 @@ public class HubConfiguration {
     WorkerControlWebSocketHandler workerControlWebSocketHandler(
         WorkerSessionRegistry registry,
         FrameCodec codec,
-        HubProperties properties,
         Optional<MentorSessionBridge> sessionInbox,
         MeterRegistry meterRegistry
     ) {
-        return new WorkerControlWebSocketHandler(registry, codec, properties, sessionInbox, meterRegistry);
+        return new WorkerControlWebSocketHandler(registry, codec, sessionInbox, meterRegistry);
     }
 
     @Bean

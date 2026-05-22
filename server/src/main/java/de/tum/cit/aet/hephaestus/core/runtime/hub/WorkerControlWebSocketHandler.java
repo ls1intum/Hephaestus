@@ -43,7 +43,6 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
 
     private final WorkerSessionRegistry registry;
     private final FrameCodec codec;
-    private final HubProperties hubProperties;
     private final Optional<MentorSessionBridge> sessionInbox;
     private final MeterRegistry meterRegistry;
     private final ScheduledExecutorService helloTimeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -55,13 +54,11 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
     public WorkerControlWebSocketHandler(
         WorkerSessionRegistry registry,
         FrameCodec codec,
-        HubProperties hubProperties,
         Optional<MentorSessionBridge> sessionInbox,
         MeterRegistry meterRegistry
     ) {
         this.registry = registry;
         this.codec = codec;
-        this.hubProperties = hubProperties;
         this.sessionInbox = sessionInbox;
         this.meterRegistry = meterRegistry;
     }
@@ -74,13 +71,13 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
             close(rawTransport, CloseStatus.POLICY_VIOLATION);
             return;
         }
-        rawTransport.setTextMessageSizeLimit(hubProperties.maxFrameSizeBytes());
-        rawTransport.setBinaryMessageSizeLimit(hubProperties.maxFrameSizeBytes());
+        rawTransport.setTextMessageSizeLimit(HubProperties.MAX_FRAME_SIZE_BYTES);
+        rawTransport.setBinaryMessageSizeLimit(HubProperties.MAX_FRAME_SIZE_BYTES);
         // Wrap with a concurrent decorator: caps the per-session outbound buffer and a send
         // deadline, so a slow worker cannot balloon hub memory or hold a sender thread.
         WebSocketSession transport = new ConcurrentWebSocketSessionDecorator(
             rawTransport,
-            (int) hubProperties.sendTimeLimit().toMillis(),
+            (int) HubProperties.SEND_TIME_LIMIT.toMillis(),
             HubProperties.SEND_BUFFER_SIZE_BYTES
         );
         String sessionId = UUID.randomUUID().toString();
@@ -220,12 +217,12 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void maybeForceReconnect(WorkerSession session) {
-        Duration threshold = hubProperties.forceReconnectThreshold();
-        if (threshold.isZero()) {
-            return;
-        }
         Duration remaining = Duration.between(Instant.now(), session.jwtExpiresAt());
-        if (!remaining.isNegative() && remaining.compareTo(threshold) <= 0 && session.markForceReconnectSent()) {
+        if (
+            !remaining.isNegative() &&
+            remaining.compareTo(HubProperties.FORCE_RECONNECT_THRESHOLD) <= 0 &&
+            session.markForceReconnectSent()
+        ) {
             session.send(new ForceReconnect("jwt near expiry"));
         }
     }

@@ -1,0 +1,99 @@
+# Runtime Roles
+
+Hephaestus ships **one JAR** that boots in any of three runtime roles. The same artifact runs as the application server, as a worker pod, as a webhook receiver, or as all three together (monolith). Roles are gated by three boolean properties:
+
+| Role | Property | Default |
+| --- | --- | --- |
+| Server | `hephaestus.runtime.server.enabled` | `true` |
+| Worker | `hephaestus.runtime.worker.enabled` | `true` |
+| Webhook | `hephaestus.runtime.webhook.enabled` | `true` |
+
+All three default-on means a vanilla `mvn spring-boot:run` is a working monolith.
+
+## Boot log
+
+On startup the JVM logs which roles wired:
+
+```
+INFO  RuntimeRoleStartupLogger : Runtime roles enabled: [server, worker, webhook]
+```
+
+If you accidentally disable all three, the WARN spells out the recovery:
+
+```
+WARN  RuntimeRoleStartupLogger : All runtime roles disabled — this JVM will
+      accept no work. Set at least one of hephaestus.runtime.server.enabled=true,
+      hephaestus.runtime.worker.enabled=true, or hephaestus.runtime.webhook.enabled=true.
+```
+
+## Monolith vs split-pod
+
+Use the monolith when:
+
+- You're a single contributor running locally.
+- You have one app server and no horizontal scale yet.
+- Your worker is bottlenecked on the LLM, not on Docker capacity.
+
+Split the worker out when:
+
+- LLM reviews and HTTP traffic compete for the same JVM heap / sandbox quota.
+- You want to scale practice-review throughput independently of webhook ingestion.
+- You're running BYO worker pods behind enterprise MITM proxies (ADR 0009 — WSS over TLS-443).
+
+Split the webhook receiver out when:
+
+- You want to deploy app-server changes without dropping inbound GitHub/GitLab events. The webhook pod runs the JetStream publisher in isolation; redeploys of the app pod don't touch the inbound HTTP surface.
+
+## Per-role overlays
+
+Each role ships with a Spring profile YAML that flips the other two flags off and prunes the bean graph:
+
+- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, `web-application-type=none`, OAuth2 autoconfigure excluded, JPA still enabled.
+- `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent NATS disabled.
+- No `application-server.yml` — the monolith default _is_ the server profile.
+
+To deploy a worker pod set `SPRING_PROFILES_ACTIVE=prod,worker` and point `HEPHAESTUS_HUB_URL` at the app pod's WSS endpoint. See `docker/compose.app.yaml` for a working compose template.
+
+## Configuration cheatsheet
+
+| Property | Server | Worker | Webhook |
+| --- | --- | --- | --- |
+| `hephaestus.runtime.{role}.enabled` | true | true | true |
+| `hephaestus.workspace.init-default` | true | false | false |
+| `hephaestus.git.enabled` | true | true | false |
+| `hephaestus.sync.nats.enabled` | true | false | true |
+| `hephaestus.agent.nats.enabled` | true | true | false |
+| `hephaestus.sandbox.enabled` | true | true | false |
+| Needs Keycloak | yes | no | no |
+
+## Worker pod env vars
+
+The bare minimum to boot a worker against a remote hub:
+
+```sh
+SPRING_PROFILES_ACTIVE=prod,worker
+HEPHAESTUS_HUB_URL=wss://app.example.com/api/workers/connect
+HEPHAESTUS_WORKER_REGISTRATION_TOKEN=<shared bootstrap secret>
+HEPHAESTUS_WORKER_HUB_SIGNING_KEY=<RSA-2048 PEM>     # only on the app pod
+HEPHAESTUS_WORKER_LLM_BASE_URL=https://gpu.example.com
+HEPHAESTUS_WORKER_LLM_API_KEY=<llm provider key>
+HEPHAESTUS_WORKER_DRAIN_TIMEOUT=5m
+```
+
+Capacity (`HEPHAESTUS_WORKER_REVIEW_MAX`, `HEPHAESTUS_WORKER_MENTOR_MAX`) defaults to `auto` and auto-sizes from `Runtime.availableProcessors()`. Override only if the host is noisy.
+
+## Graceful drain
+
+On SIGTERM the worker:
+
+1. Sends `Heartbeat{draining=true}` to the hub so the dispatcher stops claiming new jobs for it.
+2. Waits up to `hephaestus.worker.drain.timeout` (default 5 min) for in-flight jobs to finish.
+3. Cancels remaining jobs cleanly — the NATS consumer redelivers via MaxDeliver.
+
+The compose template pins `stop_grace_period: 6m` to give the JVM 60s of headroom before Docker SIGKILLs.
+
+## See also
+
+- [ADR 0005](../decisions/0005-two-role-runtime-via-conditional-on-property.md) — original two-role design.
+- [ADR 0008](../decisions/0008-webhook-runtime-role.md) — webhook role rationale.
+- [ADR 0009](../decisions/0009-worker-runtime-substrate-wss-control-channel.md) — worker substrate + WSS.
