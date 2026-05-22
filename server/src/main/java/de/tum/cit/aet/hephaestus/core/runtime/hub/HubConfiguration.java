@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerKeyRing;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylistRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylistService;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenProperties;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.session.HubSessionInbox;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.session.HubSessionRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.session.MentorSessionBridge;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
@@ -83,7 +82,7 @@ public class HubConfiguration {
         WorkerSessionRegistry registry,
         FrameCodec codec,
         HubProperties properties,
-        Optional<HubSessionInbox> sessionInbox,
+        Optional<MentorSessionBridge> sessionInbox,
         MeterRegistry meterRegistry
     ) {
         return new WorkerControlWebSocketHandler(registry, codec, properties, sessionInbox, meterRegistry);
@@ -103,10 +102,9 @@ public class HubConfiguration {
     }
 
     /**
-     * Bridge wires only when explicitly enabled. The worker-side mentor frames flow through the
-     * WSS handler even when the bridge is absent — sessions just have no inbox so SessionOutput
-     * frames are silently dropped (acceptable for boot-without-bridge monolith mode). The bridge
-     * implements {@link HubSessionInbox} so the handler picks it up under both types.
+     * Bridge wires only when explicitly enabled. When absent, the WSS handler's
+     * {@code Optional<MentorSessionBridge>} stays empty and worker-originated SessionOutput
+     * frames are silently dropped (acceptable for monolith mode without the bridge).
      */
     @Bean
     @ConditionalOnProperty(name = "hephaestus.worker.hub.bridge.enabled", havingValue = "true")

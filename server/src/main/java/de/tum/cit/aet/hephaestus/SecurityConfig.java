@@ -108,11 +108,13 @@ public class SecurityConfig {
     }
 
     /**
-     * Fallback chain when no OAuth2 issuer is configured (worker-only pod, smoke tests, fresh
-     * dev box). Locks down every path not handled by {@link #workerHubSecurityFilterChain}.
+     * Fallback chain when Spring's OAuth2 resource-server autoconfig produces no
+     * {@code JwtDecoder} (worker-only pod, smoke tests, fresh dev box). Mutually exclusive with
+     * {@link #resourceServerSecurityFilterChain(HttpSecurity, Converter)} via the same gate so
+     * only one "any request" chain ever loads at runtime.
      */
     @Bean
-    @ConditionalOnMissingBean(name = "resourceServerSecurityFilterChain")
+    @ConditionalOnMissingBean(org.springframework.security.oauth2.jwt.JwtDecoder.class)
     SecurityFilterChain lockdownSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

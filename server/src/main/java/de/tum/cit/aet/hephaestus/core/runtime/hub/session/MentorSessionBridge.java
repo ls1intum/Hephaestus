@@ -25,8 +25,8 @@ import tools.jackson.databind.JsonNode;
  * SSE ↔ WSS bridge for browser-facing mentor sessions. First-fit worker selection (least-loaded
  * is dispatcher-owned).
  *
- * <p>Implements {@link HubSessionInbox} so the WSS handler can forward worker-originated
- * {@link SessionOutput} / {@link SessionClose} frames in without knowing about the SSE layer.
+ * <p>The WSS handler forwards worker-originated {@link SessionOutput} / {@link SessionClose}
+ * frames into {@link #onSessionOutput(SessionOutput)} / {@link #onSessionClose(SessionClose)}.
  *
  * <p>Race condition (intentional MVP): two near-simultaneous opens may pick the same worker
  * with {@code spareMentor=1}; the second open arrives as {@code SessionOpen} on the worker
@@ -34,7 +34,7 @@ import tools.jackson.databind.JsonNode;
  * emitter; the caller (HTTP layer) sees the empty SSE stream and can retry. CAS / soft
  * reservation is the dispatcher's job.
  */
-public class MentorSessionBridge implements HubSessionInbox {
+public class MentorSessionBridge {
 
     private static final Logger log = LoggerFactory.getLogger(MentorSessionBridge.class);
 
@@ -118,9 +118,8 @@ public class MentorSessionBridge implements HubSessionInbox {
             });
     }
 
-    // ── HubSessionInbox ──
+    // ── Worker → SSE inbound ──
 
-    @Override
     public void onSessionOutput(SessionOutput out) {
         sessionRegistry
             .get(out.sessionId())
@@ -138,7 +137,6 @@ public class MentorSessionBridge implements HubSessionInbox {
             });
     }
 
-    @Override
     public void onSessionClose(SessionClose close) {
         sessionRegistry
             .remove(close.sessionId())

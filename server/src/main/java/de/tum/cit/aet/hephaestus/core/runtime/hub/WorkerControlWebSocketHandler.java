@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub;
 
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwt;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtHandshakeInterceptor;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.session.HubSessionInbox;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.session.MentorSessionBridge;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
@@ -44,7 +44,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
     private final WorkerSessionRegistry registry;
     private final FrameCodec codec;
     private final HubProperties hubProperties;
-    private final Optional<HubSessionInbox> sessionInbox;
+    private final Optional<MentorSessionBridge> sessionInbox;
     private final MeterRegistry meterRegistry;
     private final ScheduledExecutorService helloTimeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "worker-hub-hello-timeout");
@@ -56,7 +56,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
         WorkerSessionRegistry registry,
         FrameCodec codec,
         HubProperties hubProperties,
-        Optional<HubSessionInbox> sessionInbox,
+        Optional<MentorSessionBridge> sessionInbox,
         MeterRegistry meterRegistry
     ) {
         this.registry = registry;
