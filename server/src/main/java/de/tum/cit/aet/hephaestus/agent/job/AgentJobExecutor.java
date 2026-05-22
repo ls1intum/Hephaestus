@@ -51,7 +51,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
@@ -78,8 +78,11 @@ import tools.jackson.databind.ObjectMapper;
  * </ul>
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
-@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
+// Wires only when agent NATS is explicitly enabled AND the worker role isn't explicitly off
+// (single-process default keeps the executor on). Two annotations would silently no-op on the
+// second — Spring honors only the first @ConditionalOnProperty on an element, so the original
+// "worker role check" never fired.
+@ConditionalOnExpression("${hephaestus.agent.nats.enabled:false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}")
 @WorkspaceAgnostic("NATS consumer processes jobs across all workspaces")
 public class AgentJobExecutor {
 

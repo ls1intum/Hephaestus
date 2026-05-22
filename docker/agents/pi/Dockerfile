@@ -14,10 +14,21 @@ ENV PNPM_HOME=/usr/local/pnpm
 # deprecated); both PNPM_HOME and PNPM_HOME/bin need to be in PATH so corepack
 # can find the pnpm shim and pnpm can find the binaries it installs globally.
 ENV PATH=$PNPM_HOME/bin:$PNPM_HOME:$PATH
+# pnpm 11 globals land in a content-hashed path under $PNPM_HOME/global/v11/<hash>/
+# that changes whenever the lockfile hashes change. The runner imports the SDK
+# via bare ESM specifiers from /workspace/.run-pi.mjs, where Node would walk
+# /workspace/node_modules → /node_modules (neither contains @earendil-works).
+# Symlink the actual install to a stable path /opt/pi-sdk/node_modules so
+# PiRuntimeFactory can hardcode NODE_PATH without grepping for the hash.
 RUN corepack enable && \
     corepack prepare pnpm@11.1.2 --activate && \
     pnpm add -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
     pnpm store prune && \
+    sdk_node_modules=$(ls -1d /usr/local/pnpm/global/v11/*/node_modules | head -n 1) && \
+    test -d "${sdk_node_modules}/@earendil-works/pi-coding-agent" \
+      || (echo "Pi SDK not found at ${sdk_node_modules}" >&2; exit 1) && \
+    mkdir -p /opt/pi-sdk && \
+    ln -s "${sdk_node_modules}" /opt/pi-sdk/node_modules && \
     mkdir -p /home/agent /workspace && \
     chown -R 1000:1000 /home/agent /workspace
 

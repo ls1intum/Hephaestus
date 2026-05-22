@@ -79,6 +79,12 @@ public class PiRuntimeFactory {
         env.put("XDG_CONFIG_HOME", "/home/agent/.config");
         env.put("TMPDIR", "/home/agent/.local/tmp");
         env.put("PI_CODING_AGENT_DIR", WorkspaceAbi.PI_AGENT_DIR);
+        // The runner script under /workspace/.run-pi.mjs imports the Pi SDK via bare ESM
+        // specifiers. Node's resolver only walks /workspace/node_modules → /node_modules;
+        // the SDK lives at /opt/pi-sdk/node_modules (symlinked by the agent-pi Dockerfile
+        // to pnpm's content-hashed global install). Without NODE_PATH the runner dies with
+        // `Cannot find package '@earendil-works/pi-coding-agent'`.
+        env.put("NODE_PATH", "/opt/pi-sdk/node_modules");
 
         // Azure's `azure-openai-responses` provider hard-defaults the model id to "gpt-5.2"; route
         // both that and the configured model to the same Azure deployment.

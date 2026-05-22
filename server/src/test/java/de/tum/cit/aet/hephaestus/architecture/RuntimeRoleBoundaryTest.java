@@ -68,6 +68,37 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     );
 
     @Test
+    void noStackedConditionalOnPropertyOnSameElement() {
+        // Spring honors only ONE @ConditionalOnProperty per element; the second annotation is
+        // silently ignored. Multiple @ConditionalOnProperty annotations on the same class is the
+        // antipattern that hid the dev-trigger DX bug (BridgedMentorController), the worker-role
+        // gate bypass on AgentJobExecutor, and the same pattern on AgentNatsConsumerConfig +
+        // DockerSandboxConfiguration. Anyone wanting both conditions must use
+        // @ConditionalOnExpression or compose with @Conditional.
+        List<String> violations = classes
+            .stream()
+            .filter(c -> c.getFullName().startsWith("de.tum.cit.aet.hephaestus."))
+            .filter(
+                clazz ->
+                    clazz
+                        .getAnnotations()
+                        .stream()
+                        .filter(a -> a.getRawType().isEquivalentTo(ConditionalOnProperty.class))
+                        .count() >
+                    1
+            )
+            .map(JavaClass::getFullName)
+            .collect(Collectors.toList());
+
+        assertThat(violations)
+            .as(
+                "Classes with multiple @ConditionalOnProperty annotations — Spring honors only the " +
+                    "first; use @ConditionalOnExpression for compound predicates instead."
+            )
+            .isEmpty();
+    }
+
+    @Test
     void runtimeGatesAreMatchIfMissingTrue() {
         List<String> violations = classes
             .stream()
