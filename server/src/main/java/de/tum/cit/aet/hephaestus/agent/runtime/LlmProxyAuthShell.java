@@ -98,30 +98,34 @@ public final class LlmProxyAuthShell {
             "\"" +
             " && ";
             case OPENAI -> {
-                env.put("OPENAI_API_KEY", credential);
                 if (hasBaseUrl) {
+                    // ONLY export the hephaestus-extension env. Setting OPENAI_API_KEY alongside
+                    // would auto-activate Pi's built-in OpenAI provider against api.openai.com,
+                    // which wins resolution and silently bypasses the custom gateway. Confirmed
+                    // empirically: with both keys present, Pi sent the TUM gateway key to OpenAI
+                    // and got a 401. The hephaestus provider extension reads its own creds.
                     env.put("PI_HEPHAESTUS_BASE_URL", baseUrl);
                     env.put("PI_HEPHAESTUS_API_KEY", credential);
                     if (modelName != null && !modelName.isBlank()) {
                         // Pi parses any slash in a model id as a `provider/model` reference; the
                         // hephaestus provider registers the model under the bare id so the model
-                        // resolver can find it via `hephaestus/<id>` from settings.json.
+                        // resolver can find it via `defaultProvider=hephaestus, defaultModel=<id>`.
                         env.put("PI_HEPHAESTUS_MODEL", PiRuntimeFactory.stripProviderPrefix(modelName));
                     }
+                } else {
+                    env.put("OPENAI_API_KEY", credential);
                 }
                 yield "";
             }
             case ANTHROPIC -> {
-                env.put("ANTHROPIC_API_KEY", credential);
                 if (hasBaseUrl) {
                     env.put("PI_HEPHAESTUS_BASE_URL", baseUrl);
                     env.put("PI_HEPHAESTUS_API_KEY", credential);
                     if (modelName != null && !modelName.isBlank()) {
-                        // Pi parses any slash in a model id as a `provider/model` reference; the
-                        // hephaestus provider registers the model under the bare id so the model
-                        // resolver can find it via `hephaestus/<id>` from settings.json.
                         env.put("PI_HEPHAESTUS_MODEL", PiRuntimeFactory.stripProviderPrefix(modelName));
                     }
+                } else {
+                    env.put("ANTHROPIC_API_KEY", credential);
                 }
                 yield "";
             }

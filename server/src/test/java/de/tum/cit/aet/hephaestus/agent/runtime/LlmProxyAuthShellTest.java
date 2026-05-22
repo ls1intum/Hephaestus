@@ -114,10 +114,13 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("OPENAI baseUrl override exports PI_HEPHAESTUS_* env vars (routes via custom provider)")
+        @DisplayName("OPENAI baseUrl override exports ONLY PI_HEPHAESTUS_* (no OPENAI_API_KEY)")
         void openaiBaseUrlExported() {
             // Pi does NOT read OPENAI_BASE_URL natively. The base URL is consumed by the
             // hephaestus provider extension via PI_HEPHAESTUS_BASE_URL / PI_HEPHAESTUS_API_KEY.
+            // Critically, OPENAI_API_KEY must NOT also be set — Pi's built-in OpenAI provider
+            // would auto-activate against api.openai.com and win resolution, sending the
+            // gateway key to OpenAI (silent 401 against the wrong host).
             Map<String, String> env = new HashMap<>();
             LlmProxyAuthShell.build(
                 CredentialMode.API_KEY,
@@ -128,7 +131,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
                 env
             );
             assertThat(env)
-                .containsEntry("OPENAI_API_KEY", "sk-test")
+                .doesNotContainKey("OPENAI_API_KEY")
                 .containsEntry("PI_HEPHAESTUS_BASE_URL", "https://gpu.example.com/api")
                 .containsEntry("PI_HEPHAESTUS_API_KEY", "sk-test")
                 .containsEntry("PI_HEPHAESTUS_MODEL", "gpt-test");
@@ -147,7 +150,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
                 env
             );
             assertThat(env)
-                .containsEntry("ANTHROPIC_API_KEY", "sk-test")
+                .doesNotContainKey("ANTHROPIC_API_KEY")
                 .containsEntry("PI_HEPHAESTUS_BASE_URL", "https://proxy.example.com")
                 .containsEntry("PI_HEPHAESTUS_API_KEY", "sk-test")
                 .containsEntry("PI_HEPHAESTUS_MODEL", "claude-test");
