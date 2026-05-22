@@ -614,7 +614,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                     .anyMatch(f -> f.practiceSlug().equals("code-hygiene"))
             ).isTrue();
         }
-
     }
 
     @Nested

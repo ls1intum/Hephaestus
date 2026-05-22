@@ -178,12 +178,7 @@ class DiffHunkValidator {
         }
 
         if (corrections > 0 || dropped > 0) {
-            log.info(
-                "Diff note position fixup: corrected={}, dropped={}, jobId={}",
-                corrections,
-                dropped,
-                jobId
-            );
+            log.info("Diff note position fixup: corrected={}, dropped={}, jobId={}", corrections, dropped, jobId);
         }
 
         return corrected;
