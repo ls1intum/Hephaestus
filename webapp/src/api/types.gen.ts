@@ -539,10 +539,6 @@ export type UpdatePracticeRequest = {
      */
     criteria?: string;
     /**
-     * Practice description
-     */
-    description?: string;
-    /**
      * Human-readable name
      */
     name?: string;
@@ -1143,11 +1139,7 @@ export type Practice = {
     /**
      * Practice evaluation criteria
      */
-    criteria?: string;
-    /**
-     * Practice description
-     */
-    description: string;
+    criteria: string;
     /**
      * Practice ID
      */
@@ -1643,11 +1635,7 @@ export type CreatePracticeRequest = {
     /**
      * Practice evaluation criteria
      */
-    criteria?: string;
-    /**
-     * Practice description
-     */
-    description: string;
+    criteria: string;
     /**
      * Human-readable name
      */
