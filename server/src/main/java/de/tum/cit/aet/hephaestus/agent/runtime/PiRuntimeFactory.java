@@ -178,12 +178,12 @@ public class PiRuntimeFactory {
     /**
      * Build the settings JSON Pi loads at session start. When {@code useCustomProvider} is true,
      * {@code defaultProvider} routes through the {@code hephaestus} extension (see
-     * {@link #buildExtensionFile}) and {@code defaultModel} becomes {@code hephaestus/<id>}.
-     * Without the {@code hephaestus/} prefix Pi's model resolver parses any slash in the model
-     * name (e.g. {@code openai/gpt-oss-120b}) as a {@code provider/model} reference, walks the
-     * built-in OpenAI provider, fails to find the model, and silently falls back to the
-     * built-in default — sending requests to {@code api.openai.com} instead of the custom
-     * gateway. The prefix forces unambiguous resolution.
+     * {@link #buildExtensionFile}) and {@code defaultModel} is the bare model id (no provider
+     * prefix). Pi's resolver looks up {@code modelRegistry.find(defaultProvider, defaultModel)}
+     * — if either arg carries a slash, the parser reinterprets the slash as
+     * {@code provider/model} and falls back to the built-in OpenAI provider (sending requests
+     * to {@code api.openai.com}). Strip any leading {@code <provider>/} segment from the
+     * model id (e.g. {@code openai/gpt-oss-120b → gpt-oss-120b}).
      */
     public byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName, boolean useCustomProvider) {
         Map<String, Object> settings = new LinkedHashMap<>();
@@ -193,7 +193,7 @@ public class PiRuntimeFactory {
             settings.put("defaultProvider", providerToken(provider));
         }
         if (modelName != null && !modelName.isBlank()) {
-            String defaultModel = useCustomProvider ? "hephaestus/" + stripProviderPrefix(modelName) : modelName;
+            String defaultModel = useCustomProvider ? stripProviderPrefix(modelName) : modelName;
             settings.put("defaultModel", defaultModel);
         }
         settings.put("transport", "sse");

@@ -518,7 +518,7 @@ async function main() {
     const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
     const sessionManager = SessionManager.inMemory();
 
-    const { session } = await createAgentSession({
+    const { session, extensionsResult } = await createAgentSession({
         cwd: CWD,
         agentDir: AGENT_DIR,
         tools: ["read", "bash", "grep", "report_finding"],
@@ -526,6 +526,20 @@ async function main() {
         sessionManager,
         settingsManager,
     });
+    // Surface extension-load diagnostics — a silently-failed extension lets the agent
+    // fall through to the built-in provider's default endpoint (e.g. api.openai.com)
+    // which is rarely the operator's intent. The first live e2e against the TUM GPU
+    // gateway burned an hour on exactly this gap.
+    if (extensionsResult?.extensions?.length) {
+        for (const ext of extensionsResult.extensions) {
+            console.error(`[pi-runner] extension loaded: ${ext.path}`);
+        }
+    }
+    if (extensionsResult?.errors?.length) {
+        for (const err of extensionsResult.errors) {
+            console.error(`[pi-runner] extension error: ${err?.path}: ${err?.error}`);
+        }
+    }
 
     // ── Attempt 1: Initial analysis ──────────────────────────────
 
