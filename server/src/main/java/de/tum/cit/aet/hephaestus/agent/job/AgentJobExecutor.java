@@ -236,6 +236,9 @@ public class AgentJobExecutor {
      * WorkQueue + {@code maxAckPending} bound ensures only this worker holds RUNNING messages.
      */
     public void cancelInFlight(AgentJobCancellationReason reason) {
+        // TODO(#1138): scope to RUNNING jobs claimed by THIS worker once
+        // the dispatcher claim loop lands. Until then, do not scale worker
+        // replicas above 1 — sibling workers' jobs will be mass-cancelled.
         java.util.List<AgentJob> running = jobRepository.findByStatus(AgentJobStatus.RUNNING);
         if (running.isEmpty()) {
             return;
