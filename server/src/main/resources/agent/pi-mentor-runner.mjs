@@ -247,6 +247,8 @@ async function ensureRuntime() {
             createAgentSessionServices,
             SessionManager,
             DefaultResourceLoader,
+            AuthStorage,
+            ModelRegistry,
             getAgentDir,
         } = await loadSdk();
         // `typeof getAgentDir === "function"` guard accommodates MENTOR_RUNNER_PROTOCOL_ONLY=1 mode,
@@ -269,9 +271,51 @@ async function ensureRuntime() {
         const fetchContextTool = defineFetchContextTool();
         const linkFindingTool = defineLinkFindingTool();
 
+        // Build AuthStorage + ModelRegistry ONCE and register the hephaestus provider directly.
+        // Pi 0.74.x has a race: createAgentSession.findInitialModel runs *before* the extension
+        // runner drains its pending provider registrations into the model registry; the session
+        // is then created with model=undefined and crashes at first stream with
+        // "No API key found for the selected model". Registering directly on ModelRegistry here
+        // sidesteps the race. Same instances are reused across cwd switches — providers are
+        // cwd-independent. PROTOCOL_ONLY mode's stub SDK exposes neither class; guard accordingly.
+        let sharedAuthStorage;
+        let sharedModelRegistry;
+        if (typeof AuthStorage?.create === "function" && typeof ModelRegistry?.create === "function") {
+            sharedAuthStorage = AuthStorage.create();
+            sharedModelRegistry = ModelRegistry.create(sharedAuthStorage);
+            const hephaestusBaseUrl = process.env.PI_HEPHAESTUS_BASE_URL;
+            const hephaestusModel = process.env.PI_HEPHAESTUS_MODEL;
+            if (hephaestusBaseUrl && hephaestusModel) {
+                sharedModelRegistry.registerProvider("hephaestus", {
+                    name: "Hephaestus Gateway",
+                    baseUrl: hephaestusBaseUrl,
+                    apiKey: "PI_HEPHAESTUS_API_KEY",
+                    authHeader: true,
+                    api: "openai-completions",
+                    models: [
+                        {
+                            id: hephaestusModel,
+                            name: hephaestusModel,
+                            reasoning: false,
+                            input: ["text"],
+                            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                            contextWindow: 131072,
+                            maxTokens: 4096,
+                        },
+                    ],
+                });
+                log(`registered hephaestus provider: baseUrl=${hephaestusBaseUrl} model=${hephaestusModel}`);
+            }
+        }
+
         // Factory: rebuilds cwd-bound services on every session lifecycle event.
         const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
-            const services = await createAgentSessionServices({ cwd, agentDir: agentDir });
+            const services = await createAgentSessionServices({
+                cwd,
+                agentDir: agentDir,
+                authStorage: sharedAuthStorage,
+                modelRegistry: sharedModelRegistry,
+            });
             const loader = systemPrompt
                 ? new DefaultResourceLoader({
                       cwd,

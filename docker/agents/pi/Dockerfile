@@ -9,26 +9,19 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends git finduti
 
 # renovate: datasource=npm depName=@earendil-works/pi-coding-agent
 ARG PI_VERSION=0.74.1
-ENV PNPM_HOME=/usr/local/pnpm
-# pnpm 11 installs globals into $PNPM_HOME/bin (the v10 flat layout was
-# deprecated); both PNPM_HOME and PNPM_HOME/bin need to be in PATH so corepack
-# can find the pnpm shim and pnpm can find the binaries it installs globally.
-ENV PATH=$PNPM_HOME/bin:$PNPM_HOME:$PATH
-# pnpm 11 globals land in a content-hashed path under $PNPM_HOME/global/v11/<hash>/
-# that changes whenever the lockfile hashes change. The runner imports the SDK
-# via bare ESM specifiers from /workspace/.run-pi.mjs, where Node would walk
-# /workspace/node_modules → /node_modules (neither contains @earendil-works).
-# Symlink the actual install to a stable path /opt/pi-sdk/node_modules so
-# PiRuntimeFactory can hardcode NODE_PATH without grepping for the hash.
-RUN corepack enable && \
-    corepack prepare pnpm@11.1.2 --activate && \
-    pnpm add -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
-    pnpm store prune && \
-    sdk_node_modules=$(ls -1d /usr/local/pnpm/global/v11/*/node_modules | head -n 1) && \
-    test -d "${sdk_node_modules}/@earendil-works/pi-coding-agent" \
-      || (echo "Pi SDK not found at ${sdk_node_modules}" >&2; exit 1) && \
-    mkdir -p /opt/pi-sdk && \
-    ln -s "${sdk_node_modules}" /opt/pi-sdk/node_modules && \
+# Install the Pi SDK into a deterministic, hash-free path at /opt/pi-sdk/node_modules.
+# We use plain `npm install --prefix` here — not pnpm globals — because pnpm 11 stores
+# globals under /usr/local/pnpm/global/v11/<content-hash>/, which the previous Dockerfile
+# fished out via `ls | head -n 1` (fragile if anything else ever lands in that tree).
+# `npm install --prefix` writes a real /opt/pi-sdk/node_modules/@earendil-works/pi-coding-agent
+# directory with no symlink indirection. The runner imports via the symlink PiRuntimeFactory
+# plants at /<workspace>/node_modules → /opt/pi-sdk/node_modules.
+RUN mkdir -p /opt/pi-sdk && \
+    npm install --prefix /opt/pi-sdk --omit=dev --no-audit --no-fund --no-progress \
+        @earendil-works/pi-coding-agent@${PI_VERSION} && \
+    test -d /opt/pi-sdk/node_modules/@earendil-works/pi-coding-agent \
+      || (echo "Pi SDK not found at /opt/pi-sdk/node_modules" >&2; exit 1) && \
+    npm cache clean --force && \
     mkdir -p /home/agent /workspace && \
     chown -R 1000:1000 /home/agent /workspace
 

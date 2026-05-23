@@ -249,12 +249,12 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("custom provider extension")
+    @DisplayName("custom provider routing")
     class CustomProvider {
 
         @Test
-        @DisplayName("baseUrl-pinned OPENAI spec emits hephaestus-provider.ts under .pi/extensions/")
-        void baseUrlOpenaiEmitsExtension() {
+        @DisplayName("no .pi/extensions/ files are written — runner-script owns provider registration")
+        void noExtensionFilesEmitted() {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
@@ -268,41 +268,12 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 Map.of(),
                 ""
             );
-            var inputs = factory.build(spec).inputFiles();
-            String ts = new String(
-                inputs.get(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts"),
-                StandardCharsets.UTF_8
-            );
-            assertThat(ts)
-                .contains("pi.registerProvider(\"hephaestus\"")
-                .contains("PI_HEPHAESTUS_BASE_URL")
-                .contains("api: \"openai-completions\"");
-        }
-
-        @Test
-        @DisplayName("baseUrl-pinned ANTHROPIC spec uses anthropic-messages api in the extension")
-        void baseUrlAnthropicUsesAnthropicMessagesApi() {
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.ANTHROPIC,
-                CredentialMode.API_KEY,
-                "sk-test",
-                "claude-x",
-                "https://proxy.example.com",
-                null,
-                true,
-                600,
-                PRACTICE,
-                Map.of(),
-                ""
-            );
-            String ts = new String(
-                factory
-                    .build(spec)
-                    .inputFiles()
-                    .get(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts"),
-                StandardCharsets.UTF_8
-            );
-            assertThat(ts).contains("api: \"anthropic-messages\"");
+            assertThat(factory.build(spec).inputFiles().keySet())
+                .as(
+                    "provider extension files are no longer emitted; the runner script's " +
+                        "modelRegistry.registerProvider() call is the single source of truth"
+                )
+                .noneMatch(k -> k.startsWith(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/"));
         }
 
         @Test
@@ -355,14 +326,14 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             // defaultProvider=hephaestus pins the provider explicitly, so Pi does not parse the
             // slash in defaultModel as a provider/model reference; the full id is what the
-            // extension's models[0].id matches AND what the gateway expects on the wire.
+            // runner-script's registerProvider() call matches AND what the gateway expects on the wire.
             assertThat(settings.path("defaultProvider").asText()).isEqualTo("hephaestus");
             assertThat(settings.path("defaultModel").asText()).isEqualTo("openai/gpt-oss-120b");
         }
 
         @Test
-        @DisplayName("no baseUrl → defaultProvider=openai, no extension file written")
-        void noBaseUrlNoExtension() throws Exception {
+        @DisplayName("no baseUrl → defaultProvider=openai (built-in provider, no runner registration)")
+        void noBaseUrlUsesBuiltInProvider() throws Exception {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
@@ -376,17 +347,18 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 Map.of(),
                 ""
             );
-            var inputs = factory.build(spec).inputFiles();
-            assertThat(inputs).doesNotContainKey(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts");
             JsonNode settings = objectMapper.readTree(
-                new String(inputs.get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"), StandardCharsets.UTF_8)
+                new String(
+                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"),
+                    StandardCharsets.UTF_8
+                )
             );
             assertThat(settings.path("defaultProvider").asText()).isEqualTo("openai");
         }
 
         @Test
-        @DisplayName("AZURE_OPENAI with baseUrl never writes the extension (Azure has its own routing)")
-        void azureNeverUsesExtension() {
+        @DisplayName("AZURE_OPENAI with baseUrl uses azure-openai-responses (Azure has its own routing)")
+        void azureNeverUsesHephaestusProvider() throws Exception {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.AZURE_OPENAI,
                 CredentialMode.API_KEY,
@@ -400,9 +372,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 Map.of(),
                 ""
             );
-            assertThat(factory.build(spec).inputFiles()).doesNotContainKey(
-                WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts"
+            JsonNode settings = objectMapper.readTree(
+                new String(
+                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"),
+                    StandardCharsets.UTF_8
+                )
             );
+            assertThat(settings.path("defaultProvider").asText()).isEqualTo("azure-openai-responses");
         }
     }
 
