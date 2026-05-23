@@ -142,43 +142,52 @@ class KeycloakPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Validation Failures")
-    class ValidationFailures {
+    @DisplayName("isConfigured() contract")
+    class IsConfiguredContract {
 
         @Test
-        @DisplayName("should fail when URL is blank")
-        void blankUrl_validationFails() {
+        @DisplayName("isConfigured() returns false when URL is blank — non-server roles boot without Keycloak")
+        void blankUrl_isConfiguredFalse() {
             contextRunner()
                 .withPropertyValues(
                     "hephaestus.keycloak.url=",
                     "hephaestus.keycloak.realm=test",
                     "hephaestus.keycloak.client-id=client"
                 )
-                .run(context -> assertThat(context).hasFailed());
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(KeycloakProperties.class).isConfigured()).isFalse();
+                });
         }
 
         @Test
-        @DisplayName("should fail when realm is blank")
-        void blankRealm_validationFails() {
+        @DisplayName("isConfigured() returns false when realm is whitespace")
+        void blankRealm_isConfiguredFalse() {
             contextRunner()
                 .withPropertyValues(
                     "hephaestus.keycloak.url=https://auth.example.com",
                     "hephaestus.keycloak.realm=   ",
                     "hephaestus.keycloak.client-id=client"
                 )
-                .run(context -> assertThat(context).hasFailed());
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(KeycloakProperties.class).isConfigured()).isFalse();
+                });
         }
 
         @Test
-        @DisplayName("should fail when client ID is blank")
-        void blankClientId_validationFails() {
+        @DisplayName("isConfigured() returns false when client ID is blank")
+        void blankClientId_isConfiguredFalse() {
             contextRunner()
                 .withPropertyValues(
                     "hephaestus.keycloak.url=https://auth.example.com",
                     "hephaestus.keycloak.realm=test",
                     "hephaestus.keycloak.client-id="
                 )
-                .run(context -> assertThat(context).hasFailed());
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(KeycloakProperties.class).isConfigured()).isFalse();
+                });
         }
 
         @Test

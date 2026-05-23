@@ -128,17 +128,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             new MentorChatExecutorConfig.MentorRunnerTimeoutScheduler(scheduler);
 
         meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
-        // Instance-level LLM config — all three required fields set so resolveLlmConfig takes
-        // the instance path and does not need the agentConfigRepository.
-        MentorAgentProperties mentorProps = new MentorAgentProperties(
-            100_000,
-            "",
-            LlmProvider.OPENAI,
-            CredentialMode.API_KEY,
-            "test-key",
-            "test-model",
-            600
-        );
+        MentorAgentProperties mentorProps = new MentorAgentProperties(100_000, "");
         service = new MentorChatService(
             userRepository,
             chatThreadRepository,
@@ -164,6 +154,11 @@ class MentorChatServiceTest extends BaseUnitTest {
 
         AgentConfig agentConfig = new AgentConfig();
         agentConfig.setEnabled(true);
+        agentConfig.setLlmProvider(LlmProvider.OPENAI);
+        agentConfig.setCredentialMode(CredentialMode.API_KEY);
+        agentConfig.setLlmApiKey("test-key");
+        agentConfig.setModelName("test-model");
+        agentConfig.setTimeoutSeconds(600);
         when(agentConfigRepository.findByWorkspaceId(eq(WORKSPACE_ID))).thenReturn(List.of(agentConfig));
 
         Workspace ws = new Workspace();
@@ -414,7 +409,7 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     /** Run a turn on the same thread as the test (deterministic) and block until the emitter completes. */
     private void runTurnSync() {
-        service.start(new MentorChatService.MentorTurnRequest(WORKSPACE_ID, THREAD_ID, "hello mentor"), emitter);
+        service.start(new MentorChatService.MentorTurnRequest(WORKSPACE_ID, THREAD_ID, "hello mentor", null), emitter);
     }
 
     /** Direct (synchronous) ExecutorService — the test thread runs every task before returning. */

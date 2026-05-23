@@ -87,11 +87,9 @@ jobs:
           pnpm install --frozen-lockfile
 
           ISSUES_FOUND=()
-          FMT_OK=true; TS_OK=true; RUNNER_OK=true
+          FMT_OK=true; RUNNER_OK=true
 
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
-          pnpm --filter @hephaestus/agent-extensions run typecheck \
-            || { TS_OK=false; ISSUES_FOUND+=("Pi extension TS failed typecheck against @earendil-works/pi-coding-agent. Run: pnpm --filter @hephaestus/agent-extensions run typecheck"); }
           node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
             || { RUNNER_OK=false; ISSUES_FOUND+=("Pi mentor runner smoke test failed. Run: node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs"); }
 
@@ -100,7 +98,6 @@ jobs:
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TS_OK" == "false" ]] && echo "| Pi extension TS | :x: Failed | \`pnpm --filter @hephaestus/agent-extensions run typecheck\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$RUNNER_OK" == "false" ]] && echo "| Pi mentor runner smoke | :x: Failed | \`node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1

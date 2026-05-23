@@ -42,7 +42,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         practice.setSlug(slug);
         practice.setName(name);
         practice.setCategory(category);
-        practice.setDescription("Test description for " + slug);
+        practice.setCriteria("Default criteria for " + slug);
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         return practice;
     }
@@ -68,7 +68,6 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(found.getSlug()).isEqualTo("test-slug");
             assertThat(found.getName()).isEqualTo("Test Practice");
             assertThat(found.getCategory()).isEqualTo("test-category");
-            assertThat(found.getDescription()).isEqualTo("Test description for test-slug");
             assertThat(found.getTriggerEvents().toString()).contains("PullRequestCreated");
             assertThat(found.getCriteria()).isEqualTo("Check for quality");
             assertThat(found.isActive()).isFalse();

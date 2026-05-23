@@ -41,8 +41,8 @@ export const Inactive: Story = {
 	},
 };
 
-/** Practice without criteria configured. */
-export const NoCriteria: Story = {
+/** Practice without category — tests no-badge rendering. */
+export const ShortCriteria: Story = {
 	args: {
 		practice: mockPractices[1],
 	},
@@ -69,7 +69,7 @@ export const NoCategory: Story = {
 	},
 };
 
-/** Practice with long name, description, and criteria — tests overflow and line-clamp. */
+/** Practice with long name and verbose criteria — tests overflow and line-clamp. */
 export const LongText: Story = {
 	args: {
 		practice: mockPracticeLongText,

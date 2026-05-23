@@ -5,7 +5,8 @@ import { mockPractices, mockPracticeWithAllTriggers } from "./storyMockData";
 
 /**
  * Full-page form for creating or editing a practice definition.
- * Includes sections for general info, trigger events, criteria, and precompute script.
+ * Includes sections for general info, trigger events, evaluation criteria
+ * (the single source of truth), and precompute script.
  */
 const meta = {
 	component: PracticeForm,

@@ -773,14 +773,12 @@ class MentorSandboxStressTest {
             ""
         );
         byte[] settingsBytes = factory.buildPiSettingsJson(spec.provider(), spec.modelName(), true);
-        byte[] extensionBytes = factory.buildExtensionFile(spec);
 
         Path piHome = tmp.resolve(".pi-home");
         Files.createDirectories(piHome);
         Files.write(piHome.resolve("settings.json"), settingsBytes);
-        Path extDir = piHome.resolve("extensions");
-        Files.createDirectories(extDir);
-        Files.write(extDir.resolve("hephaestus-provider.ts"), extensionBytes);
+        // No extension file — pi-mentor-runner.mjs registers the hephaestus provider directly
+        // on the ModelRegistry from the PI_HEPHAESTUS_* env vars set on the spawned process.
         return tmp;
     }
 

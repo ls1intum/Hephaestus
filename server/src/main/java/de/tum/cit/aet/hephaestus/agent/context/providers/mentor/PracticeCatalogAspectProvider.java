@@ -88,8 +88,6 @@ public class PracticeCatalogAspectProvider implements ContentProvider {
             ObjectNode node = arr.addObject();
             node.put("slug", practice.getSlug());
             node.put("displayName", practice.getName());
-            // criteria is multi-line markdown; description is shorter prose. Keep both.
-            node.put("description", practice.getDescription());
             node.put("criteria", practice.getCriteria());
         }
         return root;

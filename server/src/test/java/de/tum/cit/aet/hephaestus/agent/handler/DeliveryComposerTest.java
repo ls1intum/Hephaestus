@@ -64,7 +64,8 @@ class DeliveryComposerTest extends BaseUnitTest {
             0.90f,
             null,
             null,
-            null
+            null,
+            List.of()
         );
     }
 
@@ -85,7 +86,8 @@ class DeliveryComposerTest extends BaseUnitTest {
             0.92f,
             buildEvidence(locations, snippets),
             reasoning,
-            guidance
+            guidance,
+            List.of()
         );
     }
 

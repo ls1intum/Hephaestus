@@ -3,7 +3,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 
 import {
+    AuthStorage,
     createAgentSession,
+    ModelRegistry,
     SessionManager,
     SettingsManager,
     defineTool,
@@ -56,7 +58,6 @@ const runnerDebug = { attempts: [], usageTotals };
 const reviewState = {
     findings: [],
     findingKeys: [],
-    delivery: { mrNote: null },
 };
 const verdictSchema = { type: "string", enum: ["POSITIVE", "NEGATIVE", "NOT_APPLICABLE"] };
 const severitySchema = { type: "string", enum: ["CRITICAL", "MAJOR", "MINOR", "INFO"] };
@@ -118,14 +119,7 @@ function persistRunnerDebug() {
 function persistReviewState() {
     writeFileSync(
         REVIEW_STATE_PATH,
-        JSON.stringify(
-            {
-                findings: reviewState.findings,
-                delivery: reviewState.delivery,
-            },
-            null,
-            2,
-        ),
+        JSON.stringify({ findings: reviewState.findings }, null, 2),
     );
 }
 
@@ -158,13 +152,12 @@ function isValidFindingsPayload(p) {
         typeof p === "object" &&
         Array.isArray(p.findings) &&
         p.findings.length > 0 &&
-        p.findings.some(isValidFinding) &&
-        (p.delivery == null || (typeof p.delivery === "object" && !Array.isArray(p.delivery)))
+        p.findings.some(isValidFinding)
     );
 }
 
 function lenientJsonParse(text) {
-    // Strip C0 + DEL control chars (mirrors Java ALLOW_UNQUOTED_CONTROL_CHARS).
+    // Strip C0 + DEL control chars (mirrors Java ALLOW_UNESCAPED_CONTROL_CHARS).
     try {
         return JSON.parse(text);
     } catch {}
@@ -196,24 +189,13 @@ function checkResultFile() {
 }
 
 function maybeWriteResultFile() {
-    const mrNote = typeof reviewState.delivery.mrNote === "string" ? reviewState.delivery.mrNote.trim() : "";
-    if (!mrNote || reviewState.findings.length === 0) return false;
-    writeFileSync(
-        RESULT_PATH,
-        JSON.stringify(
-            {
-                findings: reviewState.findings,
-                delivery: { mrNote },
-            },
-            null,
-            2,
-        ),
-    );
+    if (reviewState.findings.length === 0) return false;
+    writeFileSync(RESULT_PATH, JSON.stringify({ findings: reviewState.findings }, null, 2));
     return true;
 }
 
 function hasPersistedReviewState() {
-    return reviewState.findings.length > 0 || Boolean(reviewState.delivery.mrNote?.trim());
+    return reviewState.findings.length > 0;
 }
 
 function normalizeDiffNote(note) {
@@ -330,38 +312,6 @@ const reportFindingTool = defineTool({
         };
     },
 });
-
-const setReviewSummaryTool = defineTool({
-    name: "set_review_summary",
-    label: "Set Review Summary",
-    description:
-        "Persist the final delivery.mrNote markdown summary for the merge request comment. Keep it concise and call this once the review findings are already persisted.",
-    parameters: {
-        type: "object",
-        additionalProperties: false,
-        required: ["mrNote"],
-        properties: {
-            mrNote: { type: "string", minLength: 1, maxLength: 60000 },
-        },
-    },
-    execute: async (_toolCallId, params) => {
-        reviewState.delivery.mrNote = String(params.mrNote ?? "").trim();
-        persistReviewState();
-        const wroteResult = maybeWriteResultFile();
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: wroteResult
-                        ? `Stored review summary and wrote ${RESULT_PATH}.`
-                        : "Stored review summary. Result file will be written after at least one finding is reported.",
-                },
-            ],
-            details: { wroteResult, totalFindings: reviewState.findings.length },
-        };
-    },
-});
-
 
 function extractUsageFromSession(session) {
     const messages = session.messages || [];
@@ -498,8 +448,7 @@ function buildRetryScaffold(slugs) {
         `Persist every justified finding with report_finding, one finding per call. ` +
         `There is no target count and no quota. ` +
         `Only report POSITIVE findings that add real review value. ` +
-        `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem. ` +
-        `Then persist the final MR summary with set_review_summary.`
+        `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem.`
     );
 }
 
@@ -563,22 +512,63 @@ async function main() {
         `[pi-runner] Budget: total=${AGENT_BUDGET_MS}ms, initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry=${RETRY_TIMEOUT_MS}ms`,
     );
 
-    // Pi SDK option `tools` is an allowlist of tool *names*, not constructed tool
-    // instances. Restricting to read/bash/grep prevents the agent from invoking
-    // edit/write — findings are persisted only via the customTools below. Pi 0.74+
-    // filters customTools through the same allowlist (see agent-session.js:1796), so
-    // the custom tool names must be listed here too or they won't be exposed to the LLM.
+    // `tools` is an allowlist of tool *names* (Pi 0.74+ filters customTools through the same
+    // allowlist), so both built-in and custom tool names must appear here. Edit/write are omitted
+    // — findings are persisted only via report_finding.
     const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
     const sessionManager = SessionManager.inMemory();
+    const authStorage = AuthStorage.create();
+    const modelRegistry = ModelRegistry.create(authStorage);
 
-    const { session } = await createAgentSession({
+    // Pi 0.74.x bug: createAgentSession.findInitialModel runs before the extension runner drains
+    // pending registrations into the model registry. Register the hephaestus provider directly
+    // here so the session resolves a real model on first prompt.
+    const hephaestusBaseUrl = process.env.PI_HEPHAESTUS_BASE_URL;
+    const hephaestusModel = process.env.PI_HEPHAESTUS_MODEL;
+    if (hephaestusBaseUrl && hephaestusModel) {
+        modelRegistry.registerProvider("hephaestus", {
+            name: "Hephaestus Gateway",
+            baseUrl: hephaestusBaseUrl,
+            apiKey: "PI_HEPHAESTUS_API_KEY",
+            authHeader: true,
+            api: "openai-completions",
+            models: [
+                {
+                    id: hephaestusModel,
+                    name: hephaestusModel,
+                    reasoning: false,
+                    input: ["text"],
+                    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                    contextWindow: 131072,
+                    maxTokens: 4096,
+                },
+            ],
+        });
+        console.error(`[pi-runner] registered hephaestus provider: baseUrl=${hephaestusBaseUrl} model=${hephaestusModel}`);
+    }
+
+    const { session, extensionsResult } = await createAgentSession({
         cwd: CWD,
         agentDir: AGENT_DIR,
-        tools: ["read", "bash", "grep", "report_finding", "set_review_summary"],
-        customTools: [reportFindingTool, setReviewSummaryTool],
+        tools: ["read", "bash", "grep", "report_finding"],
+        customTools: [reportFindingTool],
         sessionManager,
         settingsManager,
+        authStorage,
+        modelRegistry,
     });
+    // Extension load failures are silent in Pi — surface them so the agent doesn't fall through
+    // to a built-in provider's default endpoint (e.g. api.openai.com).
+    if (extensionsResult?.extensions?.length) {
+        for (const ext of extensionsResult.extensions) {
+            console.error(`[pi-runner] extension loaded: ${ext.path}`);
+        }
+    }
+    if (extensionsResult?.errors?.length) {
+        for (const err of extensionsResult.errors) {
+            console.error(`[pi-runner] extension error: ${err?.path}: ${err?.error}`);
+        }
+    }
 
     // ── Attempt 1: Initial analysis ──────────────────────────────
 
@@ -598,7 +588,6 @@ async function main() {
             `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be "No change needed." ` +
             `Only keep POSITIVE findings that add real review value. ` +
             `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Then call set_review_summary exactly once. ` +
             `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
         session.steer(steerMessage).catch((err) => console.error(`[pi-runner] steer failed: ${err.message}`));
     }, SOFT_TIMEOUT_MS);
@@ -618,8 +607,10 @@ async function main() {
             const stopReason = event.message.stopReason;
             const types = (event.message.content || []).map((c) => c.type);
             const toolCalls = types.filter((t) => t === "tool_use" || t === "tool_call").length;
+            const errMsg = event.message.errorMessage;
             console.error(
-                `[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, types=[${types}]`,
+                `[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, types=[${types}]` +
+                    (errMsg ? `, errorMessage=${redact(errMsg)}` : ""),
             );
         }
         events.push({ type: event.type, timestamp: Date.now() });
@@ -726,7 +717,6 @@ async function main() {
             `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
             `Only keep POSITIVE findings that add real review value. ` +
             `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Then call set_review_summary exactly once with the MR note. ` +
             `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
             scaffold;
     } else if (agentText) {
@@ -737,7 +727,6 @@ async function main() {
             `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
             `Only keep POSITIVE findings that add real review value. ` +
             `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Then call set_review_summary exactly once with delivery.mrNote. ` +
             `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
             scaffold;
     } else {
@@ -748,7 +737,6 @@ async function main() {
             `using \"No change needed.\" as guidance for POSITIVE or NOT_APPLICABLE findings when needed. ` +
             `Only keep POSITIVE findings that add real review value. ` +
             `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Then call set_review_summary exactly once with the MR note. ` +
             `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
             scaffold;
     }

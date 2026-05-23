@@ -60,6 +60,10 @@ public class AgentConfigService {
         if (request.llmApiKey() != null) {
             config.setLlmApiKey(request.llmApiKey());
         }
+        if (request.llmBaseUrl() != null) {
+            // Empty string clears the field; otherwise stores the trimmed value.
+            config.setLlmBaseUrl(request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim());
+        }
         if (request.timeoutSeconds() != null) {
             config.setTimeoutSeconds(request.timeoutSeconds());
         }
@@ -99,6 +103,10 @@ public class AgentConfigService {
         }
         if (request.llmApiKey() != null) {
             config.setLlmApiKey(request.llmApiKey());
+        }
+        if (request.llmBaseUrl() != null) {
+            // Empty string clears the field; otherwise stores the trimmed value.
+            config.setLlmBaseUrl(request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim());
         }
         if (request.timeoutSeconds() != null) {
             config.setTimeoutSeconds(request.timeoutSeconds());

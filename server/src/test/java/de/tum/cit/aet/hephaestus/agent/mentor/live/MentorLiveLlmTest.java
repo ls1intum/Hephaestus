@@ -48,12 +48,13 @@ import tools.jackson.databind.node.ObjectNode;
  *       {@link PiEventToUiChunkTranslator} so the test exercises the production stream-merge logic.</li>
  * </ol>
  *
- * <p>The runner only honours a custom model registry through extensions. To exercise the
- * production routing end-to-end, this test uses the real {@link PiRuntimeFactory} to mint
- * the settings.json and the {@code hephaestus-provider.ts} extension — the same bytes the
- * production agent container would see. The {@code PI_HEPHAESTUS_*} env vars the factory
- * expects are seeded from {@link LiveLlmCredentials}. If C1's provider refactor regresses
- * the production path, this live test fails — no separate test extension to mask the bug.
+ * <p>To exercise the production routing end-to-end, this test uses the real
+ * {@link PiRuntimeFactory} to mint the settings.json (defaultProvider=hephaestus) — the same
+ * bytes the production agent container would see. The hephaestus custom provider is registered
+ * directly on the ModelRegistry by {@code pi-mentor-runner.mjs} before {@code createAgentSession},
+ * driven by the {@code PI_HEPHAESTUS_*} env vars seeded from {@link LiveLlmCredentials}. If a
+ * future refactor regresses the production path, this live test fails — no test-only extension
+ * masks the bug.
  */
 @LiveLlmTest
 @DisplayName("Mentor runner — live LLM round-trip")
@@ -563,7 +564,7 @@ class MentorLiveLlmTest {
         Files.createDirectories(tmp.resolve(".sessions"));
 
         // ESM resolution walks node_modules upward from the *importing* file, not from cwd. The
-        // production container handles this by `ln -sf /usr/local/lib/node_modules
+        // production container handles this by `ln -sf /opt/pi-sdk/node_modules
         // /workspace/node_modules` and bind-mounting the runner under /workspace/.run-pi.mjs
         // (see PiRuntimeFactory). We mirror both moves here: symlink node_modules under the
         // workspace, and copy the runner into the workspace so resolution finds the symlink.
@@ -598,7 +599,6 @@ class MentorLiveLlmTest {
             ""
         );
         byte[] settingsBytes = factory.buildPiSettingsJson(spec.provider(), spec.modelName(), true);
-        byte[] extensionBytes = factory.buildExtensionFile(spec);
 
         // Pi loads its on-disk settings from `~/.pi/settings.json`; redirect with env vars so we
         // never touch the user's real ~/.pi.
@@ -606,10 +606,9 @@ class MentorLiveLlmTest {
         Files.createDirectories(piHome);
         Files.write(piHome.resolve("settings.json"), settingsBytes);
 
-        // Pi SDK auto-discovers extensions in $PI_CODING_AGENT_DIR/extensions/ via jiti.
-        Path extDir = piHome.resolve("extensions");
-        Files.createDirectories(extDir);
-        Files.write(extDir.resolve("hephaestus-provider.ts"), extensionBytes);
+        // No extension file is written: pi-mentor-runner.mjs registers the hephaestus provider
+        // directly on the ModelRegistry before createAgentSession (mirrors pi-runner.mjs). The
+        // PI_HEPHAESTUS_* env vars seeded from LiveLlmCredentials drive that registration.
 
         return tmp;
     }

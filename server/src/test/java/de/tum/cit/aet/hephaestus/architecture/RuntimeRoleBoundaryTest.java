@@ -54,8 +54,42 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         "de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService",
         RuntimeRole.SERVER_PROPERTY,
         "de.tum.cit.aet.hephaestus.workspace.WorkspaceStartupListener",
+        RuntimeRole.SERVER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerConfiguration",
+        RuntimeRole.WORKER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration",
+        RuntimeRole.SERVER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
         RuntimeRole.SERVER_PROPERTY
     );
+
+    @Test
+    void noStackedConditionalOnPropertyOnSameElement() {
+        // Spring honors only ONE @ConditionalOnProperty per element; the second annotation is
+        // silently ignored. Anyone wanting both conditions must use @ConditionalOnExpression or
+        // compose with @Conditional.
+        List<String> violations = classes
+            .stream()
+            .filter(c -> c.getFullName().startsWith("de.tum.cit.aet.hephaestus."))
+            .filter(
+                clazz ->
+                    clazz
+                        .getAnnotations()
+                        .stream()
+                        .filter(a -> a.getRawType().isEquivalentTo(ConditionalOnProperty.class))
+                        .count() >
+                    1
+            )
+            .map(JavaClass::getFullName)
+            .collect(Collectors.toList());
+
+        assertThat(violations)
+            .as(
+                "Classes with multiple @ConditionalOnProperty annotations — Spring honors only the " +
+                    "first; use @ConditionalOnExpression for compound predicates instead."
+            )
+            .isEmpty();
+    }
 
     @Test
     void runtimeGatesAreMatchIfMissingTrue() {

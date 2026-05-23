@@ -137,7 +137,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         p.setSlug(slug);
         p.setName(name);
         p.setCategory("test");
-        p.setDescription("Test " + slug);
+        p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(triggerEvents));
         p.setActive(active);
         return practiceRepository.save(p);

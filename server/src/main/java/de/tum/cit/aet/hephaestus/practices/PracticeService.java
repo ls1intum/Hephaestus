@@ -61,7 +61,6 @@ public class PracticeService {
         practice.setSlug(request.slug());
         practice.setName(request.name());
         practice.setCategory(request.category());
-        practice.setDescription(request.description());
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(request.triggerEvents()));
         practice.setCriteria(request.criteria());
         practice.setPrecomputeScript(request.precomputeScript());
@@ -93,10 +92,6 @@ public class PracticeService {
         }
         if (request.category() != null) {
             practice.setCategory(request.category());
-            changed = true;
-        }
-        if (request.description() != null) {
-            practice.setDescription(request.description());
             changed = true;
         }
         if (request.triggerEvents() != null) {

@@ -55,7 +55,7 @@ class PiResultParserTest extends BaseUnitTest {
         String reviewState = """
             {"findings":[{"practiceSlug":"x","title":"t","verdict":"NEGATIVE","severity":"MAJOR",
             "confidence":0.9,"evidence":{"locations":[],"snippets":[]},"reasoning":"r","guidance":"g",
-            "suggestedDiffNotes":[]}],"delivery":{"mrNote":"please fix"}}""";
+            "suggestedDiffNotes":[]}]}""";
         var result = parser.parse(
             new SandboxResult(
                 1,
@@ -66,7 +66,7 @@ class PiResultParserTest extends BaseUnitTest {
             )
         );
         String raw = result.output().get("rawOutput").toString();
-        assertThat(raw).contains("\"x\"").contains("please fix");
+        assertThat(raw).contains("\"x\"").contains("\"NEGATIVE\"");
     }
 
     @Test

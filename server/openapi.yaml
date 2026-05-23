@@ -2554,6 +2554,9 @@ components:
           type: integer
           format: int64
           description: Configuration ID
+        llmBaseUrl:
+          type: string
+          description: Optional LLM base URL override
         llmProvider:
           type: string
           description: LLM provider
@@ -2886,6 +2889,14 @@ components:
         llmApiKey:
           type: string
           description: LLM API key
+        llmBaseUrl:
+          type: string
+          description: "Optional LLM base URL — set for OpenAI/Anthropic-compatible\
+            \ endpoints that need routing through the hephaestus chat/completions\
+            \ provider extension (e.g. TUM GPU, on-prem gateways)"
+          example: https://gpu.example.com
+          maxLength: 512
+          minLength: 0
         llmProvider:
           type: string
           description: LLM provider
@@ -2955,12 +2966,6 @@ components:
           description: Practice evaluation criteria
           maxLength: 50000
           minLength: 0
-        description:
-          type: string
-          description: Practice description
-          example: Ensures pull request descriptions are detailed and informative
-          maxLength: 10000
-          minLength: 0
         name:
           type: string
           description: Human-readable name
@@ -2991,7 +2996,7 @@ components:
           maxItems: 10
           minItems: 1
       required:
-      - description
+      - criteria
       - name
       - slug
       - triggerEvents
@@ -3503,9 +3508,6 @@ components:
         criteria:
           type: string
           description: Practice evaluation criteria
-        description:
-          type: string
-          description: Practice description
         id:
           type: integer
           format: int64
@@ -3532,7 +3534,7 @@ components:
       required:
       - active
       - createdAt
-      - description
+      - criteria
       - id
       - name
       - slug
@@ -4203,6 +4205,12 @@ components:
         llmApiKey:
           type: string
           description: LLM API key (omit or null to keep existing key)
+        llmBaseUrl:
+          type: string
+          description: Optional LLM base URL override (omit or null to keep existing
+            value; empty string clears it)
+          maxLength: 512
+          minLength: 0
         llmProvider:
           type: string
           description: LLM provider
@@ -4254,11 +4262,6 @@ components:
           type: string
           description: Practice evaluation criteria
           maxLength: 50000
-          minLength: 0
-        description:
-          type: string
-          description: Practice description
-          maxLength: 10000
           minLength: 0
           pattern: .*\S.*
         name:

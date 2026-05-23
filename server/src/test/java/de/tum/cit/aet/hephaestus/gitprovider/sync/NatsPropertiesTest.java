@@ -184,15 +184,15 @@ class NatsPropertiesTest {
     class DisabledState {
 
         @Test
-        @DisplayName("should still validate server when NATS is disabled (validation is unconditional)")
-        void disabledNats_serverStillValidated() {
+        @DisplayName("blank server is tolerated when NATS is disabled — worker/webhook pods need this")
+        void disabledNats_blankServerTolerated() {
             new ApplicationContextRunner()
                 .withUserConfiguration(TestConfiguration.class, ValidationAutoConfiguration.class)
                 .withPropertyValues("hephaestus.sync.nats.enabled=false", "hephaestus.sync.nats.server=")
                 .run(context -> {
-                    // Note: @NotBlank still validates even when disabled
-                    // This documents current behavior - validation is unconditional
-                    assertThat(context).hasFailed();
+                    // Validation lives in the compact constructor and is gated on `enabled` so
+                    // pods running without sync NATS (worker, webhook) don't need a sentinel value.
+                    assertThat(context).hasNotFailed();
                 });
         }
     }

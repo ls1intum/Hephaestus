@@ -77,7 +77,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
         practice.setCategory("test");
-        practice.setDescription("Test description");
+        practice.setCriteria("Test description");
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         practice = practiceRepository.save(practice);
 

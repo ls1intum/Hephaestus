@@ -45,6 +45,8 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
     private static final String PREFIX = "ENC:";
+    /** Hoisted to avoid re-seeding /dev/random on every encrypt; SecureRandom is thread-safe. */
+    private static final SecureRandom IV_GENERATOR = new SecureRandom();
 
     private final SecretKey secretKey;
     private final boolean enabled;
@@ -95,7 +97,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
         try {
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             byte[] iv = new byte[GCM_IV_LENGTH];
-            new SecureRandom().nextBytes(iv);
+            IV_GENERATOR.nextBytes(iv);
             GCMParameterSpec parameterSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, parameterSpec);
 

@@ -54,7 +54,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setSlug(slug);
         practice.setName(name);
         practice.setCategory(category);
-        practice.setDescription("Description for " + slug);
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         practice.setCriteria("Detect prompt for " + slug);
         practice.setActive(active);
@@ -66,7 +65,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             slug,
             "Practice " + slug,
             "test-category",
-            "Description for " + slug,
             List.of("PullRequestCreated", "ReviewSubmitted"),
             "Detect if the PR follows best practices",
             null
@@ -391,9 +389,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "minimal-practice",
                 "Minimal Practice",
                 null,
-                "A description",
                 List.of("PullRequestCreated"),
-                null,
+                "Minimal criteria",
                 null
             );
 
@@ -413,7 +410,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("minimal-practice");
             assertThat(result.category()).isNull();
-            assertThat(result.criteria()).isNull();
+            assertThat(result.criteria()).isEqualTo("Minimal criteria");
             assertThat(result.active()).isTrue();
         }
 
@@ -493,7 +490,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "INVALID_SLUG",
                 "Name",
                 null,
-                "Description",
                 List.of("PullRequestCreated"),
                 null,
                 null
@@ -529,7 +525,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "bad-slug-",
                 "Name",
                 null,
-                "Description",
                 List.of("PullRequestCreated"),
                 null,
                 null
@@ -556,7 +551,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "bad--slug",
                 "Name",
                 null,
-                "Description",
                 List.of("PullRequestCreated"),
                 null,
                 null
@@ -583,7 +577,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "-bad-slug",
                 "Name",
                 null,
-                "Description",
                 List.of("PullRequestCreated"),
                 null,
                 null
@@ -610,7 +603,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "valid-slug",
                 "Name",
                 null,
-                "Description",
                 List.of("NonExistentEvent"),
                 null,
                 null
@@ -646,7 +638,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "dup-events",
                 "Name",
                 null,
-                "Description",
                 List.of("PullRequestCreated", "PullRequestCreated"),
                 null,
                 null
@@ -669,7 +660,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn400ForBlankFields() {
             ensureAdminMembership(workspace);
 
-            var request = new CreatePracticeRequestDTO("", "", null, "", List.of(), null, null);
+            var request = new CreatePracticeRequestDTO("", "", null, List.of(), null, null);
 
             ProblemDetail problem = webTestClient
                 .post()
@@ -688,7 +679,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(problem.getTitle()).isEqualTo("Validation failed");
             assertThat(problem.getProperties().get("errors"))
                 .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-                .containsKeys("slug", "name", "description", "triggerEvents");
+                .containsKeys("slug", "name", "criteria", "triggerEvents");
         }
 
         @Test
@@ -697,15 +688,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn400ForSlugTooShort() {
             ensureAdminMembership(workspace);
 
-            var request = new CreatePracticeRequestDTO(
-                "ab",
-                "Name",
-                null,
-                "Description",
-                List.of("PullRequestCreated"),
-                null,
-                null
-            );
+            var request = new CreatePracticeRequestDTO("ab", "Name", null, List.of("PullRequestCreated"), null, null);
 
             webTestClient
                 .post()
@@ -728,7 +711,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "a".repeat(65),
                 "Name",
                 null,
-                "Description",
                 List.of("PullRequestCreated"),
                 null,
                 null
@@ -755,7 +737,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "valid-slug",
                 "AB",
                 null,
-                "Description",
                 List.of("PullRequestCreated"),
                 null,
                 null
@@ -778,7 +759,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn400ForEmptyTriggerEvents() {
             ensureAdminMembership(workspace);
 
-            var request = new CreatePracticeRequestDTO("no-events", "Name", null, "Description", List.of(), null, null);
+            var request = new CreatePracticeRequestDTO("no-events", "Name", null, List.of(), null, null);
 
             webTestClient
                 .post()
@@ -838,7 +819,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             ensureAdminMembership(workspace);
             persistPractice("update-me", "Original Name", "original-cat", true);
 
-            var request = new UpdatePracticeRequestDTO("Updated Name", null, null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("Updated Name", null, null, null, null);
 
             PracticeDTO result = webTestClient
                 .patch()
@@ -857,7 +838,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.name()).isEqualTo("Updated Name");
             // Verify unchanged fields remain intact
             assertThat(result.category()).isEqualTo("original-cat");
-            assertThat(result.description()).isEqualTo("Description for update-me");
             assertThat(result.triggerEvents()).containsExactly("PullRequestCreated");
             assertThat(result.criteria()).isEqualTo("Detect prompt for update-me");
             assertThat(result.active()).isTrue();
@@ -873,7 +853,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new UpdatePracticeRequestDTO(
                 "New Name",
                 "new-cat",
-                "New description",
                 List.of("ReviewSubmitted"),
                 "New prompt",
                 null
@@ -895,7 +874,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.name()).isEqualTo("New Name");
             assertThat(result.category()).isEqualTo("new-cat");
-            assertThat(result.description()).isEqualTo("New description");
             assertThat(result.triggerEvents()).containsExactly("ReviewSubmitted");
             assertThat(result.criteria()).isEqualTo("New prompt");
 
@@ -907,7 +885,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(persisted).isPresent();
             assertThat(persisted.get().getName()).isEqualTo("New Name");
             assertThat(persisted.get().getCategory()).isEqualTo("new-cat");
-            assertThat(persisted.get().getDescription()).isEqualTo("New description");
+            assertThat(persisted.get().getCriteria()).isEqualTo("New prompt");
         }
 
         @Test
@@ -916,7 +894,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn404() {
             ensureAdminMembership(workspace);
 
-            var request = new UpdatePracticeRequestDTO("Name", null, null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("Name", null, null, null, null);
 
             webTestClient
                 .patch()
@@ -936,7 +914,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             ensureAdminMembership(workspace);
             persistPractice("bad-update", "Name", "cat", true);
 
-            var request = new UpdatePracticeRequestDTO("AB", null, null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("AB", null, null, null, null);
 
             ProblemDetail problem = webTestClient
                 .patch()
@@ -965,7 +943,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             ensureAdminMembership(workspace);
             persistPractice("ws-name", "Name", "cat", true);
 
-            var request = new UpdatePracticeRequestDTO("   ", null, null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("   ", null, null, null, null);
 
             ProblemDetail problem = webTestClient
                 .patch()
@@ -989,16 +967,16 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for whitespace-only description")
-        void shouldReturn400ForWhitespaceOnlyDescription() {
+        @DisplayName("returns 400 for whitespace-only criteria")
+        void shouldReturn400ForWhitespaceOnlyCriteria() {
             ensureAdminMembership(workspace);
-            persistPractice("ws-desc", "Name", "cat", true);
+            persistPractice("ws-criteria", "Name", "cat", true);
 
-            var request = new UpdatePracticeRequestDTO(null, null, "   ", null, null, null);
+            var request = new UpdatePracticeRequestDTO(null, null, null, "   ", null);
 
             ProblemDetail problem = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "ws-desc")
+                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "ws-criteria")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -1013,7 +991,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(problem.getTitle()).isEqualTo("Validation failed");
             assertThat(problem.getProperties().get("errors"))
                 .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-                .containsKey("description");
+                .containsKey("criteria");
         }
 
         @Test
@@ -1023,7 +1001,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             ensureAdminMembership(workspace);
             persistPractice("update-events", "Name", "cat", true);
 
-            var request = new UpdatePracticeRequestDTO(null, null, null, List.of("FakeEvent"), null, null);
+            var request = new UpdatePracticeRequestDTO(null, null, List.of("FakeEvent"), null, null);
 
             webTestClient
                 .patch()
@@ -1044,7 +1022,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
             persistPractice("forbidden-update", "Name", "cat", true);
 
-            var request = new UpdatePracticeRequestDTO("New Name", null, null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("New Name", null, null, null, null);
 
             webTestClient
                 .patch()
@@ -1060,7 +1038,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
-            var request = new UpdatePracticeRequestDTO("Name", null, null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("Name", null, null, null, null);
 
             webTestClient
                 .patch()
@@ -1325,7 +1303,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             practice.setWorkspace(wsA);
             practice.setSlug("isolated-practice");
             practice.setName("Isolated");
-            practice.setDescription("Description");
+            practice.setCriteria("Description");
             practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             practiceRepository.save(practice);
 
@@ -1363,7 +1341,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             practice.setWorkspace(wsA);
             practice.setSlug("only-in-a");
             practice.setName("Only in A");
-            practice.setDescription("Description");
+            practice.setCriteria("Description");
             practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             practiceRepository.save(practice);
 
@@ -1429,11 +1407,11 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             practice.setWorkspace(wsA);
             practice.setSlug("write-isolated");
             practice.setName("Write Isolated");
-            practice.setDescription("Desc");
+            practice.setCriteria("Desc");
             practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             practiceRepository.save(practice);
 
-            var request = new UpdatePracticeRequestDTO("Hacked Name", null, null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("Hacked Name", null, null, null, null);
 
             webTestClient
                 .patch()
