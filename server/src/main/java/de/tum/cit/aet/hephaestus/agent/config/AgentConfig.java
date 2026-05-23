@@ -85,7 +85,7 @@ public class AgentConfig {
      * the Pi runtime registers a custom {@code hephaestus} provider extension that uses
      * the chat/completions surface — needed for providers that don't speak the Responses API.
      */
-    @Column(name = "llm_base_url", length = 512)
+    @Column(name = "llm_base_url", length = 2048)
     private String llmBaseUrl;
 
     @Enumerated(EnumType.STRING)
