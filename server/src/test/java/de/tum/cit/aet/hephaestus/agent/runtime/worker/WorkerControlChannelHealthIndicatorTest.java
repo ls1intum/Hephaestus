@@ -21,11 +21,11 @@ class WorkerControlChannelHealthIndicatorTest extends BaseUnitTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("connectionStates")
     void reflectsConnectionState(String label, boolean connected, Instant lastInbound, Status expected) {
-        WorkerControlPublisher publisher = mock(WorkerControlPublisher.class);
-        when(publisher.isConnected()).thenReturn(connected);
-        when(publisher.lastInboundAt()).thenReturn(lastInbound);
+        WorkerControlClient client = mock(WorkerControlClient.class);
+        when(client.isConnected()).thenReturn(connected);
+        when(client.lastInboundAt()).thenReturn(lastInbound);
 
-        Health health = new WorkerControlChannelHealthIndicator(publisher, props(Duration.ofSeconds(20))).health();
+        Health health = new WorkerControlChannelHealthIndicator(client, props(Duration.ofSeconds(20))).health();
 
         assertThat(health.getStatus()).isEqualTo(expected);
         assertThat(health.getDetails()).containsEntry("connected", connected);
@@ -41,11 +41,11 @@ class WorkerControlChannelHealthIndicatorTest extends BaseUnitTest {
     @Test
     void downWhenInboundStaleEvenIfConnected() {
         // Catches the silent-stall case where TCP is up but no frames are arriving.
-        WorkerControlPublisher publisher = mock(WorkerControlPublisher.class);
-        when(publisher.isConnected()).thenReturn(true);
-        when(publisher.lastInboundAt()).thenReturn(Instant.now().minusSeconds(120));
+        WorkerControlClient client = mock(WorkerControlClient.class);
+        when(client.isConnected()).thenReturn(true);
+        when(client.lastInboundAt()).thenReturn(Instant.now().minusSeconds(120));
 
-        Health health = new WorkerControlChannelHealthIndicator(publisher, props(Duration.ofSeconds(20))).health();
+        Health health = new WorkerControlChannelHealthIndicator(client, props(Duration.ofSeconds(20))).health();
 
         assertThat(health.getStatus()).isEqualTo(Status.DOWN);
     }

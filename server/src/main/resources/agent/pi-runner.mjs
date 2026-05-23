@@ -512,26 +512,17 @@ async function main() {
         `[pi-runner] Budget: total=${AGENT_BUDGET_MS}ms, initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry=${RETRY_TIMEOUT_MS}ms`,
     );
 
-    // Pi SDK option `tools` is an allowlist of tool *names*, not constructed tool
-    // instances. Restricting to read/bash/grep prevents the agent from invoking
-    // edit/write — findings are persisted only via the customTools below. Pi 0.74+
-    // filters customTools through the same allowlist (see agent-session.js:1796), so
-    // the custom tool names must be listed here too or they won't be exposed to the LLM.
+    // `tools` is an allowlist of tool *names* (Pi 0.74+ filters customTools through the same
+    // allowlist), so both built-in and custom tool names must appear here. Edit/write are omitted
+    // — findings are persisted only via report_finding.
     const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
     const sessionManager = SessionManager.inMemory();
-    // Per Pi SDK Quick Start: omitting authStorage + modelRegistry causes the resolver to
-    // fail with "No API key found for the selected model" because the env-var indirection
-    // registered by the hephaestus extension (apiKey: "PI_HEPHAESTUS_API_KEY") needs the
-    // ModelRegistry constructed against an AuthStorage to read it.
     const authStorage = AuthStorage.create();
     const modelRegistry = ModelRegistry.create(authStorage);
 
-    // Register the hephaestus provider DIRECTLY on the registry. Pi 0.74.1 has a race:
-    // `createAgentSession` calls `findInitialModel` *before* the extension runner drains its
-    // pending provider registrations into the model registry. Without this direct registration,
-    // the session is created with model=undefined; the agent then crashes at first stream with
-    // "No API key found for the selected model." Keeping the extension file too lets a future
-    // CLI/TUI invocation reuse the same provider definition.
+    // Pi 0.74.x bug: createAgentSession.findInitialModel runs before the extension runner drains
+    // pending registrations into the model registry. Register the hephaestus provider directly
+    // here so the session resolves a real model on first prompt.
     const hephaestusBaseUrl = process.env.PI_HEPHAESTUS_BASE_URL;
     const hephaestusModel = process.env.PI_HEPHAESTUS_MODEL;
     if (hephaestusBaseUrl && hephaestusModel) {
@@ -566,10 +557,8 @@ async function main() {
         authStorage,
         modelRegistry,
     });
-    // Surface extension-load diagnostics — a silently-failed extension lets the agent
-    // fall through to the built-in provider's default endpoint (e.g. api.openai.com)
-    // which is rarely the operator's intent. The first live e2e against the TUM GPU
-    // gateway burned an hour on exactly this gap.
+    // Extension load failures are silent in Pi — surface them so the agent doesn't fall through
+    // to a built-in provider's default endpoint (e.g. api.openai.com).
     if (extensionsResult?.extensions?.length) {
         for (const ext of extensionsResult.extensions) {
             console.error(`[pi-runner] extension loaded: ${ext.path}`);

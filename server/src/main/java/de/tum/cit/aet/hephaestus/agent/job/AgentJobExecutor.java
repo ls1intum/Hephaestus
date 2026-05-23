@@ -78,10 +78,8 @@ import tools.jackson.databind.ObjectMapper;
  * </ul>
  */
 @Component
-// Wires only when agent NATS is explicitly enabled AND the worker role isn't explicitly off
-// (single-process default keeps the executor on). Two annotations would silently no-op on the
-// second — Spring honors only the first @ConditionalOnProperty on an element, so the original
-// "worker role check" never fired.
+// Wires when agent NATS is enabled AND the worker role isn't explicitly disabled. Combined into
+// @ConditionalOnExpression because Spring honors only ONE @ConditionalOnProperty per element.
 @ConditionalOnExpression("${hephaestus.agent.nats.enabled:false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}")
 @WorkspaceAgnostic("NATS consumer processes jobs across all workspaces")
 public class AgentJobExecutor {

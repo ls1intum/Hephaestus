@@ -1,8 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
-import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.WorkerSessionDispatcher;
-import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.mentor.MentorSessionRunner;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import io.micrometer.core.instrument.Gauge;
@@ -16,7 +14,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -92,17 +89,10 @@ public class WorkerConfiguration {
     WorkerControlClient workerControlClient(
         WorkerProperties properties,
         FrameCodec frameCodec,
-        org.springframework.beans.factory.ObjectProvider<WorkerSessionDispatcher> dispatcherProvider,
         ObjectMapper objectMapper,
         MeterRegistry meterRegistry
     ) {
-        WorkerControlClient client = new WorkerControlClient(
-            properties,
-            frameCodec,
-            dispatcherProvider,
-            objectMapper,
-            meterRegistry
-        );
+        WorkerControlClient client = new WorkerControlClient(properties, frameCodec, objectMapper, meterRegistry);
         Gauge.builder("worker.control.channel.connected", client, c -> c.isConnected() ? 1.0 : 0.0)
             .description("1 when the worker control channel is connected, 0 otherwise")
             .strongReference(true)
@@ -117,58 +107,33 @@ public class WorkerConfiguration {
     }
 
     @Bean
-    MentorSessionRunner mentorSessionRunner(
-        WorkerControlPublisher publisher,
-        WorkerCapacityState capacityState,
-        Optional<de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService> sandboxService,
-        ObjectMapper objectMapper,
-        MeterRegistry meterRegistry
-    ) {
-        return new MentorSessionRunner(publisher, capacityState, sandboxService, objectMapper, meterRegistry);
-    }
-
-    @Bean
     WorkerCapacityReporter workerCapacityReporter(
         WorkerCapacityState state,
-        WorkerControlPublisher publisher,
+        WorkerControlClient client,
         WorkerProperties properties,
         ScheduledExecutorService workerScheduler,
         MeterRegistry meterRegistry
     ) {
-        return new WorkerCapacityReporter(state, publisher, properties, workerScheduler, meterRegistry);
+        return new WorkerCapacityReporter(state, client, properties, workerScheduler, meterRegistry);
     }
 
     @Bean
     WorkerControlChannelHealthIndicator workerControlChannelHealthIndicator(
-        WorkerControlPublisher publisher,
+        WorkerControlClient client,
         WorkerProperties properties
     ) {
-        return new WorkerControlChannelHealthIndicator(publisher, properties);
-    }
-
-    @Bean
-    WorkerSessionDispatcher workerSessionDispatcher(MentorSessionRunner mentorSessionRunner) {
-        return new WorkerSessionDispatcher(mentorSessionRunner);
+        return new WorkerControlChannelHealthIndicator(client, properties);
     }
 
     @Bean
     WorkerDrainCoordinator workerDrainCoordinator(
-        WorkerControlPublisher publisher,
+        WorkerControlClient client,
         WorkerCapacityState state,
         WorkerProperties properties,
         Optional<AgentJobExecutor> executor,
-        Optional<WorkerSessionDispatcher> sessionDispatcher,
         ApplicationEventPublisher events,
         MeterRegistry meterRegistry
     ) {
-        return new WorkerDrainCoordinator(
-            publisher,
-            state,
-            properties,
-            executor,
-            sessionDispatcher,
-            events,
-            meterRegistry
-        );
+        return new WorkerDrainCoordinator(client, state, properties, executor, events, meterRegistry);
     }
 }

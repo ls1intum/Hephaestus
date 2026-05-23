@@ -39,15 +39,11 @@ class WorkerSessionRegistryTest extends BaseUnitTest {
         verify(firstTransport).close(any());
 
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-        verify(events, times(3)).publishEvent(captor.capture());
-        // Order: connected(first) → disconnected(first, "duplicate-evicted") → connected(second)
-        assertThat(captor.getAllValues()).hasSize(3);
-        assertThat(captor.getAllValues().get(0)).isInstanceOf(WorkerConnectedEvent.class);
-        assertThat(captor.getAllValues().get(1)).isInstanceOfSatisfying(WorkerDisconnectedEvent.class, e -> {
+        verify(events, times(1)).publishEvent(captor.capture());
+        assertThat(captor.getValue()).isInstanceOfSatisfying(WorkerDisconnectedEvent.class, e -> {
             assertThat(e.reason()).isEqualTo("duplicate-evicted");
             assertThat(e.sessionId()).isEqualTo("session-1");
         });
-        assertThat(captor.getAllValues().get(2)).isInstanceOf(WorkerConnectedEvent.class);
     }
 
     @Test

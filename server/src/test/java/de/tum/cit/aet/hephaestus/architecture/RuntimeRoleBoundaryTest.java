@@ -61,20 +61,13 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         RuntimeRole.SERVER_PROPERTY,
         "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
         RuntimeRole.SERVER_PROPERTY
-        // BridgedMentorController is gated via @ConditionalOnBean(MentorSessionBridge.class).
-        // The bridge bean itself lives in HubConfiguration (already in this map) and is double-
-        // gated by hephaestus.worker.hub.bridge.enabled — so the controller can never wire
-        // outside the server role. Listing it here would conflict with the bean-condition gate.
     );
 
     @Test
     void noStackedConditionalOnPropertyOnSameElement() {
         // Spring honors only ONE @ConditionalOnProperty per element; the second annotation is
-        // silently ignored. Multiple @ConditionalOnProperty annotations on the same class is the
-        // antipattern that hid the dev-trigger DX bug (BridgedMentorController), the worker-role
-        // gate bypass on AgentJobExecutor, and the same pattern on AgentNatsConsumerConfig +
-        // DockerSandboxConfiguration. Anyone wanting both conditions must use
-        // @ConditionalOnExpression or compose with @Conditional.
+        // silently ignored. Anyone wanting both conditions must use @ConditionalOnExpression or
+        // compose with @Conditional.
         List<String> violations = classes
             .stream()
             .filter(c -> c.getFullName().startsWith("de.tum.cit.aet.hephaestus."))

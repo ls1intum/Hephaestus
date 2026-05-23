@@ -1,15 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
-import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.WorkerSessionDispatcher;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameEnvelope;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.Heartbeat;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionClose;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionInput;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOpen;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOutput;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerHello;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerWelcome;
@@ -36,7 +31,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import tools.jackson.databind.ObjectMapper;
@@ -47,7 +41,7 @@ import tools.jackson.databind.ObjectMapper;
  * WebSocket callbacks (which pin virtual-thread carriers) don't OOM the carrier pool. Both
  * queues are bounded.
  */
-public class WorkerControlClient implements WorkerControlPublisher {
+public class WorkerControlClient {
 
     private static final Logger log = LoggerFactory.getLogger(WorkerControlClient.class);
     private static final int OUTBOUND_QUEUE_CAPACITY = 1024;
@@ -77,19 +71,14 @@ public class WorkerControlClient implements WorkerControlPublisher {
     private volatile Thread inboundThread;
     private volatile Thread connectionThread;
 
-    private final ObjectProvider<WorkerSessionDispatcher> dispatcherProvider;
-
     public WorkerControlClient(
         WorkerProperties properties,
         FrameCodec codec,
-        // ObjectProvider breaks a real cycle: dispatcher → MentorSessionRunner → publisher (= this).
-        ObjectProvider<WorkerSessionDispatcher> dispatcherProvider,
         ObjectMapper objectMapper,
         MeterRegistry meterRegistry
     ) {
         this.properties = properties;
         this.codec = codec;
-        this.dispatcherProvider = dispatcherProvider;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
         this.framesSent = Counter.builder("worker.control.frames.sent")
@@ -136,9 +125,6 @@ public class WorkerControlClient implements WorkerControlPublisher {
         interrupt(connectionThread);
     }
 
-    // ── WorkerControlPublisher ──
-
-    @Override
     public void send(WorkerControlFrame frame) {
         FrameEnvelope envelope = FrameEnvelope.of(frame);
         if (!outbound.offer(envelope)) {
@@ -147,17 +133,14 @@ public class WorkerControlClient implements WorkerControlPublisher {
         }
     }
 
-    @Override
     public boolean isConnected() {
         return connected.get();
     }
 
-    @Override
+    /** Sentinel {@link Instant#EPOCH} when no frame has been received yet. */
     public Instant lastInboundAt() {
         return lastInboundAt.get();
     }
-
-    // ── Loops ──
 
     private void runOutboundLoop() {
         while (running.get()) {
@@ -218,14 +201,10 @@ public class WorkerControlClient implements WorkerControlPublisher {
                     log.info("Hub requested reconnect: {}", r.reason());
                     forceReconnect("server-requested:" + r.reason());
                 }
-                case SessionOpen open -> dispatcherProvider.getObject().accept(open);
-                case SessionInput input -> dispatcherProvider.getObject().accept(input);
-                case SessionClose close -> dispatcherProvider.getObject().accept(close);
                 // Hub never originates these — log once and ignore (protocol violation by the hub).
                 case Heartbeat h -> warnSourceMismatch(h);
                 case WorkerHello h -> warnSourceMismatch(h);
                 case CapacityReport r -> warnSourceMismatch(r);
-                case SessionOutput o -> warnSourceMismatch(o);
             }
         } catch (RuntimeException e) {
             log.error("Inbound dispatch threw for {}", frame.getClass().getSimpleName(), e);

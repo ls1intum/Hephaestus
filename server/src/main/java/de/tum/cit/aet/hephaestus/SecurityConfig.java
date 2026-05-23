@@ -168,9 +168,6 @@ public class SecurityConfig {
             // controller layer. Spring Security must not block these or external providers can
             // never reach the receiver. See gitprovider.webhook.* and ADR 0008.
             requests.requestMatchers(HttpMethod.POST, "/gitlab", "/github").permitAll();
-            // Bridged mentor SSE (opt-in, split-pod / BYO): user authentication enforced by
-            // @PreAuthorize on BridgedMentorController. Keep at the same layer as /user/**.
-            requests.requestMatchers("/api/mentor/bridge/**").authenticated();
             // NOTE: /api/workers/** and /actuator/** are handled by workerHubSecurityFilterChain
             // (highest precedence) which skips the OAuth2 resource server entirely — the worker
             // hub validates its own JWTs via WorkerJwtHandshakeInterceptor.

@@ -21,9 +21,6 @@ final class HubProperties {
     /** Per-session outbound buffer cap; slow worker beyond this gets closed with code 1011. */
     static final int SEND_BUFFER_SIZE_BYTES = 8 * 1024 * 1024;
 
-    /** Max single-frame payload. Tied to the protocol's frame size, not deployment topology. */
-    static final int MAX_FRAME_SIZE_BYTES = 256 * 1024;
-
     /** Per-frame send budget. Beyond this the slow-consumer path closes the session. */
     static final Duration SEND_TIME_LIMIT = Duration.ofSeconds(10);
 

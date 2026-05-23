@@ -24,9 +24,4 @@ public record CapacityReport(
             throw new IllegalArgumentException("CapacityReport fields must be non-negative");
         }
     }
-
-    /** Returns a copy with both {@code spare*} forced to zero. Used by drain to evacuate rotation. */
-    public CapacityReport withSpareForcedZero() {
-        return new CapacityReport(reviewMax, mentorMax, inFlightReview, inFlightMentor, 0, 0);
-    }
 }

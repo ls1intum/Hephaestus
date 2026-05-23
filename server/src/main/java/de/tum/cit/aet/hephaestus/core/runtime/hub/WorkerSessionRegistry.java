@@ -65,10 +65,6 @@ public class WorkerSessionRegistry implements SmartLifecycle {
                 new WorkerDisconnectedEvent(incoming.workerId(), loser.sessionId(), "duplicate-evicted", Instant.now())
             );
         }
-
-        events.publishEvent(
-            new WorkerConnectedEvent(incoming.workerId(), incoming.sessionId(), incoming.connectedAt())
-        );
         return result;
     }
 

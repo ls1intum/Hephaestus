@@ -9,25 +9,15 @@ import org.springframework.lang.Nullable;
  * Build the shell {@code export ... && } prefix that prepares LLM credentials inside the Pi
  * sandbox container. State-free; reused verbatim by every Pi-based agent.
  *
- * <p>{@code PROXY} mode forwards the sandbox-injected {@code $LLM_PROXY_URL} / {@code $LLM_PROXY_TOKEN}
- * to the provider env vars. {@code API_KEY} / {@code OAUTH} go through {@code export} for Azure
- * (the sandbox security policy blocks {@code AZURE_*} env vars to prevent accidental leakage) and
- * through the env map for the other providers.
+ * <p>Azure keys go through {@code export} (the sandbox security policy strips {@code AZURE_*}
+ * env vars). Non-Azure keys land in the {@code env} map the caller passes in.
  *
- * <p>For {@code OPENAI} / {@code ANTHROPIC} in API_KEY/OAUTH mode with a non-blank {@code baseUrl}
- * override, the routing is achieved by registering a custom Pi provider named {@code hephaestus}
- * directly on the ModelRegistry from the runner script (pi-runner.mjs / pi-mentor-runner.mjs).
- * Pi does NOT read {@code OPENAI_BASE_URL} or {@code ANTHROPIC_BASE_URL} natively, so a bare
- * env-var export silently fails — the runner calls {@code modelRegistry.registerProvider(
- * "hephaestus", ...)} before {@code createAgentSession}, and {@link PiRuntimeFactory}'s
- * settings.json pins {@code defaultProvider="hephaestus"} so resolution is unambiguous. The env
- * vars that runner expects are {@code PI_HEPHAESTUS_BASE_URL}, {@code PI_HEPHAESTUS_API_KEY},
- * and {@code PI_HEPHAESTUS_MODEL}; this class writes them when {@code baseUrl} is non-blank.
- * {@code OPENAI_API_KEY} / {@code ANTHROPIC_API_KEY} must NOT be set on this path — Pi's built-in
- * provider would auto-activate against api.openai.com / api.anthropic.com and win resolution.
- *
- * <p>The caller passes a mutable {@code env} map; non-Azure API keys are written into it as a
- * side effect (Azure keys land in the shell prefix instead).
+ * <p>For OpenAI / Anthropic with a non-blank {@code baseUrl} override, the runner registers a
+ * custom Pi provider named {@code hephaestus} on the ModelRegistry — Pi does not honour
+ * {@code OPENAI_BASE_URL} / {@code ANTHROPIC_BASE_URL} natively. This class writes the
+ * {@code PI_HEPHAESTUS_BASE_URL} / {@code _API_KEY} / {@code _MODEL} env vars the runner reads.
+ * {@code OPENAI_API_KEY} / {@code ANTHROPIC_API_KEY} must NOT be set on this path or Pi's
+ * built-in provider auto-activates against api.openai.com / api.anthropic.com.
  */
 public final class LlmProxyAuthShell {
 

@@ -10,14 +10,15 @@
         (issues #1098 + #1099, plus the dual-variant cleanup that consolidated mentor /
          practice / agent surfaces under one source of truth).
 
-        Five logical changes consolidated into one branch-scoped changelog with a precise
+        Six logical changes consolidated into one branch-scoped changelog with a precise
         timestamp:
 
           1. agent_job.cancellation_reason — drain audit column.
           2. worker_token_denylist — fleet-wide JWT revocation table.
           3. practice.description backfill into practice.criteria.
-          4. Drop practice.description; make practice.criteria NOT NULL.
-          5. agent_config.llm_base_url — per-workspace LLM gateway URL.
+          4. Drop practice.description.
+          5. practice.criteria NOT NULL.
+          6. agent_config.llm_base_url — per-workspace LLM gateway URL.
 
         Each step is preconditioned (onFail=MARK_RAN) so partial re-applies are idempotent
         and rollouts that span sibling worktrees stay safe.

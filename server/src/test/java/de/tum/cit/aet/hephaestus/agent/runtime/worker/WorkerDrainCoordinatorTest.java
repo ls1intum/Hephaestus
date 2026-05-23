@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -11,16 +12,13 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobCancellationReason;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
-import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.WorkerSessionDispatcher;
-import de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.CapturingPublisher;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.WorkerPropertiesFixtures;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.Heartbeat;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionCloseReason;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -35,18 +33,16 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
     void gracefulDrainAwaitsThenSucceeds() {
         WorkerProperties props = propsWithDrain(Duration.ofSeconds(5));
         WorkerCapacityState state = new WorkerCapacityState(props);
-        CapturingPublisher publisher = new CapturingPublisher();
+        WorkerControlClient client = mock(WorkerControlClient.class);
         AgentJobExecutor executor = mock(AgentJobExecutor.class);
         when(executor.awaitInFlight(any(Duration.class))).thenReturn(true);
-        WorkerSessionDispatcher sessions = mock(WorkerSessionDispatcher.class);
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
-            publisher,
+            client,
             state,
             props,
             Optional.of(executor),
-            Optional.of(sessions),
             events,
             new SimpleMeterRegistry()
         );
@@ -56,12 +52,13 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         verify(executor).stopAcceptingNewJobs();
         verify(executor).awaitInFlight(Duration.ofSeconds(5));
         verify(executor, never()).cancelInFlight(any());
-        verify(sessions).closeAll(SessionCloseReason.WORKER_DRAINING);
-        assertThat(publisher.sent)
+        ArgumentCaptor<WorkerControlFrame> sent = ArgumentCaptor.forClass(WorkerControlFrame.class);
+        verify(client, times(2)).send(sent.capture());
+        assertThat(sent.getAllValues())
             .extracting(WorkerControlFrame::getClass)
             .containsExactly(Heartbeat.class, CapacityReport.class);
-        assertThat(((Heartbeat) publisher.sent.get(0)).draining()).isTrue();
-        assertThat(((CapacityReport) publisher.sent.get(1)).spareReview()).isZero();
+        assertThat(((Heartbeat) sent.getAllValues().get(0)).draining()).isTrue();
+        assertThat(((CapacityReport) sent.getAllValues().get(1)).spareReview()).isZero();
         assertThat(coordinator.isDraining()).isTrue();
         verifyReadinessStateRefusingTrafficWasPublished(events);
     }
@@ -73,11 +70,10 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         when(executor.awaitInFlight(any(Duration.class))).thenReturn(false);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
-            new CapturingPublisher(),
+            mock(WorkerControlClient.class),
             new WorkerCapacityState(props),
             props,
             Optional.of(executor),
-            Optional.of(mock(WorkerSessionDispatcher.class)),
             mock(ApplicationEventPublisher.class),
             new SimpleMeterRegistry()
         );
@@ -93,11 +89,10 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         AgentJobExecutor executor = mock(AgentJobExecutor.class);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
-            new CapturingPublisher(),
+            mock(WorkerControlClient.class),
             new WorkerCapacityState(props),
             props,
             Optional.of(executor),
-            Optional.of(mock(WorkerSessionDispatcher.class)),
             mock(ApplicationEventPublisher.class),
             new SimpleMeterRegistry()
         );
@@ -116,11 +111,10 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         when(executor.awaitInFlight(any(Duration.class))).thenReturn(true);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
-            new CapturingPublisher(),
+            mock(WorkerControlClient.class),
             new WorkerCapacityState(props),
             props,
             Optional.of(executor),
-            Optional.of(mock(WorkerSessionDispatcher.class)),
             mock(ApplicationEventPublisher.class),
             new SimpleMeterRegistry()
         );
@@ -134,22 +128,8 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
     @Test
     void availabilityEventEmittedEvenWhenSendsThrow() {
         WorkerProperties props = propsWithDrain(Duration.ZERO);
-        WorkerControlPublisher throwing = new WorkerControlPublisher() {
-            @Override
-            public void send(WorkerControlFrame frame) {
-                throw new RuntimeException("broken transport");
-            }
-
-            @Override
-            public boolean isConnected() {
-                return false;
-            }
-
-            @Override
-            public Instant lastInboundAt() {
-                return Instant.EPOCH;
-            }
-        };
+        WorkerControlClient throwing = mock(WorkerControlClient.class);
+        doThrow(new RuntimeException("broken transport")).when(throwing).send(any());
         AgentJobExecutor executor = mock(AgentJobExecutor.class);
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
 
@@ -158,21 +138,20 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
             new WorkerCapacityState(props),
             props,
             Optional.of(executor),
-            Optional.empty(),
             events,
             new SimpleMeterRegistry()
         );
         coordinator.start();
         coordinator.stop();
 
-        // Critical: even with a broken transport, the executor is still drained AND readiness
-        // was flipped (kubelet would otherwise keep routing to a worker that's mid-shutdown).
+        // Even with a broken transport, the executor is still drained AND readiness was flipped
+        // (kubelet would otherwise keep routing to a worker that's mid-shutdown).
         verify(executor).cancelInFlight(AgentJobCancellationReason.DRAIN_IMMEDIATE);
         verifyReadinessStateRefusingTrafficWasPublished(events);
     }
 
     private static WorkerProperties propsWithDrain(Duration timeout) {
-        return de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.WorkerPropertiesFixtures.withDrain(timeout);
+        return WorkerPropertiesFixtures.withDrain(timeout);
     }
 
     private static void verifyReadinessStateRefusingTrafficWasPublished(ApplicationEventPublisher events) {

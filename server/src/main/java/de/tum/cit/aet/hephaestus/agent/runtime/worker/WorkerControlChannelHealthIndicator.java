@@ -12,12 +12,12 @@ import org.springframework.boot.health.contributor.HealthIndicator;
  */
 public class WorkerControlChannelHealthIndicator implements HealthIndicator {
 
-    private final WorkerControlPublisher publisher;
+    private final WorkerControlClient client;
     private final WorkerProperties properties;
     private final Duration silenceThreshold;
 
-    public WorkerControlChannelHealthIndicator(WorkerControlPublisher publisher, WorkerProperties properties) {
-        this.publisher = publisher;
+    public WorkerControlChannelHealthIndicator(WorkerControlClient client, WorkerProperties properties) {
+        this.client = client;
         this.properties = properties;
         this.silenceThreshold = properties.heartbeat().interval().multipliedBy(3);
     }
@@ -27,8 +27,8 @@ public class WorkerControlChannelHealthIndicator implements HealthIndicator {
         if (!properties.control().isConfigured()) {
             return Health.up().withDetail("configured", false).build();
         }
-        boolean connected = publisher.isConnected();
-        Instant lastInbound = publisher.lastInboundAt();
+        boolean connected = client.isConnected();
+        Instant lastInbound = client.lastInboundAt();
         long ageMs = lastInbound.equals(Instant.EPOCH) ? -1L : Duration.between(lastInbound, Instant.now()).toMillis();
         boolean inboundStale = lastInbound.equals(Instant.EPOCH) || ageMs > silenceThreshold.toMillis();
         Health.Builder builder = (connected && !inboundStale) ? Health.up() : Health.down();

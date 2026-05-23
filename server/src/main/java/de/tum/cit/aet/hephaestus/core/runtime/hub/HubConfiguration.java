@@ -9,11 +9,8 @@ import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerKeyRing;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylistRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylistService;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenProperties;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.session.HubSessionRegistry;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.session.MentorSessionBridge;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
@@ -26,9 +23,6 @@ import tools.jackson.databind.ObjectMapper;
  * Wires the worker hub: WSS endpoint registration, JWT auth, session registry. Gated by
  * {@link RuntimeRole#SERVER_PROPERTY} with {@code matchIfMissing=true} — the application-server
  * runtime role hosts the hub; webhook and worker pods do not.
- *
- * <p>The {@code WebSocketConfigurer} lives in a separate {@link HubWebSocketRegistration} class
- * so it can depend on this configuration's beans without a constructor cycle.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
@@ -81,10 +75,9 @@ public class HubConfiguration {
     WorkerControlWebSocketHandler workerControlWebSocketHandler(
         WorkerSessionRegistry registry,
         FrameCodec codec,
-        Optional<MentorSessionBridge> sessionInbox,
         MeterRegistry meterRegistry
     ) {
-        return new WorkerControlWebSocketHandler(registry, codec, sessionInbox, meterRegistry);
+        return new WorkerControlWebSocketHandler(registry, codec, meterRegistry);
     }
 
     @Bean
@@ -93,26 +86,5 @@ public class HubConfiguration {
         WorkerJwtHandshakeInterceptor interceptor
     ) {
         return new HubWebSocketRegistration(handler, interceptor);
-    }
-
-    /**
-     * Bridge + its session registry wire only when the bridge is explicitly enabled. When absent,
-     * the WSS handler's {@code Optional<MentorSessionBridge>} stays empty and worker-originated
-     * SessionOutput frames are silently dropped (acceptable for monolith mode without the bridge).
-     */
-    @Bean
-    @ConditionalOnProperty(name = "hephaestus.worker.hub.bridge.enabled", havingValue = "true")
-    HubSessionRegistry hubSessionRegistry() {
-        return new HubSessionRegistry();
-    }
-
-    @Bean
-    @ConditionalOnProperty(name = "hephaestus.worker.hub.bridge.enabled", havingValue = "true")
-    MentorSessionBridge mentorSessionBridge(
-        WorkerSessionRegistry workerRegistry,
-        HubSessionRegistry sessionRegistry,
-        MeterRegistry meterRegistry
-    ) {
-        return new MentorSessionBridge(workerRegistry, sessionRegistry, meterRegistry);
     }
 }

@@ -271,13 +271,9 @@ async function ensureRuntime() {
         const fetchContextTool = defineFetchContextTool();
         const linkFindingTool = defineLinkFindingTool();
 
-        // Build AuthStorage + ModelRegistry ONCE and register the hephaestus provider directly.
-        // Pi 0.74.x has a race: createAgentSession.findInitialModel runs *before* the extension
-        // runner drains its pending provider registrations into the model registry; the session
-        // is then created with model=undefined and crashes at first stream with
-        // "No API key found for the selected model". Registering directly on ModelRegistry here
-        // sidesteps the race. Same instances are reused across cwd switches — providers are
-        // cwd-independent. PROTOCOL_ONLY mode's stub SDK exposes neither class; guard accordingly.
+        // Same race workaround as pi-runner.mjs: register the hephaestus provider directly on
+        // the ModelRegistry before createAgentSession. Reused across cwd switches; providers are
+        // cwd-independent. PROTOCOL_ONLY mode's stub SDK exposes neither class.
         let sharedAuthStorage;
         let sharedModelRegistry;
         if (typeof AuthStorage?.create === "function" && typeof ModelRegistry?.create === "function") {

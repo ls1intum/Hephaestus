@@ -1,24 +1,27 @@
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
-import de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.CapturingPublisher;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.WorkerPropertiesFixtures;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.time.Instant;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class WorkerCapacityReporterTest extends BaseUnitTest {
 
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    private final CapturingPublisher publisher = new CapturingPublisher();
+    private final WorkerControlClient client = mock(WorkerControlClient.class);
 
     @AfterEach
     void shutdown() {
@@ -30,12 +33,13 @@ class WorkerCapacityReporterTest extends BaseUnitTest {
         WorkerProperties props = WorkerPropertiesFixtures.minimal("3", "2");
         WorkerCapacityState state = new WorkerCapacityState(props);
         state.claimReview();
-        WorkerCapacityReporter reporter = new WorkerCapacityReporter(state, publisher, props, scheduler, registry);
+        WorkerCapacityReporter reporter = new WorkerCapacityReporter(state, client, props, scheduler, registry);
 
         reporter.tick();
 
-        assertThat(publisher.sent).hasSize(1);
-        CapacityReport report = (CapacityReport) publisher.sent.get(0);
+        ArgumentCaptor<WorkerControlFrame> frame = ArgumentCaptor.forClass(WorkerControlFrame.class);
+        verify(client).send(frame.capture());
+        CapacityReport report = (CapacityReport) frame.getValue();
         assertThat(report.reviewMax()).isEqualTo(3);
         assertThat(report.mentorMax()).isEqualTo(2);
         assertThat(report.inFlightReview()).isEqualTo(1);
@@ -47,23 +51,8 @@ class WorkerCapacityReporterTest extends BaseUnitTest {
     void incrementsFailedCounterOnPublisherException() {
         WorkerProperties props = WorkerPropertiesFixtures.minimal("1", "1");
         WorkerCapacityState state = new WorkerCapacityState(props);
-        WorkerControlPublisher throwing = new WorkerControlPublisher() {
-            @Override
-            public void send(WorkerControlFrame frame) {
-                throw new RuntimeException("boom");
-            }
-
-            @Override
-            public boolean isConnected() {
-                return false;
-            }
-
-            @Override
-            public Instant lastInboundAt() {
-                return Instant.EPOCH;
-            }
-        };
-        WorkerCapacityReporter reporter = new WorkerCapacityReporter(state, throwing, props, scheduler, registry);
+        doThrow(new RuntimeException("boom")).when(client).send(any());
+        WorkerCapacityReporter reporter = new WorkerCapacityReporter(state, client, props, scheduler, registry);
 
         reporter.tick();
 

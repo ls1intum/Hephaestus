@@ -2,16 +2,11 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub;
 
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwt;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtHandshakeInterceptor;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.session.MentorSessionBridge;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameEnvelope;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.Heartbeat;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionClose;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionInput;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOpen;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionOutput;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerHello;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerWelcome;
@@ -21,7 +16,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -43,7 +37,6 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
 
     private final WorkerSessionRegistry registry;
     private final FrameCodec codec;
-    private final Optional<MentorSessionBridge> sessionInbox;
     private final MeterRegistry meterRegistry;
     private final ScheduledExecutorService helloTimeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "worker-hub-hello-timeout");
@@ -54,12 +47,10 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
     public WorkerControlWebSocketHandler(
         WorkerSessionRegistry registry,
         FrameCodec codec,
-        Optional<MentorSessionBridge> sessionInbox,
         MeterRegistry meterRegistry
     ) {
         this.registry = registry;
         this.codec = codec;
-        this.sessionInbox = sessionInbox;
         this.meterRegistry = meterRegistry;
     }
 
@@ -71,8 +62,8 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
             close(rawTransport, CloseStatus.POLICY_VIOLATION);
             return;
         }
-        rawTransport.setTextMessageSizeLimit(HubProperties.MAX_FRAME_SIZE_BYTES);
-        rawTransport.setBinaryMessageSizeLimit(HubProperties.MAX_FRAME_SIZE_BYTES);
+        rawTransport.setTextMessageSizeLimit(FrameCodec.MAX_FRAME_BYTES);
+        rawTransport.setBinaryMessageSizeLimit(FrameCodec.MAX_FRAME_BYTES);
         // Wrap with a concurrent decorator: caps the per-session outbound buffer and a send
         // deadline, so a slow worker cannot balloon hub memory or hold a sender thread.
         WebSocketSession transport = new ConcurrentWebSocketSessionDecorator(
@@ -172,12 +163,8 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
                     meterRegistry.counter("worker.hub.draining.signalled").increment();
                 }
             }
-            case SessionOutput output -> sessionInbox.ifPresent(inbox -> inbox.onSessionOutput(output));
-            case SessionClose close -> sessionInbox.ifPresent(inbox -> inbox.onSessionClose(close));
             case WorkerWelcome w -> warnUnexpectedFrame(session, w);
             case ForceReconnect f -> warnUnexpectedFrame(session, f);
-            case SessionOpen o -> warnUnexpectedFrame(session, o);
-            case SessionInput i -> warnUnexpectedFrame(session, i);
         }
     }
 

@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.core.runtime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import de.tum.cit.aet.hephaestus.agent.runtime.worker.session.WorkerSessionDispatcher;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerSession;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerSessionRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
@@ -11,7 +10,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylistServic
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameEnvelope;
-import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.SessionCloseReason;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerHello;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.net.URI;
@@ -64,9 +62,6 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
 
     @Autowired(required = false)
     WorkerTokenDenylistService denylist;
-
-    @Autowired(required = false)
-    WorkerSessionDispatcher dispatcher;
 
     @Test
     @DisplayName("raw WSS client completes handshake; hub registers session and receives CapacityReport")

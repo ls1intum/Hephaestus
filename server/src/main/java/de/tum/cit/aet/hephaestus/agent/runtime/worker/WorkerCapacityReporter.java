@@ -21,7 +21,7 @@ public class WorkerCapacityReporter {
     private static final Logger log = LoggerFactory.getLogger(WorkerCapacityReporter.class);
 
     private final WorkerCapacityState state;
-    private final WorkerControlPublisher publisher;
+    private final WorkerControlClient client;
     private final Duration interval;
     private final ScheduledExecutorService scheduler;
     private final Counter sent;
@@ -30,13 +30,13 @@ public class WorkerCapacityReporter {
 
     public WorkerCapacityReporter(
         WorkerCapacityState state,
-        WorkerControlPublisher publisher,
+        WorkerControlClient client,
         WorkerProperties properties,
         ScheduledExecutorService workerScheduler,
         MeterRegistry meterRegistry
     ) {
         this.state = state;
-        this.publisher = publisher;
+        this.client = client;
         this.interval = properties.heartbeat().interval();
         this.scheduler = workerScheduler;
         this.sent = Counter.builder("worker.heartbeats.sent")
@@ -64,7 +64,7 @@ public class WorkerCapacityReporter {
 
     void tick() {
         try {
-            publisher.send(state.snapshot());
+            client.send(state.snapshot());
             sent.increment();
         } catch (Exception e) {
             failed.increment();

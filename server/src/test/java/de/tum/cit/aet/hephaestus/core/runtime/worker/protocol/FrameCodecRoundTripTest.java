@@ -26,31 +26,10 @@ class FrameCodecRoundTripTest extends BaseUnitTest {
     }
 
     @Test
-    void rejectsOversizedFrameOnEncode() {
-        String huge = "x".repeat(FrameCodec.MAX_FRAME_BYTES);
-        FrameEnvelope envelope = FrameEnvelope.of(new SessionInput("s", huge));
-        assertThatThrownBy(() -> codec.encode(envelope))
-            .isInstanceOf(FrameCodec.FrameCodecException.class)
-            .hasMessageContaining("exceeds " + FrameCodec.MAX_FRAME_BYTES);
-    }
-
-    @Test
     void rejectsOversizedFrameOnDecode() {
         String tooLarge = "x".repeat(FrameCodec.MAX_FRAME_BYTES + 1);
         assertThatThrownBy(() -> codec.decode(tooLarge))
             .isInstanceOf(FrameCodec.FrameCodecException.class)
             .hasMessageContaining("exceeds " + FrameCodec.MAX_FRAME_BYTES);
-    }
-
-    @Test
-    void capacityReportSnapshotForcesSpareZeroAndPreservesInFlight() {
-        // Drain emits a CapacityReport with spare=0 so the hub removes the worker from rotation
-        // before the heartbeat cadence catches up. The hub still sees the in-flight counts so
-        // it can chart drain progress.
-        CapacityReport drained = new CapacityReport(4, 2, 1, 0, 3, 2).withSpareForcedZero();
-        assertThat(drained.spareReview()).isZero();
-        assertThat(drained.spareMentor()).isZero();
-        assertThat(drained.reviewMax()).isEqualTo(4);
-        assertThat(drained.inFlightReview()).isEqualTo(1);
     }
 }

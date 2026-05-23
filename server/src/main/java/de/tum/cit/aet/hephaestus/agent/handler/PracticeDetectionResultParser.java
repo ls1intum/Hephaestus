@@ -82,8 +82,6 @@ public class PracticeDetectionResultParser {
         if (jobOutput == null || jobOutput.isNull() || jobOutput.isMissingNode()) {
             return ParseResult.empty("jobOutput is null or missing");
         }
-
-        // Step 1: Extract rawOutput string
         JsonNode rawOutputNode = jobOutput.get("rawOutput");
         if (rawOutputNode == null || rawOutputNode.isNull() || rawOutputNode.isMissingNode()) {
             return ParseResult.empty("missing rawOutput field in job output");
@@ -93,15 +91,13 @@ public class PracticeDetectionResultParser {
             return ParseResult.empty("rawOutput is blank");
         }
 
-        // Step 2: Sanitize invalid JSON escapes (e.g., Swift's \(variable) interpolation)
-        // then parse. The rawOutput may be pure JSON (from --json-schema) or may contain
-        // phase markers followed by JSON (from orchestrator protocol).
+        // rawOutput is JSON but LLMs sometimes emit Swift-style \(var) interpolation that strict
+        // JSON rejects; sanitize then fall back to extracting JSON from mixed-text output.
         String sanitizedText = sanitizeJsonEscapes(rawOutputText);
         JsonNode root;
         try {
             root = lenientMapper.readTree(sanitizedText);
         } catch (JacksonException e) {
-            // Fallback: try to extract JSON from mixed text (e.g., "[PHASE0]...\n{...}")
             root = extractJsonFromText(sanitizedText);
             if (root == null) {
                 return ParseResult.empty("invalid JSON in rawOutput: " + e.getMessage());
@@ -110,8 +106,6 @@ public class PracticeDetectionResultParser {
         if (root == null || root.isNull()) {
             return ParseResult.empty("rawOutput parsed to null");
         }
-
-        // Step 3: Extract findings array using the canonical top-level contract.
         JsonNode findingsNode = extractFindingsNode(root);
         if (findingsNode == null || !findingsNode.isArray()) {
             return ParseResult.empty("missing or non-array 'findings' field");
@@ -120,10 +114,8 @@ public class PracticeDetectionResultParser {
             return ParseResult.empty("findings array is empty");
         }
 
-        // Step 4: Validate each entry. Do not silently truncate findings.
         List<ValidatedFinding> valid = new ArrayList<>();
         List<DiscardedEntry> discarded = new ArrayList<>();
-
         for (int i = 0; i < findingsNode.size(); i++) {
             JsonNode entry = findingsNode.get(i);
             if (!entry.isObject()) {
