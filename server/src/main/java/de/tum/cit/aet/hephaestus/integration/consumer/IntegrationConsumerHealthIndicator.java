@@ -48,10 +48,6 @@ import org.springframework.stereotype.Component;
  * pods that intentionally omit actuator. The {@link IntegrationConsumerStats} bean is a
  * plain unconditional {@code @Component}, so it is always present; we look at its
  * connection-status field to decide whether the consumer has come up.
- *
- * <p><b>TODO (C13):</b> add a {@code IntegrationConsumerHealthIndicatorTest} once the
- * full consumer split lands — that test needs a {@code @SpringBootTest} slice (actuator
- * binding) which is out of scope for the D9 incremental slice.
  */
 @Component
 @ConditionalOnClass(HealthIndicator.class)

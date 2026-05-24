@@ -25,11 +25,11 @@ import org.springframework.web.server.ResponseStatusException;
  * {@code MultiTenancyArchitectureTest.ControllerWorkspaceContextTests} sees a workspace
  * scope on every method.
  *
- * <p>TODO(#1198): Replace the {@link RequireWorkspaceAdminForBinding} placeholder (which
- * currently meta-binds {@code @PreAuthorize("isAuthenticated()")}) with a real guard such
- * as {@code @PreAuthorize("@workspaceAccessGuard.hasAdminAccess(#workspaceId)")}. The
- * permissive default lets the endpoint boot in test profiles that haven't wired the full
- * workspace-access-guard bean graph yet.
+ * <p>TODO(#1198 follow-up): {@link RequireWorkspaceAdminForBinding} is permissive
+ * ({@code isAuthenticated()}). Tightening it to {@code @workspaceSecure.isAdminOfWorkspace(#workspaceId)}
+ * needs a parameterised SpEL on {@code WorkspaceSecurityExpressions} that resolves the
+ * workspace by id directly (without {@code WorkspaceContextHolder}, which is only populated
+ * on {@code /workspaces/{slug}/...} paths). See the annotation's Javadoc for the gap details.
  */
 @RestController
 @RequestMapping("/api/v1/admin/workspaces/{workspaceId}/integrations/github")
