@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.sync.exception;
+package de.tum.cit.aet.hephaestus.integration.github.sync.exception;
 
 /**
  * Exception thrown when a sync operation is interrupted.
