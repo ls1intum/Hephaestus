@@ -41,18 +41,28 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     /**
      * Package prefixes that are inherently workspace-agnostic.
      *
-     * <p>The gitprovider package is the ETL/sync layer that ingests data from GitHub.
-     * It operates at the external entity level (GitHub IDs) and resolves workspace
-     * context through entity relationships. The workspace filtering happens at the
-     * domain/application layer, not at the gitprovider layer.
+     * <p>The {@code gitprovider} package is the shared SCM kernel (entities, SPIs,
+     * sync orchestrator). The per-vendor ETL handlers (former {@code gitprovider.<domain>.<kind>})
+     * now live under {@code integration.<kind>}, but they still operate at the external
+     * entity level (GitHub/GitLab IDs) and resolve workspace context through entity
+     * relationships, so they remain workspace-agnostic for the purposes of this rule.
+     * Workspace filtering happens at the domain/application layer, not at the
+     * gitprovider/integration ETL layer.
      */
     static final String GITPROVIDER_PACKAGE = BASE_PACKAGE + ".gitprovider";
 
+    static final String INTEGRATION_GITHUB_PACKAGE = BASE_PACKAGE + ".integration.github";
+    static final String INTEGRATION_GITLAB_PACKAGE = BASE_PACKAGE + ".integration.gitlab";
+
     /**
-     * Checks if a class belongs to a workspace-agnostic package (e.g., gitprovider).
+     * Checks if a class belongs to a workspace-agnostic package (gitprovider kernel
+     * or the per-vendor ETL handlers in integration.{github,gitlab}).
      */
     private static boolean isInWorkspaceAgnosticPackage(JavaClass javaClass) {
-        return javaClass.getPackageName().startsWith(GITPROVIDER_PACKAGE);
+        String pkg = javaClass.getPackageName();
+        return pkg.startsWith(GITPROVIDER_PACKAGE)
+            || pkg.startsWith(INTEGRATION_GITHUB_PACKAGE)
+            || pkg.startsWith(INTEGRATION_GITLAB_PACKAGE);
     }
 
     /**

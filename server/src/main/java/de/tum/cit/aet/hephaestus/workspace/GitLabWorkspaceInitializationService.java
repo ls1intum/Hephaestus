@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabRateLimitTracker;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabSyncServiceHolder;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.gitlab.GitLabSyncResult;
+import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
@@ -58,7 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
  * a failure on one does not roll back previously created monitors.
  *
  * @see WorkspaceActivationService
- * @see de.tum.cit.aet.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService
+ * @see de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabGroupSyncService
  */
 @Service
 public class GitLabWorkspaceInitializationService {

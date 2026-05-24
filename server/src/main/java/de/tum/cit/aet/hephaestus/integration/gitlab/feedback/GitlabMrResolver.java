@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.feedback;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import java.time.Duration;
 import java.util.List;

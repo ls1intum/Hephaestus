@@ -12,13 +12,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabRateLimitTracker;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabSyncServiceHolder;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.gitlab.GitLabSyncResult;
+import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabGroupSyncService;
+import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;

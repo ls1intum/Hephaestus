@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
+import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.GITHUB_API_BASE_URL;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
@@ -8,8 +8,8 @@ import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;

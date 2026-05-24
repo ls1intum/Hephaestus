@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.gitprovider.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.github.GitHubSubjectBuilder;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.gitlab.GitLabSubjectBuilder;
+import de.tum.cit.aet.hephaestus.integration.github.webhook.GitHubSubjectBuilder;
+import de.tum.cit.aet.hephaestus.integration.gitlab.webhook.GitLabSubjectBuilder;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.nio.file.Files;

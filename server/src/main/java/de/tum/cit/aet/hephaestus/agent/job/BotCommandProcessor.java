@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.gitprovider.common.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
@@ -27,7 +27,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * Processes bot commands from MR comments (e.g., {@code /hephaestus review}).
  *
  * <p>Listens for {@link BotCommandReceivedEvent} published by
- * {@link de.tum.cit.aet.hephaestus.gitprovider.issuecomment.gitlab.GitLabNoteMessageHandler}
+ * {@link de.tum.cit.aet.hephaestus.integration.gitlab.issuecomment.GitLabNoteMessageHandler}
  * when a non-system MR comment matches a known command pattern. Runs asynchronously
  * to avoid blocking webhook processing.
  *

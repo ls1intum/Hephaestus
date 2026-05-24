@@ -4,11 +4,11 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.ExponentialBackoff;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabMessageHandler;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabMessageHandlerRegistry;
+import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandlerRegistry;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandlerRegistry;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.exception.NatsConnectionException;

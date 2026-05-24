@@ -9,8 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;

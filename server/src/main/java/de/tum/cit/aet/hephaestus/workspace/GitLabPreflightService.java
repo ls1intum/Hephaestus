@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.workspace.dto.GitLabGroupDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.GitLabPreflightResponseDTO;
 import java.time.Duration;

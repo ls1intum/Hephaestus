@@ -10,7 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;

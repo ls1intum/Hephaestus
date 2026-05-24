@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.github.GitHubProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;

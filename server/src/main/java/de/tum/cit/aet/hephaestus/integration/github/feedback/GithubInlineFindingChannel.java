@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
 
 import static de.tum.cit.aet.hephaestus.integration.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.github.feedback.GithubFeedbackChannel.PrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;

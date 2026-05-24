@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.github.GitHubProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;

@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.gitprovider.milestone.MilestoneRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.milestone.github.GitHubMilestoneSyncService;
+import de.tum.cit.aet.hephaestus.integration.github.milestone.GitHubMilestoneSyncService;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
+import de.tum.cit.aet.hephaestus.integration.github.repository.GitHubRepositorySyncService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 

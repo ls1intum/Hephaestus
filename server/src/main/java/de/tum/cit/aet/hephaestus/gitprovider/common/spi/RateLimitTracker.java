@@ -16,7 +16,7 @@ import org.springframework.lang.Nullable;
  * <p>Implementations must be thread-safe as multiple sync threads may
  * access the same scope's rate limit state concurrently.
  *
- * @see de.tum.cit.aet.hephaestus.gitprovider.common.github.ScopedRateLimitTracker
+ * @see de.tum.cit.aet.hephaestus.integration.github.common.ScopedRateLimitTracker
  */
 public interface RateLimitTracker {
     /**

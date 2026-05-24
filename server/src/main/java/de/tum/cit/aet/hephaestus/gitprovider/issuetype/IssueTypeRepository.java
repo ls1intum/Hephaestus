@@ -60,7 +60,7 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
      * issue lives in a subgroup whose {@code organization} has not had its own
      * {@code issue_type} seed rows materialised yet.
      * <p>
-     * The current {@link de.tum.cit.aet.hephaestus.gitprovider.issuetype.gitlab.GitLabIssueTypeSyncService}
+     * The current {@link de.tum.cit.aet.hephaestus.integration.gitlab.issuetype.GitLabIssueTypeSyncService}
      * only seeds types under the workspace's root accountLogin, but in GitLab each
      * subgroup becomes its own {@code Organization} row. Without this fallback an
      * issue synced from a subgroup would always resolve {@code issue_type_id} to

@@ -14,8 +14,8 @@ import org.junit.jupiter.params.provider.CsvSource;
  * Tests for {@link NatsConsumerService#buildSubjectPrefix(String, String)}.
  * <p>
  * These tests validate that the Java consumer-side subject prefix building matches the
- * publisher-side logic in {@link de.tum.cit.aet.hephaestus.gitprovider.webhook.gitlab.GitLabSubjectBuilder}
- * and {@link de.tum.cit.aet.hephaestus.gitprovider.webhook.github.GitHubSubjectBuilder}.
+ * publisher-side logic in {@link de.tum.cit.aet.hephaestus.integration.gitlab.webhook.GitLabSubjectBuilder}
+ * and {@link de.tum.cit.aet.hephaestus.integration.github.webhook.GitHubSubjectBuilder}.
  * <p>
  * The cross-side parity round-trip is asserted in
  * {@link de.tum.cit.aet.hephaestus.gitprovider.sync.SubjectGrammarRoundTripTest}.

@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.spi.ApprovalChannel;
 
 import static de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.GRAPHQL_TIMEOUT;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;

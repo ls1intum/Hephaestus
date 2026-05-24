@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.github.credentials;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.app.GitHubAppTokenService.InstallationToken;
+import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService.InstallationToken;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.GithubAppCredential;

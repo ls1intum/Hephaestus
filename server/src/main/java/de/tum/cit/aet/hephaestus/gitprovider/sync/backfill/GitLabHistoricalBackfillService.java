@@ -2,14 +2,14 @@ package de.tum.cit.aet.hephaestus.gitprovider.sync.backfill;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabSyncServiceHolder;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService;
+import de.tum.cit.aet.hephaestus.integration.gitlab.issue.GitLabIssueSyncService;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.gitlab.GitLabMergeRequestSyncService;
+import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest.GitLabMergeRequestSyncService;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties;

@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContentProvider;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;

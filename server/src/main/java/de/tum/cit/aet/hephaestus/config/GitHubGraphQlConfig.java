@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.config;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
-import static de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
-import static de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.cit.aet.hephaestus.config.jackson.GitHubActorMixin;
 import de.tum.cit.aet.hephaestus.config.jackson.GitHubIssueMixin;
@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.config.jackson.GitHubProjectV2OwnerMixin;
 import de.tum.cit.aet.hephaestus.config.jackson.GitHubPullRequestMixin;
 import de.tum.cit.aet.hephaestus.config.jackson.GitHubRepositoryOwnerMixin;
 import de.tum.cit.aet.hephaestus.config.jackson.GitHubRequestedReviewerMixin;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHActor;
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
