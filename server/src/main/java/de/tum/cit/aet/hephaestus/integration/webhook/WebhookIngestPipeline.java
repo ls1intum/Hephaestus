@@ -1,6 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.webhook;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
+import de.tum.cit.aet.hephaestus.gitprovider.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier.VerificationResult;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier.WebhookRequest;
@@ -8,8 +13,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -21,7 +26,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Inbound webhook pipeline: verify → publish.
+ * Inbound webhook pipeline: verify → derive → publish.
  *
  * <p>The verification step may short-circuit with {@code RespondImmediately}
  * (Slack {@code url_verification}, Asana {@code X-Hook-Secret} echo) — in that
@@ -30,18 +35,33 @@ import org.springframework.stereotype.Component;
  * per-subscription secret to the registered subscription handler before
  * responding.
  *
- * <p>The actual NATS publish + dedup is delegated to a dedicated publisher bean
- * that wires into the existing {@code JetStreamPublisher}. This pipeline
- * intentionally has zero JetStream-specific code so it stays unit-testable.
+ * <p>On {@code Verified}, the pipeline routes through the kind's
+ * {@link SubjectKeyDeriver} for the NATS subject + dedup-id, then publishes to
+ * JetStream via {@link JetStreamPublisher}. The legacy {@code /github} and
+ * {@code /gitlab} controllers delegate through this same path so both URL
+ * anchors produce identical JetStream messages (verified by
+ * {@code WebhookIngestParityTest}).
  */
 @Component
 public class WebhookIngestPipeline {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookIngestPipeline.class);
 
-    private final Map<IntegrationKind, WebhookSignatureVerifier> verifiersByKind;
+    /** Bridge from Servlet headers into a {@code Nats-Msg-Id} echo, matches legacy controller behaviour. */
+    static final String NATS_MSG_ID = "Nats-Msg-Id";
 
-    public WebhookIngestPipeline(java.util.List<WebhookSignatureVerifier> verifiers) {
+    private final Map<IntegrationKind, WebhookSignatureVerifier> verifiersByKind;
+    private final Map<IntegrationKind, SubjectKeyDeriver> deriversByKind;
+    @Nullable
+    private final JetStreamPublisher jetStreamPublisher;
+    private final ObjectMapper objectMapper;
+
+    public WebhookIngestPipeline(
+        List<WebhookSignatureVerifier> verifiers,
+        List<SubjectKeyDeriver> derivers,
+        @Nullable JetStreamPublisher jetStreamPublisher,
+        ObjectMapper objectMapper
+    ) {
         this.verifiersByKind = verifiers.stream()
             .collect(Collectors.toUnmodifiableMap(
                 WebhookSignatureVerifier::kind,
@@ -52,12 +72,31 @@ public class WebhookIngestPipeline {
                     );
                 }
             ));
+        this.deriversByKind = derivers.stream()
+            .collect(Collectors.toUnmodifiableMap(
+                SubjectKeyDeriver::kind,
+                Function.identity(),
+                (a, b) -> {
+                    throw new IllegalStateException(
+                        "Duplicate SubjectKeyDeriver for kind=" + a.kind()
+                    );
+                }
+            ));
+        this.jetStreamPublisher = jetStreamPublisher;
+        this.objectMapper = objectMapper;
     }
 
     public ResponseEntity<?> handle(IntegrationKind kind, HttpServletRequest req) throws IOException {
         byte[] body = req.getInputStream().readAllBytes();
         Map<String, String> headers = readHeaders(req);
+        return handle(kind, body, headers);
+    }
 
+    /**
+     * Pre-read overload — used by the legacy {@code /github} and {@code /gitlab}
+     * controller shims that already consumed the body via {@code @RequestBody byte[]}.
+     */
+    public ResponseEntity<?> handle(IntegrationKind kind, byte[] body, Map<String, String> headers) {
         WebhookSignatureVerifier verifier = verifiersByKind.get(kind);
         if (verifier == null) {
             // No verifier wired — kind is allow-listed but not yet implemented.
@@ -90,23 +129,80 @@ public class WebhookIngestPipeline {
     }
 
     private ResponseEntity<?> publish(IntegrationKind kind, byte[] body, Map<String, String> headers) {
-        // The unified /webhooks/{kind} ingest path is only wired for SPI exercise today.
-        // GitHub / GitLab webhook traffic is still published by the legacy controllers at
-        // /github + /gitlab; routing the same event twice would double-publish into NATS.
-        // Reject explicitly until JetStream wiring lands so deliveries are never silently
-        // swallowed (NotImplemented signals to the vendor to retry — the legacy paths
-        // remain operational).
-        log.warn("Refusing unified webhook ingest (kind={}, bytes={}) — JetStream wiring pending",
-            kind, body.length);
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-            .body(Map.of(
-                "error", "unified webhook ingest not yet enabled",
-                "use_legacy_path", switch (kind) {
-                    case GITHUB -> "/github";
-                    case GITLAB -> "/gitlab";
-                    default -> "vendor-specific (see docs)";
-                }
-            ));
+        if (jetStreamPublisher == null) {
+            // No publisher bean — the webhook runtime role is disabled. Vendor will retry.
+            // 503 is the right surface here: the verification succeeded, but the downstream
+            // pipe is intentionally not wired on this pod.
+            log.warn(
+                "WebhookIngestPipeline: verified {} webhook but no JetStreamPublisher bean — replying 503",
+                kind
+            );
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", "publisher not wired"));
+        }
+        SubjectKeyDeriver deriver = deriversByKind.get(kind);
+        if (deriver == null) {
+            // Kind has a verifier but no derivation — surface as NOT_IMPLEMENTED so the
+            // operator notices the gap rather than silently dropping into a default subject.
+            log.warn("WebhookIngestPipeline: no SubjectKeyDeriver wired for kind={}", kind);
+            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+                .body(Map.of("error", "no subject deriver for " + kind));
+        }
+
+        JsonNode payload;
+        try {
+            payload = objectMapper.readTree(body);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "invalid-json"));
+        }
+
+        String subject = deriver.deriveSubject(payload, headers);
+        String dedupId = deriver.deriveDedupKey(body, headers);
+
+        // Match the legacy controller's header set: pass the vendor event header
+        // through unchanged when present, and ALWAYS attach the Nats-Msg-Id for
+        // server-side dedup. JetStreamPublisher already echoes the latter through
+        // its PublishOptions; including it on the headers keeps the wire trace
+        // self-describing.
+        Map<String, String> outboundHeaders = new LinkedHashMap<>();
+        passthroughHeader(outboundHeaders, headers, "X-GitHub-Event");
+        passthroughHeader(outboundHeaders, headers, "X-GitHub-Delivery");
+        passthroughHeader(outboundHeaders, headers, "X-Gitlab-Event");
+        passthroughHeader(outboundHeaders, headers, "X-Gitlab-Webhook-UUID");
+        outboundHeaders.put(NATS_MSG_ID, dedupId);
+
+        try {
+            jetStreamPublisher.publish(new PublishRequest(subject, dedupId, outboundHeaders, body));
+        } catch (JetStreamPublisher.PublishFailedException e) {
+            log.error(
+                "WebhookIngestPipeline: publish failed for kind={} subject={}: {}",
+                kind, subject, e.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", "publish-failed"));
+        }
+        log.debug("Published {} webhook to NATS: subject={} dedupId={}", kind, subject, dedupId);
+        return ResponseEntity.accepted().body(Map.of("status", "ok"));
+    }
+
+    private static void passthroughHeader(Map<String, String> out, Map<String, String> in, String name) {
+        String value = headerCaseInsensitive(in, name);
+        if (value != null && !value.isBlank()) {
+            out.put(name, value);
+        }
+    }
+
+    @Nullable
+    private static String headerCaseInsensitive(Map<String, String> headers, String name) {
+        String direct = headers.get(name);
+        if (direct != null) return direct;
+        for (var entry : headers.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(name)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     private ResponseEntity<?> respondImmediately(VerificationResult.RespondImmediately r) {
