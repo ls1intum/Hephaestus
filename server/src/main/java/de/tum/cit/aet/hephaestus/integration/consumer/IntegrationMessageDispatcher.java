@@ -138,6 +138,15 @@ public class IntegrationMessageDispatcher {
     }
 
     /**
+     * @return the number of registered {@link SubjectParser} bindings — one per
+     *     {@link IntegrationKind} that has wired up subject parsing. Stable for the
+     *     lifetime of the bean; safe to call from probe threads.
+     */
+    public int parserCount() {
+        return parsersByKind.size();
+    }
+
+    /**
      * Explicit allow-list mapping of subject prefix → {@link IntegrationKind}. Returns
      * empty for null, blank, dot-less, or unknown prefixes. Never reflects on the
      * input.
