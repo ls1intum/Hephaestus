@@ -12,7 +12,7 @@ import org.springframework.lang.Nullable;
  * Parking row for a GitHub App installation observed BEFORE any Hephaestus workspace
  * claims it.
  *
- * <p>Today's {@code WorkspaceInstallationService.createOrUpdateFromInstallation()} inlines
+ * <p>Today's {@code GithubLifecycleListener.createOrUpdateFromInstallation()} inlines
  * workspace creation on first webhook — that's wrong for the canonical user journey: an
  * admin clicks "Install Hephaestus App" on github.com first, returns to Hephaestus, signs
  * up / picks an org, and only THEN claims the installation. The {@code installation.created}

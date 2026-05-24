@@ -368,7 +368,7 @@ public class Workspace {
      * stored token are preserved to support ongoing local development.
      *
      * @see WorkspaceProvisioningService#bootstrapDefaultPatWorkspace() for PAT workspace creation
-     * @see WorkspaceInstallationService#createOrUpdateFromInstallation for migration logic
+     * @see de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener#createOrUpdateFromInstallation for migration logic
      */
     public enum GitProviderMode {
         /**

@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li>{@link WorkspaceQueryService} – Read-only queries and lookups</li>
  *   <li>{@link WorkspaceLifecycleService} – Status transitions (suspend/resume/purge)</li>
- *   <li>{@link WorkspaceInstallationService} – GitHub App installation handling</li>
+ *   <li>{@link de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener} – GitHub App installation handling</li>
  *   <li>{@link WorkspaceRepositoryMonitorService} – Repository monitoring configuration</li>
  *   <li>{@link WorkspaceActivationService} – Activation/startup orchestration</li>
  *   <li>{@link WorkspaceTeamSettingsService} – Workspace-scoped team settings</li>

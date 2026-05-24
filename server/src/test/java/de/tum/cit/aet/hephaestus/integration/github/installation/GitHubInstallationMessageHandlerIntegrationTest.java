@@ -38,7 +38,7 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        // Ensure GitHub GitProvider exists - required by WorkspaceInstallationService
+        // Ensure GitHub GitProvider exists - required by GithubLifecycleListener
         gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
