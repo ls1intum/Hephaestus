@@ -13,6 +13,7 @@ import java.util.Base64;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -53,11 +54,25 @@ public class HmacOAuthStateService implements OAuthStateService {
 
     @Override
     public String issue(long workspaceId, IntegrationKind kind) {
+        return issue(workspaceId, kind, null);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The actorRef is encoded as a base64url segment so it survives the {@code |}
+     * tokeniser intact even if a future identity source emits subjects containing the
+     * delimiter. {@code null} → empty segment, which decodes back to {@code null} in
+     * {@link #consume(String)} — preserving the binding-field nullability contract.
+     */
+    @Override
+    public String issue(long workspaceId, IntegrationKind kind, @Nullable String actorRef) {
         long issuedAt = Instant.now().getEpochSecond();
         byte[] nonceBytes = new byte[12];
         RANDOM.nextBytes(nonceBytes);
         String nonce = Base64.getUrlEncoder().withoutPadding().encodeToString(nonceBytes);
-        String payload = workspaceId + "|" + kind.name() + "|" + issuedAt + "|" + nonce;
+        String actorSegment = encodeActor(actorRef);
+        String payload = workspaceId + "|" + kind.name() + "|" + issuedAt + "|" + nonce + "|" + actorSegment;
         String sig = hmac(payload);
         return Base64.getUrlEncoder().withoutPadding()
             .encodeToString((payload + "|" + sig).getBytes(StandardCharsets.UTF_8));
@@ -74,16 +89,23 @@ public class HmacOAuthStateService implements OAuthStateService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("OAuth state malformed", e);
         }
-        String[] parts = decoded.split("\\|");
-        if (parts.length != 5) {
+        // -1 limit preserves trailing empty fields ({@code actorSegment} is empty when
+        // the legacy no-actor overload mints the token). Without -1 a trailing empty
+        // string is dropped and the split arity check below misfires.
+        String[] parts = decoded.split("\\|", -1);
+        if (parts.length != 5 && parts.length != 6) {
             throw new IllegalArgumentException("OAuth state malformed");
         }
+        boolean hasActorSegment = parts.length == 6;
         String workspaceIdStr = parts[0];
         String kindStr = parts[1];
         String issuedAtStr = parts[2];
         String nonce = parts[3];
-        String suppliedSig = parts[4];
-        String payload = workspaceIdStr + "|" + kindStr + "|" + issuedAtStr + "|" + nonce;
+        String actorSegment = hasActorSegment ? parts[4] : "";
+        String suppliedSig = parts[hasActorSegment ? 5 : 4];
+        String payload = hasActorSegment
+            ? workspaceIdStr + "|" + kindStr + "|" + issuedAtStr + "|" + nonce + "|" + actorSegment
+            : workspaceIdStr + "|" + kindStr + "|" + issuedAtStr + "|" + nonce;
         String expectedSig = hmac(payload);
         if (!MessageDigest.isEqual(
             expectedSig.getBytes(StandardCharsets.UTF_8),
@@ -91,7 +113,12 @@ public class HmacOAuthStateService implements OAuthStateService {
         )) {
             throw new IllegalArgumentException("OAuth state signature mismatch");
         }
-        long issuedAt = Long.parseLong(issuedAtStr);
+        long issuedAt;
+        try {
+            issuedAt = Long.parseLong(issuedAtStr);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("OAuth state issuedAt malformed", e);
+        }
         Instant issued = Instant.ofEpochSecond(issuedAt);
         if (Instant.now().minus(ttl).isAfter(issued)) {
             throw new IllegalArgumentException("OAuth state expired");
@@ -102,8 +129,33 @@ public class HmacOAuthStateService implements OAuthStateService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("OAuth state references unknown kind: " + kindStr);
         }
-        long workspaceId = Long.parseLong(workspaceIdStr);
-        return new StateBinding(workspaceId, kind, issued);
+        long workspaceId;
+        try {
+            workspaceId = Long.parseLong(workspaceIdStr);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("OAuth state workspaceId malformed", e);
+        }
+        String actorRef = hasActorSegment ? decodeActor(actorSegment) : null;
+        return new StateBinding(workspaceId, kind, issued, actorRef);
+    }
+
+    private static String encodeActor(@Nullable String actorRef) {
+        if (actorRef == null || actorRef.isEmpty()) return "";
+        return Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(actorRef.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Nullable
+    private static String decodeActor(String actorSegment) {
+        if (actorSegment.isEmpty()) return null;
+        try {
+            return new String(Base64.getUrlDecoder().decode(actorSegment), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            // Defensive: a tampered actor segment with intact outer HMAC shouldn't be
+            // reachable (the segment is signed), but if base64 ever rejects we'd rather
+            // null out than throw — the audit row falls back to a sentinel.
+            return null;
+        }
     }
 
     private String hmac(String payload) {

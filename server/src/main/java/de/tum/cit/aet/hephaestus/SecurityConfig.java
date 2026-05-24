@@ -98,7 +98,8 @@ public class SecurityConfig {
                 "/actuator/health/**",
                 "/actuator/info",
                 "/gitlab",
-                "/github"
+                "/github",
+                "/oauth/callback/**"
             )
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .csrf(csrf -> csrf.disable())
@@ -168,6 +169,10 @@ public class SecurityConfig {
             // controller layer. Spring Security must not block these or external providers can
             // never reach the receiver. See gitprovider.webhook.* and ADR 0008.
             requests.requestMatchers(HttpMethod.POST, "/gitlab", "/github").permitAll();
+            // OAuth vendor callbacks — authenticated by HMAC-signed state parameter at the
+            // controller layer (see OAuthCallbackController). The vendor redirect arrives
+            // unauthenticated; Spring Security MUST NOT block it or no OAuth flow ever completes.
+            requests.requestMatchers("/oauth/callback/**").permitAll();
             // NOTE: /api/workers/** and /actuator/** are handled by workerHubSecurityFilterChain
             // (highest precedence) which skips the OAuth2 resource server entirely — the worker
             // hub validates its own JWTs via WorkerJwtHandshakeInterceptor.
