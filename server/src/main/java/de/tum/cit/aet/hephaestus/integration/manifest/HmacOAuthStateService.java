@@ -24,9 +24,14 @@ import org.springframework.stereotype.Component;
  * The nonce makes every issued state unique, so even simultaneous concurrent OAuth
  * flows produce distinguishable tokens. Constant-time MAC comparison.
  *
- * <p>Replay protection is best-effort within the TTL window — adding a one-shot store
- * (Redis SETNX, DB row) is a follow-up if needed. For Hephaestus's threat model
- * (admin-triggered connect flows), TTL+HMAC is sufficient.
+ * <p><b>Single-use guarantee.</b> Every {@link #issue} writes a row to
+ * {@link OAuthStateNonceStore}; every {@link #consume} attempts an atomic
+ * conditional UPDATE on that row. The first caller wins; the second sees zero
+ * rows affected and is rejected with {@code "OAuth state already consumed"}.
+ * This closes the replay window inside the TTL.
+ *
+ * <p>{@link OAuthStateNonceStore} is optional in the constructor so the
+ * unit-test overloads (no DB) still work; production wiring always supplies it.
  */
 @Component
 public class HmacOAuthStateService implements OAuthStateService {
@@ -36,10 +41,44 @@ public class HmacOAuthStateService implements OAuthStateService {
 
     private final byte[] secret;
     private final Duration ttl;
+    @Nullable
+    private final OAuthStateNonceStore nonceStore;
 
+    /**
+     * Spring-injected primary constructor. The {@code nonceStore} is required at
+     * runtime — it provides the single-use guarantee on top of the HMAC + TTL.
+     */
     public HmacOAuthStateService(
         @Value("${hephaestus.integration.oauth-state.secret:${hephaestus.webhook.secret:}}") String configuredSecret,
-        @Value("${hephaestus.integration.oauth-state.ttl:PT10M}") Duration ttl
+        @Value("${hephaestus.integration.oauth-state.ttl:PT10M}") Duration ttl,
+        OAuthStateNonceStore nonceStore
+    ) {
+        this(configuredSecret, ttl, (OAuthStateNonceStore) nonceStore, true);
+    }
+
+    /**
+     * Test convenience: HMAC + TTL only, no single-use enforcement. Use only
+     * when the test is specifically NOT validating the replay guard. Tests that
+     * cover the single-use semantics pass a real (or in-memory) store via
+     * {@link #withNonceStore}.
+     */
+    public HmacOAuthStateService(String configuredSecret, Duration ttl) {
+        this(configuredSecret, ttl, null, false);
+    }
+
+    /**
+     * Test factory: HMAC + TTL + custom nonce store. Distinct method name from the
+     * @Value constructor so Spring doesn't pick it; tests use it directly.
+     */
+    public static HmacOAuthStateService withNonceStore(String secret, Duration ttl, OAuthStateNonceStore store) {
+        return new HmacOAuthStateService(secret, ttl, store, true);
+    }
+
+    private HmacOAuthStateService(
+        String configuredSecret,
+        Duration ttl,
+        @Nullable OAuthStateNonceStore nonceStore,
+        @SuppressWarnings("unused") boolean disambiguator
     ) {
         // Fall back to webhook secret if a dedicated key isn't configured — pre-existing
         // shared infrastructure secret. Production should set both explicitly.
@@ -50,6 +89,7 @@ public class HmacOAuthStateService implements OAuthStateService {
         }
         this.secret = configuredSecret.getBytes(StandardCharsets.UTF_8);
         this.ttl = ttl == null ? DEFAULT_TTL : ttl;
+        this.nonceStore = nonceStore;
     }
 
     @Override
@@ -74,6 +114,11 @@ public class HmacOAuthStateService implements OAuthStateService {
         String actorSegment = encodeActor(actorRef);
         String payload = workspaceId + "|" + kind.name() + "|" + issuedAt + "|" + nonce + "|" + actorSegment;
         String sig = hmac(payload);
+        // Persist the nonce BEFORE returning so a fast OAuth roundtrip can't race the
+        // first consume to an empty row. Skipped when no store is wired (test path).
+        if (nonceStore != null) {
+            nonceStore.issue(nonce, workspaceId, kind, Instant.ofEpochSecond(issuedAt));
+        }
         return Base64.getUrlEncoder().withoutPadding()
             .encodeToString((payload + "|" + sig).getBytes(StandardCharsets.UTF_8));
     }
@@ -134,6 +179,13 @@ public class HmacOAuthStateService implements OAuthStateService {
             workspaceId = Long.parseLong(workspaceIdStr);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("OAuth state workspaceId malformed", e);
+        }
+        // Single-use enforcement: atomic conditional UPDATE. The HMAC + TTL are now
+        // verified — any forged or stale token has already been rejected. The only
+        // remaining attack is replay of an authentic captured token; the store
+        // ensures the SECOND consume sees 0 rows affected and bounces.
+        if (nonceStore != null && !nonceStore.tryConsume(nonce)) {
+            throw new IllegalArgumentException("OAuth state already consumed");
         }
         String actorRef = hasActorSegment ? decodeActor(actorSegment) : null;
         return new StateBinding(workspaceId, kind, issued, actorRef);

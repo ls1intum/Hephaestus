@@ -120,4 +120,100 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         assertThatThrownBy(() -> svc.consume(tampered))
             .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("nonce store wired: first consume wins, second is rejected as already-consumed")
+    void singleUseEnforcedWithNonceStore() {
+        InMemoryNonceStore store = new InMemoryNonceStore();
+        HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
+        String state = svc.issue(42L, IntegrationKind.GITHUB);
+
+        // First consume: legit.
+        StateBinding binding = svc.consume(state);
+        assertThat(binding.workspaceId()).isEqualTo(42L);
+
+        // Second consume of the same state must be rejected — even though HMAC + TTL
+        // still validate. This is the load-bearing replay guard.
+        assertThatThrownBy(() -> svc.consume(state))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("already consumed");
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("nonce store: every issue writes a row; consume flips it exactly once")
+    void singleUseHonoursPersistence() {
+        InMemoryNonceStore store = new InMemoryNonceStore();
+        HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
+        svc.issue(1L, IntegrationKind.GITHUB);
+        svc.issue(1L, IntegrationKind.GITHUB);
+        assertThat(store.size()).isEqualTo(2);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("nonce store: HMAC failure is detected BEFORE the store is touched")
+    void hmacFailureNeverConsumesNonce() {
+        InMemoryNonceStore store = new InMemoryNonceStore();
+        HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
+        String state = svc.issue(42L, IntegrationKind.GITHUB);
+        String tampered = state.substring(0, state.length() - 2) + "AA";
+
+        assertThatThrownBy(() -> svc.consume(tampered))
+            .isInstanceOf(IllegalArgumentException.class);
+        // The nonce row must NOT have been consumed — the legitimate caller should
+        // still be able to use the real state.
+        assertThat(store.consumedCount()).isEqualTo(0);
+        StateBinding b = svc.consume(state);
+        assertThat(b.workspaceId()).isEqualTo(42L);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("nonce store: expired-by-TTL state is rejected before the store is touched")
+    void ttlFailureNeverConsumesNonce() {
+        InMemoryNonceStore store = new InMemoryNonceStore();
+        // 1ms TTL forces immediate expiry.
+        HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMillis(1), store);
+        String state = svc.issue(42L, IntegrationKind.GITHUB);
+        try { Thread.sleep(50); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+
+        assertThatThrownBy(() -> svc.consume(state))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("expired");
+        assertThat(store.consumedCount()).isEqualTo(0);
+    }
+
+    /**
+     * Minimal in-memory store used only by these tests — keeps the dependency surface
+     * narrow and avoids spinning up JPA for unit assertions. Mirrors the production
+     * "atomic conditional UPDATE" semantics: first {@link #tryConsume} for a known
+     * nonce returns true exactly once; every subsequent call returns false.
+     */
+    private static final class InMemoryNonceStore extends OAuthStateNonceStore {
+        private final java.util.Map<String, Boolean> rows = new java.util.concurrent.ConcurrentHashMap<>();
+
+        InMemoryNonceStore() {
+            super(null);
+        }
+
+        @Override
+        public void issue(String nonce, long workspaceId, IntegrationKind kind, java.time.Instant issuedAt) {
+            // Idempotent insert — production behaviour skips on collision.
+            rows.putIfAbsent(nonce, Boolean.FALSE);
+        }
+
+        @Override
+        public boolean tryConsume(String nonce) {
+            // Atomic compare-and-set: flip FALSE → TRUE and return true; if already
+            // TRUE (or absent), return false. Mirrors the WHERE consumed_at IS NULL
+            // guard in markConsumed().
+            return rows.replace(nonce, Boolean.FALSE, Boolean.TRUE);
+        }
+
+        int size() { return rows.size(); }
+
+        int consumedCount() {
+            int n = 0;
+            for (Boolean v : rows.values()) if (v) n++;
+            return n;
+        }
+    }
 }

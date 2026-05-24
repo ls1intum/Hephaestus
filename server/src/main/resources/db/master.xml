@@ -82,4 +82,5 @@
     <include file="./changelog/1779700400000_slack_persistence.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700500000_outline_persistence.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700600000_shedlock.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1779700700000_oauth_state_nonce.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
