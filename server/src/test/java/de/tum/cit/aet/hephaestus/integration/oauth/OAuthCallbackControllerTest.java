@@ -52,7 +52,7 @@ import org.springframework.http.ResponseEntity;
 class OAuthCallbackControllerTest extends BaseUnitTest {
 
     private static final OAuthCallbackProperties PROPS =
-        new OAuthCallbackProperties("/integrations?status=success", "/integrations?status=error&kind={kind}");
+        new OAuthCallbackProperties("/integrations?status=success");
 
     @Mock private OAuthStateService oauthStateService;
     @Mock private OAuthCallbackService callbackService;

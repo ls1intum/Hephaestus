@@ -7,18 +7,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * JPA converter for the sealed {@link ConnectionConfig} JSONB column.
- *
- * <p>Delegates to Spring's auto-configured {@code ObjectMapper} so the
- * {@code @JsonTypeInfo} discriminator is respected. Hibernate's native JSON
- * binding (which uses its own ObjectMapper) is not used here because polymorphic
- * sealed-type round-trip is unproven on that path.
+ * JPA converter for the sealed {@link ConnectionConfig} JSONB column. Delegates to
+ * Spring's auto-configured {@code ObjectMapper} so the {@code @JsonTypeInfo}
+ * discriminator survives round-trip; Hibernate's native JSON binding is not used
+ * because sealed-type support there is unproven.
  */
 @Component
 @Converter(autoApply = false)
 public class ConnectionConfigConverter implements AttributeConverter<ConnectionConfig, String> {
 
-    private static ObjectMapper sharedMapper;
+    /** Static so Hibernate's no-arg materialisation still hits the wired mapper. */
+    private static volatile ObjectMapper sharedMapper;
 
     @Autowired
     public void setObjectMapper(ObjectMapper objectMapper) {
@@ -46,10 +45,18 @@ public class ConnectionConfigConverter implements AttributeConverter<ConnectionC
     }
 
     private static ObjectMapper mapper() {
-        if (sharedMapper == null) {
-            // Bootstrap fallback for tests / detached usage. Discouraged in production.
-            sharedMapper = new ObjectMapper();
+        ObjectMapper m = sharedMapper;
+        if (m != null) {
+            return m;
         }
-        return sharedMapper;
+        // Bootstrap fallback for unit tests / detached Hibernate. Register modules so
+        // Java-time types (Instant in expiresAt-bearing configs) round-trip correctly
+        // — the previous bare mapper silently broke as soon as a Java-time field landed.
+        synchronized (ConnectionConfigConverter.class) {
+            if (sharedMapper == null) {
+                sharedMapper = new ObjectMapper().findAndRegisterModules();
+            }
+            return sharedMapper;
+        }
     }
 }

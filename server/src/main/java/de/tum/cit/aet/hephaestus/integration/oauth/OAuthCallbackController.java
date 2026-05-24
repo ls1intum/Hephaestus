@@ -30,44 +30,20 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Receives the vendor-side OAuth redirect at {@code /oauth/callback/{kind}} and finalises
- * the Connection by handing off to the per-kind {@link ConnectionStrategy}.
+ * Vendor OAuth redirect ingress at {@code /oauth/callback/{kind}}. Unauthenticated —
+ * the browser arrives without a Hephaestus session — so identity comes from the
+ * HMAC-signed {@code state} param ({@code (workspaceId, kind, issuedAt, actorRef)},
+ * minted by {@link OAuthStateService}). The path's {@code {kind}} MUST equal the
+ * state's kind, otherwise a state issued for kind A could be replayed against kind B's
+ * callback.
  *
- * <h2>Security model</h2>
- * This endpoint is intentionally unauthenticated ({@code @PreAuthorize("permitAll()")}).
- * The vendor (Slack, Outline, GitHub App settings UI, …) redirects the user's browser
- * back here with no Hephaestus session — there is no opportunity to attach a JWT.
- * Authentication is enforced via the HMAC-signed {@code state} parameter minted by
- * {@link OAuthStateService} at the start of the flow:
- * <ul>
- *   <li>the state binds {@code (workspaceId, kind, issuedAt, actorRef)};</li>
- *   <li>the HMAC prevents forgery and the TTL prevents long-tail replays;</li>
- *   <li>the {@code kind} embedded in the state MUST match the {@code {kind}} path
- *       segment — otherwise a state issued for kind A could be replayed against the
- *       callback path for kind B (the strategies' {@code finalizeConnect} contract
- *       does not include a kind self-check).</li>
- * </ul>
+ * <p>Browser audience: success and vendor-side cancellations return 302 redirects.
+ * Framework errors (bad state, unknown kind, strategy throw) return 4xx JSON so dev
+ * tools surface the failure clearly.
  *
- * <h2>Outcome encoding</h2>
- * The browser is the audience here — humans, not programs. Success and vendor-side
- * cancellations therefore return HTTP 302 redirects to the configured Hephaestus UI
- * pages. Programmatic / framework errors (malformed state, unknown kind, strategy
- * failure with no UI to bounce to) return HTTP 4xx with a small JSON body so the
- * problem surfaces in browser dev tools and proxy logs.
- *
- * <h2>Architecture posture</h2>
- * Thin HTTP adapter: all repository access lives in {@link OAuthCallbackService} so the
- * controller stays under the {@code controllersDoNotAccessRepositories} +
- * {@code controllersAreThin} (max 5 constructor params) ceilings. The two
- * redirect-target strings are bundled in {@link OAuthCallbackProperties} for the same
- * reason — every {@code @Value} string counts as a separate constructor param.
- *
- * <h2>Workspace context (architecture rule exemption)</h2>
- * {@code MultiTenancyArchitectureTest.dataEndpointsReceiveWorkspaceContext} expects a
- * {@code workspaceId} path variable or workspace security annotation on every controller
- * method. This controller is exempt — workspace identity is derived from the verified
- * state binding, NEVER from the request — and the rule has an explicit allow-list entry
- * matching the {@code OAuthCallbackController} class simple name.
+ * <p>Repository access lives in {@link OAuthCallbackService} (architecture rule). The
+ * workspace-context allow-list exempts this controller — workspace identity is from
+ * the verified state, never from the request.
  */
 @RestController
 @RequestMapping("/oauth/callback")
@@ -105,12 +81,9 @@ public class OAuthCallbackController {
     }
 
     /**
-     * Vendor-style GET callback: Slack, Outline, GitHub App install all bounce here.
-     *
-     * <p>The {@code error} param is checked BEFORE state — Slack/Outline send
-     * {@code error=access_denied} with no {@code code} when the user clicks "cancel"
-     * on the consent page, and we surface that as 400 rather than blowing up on the
-     * missing state.
+     * GET callback (Slack, Outline, GitHub App install). The {@code error} param is
+     * checked before state so vendor cancellations ({@code error=access_denied} with
+     * no {@code code}) surface as 400 rather than blowing up on missing state.
      */
     @GetMapping("/{kind}")
     @PreAuthorize("permitAll()")
@@ -125,12 +98,7 @@ public class OAuthCallbackController {
         return handleCallback(kind, code, state, error, errorDescription, allParams);
     }
 
-    /**
-     * POST variant for vendors that send form-encoded callbacks. Slack's OAuth v2
-     * exchange is GET-based today, but webhook-style integrations (Outline custom
-     * apps, possible future Slack flows) post the code body — accepting both keeps
-     * the controller robust to vendor-side changes without code churn.
-     */
+    /** POST variant for vendors that send form-encoded callbacks. */
     @PostMapping("/{kind}")
     @PreAuthorize("permitAll()")
     public ResponseEntity<?> callbackPost(
@@ -144,10 +112,7 @@ public class OAuthCallbackController {
         return handleCallback(kind, code, state, error, errorDescription, allParams);
     }
 
-    /**
-     * Shared core for GET + POST callbacks. Pulled out so the two HTTP entry methods
-     * stay thin and the test surface is one method, not two.
-     */
+    /** Shared core for GET + POST callbacks. Package-visible for unit tests. */
     ResponseEntity<?> handleCallback(
         String kindPathSegment,
         @Nullable String code,
@@ -171,8 +136,6 @@ public class OAuthCallbackController {
         if (vendorError != null && !vendorError.isBlank()) {
             log.info("OAuth callback for kind={} returned vendor error={} description={}",
                 kind, sanitize(vendorError), sanitize(vendorErrorDescription));
-            // TODO(#1198 follow-up): if the state carried a redirectAfter URI, bounce
-            // there with ?status=error&reason=<vendorError>; for now return 400 JSON.
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                 errorBody(kind.name(), vendorError, vendorErrorDescription)
             );
@@ -278,11 +241,7 @@ public class OAuthCallbackController {
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 
-    /**
-     * Build a structured error body for 4xx responses. Wrapped as a method to keep
-     * the JSON shape consistent across every error branch — clients (browser dev
-     * tools, proxy logs) get a stable contract.
-     */
+    /** Structured 4xx body: stable {kind, error, errorDescription} shape across all branches. */
     private static Map<String, String> errorBody(@Nullable String kind, String error, @Nullable String description) {
         Map<String, String> body = new HashMap<>();
         body.put("kind", kind == null ? "unknown" : kind);
@@ -291,10 +250,7 @@ public class OAuthCallbackController {
         return Collections.unmodifiableMap(body);
     }
 
-    /**
-     * Strip control characters and cap length before logging user-controlled input.
-     * Prevents log injection (CRLF) and giant payloads dragging down the log volume.
-     */
+    /** Strip control characters + cap length so user-supplied input can't poison logs. */
     @Nullable
     private static String sanitize(@Nullable String input) {
         if (input == null) return null;

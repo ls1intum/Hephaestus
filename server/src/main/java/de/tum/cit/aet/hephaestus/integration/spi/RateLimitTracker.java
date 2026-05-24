@@ -19,6 +19,9 @@ import org.springframework.lang.Nullable;
  */
 public interface RateLimitTracker {
 
+    /** Vendor binding — every per-kind SPI in this framework declares its {@link IntegrationKind}. */
+    IntegrationKind kind();
+
     void recordSuccess(IntegrationRef ref, @Nullable RateLimitHeaders headers, @Nullable String operationScope);
 
     void recordThrottled(IntegrationRef ref, Duration retryAfter, @Nullable String operationScope);

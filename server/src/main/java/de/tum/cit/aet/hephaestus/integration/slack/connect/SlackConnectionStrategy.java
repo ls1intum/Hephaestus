@@ -83,10 +83,8 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public ValidationResult validate(IntegrationRef ref, CredentialBundle credentials) {
-        // TODO(#1198 next slice): call https://slack.com/api/auth.test with the bot token
-        // and surface team_id / bot_user_id back as observedInstanceKey + observedDisplayName.
-        log.debug("Slack validate stub for workspace={}", ref.workspaceId());
-        return new ValidationResult.Ok(ref.instanceKey(), null);
+        // Honest: auth.test probe ships with the Slack OAuth client (#1204).
+        return new ValidationResult.NotImplemented("Slack auth.test probe not wired");
     }
 
     @Override

@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.spi.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
@@ -17,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.spi.WebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,20 +29,31 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Startup-time validation that every declared {@link Capability} has its required SPI
- * beans wired for the same kind.
- *
- * <p>Gated to the application-server runtime role — webhook and worker pods do not have
- * every SPI bean wired, so manifest validation only runs where the full set is expected.
- *
- * <p>On failure: throws on startup so misconfigurations surface immediately rather than
- * at the first request.
+ * Startup-time validation that every declared {@link Capability} has its required
+ * per-kind SPI beans wired. Throws so misconfigurations surface immediately, not at
+ * the first request. Gated to the application-server runtime role since worker pods
+ * intentionally wire only a subset of SPI beans.
  */
 @Component
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
-public class IntegrationFrameworkBootstrap { /* matchIfMissing=true: validation runs by default on the app-server runtime role */
+public class IntegrationFrameworkBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(IntegrationFrameworkBootstrap.class);
+
+    /**
+     * Capabilities that the framework does not (yet) enforce a per-kind bean for. Anything
+     * outside this set MUST be covered by {@link #checkRequired}: a future {@link Capability}
+     * literal added without a backing check fails the {@code unmappedCapabilities} guard
+     * below, so the bootstrap stays in lockstep with the enum.
+     *
+     * <p>Note: {@code REALTIME_INGEST} is unenforced because the realtime SPI is a separate
+     * follow-up (Discord Gateway / Slack Socket Mode); {@code ALERTS_INGEST} likewise
+     * has no SPI surface yet.
+     */
+    private static final Set<Capability> UNENFORCED_CAPABILITIES = EnumSet.of(
+        Capability.REALTIME_INGEST,
+        Capability.ALERTS_INGEST
+    );
 
     private final IntegrationManifestRegistry manifests;
     private final List<WebhookSignatureVerifier> signatureVerifiers;
@@ -54,6 +67,7 @@ public class IntegrationFrameworkBootstrap { /* matchIfMissing=true: validation 
     private final List<FeedbackChannel> feedbackChannels;
     private final List<InlineFindingChannel> inlineFindingChannels;
     private final List<ApprovalChannel> approvalChannels;
+    private final List<IntegrationLifecycleListener> lifecycleListeners;
 
     public IntegrationFrameworkBootstrap(
         IntegrationManifestRegistry manifests,
@@ -67,7 +81,8 @@ public class IntegrationFrameworkBootstrap { /* matchIfMissing=true: validation 
         List<SyncSource> syncSources,
         List<FeedbackChannel> feedbackChannels,
         List<InlineFindingChannel> inlineFindingChannels,
-        List<ApprovalChannel> approvalChannels
+        List<ApprovalChannel> approvalChannels,
+        List<IntegrationLifecycleListener> lifecycleListeners
     ) {
         this.manifests = manifests;
         this.signatureVerifiers = signatureVerifiers;
@@ -81,6 +96,7 @@ public class IntegrationFrameworkBootstrap { /* matchIfMissing=true: validation 
         this.feedbackChannels = feedbackChannels;
         this.inlineFindingChannels = inlineFindingChannels;
         this.approvalChannels = approvalChannels;
+        this.lifecycleListeners = lifecycleListeners;
     }
 
     @PostConstruct
@@ -101,8 +117,14 @@ public class IntegrationFrameworkBootstrap { /* matchIfMissing=true: validation 
     }
 
     private void checkRequired(IntegrationKind kind, Set<Capability> declared, List<String> violations) {
-        // Universal: every registered kind needs a credential provider + manifest.
+        // Universal: every registered kind needs a credential provider.
         require(kind, "ApiCredentialProvider", anyMatchKind(credentialProviders, p -> p.kind() == kind), violations);
+
+        // Universal: every registered kind needs a lifecycle listener so Connection state
+        // transitions can be wired into the right vendor adapter (even when the body is
+        // a no-op stub — that's per-kind policy, not a framework gap).
+        require(kind, "IntegrationLifecycleListener",
+            anyMatchKind(lifecycleListeners, l -> l.kind() == kind), violations);
 
         if (declared.contains(Capability.WEBHOOK_INGEST)) {
             require(kind, "WebhookSignatureVerifier", anyMatchKind(signatureVerifiers, v -> v.kind() == kind), violations);
@@ -110,11 +132,24 @@ public class IntegrationFrameworkBootstrap { /* matchIfMissing=true: validation 
             require(kind, "SubjectKeyDeriver", anyMatchKind(subjectKeyDerivers, s -> s.kind() == kind), violations);
             require(kind, "SubjectParser", anyMatchKind(subjectParsers, s -> s.kind() == kind), violations);
         }
+        if (declared.contains(Capability.URL_VERIFICATION_HANDSHAKE)) {
+            // Currently piggy-backs on WebhookSignatureVerifier (Slack's verifier short-
+            // circuits on url_verification). Enforce both so the manifest can't drift.
+            require(kind, "WebhookSignatureVerifier (url_verification handshake)",
+                anyMatchKind(signatureVerifiers, v -> v.kind() == kind), violations);
+        }
+        if (declared.contains(Capability.REPLAY_PROTECTION)) {
+            require(kind, "WebhookSignatureVerifier (replay-window check)",
+                anyMatchKind(signatureVerifiers, v -> v.kind() == kind), violations);
+        }
         if (declared.contains(Capability.TOKEN_REFRESH)) {
             require(kind, "TokenRefresher", anyMatchKind(tokenRefreshers, t -> t.kind() == kind), violations);
         }
         if (declared.contains(Capability.RATE_LIMITED)) {
-            require(kind, "RateLimitTracker", !rateLimitTrackers.isEmpty(), violations);
+            // Per-kind enforcement: a vendor that claims rate-limit awareness must wire
+            // its own tracker (otherwise we silently throttle no one).
+            require(kind, "RateLimitTracker",
+                anyMatchKind(rateLimitTrackers, t -> t.kind() == kind), violations);
         }
         if (declared.contains(Capability.BACKFILL_SYNC)) {
             require(kind, "SyncSource", anyMatchKind(syncSources, s -> s.kind() == kind), violations);
@@ -128,7 +163,42 @@ public class IntegrationFrameworkBootstrap { /* matchIfMissing=true: validation 
         if (declared.contains(Capability.APPROVAL_WORKFLOW)) {
             require(kind, "ApprovalChannel", anyMatchKind(approvalChannels, f -> f.kind() == kind), violations);
         }
+        if (declared.contains(Capability.SCOPE_CHANGES)) {
+            // SCOPE_CHANGES says "this vendor will fire onScopeChanged" — the listener
+            // must therefore have a real body. We can't introspect for that, but we
+            // can at least force the listener bean to be wired.
+            require(kind, "IntegrationLifecycleListener (scope-change emitter)",
+                anyMatchKind(lifecycleListeners, l -> l.kind() == kind), violations);
+        }
+
+        // Forward-compat: the moment a new Capability is added to the enum without a
+        // matching check above, fail loud at boot instead of silently treating it as
+        // satisfied.
+        Set<Capability> unmapped = EnumSet.copyOf(declared);
+        unmapped.removeAll(ENFORCED_CAPABILITIES);
+        unmapped.removeAll(UNENFORCED_CAPABILITIES);
+        for (Capability cap : unmapped) {
+            violations.add(kind + " declares capability " + cap
+                + " but the bootstrap has no enforcement rule for it — add a require() branch");
+        }
     }
+
+    /** Capabilities the {@link #checkRequired} switch above pins to a bean check. */
+    private static final Set<Capability> ENFORCED_CAPABILITIES = EnumSet.of(
+        Capability.WEBHOOK_INGEST,
+        Capability.URL_VERIFICATION_HANDSHAKE,
+        Capability.REPLAY_PROTECTION,
+        Capability.TOKEN_REFRESH,
+        Capability.RATE_LIMITED,
+        Capability.BACKFILL_SYNC,
+        Capability.FEEDBACK_DELIVERY,
+        Capability.INLINE_FINDINGS,
+        Capability.APPROVAL_WORKFLOW,
+        Capability.SCOPE_CHANGES,
+        // Not bean-backed yet — declarable, but no per-kind SPI to require.
+        Capability.GIT_CONTENT_ACCESS,
+        Capability.STATUS_REPORTING
+    );
 
     private static <T> boolean anyMatchKind(List<T> beans, Predicate<T> predicate) {
         return beans.stream().anyMatch(predicate);

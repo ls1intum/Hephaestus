@@ -79,19 +79,9 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public ValidationResult validate(IntegrationRef ref, CredentialBundle credentials) {
-        // TODO(#1198 follow-up): ping GET /api/v4/user with the PAT and confirm the
-        // response carries the expected group membership. For first-cut migration we
-        // optimistically return Ok so workspace setup is not blocked.
-        log.warn(
-            "GitlabConnectionStrategy.validate is a stub — credentials accepted without vendor probe "
-                + "(workspace={}, instanceKey={})",
-            ref == null ? null : ref.workspaceId(),
-            ref == null ? null : ref.instanceKey()
-        );
-        return new ValidationResult.Ok(
-            ref == null ? null : ref.instanceKey(),
-            /* observedDisplayName */ null
-        );
+        // Honest: PAT not probed against GET /api/v4/user yet. Callers must treat
+        // NotImplemented as "skip", not as a green light to transition to ACTIVE.
+        return new ValidationResult.NotImplemented("GitLab PAT probe not wired");
     }
 
     @Override

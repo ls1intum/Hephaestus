@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +39,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.lang.Nullable;
 
@@ -65,8 +65,6 @@ class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
     @Mock Database database;
     @Mock JdbcConnection jdbcConnection;
     @Mock Statement selectStatement;
-    @Mock PreparedStatement existsStatement;
-    @Mock ResultSet existsResultSet;
     @Mock PreparedStatement insertStatement;
 
     /** Captured INSERT parameters, one entry per executeUpdate() call. */
@@ -84,14 +82,10 @@ class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
         when(database.getConnection()).thenReturn(jdbcConnection);
         when(jdbcConnection.createStatement()).thenReturn(selectStatement);
 
-        // Default the existence check to "not present" — individual tests override.
-        lenient().when(existsResultSet.next()).thenReturn(false);
-        lenient().when(existsStatement.executeQuery()).thenReturn(existsResultSet);
-
-        // Route the two prepareStatement(…) call sites.
+        // Backfill no longer pre-checks existence — it relies on
+        // INSERT ... ON CONFLICT DO NOTHING for atomic idempotency.
         lenient().when(jdbcConnection.prepareStatement(anyString())).thenAnswer(invocation -> {
             String sql = invocation.getArgument(0);
-            if (sql.startsWith("SELECT 1 FROM connection")) return existsStatement;
             if (sql.startsWith("INSERT INTO connection")) return insertStatement;
             throw new AssertionError("Unexpected prepareStatement SQL: " + sql);
         });
@@ -245,20 +239,42 @@ class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
     class Edges {
 
         @Test
-        @DisplayName("Existing Connection of the same kind → INSERT is skipped")
-        void existingConnection_skipsInsert() throws Exception {
+        @DisplayName("INSERT carries ON CONFLICT DO NOTHING — concurrent applies cannot duplicate rows")
+        void insertUsesOnConflictDoNothing() throws Exception {
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
             stubSingleWorkspace(WorkspaceRow.builder()
                 .id(1L)
                 .mode("GITHUB_APP_INSTALLATION")
                 .installationId(1L)
                 .accountLogin("any")
                 .build());
-            when(existsResultSet.next()).thenReturn(true);
 
             new WorkspaceConnectionBackfillChange().execute(database);
 
-            verify(insertStatement, never()).executeUpdate();
-            assertThat(capturedInserts).isEmpty();
+            verify(jdbcConnection).prepareStatement(sql.capture());
+            assertThat(sql.getValue())
+                .startsWith("INSERT INTO connection")
+                .contains("ON CONFLICT (workspace_id, kind, instance_key) DO NOTHING");
+        }
+
+        @Test
+        @DisplayName("Existing Connection (executeUpdate returns 0 from ON CONFLICT) → counted as skipped, no error")
+        void existingConnection_executesUpdateButRecordsZeroRows() throws Exception {
+            stubSingleWorkspace(WorkspaceRow.builder()
+                .id(1L)
+                .mode("GITHUB_APP_INSTALLATION")
+                .installationId(1L)
+                .accountLogin("any")
+                .build());
+            // The unique constraint absorbs the INSERT: executeUpdate returns 0.
+            when(insertStatement.executeUpdate()).thenReturn(0);
+
+            new WorkspaceConnectionBackfillChange().execute(database);
+
+            verify(insertStatement, times(1)).executeUpdate();
+            // The capture stub records nothing because our wireInsertCapture treats
+            // executeUpdate's return value as the row-count proxy — and 0 means no row
+            // was actually inserted by the DB.
         }
 
         @Test

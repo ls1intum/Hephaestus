@@ -19,21 +19,13 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * JPA-style converter for the sealed {@link CredentialBundle} ↔ raw ciphertext bytes.
- *
- * <p>Wire model: a {@code CredentialBundle} is serialized to JSON via Jackson (the
- * sealed type carries {@code @JsonTypeInfo} / {@code @JsonSubTypes} just like
- * {@link ConnectionConfig}), then encrypted with AES-256-GCM using the same key
- * derivation as {@link de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter}
- * — single property {@code hephaestus.security.encryption-key} (32-char/256-bit).
- *
- * <p>Output layout matches the {@code EncryptedStringConverter} convention bit-for-bit
- * except that we operate on raw {@code byte[]} (no Base64, no {@code ENC:} prefix —
- * the column is {@code BYTEA}, not text): {@code [12-byte IV][ciphertext+128-bit GCM tag]}.
- *
- * <p>NOT registered with {@code autoApply = true}. Callers invoke the converter directly
- * via the {@code Connection.setCredentials(bundle, converter)} / {@code credentials(converter)}
- * helpers so the algorithm tag column on the same row stays in lockstep with the blob.
+ * JPA converter for the sealed {@link CredentialBundle} ↔ raw ciphertext bytes.
+ * Serialises via Jackson, encrypts with AES-256-GCM
+ * ({@code hephaestus.security.encryption-key}, 32-char/256-bit). Layout:
+ * {@code [12-byte IV][ciphertext+128-bit GCM tag]} — raw {@code BYTEA}, no {@code ENC:}
+ * prefix. Not {@code autoApply}: callers go through
+ * {@code Connection.setCredentials(bundle, converter)} so the {@code credentials_alg}
+ * column stays in lockstep with the blob.
  */
 @Component
 @Converter(autoApply = false)
@@ -50,8 +42,8 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     /** Hoisted to avoid re-seeding /dev/random on every encrypt; SecureRandom is thread-safe. */
     private static final SecureRandom IV_GENERATOR = new SecureRandom();
 
-    /** Static so Hibernate's no-arg construction of this @Converter still gets the wired mapper. */
-    private static ObjectMapper sharedMapper;
+    /** Static so Hibernate's no-arg construction of this @Converter still hits the wired mapper. */
+    private static volatile ObjectMapper sharedMapper;
 
     private final SecretKey secretKey;
     private final boolean enabled;
@@ -193,16 +185,17 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     }
 
     private static ObjectMapper mapper() {
-        if (sharedMapper == null) {
-            // Bootstrap fallback for unit tests / detached usage. We MUST register the
-            // JSR-310 module here because credential bundles carry {@code Instant}
-            // (BearerToken.expiresAt, OAuthSession.expiresAt) and the default mapper
-            // refuses Java-time types. Spring's auto-configured mapper has this module
-            // already, so {@link #setObjectMapper(ObjectMapper)} replaces this fallback
-            // in production. findAndRegisterModules picks up jackson-datatype-jsr310 via
-            // the ServiceLoader without us needing a hard import on the class.
-            sharedMapper = new ObjectMapper().findAndRegisterModules();
+        ObjectMapper m = sharedMapper;
+        if (m != null) {
+            return m;
         }
-        return sharedMapper;
+        // Bootstrap fallback for unit tests / detached Hibernate. JSR-310 module is
+        // required: BearerToken.expiresAt + OAuthSession.expiresAt carry Instant.
+        synchronized (CredentialBundleConverter.class) {
+            if (sharedMapper == null) {
+                sharedMapper = new ObjectMapper().findAndRegisterModules();
+            }
+            return sharedMapper;
+        }
     }
 }

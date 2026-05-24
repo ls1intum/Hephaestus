@@ -82,10 +82,8 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public ValidationResult validate(IntegrationRef ref, CredentialBundle credentials) {
-        // TODO(#1203): call POST <serverUrl>/api/auth.info with bearer token and surface
-        // team.id / team.name back as observedInstanceKey + observedDisplayName.
-        log.debug("Outline validate stub for workspace={}", ref.workspaceId());
-        return new ValidationResult.Ok(ref.instanceKey(), null);
+        // Honest: auth.info probe ships with the Outline OAuth client (#1203).
+        return new ValidationResult.NotImplemented("Outline auth.info probe not wired");
     }
 
     @Override

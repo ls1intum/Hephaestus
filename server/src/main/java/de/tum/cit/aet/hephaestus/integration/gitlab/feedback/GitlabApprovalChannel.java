@@ -18,15 +18,10 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitLab adapter for {@link ApprovalChannel}. Approves an MR via the
- * {@code ApproveMergeRequest} GraphQL mutation. Optional message is posted as a
- * regular MR note since {@code mergeRequestApprove} does not accept a body.
- *
- * <p>Not yet exercised by the agent layer — present so {@code IntegrationFrameworkBootstrap}
- * can validate the manifest's {@code APPROVAL_WORKFLOW} capability has a wired bean.
- *
- * <p>Gated on {@code hephaestus.gitlab.enabled=true} to track
- * {@link GitLabGraphQlClientProvider}.
+ * GitLab adapter for {@link ApprovalChannel}: approves an MR via the
+ * {@code ApproveMergeRequest} mutation. Optional message goes as a regular MR note —
+ * {@code mergeRequestApprove} does not accept a body. Gated on
+ * {@code hephaestus.gitlab.enabled=true} to track {@link GitLabGraphQlClientProvider}.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")

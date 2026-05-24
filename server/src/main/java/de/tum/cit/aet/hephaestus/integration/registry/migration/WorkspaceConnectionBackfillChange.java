@@ -126,10 +126,8 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         // local dev env (no key) shouldn't block App-mode backfill.
         EncryptionContext crypto = new EncryptionContext();
 
-        int inserted = 0;
-        int skipped = 0;
+        int gitInserted = 0;
         int slackInserted = 0;
-        int slackSkipped = 0;
 
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(
@@ -152,18 +150,14 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
                 String slackChannelId = rs.getString("leaderboard_notification_channel_id");
 
                 if (mode != null) {
-                    GitBackfillResult git = backfillGit(
+                    gitInserted += backfillGit(
                         conn, workspaceId, mode, installationId, accountLogin, serverUrl,
                         pat, gitlabGroupId, gitlabWebhookId, crypto);
-                    if (git == GitBackfillResult.INSERTED) inserted++;
-                    else if (git == GitBackfillResult.SKIPPED_EXISTS) skipped++;
                 }
 
                 if (slackToken != null && !slackToken.isBlank()) {
-                    SlackBackfillResult slack = backfillSlack(
+                    slackInserted += backfillSlack(
                         conn, workspaceId, slackToken, slackTeamLabel, slackChannelId, crypto);
-                    if (slack == SlackBackfillResult.INSERTED) slackInserted++;
-                    else if (slack == SlackBackfillResult.SKIPPED_EXISTS) slackSkipped++;
                 }
             }
         } catch (Exception e) {
@@ -171,13 +165,13 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         }
 
         log.info(
-            "WorkspaceConnectionBackfillChange complete: git_inserted={}, git_skipped_existing={}, "
-                + "slack_inserted={}, slack_skipped_existing={}",
-            inserted, skipped, slackInserted, slackSkipped);
+            "WorkspaceConnectionBackfillChange complete: git_inserted={}, slack_inserted={}",
+            gitInserted, slackInserted);
     }
 
 
-    private GitBackfillResult backfillGit(
+    /** Returns 1 if a row was newly inserted, 0 if the row already existed (ON CONFLICT) or input was invalid. */
+    private int backfillGit(
         JdbcConnection conn,
         long workspaceId,
         String mode,
@@ -199,7 +193,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
                 if (installationId == null) {
                     log.warn("Skipping workspace {}: mode=GITHUB_APP_INSTALLATION but installation_id is NULL",
                         workspaceId);
-                    return GitBackfillResult.SKIPPED_INVALID;
+                    return 0;
                 }
                 kind = IntegrationKind.GITHUB;
                 instanceKey = Long.toString(installationId);
@@ -230,22 +224,22 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
             }
             default -> {
                 log.warn("Skipping workspace {}: unknown git_provider_mode={}", workspaceId, mode);
-                return GitBackfillResult.SKIPPED_INVALID;
+                return 0;
             }
         }
 
-        if (connectionExists(conn, workspaceId, kind)) {
-            log.debug("Workspace {} already has a {} connection; skipping insert", workspaceId, kind);
-            return GitBackfillResult.SKIPPED_EXISTS;
+        int rows = insertConnection(conn, workspaceId, kind, instanceKey, config, credentialBlob);
+        if (rows > 0) {
+            log.info("Backfilled connection: workspace_id={}, kind={}, instance_key={}, has_credentials={}",
+                workspaceId, kind, instanceKey, credentialBlob != null);
+        } else {
+            log.debug("Workspace {} already has a {} connection at instance_key={}; skipped by ON CONFLICT",
+                workspaceId, kind, instanceKey);
         }
-
-        insertConnection(conn, workspaceId, kind, instanceKey, config, credentialBlob);
-        log.info("Backfilled connection: workspace_id={}, kind={}, instance_key={}, has_credentials={}",
-            workspaceId, kind, instanceKey, credentialBlob != null);
-        return GitBackfillResult.INSERTED;
+        return rows;
     }
 
-    private SlackBackfillResult backfillSlack(
+    private int backfillSlack(
         JdbcConnection conn,
         long workspaceId,
         String encryptedSlackToken,
@@ -253,37 +247,31 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         @Nullable String channelId,
         EncryptionContext crypto
     ) throws Exception {
-        if (connectionExists(conn, workspaceId, IntegrationKind.SLACK)) {
-            log.debug("Workspace {} already has a SLACK connection; skipping insert", workspaceId);
-            return SlackBackfillResult.SKIPPED_EXISTS;
-        }
-
         SlackConfig config = new SlackConfig(null, null, channelId, teamLabel, Collections.emptySet());
         byte[] credentialBlob = rewrapPat(encryptedSlackToken, crypto);
         // Sentinel instance_key — Postgres treats NULL as distinct in UNIQUE indexes
         // (pre-15 behavior, and we don't yet enforce NULLS NOT DISTINCT), so a real
         // NULL would let two rows race in at once. The first successful Slack call
         // after migration replaces this with the real team id via SlackTokenService.
-        insertConnection(conn, workspaceId, IntegrationKind.SLACK, "pending-team-bind", config, credentialBlob);
-        log.info("Backfilled SLACK connection: workspace_id={}, channel_id={}, has_credentials={}",
-            workspaceId, channelId, credentialBlob != null);
-        return SlackBackfillResult.INSERTED;
-    }
-
-
-    private boolean connectionExists(JdbcConnection conn, long workspaceId, IntegrationKind kind)
-        throws Exception {
-        try (PreparedStatement ps = conn.prepareStatement(
-            "SELECT 1 FROM connection WHERE workspace_id = ? AND kind = ? LIMIT 1")) {
-            ps.setLong(1, workspaceId);
-            ps.setString(2, kind.name());
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
+        int rows = insertConnection(
+            conn, workspaceId, IntegrationKind.SLACK, "pending-team-bind", config, credentialBlob);
+        if (rows > 0) {
+            log.info("Backfilled SLACK connection: workspace_id={}, channel_id={}, has_credentials={}",
+                workspaceId, channelId, credentialBlob != null);
+        } else {
+            log.debug("Workspace {} already has a SLACK connection; skipped by ON CONFLICT", workspaceId);
         }
+        return rows;
     }
 
-    private void insertConnection(
+
+    /**
+     * Atomically idempotent insert via {@code ON CONFLICT (workspace_id, kind, instance_key) DO NOTHING}
+     * against the {@code uq_connection} unique constraint. Returns {@code 1} when a new row was
+     * inserted, {@code 0} when the row already existed — concurrent Liquibase apply (multi-node
+     * boot) cannot produce duplicates or fail this changeset.
+     */
+    private int insertConnection(
         JdbcConnection conn,
         long workspaceId,
         IntegrationKind kind,
@@ -297,7 +285,8 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         String sql = "INSERT INTO connection ("
             + "workspace_id, kind, instance_key, state, config, "
             + "credentials_encrypted, credentials_alg, created_at, updated_at, version) "
-            + "VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, ?, NOW(), NOW(), 0)";
+            + "VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, ?, NOW(), NOW(), 0) "
+            + "ON CONFLICT (workspace_id, kind, instance_key) DO NOTHING";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, workspaceId);
             ps.setString(2, kind.name());
@@ -315,7 +304,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
                 ps.setBytes(6, credentialBlob);
                 ps.setString(7, ALGORITHM_TAG);
             }
-            ps.executeUpdate();
+            return ps.executeUpdate();
         }
     }
 
@@ -419,6 +408,4 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         }
     }
 
-    private enum GitBackfillResult { INSERTED, SKIPPED_EXISTS, SKIPPED_INVALID }
-    private enum SlackBackfillResult { INSERTED, SKIPPED_EXISTS }
 }

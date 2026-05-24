@@ -64,8 +64,15 @@ public interface ConnectionStrategy {
         record Failed(String reason) implements ConnectFinalization {}
     }
 
-    sealed interface ValidationResult permits ValidationResult.Ok, ValidationResult.Failed {
+    sealed interface ValidationResult
+        permits ValidationResult.Ok, ValidationResult.Failed, ValidationResult.NotImplemented {
         record Ok(@Nullable String observedInstanceKey, @Nullable String observedDisplayName) implements ValidationResult {}
         record Failed(String reason) implements ValidationResult {}
+        /**
+         * Honest signal that the strategy has no vendor-side probe yet. Callers MUST treat
+         * this differently from {@link Ok} — typically: log + skip, never auto-transition
+         * a Connection to ACTIVE on this verdict alone.
+         */
+        record NotImplemented(String reason) implements ValidationResult {}
     }
 }

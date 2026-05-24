@@ -10,26 +10,18 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * GitLab integration manifest.
+ * GitLab integration manifest. {@code GitlabWebhookSignatureVerifier} runs dual-mode
+ * (legacy plaintext {@code X-Gitlab-Token} + GitLab 19.0+ HMAC {@code whsec_*}).
  *
- * <p>{@code GitlabWebhookSignatureVerifier} ships in dual-mode (legacy plaintext
- * {@code X-Gitlab-Token} + GitLab 19.0+ HMAC {@code whsec_*}).
+ * <p>Feedback-delivery / inline-finding / approval capabilities are gated on the legacy
+ * {@code hephaestus.gitlab.enabled} flag — the underlying GraphQL provider and the
+ * channel beans share that flag, and the bootstrap demands matching SPI beans for any
+ * declared capability.
  *
- * <p>{@code matchIfMissing = true}: with the GitLab SPI beans wired
- * (signature verifier, secret source, subject deriver/parser, credential provider,
- * connection strategy, lifecycle listener) the manifest opts into validation by
- * default.
- *
- * <p>The feedback-delivery / inline-finding / approval capabilities are gated on the
- * legacy {@code hephaestus.gitlab.enabled} flag because the underlying
- * {@link de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider}
- * is also gated on that flag — and so are the channel beans under
- * {@code integration/gitlab/feedback/}
- * ({@link de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabFeedbackChannel},
- * {@link de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabInlineFindingChannel},
- * {@link de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabApprovalChannel}).
- * The manifest mirrors that gating so {@code IntegrationFrameworkBootstrap} won't
- * demand channel beans on deployments where the GitLab GraphQL stack is disabled.
+ * <p>No {@code RATE_LIMITED}: GitLab has no per-kind {@code RateLimitTracker} impl.
+ * No {@code SCOPE_CHANGES}: GitLab has no install/uninstall/scope webhooks, so
+ * {@code GitlabLifecycleListener.onScopeChanged} would never fire — declaring the
+ * capability would lie to the UI's practice-gating check.
  */
 @Component
 @ConditionalOnProperty(
@@ -57,16 +49,9 @@ public class GitLabManifest implements IntegrationManifest {
 
     @Override
     public Set<Capability> declaredCapabilities() {
-        // Each entry below MUST correspond to a wired SPI bean under
-        // integration/gitlab/. IntegrationFrameworkBootstrap fails startup otherwise.
-        EnumSet<Capability> capabilities = EnumSet.of(
-            Capability.WEBHOOK_INGEST,   // GitlabWebhookSignatureVerifier + SecretSource + SubjectKeyDeriver + SubjectParser
-            Capability.RATE_LIMITED,     // generic RateLimitTracker (any-kind) — see bootstrap rule
-            Capability.SCOPE_CHANGES     // GitlabLifecycleListener.onScopeChanged stub (real wiring in follow-up)
-        );
+        EnumSet<Capability> capabilities = EnumSet.of(Capability.WEBHOOK_INGEST);
         if (gitlabStackEnabled) {
-            // GitLabGraphQlClientProvider + the three channel beans only load when
-            // hephaestus.gitlab.enabled=true; declare matching capabilities only then.
+            // GraphQL provider + channel beans only load when hephaestus.gitlab.enabled=true.
             capabilities.add(Capability.FEEDBACK_DELIVERY);
             capabilities.add(Capability.INLINE_FINDINGS);
             capabilities.add(Capability.APPROVAL_WORKFLOW);

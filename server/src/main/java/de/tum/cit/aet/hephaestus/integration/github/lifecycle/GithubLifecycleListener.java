@@ -8,19 +8,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link IntegrationLifecycleListener}. Receives the framework's
- * {@code onInstanceInstalled} / {@code onInstanceUninstalled} / {@code onScopeChanged}
- * / {@code onTenantRenamed} signals derived from {@code installation.*} and
- * {@code installation_repositories.*} webhooks and must (eventually) persist or
- * reconcile workspace-side state for them.
- *
- * <p>For #1198 this is a structural skeleton — bodies log only — because the existing
- * {@code WorkspaceInstallationService.createOrUpdateFromInstallation()} path in the
- * legacy {@code workspace} package still owns those mutations. Wiring this listener as
- * the canonical write path is part of the C13 migration; until then this bean exists
- * solely so {@code IntegrationFrameworkBootstrap} (and any future capability check
- * that requires a lifecycle listener per kind) sees a registered impl for
- * {@link IntegrationKind#GITHUB}.
+ * GitHub adapter for {@link IntegrationLifecycleListener}. Skeleton for #1198: bodies
+ * log only — the existing {@code WorkspaceInstallationService} path still owns the
+ * mutations. Wiring this listener as the canonical write path is part of the C13
+ * migration. Bean exists so {@code IntegrationFrameworkBootstrap}'s per-kind listener
+ * check passes.
  */
 @Component
 public class GithubLifecycleListener implements IntegrationLifecycleListener {

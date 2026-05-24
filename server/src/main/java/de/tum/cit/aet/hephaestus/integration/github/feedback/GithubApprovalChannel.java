@@ -15,12 +15,9 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link ApprovalChannel}. Submits an APPROVE pull-request review
- * via the {@code ApprovePullRequest} GraphQL mutation (a {@code addPullRequestReview}
- * specialised to {@code event: APPROVE}).
- *
- * <p>Not yet exercised by the agent layer — present so {@code IntegrationFrameworkBootstrap}
- * can validate the manifest's {@code APPROVAL_WORKFLOW} capability has a wired bean.
+ * GitHub adapter for {@link ApprovalChannel}: submits an APPROVE pull-request review
+ * via the {@code ApprovePullRequest} mutation ({@code addPullRequestReview} specialised
+ * to {@code event: APPROVE}).
  */
 @Component
 public class GithubApprovalChannel implements ApprovalChannel {

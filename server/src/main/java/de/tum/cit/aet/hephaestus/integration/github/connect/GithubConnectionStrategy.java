@@ -15,19 +15,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link ConnectionStrategy}. Encodes the GitHub App install flow:
- * {@link #initiate} bounces the user to the configured App install URL with a signed
- * {@code state} parameter; {@link #finalizeConnect} reads the {@code installation_id}
- * returned by the GitHub callback and constructs a {@link GithubAppCredential} so the
- * orchestrator can persist a {@code Connection} row keyed on that installation.
+ * GitHub adapter for {@link ConnectionStrategy}: GitHub App install flow.
+ * {@link #initiate} bounces to the configured install URL with a signed {@code state};
+ * {@link #finalizeConnect} reads {@code installation_id} from the callback and emits a
+ * {@link GithubAppCredential} for orchestrator persistence.
  *
- * <p>This is the SKELETON wiring for #1198. {@link #validate} returns {@code Ok}
- * unconditionally — a real-world impl would call {@code GET /app/installations/{id}}
- * via the existing {@code GitHubAppTokenService.isInstallationSuspended} probe to
- * fail-fast on revoked installations. {@link #revoke} is a no-op log line because
- * GitHub App uninstall is initiated on GitHub's side (we observe via
- * {@code installation.deleted} webhook + transition our row to {@code UNINSTALLED}).
- * Both gaps are tracked TODOs for the C13 follow-up.
+ * <p>{@link #validate} reports {@link ValidationResult.NotImplemented} — no vendor probe
+ * is wired yet. {@link #revoke} is a local no-op log: GitHub App uninstall happens on
+ * GitHub's side; we observe {@code installation.deleted} via the lifecycle webhook and
+ * transition our row to {@code UNINSTALLED} from there.
  */
 @Component
 public class GithubConnectionStrategy implements ConnectionStrategy {
@@ -38,13 +34,16 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     private static final String CALLBACK_PARAM_STATE = "state";
 
     private final String installUrl;
+    private final String appId;
     private final OAuthStateService oauthStateService;
 
     public GithubConnectionStrategy(
         @Value("${hephaestus.github.app.install-url:}") String installUrl,
+        @Value("${hephaestus.github.app.id:}") String appId,
         OAuthStateService oauthStateService
     ) {
         this.installUrl = installUrl == null ? "" : installUrl.trim();
+        this.appId = appId == null ? "" : appId.trim();
         this.oauthStateService = oauthStateService;
     }
 
@@ -84,25 +83,30 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
         } catch (NumberFormatException e) {
             return new ConnectFinalization.Failed("installation_id is not a valid long: " + installationIdRaw);
         }
-        // appId placeholder mirrors GithubCredentialProvider — Connection schema does not yet carry it.
-        GithubAppCredential credentials = new GithubAppCredential(installationId, "unknown");
+        // appId from the configured GitHub App; blank in dev profiles that haven't
+        // wired hephaestus.github.app.id yet. The credential record carries it so
+        // downstream callers (token refresh) can reconstruct the JWT without hitting
+        // the DB for an unrelated property.
+        GithubAppCredential credentials = new GithubAppCredential(installationId, appId);
         return new ConnectFinalization.Completed(Long.toString(installationId), credentials, null);
     }
 
     @Override
     public ValidationResult validate(IntegrationRef ref, de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle credentials) {
-        // TODO(#1198 follow-up): probe GET /app/installations/{id} via GitHubAppTokenService.isInstallationSuspended
-        // to fail-fast on revoked installations before transitioning the Connection to ACTIVE.
-        return new ValidationResult.Ok(null, null);
+        // Honest: no vendor-side probe yet. Returning Ok would silently transition the
+        // Connection to ACTIVE on revoked installations. Follow-up wiring would call
+        // GitHubAppTokenService.isInstallationSuspended against GET /app/installations/{id}.
+        return new ValidationResult.NotImplemented(
+            "GitHub installation validation probe not wired"
+        );
     }
 
     @Override
     public void revoke(IntegrationRef ref) {
-        log.warn(
-            "GitHub revoke is a local no-op — uninstall happens via the GitHub App settings UI (ref={})",
-            ref
-        );
-        // TODO(#1198 follow-up): wire to ConnectionService.transition(... UNINSTALLED ...) once the
-        // adapter owns lifecycle transitions; the legacy installation webhook handler still drives them today.
+        // Local no-op: GitHub App uninstall is initiated on github.com (App settings UI);
+        // we observe installation.deleted via the lifecycle webhook and transition the
+        // Connection there. The caller still drives any local state change via
+        // ConnectionService.transition() — no vendor-side call belongs here.
+        log.info("GitHub revoke: local no-op (uninstall is webhook-driven), ref={}", ref);
     }
 }
