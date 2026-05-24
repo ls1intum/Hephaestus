@@ -1,34 +1,30 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import static de.tum.cit.aet.hephaestus.agent.handler.PullRequestCommentPoster.GRAPHQL_TIMEOUT;
-
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
+import de.tum.cit.aet.hephaestus.integration.spi.FindingAnchor;
+import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.lang.Nullable;
-import tools.jackson.databind.JsonNode;
 
 /**
- * Posts inline diff notes on GitHub PRs (via pull request review threads) or GitLab MRs
- * (via individual diff note mutations).
+ * Posts inline diff notes on PRs/MRs by dispatching to the per-vendor
+ * {@link InlineFindingChannel}. Vendor-specific posting (atomic GitHub review with
+ * threads, per-note GitLab createDiffNote with hunk-fallback) lives in the channels
+ * under {@code integration/<kind>/feedback/}; this wrapper handles sanitization,
+ * mapping the agent-side {@link DiffNote} record to {@link InlineFindingChannel.InlineFinding},
+ * and vendor dispatch.
  *
- * <p><b>GitHub:</b> Uses {@code addPullRequestReview} with {@code threads} for atomic, single-notification
- * delivery. All diff notes are posted as part of a single review with {@code COMMENT} event (neutral).
- *
- * <p><b>GitLab:</b> No batch API exists, so each diff note is posted individually via
- * {@code createDiffNote}. Best-effort: continues on per-note failure, stops on rate limit.
+ * <p>Vendor dispatch is keyed off {@link AgentJob#getIntegrationKind()} (post-#1198)
+ * with a {@link PullRequestCommentPoster#resolveKind} fallback for legacy rows.
  *
  * <p>Package-private — created as {@code @Bean} in {@link JobTypeHandlerConfiguration}.
  */
@@ -40,436 +36,93 @@ class DiffNotePoster {
     static final String HEPHAESTUS_MARKER = "<!-- hephaestus-diff-note -->";
 
     private final PullRequestCommentPoster commentPoster;
-    private final GitHubGraphQlClientProvider gitHubProvider;
-
-    @Nullable
-    private final GitLabGraphQlClientProvider gitLabProvider;
-
-    private final WorkspaceRepository workspaceRepository;
+    private final Map<IntegrationKind, InlineFindingChannel> channels;
 
     DiffNotePoster(
         PullRequestCommentPoster commentPoster,
-        GitHubGraphQlClientProvider gitHubProvider,
-        @Nullable GitLabGraphQlClientProvider gitLabProvider,
-        WorkspaceRepository workspaceRepository
+        List<InlineFindingChannel> inlineFindingChannels
     ) {
         this.commentPoster = commentPoster;
-        this.gitHubProvider = gitHubProvider;
-        this.gitLabProvider = gitLabProvider;
-        this.workspaceRepository = workspaceRepository;
+        EnumMap<IntegrationKind, InlineFindingChannel> map = new EnumMap<>(IntegrationKind.class);
+        for (InlineFindingChannel channel : inlineFindingChannels) {
+            InlineFindingChannel previous = map.putIfAbsent(channel.kind(), channel);
+            if (previous != null) {
+                throw new IllegalStateException(
+                    "Duplicate InlineFindingChannel for kind " +
+                        channel.kind() +
+                        ": " +
+                        previous.getClass().getName() +
+                        " conflicts with " +
+                        channel.getClass().getName()
+                );
+            }
+        }
+        this.channels = map;
     }
 
     /**
-     * Posts diff notes for the given job. Routes to GitHub or GitLab based on workspace provider.
+     * Posts diff notes for the given job by routing to the per-kind
+     * {@link InlineFindingChannel}.
      *
      * @param job       the completed agent job (must have metadata with repository info)
      * @param diffNotes the sanitized diff notes to post
      * @return result with posted/failed counts
      */
     DiffNoteResult postDiffNotes(AgentJob job, List<DiffNote> diffNotes) {
-        if (diffNotes.isEmpty()) {
+        if (diffNotes == null || diffNotes.isEmpty()) {
             return new DiffNoteResult(0, 0);
         }
 
-        Long workspaceId = job.getWorkspace().getId();
-        Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new JobDeliveryException("Workspace not found: id=" + workspaceId));
+        long workspaceId = job.getWorkspace().getId();
+        IntegrationKind kind = commentPoster.resolveKind(job, workspaceId);
+        InlineFindingChannel channel = channels.get(kind);
+        if (channel == null) {
+            throw new JobDeliveryException(
+                "No InlineFindingChannel wired for kind " + kind +
+                    " — check that the vendor integration is enabled and its channel bean is registered"
+            );
+        }
 
-        if (workspace.getProviderType() == GitProviderType.GITHUB) {
-            return postGitHubDiffNotes(workspaceId, job, diffNotes);
-        } else {
-            return postGitLabDiffNotes(workspaceId, job, diffNotes);
+        FeedbackChannel.FeedbackTarget target = commentPoster.buildTarget(job, kind, workspaceId);
+        List<InlineFindingChannel.InlineFinding> findings = mapFindings(diffNotes);
+        if (findings.isEmpty()) {
+            return new DiffNoteResult(0, 0);
+        }
+
+        try {
+            InlineFindingChannel.InlineResult result = channel.postInlineFindings(target, findings);
+            log.debug(
+                "Inline finding delivery: kind={}, posted={}, failed={}, jobId={}",
+                kind,
+                result.posted(),
+                result.failed(),
+                job.getId()
+            );
+            return new DiffNoteResult(result.posted(), result.failed());
+        } catch (FeedbackDeliveryException e) {
+            throw new JobDeliveryException(e.getMessage(), e);
         }
     }
 
-    // ── GitHub: atomic review with threads ──
-
-    private DiffNoteResult postGitHubDiffNotes(Long scopeId, AgentJob job, List<DiffNote> diffNotes) {
-        if (gitHubProvider.isRateLimitCritical(scopeId)) {
-            log.warn("GitHub rate limit critical — skipping diff notes: jobId={}", job.getId());
-            return new DiffNoteResult(0, diffNotes.size());
-        }
-
-        JsonNode metadata = job.getMetadata();
-        String repoFullName = PullRequestCommentPoster.requireMetadataText(metadata, "repository_full_name");
-        int prNumber = PullRequestCommentPoster.requireMetadataInt(metadata, "pr_number");
-        String commitSha = PullRequestCommentPoster.requireMetadataText(metadata, "commit_sha");
-
-        String[] parts = repoFullName.split("/", 2);
-        if (parts.length != 2) {
-            throw new JobDeliveryException("Invalid repository_full_name: " + repoFullName);
-        }
-
-        // Resolve PR node ID via injected comment poster (reuses same GraphQL query)
-        String prNodeId = commentPoster.resolveGitHubPrNodeId(scopeId, parts[0], parts[1], prNumber);
-
-        // Build threads array for the review
-        List<Map<String, Object>> threads = new ArrayList<>();
+    private static List<InlineFindingChannel.InlineFinding> mapFindings(List<DiffNote> diffNotes) {
+        List<InlineFindingChannel.InlineFinding> findings = new ArrayList<>(diffNotes.size());
         for (DiffNote note : diffNotes) {
-            String sanitizedBody = PullRequestCommentPoster.sanitize(note.body());
-            if (sanitizedBody.isBlank()) {
+            String sanitized = PullRequestCommentPoster.sanitize(note.body());
+            if (sanitized.isBlank()) {
                 continue;
             }
-
-            Map<String, Object> thread = new HashMap<>();
-            thread.put("path", note.filePath());
-            thread.put("body", sanitizedBody);
-
-            // GitHub review threads: single-line vs multi-line annotation
+            // DiffNote uses (startLine, endLine) where endLine==null means single-line.
+            // DiffAnchor uses (newLineNumber, startLine) where startLine==null means single-line:
+            //   newLineNumber is the END line that the annotation attaches to, and startLine
+            //   the (optional) range start. For single-line notes, both shapes converge.
             boolean isMultiLine = note.endLine() != null && note.endLine() > note.startLine();
-            if (isMultiLine) {
-                // Multi-line: startLine..line on the RIGHT (new) side
-                thread.put("startLine", note.startLine());
-                thread.put("line", note.endLine());
-                thread.put("side", "RIGHT");
-                thread.put("startSide", "RIGHT");
-            } else {
-                // Single-line: annotate the new version of the file
-                thread.put("line", note.startLine());
-                thread.put("side", "RIGHT");
-            }
-
-            threads.add(thread);
+            FindingAnchor.DiffAnchor anchor = isMultiLine
+                ? new FindingAnchor.DiffAnchor(note.filePath(), note.endLine(), note.startLine())
+                : new FindingAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
+            findings.add(new InlineFindingChannel.InlineFinding(anchor, sanitized, HEPHAESTUS_MARKER));
         }
-
-        if (threads.isEmpty()) {
-            log.debug("All diff notes were empty after sanitization: jobId={}", job.getId());
-            return new DiffNoteResult(0, 0);
-        }
-
-        // Single atomic mutation — all-or-nothing
-        try {
-            ClientGraphQlResponse response = gitHubProvider
-                .forScope(scopeId)
-                .documentName("AddPullRequestReviewWithThreads")
-                .variable("pullRequestId", prNodeId)
-                .variable("event", "COMMENT")
-                .variable("commitOID", commitSha)
-                .variable("threads", threads)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
-
-            if (response == null) {
-                throw new JobDeliveryException("Null response from AddPullRequestReviewWithThreads");
-            }
-            gitHubProvider.trackRateLimit(scopeId, response);
-
-            if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                log.warn(
-                    "GitHub addPullRequestReview with threads failed: jobId={}, errors={}, threadCount={}",
-                    job.getId(),
-                    response.getErrors(),
-                    threads.size()
-                );
-                return new DiffNoteResult(0, threads.size());
-            }
-
-            log.info(
-                "Posted {} GitHub diff notes as review: jobId={}, prNodeId={}",
-                threads.size(),
-                job.getId(),
-                prNodeId
-            );
-            return new DiffNoteResult(threads.size(), 0);
-        } catch (JobDeliveryException e) {
-            throw e;
-        } catch (Exception e) {
-            log.warn("GitHub diff notes failed: jobId={}, threadCount={}", job.getId(), threads.size(), e);
-            return new DiffNoteResult(0, threads.size());
-        }
+        return findings;
     }
-
-    // ── GitLab: individual diff notes ──
-
-    private DiffNoteResult postGitLabDiffNotes(Long scopeId, AgentJob job, List<DiffNote> diffNotes) {
-        if (gitLabProvider == null) {
-            throw new JobDeliveryException(
-                "GitLab provider not configured — cannot post diff notes for scope " + scopeId
-            );
-        }
-        if (gitLabProvider.isRateLimitCritical(scopeId)) {
-            log.warn("GitLab rate limit critical — skipping diff notes: jobId={}", job.getId());
-            return new DiffNoteResult(0, diffNotes.size());
-        }
-
-        JsonNode metadata = job.getMetadata();
-        String repoFullName = PullRequestCommentPoster.requireMetadataText(metadata, "repository_full_name");
-        int prNumber = PullRequestCommentPoster.requireMetadataInt(metadata, "pr_number");
-
-        // Resolve MR global ID and diffRefs
-        MrInfo mrInfo = resolveGitLabMrInfo(scopeId, repoFullName, prNumber);
-        if (mrInfo.headSha == null || mrInfo.startSha == null) {
-            log.warn(
-                "GitLab MR missing diffRefs — skipping diff notes: jobId={}, mrGlobalId={}",
-                job.getId(),
-                mrInfo.globalId
-            );
-            return new DiffNoteResult(0, diffNotes.size());
-        }
-
-        // Remove old hephaestus diff notes to prevent duplication on re-runs
-        deleteOldHephaestusDiffNotes(scopeId, repoFullName, prNumber, job);
-
-        int posted = 0;
-        int failed = 0;
-        int remaining = diffNotes.size();
-
-        for (DiffNote note : diffNotes) {
-            remaining--;
-            String sanitizedBody = PullRequestCommentPoster.sanitize(note.body());
-            if (sanitizedBody.isBlank()) {
-                continue;
-            }
-
-            try {
-                // Build DiffPositionInput
-                Map<String, Object> position = new HashMap<>();
-                position.put("headSha", mrInfo.headSha);
-                position.put("startSha", mrInfo.startSha);
-                position.put("baseSha", mrInfo.baseSha);
-                Map<String, String> paths = new HashMap<>();
-                paths.put("newPath", note.filePath());
-                // oldPath required for GitLab to match the note position to the diff
-                // file in the Changes tab. Correct for new and modified files.
-                // For renamed files oldPath should be the pre-rename path, but the
-                // DiffNote record only carries the new path. Renames are rare in
-                // student assignments; if needed, resolve from MR diff metadata.
-                paths.put("oldPath", note.filePath());
-                position.put("paths", paths);
-                position.put("newLine", note.startLine());
-
-                ClientGraphQlResponse response = gitLabProvider
-                    .forScope(scopeId)
-                    .documentName("CreateDiffNote")
-                    .variable("noteableId", mrInfo.globalId)
-                    .variable("body", sanitizedBody + "\n" + HEPHAESTUS_MARKER)
-                    .variable("position", position)
-                    .execute()
-                    .block(GRAPHQL_TIMEOUT);
-
-                if (response == null) {
-                    failed++;
-                    log.warn("Null response posting GitLab diff note: jobId={}, file={}", job.getId(), note.filePath());
-                    continue;
-                }
-
-                List<String> errors = response.field("createDiffNote.errors").getValue();
-                if (errors != null && !errors.isEmpty()) {
-                    // Fallback: if line is outside diff hunk, post as regular MR comment
-                    if (isLineCodeError(errors)) {
-                        log.info(
-                            "Diff note line outside diff hunk, falling back to MR comment: jobId={}, file={}, line={}",
-                            job.getId(),
-                            note.filePath(),
-                            note.startLine()
-                        );
-                        if (postFallbackComment(scopeId, mrInfo.globalId, note, sanitizedBody, job)) {
-                            posted++;
-                        } else {
-                            failed++;
-                        }
-                        continue;
-                    }
-                    failed++;
-                    log.warn(
-                        "GitLab createDiffNote failed: jobId={}, file={}, line={}, errors={}",
-                        job.getId(),
-                        note.filePath(),
-                        note.startLine(),
-                        errors
-                    );
-                    continue;
-                }
-
-                posted++;
-            } catch (Exception e) {
-                // Check for rate limit — stop processing remaining notes
-                if (isRateLimitError(e)) {
-                    log.warn("GitLab rate limit hit during diff note posting — stopping: jobId={}", job.getId());
-                    failed += remaining + 1; // current note + unprocessed remaining
-                    break;
-                }
-                failed++;
-                log.warn(
-                    "GitLab diff note failed: jobId={}, file={}, line={}",
-                    job.getId(),
-                    note.filePath(),
-                    note.startLine(),
-                    e
-                );
-            }
-        }
-
-        log.info("Posted {} GitLab diff notes ({} failed): jobId={}", posted, failed, job.getId());
-        return new DiffNoteResult(posted, failed);
-    }
-
-    /**
-     * Queries existing MR notes and deletes any that contain the hephaestus marker.
-     * This prevents diff note accumulation on re-runs of the same review.
-     * Best-effort: failures are logged but don't block new note posting.
-     */
-    private void deleteOldHephaestusDiffNotes(Long scopeId, String repoFullName, int mrIid, AgentJob job) {
-        try {
-            ClientGraphQlResponse response = gitLabProvider
-                .forScope(scopeId)
-                .documentName("GetMergeRequestNotes")
-                .variable("fullPath", repoFullName)
-                .variable("iid", String.valueOf(mrIid))
-                // 500 = GitLab's max per-page limit; sufficient since we post at most ~30 diff notes per review
-                .variable("first", 500)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
-
-            if (response == null) {
-                return;
-            }
-
-            List<Map<String, Object>> notes = response.field("project.mergeRequest.notes.nodes").getValue();
-
-            if (notes == null || notes.isEmpty()) {
-                return;
-            }
-
-            int deleted = 0;
-            for (Map<String, Object> note : notes) {
-                String body = (String) note.get("body");
-                String noteId = (String) note.get("id");
-                Boolean isSystem = (Boolean) note.get("system");
-
-                // Skip system notes and notes without our marker
-                if (Boolean.TRUE.equals(isSystem) || noteId == null || body == null) {
-                    continue;
-                }
-                if (!body.contains(HEPHAESTUS_MARKER)) {
-                    continue;
-                }
-
-                try {
-                    ClientGraphQlResponse deleteResponse = gitLabProvider
-                        .forScope(scopeId)
-                        .documentName("DestroyNote")
-                        .variable("noteId", noteId)
-                        .execute()
-                        .block(GRAPHQL_TIMEOUT);
-
-                    if (deleteResponse != null) {
-                        List<String> errors = deleteResponse.field("destroyNote.errors").getValue();
-                        if (errors == null || errors.isEmpty()) {
-                            deleted++;
-                        } else {
-                            log.debug("Failed to delete old diff note: noteId={}, errors={}", noteId, errors);
-                        }
-                    }
-                } catch (Exception e) {
-                    log.debug("Failed to delete old diff note: noteId={}", noteId, e);
-                }
-            }
-
-            if (deleted > 0) {
-                log.info(
-                    "Deleted {} old hephaestus diff notes before re-posting: jobId={}, mr={}!{}",
-                    deleted,
-                    repoFullName,
-                    mrIid,
-                    job.getId()
-                );
-            }
-        } catch (Exception e) {
-            log.debug("Failed to query existing MR notes for dedup: jobId={}", job.getId(), e);
-        }
-    }
-
-    private MrInfo resolveGitLabMrInfo(Long scopeId, String projectPath, int mrIid) {
-        ClientGraphQlResponse response = gitLabProvider
-            .forScope(scopeId)
-            .documentName("GetMergeRequestGlobalId")
-            .variable("fullPath", projectPath)
-            .variable("iid", String.valueOf(mrIid))
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
-
-        if (response == null) {
-            throw new JobDeliveryException("Null response resolving MR info: " + projectPath + "!" + mrIid);
-        }
-
-        String globalId = response.field("project.mergeRequest.id").getValue();
-        if (globalId == null) {
-            List<?> errors = response.getErrors();
-            throw new JobDeliveryException(
-                "MR not found via GraphQL: " +
-                    projectPath +
-                    "!" +
-                    mrIid +
-                    (errors.isEmpty() ? "" : ", errors=" + errors)
-            );
-        }
-
-        // diffRefs may be null if the MR has no diffs yet
-        String baseSha = response.field("project.mergeRequest.diffRefs.baseSha").getValue();
-        String headSha = response.field("project.mergeRequest.diffRefs.headSha").getValue();
-        String startSha = response.field("project.mergeRequest.diffRefs.startSha").getValue();
-
-        return new MrInfo(globalId, baseSha, headSha, startSha);
-    }
-
-    private static boolean isRateLimitError(Exception e) {
-        String message = e.getMessage();
-        return message != null && (message.contains("rate limit") || message.contains("429"));
-    }
-
-    private static boolean isLineCodeError(List<String> errors) {
-        return errors
-            .stream()
-            .anyMatch(e -> e.toLowerCase().contains("line code") || e.toLowerCase().contains("line_code"));
-    }
-
-    /**
-     * Fallback: post a diff note as a regular MR comment when the line is outside the diff hunk.
-     * Includes file path and line number in the comment body for context.
-     */
-    private boolean postFallbackComment(
-        Long scopeId,
-        String mrGlobalId,
-        DiffNote note,
-        String sanitizedBody,
-        AgentJob job
-    ) {
-        try {
-            String fallbackBody = String.format(
-                "**`%s:%d`**\n\n%s\n%s",
-                note.filePath(),
-                note.startLine(),
-                sanitizedBody,
-                HEPHAESTUS_MARKER
-            );
-            ClientGraphQlResponse response = gitLabProvider
-                .forScope(scopeId)
-                .documentName("CreateMergeRequestNote")
-                .variable("noteableId", mrGlobalId)
-                .variable("body", fallbackBody)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
-
-            if (response == null) {
-                log.warn("Null response posting fallback MR comment: jobId={}", job.getId());
-                return false;
-            }
-
-            List<String> errors = response.field("createNote.errors").getValue();
-            if (errors != null && !errors.isEmpty()) {
-                log.warn("Fallback MR comment failed: jobId={}, errors={}", job.getId(), errors);
-                return false;
-            }
-            return true;
-        } catch (Exception e) {
-            log.warn("Fallback MR comment failed: jobId={}, file={}", job.getId(), note.filePath(), e);
-            return false;
-        }
-    }
-
-    record MrInfo(String globalId, @Nullable String baseSha, @Nullable String headSha, @Nullable String startSha) {}
 
     record DiffNoteResult(int posted, int failed) {}
 }

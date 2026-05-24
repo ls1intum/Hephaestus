@@ -5,17 +5,16 @@ import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.lang.Nullable;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -56,21 +55,18 @@ public class JobTypeHandlerConfiguration {
 
     @Bean
     PullRequestCommentPoster pullRequestCommentPoster(
-        GitHubGraphQlClientProvider gitHubProvider,
-        @Nullable GitLabGraphQlClientProvider gitLabProvider,
+        List<FeedbackChannel> feedbackChannels,
         WorkspaceRepository workspaceRepository
     ) {
-        return new PullRequestCommentPoster(gitHubProvider, gitLabProvider, workspaceRepository);
+        return new PullRequestCommentPoster(feedbackChannels, workspaceRepository);
     }
 
     @Bean
     DiffNotePoster diffNotePoster(
         PullRequestCommentPoster commentPoster,
-        GitHubGraphQlClientProvider gitHubProvider,
-        @Nullable GitLabGraphQlClientProvider gitLabProvider,
-        WorkspaceRepository workspaceRepository
+        List<InlineFindingChannel> inlineFindingChannels
     ) {
-        return new DiffNotePoster(commentPoster, gitHubProvider, gitLabProvider, workspaceRepository);
+        return new DiffNotePoster(commentPoster, inlineFindingChannels);
     }
 
     @Bean

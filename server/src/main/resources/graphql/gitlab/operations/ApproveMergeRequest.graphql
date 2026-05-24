@@ -1,0 +1,11 @@
+# Marks the current user as an approver for the merge request.
+# Used by ApprovalChannel.approve. GitLab returns errors[] inline.
+
+mutation ApproveMergeRequest($mergeRequestId: MergeRequestID!) {
+    mergeRequestApprove(input: {
+        mergeRequestId: $mergeRequestId
+    }) {
+        clientMutationId
+        errors
+    }
+}

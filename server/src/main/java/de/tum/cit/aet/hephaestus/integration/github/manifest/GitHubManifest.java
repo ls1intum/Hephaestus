@@ -11,11 +11,16 @@ import org.springframework.stereotype.Component;
  * GitHub manifest. Enabled by default ({@code matchIfMissing = true}) since the
  * #1198 first cut wires the universal SPI surface (webhook verifier, secret source,
  * subject deriver/parser, credential provider, token refresher) under
- * {@code integration/github/}. Capabilities that still depend on the legacy
- * {@code gitprovider.*} services (feedback delivery, inline findings, approval,
- * backfill sync, git content, status reporting, scope-change emission) are NOT
- * declared yet — they re-add as the C13 migration moves each legacy service into
- * the adapter package and registers the matching SPI bean.
+ * {@code integration/github/}.
+ *
+ * <p>The feedback-delivery / inline-finding / approval capabilities are now backed by
+ * the channel beans under {@code integration/github/feedback/}
+ * ({@link de.tum.cit.aet.hephaestus.integration.github.feedback.GithubFeedbackChannel},
+ * {@link de.tum.cit.aet.hephaestus.integration.github.feedback.GithubInlineFindingChannel},
+ * {@link de.tum.cit.aet.hephaestus.integration.github.feedback.GithubApprovalChannel}).
+ * Capabilities still pending C13 migration ({@code GIT_CONTENT_ACCESS},
+ * {@code BACKFILL_SYNC}, {@code STATUS_REPORTING}) re-add as the corresponding SPI
+ * beans land.
  *
  * <p>Disable for tests / fixtures that intentionally exercise a degraded boot by
  * setting {@code hephaestus.integration.github.enabled=false}.
@@ -38,7 +43,10 @@ public class GitHubManifest implements IntegrationManifest {
     public Set<Capability> declaredCapabilities() {
         return Set.of(
             Capability.WEBHOOK_INGEST,
-            Capability.TOKEN_REFRESH
+            Capability.TOKEN_REFRESH,
+            Capability.FEEDBACK_DELIVERY,
+            Capability.INLINE_FINDINGS,
+            Capability.APPROVAL_WORKFLOW
         );
     }
 }
