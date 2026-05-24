@@ -551,7 +551,7 @@ public class GitLabWorkspaceInitializationService {
         var commitBackfillService = gitLabServices.getCommitBackfillService();
 
         // Map nameWithOwner → sync target id so each phase can stamp its per-repo watermark
-        // via the SPI. Mirrors GitLabDataSyncScheduler.syncRepositories — without this the
+        // via the SPI. Mirrors GitlabDataSyncScheduler.syncRepositories — without this the
         // initial sync left every watermark column NULL until the first cron run.
         Map<String, Long> syncTargetIdsByNameWithOwner = repositoryToMonitorRepository
             .findByWorkspaceId(workspace.getId())

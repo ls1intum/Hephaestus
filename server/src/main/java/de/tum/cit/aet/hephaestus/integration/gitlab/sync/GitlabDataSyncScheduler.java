@@ -57,7 +57,7 @@ import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
  * GitLab's 40-failure auto-disable) cause permanent data drift.
  *
  * <h2>Architecture</h2>
- * Mirrors {@link GitHubDataSyncScheduler} but uses GitLab-specific sync services.
+ * Mirrors {@link GithubDataSyncScheduler} but uses GitLab-specific sync services.
  * Uses SPI interfaces to remain decoupled from consuming modules:
  * <ul>
  *   <li>{@link SyncTargetProvider} - provides scope/repository info to sync</li>
@@ -68,14 +68,14 @@ import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
  * merge requests, and teams.
  *
  * <h2>Thread Safety</h2>
- * Same guarantees as {@link GitHubDataSyncScheduler}: single-threaded scheduling,
+ * Same guarantees as {@link GithubDataSyncScheduler}: single-threaded scheduling,
  * parallel workspace processing via virtual threads, per-workspace error isolation.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitLabDataSyncScheduler {
+public class GitlabDataSyncScheduler {
 
-    private static final Logger log = LoggerFactory.getLogger(GitLabDataSyncScheduler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitlabDataSyncScheduler.class);
 
     private final SyncTargetProvider syncTargetProvider;
     private final SyncContextProvider syncContextProvider;
@@ -86,7 +86,7 @@ public class GitLabDataSyncScheduler {
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final Executor monitoringExecutor;
 
-    public GitLabDataSyncScheduler(
+    public GitlabDataSyncScheduler(
         SyncTargetProvider syncTargetProvider,
         SyncContextProvider syncContextProvider,
         OrganizationRepository organizationRepository,

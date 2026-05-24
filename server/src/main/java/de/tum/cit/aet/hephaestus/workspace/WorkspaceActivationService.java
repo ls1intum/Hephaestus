@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.github.sync.GitHubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
@@ -44,7 +44,7 @@ public class WorkspaceActivationService {
     private final GitLabWorkspaceInitializationService gitLabInitService;
 
     // Lazy-loaded to break circular reference with sync services
-    private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
+    private final ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -56,7 +56,7 @@ public class WorkspaceActivationService {
         ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         GitLabWorkspaceInitializationService gitLabInitService,
-        ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
+        ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.natsProperties = natsProperties;
@@ -69,8 +69,8 @@ public class WorkspaceActivationService {
         this.monitoringExecutor = monitoringExecutor;
     }
 
-    /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
-    private GitHubDataSyncService getGitHubDataSyncService() {
+    /** Lazy accessor for GithubDataSyncService to break circular dependency. */
+    private GithubDataSyncService getGitHubDataSyncService() {
         return gitHubDataSyncServiceProvider.getObject();
     }
 

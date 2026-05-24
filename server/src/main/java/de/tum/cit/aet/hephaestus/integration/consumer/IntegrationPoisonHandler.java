@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * Centralises NAK-with-exponential-backoff and poison-message handling for the
  * integration-framework NATS consumers.
  *
- * <p>Carved out of the legacy {@code NatsConsumerService} during plan v4 D9 so the same
+ * <p>Carved out of the pre-unification monolithic consumer service in Slice D9 so the same
  * policy applies to every consumer — scope, installation, and (when migrated) the
  * unified-framework consumers — without duplication. The behaviour is intentionally a
  * verbatim port of the legacy logic:
@@ -38,7 +38,7 @@ import org.springframework.stereotype.Component;
  * <p>The backoff math is intentionally inlined (rather than reused from
  * {@code gitprovider.common.github.ExponentialBackoff}) to keep
  * {@code integration.consumer} from depending on {@code gitprovider} — that direction
- * would close a Modulith cycle with the legacy {@code NatsConsumerService}, which already
+ * would close a Modulith cycle with the pre-unification consumer service, which already
  * depends on this package.
  *
  * <p><b>Counter tagging.</b> Counters are tagged with {@code kind=<integration-kind>}

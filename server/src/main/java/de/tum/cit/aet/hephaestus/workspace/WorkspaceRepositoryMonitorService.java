@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.github.installation.GitHubInstallat
 import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectIntegrityService;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.github.sync.GitHubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -66,7 +66,7 @@ public class WorkspaceRepositoryMonitorService {
     private final GitRepositoryManager gitRepositoryManager;
 
     // Lazy-loaded dependencies (to break circular references)
-    private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
+    private final ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider;
 
     public WorkspaceRepositoryMonitorService(
         NatsConnectionProperties natsProperties,
@@ -80,7 +80,7 @@ public class WorkspaceRepositoryMonitorService {
         GitHubAppTokenService gitHubAppTokenService,
         ProjectIntegrityService projectIntegrityService,
         GitRepositoryManager gitRepositoryManager,
-        ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider
+        ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider
     ) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
@@ -96,8 +96,8 @@ public class WorkspaceRepositoryMonitorService {
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
     }
 
-    /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
-    private GitHubDataSyncService getGitHubDataSyncService() {
+    /** Lazy accessor for GithubDataSyncService to break circular dependency. */
+    private GithubDataSyncService getGitHubDataSyncService() {
         return gitHubDataSyncServiceProvider.getObject();
     }
 

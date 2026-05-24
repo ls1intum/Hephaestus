@@ -44,7 +44,7 @@ public class WorkspaceInstallationService {
     private final WorkspaceMembershipService workspaceMembershipService;
     /**
      * Absent when {@code hephaestus.runtime.server.enabled=false} (e.g., the webhook-server pod)
-     * because {@link NatsConsumerService} is gated by {@code SERVER_PROPERTY}. The webhook
+     * because {@link de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer IntegrationNatsConsumer} is gated by {@code SERVER_PROPERTY}. The webhook
      * profile never invokes the methods that consume this; it boots dead-code but doesn't crash.
      */
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;

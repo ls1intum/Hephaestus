@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 /**
  * One JetStream consumer per logical scope, with single-threaded dispatch.
  *
- * <p>Vendor-neutral successor to the pre-unification {@code gitprovider.sync.ScopeNatsConsumer}.
+ * <p>Vendor-neutral successor to the pre-unification per-scope consumer wrapper.
  * The shape is identical because the invariants are identical:
  *
  * <ul>

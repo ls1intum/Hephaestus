@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.integration.github.sync.GitHubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceInstallationService;
@@ -28,8 +28,8 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final WorkspaceRepository workspaceRepository;
 
-    // Lazy-loaded to break circular reference with GitHubDataSyncService
-    private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
+    // Lazy-loaded to break circular reference with GithubDataSyncService
+    private final ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider;
     private final AsyncTaskExecutor monitoringExecutor;
 
     public WorkspaceProvisioningAdapter(
@@ -37,7 +37,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         WorkspaceRepositoryMonitorService repositoryMonitorService,
         WorkspaceScopeFilter workspaceScopeFilter,
         WorkspaceRepository workspaceRepository,
-        ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
+        ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.workspaceInstallationService = workspaceInstallationService;
@@ -48,8 +48,8 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         this.monitoringExecutor = monitoringExecutor;
     }
 
-    /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
-    private GitHubDataSyncService getGitHubDataSyncService() {
+    /** Lazy accessor for GithubDataSyncService to break circular dependency. */
+    private GithubDataSyncService getGitHubDataSyncService() {
         return gitHubDataSyncServiceProvider.getObject();
     }
 

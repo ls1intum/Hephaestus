@@ -132,7 +132,7 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # Three property keys (see ADR 0005 baseline + ADR 0008 webhook role):
     #   server  — WIRED. Gates ServerSchedulingConfig (@EnableScheduling),
-    #     NatsConsumerService (sync NATS pull consumer), and WorkspaceStartupListener.
+    #     IntegrationNatsConsumer (the unified NATS pull consumer), and WorkspaceStartupListener.
     #     Setting false silences all @Scheduled methods and prevents workspace bootstrap.
     #   worker  — WIRED. Gates DockerSandboxConfiguration + AgentNatsConsumerConfig.
     #     Setting false removes the Docker sandbox runtime + agent NATS pull consumer.

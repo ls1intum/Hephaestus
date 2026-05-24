@@ -1645,7 +1645,7 @@ public class GitHubProjectSyncService {
      * Returns all projects ordered by last sync time (oldest first) that haven't
      * been synced within the cooldown period (from {@code SyncSchedulerProperties}).
      * <p>
-     * This mirrors the repository sync behavior in {@code GitHubDataSyncService.shouldSync()}.
+     * This mirrors the repository sync behavior in {@code GithubDataSyncService.shouldSync()}.
      *
      * @param organizationId the organization ID
      * @return list of projects needing item sync

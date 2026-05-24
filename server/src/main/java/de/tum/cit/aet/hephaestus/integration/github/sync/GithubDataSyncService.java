@@ -79,12 +79,12 @@ import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
  * </ul>
  *
  * @see SyncTargetProvider
- * @see GitHubDataSyncScheduler
+ * @see GithubDataSyncScheduler
  */
 @Service
-public class GitHubDataSyncService {
+public class GithubDataSyncService {
 
-    private static final Logger log = LoggerFactory.getLogger(GitHubDataSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GithubDataSyncService.class);
 
     private static final String GITHUB_SERVER_URL = "https://github.com";
 
@@ -119,7 +119,7 @@ public class GitHubDataSyncService {
 
     private final AsyncTaskExecutor monitoringExecutor;
 
-    public GitHubDataSyncService(
+    public GithubDataSyncService(
         SyncSchedulerProperties syncSchedulerProperties,
         GitProviderRepository gitProviderRepository,
         SyncTargetProvider syncTargetProvider,
@@ -1275,7 +1275,7 @@ public class GitHubDataSyncService {
      * clock skew or stale cached values), retries up to {@link #MAX_RATE_LIMIT_WAIT_CYCLES}
      * times before giving up.
      * <p>
-     * Package-visible so {@link GitHubDataSyncScheduler} can also use it.
+     * Package-visible so {@link GithubDataSyncScheduler} can also use it.
      *
      * @param scopeId the scope to wait for
      * @throws InterruptedException if the thread is interrupted while waiting

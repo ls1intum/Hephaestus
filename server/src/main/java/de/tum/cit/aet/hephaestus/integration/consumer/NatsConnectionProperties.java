@@ -15,9 +15,9 @@ import org.springframework.validation.annotation.Validated;
  *
  * <p>Owns the {@code hephaestus.sync.nats.*} property block that drives the JetStream
  * publisher (inbound webhook fan-out) AND the consumer fleet (per-scope + installation
- * subscriptions). The prefix is preserved verbatim from the pre-unification
- * {@code gitprovider.sync.NatsProperties} so production YAML continues to bind without
- * an operator-facing rename — see {@code application.yml}.
+ * subscriptions). The prefix is preserved verbatim from the pre-unification connection
+ * properties so production YAML continues to bind without an operator-facing rename —
+ * see {@code application.yml}.
  *
  * <p>The consumer-side tuning knobs (ack-wait, max-ack-pending, poison handling, …)
  * live separately on {@link NatsConsumerProperties} under

@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
  * Shared read/write holder for the live consumer fleet's status.
  *
  * <p>Introduced in plan v4 D9 as the seam between the soon-to-be-deleted
- * {@code NatsConsumerService} (the orchestrator that writes the state) and the new
+ * {@link IntegrationNatsConsumer} (the orchestrator that writes the state) and the new
  * {@link IntegrationConsumerHealthIndicator} (the actuator probe that reads it).
  *
  * <p><b>Design choice.</b> A concrete {@link Component} rather than an interface +
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
  *   <li>There is exactly ONE consumer fleet in this process (the C13 follow-up that adds
  *       a second is the moment to introduce a per-fleet abstraction). Premature interface
  *       extraction would just spread setup across two files.</li>
- *   <li>Keeping the writer surface separate from {@code NatsConsumerService} prevents the
+ *   <li>Keeping the writer surface separate from {@link IntegrationNatsConsumer} prevents the
  *       writer methods from inflating the orchestrator's business-method count past the
  *       "split this service" architecture rule.</li>
  *   <li>Updating fields through a held collaborator (rather than implementing an

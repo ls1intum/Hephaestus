@@ -49,7 +49,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * <p>More than 12 dependencies indicates a God class that needs splitting.
          *
          * <p><strong>Exceptions:</strong> Orchestrator services that coordinate many sub-services
-         * (e.g., GitHubDataSyncService) may legitimately have more dependencies.
+         * (e.g., GithubDataSyncService) may legitimately have more dependencies.
          * These should be explicitly named here with justification.
          */
         @Test
@@ -57,7 +57,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         void servicesHaveLimitedConstructorParams() {
             // Orchestrator services that coordinate many sub-services are allowed more dependencies
             Set<String> orchestratorExceptions = Set.of(
-                "GitHubDataSyncService", // Coordinates 15 entity-specific sync services
+                "GithubDataSyncService", // Coordinates 15 entity-specific sync services
                 "HistoricalBackfillService", // Coordinates multiple sync services for historical data backfill
                 "GitHubPullRequestSyncService", // Coordinates review, review comment, and project item sub-sync services
                 "WorkspaceProvisioningService", // Orchestrates provisioning across GitHub and GitLab providers
@@ -474,11 +474,11 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "WorkspaceActivationService",
                 "WorkspaceInstallationService", // IntegrationNatsConsumer absent under the webhook runtime role (server.enabled=false) — see ADR 0008
                 "WorkspaceLifecycleService", // IntegrationNatsConsumer absent under the webhook runtime role
-                "WorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GitHubDataSyncService
+                "WorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GithubDataSyncService
                 "WorkspaceRepositoryMonitorService",
                 "GitLabWorkspaceInitializationService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabWebhookService", // Optional GitLab beans gated by @ConditionalOnProperty
-                "GitLabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
+                "GitlabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabHistoricalBackfillService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "HistoricalBackfillScheduler", // Optional GitLab backfill service gated by @ConditionalOnProperty
                 "AccountService", // PosthogClient is optional, gated by @ConditionalOnProperty(hephaestus.posthog.enabled=true)

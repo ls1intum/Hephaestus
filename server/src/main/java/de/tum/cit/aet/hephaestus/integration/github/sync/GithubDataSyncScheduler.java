@@ -59,7 +59,7 @@ import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
  *
  * <h2>Lifecycle</h2>
  * <ol>
- *   <li>Spring creates this component at startup (after {@code NatsConsumerService}
+ *   <li>Spring creates this component at startup (after {@code IntegrationNatsConsumer}
  *       due to {@code @Order(2)})</li>
  *   <li>{@code @Scheduled} method runs at cron interval from {@code hephaestus.sync.cron}</li>
  *   <li>Each run processes all ACTIVE scopes, respecting monitoring filters</li>
@@ -72,18 +72,18 @@ import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
  *   <li>{@code hephaestus.sync.filters.allowed-repositories} - Limit to specific repos (dev filter)</li>
  * </ul>
  *
- * @see GitHubDataSyncService
+ * @see GithubDataSyncService
  * @see SyncTargetProvider
  */
 @Order(value = 2)
 @Component
-public class GitHubDataSyncScheduler {
+public class GithubDataSyncScheduler {
 
-    private static final Logger log = LoggerFactory.getLogger(GitHubDataSyncScheduler.class);
+    private static final Logger log = LoggerFactory.getLogger(GithubDataSyncScheduler.class);
 
     private final SyncTargetProvider syncTargetProvider;
     private final SyncContextProvider syncContextProvider;
-    private final GitHubDataSyncService dataSyncService;
+    private final GithubDataSyncService dataSyncService;
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final GitHubIssueDependencySyncService issueDependencySyncService;
@@ -95,10 +95,10 @@ public class GitHubDataSyncScheduler {
     private final RateLimitTracker rateLimitTracker;
     private final Executor monitoringExecutor;
 
-    public GitHubDataSyncScheduler(
+    public GithubDataSyncScheduler(
         SyncTargetProvider syncTargetProvider,
         SyncContextProvider syncContextProvider,
-        GitHubDataSyncService dataSyncService,
+        GithubDataSyncService dataSyncService,
         GitHubSubIssueSyncService subIssueSyncService,
         GitHubIssueTypeSyncService issueTypeSyncService,
         GitHubIssueDependencySyncService issueDependencySyncService,
@@ -319,7 +319,7 @@ public class GitHubDataSyncScheduler {
                 projectSyncService.relinkOrphanedProjectItems();
 
                 // Sync teams AFTER repositories exist (team repo permissions need repos).
-                // This mirrors the startup sync order in GitHubDataSyncService.
+                // This mirrors the startup sync order in GithubDataSyncService.
                 syncTeams(session);
 
                 // Sync sub-issues and issue dependencies via GraphQL

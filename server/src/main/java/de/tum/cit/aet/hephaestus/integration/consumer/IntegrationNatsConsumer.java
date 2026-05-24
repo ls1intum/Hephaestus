@@ -51,7 +51,7 @@ import org.springframework.stereotype.Service;
  *
  * <p>Sole consumer-side entry point for the integration framework: per-scope consumers,
  * the GitHub installation-wide consumer, lifecycle, reconnect, and the per-message
- * dispatch path. Replaces the pre-unification {@code gitprovider.sync.NatsConsumerService}
+ * dispatch path. Replaces the pre-unification monolithic consumer service
  * verbatim in behaviour; the collaborator decomposition is the structural improvement.
  *
  * <h2>Collaborators</h2>

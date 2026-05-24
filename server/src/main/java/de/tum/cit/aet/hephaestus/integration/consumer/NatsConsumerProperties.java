@@ -15,20 +15,14 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Typed configuration for the integration framework's NATS consumer surface.
  *
- * <p>This bean is the canonical home for the consumer-tuning knobs that today are split
- * between {@code de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties.Consumer} (the
- * monolithic {@code NatsConsumerService}) and inlined constants in
- * {@code NatsConsumerService} itself.
+ * <p>This bean is the canonical home for the consumer-tuning knobs (ack-wait,
+ * max-ack-pending, idle-heartbeat, poison policy) and is read by every consumer-side
+ * collaborator under {@code integration.consumer}.
  *
- * <p><b>Transition window (plan v4 D9 → C13).</b> The legacy {@code NatsProperties.Consumer}
- * record continues to drive the monolithic service while handlers migrate behind the
- * unified registry. The new collaborators extracted in D9 (currently:
- * {@link IntegrationPoisonHandler}) read from THIS bean. When C13 dissolves
- * {@code NatsConsumerService} the old record is deleted and every knob below becomes the
- * single source of truth. Until then, deployments that wish to override the consumer-wide
- * defaults must keep setting the {@code hephaestus.sync.nats.consumer.*} properties as
- * well — the duplication is intentional and documented to make the C13 cutover purely
- * config-side.
+ * <p><b>History.</b> Pre-Slice-D the consumer-tuning knobs were duplicated between an
+ * inner record on the monolithic consumer service and inlined constants. Slice D dissolved
+ * the monolith into {@link IntegrationNatsConsumer} + collaborators, and this record is
+ * now the single source of truth for the consumer-side tuning surface.
  *
  * <h2>Property prefix</h2>
  * {@code hephaestus.integration.consumer}. Auto-bound via {@code @ConfigurationPropertiesScan}

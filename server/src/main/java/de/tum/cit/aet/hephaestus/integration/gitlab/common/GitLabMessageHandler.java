@@ -86,7 +86,7 @@ public abstract class GitLabMessageHandler<T> implements MessageHandler {
             throw new PayloadParsingException("Payload parsing failed for subject: " + safeSubject, e);
         }
         // Note: Other exceptions are NOT logged here to avoid duplicate logging.
-        // NatsConsumerService.handleMessage() will catch and log the error.
+        // IntegrationNatsConsumer.handleMessage() will catch and log the error.
     }
 
     /**
