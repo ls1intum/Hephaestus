@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 
 /**
  * Scheduler for periodic GitHub data synchronization across all scopes.

@@ -472,8 +472,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         void objectProviderUsageIsLimited() {
             Set<String> knownCycleBreakers = Set.of(
                 "WorkspaceActivationService",
-                "WorkspaceInstallationService", // NatsConsumerService absent under the webhook runtime role (server.enabled=false) — see ADR 0008
-                "WorkspaceLifecycleService", // NatsConsumerService absent under the webhook runtime role
+                "WorkspaceInstallationService", // IntegrationNatsConsumer absent under the webhook runtime role (server.enabled=false) — see ADR 0008
+                "WorkspaceLifecycleService", // IntegrationNatsConsumer absent under the webhook runtime role
                 "WorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GitHubDataSyncService
                 "WorkspaceRepositoryMonitorService",
                 "GitLabWorkspaceInitializationService", // Optional GitLab beans gated by @ConditionalOnProperty

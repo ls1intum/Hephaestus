@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.sync;
+package de.tum.cit.aet.hephaestus.integration.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

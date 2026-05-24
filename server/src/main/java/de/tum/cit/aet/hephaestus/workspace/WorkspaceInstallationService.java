@@ -9,8 +9,8 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties;
+import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
@@ -32,7 +32,7 @@ public class WorkspaceInstallationService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceInstallationService.class);
 
-    private final NatsProperties natsProperties;
+    private final NatsConnectionProperties natsProperties;
 
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
@@ -47,12 +47,12 @@ public class WorkspaceInstallationService {
      * because {@link NatsConsumerService} is gated by {@code SERVER_PROPERTY}. The webhook
      * profile never invokes the methods that consume this; it boots dead-code but doesn't crash.
      */
-    private final ObjectProvider<NatsConsumerService> natsConsumerService;
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final GitHubAppTokenService gitHubAppTokenService;
     private final OrganizationService organizationService;
 
     public WorkspaceInstallationService(
-        NatsProperties natsProperties,
+        NatsConnectionProperties natsProperties,
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
@@ -60,7 +60,7 @@ public class WorkspaceInstallationService {
         GitProviderRepository gitProviderRepository,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceMembershipService workspaceMembershipService,
-        ObjectProvider<NatsConsumerService> natsConsumerService,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         GitHubAppTokenService gitHubAppTokenService,
         OrganizationService organizationService
     ) {

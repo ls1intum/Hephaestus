@@ -21,8 +21,8 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabGroupSync
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties;
+import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Collections;
@@ -61,10 +61,10 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     private RepositoryRepository repositoryRepository;
 
     @Mock
-    private NatsConsumerService natsConsumerService;
+    private IntegrationNatsConsumer natsConsumerService;
 
     @Mock
-    private ObjectProvider<NatsConsumerService> natsConsumerServiceProvider;
+    private ObjectProvider<IntegrationNatsConsumer> natsConsumerServiceProvider;
 
     @Mock
     private SyncTargetProvider syncTargetProvider;
@@ -95,12 +95,12 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        NatsProperties natsProperties = new NatsProperties(true, "nats://localhost:4222", null, 7, null);
+        NatsConnectionProperties natsProperties = new NatsConnectionProperties(true, "nats://localhost:4222", null, 7, null);
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(true, 7, "0 0 3 * * *", 15, null, null);
 
         lenient()
             .doAnswer(invocation -> {
-                Consumer<NatsConsumerService> consumer = invocation.getArgument(0);
+                Consumer<IntegrationNatsConsumer> consumer = invocation.getArgument(0);
                 consumer.accept(natsConsumerService);
                 return null;
             })
@@ -131,7 +131,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
     /** Creates a service instance with NATS disabled for testing skip behavior. */
     private GitLabWorkspaceInitializationService createServiceWithNatsDisabled() {
-        NatsProperties disabledNats = new NatsProperties(false, "nats://localhost:4222", null, 7, null);
+        NatsConnectionProperties disabledNats = new NatsConnectionProperties(false, "nats://localhost:4222", null, 7, null);
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(true, 7, "0 0 3 * * *", 15, null, null);
         return new GitLabWorkspaceInitializationService(
             workspaceRepository,

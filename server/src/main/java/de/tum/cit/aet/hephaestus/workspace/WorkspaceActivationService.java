@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.GitHubDataSyncService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties;
+import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
@@ -31,7 +31,7 @@ public class WorkspaceActivationService {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceActivationService.class);
 
     // Configuration
-    private final NatsProperties natsProperties;
+    private final NatsConnectionProperties natsProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     // Core repositories
@@ -39,7 +39,7 @@ public class WorkspaceActivationService {
 
     // Services — natsConsumerService absent under webhook profile (server.enabled=false);
     // activation paths that need it are themselves server-only.
-    private final ObjectProvider<NatsConsumerService> natsConsumerService;
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitLabWorkspaceInitializationService gitLabInitService;
 
@@ -50,10 +50,10 @@ public class WorkspaceActivationService {
     private final AsyncTaskExecutor monitoringExecutor;
 
     public WorkspaceActivationService(
-        NatsProperties natsProperties,
+        NatsConnectionProperties natsProperties,
         SyncSchedulerProperties syncSchedulerProperties,
         WorkspaceRepository workspaceRepository,
-        ObjectProvider<NatsConsumerService> natsConsumerService,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         GitLabWorkspaceInitializationService gitLabInitService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,

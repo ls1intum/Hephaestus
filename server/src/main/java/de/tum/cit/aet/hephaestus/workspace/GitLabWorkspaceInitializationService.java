@@ -9,8 +9,8 @@ import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties;
+import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -72,11 +72,11 @@ public class GitLabWorkspaceInitializationService {
     private final RepositoryRepository repositoryRepository;
 
     // Configuration
-    private final NatsProperties natsProperties;
+    private final NatsConnectionProperties natsProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     // Services — natsConsumerService absent under webhook profile.
-    private final ObjectProvider<NatsConsumerService> natsConsumerService;
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final SyncTargetProvider syncTargetProvider;
 
     // Lazy-loaded: optional GitLab beans gated by @ConditionalOnProperty
@@ -92,9 +92,9 @@ public class GitLabWorkspaceInitializationService {
         OrganizationRepository organizationRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
-        NatsProperties natsProperties,
+        NatsConnectionProperties natsProperties,
         SyncSchedulerProperties syncSchedulerProperties,
-        ObjectProvider<NatsConsumerService> natsConsumerService,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         SyncTargetProvider syncTargetProvider,
         ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
         ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider,

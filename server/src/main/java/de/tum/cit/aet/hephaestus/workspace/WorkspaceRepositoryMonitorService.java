@@ -14,8 +14,8 @@ import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectIntegrityService;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.GitHubDataSyncService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties;
+import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
@@ -49,7 +49,7 @@ public class WorkspaceRepositoryMonitorService {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceRepositoryMonitorService.class);
 
     // Configuration
-    private final NatsProperties natsProperties;
+    private final NatsConnectionProperties natsProperties;
 
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
@@ -58,7 +58,7 @@ public class WorkspaceRepositoryMonitorService {
     private final GitProviderRepository gitProviderRepository;
 
     // Services — natsConsumerService absent under webhook profile.
-    private final ObjectProvider<NatsConsumerService> natsConsumerService;
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitHubAppTokenService gitHubAppTokenService;
@@ -69,12 +69,12 @@ public class WorkspaceRepositoryMonitorService {
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
 
     public WorkspaceRepositoryMonitorService(
-        NatsProperties natsProperties,
+        NatsConnectionProperties natsProperties,
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
         GitProviderRepository gitProviderRepository,
-        ObjectProvider<NatsConsumerService> natsConsumerService,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
         WorkspaceScopeFilter workspaceScopeFilter,
         GitHubAppTokenService gitHubAppTokenService,

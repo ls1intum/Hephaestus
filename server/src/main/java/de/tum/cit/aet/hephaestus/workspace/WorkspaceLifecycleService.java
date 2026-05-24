@@ -4,8 +4,8 @@ import static de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties;
+import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamLabelFilterRepository;
@@ -29,10 +29,10 @@ public class WorkspaceLifecycleService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceLifecycleService.class);
 
-    private final NatsProperties natsProperties;
+    private final NatsConnectionProperties natsProperties;
     private final WorkspaceRepository workspaceRepository;
     /** Absent under webhook profile (server.enabled=false). */
-    private final ObjectProvider<NatsConsumerService> natsConsumerService;
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
 
     // Repositories for workspace-scoped data cleanup
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
@@ -46,9 +46,9 @@ public class WorkspaceLifecycleService {
     private final List<WorkspacePurgeContributor> purgeContributors;
 
     public WorkspaceLifecycleService(
-        NatsProperties natsProperties,
+        NatsConnectionProperties natsProperties,
         WorkspaceRepository workspaceRepository,
-        ObjectProvider<NatsConsumerService> natsConsumerService,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceTeamSettingsRepository workspaceTeamSettingsRepository,

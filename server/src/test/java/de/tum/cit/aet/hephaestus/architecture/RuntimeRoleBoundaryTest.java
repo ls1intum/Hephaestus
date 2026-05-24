@@ -51,7 +51,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         RuntimeRole.WEBHOOK_PROPERTY,
         "de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig",
         RuntimeRole.SERVER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService",
+        "de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer",
         RuntimeRole.SERVER_PROPERTY,
         "de.tum.cit.aet.hephaestus.workspace.WorkspaceStartupListener",
         RuntimeRole.SERVER_PROPERTY,

@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.sync;
+package de.tum.cit.aet.hephaestus.integration.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,7 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * For every committed fixture, asserts the publisher-side subject built by
  * {@link GitLabSubjectBuilder}/{@link GitHubSubjectBuilder} starts with the consumer-side prefix
- * that {@link NatsConsumerService#buildSubjectPrefix(String, String)} subscribes to. Catches the
+ * that {@link ConsumerSubjectMath#buildSubjectPrefix(String, String)} subscribes to. Catches the
  * producer-consumer drift class that per-side unit tests cannot see in isolation.
  *
  * <p>Where namespace/project can't be reliably extracted (instance-level fallback to {@code ?}),
@@ -57,7 +57,7 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
             pathWithNamespace = payload.path("path_with_namespace").asText("");
         }
         if (pathWithNamespace.contains("/")) {
-            String consumerPrefix = NatsConsumerService.buildSubjectPrefix("gitlab", pathWithNamespace);
+            String consumerPrefix = ConsumerSubjectMath.buildSubjectPrefix("gitlab", pathWithNamespace);
             assertThat(publisherSubject)
                 .as("publisher %s should start with consumer prefix '%s.'", fixture.getFileName(), consumerPrefix)
                 .startsWith(consumerPrefix + ".");
@@ -78,7 +78,7 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
             return;
         }
         String publisherSubject = GitHubSubjectBuilder.build(payload, eventTypeFromFilename(fixture));
-        String consumerPrefix = NatsConsumerService.buildSubjectPrefix("github", owner + "/" + repo);
+        String consumerPrefix = ConsumerSubjectMath.buildSubjectPrefix("github", owner + "/" + repo);
         assertThat(publisherSubject)
             .as("publisher %s should start with consumer prefix '%s.'", fixture.getFileName(), consumerPrefix)
             .startsWith(consumerPrefix + ".");
