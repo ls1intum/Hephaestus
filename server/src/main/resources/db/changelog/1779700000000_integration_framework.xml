@@ -1,0 +1,341 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        #1198 Unified Integration Framework — schema foundations.
+
+        Creates the central Connection aggregate + audit + idempotency, the per-
+        subscription webhook secret sidecar (generalised from outline-only), the
+        GitHub-App pre-workspace bootstrap table, the cross-vendor FeedbackPost
+        edit-in-place tracking, sync_state replacing scattered cursor columns,
+        and the identity split tables (hephaestus_user, integration_identity).
+
+        Backfill of existing Workspace columns and DROP of legacy columns ships in
+        a follow-up changeset once the migrator customChange + cutover runbook are
+        wired (out of #1198's first cut). Each table is preconditioned for idempotent
+        re-apply across worktrees.
+    -->
+
+    <changeSet author="hephaestus-1198" id="1779700000000-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="connection table already present">
+            <not><tableExists tableName="connection"/></not>
+        </preConditions>
+        <comment>Connection aggregate — multi-instance natural key (workspace_id, kind, instance_key).</comment>
+        <createTable tableName="connection">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_connection" nullable="false"/>
+            </column>
+            <column name="workspace_id" type="bigint">
+                <constraints nullable="false" referencedTableName="workspace" referencedColumnNames="id"
+                             foreignKeyName="fk_connection_workspace"/>
+            </column>
+            <column name="kind" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="instance_key" type="varchar(128)"/>
+            <column name="display_name" type="varchar(256)"/>
+            <column name="state" type="varchar(32)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="state_reason" type="varchar(512)"/>
+            <column name="config" type="jsonb" defaultValueComputed="'{}'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="credentials_encrypted" type="bytea"/>
+            <column name="credentials_alg" type="varchar(64)"/>
+            <column name="replaces_connection_id" type="bigint"/>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_activity_at" type="timestamp with time zone"/>
+            <column name="version" type="bigint" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="connection"
+                             columnNames="workspace_id, kind, instance_key"
+                             constraintName="uq_connection"/>
+        <sql>
+            ALTER TABLE connection ADD CONSTRAINT ck_connection_kind
+                CHECK (kind IN ('GITHUB','GITLAB','SLACK','OUTLINE'));
+            ALTER TABLE connection ADD CONSTRAINT ck_connection_state
+                CHECK (state IN ('PENDING','ACTIVE','SUSPENDED','UNINSTALLED'));
+        </sql>
+        <createIndex tableName="connection" indexName="ix_connection_active">
+            <column name="workspace_id"/>
+            <column name="kind"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="connection"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700000000-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="connection_audit already present">
+            <not><tableExists tableName="connection_audit"/></not>
+        </preConditions>
+        <comment>Connection audit — append-only with correlation-id idempotency on webhook replay.</comment>
+        <createTable tableName="connection_audit">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_connection_audit" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false" referencedTableName="connection" referencedColumnNames="id"
+                             foreignKeyName="fk_connection_audit_connection"/>
+            </column>
+            <column name="event_type" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="from_state" type="varchar(32)"/>
+            <column name="to_state" type="varchar(32)"/>
+            <column name="actor_kind" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="actor_ref" type="varchar(256)"/>
+            <column name="correlation_id" type="varchar(64)"/>
+            <column name="detail" type="jsonb"/>
+            <column name="occurred_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="connection_audit"
+                             columnNames="connection_id, event_type, correlation_id"
+                             constraintName="uq_connection_audit_idempotency"/>
+        <createIndex tableName="connection_audit" indexName="ix_connection_audit_lookup">
+            <column name="connection_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="connection_audit"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700000000-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="github_installation_unbound already present">
+            <not><tableExists tableName="github_installation_unbound"/></not>
+        </preConditions>
+        <comment>GitHub App pre-workspace bootstrap — installations observed before any workspace claims them.</comment>
+        <createTable tableName="github_installation_unbound">
+            <column name="installation_id" type="bigint">
+                <constraints primaryKey="true" primaryKeyName="pk_github_installation_unbound" nullable="false"/>
+            </column>
+            <column name="account_id" type="bigint"/>
+            <column name="account_login" type="varchar(256)"/>
+            <column name="account_type" type="varchar(32)"/>
+            <column name="avatar_url" type="varchar(512)"/>
+            <column name="repositories" type="jsonb" defaultValueComputed="'[]'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="observed_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="timestamp with time zone" defaultValueComputed="NOW() + INTERVAL '30 days'">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="github_installation_unbound" indexName="ix_github_installation_unbound_expires">
+            <column name="expires_at"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="github_installation_unbound"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700000000-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="integration_webhook_subscription already present">
+            <not><tableExists tableName="integration_webhook_subscription"/></not>
+        </preConditions>
+        <comment>Per-subscription signing-secret sidecar (Outline, Notion, MS Graph, Asana, Linear).</comment>
+        <createTable tableName="integration_webhook_subscription">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_integration_webhook_subscription" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false" referencedTableName="connection" referencedColumnNames="id"
+                             foreignKeyName="fk_iws_connection"/>
+            </column>
+            <column name="subscription_id" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="signing_secret_encrypted" type="bytea">
+                <constraints nullable="false"/>
+            </column>
+            <column name="credentials_alg" type="varchar(64)" defaultValue="aesgcm-v1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="events_subscribed" type="jsonb" defaultValueComputed="'[]'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_delivery_at" type="timestamp with time zone"/>
+        </createTable>
+        <addUniqueConstraint tableName="integration_webhook_subscription"
+                             columnNames="connection_id, subscription_id"
+                             constraintName="uq_integration_webhook_subscription"/>
+        <rollback>
+            <dropTable tableName="integration_webhook_subscription"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700000000-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_post already present">
+            <not><tableExists tableName="feedback_post"/></not>
+        </preConditions>
+        <comment>Cross-vendor edit-in-place tracking — Slack chat.update, Outline comments.update, GitHub PR comments.</comment>
+        <createTable tableName="feedback_post">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_feedback_post" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false" referencedTableName="connection" referencedColumnNames="id"
+                             foreignKeyName="fk_feedback_post_connection"/>
+            </column>
+            <column name="subject_external_id" type="varchar(256)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subject_class" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="post_kind" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="external_post_id" type="varchar(256)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="vendor_metadata" type="jsonb" defaultValueComputed="'{}'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="feedback_post"
+                             columnNames="connection_id, subject_external_id, post_kind, external_post_id"
+                             constraintName="uq_feedback_post"/>
+        <createIndex tableName="feedback_post" indexName="ix_feedback_post_lookup">
+            <column name="connection_id"/>
+            <column name="subject_external_id"/>
+            <column name="post_kind"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="feedback_post"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700000000-6">
+        <preConditions onFail="MARK_RAN" onFailMessage="sync_state already present">
+            <not><tableExists tableName="sync_state"/></not>
+        </preConditions>
+        <comment>Universal sync cursor — replaces ~30 BackfillStateProvider methods and ~7 per-entity cursor columns.</comment>
+        <createTable tableName="sync_state">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_sync_state" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false" referencedTableName="connection" referencedColumnNames="id"
+                             foreignKeyName="fk_sync_state_connection"/>
+            </column>
+            <column name="stream_name" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cursor" type="jsonb" defaultValueComputed="'{}'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_synced_at" type="timestamp with time zone"/>
+            <column name="last_realtime_at" type="timestamp with time zone"/>
+            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="sync_state"
+                             columnNames="connection_id, stream_name"
+                             constraintName="uq_sync_state"/>
+        <rollback>
+            <dropTable tableName="sync_state"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700000000-7">
+        <preConditions onFail="MARK_RAN" onFailMessage="hephaestus_user already present">
+            <not><tableExists tableName="hephaestus_user"/></not>
+        </preConditions>
+        <comment>Cross-integration identity Layer 2 — created on first Keycloak login. Aggregates a real person's vendor identities.</comment>
+        <createTable tableName="hephaestus_user">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_hephaestus_user" nullable="false"/>
+            </column>
+            <column name="keycloak_subject" type="varchar(128)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_hephaestus_user_kc_subject"/>
+            </column>
+            <column name="email" type="varchar(320)"/>
+            <column name="display_name" type="varchar(256)"/>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <rollback>
+            <dropTable tableName="hephaestus_user"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700000000-8">
+        <preConditions onFail="MARK_RAN" onFailMessage="integration_identity already present">
+            <not><tableExists tableName="integration_identity"/></not>
+        </preConditions>
+        <comment>
+            Cross-integration identity Layer 3 — per-(integration-instance, kind, external_id).
+            For GITHUB/GITLAB the integration_instance is the shared git_provider id (cross-workspace identities);
+            for SLACK/OUTLINE it's the connection_id (per-workspace identity universes).
+        </comment>
+        <createTable tableName="integration_identity">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_integration_identity" nullable="false"/>
+            </column>
+            <column name="hephaestus_user_id" type="bigint">
+                <constraints referencedTableName="hephaestus_user" referencedColumnNames="id"
+                             foreignKeyName="fk_integration_identity_user"/>
+            </column>
+            <column name="kind" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="integration_instance_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="external_id" type="varchar(256)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="external_login" type="varchar(256)"/>
+            <column name="external_email" type="varchar(320)"/>
+            <column name="display_name" type="varchar(256)"/>
+            <column name="raw_attributes" type="jsonb" defaultValueComputed="'{}'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="first_seen_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="linked_at" type="timestamp with time zone"/>
+        </createTable>
+        <addUniqueConstraint tableName="integration_identity"
+                             columnNames="kind, integration_instance_id, external_id"
+                             constraintName="uq_integration_identity"/>
+        <createIndex tableName="integration_identity" indexName="ix_integration_identity_user">
+            <column name="hephaestus_user_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="integration_identity"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
