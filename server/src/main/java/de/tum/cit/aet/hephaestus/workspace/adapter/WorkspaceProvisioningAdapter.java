@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.GitHubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.github.sync.GitHubDataSyncService;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceInstallationService;

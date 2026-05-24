@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.sync;
+package de.tum.cit.aet.hephaestus.integration.github.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 

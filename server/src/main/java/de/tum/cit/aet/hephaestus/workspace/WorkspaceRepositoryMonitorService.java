@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.github.installation.GitHubInstallat
 import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectIntegrityService;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.GitHubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.github.sync.GitHubDataSyncService;
 import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
