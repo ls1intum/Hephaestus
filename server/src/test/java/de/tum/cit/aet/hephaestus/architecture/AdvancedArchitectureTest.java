@@ -277,14 +277,33 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
+                    // Sub-SPI interfaces (e.g. family-typed extensions like ScmFeedbackChannel,
+                    // sealed permits like FindingAnchor.DocumentAnchor) are contracts, not adapters.
+                    if (javaClass.isInterface()) {
+                        return;
+                    }
+
+                    // #1198 unified integration framework: any class living under
+                    // integration.<kind>.* (where <kind> in {github,gitlab,slack,outline,…}) is
+                    // BY DEFINITION a per-vendor adapter — the sub-packages (webhook,
+                    // credentials, connect, lifecycle, installation, manifest, refs, sync,
+                    // feedback, context) are the adapter pattern at the framework level.
+                    boolean inIntegrationVendorPackage = javaClass.getPackageName()
+                        .matches("^de\\.tum\\.cit\\.aet\\.hephaestus\\.integration\\.[a-z]+\\..*");
+
                     boolean inAdapterPackage =
+                        inIntegrationVendorPackage ||
                         javaClass.getPackageName().contains(".adapter") ||
                         javaClass.getPackageName().contains(".impl") ||
                         javaClass.getPackageName().contains(".handler") || // Job type handlers implement handler SPI
                         javaClass.getPackageName().contains(".notification") || // Notification module implements activity SPIs
+                        javaClass.getPackageName().contains(".manifest") || // #1198 IntegrationManifest impls + bootstrap utilities
+                        javaClass.getPackageName().contains(".registry") || // #1198 ConnectionPurgeContributor lives with the entity
                         javaClass.getSimpleName().endsWith("Adapter") ||
                         javaClass.getSimpleName().endsWith("Provider") ||
-                        javaClass.getSimpleName().endsWith("Tracker"); // Rate limit trackers implement RateLimitTracker SPI
+                        javaClass.getSimpleName().endsWith("Tracker") || // Rate limit trackers implement RateLimitTracker SPI
+                        javaClass.getSimpleName().endsWith("Manifest") || // Per-kind IntegrationManifest impls
+                        javaClass.getSimpleName().endsWith("Contributor"); // SPI suffix used by WorkspacePurgeContributor + similar
 
                     if (!inAdapterPackage) {
                         events.add(

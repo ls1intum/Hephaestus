@@ -911,6 +911,13 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
+                    // Skip webhook ingress controllers — they receive unauthenticated vendor
+                    // deliveries. Workspace context is derived from the verified payload AFTER
+                    // the WebhookSignatureVerifier path, never from the inbound HTTP request.
+                    if (controllerName.equals("WebhookController") || controllerName.endsWith("WebhookController")) {
+                        return;
+                    }
+
                     // Skip explicitly global endpoints that aggregate across all workspaces
                     if (methodName.equals("listGlobalContributors")) {
                         return;
