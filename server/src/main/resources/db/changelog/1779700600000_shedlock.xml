@@ -1,0 +1,40 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        #1198 ShedLock distributed lock table.
+
+        Backs @SchedulerLock annotations on @Scheduled methods so multi-pod deployments
+        don't double-process. Schema is dictated by JdbcTemplateLockProvider — column
+        names + types must match exactly, do NOT customise.
+    -->
+
+    <changeSet author="hephaestus-1198" id="1779700600000-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="shedlock table already present">
+            <not><tableExists tableName="shedlock"/></not>
+        </preConditions>
+        <comment>ShedLock lock-coordination table (one row per named lock).</comment>
+        <createTable tableName="shedlock">
+            <column name="name" type="varchar(64)">
+                <constraints primaryKey="true" primaryKeyName="pk_shedlock" nullable="false"/>
+            </column>
+            <column name="lock_until" type="timestamp without time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="locked_at" type="timestamp without time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="locked_by" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <rollback>
+            <dropTable tableName="shedlock"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

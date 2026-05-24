@@ -81,4 +81,5 @@
     <include file="./changelog/1779700300000_workspace_connection_backfill.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700400000_slack_persistence.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700500000_outline_persistence.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1779700600000_shedlock.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
