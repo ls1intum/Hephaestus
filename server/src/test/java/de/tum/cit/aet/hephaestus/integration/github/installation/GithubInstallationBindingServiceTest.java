@@ -32,10 +32,9 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 /**
- * Unit-level guard rails for the binding service. The companion
- * {@code GithubInstallationBindingServiceIntegrationTest} is currently disabled by a
- * pre-existing scaffolding bug (see its Javadoc); these tests cover the same contracts
- * without booting Spring so the behavior stays asserted in CI.
+ * Unit-level guard rails for the binding service: happy path, cross-workspace collision,
+ * 404 paths. No Spring context — pure Mockito so the suite stays fast and isolated from
+ * upstream scaffolding refactors.
  */
 @DisplayName("GithubInstallationBindingService — unit")
 class GithubInstallationBindingServiceTest extends BaseUnitTest {

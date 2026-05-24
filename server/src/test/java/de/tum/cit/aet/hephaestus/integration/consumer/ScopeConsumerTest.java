@@ -19,7 +19,6 @@ import io.nats.client.StreamContext;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.ConsumerInfo;
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -353,7 +352,4 @@ class ScopeConsumerTest {
         when(msg.getSubject()).thenReturn(subject);
         return msg;
     }
-
-    @SuppressWarnings("unused")
-    private static final List<String> KEEP_IMPORTS = List.of("placeholder"); // keep import org.junit usable on aggressive trimmers
 }
