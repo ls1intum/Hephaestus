@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService.TransitionRequest;
+import de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
@@ -49,17 +50,20 @@ public class ConnectionAdminService {
     private final ConnectionService connectionService;
     private final WorkspaceRepository workspaceRepository;
     private final IntegrationManifestRegistry manifests;
+    private final CredentialBundleConverter credentialConverter;
 
     public ConnectionAdminService(ConnectionRepository connectionRepository,
                                   ConnectionAuditRepository auditRepository,
                                   ConnectionService connectionService,
                                   WorkspaceRepository workspaceRepository,
-                                  IntegrationManifestRegistry manifests) {
+                                  IntegrationManifestRegistry manifests,
+                                  CredentialBundleConverter credentialConverter) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.connectionService = connectionService;
         this.workspaceRepository = workspaceRepository;
         this.manifests = manifests;
+        this.credentialConverter = credentialConverter;
     }
 
     @Transactional(readOnly = true)
@@ -98,9 +102,9 @@ public class ConnectionAdminService {
 
     /**
      * Persist a Connection from an inline-credential flow and transition it ACTIVE.
-     * {@code credentials} are recorded via a placeholder marker today — replaced by
-     * the AES-GCM converter in the credentials slice (see {@code GitlabCredentialProvider}
-     * TODO chain).
+     * Credentials are AES-GCM encrypted via {@link CredentialBundleConverter} before the
+     * row reaches an ACTIVE state — the {@code credentials_encrypted} / {@code credentials_alg}
+     * pair stays in lockstep through {@link Connection#setCredentials}.
      */
     @Transactional
     public Connection createInlineConnection(long workspaceId,
@@ -116,7 +120,7 @@ public class ConnectionAdminService {
         Connection connection = new Connection(workspace, kind, instanceKey, config);
         connection = connectionRepository.save(connection);
 
-        persistCredentialsPlaceholder(connection, credentials);
+        persistCredentials(connection, credentials);
 
         String correlationId = "initiate-" + connection.getId() + "-" + UUID.randomUUID();
         connection = connectionService.transition(connection, new TransitionRequest(
@@ -133,19 +137,17 @@ public class ConnectionAdminService {
     }
 
     /**
-     * Stash the credential bundle alongside the Connection. The real flow encrypts via
-     * AES-GCM — see TODO in {@link de.tum.cit.aet.hephaestus.integration.gitlab.credentials.GitlabCredentialProvider}.
-     * The placeholder byte sequence is non-secret and bounded length; downstream
-     * credential providers detect it and return empty rather than crashing.
+     * Encrypt + persist the credential bundle alongside the Connection. Null bundle is a
+     * no-op (some inline flows may persist credentials in a follow-up step). The actual
+     * encryption + algorithm-tag bookkeeping lives in {@link Connection#setCredentials}
+     * so this method stays a thin wrapper around dependency wiring.
      */
-    private void persistCredentialsPlaceholder(Connection connection, CredentialBundle bundle) {
+    private void persistCredentials(Connection connection, @Nullable CredentialBundle bundle) {
         if (bundle == null) {
             return;
         }
-        connection.setCredentialsEncrypted(new byte[] { 0x00 });
-        connection.setCredentialsAlg("PLACEHOLDER-AES-GCM");
-        log.warn("Persisting credential PLACEHOLDER for connection={} kind={} (bundle type={}). "
-                + "Replace with AES-GCM ciphertext once the credential converter ships.",
+        connection.setCredentials(bundle, credentialConverter);
+        log.debug("Encrypted credentials for connection={} kind={} (bundle type={})",
             connection.getId(), connection.getKind(), bundle.getClass().getSimpleName());
     }
 

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.credentials;
 
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
@@ -13,15 +14,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Stub {@link ApiCredentialProvider} for Slack.
+ * {@link ApiCredentialProvider} for Slack.
  *
- * <p>Looks up the active Connection (no Connection / non-ACTIVE state → empty).
- * Returns {@link Optional#empty()} unconditionally with a TODO log line: the
- * encrypted bot-token reader lands in the credential-converter follow-up
- * (#1198 next slice). Callers MUST already treat empty as "no auth available".
- *
- * <p>Once the converter exists, this stub becomes a one-liner that hands the
- * decrypted {@code xoxb-…} string back as {@link BearerToken}.
+ * <p>Looks up the active Connection (no Connection / non-ACTIVE state / missing blob
+ * → empty) and decrypts the {@code xoxb-…} bot token via {@link CredentialBundleConverter},
+ * returning a {@link BearerToken} bundle. Callers MUST already treat empty as
+ * "no auth available".
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
@@ -30,9 +28,12 @@ public class SlackCredentialProvider implements ApiCredentialProvider {
     private static final Logger log = LoggerFactory.getLogger(SlackCredentialProvider.class);
 
     private final ConnectionService connectionService;
+    private final CredentialBundleConverter credentialConverter;
 
-    public SlackCredentialProvider(ConnectionService connectionService) {
+    public SlackCredentialProvider(ConnectionService connectionService,
+                                   CredentialBundleConverter credentialConverter) {
         this.connectionService = connectionService;
+        this.credentialConverter = credentialConverter;
     }
 
     @Override
@@ -47,13 +48,14 @@ public class SlackCredentialProvider implements ApiCredentialProvider {
             log.debug("Slack credential resolve: no ACTIVE Connection for workspace={}", ref.workspaceId());
             return Optional.empty();
         }
-        if (connection.get().getState() != IntegrationState.ACTIVE) {
+        Connection conn = connection.get();
+        if (conn.getState() != IntegrationState.ACTIVE) {
             return Optional.empty();
         }
-        // TODO(#1198 next slice): hand back BearerToken once the credential-converter
-        // bean decrypts Connection.credentialsEncrypted into the bot token string.
-        log.debug("Slack credential resolve: Connection {} present but credential converter not yet wired",
-            connection.get().getId());
-        return Optional.empty();
+        if (conn.getCredentialsEncrypted() == null) {
+            log.warn("Slack Connection {} has no credentials blob — cannot resolve bot token", conn.getId());
+            return Optional.empty();
+        }
+        return conn.credentials(credentialConverter);
     }
 }

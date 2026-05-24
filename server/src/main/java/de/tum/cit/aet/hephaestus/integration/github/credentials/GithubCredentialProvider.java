@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.github.credentials;
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
@@ -18,12 +19,13 @@ import org.springframework.stereotype.Component;
  * {@link ConnectionConfig} sub-type to a {@link ApiCredentialProvider.CredentialBundle}:
  * {@code GitHubAppConfig} → {@link GithubAppCredential} (installation identity only;
  * actual installation token is minted by {@link GithubTokenRefresher}),
- * {@code GitHubPatConfig} → {@link BearerToken} (NOT YET WIRED — see TODO below).
+ * {@code GitHubPatConfig} → {@link BearerToken} (decrypted from the per-row credential
+ * blob via {@link CredentialBundleConverter}).
  *
  * <p>Returns {@link Optional#empty()} when no Connection exists, the Connection is not
- * ACTIVE, or the persisted config is not a GitHub variant. Callers treat empty as
- * "no auth available" and either prompt for reconnect or suspend retry — they MUST NOT
- * fall through to anonymous API access.
+ * ACTIVE, the persisted config is not a GitHub variant, or the PAT row has no credential
+ * blob yet. Callers treat empty as "no auth available" and either prompt for reconnect
+ * or suspend retry — they MUST NOT fall through to anonymous API access.
  */
 @Component
 public class GithubCredentialProvider implements ApiCredentialProvider {
@@ -34,9 +36,12 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
     private static final String UNKNOWN_APP_ID = "unknown";
 
     private final ConnectionService connectionService;
+    private final CredentialBundleConverter credentialConverter;
 
-    public GithubCredentialProvider(ConnectionService connectionService) {
+    public GithubCredentialProvider(ConnectionService connectionService,
+                                    CredentialBundleConverter credentialConverter) {
         this.connectionService = connectionService;
+        this.credentialConverter = credentialConverter;
     }
 
     @Override
@@ -70,14 +75,14 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
                 yield Optional.of(new GithubAppCredential(installationId, appIdString()));
             }
             case ConnectionConfig.GitHubPatConfig ignored -> {
-                // TODO(#1198 follow-up): once a per-row credentials_encrypted converter ships,
-                // decode the bearer here and return Optional.of(new BearerToken(token, null)).
-                // Until then PAT-backed Connections cannot mint a usable token through this SPI.
-                log.warn(
-                    "GitHub PAT Connection {} resolution skipped — credentials_encrypted decoder not yet wired",
-                    connection.getId()
-                );
-                yield Optional.empty();
+                if (connection.getCredentialsEncrypted() == null) {
+                    log.warn(
+                        "GitHub PAT Connection {} has no credentials blob — cannot resolve token",
+                        connection.getId()
+                    );
+                    yield Optional.empty();
+                }
+                yield connection.credentials(credentialConverter);
             }
             default -> Optional.empty();
         };

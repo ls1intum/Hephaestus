@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.spi;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.lang.Nullable;
@@ -22,7 +24,21 @@ public interface ApiCredentialProvider {
 
     Optional<CredentialBundle> resolve(IntegrationRef ref);
 
-    /** Pure data — no closures, no Suppliers. JPA-persistable. */
+    /**
+     * Pure data — no closures, no Suppliers. JPA-persistable.
+     *
+     * <p>Polymorphism is explicit on the type so the credential converter can round-trip
+     * the sealed type through Jackson (sealed-interface auto-detection is not yet a
+     * Jackson default). New variants MUST add both a {@code permits} entry and a
+     * {@link JsonSubTypes.Type} entry — drift between the two is caught at serialization
+     * time, not at compile time, so keep them in sync.
+     */
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
+    @JsonSubTypes({
+        @JsonSubTypes.Type(value = BearerToken.class, name = "BEARER"),
+        @JsonSubTypes.Type(value = GithubAppCredential.class, name = "GITHUB_APP"),
+        @JsonSubTypes.Type(value = OAuthSession.class, name = "OAUTH_SESSION")
+    })
     sealed interface CredentialBundle permits BearerToken, GithubAppCredential, OAuthSession {
     }
 

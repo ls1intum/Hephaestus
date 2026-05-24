@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.credentials;
 
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
@@ -13,12 +14,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Stub {@link ApiCredentialProvider} for Outline.
+ * {@link ApiCredentialProvider} for Outline.
  *
- * <p>Same pattern as the Slack stub — looks up the active Connection but returns
- * {@link Optional#empty()} with a TODO log line until the credential converter
- * lands. Outline credentials will be an {@link OAuthSession} (Outline returns
- * access + refresh tokens), unlike Slack's plain bot token.
+ * <p>Same shape as the Slack provider — looks up the active Connection and decrypts
+ * the credential blob via {@link CredentialBundleConverter}. Outline credentials are
+ * stored as whichever variant the initiation flow produced: {@link OAuthSession}
+ * (Outline OAuth — access + refresh tokens) or {@link BearerToken} (API token pasted
+ * directly). The converter round-trips the {@code @JsonTypeInfo} discriminator so
+ * either shape comes back faithfully.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
@@ -27,9 +30,12 @@ public class OutlineCredentialProvider implements ApiCredentialProvider {
     private static final Logger log = LoggerFactory.getLogger(OutlineCredentialProvider.class);
 
     private final ConnectionService connectionService;
+    private final CredentialBundleConverter credentialConverter;
 
-    public OutlineCredentialProvider(ConnectionService connectionService) {
+    public OutlineCredentialProvider(ConnectionService connectionService,
+                                     CredentialBundleConverter credentialConverter) {
         this.connectionService = connectionService;
+        this.credentialConverter = credentialConverter;
     }
 
     @Override
@@ -44,13 +50,14 @@ public class OutlineCredentialProvider implements ApiCredentialProvider {
             log.debug("Outline credential resolve: no ACTIVE Connection for workspace={}", ref.workspaceId());
             return Optional.empty();
         }
-        if (connection.get().getState() != IntegrationState.ACTIVE) {
+        Connection conn = connection.get();
+        if (conn.getState() != IntegrationState.ACTIVE) {
             return Optional.empty();
         }
-        // TODO(#1203): hand back OAuthSession once the credential converter decrypts
-        // Connection.credentialsEncrypted into access + refresh tokens.
-        log.debug("Outline credential resolve: Connection {} present but credential converter not yet wired",
-            connection.get().getId());
-        return Optional.empty();
+        if (conn.getCredentialsEncrypted() == null) {
+            log.warn("Outline Connection {} has no credentials blob — cannot resolve token", conn.getId());
+            return Optional.empty();
+        }
+        return conn.credentials(credentialConverter);
     }
 }

@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService.TransitionRequest;
+import de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
@@ -47,13 +48,17 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     @Mock private WorkspaceRepository workspaceRepository;
     @Mock private IntegrationManifestRegistry manifests;
 
+    private CredentialBundleConverter credentialConverter;
     private ConnectionAdminService service;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        // Real converter so the encrypt/round-trip behaviour is exercised end-to-end.
+        credentialConverter = new CredentialBundleConverter("a".repeat(32), "dev");
         service = new ConnectionAdminService(
-            connectionRepository, auditRepository, connectionService, workspaceRepository, manifests
+            connectionRepository, auditRepository, connectionService, workspaceRepository, manifests,
+            credentialConverter
         );
     }
 
@@ -118,7 +123,7 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("createInlineConnection persists the row, sets placeholder credentials, transitions to ACTIVE")
+    @DisplayName("createInlineConnection persists the row, encrypts credentials, transitions to ACTIVE")
     void createInlineConnection_happyPath() {
         long workspaceId = 17L;
         Workspace workspace = Mockito.mock(Workspace.class);
@@ -152,8 +157,11 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
         ConnectionConfig.GitLabConfig cfg = (ConnectionConfig.GitLabConfig) result.getConfig();
         assertThat(cfg.serverUrl()).isEqualTo("https://gitlab.example.com");
         assertThat(cfg.gitlabGroupId()).isEqualTo(200L);
-        assertThat(result.getCredentialsAlg()).isEqualTo("PLACEHOLDER-AES-GCM");
+        assertThat(result.getCredentialsAlg()).isEqualTo(CredentialBundleConverter.ALGORITHM_TAG);
         assertThat(result.getCredentialsEncrypted()).isNotNull();
+        // Round-trip the freshly-encrypted blob to prove it's not a placeholder.
+        assertThat(result.credentials(credentialConverter))
+            .contains(new BearerToken("glpat-test", null));
 
         ArgumentCaptor<TransitionRequest> req = ArgumentCaptor.forClass(TransitionRequest.class);
         Mockito.verify(connectionService).transition(any(Connection.class), req.capture());

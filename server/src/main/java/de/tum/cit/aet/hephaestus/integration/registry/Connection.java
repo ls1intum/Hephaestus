@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.registry;
 
+import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
@@ -17,6 +18,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.Optional;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.lang.Nullable;
@@ -143,4 +145,40 @@ public class Connection {
     public void setCredentialsAlg(@Nullable String credentialsAlg) { this.credentialsAlg = credentialsAlg; }
     public void setReplacesConnectionId(@Nullable Long replacesConnectionId) { this.replacesConnectionId = replacesConnectionId; }
     public void setLastActivityAt(@Nullable Instant lastActivityAt) { this.lastActivityAt = lastActivityAt; }
+
+    // ── Credential helpers ─────────────────────────────────────────────────
+    //
+    // The entity stays ignorant of the encryption mechanics — it just delegates the
+    // ciphertext/algorithm-tag pairing to the converter and guarantees the two columns
+    // stay in lockstep. A null bundle clears BOTH columns (alg becomes meaningless
+    // without a blob); a non-null bundle stamps the converter's current ALGORITHM_TAG.
+
+    /**
+     * Encrypt {@code bundle} via {@code converter} and atomically update both the
+     * ciphertext column and the algorithm tag column. Passing {@code null} clears both
+     * — the {@code state_reason} / surrounding transition should record WHY.
+     */
+    public void setCredentials(@Nullable CredentialBundle bundle, CredentialBundleConverter converter) {
+        if (bundle == null) {
+            this.credentialsEncrypted = null;
+            this.credentialsAlg = null;
+            return;
+        }
+        this.credentialsEncrypted = converter.convertToDatabaseColumn(bundle);
+        this.credentialsAlg = CredentialBundleConverter.ALGORITHM_TAG;
+    }
+
+    /**
+     * Decrypt the credential blob if present. Empty when no blob is stored; throws
+     * {@link de.tum.cit.aet.hephaestus.core.security.EncryptionException} if the blob
+     * cannot be decrypted or deserialized — callers must treat that as an unrecoverable
+     * data error (key rotated without re-encrypt, tampered row), not a routine
+     * "no auth available" signal.
+     */
+    public Optional<CredentialBundle> credentials(CredentialBundleConverter converter) {
+        if (credentialsEncrypted == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(converter.convertToEntityAttribute(credentialsEncrypted));
+    }
 }
