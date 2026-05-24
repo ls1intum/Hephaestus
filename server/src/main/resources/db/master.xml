@@ -78,4 +78,5 @@
     <include file="./changelog/1779700000000_integration_framework.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700100000_agent_job_integration_classification.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700200000_practice_capability_gating.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1779700300000_workspace_connection_backfill.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
