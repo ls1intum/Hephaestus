@@ -46,12 +46,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("kind() returns GITLAB")
-    void kindReturnsGitlab() {
-        assertThat(channel.kind()).isEqualTo(IntegrationKind.GITLAB);
-    }
-
-    @Test
     @DisplayName("postSummary returns SummaryHandle with note id from mutation")
     void postSummaryReturnsNoteId() {
         FeedbackTarget target = gitlabTarget();

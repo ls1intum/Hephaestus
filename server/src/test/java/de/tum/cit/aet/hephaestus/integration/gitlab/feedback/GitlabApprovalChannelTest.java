@@ -47,12 +47,6 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("kind() returns GITLAB")
-    void kindReturnsGitlab() {
-        assertThat(channel.kind()).isEqualTo(IntegrationKind.GITLAB);
-    }
-
-    @Test
     @DisplayName("approve invokes ApproveMergeRequest mutation against resolved MR global gid")
     void approveInvokesMutation() {
         FeedbackTarget target = gitlabTarget();

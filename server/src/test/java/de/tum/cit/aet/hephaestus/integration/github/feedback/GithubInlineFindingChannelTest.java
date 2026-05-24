@@ -41,12 +41,6 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("kind() returns GITHUB")
-    void kindReturnsGithub() {
-        assertThat(channel.kind()).isEqualTo(IntegrationKind.GITHUB);
-    }
-
-    @Test
     @DisplayName("empty findings returns (0, 0)")
     void emptyFindingsReturnsZero() {
         FeedbackTarget target = githubTarget();

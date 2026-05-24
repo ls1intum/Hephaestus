@@ -1,10 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.github.feedback;
 
+import de.tum.cit.aet.hephaestus.integration.spi.ApprovalChannel;
+
 import static de.tum.cit.aet.hephaestus.integration.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.github.feedback.GithubFeedbackChannel.PrCoordinates;
-import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
@@ -14,7 +15,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link ScmApprovalChannel}. Submits an APPROVE pull-request review
+ * GitHub adapter for {@link ApprovalChannel}. Submits an APPROVE pull-request review
  * via the {@code ApprovePullRequest} GraphQL mutation (a {@code addPullRequestReview}
  * specialised to {@code event: APPROVE}).
  *
@@ -22,7 +23,7 @@ import org.springframework.stereotype.Component;
  * can validate the manifest's {@code APPROVAL_WORKFLOW} capability has a wired bean.
  */
 @Component
-public class GithubApprovalChannel implements ScmApprovalChannel {
+public class GithubApprovalChannel implements ApprovalChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GithubApprovalChannel.class);
 

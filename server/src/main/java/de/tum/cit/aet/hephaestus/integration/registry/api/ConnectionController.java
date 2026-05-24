@@ -89,7 +89,6 @@ public class ConnectionController {
         ));
     }
 
-    // ── List ───────────────────────────────────────────────────────────────
 
     @GetMapping
     public ResponseEntity<List<ConnectionSummary>> list(@PathVariable Long workspaceId) {
@@ -99,7 +98,6 @@ public class ConnectionController {
         return ResponseEntity.ok(summaries);
     }
 
-    // ── Read ───────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}")
     public ResponseEntity<ConnectionDetail> read(@PathVariable Long workspaceId, @PathVariable Long id) {
@@ -107,7 +105,6 @@ public class ConnectionController {
         return ResponseEntity.ok(ConnectionDetail.from(connection, admin.manifests(), objectMapper));
     }
 
-    // ── Initiate ───────────────────────────────────────────────────────────
 
     @PostMapping
     public ResponseEntity<InitiateConnectionResponse> initiate(
@@ -150,7 +147,6 @@ public class ConnectionController {
         };
     }
 
-    // ── Suspend / Reactivate ───────────────────────────────────────────────
 
     @PostMapping("/{id}/suspend")
     public ResponseEntity<ConnectionSummary> suspend(
@@ -192,7 +188,6 @@ public class ConnectionController {
         return ResponseEntity.ok(ConnectionSummary.from(connection, admin.manifests()));
     }
 
-    // ── Disconnect ─────────────────────────────────────────────────────────
 
     @PostMapping("/{id}/disconnect")
     public ResponseEntity<Void> disconnect(
@@ -229,7 +224,6 @@ public class ConnectionController {
         return ResponseEntity.noContent().build();
     }
 
-    // ── Audit ──────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/audit")
     public ResponseEntity<List<ConnectionAuditEntry>> audit(
@@ -245,20 +239,17 @@ public class ConnectionController {
         return ResponseEntity.ok(entries);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private static String actorRef(@Nullable Authentication authentication) {
         if (authentication == null || authentication.getName() == null) return "anonymous";
         return authentication.getName();
     }
 
-    // ── DTOs scoped to this controller ─────────────────────────────────────
 
     /** Lifecycle-action body — reason is optional, applied to both suspend and reactivate. */
     public record ReasonRequest(@Nullable String reason) {
     }
 
-    // ── Exception handlers ─────────────────────────────────────────────────
 
     @ExceptionHandler(NoSuchElementException.class)
     ResponseEntity<Map<String, String>> handleNotFound(NoSuchElementException e) {

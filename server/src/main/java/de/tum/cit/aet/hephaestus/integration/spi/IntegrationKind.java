@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.spi;
 /**
  * Identifies a specific external system Hephaestus integrates with.
  *
- * <p>Each value belongs to exactly one {@link IntegrationFamily.Family}. The family
+ * <p>Each value belongs to exactly one {@link IntegrationFamily}. The family
  * narrowing lets cross-cutting code dispatch by family while vendor-specific code
  * dispatches by kind.
  *
@@ -11,21 +11,21 @@ package de.tum.cit.aet.hephaestus.integration.spi;
  */
 public enum IntegrationKind {
     /** GitHub.com or GitHub Enterprise Server (host disambiguates). */
-    GITHUB(IntegrationFamily.Family.SCM),
+    GITHUB(IntegrationFamily.SCM),
     /** GitLab.com or self-hosted GitLab (host disambiguates). */
-    GITLAB(IntegrationFamily.Family.SCM),
+    GITLAB(IntegrationFamily.SCM),
     /** Slack workspace. */
-    SLACK(IntegrationFamily.Family.MESSAGING),
+    SLACK(IntegrationFamily.MESSAGING),
     /** Outline (getoutline.com) knowledge base. */
-    OUTLINE(IntegrationFamily.Family.KNOWLEDGE);
+    OUTLINE(IntegrationFamily.KNOWLEDGE);
 
-    private final IntegrationFamily.Family family;
+    private final IntegrationFamily family;
 
-    IntegrationKind(IntegrationFamily.Family family) {
+    IntegrationKind(IntegrationFamily family) {
         this.family = family;
     }
 
-    public IntegrationFamily.Family family() {
+    public IntegrationFamily family() {
         return family;
     }
 }

@@ -5,14 +5,13 @@ import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService.TransitionRequest;
-import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
+import de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy.ConnectFinalization;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityNotFoundException;
-import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,13 +45,16 @@ public class OAuthCallbackService {
     private final ConnectionRepository connectionRepository;
     private final ConnectionService connectionService;
     private final WorkspaceRepository workspaceRepository;
+    private final CredentialBundleConverter credentialBundleConverter;
 
     public OAuthCallbackService(ConnectionRepository connectionRepository,
                                 ConnectionService connectionService,
-                                WorkspaceRepository workspaceRepository) {
+                                WorkspaceRepository workspaceRepository,
+                                CredentialBundleConverter credentialBundleConverter) {
         this.connectionRepository = connectionRepository;
         this.connectionService = connectionService;
         this.workspaceRepository = workspaceRepository;
+        this.credentialBundleConverter = credentialBundleConverter;
     }
 
     /**
@@ -95,7 +97,7 @@ public class OAuthCallbackService {
                                          ConnectFinalization.Completed completed,
                                          @Nullable String actorRef) {
         applyVendorMetadata(connection, completed);
-        persistCredentialsPlaceholder(connection, completed.credentials());
+        connection.setCredentials(completed.credentials(), credentialBundleConverter);
         connection = connectionRepository.save(connection);
 
         String actor = actorRef != null ? actorRef : ACTOR_FALLBACK;
@@ -134,43 +136,12 @@ public class OAuthCallbackService {
         };
     }
 
-    /**
-     * Stamp the vendor-supplied instance_key + display_name onto a newly-bound Connection.
-     * {@code instanceKey} is part of the {@code (workspace, kind, instanceKey)} unique
-     * key — Connection has no public setter for it. We set it reflectively on the
-     * create path only (when the existing value is null); reconnect paths intentionally
-     * keep the original instance_key so we don't fork the row.
-     */
     private static void applyVendorMetadata(Connection connection, ConnectFinalization.Completed completed) {
-        if (completed.instanceKey() != null && connection.getInstanceKey() == null) {
-            try {
-                Field f = Connection.class.getDeclaredField("instanceKey");
-                f.setAccessible(true);
-                f.set(connection, completed.instanceKey());
-            } catch (ReflectiveOperationException e) {
-                // The field has no public setter on purpose. If reflection ever breaks
-                // here, the right fix is to add a guarded setter; failing the callback
-                // over it is wrong because the credentials themselves are still valid.
-                log.warn("Could not set Connection.instanceKey reflectively (connection={}): {} — proceeding",
-                    connection.getId(), e.toString());
-            }
+        if (completed.instanceKey() != null) {
+            connection.bindInstanceKey(completed.instanceKey());
         }
         if (completed.displayName() != null) {
             connection.setDisplayName(completed.displayName());
         }
-    }
-
-    /**
-     * Stash the credential bundle alongside the Connection. Same placeholder semantics
-     * as {@code ConnectionAdminService} — replaced with AES-GCM ciphertext when the
-     * {@code CredentialBundleConverter} integration ships in the credentials slice.
-     */
-    private static void persistCredentialsPlaceholder(Connection connection, @Nullable CredentialBundle bundle) {
-        if (bundle == null) return;
-        // TODO(#1198 follow-up): encrypt via CredentialBundleConverter (the converter
-        // landed in a parallel slice; wire it through this method once the wiring
-        // refactor lands so we don't break the OAuth flow on a half-merged change).
-        connection.setCredentialsEncrypted(new byte[] { 0x00 });
-        connection.setCredentialsAlg("PLACEHOLDER-AES-GCM");
     }
 }

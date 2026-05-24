@@ -12,7 +12,6 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -157,7 +156,6 @@ public class OAuthCallbackController {
         @Nullable String vendorErrorDescription,
         Map<String, String> allParams
     ) {
-        // ── 1. Resolve kind via allow-list (NEVER IntegrationKind.valueOf on raw input) ──
         Optional<IntegrationKind> kindOpt = kindRouting.resolve(kindPathSegment);
         if (kindOpt.isEmpty()) {
             log.info("OAuth callback for unknown kind path segment: {}", sanitize(kindPathSegment));
@@ -168,7 +166,6 @@ public class OAuthCallbackController {
         }
         IntegrationKind kind = kindOpt.get();
 
-        // ── 2. Vendor-side cancellation: surface the error without consuming state ──
         // The state may still be present and valid; we leave it usable (it'll expire
         // naturally via TTL) rather than racing the user who might immediately retry.
         if (vendorError != null && !vendorError.isBlank()) {
@@ -181,7 +178,6 @@ public class OAuthCallbackController {
             );
         }
 
-        // ── 3. Verify state (HMAC + TTL) ─────────────────────────────────────
         if (state == null || state.isBlank()) {
             log.info("OAuth callback for kind={} missing state parameter", kind);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
@@ -200,7 +196,6 @@ public class OAuthCallbackController {
             );
         }
 
-        // ── 4. State-kind must match path-kind (defends against cross-kind replay) ──
         if (binding.kind() != kind) {
             log.warn("OAuth state-kind mismatch: path={} stateKind={} workspace={}",
                 kind, binding.kind(), binding.workspaceId());
@@ -210,7 +205,6 @@ public class OAuthCallbackController {
             );
         }
 
-        // ── 5. Strategy lookup ────────────────────────────────────────────────
         ConnectionStrategy strategy = strategies.get(kind);
         if (strategy == null) {
             log.error("No ConnectionStrategy bean for kind={} but routing accepted it — wiring bug",
@@ -221,11 +215,9 @@ public class OAuthCallbackController {
             );
         }
 
-        // ── 6. Find or create in-flight Connection ────────────────────────────
         Connection connection = callbackService.findOrCreatePendingConnection(binding.workspaceId(), kind);
         IntegrationRef ref = connection.toRef();
 
-        // ── 7. Hand off to strategy.finalizeConnect ──────────────────────────
         ConnectFinalization result;
         try {
             // Defensive copy + remove the state param — strategies shouldn't see it
@@ -247,7 +239,6 @@ public class OAuthCallbackController {
         };
     }
 
-    // ── helpers ─────────────────────────────────────────────────────────────
 
     private ResponseEntity<?> handleCompleted(
         Connection connection,
@@ -311,13 +302,4 @@ public class OAuthCallbackController {
         return stripped.length() > 200 ? stripped.substring(0, 200) + "…" : stripped;
     }
 
-    /**
-     * Lowercase rendering of the kind for URL substitution. Exposed for the
-     * {@link OAuthCallbackProperties#errorRedirect()} {@code {kind}} placeholder if it
-     * ever needs to be applied in this controller.
-     */
-    @SuppressWarnings("unused")
-    private static String lowercaseKind(IntegrationKind kind) {
-        return kind.name().toLowerCase(Locale.ROOT);
-    }
 }

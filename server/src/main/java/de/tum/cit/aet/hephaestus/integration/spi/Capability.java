@@ -11,7 +11,6 @@ package de.tum.cit.aet.hephaestus.integration.spi;
  * {@link IntegrationManifest} validation enforces at application-server startup.
  */
 public enum Capability {
-    // ── Transport / wire axis ──────────────────────────────────────────────
 
     /** Receives HTTP webhook events. */
     WEBHOOK_INGEST,
@@ -26,7 +25,6 @@ public enum Capability {
     /** Realtime ingest via WebSocket (Discord Gateway, Slack Socket Mode, MS Bot Framework). */
     REALTIME_INGEST,
 
-    // ── Domain / action axis ───────────────────────────────────────────────
 
     /** Implements {@code FeedbackChannel.postSummary}. */
     FEEDBACK_DELIVERY,

@@ -132,7 +132,7 @@ public class Practice {
     private Set<String> requiredAspects = new LinkedHashSet<>();
 
     /**
-     * When non-null, narrows the practice to a specific {@link IntegrationFamily.Family}
+     * When non-null, narrows the practice to a specific {@link IntegrationFamily}
      * (SCM, MESSAGING, KNOWLEDGE, PROJECT_TRACKER, CI_PROVIDER, OBSERVABILITY) — the
      * workspace must have at least one ACTIVE Connection whose kind belongs to this
      * family. {@code null} = family-agnostic.
@@ -140,7 +140,7 @@ public class Practice {
     @Enumerated(EnumType.STRING)
     @Column(name = "required_family", length = 32)
     @Nullable
-    private IntegrationFamily.Family requiredFamily;
+    private IntegrationFamily requiredFamily;
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;

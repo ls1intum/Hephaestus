@@ -116,7 +116,6 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         return new VerificationResult.MissingSignature();
     }
 
-    // ── Plaintext path ─────────────────────────────────────────────────────
 
     private Verdict verifyPlaintext(WebhookRequest request, Map<String, String> headers, String tokenHeader) {
         Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(
@@ -135,7 +134,6 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         return new Verdict(new VerificationResult.Invalid("token-mismatch"));
     }
 
-    // ── Standard Webhooks (whsec_) path ────────────────────────────────────
 
     private Verdict verifyWhsec(WebhookRequest request, Map<String, String> headers, String signatureHeader) {
         String msgId = headers.get(HEADER_WEBHOOK_ID);

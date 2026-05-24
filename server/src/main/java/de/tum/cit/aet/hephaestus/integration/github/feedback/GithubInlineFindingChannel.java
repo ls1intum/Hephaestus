@@ -1,10 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.github.feedback;
 
+import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
+
 import static de.tum.cit.aet.hephaestus.integration.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.github.feedback.GithubFeedbackChannel.PrCoordinates;
-import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmInlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.FindingAnchor;
@@ -19,7 +20,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link ScmInlineFindingChannel}. Posts all inline findings as a
+ * GitHub adapter for {@link InlineFindingChannel}. Posts all inline findings as a
  * single atomic {@code addPullRequestReview} mutation with embedded threads — one
  * notification per review, all-or-nothing semantics for the batch.
  *
@@ -31,7 +32,7 @@ import org.springframework.stereotype.Component;
  * to re-resolve PR metadata.
  */
 @Component
-public class GithubInlineFindingChannel implements ScmInlineFindingChannel {
+public class GithubInlineFindingChannel implements InlineFindingChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GithubInlineFindingChannel.class);
 

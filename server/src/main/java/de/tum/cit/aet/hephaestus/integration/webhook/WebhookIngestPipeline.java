@@ -90,11 +90,23 @@ public class WebhookIngestPipeline {
     }
 
     private ResponseEntity<?> publish(IntegrationKind kind, byte[] body, Map<String, String> headers) {
-        // TODO(#1198 follow-up): wire into JetStreamPublisher with per-kind SubjectKeyDeriver.
-        // For #1198 first cut, we accept and log; existing per-kind controllers continue to handle
-        // GitHub/GitLab publishing until C13 migrates them to this pipeline.
-        log.debug("Accepted webhook kind={} bytes={}", kind, body.length);
-        return ResponseEntity.accepted().body(Map.of("status", "accepted", "kind", kind.name()));
+        // The unified /webhooks/{kind} ingest path is only wired for SPI exercise today.
+        // GitHub / GitLab webhook traffic is still published by the legacy controllers at
+        // /github + /gitlab; routing the same event twice would double-publish into NATS.
+        // Reject explicitly until JetStream wiring lands so deliveries are never silently
+        // swallowed (NotImplemented signals to the vendor to retry — the legacy paths
+        // remain operational).
+        log.warn("Refusing unified webhook ingest (kind={}, bytes={}) — JetStream wiring pending",
+            kind, body.length);
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+            .body(Map.of(
+                "error", "unified webhook ingest not yet enabled",
+                "use_legacy_path", switch (kind) {
+                    case GITHUB -> "/github";
+                    case GITLAB -> "/gitlab";
+                    default -> "vendor-specific (see docs)";
+                }
+            ));
     }
 
     private ResponseEntity<?> respondImmediately(VerificationResult.RespondImmediately r) {

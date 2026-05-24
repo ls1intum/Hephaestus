@@ -83,7 +83,6 @@ public class GithubInstallationUnbound {
         this.installationId = installationId;
     }
 
-    // ── Accessors ──────────────────────────────────────────────────────────
 
     public Long getInstallationId() { return installationId; }
     @Nullable public Long getAccountId() { return accountId; }

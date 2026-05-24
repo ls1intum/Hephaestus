@@ -46,8 +46,8 @@ class PracticeCapabilityGatingTest extends BaseUnitTest {
         Practice practice = new Practice();
         assertThat(practice.getRequiredFamily()).isNull();
 
-        practice.setRequiredFamily(IntegrationFamily.Family.SCM);
-        assertThat(practice.getRequiredFamily()).isEqualTo(IntegrationFamily.Family.SCM);
+        practice.setRequiredFamily(IntegrationFamily.SCM);
+        assertThat(practice.getRequiredFamily()).isEqualTo(IntegrationFamily.SCM);
 
         practice.setRequiredFamily(null);
         assertThat(practice.getRequiredFamily()).isNull();

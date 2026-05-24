@@ -27,7 +27,7 @@ public record IntegrationRef(
         if (kind == null) throw new IllegalArgumentException("kind must not be null");
     }
 
-    public IntegrationFamily.Family family() {
+    public IntegrationFamily family() {
         return kind.family();
     }
 }

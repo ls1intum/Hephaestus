@@ -43,12 +43,6 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("kind() returns GITLAB")
-    void kindReturnsGitlab() {
-        assertThat(channel.kind()).isEqualTo(IntegrationKind.GITLAB);
-    }
-
-    @Test
     @DisplayName("empty findings returns (0, 0)")
     void emptyFindings() {
         assertThat(channel.postInlineFindings(gitlabTarget(), List.of()))

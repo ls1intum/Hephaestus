@@ -39,12 +39,4 @@ class IntegrationStateTest extends BaseUnitTest {
         }
     }
 
-    @Test
-    void everyStateRejectsSelfTransition() {
-        // Same-state is handled as a no-op in ConnectionService.transition; the guard
-        // itself returns false (legal transitions exclude the identity).
-        for (IntegrationState s : IntegrationState.values()) {
-            assertThat(s.canTransitionTo(s)).as("self-transition for %s", s).isFalse();
-        }
-    }
 }

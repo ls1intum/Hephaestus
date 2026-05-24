@@ -1,11 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.feedback;
 
+import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
+
 import static de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrInfo;
-import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmInlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
@@ -19,7 +20,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitLab adapter for {@link ScmInlineFindingChannel}. Posts inline diff notes one at a
+ * GitLab adapter for {@link InlineFindingChannel}. Posts inline diff notes one at a
  * time via {@code CreateDiffNote} (GitLab has no batch API). For positions outside the
  * diff hunk, falls back to a regular MR comment with {@code file:line} prefix.
  *
@@ -34,7 +35,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitlabInlineFindingChannel implements ScmInlineFindingChannel {
+public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GitlabInlineFindingChannel.class);
 

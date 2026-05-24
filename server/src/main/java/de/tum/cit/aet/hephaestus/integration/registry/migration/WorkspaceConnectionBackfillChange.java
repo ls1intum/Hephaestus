@@ -96,7 +96,6 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
 
     private ResourceAccessor resourceAccessor;
 
-    // ── Liquibase plumbing ─────────────────────────────────────────────────
 
     @Override
     public String getConfirmationMessage() {
@@ -118,7 +117,6 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         return new ValidationErrors();
     }
 
-    // ── Main flow ──────────────────────────────────────────────────────────
 
     @Override
     public void execute(Database database) throws CustomChangeException {
@@ -178,7 +176,6 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
             inserted, skipped, slackInserted, slackSkipped);
     }
 
-    // ── Per-mode insert paths ──────────────────────────────────────────────
 
     private GitBackfillResult backfillGit(
         JdbcConnection conn,
@@ -261,21 +258,18 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
             return SlackBackfillResult.SKIPPED_EXISTS;
         }
 
-        // teamId is left null — the legacy schema didn't store it, and we can't fetch it
-        // without an outbound API call which is out of scope for a Liquibase change. The
-        // first successful Slack call after migration backfills it via SlackTokenService.
         SlackConfig config = new SlackConfig(null, null, channelId, teamLabel, Collections.emptySet());
         byte[] credentialBlob = rewrapPat(encryptedSlackToken, crypto);
-        // instance_key is null for now — same reason as teamId. The DB unique constraint
-        // (workspace_id, kind, instance_key) handles NULL as "any", which is exactly what
-        // we want for the single-Slack-per-workspace case.
-        insertConnection(conn, workspaceId, IntegrationKind.SLACK, null, config, credentialBlob);
+        // Sentinel instance_key — Postgres treats NULL as distinct in UNIQUE indexes
+        // (pre-15 behavior, and we don't yet enforce NULLS NOT DISTINCT), so a real
+        // NULL would let two rows race in at once. The first successful Slack call
+        // after migration replaces this with the real team id via SlackTokenService.
+        insertConnection(conn, workspaceId, IntegrationKind.SLACK, "pending-team-bind", config, credentialBlob);
         log.info("Backfilled SLACK connection: workspace_id={}, channel_id={}, has_credentials={}",
             workspaceId, channelId, credentialBlob != null);
         return SlackBackfillResult.INSERTED;
     }
 
-    // ── DB helpers ─────────────────────────────────────────────────────────
 
     private boolean connectionExists(JdbcConnection conn, long workspaceId, IntegrationKind kind)
         throws Exception {
@@ -331,7 +325,6 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         return rs.wasNull() ? null : v;
     }
 
-    // ── Crypto helpers ─────────────────────────────────────────────────────
 
     /**
      * Decrypts a value written by {@link de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter}

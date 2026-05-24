@@ -202,7 +202,7 @@ class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Slack token present → SLACK connection inserted with null instance_key and rewrapped bot token")
+        @DisplayName("Slack token present → SLACK connection inserted with sentinel instance_key and rewrapped bot token")
         void slackTokenPresent_insertsSlackConnection() throws Exception {
             String plaintextSlackToken = "xoxb-12345-pretend";
             stubSingleWorkspace(WorkspaceRow.builder()
@@ -224,7 +224,7 @@ class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
                 .findFirst()
                 .orElseThrow();
 
-            assertThat(slack.instanceKey).isNull();
+            assertThat(slack.instanceKey).isEqualTo("pending-team-bind");
             assertThat(slack.credentialsEncrypted).isNotNull();
             assertThat(slack.credentialsAlg).isEqualTo(CredentialBundleConverter.ALGORITHM_TAG);
 

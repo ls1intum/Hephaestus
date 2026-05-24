@@ -1,11 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.feedback;
 
+import de.tum.cit.aet.hephaestus.integration.spi.ApprovalChannel;
+
 import static de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrInfo;
-import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
@@ -17,7 +18,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitLab adapter for {@link ScmApprovalChannel}. Approves an MR via the
+ * GitLab adapter for {@link ApprovalChannel}. Approves an MR via the
  * {@code ApproveMergeRequest} GraphQL mutation. Optional message is posted as a
  * regular MR note since {@code mergeRequestApprove} does not accept a body.
  *
@@ -29,7 +30,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitlabApprovalChannel implements ScmApprovalChannel {
+public class GitlabApprovalChannel implements ApprovalChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GitlabApprovalChannel.class);
 

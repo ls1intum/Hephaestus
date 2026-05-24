@@ -37,13 +37,15 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     @Mock private ConnectionRepository connectionRepository;
     @Mock private ConnectionService connectionService;
     @Mock private WorkspaceRepository workspaceRepository;
+    @Mock private de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter credentialBundleConverter;
 
     private OAuthCallbackService service;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new OAuthCallbackService(connectionRepository, connectionService, workspaceRepository);
+        service = new OAuthCallbackService(
+            connectionRepository, connectionService, workspaceRepository, credentialBundleConverter);
     }
 
     @Test
@@ -119,14 +121,14 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
                 c.setState(IntegrationState.ACTIVE);
                 return c;
             });
+        when(credentialBundleConverter.convertToDatabaseColumn(any())).thenReturn(new byte[]{1, 2, 3});
 
         Connection result = service.completeConnection(pending, completed, "alice@example.com");
 
         assertThat(result.getInstanceKey()).isEqualTo("T123");
         assertThat(result.getDisplayName()).isEqualTo("Acme");
         assertThat(result.getState()).isEqualTo(IntegrationState.ACTIVE);
-        // Placeholder credentials persisted — replaced by AES-GCM converter in follow-up.
-        assertThat(result.getCredentialsAlg()).isEqualTo("PLACEHOLDER-AES-GCM");
+        assertThat(result.getCredentialsAlg()).isEqualTo("aesgcm-v1");
 
         ArgumentCaptor<TransitionRequest> req = ArgumentCaptor.forClass(TransitionRequest.class);
         verify(connectionService).transition(any(Connection.class), req.capture());
@@ -157,21 +159,16 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("completeConnection does NOT overwrite an existing instance_key on reconnect")
-    void complete_doesNotOverwriteExistingInstanceKey() {
+    @DisplayName("completeConnection rejects a vendor-returned instance_key that conflicts with the existing one")
+    void complete_conflictingInstanceKey_throws() {
         Connection existing = newConnection(7L, 42L, IntegrationKind.SLACK, "T_ORIG", IntegrationState.ACTIVE);
         ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
             "T_NEW", new BearerToken("t", null), "Renamed"
         );
-        when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
-
-        Connection result = service.completeConnection(existing, completed, "alice");
-
-        // instance_key preserved (it's part of the unique key); display_name DID get updated.
-        assertThat(result.getInstanceKey()).isEqualTo("T_ORIG");
-        assertThat(result.getDisplayName()).isEqualTo("Renamed");
+        org.assertj.core.api.Assertions
+            .assertThatThrownBy(() -> service.completeConnection(existing, completed, "alice"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("instance_key");
     }
 
     @Test

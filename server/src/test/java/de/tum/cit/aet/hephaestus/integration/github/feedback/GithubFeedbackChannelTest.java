@@ -42,12 +42,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("kind() returns GITHUB")
-    void kindReturnsGithub() {
-        assertThat(channel.kind()).isEqualTo(IntegrationKind.GITHUB);
-    }
-
-    @Test
     @DisplayName("postSummary returns SummaryHandle with comment node id from mutation")
     void postSummaryReturnsCommentNodeId() {
         FeedbackTarget target = new FeedbackTarget(

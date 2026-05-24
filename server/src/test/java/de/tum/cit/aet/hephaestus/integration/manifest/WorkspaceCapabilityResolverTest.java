@@ -171,7 +171,7 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                 .thenReturn(List.of());
 
             assertThat(resolver.isAvailable(
-                WORKSPACE_ID, Set.of(Capability.WEBHOOK_INGEST), IntegrationFamily.Family.SCM
+                WORKSPACE_ID, Set.of(Capability.WEBHOOK_INGEST), IntegrationFamily.SCM
             )).isFalse();
         }
 
@@ -229,7 +229,7 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                 .thenReturn(connections);
 
             assertThat(resolver.isAvailable(
-                WORKSPACE_ID, Set.of(Capability.WEBHOOK_INGEST), IntegrationFamily.Family.SCM
+                WORKSPACE_ID, Set.of(Capability.WEBHOOK_INGEST), IntegrationFamily.SCM
             )).isFalse();
         }
 
@@ -241,7 +241,7 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                 .thenReturn(connections);
 
             assertThat(resolver.isAvailable(
-                WORKSPACE_ID, Set.of(Capability.URL_VERIFICATION_HANDSHAKE), IntegrationFamily.Family.MESSAGING
+                WORKSPACE_ID, Set.of(Capability.URL_VERIFICATION_HANDSHAKE), IntegrationFamily.MESSAGING
             )).isTrue();
         }
 
@@ -252,8 +252,8 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
             when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
                 .thenReturn(connections);
 
-            assertThat(resolver.isAvailable(WORKSPACE_ID, Set.of(), IntegrationFamily.Family.SCM)).isTrue();
-            assertThat(resolver.isAvailable(WORKSPACE_ID, Set.of(), IntegrationFamily.Family.KNOWLEDGE)).isFalse();
+            assertThat(resolver.isAvailable(WORKSPACE_ID, Set.of(), IntegrationFamily.SCM)).isTrue();
+            assertThat(resolver.isAvailable(WORKSPACE_ID, Set.of(), IntegrationFamily.KNOWLEDGE)).isFalse();
         }
     }
 

@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
  *
  * <p><b>No upstream entity types are referenced from here.</b> Callers pass primitive
  * requirements (a {@code Set<Capability>} and an optional {@link
- * IntegrationFamily.Family}) so we keep a clean module boundary — the integration
+ * IntegrationFamily}) so we keep a clean module boundary — the integration
  * module never reaches into practices, mentor, or any other downstream model. A thin
  * caller-side adapter (e.g. {@code PracticeAvailabilityResolver} in the practices
  * module) projects domain entities to the primitive shape expected here.
@@ -105,7 +105,7 @@ public class WorkspaceCapabilityResolver {
     public boolean isAvailable(
         long workspaceId,
         Set<Capability> requiredCapabilities,
-        @Nullable IntegrationFamily.Family requiredFamily
+        @Nullable IntegrationFamily requiredFamily
     ) {
         Set<Capability> required = requiredCapabilities == null ? Set.of() : requiredCapabilities;
 

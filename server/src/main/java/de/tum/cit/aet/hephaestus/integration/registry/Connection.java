@@ -115,11 +115,33 @@ public class Connection {
         this.config = config;
     }
 
+    /**
+     * Bind a vendor-supplied {@code instance_key} on a row that didn't have one yet
+     * (the typical OAuth-finalize path: create PENDING with null key, vendor returns
+     * the installation/team/workspace id, we stamp it). Throws if the row already
+     * carries a different key — reconnecting an installation must reuse the existing
+     * row to preserve audit history, not fork.
+     */
+    public void bindInstanceKey(String instanceKey) {
+        if (instanceKey == null || instanceKey.isBlank()) {
+            throw new IllegalArgumentException("instanceKey must be non-blank");
+        }
+        if (this.instanceKey == null) {
+            this.instanceKey = instanceKey;
+            return;
+        }
+        if (!this.instanceKey.equals(instanceKey)) {
+            throw new IllegalStateException(
+                "Cannot rebind Connection " + id + " from instance_key="
+                    + this.instanceKey + " to " + instanceKey
+            );
+        }
+    }
+
     public IntegrationRef toRef() {
         return new IntegrationRef(kind, workspace.getId(), instanceKey);
     }
 
-    // ── Accessors ──────────────────────────────────────────────────────────
 
     public Long getId() { return id; }
     public de.tum.cit.aet.hephaestus.workspace.Workspace getWorkspace() { return workspace; }
@@ -146,7 +168,6 @@ public class Connection {
     public void setReplacesConnectionId(@Nullable Long replacesConnectionId) { this.replacesConnectionId = replacesConnectionId; }
     public void setLastActivityAt(@Nullable Instant lastActivityAt) { this.lastActivityAt = lastActivityAt; }
 
-    // ── Credential helpers ─────────────────────────────────────────────────
     //
     // The entity stays ignorant of the encryption mechanics — it just delegates the
     // ciphertext/algorithm-tag pairing to the converter and guarantees the two columns

@@ -1,11 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.feedback;
 
+import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
+
 import static de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrInfo;
-import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.util.List;
@@ -17,7 +18,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitLab adapter for {@link ScmFeedbackChannel}. Posts a single MR-level note via the
+ * GitLab adapter for {@link FeedbackChannel}. Posts a single MR-level note via the
  * {@code CreateMergeRequestNote} GraphQL mutation.
  *
  * <p>{@link FeedbackChannel.FeedbackTarget#subjectExternalId} convention for GitLab is
@@ -34,7 +35,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitlabFeedbackChannel implements ScmFeedbackChannel {
+public class GitlabFeedbackChannel implements FeedbackChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GitlabFeedbackChannel.class);
 

@@ -1,9 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.github.feedback;
 
+import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
+
 import static de.tum.cit.aet.hephaestus.integration.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
@@ -12,7 +13,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link ScmFeedbackChannel}. Posts a single PR-level comment via
+ * GitHub adapter for {@link FeedbackChannel}. Posts a single PR-level comment via
  * the {@code AddPullRequestComment} GraphQL mutation.
  *
  * <p>{@link FeedbackChannel.FeedbackTarget#subjectExternalId} convention for GitHub is
@@ -22,7 +23,7 @@ import org.springframework.stereotype.Component;
  * {@code FeedbackPostService} can edit in place on subsequent runs.
  */
 @Component
-public class GithubFeedbackChannel implements ScmFeedbackChannel {
+public class GithubFeedbackChannel implements FeedbackChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GithubFeedbackChannel.class);
 

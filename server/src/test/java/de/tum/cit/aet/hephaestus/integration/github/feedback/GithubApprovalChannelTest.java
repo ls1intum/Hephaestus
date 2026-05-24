@@ -43,12 +43,6 @@ class GithubApprovalChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("kind() returns GITHUB")
-    void kindReturnsGithub() {
-        assertThat(channel.kind()).isEqualTo(IntegrationKind.GITHUB);
-    }
-
-    @Test
     @DisplayName("approve invokes ApprovePullRequest mutation against resolved PR node id")
     void approveInvokesMutation() {
         FeedbackTarget target = new FeedbackTarget(

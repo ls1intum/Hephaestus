@@ -24,7 +24,7 @@ import org.springframework.lang.Nullable;
 public record ConnectionDetail(
     Long id,
     IntegrationKind kind,
-    IntegrationFamily.Family family,
+    IntegrationFamily family,
     IntegrationState state,
     @Nullable String instanceKey,
     @Nullable String displayName,

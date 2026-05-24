@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.spi;
 
 /**
- * Discriminator for {@link IntegrationSubject}s — the kind of work product Hephaestus
+ * Discriminator for Subjects — the kind of work product Hephaestus
  * reviews or contextualizes. Persisted on {@code agent_job.subject_class} for
  * polymorphic dispatch in the agent layer (no {@code switch (kind)} branching).
  */

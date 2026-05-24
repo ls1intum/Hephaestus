@@ -47,12 +47,12 @@ class PracticeAvailabilityResolverTest extends BaseUnitTest {
     void forwardsKnownCapabilities() {
         Practice practice = practiceWith(
             new LinkedHashSet<>(List.of("INLINE_FINDINGS", "FEEDBACK_DELIVERY")),
-            IntegrationFamily.Family.SCM
+            IntegrationFamily.SCM
         );
         when(capabilityResolver.isAvailable(
             eq(WORKSPACE_ID),
             eq(Set.of(Capability.INLINE_FINDINGS, Capability.FEEDBACK_DELIVERY)),
-            eq(IntegrationFamily.Family.SCM)
+            eq(IntegrationFamily.SCM)
         )).thenReturn(true);
 
         assertThat(resolver.isAvailable(WORKSPACE_ID, practice)).isTrue();
@@ -94,7 +94,7 @@ class PracticeAvailabilityResolverTest extends BaseUnitTest {
         verify(capabilityResolver, never()).activeCapabilitiesFor(WORKSPACE_ID);
     }
 
-    private static Practice practiceWith(Set<String> requiredCapabilities, IntegrationFamily.Family requiredFamily) {
+    private static Practice practiceWith(Set<String> requiredCapabilities, IntegrationFamily requiredFamily) {
         Practice practice = new Practice();
         practice.setRequiredCapabilities(new LinkedHashSet<>(requiredCapabilities));
         practice.setRequiredFamily(requiredFamily);
