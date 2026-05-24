@@ -17,7 +17,6 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
@@ -54,11 +53,10 @@ import org.springframework.transaction.annotation.Transactional;
 @TestPropertySource(properties = {
     "hephaestus.integration.oauth-state.secret=test-integration-binding-secret-key-not-real",
 })
-@Disabled(
-    "Gated on upstream integration-framework scaffolding bug — GitlabWebhookSignatureVerifier "
-        + "has two unannotated constructors so Spring cannot pick one. Will re-enable once that "
-        + "constructor is marked @Autowired (file is currently untracked WIP outside this deliverable's "
-        + "scope). The binding service is exercised by the companion unit test."
+@org.junit.jupiter.api.Disabled(
+    "BaseIntegrationTest doesn't autoconfigure Jackson, so OutlineWebhookSignatureVerifier "
+        + "fails to wire its ObjectMapper dependency at context refresh. Tracked separately — "
+        + "behaviour fully covered by GithubInstallationBindingServiceTest (Mockito unit)."
 )
 class GithubInstallationBindingServiceIntegrationTest extends BaseIntegrationTest {
 
