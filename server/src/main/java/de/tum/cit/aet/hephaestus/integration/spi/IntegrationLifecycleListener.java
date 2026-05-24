@@ -27,13 +27,20 @@ public interface IntegrationLifecycleListener {
 
     IntegrationKind kind();
 
-    void onInstanceInstalled(InstanceProvisioned event);
+    /** Vendor confirmed install. Default no-op so vendors that don't react can stay
+     *  silent (the framework already drives Connection state machine + audit). */
+    default void onInstanceInstalled(InstanceProvisioned event) {}
 
-    void onInstanceUninstalled(IntegrationRef ref);
+    /** Vendor confirmed uninstall. Default no-op — same rationale as install. */
+    default void onInstanceUninstalled(IntegrationRef ref) {}
 
-    void onScopeChanged(IntegrationRef ref, ScopeDelta delta);
+    /** Scope changed (repository added/removed, channel join/leave, collection
+     *  creation/deletion). Default no-op — vendors that don't expose scope changes
+     *  (e.g. GitLab) need not override. */
+    default void onScopeChanged(IntegrationRef ref, ScopeDelta delta) {}
 
-    void onTenantRenamed(IntegrationRef ref, String oldName, String newName);
+    /** Vendor-side tenant rename. Default no-op — display-name only, no integrity impact. */
+    default void onTenantRenamed(IntegrationRef ref, String oldName, String newName) {}
 
     record InstanceProvisioned(
         IntegrationRef ref,

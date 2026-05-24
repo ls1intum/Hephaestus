@@ -2,60 +2,18 @@ package de.tum.cit.aet.hephaestus.integration.github.lifecycle;
 
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link IntegrationLifecycleListener}. Skeleton for #1198: bodies
- * log only — the existing {@code WorkspaceInstallationService} path still owns the
- * mutations. Wiring this listener as the canonical write path is part of the C13
- * migration. Bean exists so {@code IntegrationFrameworkBootstrap}'s per-kind listener
- * check passes.
+ * GitHub marker. {@code WorkspaceInstallationService} still owns the canonical
+ * install/uninstall write path; this listener exists so the framework's per-kind
+ * dispatch resolves. All methods inherit the interface's default no-op.
  */
 @Component
 public class GithubLifecycleListener implements IntegrationLifecycleListener {
 
-    private static final Logger log = LoggerFactory.getLogger(GithubLifecycleListener.class);
-
     @Override
     public IntegrationKind kind() {
         return IntegrationKind.GITHUB;
-    }
-
-    @Override
-    public void onInstanceInstalled(InstanceProvisioned event) {
-        // TODO(#1198 follow-up): replace WorkspaceInstallationService.createOrUpdateFromInstallation()
-        // — persist Connection + scope rows from the provided InstanceProvisioned snapshot.
-        log.info(
-            "GitHub onInstanceInstalled (skeleton): ref={} account={} resources={}",
-            event == null ? null : event.ref(),
-            event == null || event.account() == null ? null : event.account().externalId(),
-            event == null || event.initialResources() == null ? 0 : event.initialResources().size()
-        );
-    }
-
-    @Override
-    public void onInstanceUninstalled(IntegrationRef ref) {
-        // TODO(#1198 follow-up): transition the Connection row to UNINSTALLED via ConnectionService.
-        log.info("GitHub onInstanceUninstalled (skeleton): ref={}", ref);
-    }
-
-    @Override
-    public void onScopeChanged(IntegrationRef ref, ScopeDelta delta) {
-        // TODO(#1198 follow-up): reconcile workspace-side scope rows from delta.added + delta.removedExternalIds.
-        log.info(
-            "GitHub onScopeChanged (skeleton): ref={} added={} removed={}",
-            ref,
-            delta == null || delta.added() == null ? 0 : delta.added().size(),
-            delta == null || delta.removedExternalIds() == null ? 0 : delta.removedExternalIds().size()
-        );
-    }
-
-    @Override
-    public void onTenantRenamed(IntegrationRef ref, String oldName, String newName) {
-        // TODO(#1198 follow-up): update Connection.displayName + any workspace-side denormalized name.
-        log.info("GitHub onTenantRenamed (skeleton): ref={} {} -> {}", ref, oldName, newName);
     }
 }

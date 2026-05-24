@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationManifest;
-import de.tum.cit.aet.hephaestus.integration.spi.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectParser;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncSource;
@@ -41,19 +40,11 @@ public class IntegrationFrameworkBootstrap {
     private static final Logger log = LoggerFactory.getLogger(IntegrationFrameworkBootstrap.class);
 
     /**
-     * Capabilities that the framework does not (yet) enforce a per-kind bean for. Anything
-     * outside this set MUST be covered by {@link #checkRequired}: a future {@link Capability}
-     * literal added without a backing check fails the {@code unmappedCapabilities} guard
-     * below, so the bootstrap stays in lockstep with the enum.
-     *
-     * <p>Note: {@code REALTIME_INGEST} is unenforced because the realtime SPI is a separate
-     * follow-up (Discord Gateway / Slack Socket Mode); {@code ALERTS_INGEST} likewise
-     * has no SPI surface yet.
+     * Capabilities the bootstrap intentionally doesn't bind to a per-kind bean.
+     * Anything else MUST be covered by {@link #checkRequired} — the unmapped-guard
+     * below fails loudly if a future {@link Capability} literal slips in.
      */
-    private static final Set<Capability> UNENFORCED_CAPABILITIES = EnumSet.of(
-        Capability.REALTIME_INGEST,
-        Capability.ALERTS_INGEST
-    );
+    private static final Set<Capability> UNENFORCED_CAPABILITIES = EnumSet.noneOf(Capability.class);
 
     private final IntegrationManifestRegistry manifests;
     private final List<WebhookSignatureVerifier> signatureVerifiers;
@@ -62,7 +53,6 @@ public class IntegrationFrameworkBootstrap {
     private final List<SubjectParser> subjectParsers;
     private final List<ApiCredentialProvider> credentialProviders;
     private final List<TokenRefresher> tokenRefreshers;
-    private final List<RateLimitTracker> rateLimitTrackers;
     private final List<SyncSource> syncSources;
     private final List<FeedbackChannel> feedbackChannels;
     private final List<InlineFindingChannel> inlineFindingChannels;
@@ -77,7 +67,6 @@ public class IntegrationFrameworkBootstrap {
         List<SubjectParser> subjectParsers,
         List<ApiCredentialProvider> credentialProviders,
         List<TokenRefresher> tokenRefreshers,
-        List<RateLimitTracker> rateLimitTrackers,
         List<SyncSource> syncSources,
         List<FeedbackChannel> feedbackChannels,
         List<InlineFindingChannel> inlineFindingChannels,
@@ -91,7 +80,6 @@ public class IntegrationFrameworkBootstrap {
         this.subjectParsers = subjectParsers;
         this.credentialProviders = credentialProviders;
         this.tokenRefreshers = tokenRefreshers;
-        this.rateLimitTrackers = rateLimitTrackers;
         this.syncSources = syncSources;
         this.feedbackChannels = feedbackChannels;
         this.inlineFindingChannels = inlineFindingChannels;
@@ -145,12 +133,6 @@ public class IntegrationFrameworkBootstrap {
         if (declared.contains(Capability.TOKEN_REFRESH)) {
             require(kind, "TokenRefresher", anyMatchKind(tokenRefreshers, t -> t.kind() == kind), violations);
         }
-        if (declared.contains(Capability.RATE_LIMITED)) {
-            // Per-kind enforcement: a vendor that claims rate-limit awareness must wire
-            // its own tracker (otherwise we silently throttle no one).
-            require(kind, "RateLimitTracker",
-                anyMatchKind(rateLimitTrackers, t -> t.kind() == kind), violations);
-        }
         if (declared.contains(Capability.BACKFILL_SYNC)) {
             require(kind, "SyncSource", anyMatchKind(syncSources, s -> s.kind() == kind), violations);
         }
@@ -189,15 +171,11 @@ public class IntegrationFrameworkBootstrap {
         Capability.URL_VERIFICATION_HANDSHAKE,
         Capability.REPLAY_PROTECTION,
         Capability.TOKEN_REFRESH,
-        Capability.RATE_LIMITED,
         Capability.BACKFILL_SYNC,
         Capability.FEEDBACK_DELIVERY,
         Capability.INLINE_FINDINGS,
         Capability.APPROVAL_WORKFLOW,
-        Capability.SCOPE_CHANGES,
-        // Not bean-backed yet — declarable, but no per-kind SPI to require.
-        Capability.GIT_CONTENT_ACCESS,
-        Capability.STATUS_REPORTING
+        Capability.SCOPE_CHANGES
     );
 
     private static <T> boolean anyMatchKind(List<T> beans, Predicate<T> predicate) {

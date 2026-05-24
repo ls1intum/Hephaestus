@@ -1,30 +1,24 @@
 package de.tum.cit.aet.hephaestus.integration.spi;
 
 /**
- * Two-axis capability set declared by per-kind {@link IntegrationManifest}.
+ * Capability set declared by per-kind {@link IntegrationManifest}. Practices declare
+ * required capabilities; the UI gates on the workspace's union. Each declared
+ * capability binds to a specific bean-wiring requirement enforced at startup by
+ * {@code IntegrationFrameworkBootstrap}.
  *
- * <p>Practices declare {@code required_capabilities}; UI gating computes the
- * workspace's {@code activeCapabilities} as the union over its ACTIVE Connections'
- * manifests and shows only practices whose required set is satisfied.
- *
- * <p>Each declared capability binds to a specific bean-wiring requirement that
- * {@link IntegrationManifest} validation enforces at application-server startup.
+ * <p>This enum is intentionally narrow: every value is satisfied by code that ships
+ * today. New capabilities re-add once their SPI lands.
  */
 public enum Capability {
 
     /** Receives HTTP webhook events. */
     WEBHOOK_INGEST,
-    /** Needs the {@code RespondImmediately} verification short-circuit (Slack url_verification). */
+    /** Vendor sends a verification handshake the pipeline answers in-band (Slack). */
     URL_VERIFICATION_HANDSHAKE,
-    /** Has timestamp-based replay-window check (Slack 5-minute). */
+    /** Verifier rejects requests with stale timestamps (Slack 5-minute window). */
     REPLAY_PROTECTION,
-    /** Vendor enforces rate limits we should respect. */
-    RATE_LIMITED,
-    /** Has refresh tokens (OAuth). */
+    /** OAuth refresh tokens are minted via {@code TokenRefresher}. */
     TOKEN_REFRESH,
-    /** Realtime ingest via WebSocket (Discord Gateway, Slack Socket Mode, MS Bot Framework). */
-    REALTIME_INGEST,
-
 
     /** Implements {@code FeedbackChannel.postSummary}. */
     FEEDBACK_DELIVERY,
@@ -32,14 +26,8 @@ public enum Capability {
     INLINE_FINDINGS,
     /** Implements {@code ApprovalChannel.approve}. */
     APPROVAL_WORKFLOW,
-    /** Implements {@code GitContentPlatform} (clone + token resolution). */
-    GIT_CONTENT_ACCESS,
-    /** Posts commit/build status back to SCM (CI providers + SCM-bundled CI). */
-    STATUS_REPORTING,
-    /** Implements {@code SyncSource} with non-empty stream catalog. */
+    /** Implements {@code SyncSource} with a non-empty stream catalog. */
     BACKFILL_SYNC,
-    /** Emits {@code onScopeChanged} events. */
-    SCOPE_CHANGES,
-    /** Ingests observability alerts (Datadog, Sentry — scaffolded). */
-    ALERTS_INGEST
+    /** Listener emits {@code onScopeChanged} (channel join/leave, repo add/remove). */
+    SCOPE_CHANGES
 }

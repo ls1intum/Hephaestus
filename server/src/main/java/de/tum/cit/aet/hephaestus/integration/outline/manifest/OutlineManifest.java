@@ -7,19 +7,7 @@ import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/**
- * Outline manifest.
- *
- * <p>Per-webhook-subscription signing secrets (Notion-style). Capture flow lands with
- * #1203 alongside the subscription store; for #1198 first cut the manifest only
- * declares ingest so the framework can validate the wired SPI beans. The richer
- * capability set ({@code TOKEN_REFRESH}, {@code BACKFILL_SYNC},
- * {@code FEEDBACK_DELIVERY}, {@code RATE_LIMITED}) re-appears as their respective
- * SPI beans land.
- *
- * <p>{@code matchIfMissing = true}: ingest beans are wired now, so the manifest is on
- * by default — bootstrap exercises the framework even when the property isn't set.
- */
+/** Per-kind capability declaration for Outline. */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
 public class OutlineManifest implements IntegrationManifest {

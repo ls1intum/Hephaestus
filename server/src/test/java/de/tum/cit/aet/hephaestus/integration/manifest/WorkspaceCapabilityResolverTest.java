@@ -40,13 +40,13 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                 Capability.WEBHOOK_INGEST,
                 Capability.FEEDBACK_DELIVERY,
                 Capability.INLINE_FINDINGS,
-                Capability.GIT_CONTENT_ACCESS,
+                Capability.SCOPE_CHANGES,
                 Capability.BACKFILL_SYNC
             )),
             stubManifest(IntegrationKind.GITLAB, Set.of(
                 Capability.WEBHOOK_INGEST,
                 Capability.FEEDBACK_DELIVERY,
-                Capability.GIT_CONTENT_ACCESS
+                Capability.SCOPE_CHANGES
             )),
             stubManifest(IntegrationKind.SLACK, Set.of(
                 Capability.WEBHOOK_INGEST,
@@ -84,7 +84,7 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                     Capability.WEBHOOK_INGEST,
                     Capability.FEEDBACK_DELIVERY,
                     Capability.INLINE_FINDINGS,
-                    Capability.GIT_CONTENT_ACCESS,
+                    Capability.SCOPE_CHANGES,
                     Capability.BACKFILL_SYNC
                 );
         }
@@ -103,7 +103,7 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                 .containsExactlyInAnyOrder(
                     Capability.WEBHOOK_INGEST,
                     Capability.FEEDBACK_DELIVERY,
-                    Capability.GIT_CONTENT_ACCESS,
+                    Capability.SCOPE_CHANGES,
                     Capability.URL_VERIFICATION_HANDSHAKE
                 );
         }
@@ -124,7 +124,7 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                     Capability.WEBHOOK_INGEST,
                     Capability.FEEDBACK_DELIVERY,
                     Capability.INLINE_FINDINGS,
-                    Capability.GIT_CONTENT_ACCESS,
+                    Capability.SCOPE_CHANGES,
                     Capability.BACKFILL_SYNC
                 );
         }
