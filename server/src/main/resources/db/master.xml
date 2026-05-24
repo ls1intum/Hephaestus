@@ -76,4 +76,5 @@
     <include file="./changelog/1779173113243_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779520390544_worker_runtime_substrate.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700000000_integration_framework.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1779700100000_agent_job_integration_classification.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

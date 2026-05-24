@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.spi.SubjectClass;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -33,6 +35,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.springframework.lang.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -86,6 +89,35 @@ public class AgentJob {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private AgentJobStatus status = AgentJobStatus.QUEUED;
+
+    /**
+     * Identifies which external system this job runs against. Resolves the per-kind
+     * {@code FeedbackChannel} / {@code InlineFindingChannel} via the unified
+     * integration manifest registry — replaces dispatch keyed off
+     * {@code workspace.git_provider_mode}.
+     *
+     * <p>Nullable for legacy rows created before #1198; the backfill in changeset
+     * {@code 1779700100000-3} maps {@code git_provider_mode} to a {@link IntegrationKind}
+     * for all existing rows. New rows MUST set this at submit time.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "integration_kind", length = 48)
+    @Nullable
+    private IntegrationKind integrationKind;
+
+    /**
+     * Discriminator for the work subject this job analyses. Drives polymorphic agent
+     * dispatch — for example {@code DiffNotePoster} short-circuits when this is not
+     * {@link SubjectClass#PULL_REQUEST} so issues / docs / threads don't attempt
+     * diff-note delivery.
+     *
+     * <p>Nullable for legacy rows; backfill assumes {@code PULL_REQUEST} because
+     * today's review pipeline only operates on PRs/MRs.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subject_class", length = 48)
+    @Nullable
+    private SubjectClass subjectClass;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")

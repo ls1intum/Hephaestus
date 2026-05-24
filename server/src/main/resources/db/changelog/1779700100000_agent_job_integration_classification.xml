@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        #1198 Unified Integration Framework — agent-job polymorphic dispatch.
+
+        Adds integration_kind + subject_class to agent_job so the agent dispatch layer
+        can resolve per-kind FeedbackChannel / InlineFindingChannel beans through the
+        unified registry without a switch on workspace.git_provider_mode, and so
+        diff-note delivery can short-circuit when the subject is not a pull/merge
+        request (issue, document, thread, ...).
+
+        Both columns are nullable — legacy rows existed before the framework. A
+        one-time backfill derives integration_kind from workspace.git_provider_mode
+        and assumes subject_class=PULL_REQUEST since today's review pipeline operates
+        only on PRs/MRs. Future job types (issue triage, doc review, ...) will set
+        these explicitly at submit time.
+
+        Idempotent: <addColumn> is wrapped in column-existence preconditions so the
+        changeset re-applies cleanly across worktrees and partial-state environments.
+    -->
+
+    <changeSet author="hephaestus-1198" id="1779700100000-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.integration_kind already present">
+            <not><columnExists tableName="agent_job" columnName="integration_kind"/></not>
+        </preConditions>
+        <comment>Add integration_kind: enables per-kind dispatch (GITHUB/GITLAB/SLACK/OUTLINE).</comment>
+        <addColumn tableName="agent_job">
+            <column name="integration_kind" type="varchar(48)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="integration_kind"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700100000-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.subject_class already present">
+            <not><columnExists tableName="agent_job" columnName="subject_class"/></not>
+        </preConditions>
+        <comment>Add subject_class: drives polymorphic dispatch (PULL_REQUEST, ISSUE, ...).</comment>
+        <addColumn tableName="agent_job">
+            <column name="subject_class" type="varchar(48)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="subject_class"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700100000-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job classification backfill already applied">
+            <and>
+                <columnExists tableName="agent_job" columnName="integration_kind"/>
+                <columnExists tableName="agent_job" columnName="subject_class"/>
+                <tableExists tableName="workspace"/>
+                <columnExists tableName="workspace" columnName="git_provider_mode"/>
+                <sqlCheck expectedResult="0">
+                    SELECT COUNT(*) FROM agent_job WHERE integration_kind IS NOT NULL OR subject_class IS NOT NULL
+                </sqlCheck>
+            </and>
+        </preConditions>
+        <comment>
+            One-time backfill — map workspace.git_provider_mode to integration_kind:
+            GITHUB_APP_INSTALLATION | PAT_ORG -> GITHUB
+            GITLAB_PAT -> GITLAB
+            All legacy review jobs operate on PRs/MRs -> subject_class = PULL_REQUEST.
+        </comment>
+        <sql>
+            UPDATE agent_job j
+            SET integration_kind = CASE w.git_provider_mode
+                    WHEN 'GITHUB_APP_INSTALLATION' THEN 'GITHUB'
+                    WHEN 'PAT_ORG'                 THEN 'GITHUB'
+                    WHEN 'GITLAB_PAT'              THEN 'GITLAB'
+                    ELSE NULL
+                END,
+                subject_class = 'PULL_REQUEST'
+            FROM workspace w
+            WHERE j.workspace_id = w.id
+              AND j.integration_kind IS NULL
+              AND j.subject_class IS NULL;
+        </sql>
+        <rollback>
+            <!-- Backfill is data-only; column drop in changesets -1/-2 rolls back the schema. -->
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700100000-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_agent_job_subject already present">
+            <not><indexExists indexName="idx_agent_job_subject"/></not>
+        </preConditions>
+        <comment>
+            Index for agent-job filter queries: per-(kind, subject) timelines and
+            kind-scoped recent-jobs listings. created_at DESC supports cursor pagination.
+        </comment>
+        <createIndex tableName="agent_job" indexName="idx_agent_job_subject">
+            <column name="integration_kind"/>
+            <column name="subject_class"/>
+            <column name="created_at" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="agent_job" indexName="idx_agent_job_subject"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
