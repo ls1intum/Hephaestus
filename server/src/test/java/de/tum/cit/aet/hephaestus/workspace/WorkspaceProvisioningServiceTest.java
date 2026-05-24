@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
@@ -36,7 +37,7 @@ class WorkspaceProvisioningServiceTest {
     private WorkspaceService workspaceService;
 
     @Mock
-    private WorkspaceInstallationService workspaceInstallationService;
+    private GithubLifecycleListener githubLifecycleListener;
 
     @Mock
     private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
@@ -88,7 +89,7 @@ class WorkspaceProvisioningServiceTest {
             workspaceRepository,
             repositoryToMonitorRepository,
             workspaceService,
-            workspaceInstallationService,
+            githubLifecycleListener,
             workspaceRepositoryMonitorService,
             gitHubAppTokenService,
             userRepository,

@@ -102,7 +102,7 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         workspace.setPersonalAccessToken(null);
         workspaceRepository.save(workspace);
 
-        Workspace promoted = workspaceInstallationService.createOrUpdateFromInstallation(
+        Workspace promoted = githubLifecycleListener.createOrUpdateFromInstallation(
             95711017L,
             "ls1intum",
             RepositorySelection.ALL

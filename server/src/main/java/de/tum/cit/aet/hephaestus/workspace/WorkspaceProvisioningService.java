@@ -9,8 +9,9 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
@@ -41,7 +42,7 @@ public class WorkspaceProvisioningService {
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final WorkspaceService workspaceService;
-    private final WorkspaceInstallationService workspaceInstallationService;
+    private final GithubLifecycleListener githubLifecycleListener;
     private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
     private final GitHubAppTokenService gitHubAppTokenService;
     private final UserRepository userRepository;
@@ -58,7 +59,7 @@ public class WorkspaceProvisioningService {
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceService workspaceService,
-        WorkspaceInstallationService workspaceInstallationService,
+        GithubLifecycleListener githubLifecycleListener,
         WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService,
         GitHubAppTokenService gitHubAppTokenService,
         UserRepository userRepository,
@@ -73,7 +74,7 @@ public class WorkspaceProvisioningService {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceService = workspaceService;
-        this.workspaceInstallationService = workspaceInstallationService;
+        this.githubLifecycleListener = githubLifecycleListener;
         this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.userRepository = userRepository;
@@ -577,7 +578,7 @@ public class WorkspaceProvisioningService {
                 .findByInstallationId(installation.id())
                 .ifPresent(ws -> {
                     if (ws.getStatus() != Workspace.WorkspaceStatus.SUSPENDED) {
-                        workspaceInstallationService.updateWorkspaceStatus(
+                        githubLifecycleListener.updateWorkspaceStatus(
                             installation.id(),
                             Workspace.WorkspaceStatus.SUSPENDED
                         );
@@ -611,15 +612,15 @@ public class WorkspaceProvisioningService {
         );
 
         var account = installation.account();
-        ProvisioningListener.AccountType wsAccountType = "Organization".equalsIgnoreCase(accountType)
-            ? ProvisioningListener.AccountType.ORGANIZATION
-            : ProvisioningListener.AccountType.USER;
+        IntegrationLifecycleListener.AccountKind wsAccountKind = "Organization".equalsIgnoreCase(accountType)
+            ? IntegrationLifecycleListener.AccountKind.ORGANIZATION
+            : IntegrationLifecycleListener.AccountKind.USER;
 
-        Workspace workspace = workspaceInstallationService.createOrUpdateFromInstallation(
+        Workspace workspace = githubLifecycleListener.createOrUpdateFromInstallation(
             installationId,
             account.id(),
             login,
-            wsAccountType,
+            wsAccountKind,
             account.avatarUrl(),
             selection
         );

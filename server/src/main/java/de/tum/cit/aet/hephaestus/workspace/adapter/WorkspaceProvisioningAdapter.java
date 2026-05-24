@@ -1,10 +1,11 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceInstallationService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
@@ -23,7 +24,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceProvisioningAdapter.class);
 
-    private final WorkspaceInstallationService workspaceInstallationService;
+    private final GithubLifecycleListener githubLifecycleListener;
     private final WorkspaceRepositoryMonitorService repositoryMonitorService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final WorkspaceRepository workspaceRepository;
@@ -33,14 +34,14 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
     private final AsyncTaskExecutor monitoringExecutor;
 
     public WorkspaceProvisioningAdapter(
-        WorkspaceInstallationService workspaceInstallationService,
+        GithubLifecycleListener githubLifecycleListener,
         WorkspaceRepositoryMonitorService repositoryMonitorService,
         WorkspaceScopeFilter workspaceScopeFilter,
         WorkspaceRepository workspaceRepository,
         ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
-        this.workspaceInstallationService = workspaceInstallationService;
+        this.githubLifecycleListener = githubLifecycleListener;
         this.repositoryMonitorService = repositoryMonitorService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.workspaceRepository = workspaceRepository;
@@ -71,11 +72,11 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         }
 
         RepositorySelection selection = RepositorySelection.SELECTED; // Default selection
-        Workspace workspace = workspaceInstallationService.createOrUpdateFromInstallation(
+        Workspace workspace = githubLifecycleListener.createOrUpdateFromInstallation(
             installation.installationId(),
             installation.accountId(),
             installation.accountLogin(),
-            installation.accountType(),
+            mapAccountKind(installation.accountType()),
             installation.avatarUrl(),
             selection
         );
@@ -132,14 +133,14 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         }
 
         // 1. Stop NATS consumer for the workspace first (before removing monitors)
-        workspaceInstallationService.stopNatsForInstallation(installationId);
+        githubLifecycleListener.stopNatsForInstallation(installationId);
 
         // 2. Remove all repository monitors AND delete repositories for this installation
         // When installation is deleted, we clean up all associated data
         repositoryMonitorService.removeAllRepositoriesFromMonitor(installationId, true);
 
         // 3. Mark workspace as PURGED (not SUSPENDED - deleted is permanent)
-        workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.PURGED);
+        githubLifecycleListener.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.PURGED);
 
         log.info("Completed installation cleanup: installationId={}", installationId);
     }
@@ -214,7 +215,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
             return;
         }
 
-        workspaceInstallationService.handleAccountRename(installationId, oldLogin, newLogin);
+        githubLifecycleListener.handleAccountRename(installationId, oldLogin, newLogin);
     }
 
     @Override
@@ -225,8 +226,8 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         }
 
         // Stop NATS consumer first to stop processing webhook events
-        workspaceInstallationService.stopNatsForInstallation(installationId);
-        workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.SUSPENDED);
+        githubLifecycleListener.stopNatsForInstallation(installationId);
+        githubLifecycleListener.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.SUSPENDED);
         log.info("Suspended installation: installationId={}", installationId);
     }
 
@@ -238,7 +239,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         }
 
         // Update status first
-        workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
+        githubLifecycleListener.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
 
         // Sync after the outer transaction commits so RepositoryToMonitor rows are visible.
         workspaceRepository
@@ -261,7 +262,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
             });
 
         // Start NATS consumer to resume webhook processing
-        workspaceInstallationService.startNatsForInstallation(installationId);
+        githubLifecycleListener.startNatsForInstallation(installationId);
         log.info("Activated installation: installationId={}", installationId);
     }
 
@@ -273,7 +274,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         }
 
         RepositorySelection repoSelection = parseRepositorySelection(selection);
-        workspaceInstallationService.updateRepositorySelection(installationId, repoSelection);
+        githubLifecycleListener.updateRepositorySelection(installationId, repoSelection);
         log.debug("Updated repository selection: installationId={}, selection={}", installationId, repoSelection);
     }
 
@@ -308,5 +309,21 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
             return RepositorySelection.ALL;
         }
         return RepositorySelection.SELECTED;
+    }
+
+    /**
+     * Bridges the legacy {@link ProvisioningListener.AccountType} enum (GitHub-shaped, 2 values)
+     * to the framework-wide {@link IntegrationLifecycleListener.AccountKind} (3 values, includes
+     * {@code TEAM_WORKSPACE} for Slack/Outline). The third value is unreachable from the GitHub
+     * SPI surface, hence the simple binary mapping.
+     */
+    private static IntegrationLifecycleListener.AccountKind mapAccountKind(ProvisioningListener.AccountType type) {
+        if (type == null) {
+            return IntegrationLifecycleListener.AccountKind.ORGANIZATION;
+        }
+        return switch (type) {
+            case ORGANIZATION -> IntegrationLifecycleListener.AccountKind.ORGANIZATION;
+            case USER -> IntegrationLifecycleListener.AccountKind.USER;
+        };
     }
 }
