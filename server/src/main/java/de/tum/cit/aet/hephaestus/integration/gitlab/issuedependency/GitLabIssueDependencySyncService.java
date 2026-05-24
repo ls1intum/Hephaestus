@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
 import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.HashSet;

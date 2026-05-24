@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

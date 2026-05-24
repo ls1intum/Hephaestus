@@ -23,9 +23,9 @@ import de.tum.cit.aet.hephaestus.integration.github.pullrequestreview.GitHubPull
 import de.tum.cit.aet.hephaestus.integration.github.pullrequestreview.GitHubPullRequestReviewSyncService;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequestreviewcomment.GitHubPullRequestReviewCommentSyncService;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties.BackfillProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties.FilterProperties;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties.BackfillProperties;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties.FilterProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.backfill.HistoricalBackfillService.BackfillCycleResult;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.backfill.HistoricalBackfillService.BackfillProgress;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;

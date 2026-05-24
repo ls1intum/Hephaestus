@@ -27,7 +27,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.gitprovider.issuetype.IssueTypeRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;

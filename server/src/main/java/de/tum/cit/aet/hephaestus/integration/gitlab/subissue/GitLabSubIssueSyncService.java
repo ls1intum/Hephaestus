@@ -11,7 +11,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
 import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;

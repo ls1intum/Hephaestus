@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.sync;
+package de.tum.cit.aet.hephaestus.integration.sync;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;

@@ -23,7 +23,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Collections;
 import java.util.List;

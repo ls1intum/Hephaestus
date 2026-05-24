@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import jakarta.annotation.PostConstruct;
 import java.util.Collections;
 import java.util.Locale;

@@ -18,7 +18,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;

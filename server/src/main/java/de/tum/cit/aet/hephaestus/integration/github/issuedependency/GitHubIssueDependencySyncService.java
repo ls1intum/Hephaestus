@@ -32,7 +32,7 @@ import de.tum.cit.aet.hephaestus.integration.github.issue.GitHubIssueProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;

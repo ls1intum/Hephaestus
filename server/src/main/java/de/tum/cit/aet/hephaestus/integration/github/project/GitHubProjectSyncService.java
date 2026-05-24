@@ -42,8 +42,8 @@ import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFie
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldValueDTO;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectItemDTO;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectStatusUpdateDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncResult;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;

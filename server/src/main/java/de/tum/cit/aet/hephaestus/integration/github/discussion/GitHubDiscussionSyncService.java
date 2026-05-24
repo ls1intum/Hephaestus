@@ -39,7 +39,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHDiscussionCo
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.time.Duration;
 import java.time.Instant;

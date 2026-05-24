@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.github.organization.GitHubOrganizat
 import de.tum.cit.aet.hephaestus.gitprovider.project.Project;
 import de.tum.cit.aet.hephaestus.integration.github.project.GitHubProjectSyncService;
 import de.tum.cit.aet.hephaestus.integration.github.subissue.GitHubSubIssueSyncService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.github.team.GitHubTeamSyncService;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;

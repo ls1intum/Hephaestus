@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.util.ArrayList;
