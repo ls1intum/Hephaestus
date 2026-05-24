@@ -81,7 +81,13 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         // #1198 unified integration framework
         "Connection", // has direct Workspace field
         "ConnectionAudit", // through Connection.workspace
-        "FeedbackPost" // through Connection.workspace
+        "FeedbackPost", // through Connection.workspace
+        // #1198 Slack + Outline persistence (#1204/#1205 runtime tables)
+        // Workspace-scoped via Connection.workspace; deletion rules + ToS contract in entity Javadoc.
+        "SlackChannel",
+        "SlackMessage",
+        "OutlineDocument",
+        "OutlineCollection"
     );
 
     /**

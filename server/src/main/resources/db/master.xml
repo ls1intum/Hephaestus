@@ -79,4 +79,6 @@
     <include file="./changelog/1779700100000_agent_job_integration_classification.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700200000_practice_capability_gating.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700300000_workspace_connection_backfill.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1779700400000_slack_persistence.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1779700500000_outline_persistence.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

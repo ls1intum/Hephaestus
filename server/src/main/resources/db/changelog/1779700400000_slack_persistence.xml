@@ -1,0 +1,121 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        #1198 Slack persistence — promotes the previously value-only SlackChannelRef +
+        SlackMessageRef to first-class workspace-scoped entities.
+
+        ToS basis: Salesforce Slack API ToS permits workspace-internal persistence as
+        long as (a) data stays within tenant boundary (FK→connection, cascade delete),
+        (b) deletion events are honored (message_deleted via SlackMessageDeletionHandler,
+        channel_deleted via SlackLifecycleListener, app_uninstalled / tokens_revoked via
+        connection cascade), (c) no cross-customer aggregation, (d) at-rest encryption.
+
+        See SlackMessage javadoc for the full contract.
+    -->
+
+    <changeSet author="hephaestus-1198" id="1779700400000-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_channel table already present">
+            <not><tableExists tableName="slack_channel"/></not>
+        </preConditions>
+        <comment>Slack channel metadata — one row per (connection, channel_id).</comment>
+        <createTable tableName="slack_channel">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_slack_channel" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="channel_id" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="varchar(256)"/>
+            <column name="topic" type="text"/>
+            <column name="purpose" type="text"/>
+            <column name="is_archived" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="archived_at" type="timestamp with time zone"/>
+            <column name="member_count" type="integer"/>
+            <column name="ingested_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="slack_channel"
+            baseColumnNames="connection_id"
+            referencedTableName="connection"
+            referencedColumnNames="id"
+            constraintName="fk_slack_channel_connection"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="slack_channel"
+                             columnNames="connection_id, channel_id"
+                             constraintName="uq_slack_channel"/>
+        <createIndex tableName="slack_channel" indexName="ix_slack_channel_connection">
+            <column name="connection_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="slack_channel"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700400000-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_message table already present">
+            <not><tableExists tableName="slack_message"/></not>
+        </preConditions>
+        <comment>Slack message — workspace-scoped via Connection. Soft-deleted on message_deleted.</comment>
+        <createTable tableName="slack_message">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_slack_message" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="team_id" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="channel_id" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ts" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="thread_ts" type="varchar(64)"/>
+            <column name="user_id" type="varchar(64)"/>
+            <column name="text" type="text"/>
+            <column name="blocks" type="jsonb"/>
+            <column name="ingested_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp with time zone"/>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="slack_message"
+            baseColumnNames="connection_id"
+            referencedTableName="connection"
+            referencedColumnNames="id"
+            constraintName="fk_slack_message_connection"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="slack_message"
+                             columnNames="connection_id, team_id, channel_id, ts"
+                             constraintName="uq_slack_message"/>
+        <!--
+            Composite (connection_id, channel_id, ts DESC) supports the dominant access
+            pattern: newest-first thread fetch within a channel. ts DESC must be the trailing
+            column so the scan terminates after K rows for K-window mentor context loads.
+        -->
+        <sql>
+            CREATE INDEX ix_slack_message_thread
+                ON slack_message (connection_id, channel_id, ts DESC);
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS ix_slack_message_thread;</sql>
+            <dropTable tableName="slack_message"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,106 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        #1198 Outline persistence — promotes the previously value-only OutlineDocumentRef
+        to a first-class entity and introduces OutlineCollection.
+
+        Deletion contract:
+          - documents.delete            → soft delete (deleted_at)
+          - collections.delete          → soft delete documents + the collection
+          - app_uninstalled / tokens_revoked → physical cascade via connection FK
+    -->
+
+    <changeSet author="hephaestus-1198" id="1779700500000-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_collection table already present">
+            <not><tableExists tableName="outline_collection"/></not>
+        </preConditions>
+        <comment>Outline collection — one row per (connection, collection_id).</comment>
+        <createTable tableName="outline_collection">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_outline_collection" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="collection_id" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="varchar(256)"/>
+            <column name="description" type="text"/>
+            <column name="url" type="varchar(1024)"/>
+            <column name="ingested_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp with time zone"/>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="outline_collection"
+            baseColumnNames="connection_id"
+            referencedTableName="connection"
+            referencedColumnNames="id"
+            constraintName="fk_outline_collection_connection"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="outline_collection"
+                             columnNames="connection_id, collection_id"
+                             constraintName="uq_outline_collection"/>
+        <createIndex tableName="outline_collection" indexName="ix_outline_collection_connection">
+            <column name="connection_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="outline_collection"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779700500000-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_document table already present">
+            <not><tableExists tableName="outline_document"/></not>
+        </preConditions>
+        <comment>Outline document — workspace-scoped via Connection.</comment>
+        <createTable tableName="outline_document">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_outline_document" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="document_id" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="collection_id" type="varchar(64)"/>
+            <column name="title" type="varchar(512)"/>
+            <column name="url" type="varchar(1024)"/>
+            <column name="last_revision_id" type="varchar(64)"/>
+            <column name="last_modified_at" type="timestamp with time zone"/>
+            <column name="ingested_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp with time zone"/>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="outline_document"
+            baseColumnNames="connection_id"
+            referencedTableName="connection"
+            referencedColumnNames="id"
+            constraintName="fk_outline_document_connection"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="outline_document"
+                             columnNames="connection_id, document_id"
+                             constraintName="uq_outline_document"/>
+        <createIndex tableName="outline_document" indexName="ix_outline_document_connection">
+            <column name="connection_id"/>
+        </createIndex>
+        <createIndex tableName="outline_document" indexName="ix_outline_document_collection">
+            <column name="connection_id"/>
+            <column name="collection_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="outline_document"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
