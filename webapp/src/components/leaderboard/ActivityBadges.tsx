@@ -1,17 +1,13 @@
-import {
-	CheckIcon,
-	ChevronLeftIcon,
-	CommentDiscussionIcon,
-	CommentIcon,
-	FileDiffIcon,
-	IssueClosedIcon,
-	IssueOpenedIcon,
-} from "@primer/octicons-react";
-import { MessageSquareReply } from "lucide-react";
+import { ChevronLeftIcon } from "@primer/octicons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
+import type { ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
+import {
+	type ActivityBadgeCounts,
+	type ActivityBadgeMetadata,
+	getActivityBadgeMetadata,
+} from "./activity-badge-metadata";
 import type { ReviewedPullRequest } from "./ReviewsPopover";
 import { ReviewsPopover } from "./ReviewsPopover";
 
@@ -50,32 +46,24 @@ export function ActivityBadges({
 	isLoading = false,
 	providerType = "GITHUB",
 }: ActivityBadgesProps) {
-	const terms = getProviderTerms(providerType);
-	const { icon: OpenPrIcon, colorClass: openPrColorClass } = getPullRequestStateIcon(
-		providerType,
-		"OPEN",
-	);
-	const { icon: MergedPrIcon, colorClass: mergedPrColorClass } = getPullRequestStateIcon(
-		providerType,
-		"MERGED",
-	);
-	const { icon: ClosedPrIcon, colorClass: closedPrColorClass } = getPullRequestStateIcon(
-		providerType,
-		"CLOSED",
-	);
-	const hasVisibleOnlyActivity =
-		ownReplies > 0 ||
-		openPullRequests > 0 ||
-		mergedPullRequests > 0 ||
-		closedPullRequests > 0 ||
-		openedIssues > 0 ||
-		closedIssues > 0;
+	const counts: ActivityBadgeCounts = {
+		changeRequests,
+		approvals,
+		comments,
+		codeComments,
+		ownReplies,
+		openPullRequests,
+		mergedPullRequests,
+		closedPullRequests,
+		openedIssues,
+		closedIssues,
+	};
+	const activityBadgeMetadata = getActivityBadgeMetadata(providerType);
+	const scoredActivityBadges = activityBadgeMetadata.filter((item) => item.countsTowardScore);
+	const visibleOnlyActivityBadges = activityBadgeMetadata.filter((item) => !item.countsTowardScore);
 	const hasScoredActivity =
-		reviewedPullRequests.length > 0 ||
-		changeRequests > 0 ||
-		approvals > 0 ||
-		comments > 0 ||
-		codeComments > 0;
+		reviewedPullRequests.length > 0 || scoredActivityBadges.some((item) => counts[item.key] > 0);
+	const hasVisibleOnlyActivity = visibleOnlyActivityBadges.some((item) => counts[item.key] > 0);
 
 	const hasActivity = hasScoredActivity || hasVisibleOnlyActivity;
 
@@ -108,150 +96,40 @@ export function ActivityBadges({
 					</div>
 				</>
 			)}
-			{changeRequests > 0 && (
-				<Tooltip>
-					<TooltipTrigger
-						className="cursor-help"
-						aria-label={`${changeRequests} changes requested. Counts toward score.`}
-						render={<div className="flex items-center gap-1 text-provider-danger-foreground" />}
-					>
-						<FileDiffIcon className="h-4 w-4" />
-						<span>{changeRequests}</span>
-					</TooltipTrigger>
-					<TooltipContent>Changes Requested</TooltipContent>
-				</Tooltip>
-			)}
-			{approvals > 0 && (
-				<Tooltip>
-					<TooltipTrigger
-						className="cursor-help"
-						aria-label={`${approvals} approvals. Counts toward score.`}
-						render={<div className="flex items-center gap-1 text-provider-success-foreground" />}
-					>
-						<CheckIcon className="h-4 w-4" />
-						<span>{approvals}</span>
-					</TooltipTrigger>
-					<TooltipContent>Approvals</TooltipContent>
-				</Tooltip>
-			)}
-			{comments > 0 && (
-				<Tooltip>
-					<TooltipTrigger
-						className="cursor-help"
-						aria-label={`${comments} comment reviews. Counts toward score.`}
-						render={<div className="flex items-center gap-1 text-provider-muted-foreground" />}
-					>
-						<CommentIcon className="h-4 w-4" />
-						<span>{comments}</span>
-					</TooltipTrigger>
-					<TooltipContent>Review comments</TooltipContent>
-				</Tooltip>
-			)}
-			{codeComments > 0 && (
-				<Tooltip>
-					<TooltipTrigger
-						className="cursor-help"
-						aria-label={`${codeComments} scored inline feedback comments on ${terms.pullRequests.toLowerCase()} authored by someone else. Counts toward score.`}
-						render={<div className="flex items-center gap-1 text-provider-muted-foreground" />}
-					>
-						<CommentDiscussionIcon className="h-4 w-4" />
-						<span>{codeComments}</span>
-					</TooltipTrigger>
-					<TooltipContent>
-						Inline comments on someone else&apos;s {terms.pullRequests.toLowerCase()}. Counts toward
-						score.
-					</TooltipContent>
-				</Tooltip>
-			)}
+			{scoredActivityBadges.map((item) => (
+				<ActivityBadgeItem key={item.key} item={item} count={counts[item.key]} />
+			))}
 			{hasScoredActivity && hasVisibleOnlyActivity && (
 				<div className="mx-1 h-4 border-l border-border" aria-hidden="true" />
 			)}
-			{ownReplies > 0 && (
-				<Tooltip>
-					<TooltipTrigger
-						className="cursor-help"
-						aria-label={`${ownReplies} replies on your own ${terms.pullRequests.toLowerCase()} and inline threads. Visible only and does not affect score.`}
-						render={<div className="flex items-center gap-1 text-provider-muted-foreground" />}
-					>
-						<MessageSquareReply className="h-4 w-4" />
-						<span>{ownReplies}</span>
-					</TooltipTrigger>
-					<TooltipContent>
-						Replies on your own {terms.pullRequests.toLowerCase()}. Doesn&apos;t affect score.
-					</TooltipContent>
-				</Tooltip>
-			)}
-			{openPullRequests > 0 && (
-				<Tooltip>
-					<TooltipTrigger
-						className="cursor-help"
-						aria-label={`${openPullRequests} open ${terms.pullRequests.toLowerCase()} you authored. Visible only and does not affect score.`}
-						render={<div className={cn("flex items-center gap-1", openPrColorClass)} />}
-					>
-						<OpenPrIcon className="h-4 w-4" />
-						<span>{openPullRequests}</span>
-					</TooltipTrigger>
-					<TooltipContent>
-						Your open {terms.pullRequests.toLowerCase()}. Doesn&apos;t affect score.
-					</TooltipContent>
-				</Tooltip>
-			)}
-			{mergedPullRequests > 0 && (
-				<Tooltip>
-					<TooltipTrigger
-						className="cursor-help"
-						aria-label={`${mergedPullRequests} merged ${terms.pullRequests.toLowerCase()} you authored. Visible only and does not affect score.`}
-						render={<div className={cn("flex items-center gap-1", mergedPrColorClass)} />}
-					>
-						<MergedPrIcon className="h-4 w-4" />
-						<span>{mergedPullRequests}</span>
-					</TooltipTrigger>
-					<TooltipContent>
-						Your merged {terms.pullRequests.toLowerCase()}. Doesn&apos;t affect score.
-					</TooltipContent>
-				</Tooltip>
-			)}
-			{closedPullRequests > 0 && (
-				<Tooltip>
-					<TooltipTrigger
-						className="cursor-help"
-						aria-label={`${closedPullRequests} closed ${terms.pullRequests.toLowerCase()} you authored. Visible only and does not affect score.`}
-						render={<div className={cn("flex items-center gap-1", closedPrColorClass)} />}
-					>
-						<ClosedPrIcon className="h-4 w-4" />
-						<span>{closedPullRequests}</span>
-					</TooltipTrigger>
-					<TooltipContent>
-						Your closed {terms.pullRequests.toLowerCase()}. Doesn&apos;t affect score.
-					</TooltipContent>
-				</Tooltip>
-			)}
-			{openedIssues > 0 && (
-				<Tooltip>
-					<TooltipTrigger
-						className="cursor-help"
-						aria-label={`${openedIssues} opened issues. Visible only and does not affect score.`}
-						render={<div className="flex items-center gap-1 text-provider-open-foreground" />}
-					>
-						<IssueOpenedIcon className="h-4 w-4" />
-						<span>{openedIssues}</span>
-					</TooltipTrigger>
-					<TooltipContent>Issues you opened. Doesn&apos;t affect score.</TooltipContent>
-				</Tooltip>
-			)}
-			{closedIssues > 0 && (
-				<Tooltip>
-					<TooltipTrigger
-						className="cursor-help"
-						aria-label={`${closedIssues} closed issues. Visible only and does not affect score.`}
-						render={<div className="flex items-center gap-1 text-provider-done-foreground" />}
-					>
-						<IssueClosedIcon className="h-4 w-4" />
-						<span>{closedIssues}</span>
-					</TooltipTrigger>
-					<TooltipContent>Issues you closed. Doesn&apos;t affect score.</TooltipContent>
-				</Tooltip>
-			)}
+			{visibleOnlyActivityBadges.map((item) => (
+				<ActivityBadgeItem key={item.key} item={item} count={counts[item.key]} />
+			))}
 		</div>
+	);
+}
+
+interface ActivityBadgeItemProps {
+	item: ActivityBadgeMetadata;
+	count: number;
+}
+
+function ActivityBadgeItem({ item, count }: ActivityBadgeItemProps) {
+	if (count <= 0) return null;
+
+	const Icon = item.icon;
+
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				className="cursor-help"
+				aria-label={item.ariaLabel(count)}
+				render={<div className={cn("flex items-center gap-1", item.colorClass)} />}
+			>
+				<Icon className="h-4 w-4" />
+				<span>{count}</span>
+			</TooltipTrigger>
+			<TooltipContent>{item.tooltip}</TooltipContent>
+		</Tooltip>
 	);
 }
