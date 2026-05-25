@@ -1,9 +1,9 @@
-package de.tum.cit.aet.hephaestus.gitprovider.common.spi;
+package de.tum.cit.aet.hephaestus.integration.spi;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.TeamSyncState;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.UserSyncState;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncMetadata;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncType;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.TeamSyncState;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.UserSyncState;
 import java.time.Instant;
 import java.util.Optional;
 

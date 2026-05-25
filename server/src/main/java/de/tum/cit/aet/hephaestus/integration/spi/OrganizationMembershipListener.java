@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.common.spi;
+package de.tum.cit.aet.hephaestus.integration.spi;
 
 /**
  * Listener for organization membership change events.

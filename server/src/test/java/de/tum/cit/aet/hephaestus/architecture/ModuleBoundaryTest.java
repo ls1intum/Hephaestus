@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
  * <h2>Key Boundaries Enforced</h2>
  * <ol>
  *   <li><b>gitprovider isolation</b> - Cannot depend on feature modules (uses SPI for callbacks)</li>
- *   <li><b>SPI pattern</b> - gitprovider.common.spi defines contracts; workspace.adapter implements</li>
+ *   <li><b>SPI pattern</b> - integration.spi defines contracts; workspace.adapter implements</li>
  *   <li><b>Provider isolation</b> - GitHub-specific classes must be in github/ subpackages</li>
  *   <li><b>Domain events</b> - Cross-cutting concerns via events, not direct coupling</li>
  * </ol>
@@ -43,7 +43,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
     class SpiPatternTests {
 
         /**
-         * SPI interfaces in gitprovider.common.spi should be interfaces.
+         * SPI classes in integration.spi should be interfaces.
          *
          * <p>SPIs define contracts that external modules implement to provide
          * workspace context, authentication, and sync targets to the core.
@@ -53,16 +53,18 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         void spiClassesAreInterfaces() {
             ArchRule rule = classes()
                 .that()
-                .resideInAPackage("..gitprovider.common.spi..")
+                .resideInAPackage("..integration.spi..")
                 .and()
                 .areNotRecords()
                 .and()
                 .areNotEnums()
                 .and()
                 .areNotMemberClasses()
+                .and()
+                .haveSimpleNameNotEndingWith("Exception")
                 .should()
                 .beInterfaces()
-                .because("SPI classes define contracts and should be interfaces");
+                .because("SPI classes define contracts and should be interfaces (exceptions excepted)");
             rule.check(classes);
         }
 
@@ -105,7 +107,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         void spiInterfacesAreFrameworkAgnostic() {
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..gitprovider.common.spi..")
+                .resideInAPackage("..integration.spi..")
                 .and()
                 .areInterfaces()
                 .should()
@@ -131,9 +133,10 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         /**
          * Gitprovider should not depend on feature modules.
          *
-         * <p>The gitprovider is the core ETL engine for GitHub data sync.
+         * <p>The gitprovider is the core ETL engine for git data sync.
          * It should not have direct dependencies on workspace, leaderboard,
-         * or other feature modules - only on SPIs they implement.
+         * or other feature modules - only on SPIs in {@code integration.spi}
+         * that they implement.
          */
         @Test
         @DisplayName("Gitprovider does not depend on workspace internals")
@@ -141,8 +144,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage("..gitprovider..")
-                .and()
-                .resideOutsideOfPackage("..gitprovider.common.spi..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..workspace..")
@@ -214,10 +215,12 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         /**
          * Application domain events should be in events packages.
          *
-         * <p>Events enable loose coupling between modules. Our domain events
-         * are in gitprovider.common.events. Activity events are in the activity
-         * module and use the activity_event ledger for persistence.
-         * Generated GraphQL model classes ending in 'Event' are excluded.
+         * <p>Events enable loose coupling between modules. Our cross-vendor
+         * domain events live in {@code integration.events} (post-#1198) and
+         * the legacy {@code gitprovider} module no longer hosts any event
+         * classes. Activity events are in the activity module and use the
+         * activity_event ledger for persistence. Generated GraphQL model
+         * classes ending in 'Event' are excluded.
          */
         @Test
         @DisplayName("Domain events are in events packages")
@@ -381,9 +384,8 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          *
          * <p>They SHOULD depend on:
          * <ul>
-         *   <li>gitprovider.common.spi - Service Provider Interfaces</li>
-         *   <li>gitprovider.common.dto - Data Transfer Objects</li>
-         *   <li>gitprovider.common.events - Domain events</li>
+         *   <li>integration.spi - Service Provider Interfaces (post-#1198)</li>
+         *   <li>integration.events - Cross-vendor domain events (post-#1198)</li>
          *   <li>gitprovider entity packages (for reading data)</li>
          * </ul>
          */
@@ -414,7 +416,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * Verifies that feature modules use the SPI pattern correctly.
          *
          * <p>When feature modules need to provide functionality to gitprovider (callbacks,
-         * context providers), they should implement SPIs defined in gitprovider.common.spi,
+         * context providers), they should implement SPIs defined in integration.spi,
          * not create ad-hoc coupling.
          */
         @Test

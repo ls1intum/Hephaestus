@@ -16,8 +16,8 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabDescend
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupMemberResponse;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabPageInfo;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.TeamMembershipListener;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.TeamMembershipListener.TeamsSyncedEvent;
+import de.tum.cit.aet.hephaestus.integration.spi.TeamMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.spi.TeamMembershipListener.TeamsSyncedEvent;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;

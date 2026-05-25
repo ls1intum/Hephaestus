@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import java.util.Objects;
 
 /**

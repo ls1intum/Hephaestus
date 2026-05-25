@@ -4,7 +4,7 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.BotCommandReceivedEvent;
+import de.tum.cit.aet.hephaestus.integration.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;

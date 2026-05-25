@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.common;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
 import org.slf4j.Logger;

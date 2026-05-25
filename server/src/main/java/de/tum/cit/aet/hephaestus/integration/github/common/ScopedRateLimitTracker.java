@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.github.common;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.RateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.spi.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHRateLimit;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;

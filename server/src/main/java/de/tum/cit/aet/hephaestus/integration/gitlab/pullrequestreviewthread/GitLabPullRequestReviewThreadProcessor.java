@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewthread;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;

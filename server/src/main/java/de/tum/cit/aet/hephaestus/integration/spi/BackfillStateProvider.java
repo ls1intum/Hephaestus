@@ -1,6 +1,6 @@
-package de.tum.cit.aet.hephaestus.gitprovider.common.spi;
+package de.tum.cit.aet.hephaestus.integration.spi;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
 import java.time.Instant;
 import java.util.Optional;
 

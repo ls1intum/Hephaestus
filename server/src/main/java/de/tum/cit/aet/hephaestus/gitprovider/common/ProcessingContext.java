@@ -20,7 +20,7 @@ import org.springframework.lang.Nullable;
  * {@code LazyInitializationException}.
  * <p>
  * For event publishing across transaction boundaries, use
- * {@link de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext#from(ProcessingContext)}
+ * {@link de.tum.cit.aet.hephaestus.integration.events.EventContext#from(ProcessingContext)}
  * to create an immutable, serializable context that is safe for async handling.
  *
  * <h2>Future ETL Extraction</h2>

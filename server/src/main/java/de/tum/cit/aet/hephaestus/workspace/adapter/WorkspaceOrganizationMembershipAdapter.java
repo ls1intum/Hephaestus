@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMembership;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMembershipRepository;

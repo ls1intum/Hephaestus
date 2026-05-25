@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.AuthMode;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.AuthMode;
+import de.tum.cit.aet.hephaestus.integration.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.Workspace.GitProviderMode;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;

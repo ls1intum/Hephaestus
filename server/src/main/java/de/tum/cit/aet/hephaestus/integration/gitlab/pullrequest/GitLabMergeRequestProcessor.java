@@ -1,16 +1,16 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.BaseGitLabProcessor;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabUserLookup;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.dto.GitLabWebhookUser;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
 import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
 import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.AuthMode;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.spi.AuthMode;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
 
 /**
  * Factory class for creating SyncTarget instances from workspace and repository monitor entities.

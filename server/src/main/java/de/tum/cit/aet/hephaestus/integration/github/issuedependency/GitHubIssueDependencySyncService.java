@@ -22,8 +22,8 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubRepositoryNameP
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssueConnection;
 import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;

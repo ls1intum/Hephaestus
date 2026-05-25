@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
 import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;

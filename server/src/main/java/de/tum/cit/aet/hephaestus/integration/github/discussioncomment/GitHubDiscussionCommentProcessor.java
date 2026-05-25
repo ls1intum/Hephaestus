@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.github.discussioncomment;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.github.common.BaseGitHubProcessor;
 import de.tum.cit.aet.hephaestus.gitprovider.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.gitprovider.discussioncomment.DiscussionComment;

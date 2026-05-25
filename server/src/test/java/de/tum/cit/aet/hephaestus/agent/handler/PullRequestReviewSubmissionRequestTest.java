@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;

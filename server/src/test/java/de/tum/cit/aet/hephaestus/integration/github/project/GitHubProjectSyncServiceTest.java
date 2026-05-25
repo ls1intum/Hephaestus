@@ -24,7 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassi
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2;

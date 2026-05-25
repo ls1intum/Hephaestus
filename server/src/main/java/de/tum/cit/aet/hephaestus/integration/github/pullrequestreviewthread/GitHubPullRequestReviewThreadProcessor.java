@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.github.pullrequestreviewthread;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;

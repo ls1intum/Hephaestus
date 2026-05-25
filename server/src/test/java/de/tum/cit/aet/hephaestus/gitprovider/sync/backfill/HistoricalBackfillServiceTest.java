@@ -10,12 +10,12 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.AuthMode;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.BackfillStateProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncContextProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.spi.AuthMode;
+import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncSession;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.github.issue.GitHubIssueProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.issuecomment.GitHubIssueCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequest.GitHubPullRequestProcessor;

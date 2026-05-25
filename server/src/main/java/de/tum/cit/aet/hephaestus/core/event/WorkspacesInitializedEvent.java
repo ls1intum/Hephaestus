@@ -6,7 +6,7 @@ package de.tum.cit.aet.hephaestus.core.event;
  *
  * <p>Lives in {@code core.event} as a deliberate dependency-inversion: workspace publishes,
  * gitprovider listens. Putting the event in either feature module forms a cycle with the
- * other, because {@code workspace.adapter} already implements {@code gitprovider.common.spi.*}.
+ * other, because {@code workspace.adapter} already implements {@code integration.spi.*}.
  *
  * @param workspaceCount number of workspaces that were initialized
  */

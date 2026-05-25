@@ -4,8 +4,8 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
+import de.tum.cit.aet.hephaestus.integration.spi.NatsSubscriptionProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.cit.aet.hephaestus.integration.consumer.exception.NatsConnectionException;
 import de.tum.cit.aet.hephaestus.integration.handler.IntegrationMessageHandler;
 import io.nats.client.Connection;

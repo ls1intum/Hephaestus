@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.common.spi;
+package de.tum.cit.aet.hephaestus.integration.spi;
 
 /**
  * Filters which repositories should be processed during sync and webhook handling.

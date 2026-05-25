@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.common.events;
+package de.tum.cit.aet.hephaestus.integration.events;
 
 import java.util.Set;
 import org.springframework.lang.Nullable;

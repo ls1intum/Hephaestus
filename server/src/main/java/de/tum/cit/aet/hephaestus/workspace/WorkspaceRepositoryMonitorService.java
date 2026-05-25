@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.github.installation.GitHubInstallationRepositoryEnumerationService;
 import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectIntegrityService;

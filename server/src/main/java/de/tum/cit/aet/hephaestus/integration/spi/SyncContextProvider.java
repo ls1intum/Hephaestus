@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.common.spi;
+package de.tum.cit.aet.hephaestus.integration.spi;
 
 /**
  * Manages thread-local sync context for scope isolation and logging.

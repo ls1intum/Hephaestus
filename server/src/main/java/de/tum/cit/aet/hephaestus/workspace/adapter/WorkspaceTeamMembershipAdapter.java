@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.TeamMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.spi.TeamMembershipListener;
 import de.tum.cit.aet.hephaestus.gitprovider.team.membership.TeamMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;

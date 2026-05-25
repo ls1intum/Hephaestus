@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.NatsSubscriptionProvider;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;

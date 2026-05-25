@@ -3,12 +3,12 @@ package de.tum.cit.aet.hephaestus.integration.github.sync;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.RateLimitTracker;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncContextProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncStatistics;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.spi.RateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncSession;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncStatistics;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.github.issuedependency.GitHubIssueDependencySyncService;
 import de.tum.cit.aet.hephaestus.integration.github.issuetype.GitHubIssueTypeSyncService;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;

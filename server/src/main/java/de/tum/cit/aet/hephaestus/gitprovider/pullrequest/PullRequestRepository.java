@@ -125,7 +125,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * Eagerly fetches labels, assignees, repository, author, and mergedBy in a single query.
      * The gate requires labels, assignees (step 6: assignee gate),
      * and repository (step 3: workspace resolution). Author and mergedBy are needed by
-     * {@link de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload.PullRequestData#from(PullRequest)}
+     * {@link de.tum.cit.aet.hephaestus.integration.events.EventPayload.PullRequestData#from(PullRequest)}
      * for the ReviewSubmitted path.
      * <p>
      * Uses {@code DISTINCT} because the Cartesian product of two {@code @ManyToMany} collections

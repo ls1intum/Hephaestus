@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.gitprovider.sync.backfill;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;

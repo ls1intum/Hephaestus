@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import org.springframework.stereotype.Component;
 

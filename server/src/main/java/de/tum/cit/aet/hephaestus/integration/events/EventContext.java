@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.gitprovider.common.events;
+package de.tum.cit.aet.hephaestus.integration.events;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.DataSource;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;

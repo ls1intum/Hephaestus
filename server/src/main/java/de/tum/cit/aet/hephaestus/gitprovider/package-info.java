@@ -8,9 +8,9 @@
  *
  * <p>Cross-module coupling goes through:
  * <ul>
- *   <li>{@link de.tum.cit.aet.hephaestus.gitprovider.common.spi} — service-provider
+ *   <li>{@link de.tum.cit.aet.hephaestus.integration.spi} — service-provider
  *       interfaces consumed by feature modules</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.gitprovider.common.events} — {@code DomainEvent}s
+ *   <li>{@link de.tum.cit.aet.hephaestus.integration.events} — {@code DomainEvent}s
  *       published by processors; consumers react in-process</li>
  * </ul>
  *

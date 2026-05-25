@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.github.installation;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener.RepositorySnapshot;
+import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener.RepositorySnapshot;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.installation.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;

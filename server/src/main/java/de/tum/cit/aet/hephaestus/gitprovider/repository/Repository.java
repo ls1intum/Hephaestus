@@ -48,7 +48,7 @@ import org.springframework.lang.NonNull;
  * <b>Sync Targets:</b> Repositories become sync targets when added to a scope.
  * The sync engine uses the {@code nameWithOwner} field to identify repositories.
  *
- * @see de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget
+ * @see de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget
  */
 @Entity
 @Table(

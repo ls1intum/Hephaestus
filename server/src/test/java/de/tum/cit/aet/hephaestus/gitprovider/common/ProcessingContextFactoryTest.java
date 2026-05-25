@@ -8,8 +8,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubWebhookEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;

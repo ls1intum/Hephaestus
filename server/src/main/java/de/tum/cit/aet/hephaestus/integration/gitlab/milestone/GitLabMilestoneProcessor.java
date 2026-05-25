@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.milestone;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.BaseGitLabProcessor;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.milestone.Milestone;

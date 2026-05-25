@@ -9,7 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.BotCommandReceivedEvent;
+import de.tum.cit.aet.hephaestus.integration.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;

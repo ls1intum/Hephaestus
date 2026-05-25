@@ -135,22 +135,24 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * within their respective feature modules.
          */
         @Test
-        @DisplayName("SPI interfaces are in the spi package")
+        @DisplayName("SPI interfaces are not added under gitprovider.common")
         void spiInterfacesAreInSpiPackage() {
-            ArchRule rule = classes()
+            // Post-#1198: the legacy gitprovider.common.spi package has been
+            // dissolved into integration.spi. This rule prevents Provider/
+            // Resolver/Listener interfaces from creeping back into the
+            // gitprovider module by name.
+            ArchRule rule = noClasses()
                 .that()
-                .haveSimpleNameEndingWith("Provider")
-                .or()
-                .haveSimpleNameEndingWith("Resolver")
-                .or()
-                .haveSimpleNameEndingWith("Listener")
+                .resideInAPackage("..gitprovider.common..")
                 .and()
                 .areInterfaces()
-                .and()
-                .resideInAPackage("..gitprovider.common..")
                 .should()
-                .resideInAPackage("..spi..")
-                .because("Service Provider Interfaces enable dependency inversion");
+                .haveSimpleNameEndingWith("Provider")
+                .orShould()
+                .haveSimpleNameEndingWith("Resolver")
+                .orShould()
+                .haveSimpleNameEndingWith("Listener")
+                .because("Cross-module SPIs (Provider/Resolver/Listener) belong in integration.spi");
             rule.check(classes);
         }
     }

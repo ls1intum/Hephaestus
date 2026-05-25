@@ -27,8 +27,8 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupMe
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupMemberResponse.GitLabAccessLevel;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupMemberResponse.GitLabMemberUser;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabPageInfo;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
+import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
