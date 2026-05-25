@@ -531,9 +531,18 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             metadata.put("pr_number", 42);
             job.setMetadata(metadata);
 
+            // Validation now lives on the per-kind FeedbackChannel SPI (Wave 1F closed
+            // AC#8 — no more switch(IntegrationKind) in agent/). Stub the channel to
+            // reject the malformed input the way GithubFeedbackChannel does at runtime;
+            // the poster catches the IllegalArgumentException and rethrows as
+            // JobDeliveryException.
+            when(githubChannel.formatPullRequestSubjectId("repo-without-owner", 42))
+                .thenThrow(new IllegalArgumentException(
+                    "GitHub repoFullName must be 'owner/repo': repo-without-owner"));
+
             assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
                 .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("Invalid repository_full_name");
+                .hasMessageContaining("'owner/repo'");
         }
     }
 

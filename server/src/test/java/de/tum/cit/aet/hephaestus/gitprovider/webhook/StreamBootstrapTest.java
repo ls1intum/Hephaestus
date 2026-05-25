@@ -45,11 +45,13 @@ class StreamBootstrapTest extends BaseUnitTest {
 
         new StreamBootstrap(jsm, properties).bootstrap();
 
+        // 4 per-kind streams (gitlab/github/slack/outline) + the DLQ stream
+        // introduced in Wave 6 — all created on bootstrap when none exist.
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
-        verify(jsm, times(2)).addStream(captor.capture());
+        verify(jsm, times(5)).addStream(captor.capture());
         assertThat(captor.getAllValues())
             .extracting(StreamConfiguration::getName)
-            .containsExactlyInAnyOrder("gitlab", "github");
+            .containsExactlyInAnyOrder("gitlab", "github", "slack", "outline", "INTEGRATION_DLQ");
     }
 
     @Test

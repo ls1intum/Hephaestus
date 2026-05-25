@@ -195,9 +195,14 @@ public class Connection {
             this.credentialsFormatVersion = null;
             return;
         }
-        this.credentialsEncrypted = converter.encrypt(bundle, encryptionContext());
+        byte[] encrypted = converter.encrypt(bundle, encryptionContext());
+        this.credentialsEncrypted = encrypted;
         this.credentialsAlg = CredentialBundleConverter.ALGORITHM_TAG;
-        this.credentialsFormatVersion = (short) (this.credentialsEncrypted[0] & 0xFF);
+        // `encrypted` is null in a few mock-converter test paths; clear the format
+        // version to keep it in lockstep with the absent blob rather than NPE.
+        this.credentialsFormatVersion = (encrypted == null || encrypted.length == 0)
+            ? null
+            : (short) (encrypted[0] & 0xFF);
     }
 
     /**

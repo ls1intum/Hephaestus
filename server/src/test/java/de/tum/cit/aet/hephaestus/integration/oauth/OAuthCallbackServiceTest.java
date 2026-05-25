@@ -121,7 +121,9 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
                 c.setState(IntegrationState.ACTIVE);
                 return c;
             });
-        when(credentialBundleConverter.convertToDatabaseColumn(any())).thenReturn(new byte[]{1, 2, 3});
+        // Wave 3 routes Connection.setCredentials through encrypt(bundle, ctx) — the
+        // v1 attribute-converter API is now backfill-only. Stub the new entry point.
+        when(credentialBundleConverter.encrypt(any(), any())).thenReturn(new byte[]{0x02, 1, 2, 3});
 
         Connection result = service.completeConnection(pending, completed, "alice@example.com");
 
