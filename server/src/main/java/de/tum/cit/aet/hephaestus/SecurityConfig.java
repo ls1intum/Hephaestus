@@ -99,6 +99,7 @@ public class SecurityConfig {
                 "/actuator/info",
                 "/gitlab",
                 "/github",
+                "/webhooks/**",
                 "/oauth/callback/**"
             )
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -168,7 +169,10 @@ public class SecurityConfig {
             // Webhook endpoints — authenticated by HMAC (GitHub) or shared-token (GitLab) at the
             // controller layer. Spring Security must not block these or external providers can
             // never reach the receiver. See gitprovider.webhook.* and ADR 0008.
+            // Legacy {@code /github} and {@code /gitlab} are URL anchors; {@code /webhooks/{kind}}
+            // is the unified route that also serves Slack and Outline.
             requests.requestMatchers(HttpMethod.POST, "/gitlab", "/github").permitAll();
+            requests.requestMatchers(HttpMethod.POST, "/webhooks/**").permitAll();
             // OAuth vendor callbacks — authenticated by HMAC-signed state parameter at the
             // controller layer (see OAuthCallbackController). The vendor redirect arrives
             // unauthenticated; Spring Security MUST NOT block it or no OAuth flow ever completes.
