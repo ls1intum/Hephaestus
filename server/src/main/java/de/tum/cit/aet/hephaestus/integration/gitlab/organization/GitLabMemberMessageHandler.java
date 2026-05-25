@@ -5,19 +5,20 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandler;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.OrganizationMembershipListener.MembershipChangedEvent;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.integration.gitlab.organization.dto.GitLabMemberEventDTO;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.gitlab.organization.dto.GitLabMemberEventDTO;
 import de.tum.cit.aet.hephaestus.integration.gitlab.user.GitLabUserClassifier;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitLabMemberMessageHandler extends GitLabMessageHandler<GitLabMemberEventDTO> {
+public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandler<GitLabMemberEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMemberMessageHandler.class);
 
@@ -64,7 +65,13 @@ public class GitLabMemberMessageHandler extends GitLabMessageHandler<GitLabMembe
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitLabMemberEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITLAB,
+            GitLabEventType.MEMBER.getValue(),
+            GitLabMemberEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.organizationRepository = organizationRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
@@ -73,11 +80,6 @@ public class GitLabMemberMessageHandler extends GitLabMessageHandler<GitLabMembe
         this.membershipListener = membershipListener;
         this.requiresNewTransaction = new TransactionTemplate(transactionTemplate.getTransactionManager());
         this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-    }
-
-    @Override
-    public GitLabEventType getEventType() {
-        return GitLabEventType.MEMBER;
     }
 
     @Override

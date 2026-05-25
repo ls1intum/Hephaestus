@@ -7,10 +7,11 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabDescendantGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.gitlab.team.dto.GitLabSubgroupEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,7 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitLabSubgroupMessageHandler extends GitLabMessageHandler<GitLabSubgroupEventDTO> {
+public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHandler<GitLabSubgroupEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabSubgroupMessageHandler.class);
 
@@ -44,15 +45,16 @@ public class GitLabSubgroupMessageHandler extends GitLabMessageHandler<GitLabSub
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitLabSubgroupEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITLAB,
+            GitLabEventType.SUBGROUP.getValue(),
+            GitLabSubgroupEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.teamProcessor = teamProcessor;
         this.gitProviderRepository = gitProviderRepository;
         this.gitLabProperties = gitLabProperties;
-    }
-
-    @Override
-    public GitLabEventType getEventType() {
-        return GitLabEventType.SUBGROUP;
     }
 
     @Override

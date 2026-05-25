@@ -7,14 +7,12 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.cit.aet.hephaestus.integration.consumer.exception.NatsConnectionException;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandlerRegistry;
 import de.tum.cit.aet.hephaestus.integration.handler.IntegrationMessageHandler;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamOptions;
 import io.nats.client.Message;
-import io.nats.client.MessageHandler;
 import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.StreamContext;
@@ -40,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
@@ -56,34 +53,24 @@ import org.springframework.stereotype.Service;
  * <h2>Collaborators</h2>
  * <ul>
  *   <li>{@link IntegrationMessageDispatcher} — vendor-agnostic subject → handler routing
- *       via the unified {@code IntegrationMessageHandlerRegistry}. Handlers migrated to
- *       the unified SPI dispatch through here.</li>
+ *       via the unified {@code IntegrationMessageHandlerRegistry}. Sole resolver: every
+ *       production handler extends
+ *       {@link de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler}
+ *       and the per-kind {@code SubjectParser} re-encodes the subject into an
+ *       {@code EventTypeKey} the registry looks up.</li>
  *   <li>{@link IntegrationPoisonHandler} — NAK-with-backoff + ACK-after-N for messages
  *       that exhaust their redelivery budget.</li>
  *   <li>{@link IntegrationConsumerStats} — read-side surface for the actuator probe.</li>
  *   <li>{@link ConsumerSubjectMath} — pure subject-arithmetic (wildcard filters,
  *       consumer-name conventions).</li>
  *   <li>{@link ScopeConsumer} — per-scope queue + virtual-thread dispatch.</li>
- *   <li>{@link GitLabMessageHandlerRegistry} (the only remaining legacy registry)
- *       — GitLab handlers are migrated in the slice immediately after this one; the
- *       fallback is gone in that change. GitHub handlers all run via the unified
- *       registry as of the slice that introduced
- *       {@link de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler}.</li>
  * </ul>
  *
- * <h2>Routing order</h2>
- * For every inbound message we ask, in this exact order, three questions:
- * <ol>
- *   <li>Does {@link IntegrationMessageDispatcher#dispatch(String)} resolve a unified
- *       handler? If yes, invoke it.</li>
- *   <li>Otherwise, does the matching legacy per-kind registry (selected by subject prefix)
- *       know an event key? If yes, invoke it.</li>
- *   <li>Otherwise, ACK as a no-op — unknown event types are NOT errors; they are
- *       routed-to-nothing by design (e.g. {@code check_run}, {@code push}).</li>
- * </ol>
- * Step 1 + step 2 are mutually exclusive in practice because a handler is only ever in
- * one registry at a time — migration deregisters from the legacy side as the same
- * change registers in the unified side.
+ * <h2>Routing</h2>
+ * Single resolution step: {@link IntegrationMessageDispatcher#dispatch(String)} returns
+ * the unified handler (or empty if the subject is one we deliberately don't process —
+ * e.g. {@code check_run}). Empty resolutions ACK as no-op rather than NACKing; unknown
+ * event types are not errors.
  *
  * <h2>Lifecycle</h2>
  * <ol>
@@ -157,7 +144,6 @@ public class IntegrationNatsConsumer {
     private final IntegrationMessageDispatcher dispatcher;
     private final IntegrationPoisonHandler poisonHandler;
     private final IntegrationConsumerStats stats;
-    private final GitLabMessageHandlerRegistry gitlabLegacyRegistry;
 
     public IntegrationNatsConsumer(
         NatsConnectionProperties connectionProperties,
@@ -165,8 +151,7 @@ public class IntegrationNatsConsumer {
         NatsSubscriptionProvider subscriptionProvider,
         IntegrationMessageDispatcher dispatcher,
         IntegrationPoisonHandler poisonHandler,
-        IntegrationConsumerStats stats,
-        @Lazy GitLabMessageHandlerRegistry gitlabLegacyRegistry
+        IntegrationConsumerStats stats
     ) {
         this.connectionProperties = connectionProperties;
         this.consumerProperties = consumerProperties;
@@ -174,7 +159,6 @@ public class IntegrationNatsConsumer {
         this.dispatcher = dispatcher;
         this.poisonHandler = poisonHandler;
         this.stats = stats;
-        this.gitlabLegacyRegistry = gitlabLegacyRegistry;
     }
 
     // -------------------------------------------------------------------------
@@ -511,10 +495,10 @@ public class IntegrationNatsConsumer {
     // -------------------------------------------------------------------------
 
     /**
-     * Single entry point for every queued message across every scope. Routing order
-     * mirrors the class javadoc: unified dispatcher → legacy registry → ACK-as-no-op.
-     * On exception, the {@link IntegrationPoisonHandler} NAKs with exponential backoff
-     * and ACKs once the redelivery budget is exhausted.
+     * Single entry point for every queued message across every scope. The dispatcher is
+     * the only resolution path; empty resolutions ACK as no-op (unknown events are not
+     * errors). Exceptions land in {@link IntegrationPoisonHandler#nakWithBackoff} which
+     * NAKs with exponential backoff and ACKs once the redelivery budget is exhausted.
      */
     void handleMessage(Message msg) {
         if (shuttingDown.get()) {
@@ -523,25 +507,15 @@ public class IntegrationNatsConsumer {
         }
         String subject = msg.getSubject();
         try {
-            // 1) Unified dispatcher (vendor-agnostic, key = (kind, eventType)).
-            Optional<IntegrationMessageHandler> unified = dispatcher.dispatch(subject);
-            if (unified.isPresent()) {
-                unified.get().onMessage(msg);
-                msg.ack();
-                stats.recordDispatch(Instant.now());
-                return;
-            }
-            // 2) Legacy per-kind registry fallback (transition window — handlers still on
-            // GitHub/GitLabMessageHandler will move to IntegrationMessageHandler incrementally).
-            MessageHandler legacy = resolveLegacyHandler(subject);
-            if (legacy == null) {
-                // No handler in either path — expected for events we deliberately don't
-                // process (e.g. check_run). ACK to keep the stream moving.
+            Optional<IntegrationMessageHandler> handler = dispatcher.dispatch(subject);
+            if (handler.isEmpty()) {
+                // No handler — expected for events we deliberately don't process
+                // (e.g. check_run). ACK to keep the stream moving.
                 log.debug("No handler for subject, ACK-as-no-op: subject={}", sanitizeForLog(subject));
                 msg.ack();
                 return;
             }
-            legacy.onMessage(msg);
+            handler.get().onMessage(msg);
             msg.ack();
             stats.recordDispatch(Instant.now());
         } catch (Exception e) {
@@ -551,23 +525,6 @@ public class IntegrationNatsConsumer {
             stats.recordNak(Instant.now());
             poisonHandler.nakWithBackoff(msg);
         }
-    }
-
-    private MessageHandler resolveLegacyHandler(String subject) {
-        Optional<de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind> kind =
-            ConsumerSubjectMath.kindFromSubjectPrefix(subject);
-        if (kind.isEmpty()) {
-            return null;
-        }
-        String eventKey = subject.substring(subject.lastIndexOf('.') + 1);
-        return switch (kind.get()) {
-            // GitHub has been fully migrated to the unified registry — the dispatcher
-            // is the sole resolver. A subject that reaches this fallback for GITHUB is
-            // an unknown event and should be ACK-as-no-op (handled by the caller).
-            case GITHUB -> null;
-            case GITLAB -> gitlabLegacyRegistry.getHandler(eventKey);
-            case SLACK, OUTLINE -> null; // No legacy handlers exist for these kinds.
-        };
     }
 
     // -------------------------------------------------------------------------

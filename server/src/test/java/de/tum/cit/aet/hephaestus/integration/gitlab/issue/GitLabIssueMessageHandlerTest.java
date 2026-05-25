@@ -73,9 +73,9 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("returns ISSUE event type")
-    void getEventType_returnsIssue() {
-        assertThat(handler.getEventType()).isEqualTo(GitLabEventType.ISSUE);
+    @DisplayName("registers under the unified key gitlab:issue")
+    void key_returnsIssue() {
+        assertThat(handler.key().eventType()).isEqualTo("issue");
     }
 
     // ========================================================================

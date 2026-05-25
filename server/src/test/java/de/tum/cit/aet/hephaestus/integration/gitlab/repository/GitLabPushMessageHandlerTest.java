@@ -147,9 +147,9 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("returns PUSH event type")
-    void getEventType_returnsPush() {
-        assertThat(handler.getEventType()).isEqualTo(GitLabEventType.PUSH);
+    @DisplayName("registers under the unified key gitlab:push")
+    void key_returnsPush() {
+        assertThat(handler.key().eventType()).isEqualTo("push");
     }
 
     @Test

@@ -103,9 +103,9 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("returns NOTE event type")
-    void getEventType_returnsNote() {
-        assertThat(handler.getEventType()).isEqualTo(GitLabEventType.NOTE);
+    @DisplayName("registers under the unified key gitlab:note")
+    void key_returnsNote() {
+        assertThat(handler.key().eventType()).isEqualTo("note");
     }
 
     @Nested

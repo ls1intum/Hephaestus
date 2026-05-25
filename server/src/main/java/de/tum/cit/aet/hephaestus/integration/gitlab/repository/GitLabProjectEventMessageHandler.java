@@ -6,14 +6,15 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandler;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.repository.dto.GitLabProjectEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -31,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitLabProjectEventMessageHandler extends GitLabMessageHandler<GitLabProjectEventDTO> {
+public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessageHandler<GitLabProjectEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabProjectEventMessageHandler.class);
 
@@ -48,16 +49,17 @@ public class GitLabProjectEventMessageHandler extends GitLabMessageHandler<GitLa
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitLabProjectEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITLAB,
+            GitLabEventType.PROJECT.getValue(),
+            GitLabProjectEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.repositoryRepository = repositoryRepository;
         this.organizationRepository = organizationRepository;
         this.gitProviderRepository = gitProviderRepository;
         this.gitLabProperties = gitLabProperties;
-    }
-
-    @Override
-    public GitLabEventType getEventType() {
-        return GitLabEventType.PROJECT;
     }
 
     @Override

@@ -144,7 +144,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("returns ISSUE as event type")
         void returnsCorrectEventType() {
-            assertThat(handler.getEventType()).isEqualTo(GitLabEventType.ISSUE);
+            assertThat(handler.key().eventType()).isEqualTo("issue");
         }
     }
 

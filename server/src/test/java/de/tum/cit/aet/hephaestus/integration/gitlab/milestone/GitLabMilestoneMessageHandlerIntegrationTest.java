@@ -121,7 +121,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("returns MILESTONE as event type")
         void returnsCorrectEventType() {
-            assertThat(handler.getEventType()).isEqualTo(GitLabEventType.MILESTONE);
+            assertThat(handler.key().eventType()).isEqualTo("milestone");
         }
     }
 

@@ -155,7 +155,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("returns MERGE_REQUEST as event type")
         void returnsCorrectEventType() {
-            assertThat(handler.getEventType()).isEqualTo(GitLabEventType.MERGE_REQUEST);
+            assertThat(handler.key().eventType()).isEqualTo("merge_request");
         }
     }
 

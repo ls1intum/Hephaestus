@@ -5,17 +5,18 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.events.BotCommandReceivedEvent;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventAction;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandler;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookContextResolver;
-import de.tum.cit.aet.hephaestus.integration.gitlab.issuecomment.dto.GitLabNoteEventDTO;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest.GitLabMergeRequestProcessor;
-import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment.GitLabDiffNoteWebhookProcessor;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventAction;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookContextResolver;
+import de.tum.cit.aet.hephaestus.integration.gitlab.issuecomment.dto.GitLabNoteEventDTO;
+import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest.GitLabMergeRequestProcessor;
+import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment.GitLabDiffNoteWebhookProcessor;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -26,7 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** Handles GitLab note webhook events, routing to the appropriate processor by noteable type. */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEventDTO> {
+public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<GitLabNoteEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabNoteMessageHandler.class);
     private static final String BOT_COMMAND_PREFIX = "/hephaestus ";
@@ -50,7 +51,13 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
         TransactionTemplate transactionTemplate,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(GitLabNoteEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITLAB,
+            GitLabEventType.NOTE.getValue(),
+            GitLabNoteEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.issueCommentProcessor = issueCommentProcessor;
         this.diffNoteProcessor = diffNoteProcessor;
         this.mergeRequestProcessor = mergeRequestProcessor;
@@ -58,11 +65,6 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
         this.pullRequestRepository = pullRequestRepository;
         this.userRepository = userRepository;
         this.eventPublisher = eventPublisher;
-    }
-
-    @Override
-    public GitLabEventType getEventType() {
-        return GitLabEventType.NOTE;
     }
 
     @Override

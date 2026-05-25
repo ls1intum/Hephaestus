@@ -17,10 +17,6 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandler;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
@@ -28,8 +24,13 @@ import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.repository.dto.GitLabPushEventDTO;
 import de.tum.cit.aet.hephaestus.integration.gitlab.repository.dto.GitLabPushEventDTO.CommitInfo;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -61,7 +62,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEventDTO> {
+public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<GitLabPushEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabPushMessageHandler.class);
     private static final String ZERO_SHA = "0000000000000000000000000000000000000000";
@@ -97,7 +98,13 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitLabPushEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITLAB,
+            GitLabEventType.PUSH.getValue(),
+            GitLabPushEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.projectProcessor = projectProcessor;
         this.organizationRepository = organizationRepository;
         this.repositoryRepository = repositoryRepository;
@@ -111,11 +118,6 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         this.syncTargetProvider = syncTargetProvider;
         this.eventPublisher = eventPublisher;
         this.commitMergeRequestLinker = commitMergeRequestLinker;
-    }
-
-    @Override
-    public GitLabEventType getEventType() {
-        return GitLabEventType.PUSH;
     }
 
     @Override

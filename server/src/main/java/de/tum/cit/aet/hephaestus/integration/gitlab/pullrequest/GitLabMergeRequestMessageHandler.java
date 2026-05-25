@@ -6,9 +6,10 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventAction;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest.dto.GitLabMergeRequestEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,7 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitLabMergeRequestMessageHandler extends GitLabMessageHandler<GitLabMergeRequestEventDTO> {
+public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessageHandler<GitLabMergeRequestEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMergeRequestMessageHandler.class);
 
@@ -43,14 +44,15 @@ public class GitLabMergeRequestMessageHandler extends GitLabMessageHandler<GitLa
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitLabMergeRequestEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITLAB,
+            GitLabEventType.MERGE_REQUEST.getValue(),
+            GitLabMergeRequestEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.mergeRequestProcessor = mergeRequestProcessor;
         this.contextResolver = contextResolver;
-    }
-
-    @Override
-    public GitLabEventType getEventType() {
-        return GitLabEventType.MERGE_REQUEST;
     }
 
     @Override

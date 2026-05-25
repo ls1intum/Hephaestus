@@ -137,7 +137,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("returns NOTE as event type")
     void returnsCorrectEventType() {
-        assertThat(handler.getEventType()).isEqualTo(GitLabEventType.NOTE);
+        assertThat(handler.key().eventType()).isEqualTo("note");
     }
 
     // ==================== Issue Notes ====================

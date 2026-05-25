@@ -78,9 +78,9 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("returns MERGE_REQUEST event type")
-    void getEventType_returnsMergeRequest() {
-        assertThat(handler.getEventType()).isEqualTo(GitLabEventType.MERGE_REQUEST);
+    @DisplayName("registers under the unified key gitlab:merge_request")
+    void key_returnsMergeRequest() {
+        assertThat(handler.key().eventType()).isEqualTo("merge_request");
     }
 
     // ========================================================================

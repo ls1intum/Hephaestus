@@ -6,9 +6,10 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventAction;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.gitlab.issue.dto.GitLabIssueEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -32,7 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
-public class GitLabIssueMessageHandler extends GitLabMessageHandler<GitLabIssueEventDTO> {
+public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler<GitLabIssueEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabIssueMessageHandler.class);
 
@@ -45,14 +46,15 @@ public class GitLabIssueMessageHandler extends GitLabMessageHandler<GitLabIssueE
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitLabIssueEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITLAB,
+            GitLabEventType.ISSUE.getValue(),
+            GitLabIssueEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.issueProcessor = issueProcessor;
         this.contextResolver = contextResolver;
-    }
-
-    @Override
-    public GitLabEventType getEventType() {
-        return GitLabEventType.ISSUE;
     }
 
     @Override
