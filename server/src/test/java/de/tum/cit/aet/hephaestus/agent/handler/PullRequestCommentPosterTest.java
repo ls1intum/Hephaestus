@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -12,13 +13,12 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.registry.JobIntegrationKindResolver;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -43,7 +43,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
     private FeedbackChannel gitlabChannel;
 
     @Mock
-    private WorkspaceRepository workspaceRepository;
+    private JobIntegrationKindResolver kindResolver;
 
     private PullRequestCommentPoster poster;
 
@@ -51,7 +51,15 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
     void setUp() {
         lenient().when(githubChannel.kind()).thenReturn(IntegrationKind.GITHUB);
         lenient().when(gitlabChannel.kind()).thenReturn(IntegrationKind.GITLAB);
-        poster = new PullRequestCommentPoster(List.of(githubChannel, gitlabChannel), workspaceRepository);
+        // Default: resolver returns whatever IntegrationKind the test fixture set on the
+        // job (createTestJob populates it). Tests that exercise the legacy fallback stub
+        // the resolver directly.
+        // Default stub: return whatever IntegrationKind the caller passed (post-#1198
+        // jobs have it on the row). Legacy-fallback tests stub specific calls.
+        lenient().when(kindResolver.resolve(any(), anyLong())).thenAnswer(inv ->
+            inv.getArgument(0, IntegrationKind.class)
+        );
+        poster = new PullRequestCommentPoster(List.of(githubChannel, gitlabChannel), kindResolver);
     }
 
     // ── Sanitization Tests ──
@@ -443,12 +451,10 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("falls back to workspace.providerType when job.integrationKind is null (legacy)")
-        void legacyJobFallsBackToWorkspaceProviderType() {
-            AgentJob job = createTestJob(null);
-            Workspace workspace = mock(Workspace.class);
-            when(workspace.getProviderType()).thenReturn(GitProviderType.GITHUB);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        @DisplayName("delegates kind resolution to the injected JobIntegrationKindResolver")
+        void delegatesKindResolutionToResolver() {
+            AgentJob job = createTestJob(null); // null integrationKind — legacy job row
+            when(kindResolver.resolve(null, 1L)).thenReturn(IntegrationKind.GITHUB);
             when(githubChannel.postSummary(any(), any()))
                 .thenReturn(new FeedbackChannel.SummaryHandle("IC_legacy"));
 
@@ -459,23 +465,12 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw when workspace not found on legacy fallback")
-        void shouldThrowWhenWorkspaceNotFoundOnLegacy() {
-            AgentJob job = createTestJob(null);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("Workspace not found");
-        }
-
-        @Test
         @DisplayName("should throw when no channel is wired for the resolved kind")
         void throwsWhenNoChannelForKind() {
             AgentJob job = createTestJob(IntegrationKind.GITLAB);
             PullRequestCommentPoster githubOnly = new PullRequestCommentPoster(
                 List.of(githubChannel),
-                workspaceRepository
+                kindResolver
             );
 
             assertThatThrownBy(() -> githubOnly.postComment(job, "Review body", "Summary"))
@@ -521,7 +516,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             lenient().when(anotherGithub.kind()).thenReturn(IntegrationKind.GITHUB);
 
             assertThatThrownBy(
-                () -> new PullRequestCommentPoster(List.of(githubChannel, anotherGithub), workspaceRepository)
+                () -> new PullRequestCommentPoster(List.of(githubChannel, anotherGithub), kindResolver)
             )
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Duplicate FeedbackChannel for kind GITHUB");

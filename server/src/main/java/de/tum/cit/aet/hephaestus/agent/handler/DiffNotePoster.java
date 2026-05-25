@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.registry.JobIntegrationKindResolver;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.FindingAnchor;
@@ -24,7 +25,9 @@ import org.slf4j.LoggerFactory;
  * and vendor dispatch.
  *
  * <p>Vendor dispatch is keyed off {@link AgentJob#getIntegrationKind()} (post-#1198)
- * with a {@link PullRequestCommentPoster#resolveKind} fallback for legacy rows.
+ * via {@link JobIntegrationKindResolver}, which handles the legacy-row fallback
+ * outside the agent module so this class stays free of {@code GitProviderType}
+ * references.
  *
  * <p>Package-private — created as {@code @Bean} in {@link JobTypeHandlerConfiguration}.
  */
@@ -36,13 +39,16 @@ class DiffNotePoster {
     static final String HEPHAESTUS_MARKER = "<!-- hephaestus-diff-note -->";
 
     private final PullRequestCommentPoster commentPoster;
+    private final JobIntegrationKindResolver kindResolver;
     private final Map<IntegrationKind, InlineFindingChannel> channels;
 
     DiffNotePoster(
         PullRequestCommentPoster commentPoster,
+        JobIntegrationKindResolver kindResolver,
         List<InlineFindingChannel> inlineFindingChannels
     ) {
         this.commentPoster = commentPoster;
+        this.kindResolver = kindResolver;
         EnumMap<IntegrationKind, InlineFindingChannel> map = new EnumMap<>(IntegrationKind.class);
         for (InlineFindingChannel channel : inlineFindingChannels) {
             InlineFindingChannel previous = map.putIfAbsent(channel.kind(), channel);
@@ -73,8 +79,7 @@ class DiffNotePoster {
             return new DiffNoteResult(0, 0);
         }
 
-        long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = commentPoster.resolveKind(job, workspaceId);
+        IntegrationKind kind = kindResolver.resolve(job.getIntegrationKind(), job.getWorkspace().getId());
         InlineFindingChannel channel = channels.get(kind);
         if (channel == null) {
             throw new JobDeliveryException(
@@ -83,7 +88,7 @@ class DiffNotePoster {
             );
         }
 
-        FeedbackChannel.FeedbackTarget target = commentPoster.buildTarget(job, kind, workspaceId);
+        FeedbackChannel.FeedbackTarget target = commentPoster.buildTarget(job, kind, job.getWorkspace().getId());
         List<InlineFindingChannel.InlineFinding> findings = mapFindings(diffNotes);
         if (findings.isEmpty()) {
             return new DiffNoteResult(0, 0);

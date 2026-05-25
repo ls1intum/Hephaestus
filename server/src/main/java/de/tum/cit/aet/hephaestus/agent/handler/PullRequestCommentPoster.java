@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.registry.JobIntegrationKindResolver;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel.FeedbackContent;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel.FeedbackTarget;
@@ -10,8 +10,6 @@ import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel.SummaryHandle;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
@@ -159,11 +157,11 @@ class PullRequestCommentPoster {
     private static final Pattern EXCESSIVE_NEWLINES = Pattern.compile("\\n{3,}");
 
     private final Map<IntegrationKind, FeedbackChannel> channels;
-    private final WorkspaceRepository workspaceRepository;
+    private final JobIntegrationKindResolver kindResolver;
 
     PullRequestCommentPoster(
         List<FeedbackChannel> feedbackChannels,
-        WorkspaceRepository workspaceRepository
+        JobIntegrationKindResolver kindResolver
     ) {
         EnumMap<IntegrationKind, FeedbackChannel> map = new EnumMap<>(IntegrationKind.class);
         for (FeedbackChannel channel : feedbackChannels) {
@@ -180,7 +178,7 @@ class PullRequestCommentPoster {
             }
         }
         this.channels = map;
-        this.workspaceRepository = workspaceRepository;
+        this.kindResolver = kindResolver;
     }
 
     /**
@@ -214,7 +212,7 @@ class PullRequestCommentPoster {
     @Nullable
     String postFormattedBody(AgentJob job, String formattedBody) {
         long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = resolveKind(job, workspaceId);
+        IntegrationKind kind = kindResolver.resolve(job.getIntegrationKind(), job.getWorkspace().getId());
         FeedbackChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
         try {
@@ -247,21 +245,6 @@ class PullRequestCommentPoster {
         return channel;
     }
 
-    IntegrationKind resolveKind(AgentJob job, long workspaceId) {
-        IntegrationKind kind = job.getIntegrationKind();
-        if (kind != null) {
-            return kind;
-        }
-        // Legacy fallback: job created before #1198 backfill — derive from workspace.
-        Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new JobDeliveryException("Workspace not found: id=" + workspaceId));
-        GitProviderType providerType = workspace.getProviderType();
-        return switch (providerType) {
-            case GITHUB -> IntegrationKind.GITHUB;
-            case GITLAB -> IntegrationKind.GITLAB;
-        };
-    }
 
     FeedbackTarget buildTarget(AgentJob job, IntegrationKind kind, long workspaceId) {
         JsonNode metadata = job.getMetadata();
