@@ -54,12 +54,16 @@ public class IntegrationPoisonHandler {
 
     private final NatsConsumerProperties properties;
     private final MeterRegistry meterRegistry;
+    @Nullable
+    private final IntegrationDlqPublisher dlqPublisher;
     private final Map<String, Counter> nakCounters = new ConcurrentHashMap<>();
     private final Map<String, Counter> poisonCounters = new ConcurrentHashMap<>();
 
-    public IntegrationPoisonHandler(NatsConsumerProperties properties, MeterRegistry meterRegistry) {
+    public IntegrationPoisonHandler(NatsConsumerProperties properties, MeterRegistry meterRegistry,
+                                    @Nullable IntegrationDlqPublisher dlqPublisher) {
         this.properties = properties;
         this.meterRegistry = meterRegistry;
+        this.dlqPublisher = dlqPublisher;
     }
 
     /**
@@ -131,6 +135,12 @@ public class IntegrationPoisonHandler {
      * Acknowledges a poison message — terminal action that removes it from the redelivery
      * loop. Logged at ERROR with the structured reason so it surfaces in operator
      * dashboards. The counter is bumped under the message's kind tag.
+     *
+     * <p>Before ACK, publishes the original body + failure metadata to the
+     * {@code INTEGRATION_DLQ} stream via {@link IntegrationDlqPublisher} so operators
+     * can inspect / replay specific poison messages without rebuilding them from logs.
+     * If DLQ publish fails, the message is NAKed instead of ACKed — it stays in flight
+     * for another attempt rather than being silently dropped.
      */
     public void ackPoison(Message msg, String reason) {
         if (msg == null) {
@@ -140,12 +150,24 @@ public class IntegrationPoisonHandler {
         long streamSeq = readStreamSequence(msg);
         poisonCounter(msg).increment();
         log.error(
-            "Poison message detected, ACKing to break redelivery loop: subject={}, deliveredCount={}, streamSeq={}, reason={}",
-            sanitizeForLog(msg.getSubject()),
-            deliveredCount,
-            streamSeq,
-            sanitizeForLog(reason)
-        );
+            "Poison message detected: subject={}, deliveredCount={}, streamSeq={}, reason={}",
+            sanitizeForLog(msg.getSubject()), deliveredCount, streamSeq, sanitizeForLog(reason));
+
+        if (dlqPublisher != null && !dlqPublisher.publish(msg, kindTag(msg), reason, deliveredCount, streamSeq)) {
+            // DLQ publish failed — DON'T ACK. Let the message redeliver; we'll try again
+            // and either DLQ succeeds next time OR (after MaxDeliver) the server's own
+            // advisory mechanism takes it out of rotation.
+            log.warn(
+                "DLQ publish failed for poison subject={} — NAKing for retry instead of ACKing",
+                sanitizeForLog(msg.getSubject()));
+            try {
+                msg.nak();
+            } catch (Exception nakFailed) {
+                log.debug("Failed to NAK after DLQ publish failure: error={}", nakFailed.getMessage());
+            }
+            return;
+        }
+
         try {
             msg.ack();
         } catch (Exception ackFailed) {

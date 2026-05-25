@@ -4,8 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallat
 import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.InstallerIdentityMismatchException;
 import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.InstallerIdentityNotLinkedException;
 import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.LegacyUnboundRowException;
-import de.tum.cit.aet.hephaestus.integration.identity.HephaestusUser;
-import de.tum.cit.aet.hephaestus.integration.identity.HephaestusUserRepository;
+import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.UnknownActorException;
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.constraints.NotNull;
@@ -44,12 +43,9 @@ public class GithubInstallationController {
     private static final Logger log = LoggerFactory.getLogger(GithubInstallationController.class);
 
     private final GithubInstallationBindingService bindingService;
-    private final HephaestusUserRepository userRepository;
 
-    public GithubInstallationController(GithubInstallationBindingService bindingService,
-                                        HephaestusUserRepository userRepository) {
+    public GithubInstallationController(GithubInstallationBindingService bindingService) {
         this.bindingService = bindingService;
-        this.userRepository = userRepository;
     }
 
     @PostMapping("/bind")
@@ -66,10 +62,11 @@ public class GithubInstallationController {
             // Defensive: @RequireWorkspaceAdminForBinding already gates on isAuthenticated().
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authentication required");
         }
-        HephaestusUser user = userRepository.findByKeycloakSubject(authentication.getName())
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
-                "no HephaestusUser for authenticated principal"));
-        Connection connection = bindingService.bind(body.installationId(), workspaceId, user);
+        // Service layer resolves the Keycloak subject → HephaestusUser. We do NOT inject
+        // the user repository here: ArchitectureTest.controllersDoNotAccessRepositories
+        // forbids @RestController → @Repository direct dependencies.
+        Connection connection = bindingService.bindForKeycloakSubject(
+            body.installationId(), workspaceId, authentication.getName());
         return ResponseEntity.ok(BindResponse.of(connection));
     }
 
@@ -110,6 +107,12 @@ public class GithubInstallationController {
     ResponseEntity<String> handleLegacy(LegacyUnboundRowException e) {
         log.warn("Bind request rejected (409 legacy row): {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(UnknownActorException.class)
+    ResponseEntity<String> handleUnknownActor(UnknownActorException e) {
+        log.info("Bind request rejected (401 unknown actor): {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)

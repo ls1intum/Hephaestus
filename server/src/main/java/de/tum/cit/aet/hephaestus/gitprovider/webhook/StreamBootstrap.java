@@ -15,7 +15,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Idempotently creates one JetStream stream per registered integration kind at startup.
+ * Idempotently creates one JetStream stream per registered integration kind at startup,
+ * plus a single {@code INTEGRATION_DLQ} stream that receives messages the consumer
+ * handler bound at {@code IntegrationPoisonHandler}.
  * <ul>
  *   <li>404: {@code addStream} with our defaults.</li>
  *   <li>Exists: log INFO; WARN on config drift but NEVER call {@code updateStream}.
@@ -23,16 +25,20 @@ import org.slf4j.LoggerFactory;
  * </ul>
  *
  * <p>Stay in lockstep with {@code integration.webhook.IntegrationKindRouting.ROUTES} —
- * any new integration kind needs a stream here AND a route there. The
- * {@code IntegrationKindRoutingTest} arch check pins the routing side; this list is the
- * matching infrastructure side. They are intentionally kept as two literal lists so the
- * stream lifecycle stays in {@code gitprovider/} (infrastructure) while the routing stays
- * in {@code integration/} (framework SPI).
+ * any new integration kind needs a stream here AND a route there. They're kept as two
+ * literal lists so stream lifecycle stays in {@code gitprovider/} (infrastructure) while
+ * routing stays in {@code integration/} (framework SPI).
+ *
+ * <p>The DLQ stream uses {@code WorkQueue} retention — once an op acks a DLQ message it
+ * is removed. Operators replay by republishing onto the original stream.
  */
 public class StreamBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(StreamBootstrap.class);
     private static final String[] STREAMS = { "gitlab", "github", "slack", "outline" };
+    /** Single DLQ stream backing {@code IntegrationPoisonHandler}. Subject pattern: {@code integration.dlq.<kind>.>}. */
+    public static final String DLQ_STREAM = "INTEGRATION_DLQ";
+    public static final String DLQ_SUBJECT_PREFIX = "integration.dlq";
 
     private final JetStreamManagement jsm;
     private final WebhookProperties properties;
@@ -47,6 +53,7 @@ public class StreamBootstrap {
         for (String name : STREAMS) {
             ensureStream(name);
         }
+        ensureDlqStream();
     }
 
     private void ensureStream(String name) {
@@ -68,6 +75,45 @@ public class StreamBootstrap {
             );
         } catch (IOException e) {
             throw new IllegalStateException("I/O error inspecting JetStream stream: " + name, e);
+        }
+    }
+
+    private void ensureDlqStream() {
+        try {
+            StreamInfo info = jsm.getStreamInfo(DLQ_STREAM);
+            if (info.getConfiguration().getRetentionPolicy() != RetentionPolicy.WorkQueue) {
+                log.warn(
+                    "DLQ stream {} live retentionPolicy={} differs from expected={} — left unchanged",
+                    DLQ_STREAM, info.getConfiguration().getRetentionPolicy(), RetentionPolicy.WorkQueue);
+            }
+            log.info("JetStream DLQ stream already exists: name={}", DLQ_STREAM);
+        } catch (JetStreamApiException e) {
+            if (e.getErrorCode() == 404) {
+                createDlqStream();
+                return;
+            }
+            throw new IllegalStateException(
+                "Failed to inspect DLQ stream: " + DLQ_STREAM + " (code=" + e.getErrorCode() + ")", e);
+        } catch (IOException e) {
+            throw new IllegalStateException("I/O error inspecting DLQ stream: " + DLQ_STREAM, e);
+        }
+    }
+
+    private void createDlqStream() {
+        StreamConfiguration config = StreamConfiguration.builder()
+            .name(DLQ_STREAM)
+            .subjects(DLQ_SUBJECT_PREFIX + ".>")
+            .retentionPolicy(RetentionPolicy.WorkQueue)  // operator drains
+            .discardPolicy(DiscardPolicy.New)             // refuse new on full (alert, don't lose old)
+            .storageType(StorageType.File)
+            .maxAge(properties.stream().maxAge())
+            .maxMessages(properties.stream().maxMessages())
+            .build();
+        try {
+            jsm.addStream(config);
+            log.info("Created JetStream DLQ stream: name={} subjectPrefix={}", DLQ_STREAM, DLQ_SUBJECT_PREFIX);
+        } catch (JetStreamApiException | IOException ex) {
+            throw new IllegalStateException("Failed to create DLQ stream: " + DLQ_STREAM, ex);
         }
     }
 

@@ -59,6 +59,7 @@ class GithubInstallationBindingServiceTest extends BaseUnitTest {
     @Mock private ConnectionService connectionService;
     @Mock private WorkspaceRepository workspaceRepository;
     @Mock private IntegrationIdentityRepository identityRepository;
+    @Mock private de.tum.cit.aet.hephaestus.integration.identity.HephaestusUserRepository userRepository;
     @Mock private Workspace workspace;
     @Mock private HephaestusUser authenticatedUser;
     @Mock private HephaestusUser otherUser;
@@ -70,7 +71,7 @@ class GithubInstallationBindingServiceTest extends BaseUnitTest {
         MockitoAnnotations.openMocks(this);
         service = new GithubInstallationBindingService(
             unboundRepository, connectionRepository, connectionService,
-            workspaceRepository, identityRepository
+            workspaceRepository, identityRepository, userRepository
         );
         org.mockito.Mockito.lenient().when(authenticatedUser.getId()).thenReturn(7L);
         org.mockito.Mockito.lenient().when(authenticatedUser.getKeycloakSubject()).thenReturn("alice-keycloak-sub");
