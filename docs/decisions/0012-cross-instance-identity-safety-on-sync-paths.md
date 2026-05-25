@@ -136,6 +136,40 @@ adopted by GitLab when an equivalent path is added there (today GitLab does
 not preemptively delete RTMs from REST sync; if that changes the same
 exception is reusable).
 
+## Rejected alternatives
+
+1. **Database-level `UNIQUE(login, provider_id)` constraint + compile-time
+   `findByLogin*` removal.** Cleanest possible enforcement — but legacy GitHub-only
+   rows exist with NULL `provider_id` and a NOT NULL backfill is a multi-hour
+   migration on the production org/user tables. Compile-time method removal is what
+   we shipped; the DB constraint is a follow-up once the backfill window is
+   coordinated with operations.
+
+2. **Keep `findByLoginIgnoreCase(String)` and require all callers to switch to a
+   wrapper that asserts the provider context at runtime.** Rejected because the
+   compile-time fix is exhaustive without operator discipline; a runtime assertion
+   wrapper depends on every caller routing through it.
+
+3. **Cache the provider on a ThreadLocal at the webhook/sync entry point + read it
+   in the repository.** Rejected: ThreadLocal-coupling for tenancy is precisely the
+   pattern the existing `WorkspaceStatementInspector` warns against (ADR-0004). The
+   provider must be an explicit parameter.
+
+4. **`removeSyncTarget` always on `Optional.empty()`, with retry on a higher layer.**
+   Rejected: silently deleting an RTM during a transient GitHub 5xx is the original
+   CVE; no amount of retry-at-higher-layer fixes the silent-delete window between
+   the empty branch and the operator noticing the missing repo.
+
+5. **`removeSyncTarget` only when the explicit `RepositoryNotFoundOnGitProviderException`
+   is thrown.** Adopted — this is the shipping design. The exception is thrown at
+   exactly one site (`GitHubRepositorySyncService.syncRepository` after a 404
+   classification by `GitHubExceptionClassifier`) and propagates up through the
+   catch site at `GithubDataSyncService:444`.
+
+6. **Stop calling `removeSyncTarget` at all from sync paths; require an explicit
+   admin action to remove RTMs.** Rejected: admin-removed-from-org repos legitimately
+   need automatic RTM cleanup or the sync queue accumulates dead targets.
+
 ## Consequences
 
 **Positive:**

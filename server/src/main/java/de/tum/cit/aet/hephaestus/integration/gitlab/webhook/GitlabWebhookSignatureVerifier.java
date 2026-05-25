@@ -45,10 +45,6 @@ import org.springframework.stereotype.Component;
  * priority — this is the safer choice: an attacker who only knows the legacy
  * shared secret cannot forge an HMAC over an arbitrary body.
  *
- * <p>The two paths are table-driven via private {@link Verdict} records returned
- * from each verifier method, so the outer {@link #verify} method only chooses
- * which path to attempt; per-path logic stays self-contained.
- *
  * <p>Reference: <a href="https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md">Standard Webhooks spec</a>.
  */
 @Component
@@ -108,66 +104,66 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         // X-Gitlab-Signature is opting into Standard Webhooks — falling back to the
         // weaker plaintext token on signature mismatch would be a downgrade primitive.
         if (signatureHeader != null && !signatureHeader.isBlank()) {
-            return verifyWhsec(request, normalized, signatureHeader).result();
+            return verifyWhsec(request, normalized, signatureHeader);
         }
         if (tokenHeader != null && !tokenHeader.isBlank()) {
-            return verifyPlaintext(request, normalized, tokenHeader).result();
+            return verifyPlaintext(request, normalized, tokenHeader);
         }
         return new VerificationResult.MissingSignature();
     }
 
 
-    private Verdict verifyPlaintext(WebhookRequest request, Map<String, String> headers, String tokenHeader) {
+    private VerificationResult verifyPlaintext(WebhookRequest request, Map<String, String> headers, String tokenHeader) {
         Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(headers));
         if (secret.isEmpty()) {
             log.warn("GitLab plaintext verifier: no shared secret available");
-            return new Verdict(new VerificationResult.Invalid("missing-secret"));
+            return new VerificationResult.Invalid("missing-secret");
         }
         byte[] tokenBytes = tokenHeader.getBytes(StandardCharsets.UTF_8);
         if (MessageDigest.isEqual(tokenBytes, secret.get())) {
-            return new Verdict(new VerificationResult.Verified());
+            return new VerificationResult.Verified();
         }
-        return new Verdict(new VerificationResult.Invalid("token-mismatch"));
+        return new VerificationResult.Invalid("token-mismatch");
     }
 
 
-    private Verdict verifyWhsec(WebhookRequest request, Map<String, String> headers, String signatureHeader) {
+    private VerificationResult verifyWhsec(WebhookRequest request, Map<String, String> headers, String signatureHeader) {
         String msgId = headers.get(HEADER_WEBHOOK_ID);
         String timestampHeader = headers.get(HEADER_WEBHOOK_TIMESTAMP);
         if (msgId == null || msgId.isBlank()) {
-            return new Verdict(new VerificationResult.Invalid("missing-webhook-id"));
+            return new VerificationResult.Invalid("missing-webhook-id");
         }
         if (timestampHeader == null || timestampHeader.isBlank()) {
-            return new Verdict(new VerificationResult.Invalid("missing-webhook-timestamp"));
+            return new VerificationResult.Invalid("missing-webhook-timestamp");
         }
 
         long timestampSeconds;
         try {
             timestampSeconds = Long.parseLong(timestampHeader.trim());
         } catch (NumberFormatException e) {
-            return new Verdict(new VerificationResult.Invalid("malformed-webhook-timestamp"));
+            return new VerificationResult.Invalid("malformed-webhook-timestamp");
         }
 
         long nowSeconds = clock.instant().getEpochSecond();
         long drift = Math.abs(nowSeconds - timestampSeconds);
         if (drift > TIMESTAMP_TOLERANCE.toSeconds()) {
-            return new Verdict(new VerificationResult.StaleTimestamp(drift));
+            return new VerificationResult.StaleTimestamp(drift);
         }
 
         Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(headers));
         if (secret.isEmpty()) {
             log.warn("GitLab whsec verifier: no signing secret available");
-            return new Verdict(new VerificationResult.Invalid("missing-secret"));
+            return new VerificationResult.Invalid("missing-secret");
         }
 
         byte[] hmacKey = extractHmacKey(secret.get());
         if (hmacKey == null) {
-            return new Verdict(new VerificationResult.Invalid("malformed-whsec-secret"));
+            return new VerificationResult.Invalid("malformed-whsec-secret");
         }
 
         byte[] expectedMac = computeHmac(hmacKey, msgId, timestampHeader.trim(), request.body());
         if (expectedMac == null) {
-            return new Verdict(new VerificationResult.Invalid("hmac-init-failed"));
+            return new VerificationResult.Invalid("hmac-init-failed");
         }
         String expectedB64 = Base64.getEncoder().encodeToString(expectedMac);
         byte[] expectedBytes = expectedB64.getBytes(StandardCharsets.UTF_8);
@@ -195,10 +191,10 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
             if (candidate.isEmpty()) continue;
             byte[] candidateBytes = candidate.getBytes(StandardCharsets.UTF_8);
             if (MessageDigest.isEqual(candidateBytes, expectedBytes)) {
-                return new Verdict(new VerificationResult.Verified());
+                return new VerificationResult.Verified();
             }
         }
-        return new Verdict(new VerificationResult.Invalid("signature-mismatch"));
+        return new VerificationResult.Invalid("signature-mismatch");
     }
 
     @Nullable
@@ -243,7 +239,4 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         return out;
     }
 
-    /** Wraps a path's outcome so the outer dispatcher stays a one-line table lookup. */
-    private record Verdict(VerificationResult result) {
-    }
 }
