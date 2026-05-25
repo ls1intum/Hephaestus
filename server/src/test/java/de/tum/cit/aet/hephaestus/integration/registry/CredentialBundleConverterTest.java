@@ -246,4 +246,172 @@ class CredentialBundleConverterTest extends BaseUnitTest {
                 .hasMessageContaining("exactly 32 characters");
         }
     }
+
+    @Nested
+    @DisplayName("v2 per-row AAD — closes cross-row substitution CVE")
+    class PerRowAad {
+
+        private static final EncryptionContext CTX_A = new EncryptionContext(
+            42L, de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITHUB,
+            "installation-100", "connection.credentials_encrypted");
+
+        private static final EncryptionContext CTX_B = new EncryptionContext(
+            42L, de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITHUB,
+            "installation-999", "connection.credentials_encrypted");
+
+        @Test
+        @DisplayName("v2 round-trip with the same context returns the original bundle")
+        void v2_sameRow_roundTrips() {
+            CredentialBundleConverter c = enabled();
+            BearerToken bundle = new BearerToken("ghp_secretRowA", null);
+
+            byte[] blob = c.encrypt(bundle, CTX_A);
+            assertThat(blob[0]).as("first byte is v2 format marker").isEqualTo(CredentialBundleConverter.FORMAT_VERSION_V2);
+            assertThat(c.decrypt(blob, CTX_A)).isEqualTo(bundle);
+        }
+
+        @Test
+        @DisplayName("v2 blob from row A cannot be decrypted with row B's context — AEADBadTagException")
+        void v2_crossRowSubstitution_throwsAead() {
+            CredentialBundleConverter c = enabled();
+            byte[] blobForA = c.encrypt(new BearerToken("ghp_secretRowA", null), CTX_A);
+
+            // This is the CVE we are closing: attacker swaps row A's ciphertext into row B.
+            assertThatThrownBy(() -> c.decrypt(blobForA, CTX_B))
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("decryption failed")
+                .hasRootCauseInstanceOf(javax.crypto.AEADBadTagException.class);
+        }
+
+        @Test
+        @DisplayName("v2 with wrong workspaceId is rejected")
+        void v2_wrongWorkspaceId_throws() {
+            CredentialBundleConverter c = enabled();
+            byte[] blob = c.encrypt(new BearerToken("s", null), CTX_A);
+            EncryptionContext other = new EncryptionContext(
+                99L, CTX_A.kind(), CTX_A.instanceKey(), CTX_A.columnFqn());
+
+            assertThatThrownBy(() -> c.decrypt(blob, other)).isInstanceOf(EncryptionException.class);
+        }
+
+        @Test
+        @DisplayName("v2 with wrong kind is rejected")
+        void v2_wrongKind_throws() {
+            CredentialBundleConverter c = enabled();
+            byte[] blob = c.encrypt(new BearerToken("s", null), CTX_A);
+            EncryptionContext other = new EncryptionContext(
+                CTX_A.workspaceId(), de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
+                CTX_A.instanceKey(), CTX_A.columnFqn());
+
+            assertThatThrownBy(() -> c.decrypt(blob, other)).isInstanceOf(EncryptionException.class);
+        }
+
+        @Test
+        @DisplayName("v2 with wrong columnFqn is rejected — guards against a future second encrypted column")
+        void v2_wrongColumnFqn_throws() {
+            CredentialBundleConverter c = enabled();
+            byte[] blob = c.encrypt(new BearerToken("s", null), CTX_A);
+            EncryptionContext other = new EncryptionContext(
+                CTX_A.workspaceId(), CTX_A.kind(), CTX_A.instanceKey(), "connection.some_other_column");
+
+            assertThatThrownBy(() -> c.decrypt(blob, other)).isInstanceOf(EncryptionException.class);
+        }
+
+        @Test
+        @DisplayName("v2 null instanceKey (pre-bind OAuth slot) round-trips with the same null context")
+        void v2_nullInstanceKey_roundTrips() {
+            CredentialBundleConverter c = enabled();
+            EncryptionContext pending = new EncryptionContext(
+                42L, de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITHUB,
+                null, "connection.credentials_encrypted");
+            BearerToken bundle = new BearerToken("pending-token", null);
+
+            byte[] blob = c.encrypt(bundle, pending);
+            assertThat(c.decrypt(blob, pending)).isEqualTo(bundle);
+        }
+
+        @Test
+        @DisplayName("v2 tampered ciphertext byte → AEADBadTagException")
+        void v2_tamperedCiphertext_throws() {
+            CredentialBundleConverter c = enabled();
+            byte[] blob = c.encrypt(new BearerToken("s", null), CTX_A);
+            byte[] tampered = Arrays.copyOf(blob, blob.length);
+            tampered[tampered.length - 1] ^= 0x01;
+
+            assertThatThrownBy(() -> c.decrypt(tampered, CTX_A)).isInstanceOf(EncryptionException.class);
+        }
+
+        @Test
+        @DisplayName("v1 blob is read by the v2-aware decrypt — context arg is ignored (legacy compat)")
+        void v1_blob_decryptsThroughV2Api() {
+            CredentialBundleConverter c = enabled();
+            // Write via the v1 attribute-converter API (matches the legacy backfill path).
+            byte[] v1Blob = c.convertToDatabaseColumn(new BearerToken("legacy-token", null));
+            assertThat(v1Blob[0]).isEqualTo(CredentialBundleConverter.FORMAT_VERSION_V1);
+
+            // Any context passed in is ignored for v1 — proves the tolerant-read branch.
+            assertThat(c.decrypt(v1Blob, CTX_A)).isEqualTo(new BearerToken("legacy-token", null));
+            assertThat(c.decrypt(v1Blob, CTX_B)).isEqualTo(new BearerToken("legacy-token", null));
+        }
+
+        @Test
+        @DisplayName("Tolerant attributeConverter read REJECTS v2 blobs — they require per-row context")
+        void v2_blob_attributeConverterReadRejects() {
+            CredentialBundleConverter c = enabled();
+            byte[] v2Blob = c.encrypt(new BearerToken("s", null), CTX_A);
+
+            assertThatThrownBy(() -> c.convertToEntityAttribute(v2Blob))
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("requires per-row EncryptionContext");
+        }
+
+        @Test
+        @DisplayName("Unknown version byte (e.g. 0x03) → Unsupported, NOT AEADBadTagException")
+        void unknownVersion_throwsUnsupported() {
+            CredentialBundleConverter c = enabled();
+            byte[] blob = new byte[1 + 12 + 17];
+            blob[0] = 0x03;
+
+            assertThatThrownBy(() -> c.decrypt(blob, CTX_A))
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("Unsupported");
+        }
+
+        @Test
+        @DisplayName("isLegacyV1 reports true for v1 blobs, false for v2 and null")
+        void isLegacyV1_introspection() {
+            CredentialBundleConverter c = enabled();
+            byte[] v1 = c.convertToDatabaseColumn(new BearerToken("x", null));
+            byte[] v2 = c.encrypt(new BearerToken("x", null), CTX_A);
+
+            assertThat(CredentialBundleConverter.isLegacyV1(v1)).isTrue();
+            assertThat(CredentialBundleConverter.isLegacyV1(v2)).isFalse();
+            assertThat(CredentialBundleConverter.isLegacyV1(null)).isFalse();
+            assertThat(CredentialBundleConverter.isLegacyV1(new byte[0])).isFalse();
+        }
+
+        @Test
+        @DisplayName("EncryptionContext rejects null kind / blank columnFqn at construction")
+        void encryptionContext_validatesInputs() {
+            assertThatThrownBy(() -> new EncryptionContext(1L, null, "k", "col"))
+                .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> new EncryptionContext(
+                    1L, de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITHUB, "k", ""))
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("AAD bytes are stable for the same context (deterministic serialisation)")
+        void aad_isStable() {
+            byte[] first = CTX_A.toAad();
+            byte[] second = CTX_A.toAad();
+            assertThat(first).isEqualTo(second);
+        }
+
+        @Test
+        @DisplayName("AAD bytes differ across rows (sanity — no field collision)")
+        void aad_differsAcrossRows() {
+            assertThat(CTX_A.toAad()).isNotEqualTo(CTX_B.toAad());
+        }
+    }
 }

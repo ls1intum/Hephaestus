@@ -82,6 +82,15 @@ public class Connection {
     @Nullable
     private String credentialsAlg;
 
+    /**
+     * Mirrors the first byte of {@link #credentialsEncrypted} (0x01 = v1, 0x02 = v2).
+     * Lets ops count remaining v1 rows without decrypting; once zero the legacy
+     * branch in {@link CredentialBundleConverter} can be deleted.
+     */
+    @Column(name = "credentials_format_version")
+    @Nullable
+    private Short credentialsFormatVersion;
+
     @Column(name = "replaces_connection_id")
     @Nullable
     private Long replacesConnectionId;
@@ -169,37 +178,45 @@ public class Connection {
     public void setLastActivityAt(@Nullable Instant lastActivityAt) { this.lastActivityAt = lastActivityAt; }
 
     //
-    // The entity stays ignorant of the encryption mechanics — it just delegates the
-    // ciphertext/algorithm-tag pairing to the converter and guarantees the two columns
-    // stay in lockstep. A null bundle clears BOTH columns (alg becomes meaningless
-    // without a blob); a non-null bundle stamps the converter's current ALGORITHM_TAG.
+    // The entity owns the encryption context — `(workspaceId, kind, instanceKey)` is
+    // bound into the AES-GCM AAD so a ciphertext written here cannot be substituted
+    // into a different row. Callers never pass context: it's derivable from `this`
+    // and any flexibility there would re-open the cross-row attack.
 
     /**
-     * Encrypt {@code bundle} via {@code converter} and atomically update both the
-     * ciphertext column and the algorithm tag column. Passing {@code null} clears both
-     * — the {@code state_reason} / surrounding transition should record WHY.
+     * Encrypt {@code bundle} (v2 — per-row AAD) and stamp the algorithm tag. Passing
+     * {@code null} clears both columns; the surrounding transition's {@code stateReason}
+     * records WHY.
      */
     public void setCredentials(@Nullable CredentialBundle bundle, CredentialBundleConverter converter) {
         if (bundle == null) {
             this.credentialsEncrypted = null;
             this.credentialsAlg = null;
+            this.credentialsFormatVersion = null;
             return;
         }
-        this.credentialsEncrypted = converter.convertToDatabaseColumn(bundle);
+        this.credentialsEncrypted = converter.encrypt(bundle, encryptionContext());
         this.credentialsAlg = CredentialBundleConverter.ALGORITHM_TAG;
+        this.credentialsFormatVersion = (short) (this.credentialsEncrypted[0] & 0xFF);
     }
 
     /**
-     * Decrypt the credential blob if present. Empty when no blob is stored; throws
-     * {@link de.tum.cit.aet.hephaestus.core.security.EncryptionException} if the blob
-     * cannot be decrypted or deserialized — callers must treat that as an unrecoverable
-     * data error (key rotated without re-encrypt, tampered row), not a routine
-     * "no auth available" signal.
+     * Decrypt the credential blob if present. Empty when no blob is stored.
+     *
+     * <p>Tolerant of v1 (legacy static AAD) and v2 (per-row AAD) blobs. Throws
+     * {@link de.tum.cit.aet.hephaestus.core.security.EncryptionException} on tamper,
+     * unsupported version, or — for v2 — a context mismatch (the closure the AAD
+     * binding provides). Callers must treat that as an unrecoverable data error, not
+     * "no auth available".
      */
     public Optional<CredentialBundle> credentials(CredentialBundleConverter converter) {
         if (credentialsEncrypted == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(converter.convertToEntityAttribute(credentialsEncrypted));
+        return Optional.ofNullable(converter.decrypt(credentialsEncrypted, encryptionContext()));
+    }
+
+    private EncryptionContext encryptionContext() {
+        return EncryptionContext.forConnectionCredentials(workspace.getId(), kind, instanceKey);
     }
 }
