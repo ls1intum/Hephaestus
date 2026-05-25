@@ -40,7 +40,6 @@ public interface WebhookSecretSource {
 
     /** Best-effort identification of the request before signature verification. */
     record SecretLookup(
-        @Nullable Long workspaceId,
         @Nullable String subscriptionId,
         Map<String, String> headers
     ) {

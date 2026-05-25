@@ -26,8 +26,6 @@ public enum Capability {
     INLINE_FINDINGS,
     /** Implements {@code ApprovalChannel.approve}. */
     APPROVAL_WORKFLOW,
-    /** Implements {@code SyncSource} with a non-empty stream catalog. */
-    BACKFILL_SYNC,
     /** Listener emits {@code onScopeChanged} (channel join/leave, repo add/remove). */
     SCOPE_CHANGES
 }

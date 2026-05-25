@@ -60,7 +60,7 @@ public class GithubWebhookSignatureVerifier implements WebhookSignatureVerifier 
         }
 
         Optional<byte[]> secret = secretSource.getSecret(
-            new SecretLookup(request.workspaceId(), request.subscriptionId(), request.headers())
+            new SecretLookup(request.subscriptionId(), request.headers())
         );
         if (secret.isEmpty()) {
             log.warn("GitHub webhook rejected: shared secret not configured");

@@ -107,7 +107,7 @@ public class WebhookIngestPipeline {
                 .body(Map.of("error", "no verifier wired for " + kind));
         }
 
-        WebhookRequest request = new WebhookRequest(body, headers, /* workspaceId */ null, /* subscriptionId */ null);
+        WebhookRequest request = new WebhookRequest(body, headers, /* subscriptionId */ null);
         VerificationResult result;
         try {
             result = verifier.verify(request);

@@ -47,7 +47,7 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     void validSignatureVerifies() {
         byte[] body = "{\"event\":\"documents.create\"}".getBytes(StandardCharsets.UTF_8);
         Map<String, String> headers = Map.of("Outline-Signature", sign(body));
-        WebhookRequest req = new WebhookRequest(body, headers, null, "sub-1");
+        WebhookRequest req = new WebhookRequest(body, headers, "sub-1");
 
         VerificationResult result = new OutlineWebhookSignatureVerifier(
             objectMapper, secretSourceReturning(Optional.of(SECRET))
@@ -60,7 +60,7 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     void badSignatureIsInvalid() {
         byte[] body = "{\"event\":\"documents.create\"}".getBytes(StandardCharsets.UTF_8);
         Map<String, String> headers = Map.of("Outline-Signature", "deadbeef");
-        WebhookRequest req = new WebhookRequest(body, headers, null, "sub-1");
+        WebhookRequest req = new WebhookRequest(body, headers, "sub-1");
 
         VerificationResult result = new OutlineWebhookSignatureVerifier(
             objectMapper, secretSourceReturning(Optional.of(SECRET))
@@ -73,7 +73,7 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     @Test
     void missingHeaderIsMissingSignature() {
         byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
-        WebhookRequest req = new WebhookRequest(body, Map.of(), null, "sub-1");
+        WebhookRequest req = new WebhookRequest(body, Map.of(), "sub-1");
 
         VerificationResult result = new OutlineWebhookSignatureVerifier(
             objectMapper, secretSourceReturning(Optional.of(SECRET))
@@ -86,7 +86,7 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     void emptySecretSourceIsMissingSignatureUntilSubscriptionWired() {
         byte[] body = "{\"event\":\"documents.create\"}".getBytes(StandardCharsets.UTF_8);
         Map<String, String> headers = Map.of("Outline-Signature", "anything");
-        WebhookRequest req = new WebhookRequest(body, headers, null, "sub-not-yet-known");
+        WebhookRequest req = new WebhookRequest(body, headers, "sub-not-yet-known");
 
         VerificationResult result = new OutlineWebhookSignatureVerifier(
             objectMapper, secretSourceReturning(Optional.empty())
@@ -101,7 +101,7 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     void headerLookupIsCaseInsensitive() {
         byte[] body = "{\"event\":\"documents.create\"}".getBytes(StandardCharsets.UTF_8);
         Map<String, String> headers = Map.of("outline-signature", sign(body));
-        WebhookRequest req = new WebhookRequest(body, headers, null, "sub-1");
+        WebhookRequest req = new WebhookRequest(body, headers, "sub-1");
 
         VerificationResult result = new OutlineWebhookSignatureVerifier(
             objectMapper, secretSourceReturning(Optional.of(SECRET))

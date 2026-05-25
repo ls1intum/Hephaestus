@@ -22,11 +22,14 @@ public interface WebhookSignatureVerifier {
 
     VerificationResult verify(WebhookRequest request);
 
-    /** Best-effort context — workspace/subscription may be null pre-verification. */
+    /**
+     * Workspace context isn't known at this layer — verifiers resolve it from headers /
+     * payload when they need to look up a per-workspace secret. {@code subscriptionId} is
+     * carried because Notion verification ships the signing secret in the handshake.
+     */
     record WebhookRequest(
         byte[] body,
         Map<String, String> headers,
-        @Nullable Long workspaceId,
         @Nullable String subscriptionId
     ) {
     }

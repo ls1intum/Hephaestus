@@ -7,8 +7,7 @@ import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/** Per-kind capability declaration for Slack. {@code BACKFILL_SYNC} is NEVER added —
- *  Salesforce 2025-05 ToS prohibits Slack-message-content persistence. */
+/** Per-kind capability declaration for Slack. */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
 public class SlackManifest implements IntegrationManifest {

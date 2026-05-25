@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectParser;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncSource;
 import de.tum.cit.aet.hephaestus.integration.spi.TokenRefresher;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier;
@@ -39,13 +38,6 @@ public class IntegrationFrameworkBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(IntegrationFrameworkBootstrap.class);
 
-    /**
-     * Capabilities the bootstrap intentionally doesn't bind to a per-kind bean.
-     * Anything else MUST be covered by {@link #checkRequired} — the unmapped-guard
-     * below fails loudly if a future {@link Capability} literal slips in.
-     */
-    private static final Set<Capability> UNENFORCED_CAPABILITIES = EnumSet.noneOf(Capability.class);
-
     private final IntegrationManifestRegistry manifests;
     private final List<WebhookSignatureVerifier> signatureVerifiers;
     private final List<WebhookSecretSource> secretSources;
@@ -53,7 +45,6 @@ public class IntegrationFrameworkBootstrap {
     private final List<SubjectParser> subjectParsers;
     private final List<ApiCredentialProvider> credentialProviders;
     private final List<TokenRefresher> tokenRefreshers;
-    private final List<SyncSource> syncSources;
     private final List<FeedbackChannel> feedbackChannels;
     private final List<InlineFindingChannel> inlineFindingChannels;
     private final List<ApprovalChannel> approvalChannels;
@@ -67,7 +58,6 @@ public class IntegrationFrameworkBootstrap {
         List<SubjectParser> subjectParsers,
         List<ApiCredentialProvider> credentialProviders,
         List<TokenRefresher> tokenRefreshers,
-        List<SyncSource> syncSources,
         List<FeedbackChannel> feedbackChannels,
         List<InlineFindingChannel> inlineFindingChannels,
         List<ApprovalChannel> approvalChannels,
@@ -80,7 +70,6 @@ public class IntegrationFrameworkBootstrap {
         this.subjectParsers = subjectParsers;
         this.credentialProviders = credentialProviders;
         this.tokenRefreshers = tokenRefreshers;
-        this.syncSources = syncSources;
         this.feedbackChannels = feedbackChannels;
         this.inlineFindingChannels = inlineFindingChannels;
         this.approvalChannels = approvalChannels;
@@ -133,9 +122,6 @@ public class IntegrationFrameworkBootstrap {
         if (declared.contains(Capability.TOKEN_REFRESH)) {
             require(kind, "TokenRefresher", anyMatchKind(tokenRefreshers, t -> t.kind() == kind), violations);
         }
-        if (declared.contains(Capability.BACKFILL_SYNC)) {
-            require(kind, "SyncSource", anyMatchKind(syncSources, s -> s.kind() == kind), violations);
-        }
         if (declared.contains(Capability.FEEDBACK_DELIVERY)) {
             require(kind, "FeedbackChannel", anyMatchKind(feedbackChannels, f -> f.kind() == kind), violations);
         }
@@ -158,7 +144,6 @@ public class IntegrationFrameworkBootstrap {
         // satisfied.
         Set<Capability> unmapped = EnumSet.copyOf(declared);
         unmapped.removeAll(ENFORCED_CAPABILITIES);
-        unmapped.removeAll(UNENFORCED_CAPABILITIES);
         for (Capability cap : unmapped) {
             violations.add(kind + " declares capability " + cap
                 + " but the bootstrap has no enforcement rule for it — add a require() branch");
@@ -171,7 +156,6 @@ public class IntegrationFrameworkBootstrap {
         Capability.URL_VERIFICATION_HANDSHAKE,
         Capability.REPLAY_PROTECTION,
         Capability.TOKEN_REFRESH,
-        Capability.BACKFILL_SYNC,
         Capability.FEEDBACK_DELIVERY,
         Capability.INLINE_FINDINGS,
         Capability.APPROVAL_WORKFLOW,

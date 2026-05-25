@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.util.Base64;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
@@ -45,46 +44,24 @@ public class HmacOAuthStateService implements OAuthStateService {
     @Nullable
     private final OAuthStateNonceStore nonceStore;
 
+    /** Test factory: HMAC + TTL only, no single-use enforcement. */
+    public static HmacOAuthStateService withoutNonceStore(String secret, Duration ttl) {
+        return new HmacOAuthStateService(secret, ttl, (OAuthStateNonceStore) null);
+    }
+
+    /** Test factory: HMAC + TTL + custom nonce store. */
+    public static HmacOAuthStateService withNonceStore(String secret, Duration ttl, OAuthStateNonceStore store) {
+        return new HmacOAuthStateService(secret, ttl, store);
+    }
+
     /**
-     * Spring-injected primary constructor. The {@code nonceStore} is required at
-     * runtime — it provides the single-use guarantee on top of the HMAC + TTL.
-     *
-     * <p>{@code @Autowired} is required to disambiguate from the test convenience
-     * 2-arg constructor; without it Spring sees two public ctors and refuses to
-     * pick one ({@code No default constructor found}). See #1198 audit.
+     * Spring-injected production constructor. The {@code nonceStore} provides the
+     * single-use guarantee on top of HMAC + TTL.
      */
-    @Autowired
     public HmacOAuthStateService(
         @Value("${hephaestus.integration.oauth-state.secret:${hephaestus.webhook.secret:}}") String configuredSecret,
         @Value("${hephaestus.integration.oauth-state.ttl:PT10M}") Duration ttl,
-        OAuthStateNonceStore nonceStore
-    ) {
-        this(configuredSecret, ttl, (OAuthStateNonceStore) nonceStore, true);
-    }
-
-    /**
-     * Test convenience: HMAC + TTL only, no single-use enforcement. Use only
-     * when the test is specifically NOT validating the replay guard. Tests that
-     * cover the single-use semantics pass a real (or in-memory) store via
-     * {@link #withNonceStore}.
-     */
-    public HmacOAuthStateService(String configuredSecret, Duration ttl) {
-        this(configuredSecret, ttl, null, false);
-    }
-
-    /**
-     * Test factory: HMAC + TTL + custom nonce store. Distinct method name from the
-     * @Value constructor so Spring doesn't pick it; tests use it directly.
-     */
-    public static HmacOAuthStateService withNonceStore(String secret, Duration ttl, OAuthStateNonceStore store) {
-        return new HmacOAuthStateService(secret, ttl, store, true);
-    }
-
-    private HmacOAuthStateService(
-        String configuredSecret,
-        Duration ttl,
-        @Nullable OAuthStateNonceStore nonceStore,
-        @SuppressWarnings("unused") boolean disambiguator
+        @Nullable OAuthStateNonceStore nonceStore
     ) {
         // Fall back to webhook secret if a dedicated key isn't configured — pre-existing
         // shared infrastructure secret. Production should set both explicitly.

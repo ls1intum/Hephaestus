@@ -119,7 +119,6 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
 
     private Verdict verifyPlaintext(WebhookRequest request, Map<String, String> headers, String tokenHeader) {
         Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(
-            request.workspaceId(),
             request.subscriptionId(),
             headers
         ));
@@ -159,7 +158,6 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         }
 
         Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(
-            request.workspaceId(),
             request.subscriptionId(),
             headers
         ));

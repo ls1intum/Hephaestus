@@ -231,39 +231,6 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779700000000-6">
-        <preConditions onFail="MARK_RAN" onFailMessage="sync_state already present">
-            <not><tableExists tableName="sync_state"/></not>
-        </preConditions>
-        <comment>Universal sync cursor — replaces ~30 BackfillStateProvider methods and ~7 per-entity cursor columns.</comment>
-        <createTable tableName="sync_state">
-            <column name="id" type="bigserial">
-                <constraints primaryKey="true" primaryKeyName="pk_sync_state" nullable="false"/>
-            </column>
-            <column name="connection_id" type="bigint">
-                <constraints nullable="false" referencedTableName="connection" referencedColumnNames="id"
-                             foreignKeyName="fk_sync_state_connection"/>
-            </column>
-            <column name="stream_name" type="varchar(128)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="cursor" type="jsonb" defaultValueComputed="'{}'::jsonb">
-                <constraints nullable="false"/>
-            </column>
-            <column name="last_synced_at" type="timestamp with time zone"/>
-            <column name="last_realtime_at" type="timestamp with time zone"/>
-            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-        <addUniqueConstraint tableName="sync_state"
-                             columnNames="connection_id, stream_name"
-                             constraintName="uq_sync_state"/>
-        <rollback>
-            <dropTable tableName="sync_state"/>
-        </rollback>
-    </changeSet>
-
     <changeSet author="hephaestus-1198" id="1779700000000-7">
         <preConditions onFail="MARK_RAN" onFailMessage="hephaestus_user already present">
             <not><tableExists tableName="hephaestus_user"/></not>

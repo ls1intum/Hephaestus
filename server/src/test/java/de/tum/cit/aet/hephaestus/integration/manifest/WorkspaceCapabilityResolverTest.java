@@ -41,7 +41,7 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                 Capability.FEEDBACK_DELIVERY,
                 Capability.INLINE_FINDINGS,
                 Capability.SCOPE_CHANGES,
-                Capability.BACKFILL_SYNC
+                Capability.APPROVAL_WORKFLOW
             )),
             stubManifest(IntegrationKind.GITLAB, Set.of(
                 Capability.WEBHOOK_INGEST,
@@ -85,7 +85,7 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                     Capability.FEEDBACK_DELIVERY,
                     Capability.INLINE_FINDINGS,
                     Capability.SCOPE_CHANGES,
-                    Capability.BACKFILL_SYNC
+                    Capability.APPROVAL_WORKFLOW
                 );
         }
 
@@ -125,7 +125,7 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                     Capability.FEEDBACK_DELIVERY,
                     Capability.INLINE_FINDINGS,
                     Capability.SCOPE_CHANGES,
-                    Capability.BACKFILL_SYNC
+                    Capability.APPROVAL_WORKFLOW
                 );
         }
     }

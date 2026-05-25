@@ -83,7 +83,7 @@ public class OutlineWebhookSignatureVerifier implements WebhookSignatureVerifier
         }
 
         Optional<byte[]> secret = secretSource.getSecret(
-            new SecretLookup(request.workspaceId(), request.subscriptionId(), headers)
+            new SecretLookup(request.subscriptionId(), headers)
         );
         if (secret.isEmpty()) {
             // No subscription registered yet → fail closed. Different from Slack's

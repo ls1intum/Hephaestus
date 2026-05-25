@@ -43,7 +43,7 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
     @Test
     void urlVerificationEchoesChallenge() {
         byte[] body = "{\"type\":\"url_verification\",\"challenge\":\"abc123\"}".getBytes(StandardCharsets.UTF_8);
-        WebhookRequest req = new WebhookRequest(body, Map.of(), null, null);
+        WebhookRequest req = new WebhookRequest(body, Map.of(), null);
 
         VerificationResult result = defaultVerifier().verify(req);
 
@@ -62,7 +62,7 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
             "X-Slack-Signature", sign(ts, body),
             "X-Slack-Request-Timestamp", ts
         );
-        WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers, null, null);
+        WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers, null);
 
         assertThat(defaultVerifier().verify(req)).isInstanceOf(VerificationResult.Verified.class);
     }
@@ -77,7 +77,7 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
             "X-Slack-Signature", sign(tsStr, body),
             "X-Slack-Request-Timestamp", tsStr
         );
-        WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers, null, null);
+        WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers, null);
 
         VerificationResult result = defaultVerifier().verify(req);
 
@@ -94,7 +94,7 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
             "X-Slack-Signature", "v0=deadbeef",
             "X-Slack-Request-Timestamp", ts
         );
-        WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers, null, null);
+        WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers, null);
 
         VerificationResult result = defaultVerifier().verify(req);
 
@@ -107,7 +107,6 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
         WebhookRequest req = new WebhookRequest(
             "{\"type\":\"event_callback\"}".getBytes(StandardCharsets.UTF_8),
             Map.of(),
-            null,
             null
         );
         assertThat(defaultVerifier().verify(req)).isInstanceOf(VerificationResult.MissingSignature.class);
@@ -121,7 +120,7 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
             "X-Slack-Signature", sign(ts, body),
             "X-Slack-Request-Timestamp", ts
         );
-        WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers, null, null);
+        WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers, null);
 
         VerificationResult result = verifierWithoutSecret().verify(req);
 
@@ -138,7 +137,7 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
             "x-slack-signature", sign(ts, body),
             "x-slack-request-timestamp", ts
         );
-        WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers, null, null);
+        WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers, null);
 
         assertThat(defaultVerifier().verify(req)).isInstanceOf(VerificationResult.Verified.class);
     }
