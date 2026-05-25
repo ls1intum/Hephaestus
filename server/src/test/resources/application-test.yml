@@ -67,6 +67,14 @@ hephaestus:
         enforcement: throw
     workspace:
         init-default: false # Disable PAT workspace bootstrap
+    # OAuth state HMAC secret + webhook secret — required by HmacOAuthStateService
+    # at boot. Without these the integration framework can't construct.
+    integration:
+        oauth-state:
+            secret: test-oauth-state-hmac-secret-not-real
+    webhook:
+        secret: test-webhook-shared-secret-not-real
+        external-url: http://localhost:38080
     cors:
         allowed-origins:
             - http://localhost:4200

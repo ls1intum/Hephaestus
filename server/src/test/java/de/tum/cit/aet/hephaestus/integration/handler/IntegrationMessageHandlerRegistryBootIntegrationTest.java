@@ -36,13 +36,15 @@ class IntegrationMessageHandlerRegistryBootIntegrationTest extends BaseIntegrati
     private IntegrationMessageHandlerRegistry registry;
 
     @Test
-    @DisplayName("registry carries every production handler at boot (>= 30)")
+    @DisplayName("registry carries every production handler at boot (>= 20)")
     void registryIsPopulated() {
         int count = registry.handlerCount();
-        // Floor: 24 GitHub + 8 GitLab − a couple of conditional-on-property handlers
-        // (some GitLab handlers are gated by hephaestus.gitlab.enabled). 30 is the
-        // most permissive floor that still proves the registry is wired.
-        assertThat(count).as("handlerCount must be >= 30 after Slice F").isGreaterThanOrEqualTo(30);
+        // Floor: 24 GitHub handlers wire unconditionally; the 8 GitLab handlers carry
+        // @ConditionalOnProperty(prefix=hephaestus.gitlab, name=enabled). The test
+        // config doesn't set hephaestus.gitlab.enabled, so only GitHub is observed
+        // here. 20 is a floor that still proves the unified registry is populated
+        // (well above zero) without coupling to GitLab's conditional wiring.
+        assertThat(count).as("handlerCount must be >= 20 after Slice F").isGreaterThanOrEqualTo(20);
     }
 
     @Test
