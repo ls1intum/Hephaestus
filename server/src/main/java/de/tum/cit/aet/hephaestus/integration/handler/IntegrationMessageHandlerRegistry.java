@@ -12,21 +12,19 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Cross-vendor message handler registry, indexed by {@link EventTypeKey}.
+ * Cross-vendor message handler registry, indexed by {@link EventTypeKey}. Sole resolution
+ * surface for the integration NATS consumer fleet.
  *
- * <p>This is the unified successor to the parallel per-provider registries:
- * <ul>
- *   <li>{@code gitprovider/common/github/GitHubMessageHandlerRegistry} — 3 domain maps
- *       (repository / organization / installation), keyed by event name.</li>
- *   <li>{@code gitprovider/common/gitlab/GitLabMessageHandlerRegistry} — flat map.</li>
- * </ul>
- *
- * <p><b>Transition window.</b> Per plan v4 D7+D22, both legacy registries continue to
- * operate while real handlers stay under {@code gitprovider/...}. This unified registry
- * starts EMPTY in #1198 and fills as handlers migrate to {@code integration/<kind>/...}.
- * The migration is per-handler and reversible: each handler that adopts
- * {@link IntegrationMessageHandler} is automatically picked up here via Spring DI and can
- * be deregistered from its legacy registry in the same change.
+ * <p><b>Historical note.</b> Two predecessor registries existed under
+ * {@code integration/<kind>/common/} (one per provider, with GitHub's split across three
+ * domain maps and GitLab's a flat map). Both were deleted when the last handler migrated
+ * to {@link AbstractIntegrationMessageHandler}; the domain-tier information GitHub used
+ * to split into three maps is now folded into the unified {@link EventTypeKey#eventType()}
+ * prefix ({@code repository.<event>}, {@code organization.<event>},
+ * {@code installation.<event>}) exactly as {@code GithubSubjectParser} emits it. No
+ * routing information was lost; the indirection became a string-prefix lookup. The
+ * arch test {@code IntegrationMessageHandlerArchTest.deletedLegacyClassesDoNotReappear}
+ * keeps the dead registries from being re-introduced.
  *
  * <p><b>Registration model.</b> Constructor-injects every
  * {@link IntegrationMessageHandler} bean and builds an immutable map keyed by
@@ -34,12 +32,6 @@ import org.springframework.stereotype.Component;
  * {@link IllegalStateException} naming BOTH offending bean classes — handler routing must
  * be unambiguous, so we fail at boot rather than silently shadowing one handler with
  * another.
- *
- * <p><b>GitHub domain tiers.</b> The legacy GitHub registry split the keyspace across
- * three domain maps; the unified key folds that into the eventType prefix
- * ({@code repository.<event>}, {@code organization.<event>}, {@code installation.<event>})
- * exactly as {@code GithubSubjectParser} emits it. No information is lost; the indirection
- * becomes a string-prefix lookup.
  */
 @Component
 public class IntegrationMessageHandlerRegistry {
