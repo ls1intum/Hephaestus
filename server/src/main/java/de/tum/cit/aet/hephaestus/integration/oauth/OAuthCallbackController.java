@@ -51,6 +51,14 @@ public class OAuthCallbackController {
 
     private static final Logger log = LoggerFactory.getLogger(OAuthCallbackController.class);
 
+    /**
+     * Reserved callbackParams key carrying the PKCE {@code code_verifier} from the
+     * issuing flow's nonce row. Per-vendor strategies pull this out and add it as
+     * {@code code_verifier} on the token-exchange POST per RFC 7636 §4.5. Prefixed
+     * with {@code _} so it cannot collide with a vendor-supplied query param.
+     */
+    public static final String PKCE_VERIFIER_PARAM = "_pkce_verifier";
+
     private final IntegrationKindRouting kindRouting;
     private final OAuthStateService oauthStateService;
     private final OAuthCallbackService callbackService;
@@ -184,9 +192,14 @@ public class OAuthCallbackController {
         ConnectFinalization result;
         try {
             // Defensive copy + remove the state param — strategies shouldn't see it
-            // and we don't want it accidentally logged twice.
+            // and we don't want it accidentally logged twice. Inject the PKCE verifier
+            // (if the state was PKCE-issued) under a reserved key so the strategy
+            // adds it as `code_verifier` on the token-exchange POST per RFC 7636 §4.5.
             Map<String, String> callbackParams = new HashMap<>(allParams == null ? Map.of() : allParams);
             callbackParams.remove("state");
+            if (binding.codeVerifier() != null) {
+                callbackParams.put(PKCE_VERIFIER_PARAM, binding.codeVerifier());
+            }
             result = strategy.finalizeConnect(ref, callbackParams);
         } catch (RuntimeException e) {
             log.warn("Strategy.finalizeConnect threw for kind={} workspace={}: {}",
