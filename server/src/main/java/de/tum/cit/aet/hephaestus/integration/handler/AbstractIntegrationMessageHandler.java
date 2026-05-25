@@ -13,36 +13,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Reusable scaffolding for {@link IntegrationMessageHandler} implementations.
+ * Reusable scaffolding for {@link IntegrationMessageHandler}. Centralises subject-suffix
+ * validation (including the GitLab {@code tag_push} vs {@code push} overlap guard),
+ * Jackson deserialization, and a {@link TransactionTemplate} boundary that survives
+ * Spring's self-invocation limitation.
  *
- * <p>Centralises the three concerns that every handler shared in the legacy per-kind
- * {@code GitHubMessageHandler<T>} / {@code GitLabMessageHandler<T>} bases:
- * <ol>
- *   <li><b>Subject-suffix validation.</b> The dispatcher already routes by
- *       {@link EventTypeKey} so a misrouted message is impossible in production, but
- *       direct callers (tests, replay tools) can still hand us a subject that doesn't
- *       match. We reject those rather than silently deserializing them.</li>
- *   <li><b>Jackson deserialization.</b> Done once here so every handler implements
- *       {@link #handleEvent(Object)} on the typed DTO rather than {@code byte[]}.</li>
- *   <li><b>Transaction boundary.</b> Spring AOP {@code @Transactional} does NOT work
- *       across self-invocation ({@code this.handleEvent(...)} bypasses the proxy), so
- *       we wrap the call in a {@link TransactionTemplate} the framework can see. This
- *       is the SAME reason the legacy bases needed a {@code TransactionTemplate} — we
- *       carry the constraint forward unchanged.</li>
- * </ol>
- *
- * <p>The class is intentionally {@code final}-ising {@link #onMessage(Message)} and
- * {@link #key()} so subclasses cannot subvert the routing contract: handlers express
- * their identity through the constructor arguments alone.
- *
- * <p><b>Subject-validation contract.</b> The {@link EventTypeKey}'s {@code eventType}
- * is the registry index — for GitHub it carries a tier prefix ({@code "repository.issues"})
- * that the {@code GithubSubjectParser} folds in from the {@code github.<org>.<repo>}
- * structure of the subject. The subject itself only carries the raw event token (e.g.
- * {@code "issues"}). The base class derives that raw token from {@link EventTypeKey#eventType()}
- * by stripping anything before the last {@code '.'}, then validates the inbound subject's
- * last segment against it via exact equality — this is the {@code tag_push} vs
- * {@code push} suffix-overlap guard that GitLab's legacy base required.
+ * <p>{@code eventType} is the registry index. For GitHub it carries a tier prefix
+ * ({@code "repository.issues"}) that the {@code GithubSubjectParser} folds in; the raw
+ * subject only carries the token after the last {@code '.'}. The base validates the
+ * inbound subject's last segment against that derived token by exact equality.
  *
  * @param <T> DTO type of the deserialized webhook payload.
  */

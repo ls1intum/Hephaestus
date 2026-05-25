@@ -12,26 +12,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Cross-vendor message handler registry, indexed by {@link EventTypeKey}. Sole resolution
- * surface for the integration NATS consumer fleet.
+ * Cross-vendor message handler registry, indexed by {@link EventTypeKey}. The unified
+ * resolution surface for the integration NATS consumer fleet.
  *
- * <p><b>Historical note.</b> Two predecessor registries existed under
- * {@code integration/<kind>/common/} (one per provider, with GitHub's split across three
- * domain maps and GitLab's a flat map). Both were deleted when the last handler migrated
- * to {@link AbstractIntegrationMessageHandler}; the domain-tier information GitHub used
- * to split into three maps is now folded into the unified {@link EventTypeKey#eventType()}
- * prefix ({@code repository.<event>}, {@code organization.<event>},
- * {@code installation.<event>}) exactly as {@code GithubSubjectParser} emits it. No
- * routing information was lost; the indirection became a string-prefix lookup. The
- * arch test {@code IntegrationMessageHandlerArchTest.deletedLegacyClassesDoNotReappear}
- * keeps the dead registries from being re-introduced.
- *
- * <p><b>Registration model.</b> Constructor-injects every
- * {@link IntegrationMessageHandler} bean and builds an immutable map keyed by
- * {@link IntegrationMessageHandler#key()}. Duplicate keys are a fatal
- * {@link IllegalStateException} naming BOTH offending bean classes — handler routing must
- * be unambiguous, so we fail at boot rather than silently shadowing one handler with
- * another.
+ * <p>Constructor-injects every {@link IntegrationMessageHandler} bean and builds an
+ * immutable map. Duplicate keys are a fatal {@link IllegalStateException} naming both
+ * offending bean classes — routing must be unambiguous, so we fail at boot rather than
+ * shadow one handler with another.
  */
 @Component
 public class IntegrationMessageHandlerRegistry {

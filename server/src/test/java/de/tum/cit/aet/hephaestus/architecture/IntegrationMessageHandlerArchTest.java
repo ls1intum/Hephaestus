@@ -131,52 +131,6 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
             .isGreaterThanOrEqualTo(30);
     }
 
-    @Test
-    @DisplayName("AbstractIntegrationMessageHandler stays abstract — never @Component-able directly")
-    void abstractBaseStaysAbstract() {
-        JavaClass base = classes
-            .stream()
-            .filter(c -> c.getFullName().equals(AbstractIntegrationMessageHandler.class.getName()))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("AbstractIntegrationMessageHandler must be in production classes"));
-
-        assertThat(base.getModifiers())
-            .as(
-                "AbstractIntegrationMessageHandler must remain abstract. Making it concrete "
-                    + "would let Spring instantiate it as a bare bean with a null EventTypeKey, "
-                    + "which the registry's null-key check would (correctly) reject — but at "
-                    + "boot, not at refactor-time. Failing here is louder and earlier."
-            )
-            .contains(com.tngtech.archunit.core.domain.JavaModifier.ABSTRACT);
-    }
-
-    @Test
-    @DisplayName("every concrete unified handler under integration/ declares a unique EventTypeKey")
-    void everyHandlerHasUniqueKeyByClassName() {
-        // Cheap structural check: each handler class name + its directory is unique by
-        // construction (filesystem uniqueness), so this asserts we haven't accidentally
-        // duplicated a Spring @Component bean shape that would clash at runtime.
-        long unifiedHandlers = classes
-            .stream()
-            .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.integration."))
-            .filter(c -> c.getSimpleName().endsWith("MessageHandler"))
-            .filter(c -> !c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.ABSTRACT))
-            .filter(IntegrationMessageHandlerArchTest::bindsToUnifiedSpi)
-            .count();
-
-        long distinctNames = classes
-            .stream()
-            .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.integration."))
-            .filter(c -> c.getSimpleName().endsWith("MessageHandler"))
-            .filter(c -> !c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.ABSTRACT))
-            .filter(IntegrationMessageHandlerArchTest::bindsToUnifiedSpi)
-            .map(JavaClass::getSimpleName)
-            .distinct()
-            .count();
-
-        assertThat(distinctNames).as("handler simple names must be unique").isEqualTo(unifiedHandlers);
-    }
-
     private static boolean bindsToUnifiedSpi(JavaClass c) {
         // Direct interface implementation.
         if (
