@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.github.credentials;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
@@ -34,6 +36,7 @@ import org.mockito.MockitoAnnotations;
 class GithubCredentialProviderTest extends BaseUnitTest {
 
     @Mock private ConnectionService connectionService;
+    @Mock private GitHubAppTokenService appTokenService;
 
     private CredentialBundleConverter converter;
     private GithubCredentialProvider provider;
@@ -42,7 +45,8 @@ class GithubCredentialProviderTest extends BaseUnitTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         converter = new CredentialBundleConverter("0123456789abcdef0123456789abcdef", "dev");
-        provider = new GithubCredentialProvider(connectionService, converter);
+        lenient().when(appTokenService.getConfiguredAppId()).thenReturn(42L);
+        provider = new GithubCredentialProvider(connectionService, converter, appTokenService);
     }
 
     @Test

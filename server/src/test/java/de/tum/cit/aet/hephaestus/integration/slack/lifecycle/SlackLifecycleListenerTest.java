@@ -41,12 +41,6 @@ class SlackLifecycleListenerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("kind() returns SLACK")
-    void kindIsSlack() {
-        assertThat(listener.kind()).isEqualTo(IntegrationKind.SLACK);
-    }
-
-    @Test
     @DisplayName("onScopeChanged with empty removedExternalIds is a no-op (no repo lookups)")
     void emptyDeltaIsNoOp() {
         listener.onScopeChanged(

@@ -37,6 +37,20 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     /** Tag persisted on {@code connection.credentials_alg} for any blob written by this converter. */
     public static final String ALGORITHM_TAG = "aesgcm-v1";
 
+    /** First byte of every ciphertext written by this converter — readers reject anything else. */
+    public static final byte FORMAT_VERSION_V1 = 0x01;
+
+    /**
+     * Context separator bound as AES-GCM AAD. Stops the same key + IV from being usable to
+     * decrypt a blob produced by a different converter with the same key material.
+     */
+    private static final byte[] CONTEXT_AAD = "hephaestus-credential-bundle-v1".getBytes(StandardCharsets.UTF_8);
+
+    /** Exposed for the Liquibase backfill so it produces v1-format blobs identical to runtime writes. */
+    public static byte[] contextAad() {
+        return CONTEXT_AAD.clone();
+    }
+
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
@@ -124,15 +138,16 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
             IV_GENERATOR.nextBytes(iv);
             GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, spec);
+            cipher.updateAAD(CONTEXT_AAD);
 
             byte[] cipherText = cipher.doFinal(plaintext);
 
-            byte[] combined = new byte[iv.length + cipherText.length];
-            System.arraycopy(iv, 0, combined, 0, iv.length);
-            System.arraycopy(cipherText, 0, combined, iv.length, cipherText.length);
+            byte[] combined = new byte[1 + iv.length + cipherText.length];
+            combined[0] = FORMAT_VERSION_V1;
+            System.arraycopy(iv, 0, combined, 1, iv.length);
+            System.arraycopy(cipherText, 0, combined, 1 + iv.length, cipherText.length);
             return combined;
         } catch (Exception e) {
-            log.error("Failed to encrypt credential bundle", e);
             throw new EncryptionException("Credential encryption failed", e);
         }
     }
@@ -147,25 +162,31 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
             throw new EncryptionException(
                 "CredentialBundleConverter is not enabled; cannot decrypt credentials");
         }
-        if (dbData.length < GCM_IV_LENGTH + 1) {
+        if (dbData.length < 1 + GCM_IV_LENGTH + 1) {
             throw new EncryptionException(
-                "Credential ciphertext too short: " + dbData.length + " bytes (need > " + GCM_IV_LENGTH + ")");
+                "Credential ciphertext too short: " + dbData.length + " bytes (need > "
+                    + (1 + GCM_IV_LENGTH) + ")");
+        }
+        if (dbData[0] != FORMAT_VERSION_V1) {
+            throw new EncryptionException(
+                "Unsupported credential blob version: 0x" + Integer.toHexString(dbData[0] & 0xFF)
+                    + " (expected 0x01 — " + ALGORITHM_TAG + ")");
         }
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
-            byte[] cipherText = new byte[dbData.length - GCM_IV_LENGTH];
-            System.arraycopy(dbData, 0, iv, 0, GCM_IV_LENGTH);
-            System.arraycopy(dbData, GCM_IV_LENGTH, cipherText, 0, cipherText.length);
+            byte[] cipherText = new byte[dbData.length - 1 - GCM_IV_LENGTH];
+            System.arraycopy(dbData, 1, iv, 0, GCM_IV_LENGTH);
+            System.arraycopy(dbData, 1 + GCM_IV_LENGTH, cipherText, 0, cipherText.length);
 
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
             cipher.init(Cipher.DECRYPT_MODE, secretKey, spec);
+            cipher.updateAAD(CONTEXT_AAD);
             byte[] plaintext = cipher.doFinal(cipherText);
             return deserialize(plaintext);
         } catch (EncryptionException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Failed to decrypt credential bundle", e);
             throw new EncryptionException("Credential decryption failed", e);
         }
     }

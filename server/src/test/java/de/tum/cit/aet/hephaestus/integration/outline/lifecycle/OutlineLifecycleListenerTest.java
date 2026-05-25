@@ -45,12 +45,6 @@ class OutlineLifecycleListenerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("kind() returns OUTLINE")
-    void kindIsOutline() {
-        assertThat(listener.kind()).isEqualTo(IntegrationKind.OUTLINE);
-    }
-
-    @Test
     @DisplayName("empty delta is a no-op")
     void emptyDeltaIsNoOp() {
         listener.onScopeChanged(

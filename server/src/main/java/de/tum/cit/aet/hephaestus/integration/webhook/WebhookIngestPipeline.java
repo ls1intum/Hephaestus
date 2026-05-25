@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.webhook;
 
+import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
@@ -177,12 +179,12 @@ public class WebhookIngestPipeline {
         } catch (JetStreamPublisher.PublishFailedException e) {
             log.error(
                 "WebhookIngestPipeline: publish failed for kind={} subject={}: {}",
-                kind, subject, e.getMessage()
+                kind, sanitizeForLog(subject), e.getMessage()
             );
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Map.of("error", "publish-failed"));
         }
-        log.debug("Published {} webhook to NATS: subject={} dedupId={}", kind, subject, dedupId);
+        log.debug("Published {} webhook to NATS: subject={} dedupId={}", kind, sanitizeForLog(subject), sanitizeForLog(dedupId));
         return ResponseEntity.accepted().body(Map.of("status", "ok"));
     }
 

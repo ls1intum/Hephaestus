@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.github.credentials;
 
+import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
@@ -32,16 +33,18 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
 
     private static final Logger log = LoggerFactory.getLogger(GithubCredentialProvider.class);
 
-    /** GitHub App ID isn't persisted on the Connection yet — we surface the runtime app id via {@link #appIdString()}. */
-    private static final String UNKNOWN_APP_ID = "unknown";
-
     private final ConnectionService connectionService;
     private final CredentialBundleConverter credentialConverter;
+    private final GitHubAppTokenService appTokenService;
 
-    public GithubCredentialProvider(ConnectionService connectionService,
-                                    CredentialBundleConverter credentialConverter) {
+    public GithubCredentialProvider(
+        ConnectionService connectionService,
+        CredentialBundleConverter credentialConverter,
+        GitHubAppTokenService appTokenService
+    ) {
         this.connectionService = connectionService;
         this.credentialConverter = credentialConverter;
+        this.appTokenService = appTokenService;
     }
 
     @Override
@@ -72,7 +75,7 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
                     );
                     yield Optional.empty();
                 }
-                yield Optional.of(new GithubAppCredential(installationId, appIdString()));
+                yield Optional.of(new GithubAppCredential(installationId, String.valueOf(appTokenService.getConfiguredAppId())));
             }
             case ConnectionConfig.GitHubPatConfig ignored -> {
                 if (connection.getCredentialsEncrypted() == null) {
@@ -84,18 +87,9 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
                 }
                 yield connection.credentials(credentialConverter);
             }
-            default -> Optional.empty();
+            case ConnectionConfig.GitLabConfig ignored -> Optional.empty();
+            case ConnectionConfig.SlackConfig ignored -> Optional.empty();
+            case ConnectionConfig.OutlineConfig ignored -> Optional.empty();
         };
-    }
-
-    /**
-     * Placeholder for the configured GitHub App ID until the Connection schema carries it
-     * directly. Resolving the live value would couple this adapter to
-     * {@code GitHubAppTokenService.getConfiguredAppId()}; we accept the looser contract
-     * for now because the downstream {@link GithubTokenRefresher} doesn't read appId from
-     * the bundle — it uses {@code installationId} plus its own configured app key.
-     */
-    private static String appIdString() {
-        return UNKNOWN_APP_ID;
     }
 }

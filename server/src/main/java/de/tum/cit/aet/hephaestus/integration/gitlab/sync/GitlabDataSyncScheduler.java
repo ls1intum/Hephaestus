@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.repository.collaborator.GitL
 import de.tum.cit.aet.hephaestus.integration.gitlab.subissue.GitLabSubIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.team.GitLabTeamSyncService;
 import jakarta.annotation.PostConstruct;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -119,6 +120,7 @@ public class GitlabDataSyncScheduler {
      * Runs on the same cron as GitHub sync (default: daily at 3 AM).
      */
     @Scheduled(cron = "${hephaestus.sync.cron}")
+    @SchedulerLock(name = "gitlab-data-sync", lockAtMostFor = "PT4H", lockAtLeastFor = "PT1M")
     public void syncDataCron() {
         List<SyncSession> sessions = syncTargetProvider.getGitLabSyncSessions();
 

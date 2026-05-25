@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.github.subissue.GitHubSubIssueSyncS
 import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.github.team.GitHubTeamSyncService;
 import jakarta.annotation.PostConstruct;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -163,6 +164,7 @@ public class GithubDataSyncScheduler {
      * Respects monitoring filters to limit sync scope during development.
      */
     @Scheduled(cron = "${hephaestus.sync.cron}")
+    @SchedulerLock(name = "github-data-sync", lockAtMostFor = "PT4H", lockAtLeastFor = "PT1M")
     public void syncDataCron() {
         log.info("Starting scheduled sync");
 

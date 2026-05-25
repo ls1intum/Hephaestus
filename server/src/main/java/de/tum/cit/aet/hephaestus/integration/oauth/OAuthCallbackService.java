@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.oauth;
 
+import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
@@ -112,7 +114,7 @@ public class OAuthCallbackService {
         ));
         log.info("OAuth complete: kind={} workspace={} connection={} instanceKey={} actor={}",
             connection.getKind(), connection.getWorkspace().getId(),
-            connection.getId(), completed.instanceKey(), actor);
+            connection.getId(), sanitizeForLog(completed.instanceKey()), sanitizeForLog(actor));
         return connection;
     }
 

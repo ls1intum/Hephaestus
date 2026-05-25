@@ -360,11 +360,13 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         Cipher cipher = Cipher.getInstance(ALGORITHM);
         cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "AES"),
             new GCMParameterSpec(GCM_TAG_LENGTH, iv));
+        cipher.updateAAD(CredentialBundleConverter.contextAad());
         byte[] cipherText = cipher.doFinal(plaintext);
 
-        byte[] combined = new byte[GCM_IV_LENGTH + cipherText.length];
-        System.arraycopy(iv, 0, combined, 0, GCM_IV_LENGTH);
-        System.arraycopy(cipherText, 0, combined, GCM_IV_LENGTH, cipherText.length);
+        byte[] combined = new byte[1 + GCM_IV_LENGTH + cipherText.length];
+        combined[0] = CredentialBundleConverter.FORMAT_VERSION_V1;
+        System.arraycopy(iv, 0, combined, 1, GCM_IV_LENGTH);
+        System.arraycopy(cipherText, 0, combined, 1 + GCM_IV_LENGTH, cipherText.length);
         return combined;
     }
 

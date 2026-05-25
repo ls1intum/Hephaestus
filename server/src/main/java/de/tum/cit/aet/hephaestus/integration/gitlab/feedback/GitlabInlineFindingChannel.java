@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.feedback;
 
 import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
 
+import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
@@ -141,9 +142,9 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                     log.warn(
                         "GitLab createDiffNote failed: workspaceId={}, file={}, line={}, errors={}",
                         scopeId,
-                        diff.filePath(),
+                        sanitizeForLog(diff.filePath()),
                         diff.newLineNumber(),
-                        errors
+                        sanitizeForLog(errors == null ? null : errors.toString())
                     );
                     continue;
                 }
@@ -159,7 +160,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 log.warn(
                     "GitLab diff note failed: workspaceId={}, file={}, line={}",
                     scopeId,
-                    diff.filePath(),
+                    sanitizeForLog(diff.filePath()),
                     diff.newLineNumber(),
                     e
                 );
@@ -290,12 +291,12 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
             List<String> errors = response.field("createNote.errors").getValue();
             if (errors != null && !errors.isEmpty()) {
-                log.warn("Fallback MR comment failed: workspaceId={}, errors={}", scopeId, errors);
+                log.warn("Fallback MR comment failed: workspaceId={}, errors={}", scopeId, sanitizeForLog(errors.toString()));
                 return false;
             }
             return true;
         } catch (Exception e) {
-            log.warn("Fallback MR comment failed: workspaceId={}, file={}", scopeId, diff.filePath(), e);
+            log.warn("Fallback MR comment failed: workspaceId={}, file={}", scopeId, sanitizeForLog(diff.filePath()), e);
             return false;
         }
     }

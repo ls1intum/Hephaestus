@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.webhook;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.webhook.WebhookIngestPipeline;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,12 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
  * and JetStream publication — identical for both the legacy URL anchor and the
  * unified {@code /webhooks/gitlab} entry point.
  *
- * <p>{@code @ConditionalOnBean(JetStreamPublisher.class)} mirrors the original
- * gating: this controller is active only when the webhook runtime role brings up
- * the publisher.
+ * <p>Gated on the webhook runtime role — the publisher bean is wired by the same
+ * gate, so this avoids a class-level {@code @ConditionalOnBean} that depends on
+ * autoconfig ordering.
  */
 @RestController
-@ConditionalOnBean(JetStreamPublisher.class)
+@ConditionalOnProperty(name = RuntimeRole.WEBHOOK_PROPERTY, havingValue = "true", matchIfMissing = true)
 @WorkspaceAgnostic(
     "Webhook reception is provider-keyed (group/project). Workspace context is resolved downstream by the sync consumer."
 )

@@ -1,10 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.manifest;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -35,7 +33,6 @@ public interface OAuthStateNonceRepository extends JpaRepository<OAuthStateNonce
         "UPDATE OAuthStateNonce n SET n.consumedAt = :now "
             + "WHERE n.nonce = :nonce AND n.consumedAt IS NULL"
     )
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
     int markConsumed(@Param("nonce") String nonce, @Param("now") Instant now);
 
     /** Cleanup helper — drops rows older than the cutoff. */

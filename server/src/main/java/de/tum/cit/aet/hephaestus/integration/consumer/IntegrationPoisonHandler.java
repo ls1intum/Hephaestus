@@ -15,41 +15,19 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Centralises NAK-with-exponential-backoff and poison-message handling for the
- * integration-framework NATS consumers.
+ * NAK-with-exponential-backoff and poison-message handler shared across every NATS
+ * consumer in the integration framework.
  *
- * <p>Carved out of the pre-unification monolithic consumer service in Slice D9 so the same
- * policy applies to every consumer — scope, installation, and (when migrated) the
- * unified-framework consumers — without duplication. The behaviour is intentionally a
- * verbatim port of the legacy logic:
+ * <p>Policy: read {@code deliveredCount()} from message metadata; at
+ * {@code deliveredCount >= maxRedeliver} ACK and bump {@code integration.consumer.poison}
+ * (ERROR log — operator-actionable); otherwise NAK with delay
+ * {@code clamp(base * 2^attempt + jitter, maxDelay)} and bump
+ * {@code integration.consumer.nak}.
  *
- * <ol>
- *   <li>Read the JetStream-side {@code deliveredCount()} from the message metadata.</li>
- *   <li>If {@code deliveredCount &gt;= maxRedeliver} the message is treated as poison: it
- *       is ACKed (so it stops blocking the inflight slot and is removed from the stream's
- *       redelivery loop) and the {@code integration.consumer.poison} counter is bumped.
- *       Log level is ERROR because a poison ACK is operator-actionable — there is real
- *       data we couldn't process.</li>
- *   <li>Otherwise the message is NAKed with delay {@code clamp(base * 2^attempt + jitter,
- *       maxDelay)} computed by {@link #exponentialBackoffMillis(int, long, long)}. The
- *       {@code integration.consumer.nak} counter is bumped.</li>
- * </ol>
- *
- * <p>The backoff math is intentionally inlined (rather than reused from
- * {@code gitprovider.common.github.ExponentialBackoff}) to keep
- * {@code integration.consumer} from depending on {@code gitprovider} — that direction
- * would close a Modulith cycle with the pre-unification consumer service, which already
- * depends on this package.
- *
- * <p><b>Counter tagging.</b> Counters are tagged with {@code kind=<integration-kind>}
- * derived from the message subject ({@link ConsumerSubjectMath#kindFromSubjectPrefix}).
- * When the subject is unknown or unset the tag becomes {@code kind=unknown} so unrelated
- * dashboards keep a single time-series. Counters are cached per-kind to avoid
- * re-registering on every message — Micrometer dedupes but the lookup is non-trivial.
- *
- * <p><b>Thread safety.</b> Stateless apart from the per-kind counter cache, which is a
- * {@link ConcurrentHashMap}. Safe for concurrent invocation from any thread; the dispatcher
- * already serialises per-scope.
+ * <p>Counters tag {@code kind=<integration-kind>} derived from
+ * {@link ConsumerSubjectMath#kindFromSubjectPrefix}; cache is per-kind. Backoff math is
+ * inlined (rather than imported from {@code gitprovider.common.github.ExponentialBackoff})
+ * to keep this package free of a {@code gitprovider} import.
  */
 @Component
 public class IntegrationPoisonHandler {
