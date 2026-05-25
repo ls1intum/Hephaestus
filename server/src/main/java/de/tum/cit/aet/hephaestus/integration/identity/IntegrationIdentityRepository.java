@@ -14,6 +14,16 @@ public interface IntegrationIdentityRepository extends JpaRepository<Integration
     Optional<IntegrationIdentity> findByKindAndIntegrationInstanceIdAndExternalId(
         IntegrationKind kind, long integrationInstanceId, String externalId);
 
+    /**
+     * Cross-instance lookup by (kind, external_id). Used by the GitHub App bind
+     * identity check: we need to know whether the installer's GitHub user id is
+     * linked to any Hephaestus user. For SCM kinds the {@code integration_instance_id}
+     * column resolves to the shared {@code git_provider} id, so in practice this
+     * returns 0 or 1 rows per (kind, external_id) — the explicit list shape keeps
+     * the method honest for messaging kinds where multiple connections exist.
+     */
+    List<IntegrationIdentity> findByKindAndExternalId(IntegrationKind kind, String externalId);
+
     List<IntegrationIdentity> findByHephaestusUserId(long hephaestusUserId);
 
     List<IntegrationIdentity> findByExternalEmail(String email);

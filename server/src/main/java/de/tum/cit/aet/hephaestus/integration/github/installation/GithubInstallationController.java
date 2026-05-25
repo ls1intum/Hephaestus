@@ -1,5 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.github.installation;
 
+import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.InstallationExpiredException;
+import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.InstallerIdentityMismatchException;
+import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.InstallerIdentityNotLinkedException;
+import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.LegacyUnboundRowException;
+import de.tum.cit.aet.hephaestus.integration.identity.HephaestusUser;
+import de.tum.cit.aet.hephaestus.integration.identity.HephaestusUserRepository;
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.constraints.NotNull;
@@ -38,9 +44,12 @@ public class GithubInstallationController {
     private static final Logger log = LoggerFactory.getLogger(GithubInstallationController.class);
 
     private final GithubInstallationBindingService bindingService;
+    private final HephaestusUserRepository userRepository;
 
-    public GithubInstallationController(GithubInstallationBindingService bindingService) {
+    public GithubInstallationController(GithubInstallationBindingService bindingService,
+                                        HephaestusUserRepository userRepository) {
         this.bindingService = bindingService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/bind")
@@ -53,8 +62,14 @@ public class GithubInstallationController {
         if (body == null || body.installationId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "installationId is required");
         }
-        String actorRef = authentication != null ? authentication.getName() : "unknown";
-        Connection connection = bindingService.bind(body.installationId(), workspaceId, actorRef);
+        if (authentication == null || authentication.getName() == null) {
+            // Defensive: @RequireWorkspaceAdminForBinding already gates on isAuthenticated().
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authentication required");
+        }
+        HephaestusUser user = userRepository.findByKeycloakSubject(authentication.getName())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                "no HephaestusUser for authenticated principal"));
+        Connection connection = bindingService.bind(body.installationId(), workspaceId, user);
         return ResponseEntity.ok(BindResponse.of(connection));
     }
 
@@ -69,6 +84,32 @@ public class GithubInstallationController {
     ResponseEntity<String> handleMissingWorkspace(EntityNotFoundException e) {
         log.info("Bind request rejected (404): {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(InstallerIdentityNotLinkedException.class)
+    ResponseEntity<String> handleNotLinked(InstallerIdentityNotLinkedException e) {
+        // 412 PRECONDITION_REQUIRED says "do this preparatory step (link your GitHub
+        // identity) and retry". Distinct from 403 so the UI can show a link CTA.
+        log.info("Bind request rejected (412): {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.PRECONDITION_REQUIRED).body(e.getMessage());
+    }
+
+    @ExceptionHandler(InstallerIdentityMismatchException.class)
+    ResponseEntity<String> handleIdentityMismatch(InstallerIdentityMismatchException e) {
+        // Opaque message + 403; do NOT reveal whether the installer id is claimable.
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+    }
+
+    @ExceptionHandler(InstallationExpiredException.class)
+    ResponseEntity<String> handleExpired(InstallationExpiredException e) {
+        log.info("Bind request rejected (410): {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.GONE).body(e.getMessage());
+    }
+
+    @ExceptionHandler(LegacyUnboundRowException.class)
+    ResponseEntity<String> handleLegacy(LegacyUnboundRowException e) {
+        log.warn("Bind request rejected (409 legacy row): {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)

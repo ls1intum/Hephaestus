@@ -1,0 +1,43 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        #1198 Wave 5 — capture the GitHub user who installed the App so the bind
+        endpoint can enforce installer-identity match (closes the confused-deputy
+        gap flagged by audit pass 3).
+
+        Without this, any authenticated Hephaestus user can submit ANY observed
+        installation_id and claim it for their workspace (same shape as the
+        Cloudflare CASB CVE: third-party install + tenant binding without
+        identity check). `installer_github_user_id` is the GitHub `sender.id`
+        from the installation.created webhook; the bind service refuses the
+        bind unless the authenticated Hephaestus user has a linked
+        `IntegrationIdentity(kind=GITHUB, external_id=installer_github_user_id)`.
+
+        Nullable on purpose: rows written before this column existed predate
+        the protection; the bind service treats null `installer_github_user_id`
+        as a 409 CONFLICT ("legacy row — uninstall + reinstall to bind"). The
+        TTL cleanup evicts legacy rows within 30 days.
+    -->
+
+    <changeSet author="hephaestus-1198" id="1779701100000-1">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="github_installation_unbound" columnName="installer_github_user_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="github_installation_unbound">
+            <column name="installer_github_user_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="installer_login" type="VARCHAR(256)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.github.installation;
 
+import de.tum.cit.aet.hephaestus.integration.identity.HephaestusUser;
+import de.tum.cit.aet.hephaestus.integration.identity.IntegrationIdentity;
+import de.tum.cit.aet.hephaestus.integration.identity.IntegrationIdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
@@ -10,6 +13,10 @@ import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityNotFoundException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -51,31 +58,69 @@ public class GithubInstallationBindingService {
     private final ConnectionRepository connectionRepository;
     private final ConnectionService connectionService;
     private final WorkspaceRepository workspaceRepository;
+    private final IntegrationIdentityRepository identityRepository;
 
     public GithubInstallationBindingService(GithubInstallationUnboundRepository unboundRepository,
                                             ConnectionRepository connectionRepository,
                                             ConnectionService connectionService,
-                                            WorkspaceRepository workspaceRepository) {
+                                            WorkspaceRepository workspaceRepository,
+                                            IntegrationIdentityRepository identityRepository) {
         this.unboundRepository = unboundRepository;
         this.connectionRepository = connectionRepository;
         this.connectionService = connectionService;
         this.workspaceRepository = workspaceRepository;
+        this.identityRepository = identityRepository;
     }
 
     /**
      * Bind {@code installationId} to {@code workspaceId} and activate the connection.
+     * Enforces the installer-identity check: the {@code authenticatedUser} MUST have an
+     * {@link IntegrationIdentity}({@code GITHUB}, {@code unbound.installer_github_user_id})
+     * linked to their {@link HephaestusUser}. Closes the confused-deputy CVE where any
+     * authenticated user could claim any observed {@code installation_id}.
      *
-     * @throws NoSuchElementException        if no unbound row exists for the installation
-     * @throws EntityNotFoundException       if the target workspace does not exist
-     * @throws IllegalStateException         if the installation is already bound to a different workspace
-     * @throws DataIntegrityViolationException on rare DB-level collisions (propagates so callers can map to 409)
+     * @throws NoSuchElementException                if no unbound row exists for the installation
+     * @throws InstallationExpiredException          if the unbound row passed its 30-day TTL
+     * @throws InstallerIdentityNotLinkedException   if the authenticated user has not linked their
+     *                                               GitHub identity yet (controller → 412 with link URL)
+     * @throws InstallerIdentityMismatchException    if the linked identity does not match the installer
+     *                                               (controller → 403 with opaque message — no oracle)
+     * @throws LegacyUnboundRowException             if the row predates the installer column
+     * @throws EntityNotFoundException               if the target workspace does not exist
+     * @throws IllegalStateException                 if the installation is already bound to a different workspace
+     * @throws DataIntegrityViolationException       on rare DB-level collisions (propagates so callers can map to 409)
      */
     @Transactional
-    public Connection bind(long installationId, long workspaceId, String actorRef) {
+    public Connection bind(long installationId, long workspaceId, HephaestusUser authenticatedUser) {
+        if (authenticatedUser == null || authenticatedUser.getId() == null) {
+            throw new IllegalArgumentException("authenticatedUser is required for bind");
+        }
         GithubInstallationUnbound unbound = unboundRepository.findById(installationId)
             .orElseThrow(() -> new NoSuchElementException(
                 "No unbound GitHub installation found for installationId=" + installationId
             ));
+
+        if (unbound.getExpiresAt() != null && unbound.getExpiresAt().isBefore(Instant.now())) {
+            log.info("Bind rejected (410): unbound row expired installationId={} expiresAt={}",
+                installationId, unbound.getExpiresAt());
+            throw new InstallationExpiredException(
+                "Unbound installation row expired; uninstall and reinstall to retry");
+        }
+
+        // Identity check — closes the confused-deputy CVE. The installer's GitHub user id
+        // comes from the webhook's `sender.id`; the authenticated Hephaestus user MUST
+        // have a linked IntegrationIdentity matching it. Reject otherwise.
+        Long installerGithubUserId = unbound.getInstallerGithubUserId();
+        if (installerGithubUserId == null) {
+            // Legacy row written before the installer column existed — refuse rather than
+            // wave through, since the protection isn't enforceable.
+            log.warn("Bind rejected (409): legacy unbound row without installer identity, installationId={}",
+                installationId);
+            throw new LegacyUnboundRowException(
+                "Legacy unbound row predates the installer identity check; uninstall and reinstall to bind");
+        }
+        requireInstallerIdentityMatch(installerGithubUserId, authenticatedUser, installationId, workspaceId);
+        String actorRef = authenticatedUser.getKeycloakSubject();
 
         Workspace workspace = workspaceRepository.findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException(
@@ -147,5 +192,76 @@ public class GithubInstallationBindingService {
             installationId, workspaceId, connection.getId());
 
         return connection;
+    }
+
+    /**
+     * Reject the bind unless an {@link IntegrationIdentity} exists for the installer's
+     * GitHub user id AND it links to the authenticated Hephaestus user.
+     *
+     * <p>Mismatches log at WARN with the installer id HASHED — logging the raw id would
+     * help an attacker enumerate which ids are claimable. Successful matches log the raw
+     * id at INFO for forensics.
+     */
+    private void requireInstallerIdentityMatch(long installerGithubUserId,
+                                               HephaestusUser authenticatedUser,
+                                               long installationId,
+                                               long workspaceId) {
+        List<IntegrationIdentity> linked = identityRepository.findByKindAndExternalId(
+            IntegrationKind.GITHUB, Long.toString(installerGithubUserId));
+        // Linked-to-someone case: pick the one with a hephaestus_user. SCM identities are
+        // cross-workspace, so there should be at most one.
+        Optional<IntegrationIdentity> match = linked.stream()
+            .filter(id -> id.getHephaestusUser() != null)
+            .findFirst();
+        if (match.isEmpty()) {
+            log.info("Bind rejected (412): installer GitHub id not linked to any Hephaestus user; "
+                + "actor={} workspace={} installerIdHash={}",
+                authenticatedUser.getId(), workspaceId, shortHash(installerGithubUserId));
+            throw new InstallerIdentityNotLinkedException(
+                "Link your GitHub identity before binding this installation");
+        }
+        HephaestusUser linkedUser = match.get().getHephaestusUser();
+        if (!authenticatedUser.getId().equals(linkedUser.getId())) {
+            // OPAQUE message — do NOT reveal whether the installer exists; that helps the
+            // attacker confirm which installation IDs are claimable. Log at WARN with
+            // hashed installer id so SIEM can correlate repeats without a leaked oracle.
+            log.warn("Bind rejected (403): installer identity mismatch; actor={} workspace={} "
+                + "installerIdHash={}",
+                authenticatedUser.getId(), workspaceId, shortHash(installerGithubUserId));
+            throw new InstallerIdentityMismatchException("installer_identity_mismatch");
+        }
+        log.info("Bind identity match OK: actor={} workspace={} installation={} installerGithubUserId={}",
+            authenticatedUser.getId(), workspaceId, installationId, installerGithubUserId);
+    }
+
+    /** First 8 hex chars of SHA-256(externalId) — defender-correlatable, not enumerable. */
+    private static String shortHash(long externalId) {
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            byte[] digest = sha.digest(Long.toString(externalId).getBytes());
+            return HexFormat.of().formatHex(digest).substring(0, 8);
+        } catch (NoSuchAlgorithmException e) {
+            return "nohash";
+        }
+    }
+
+    /** 412 — authenticated user has not linked their GitHub identity yet. */
+    public static class InstallerIdentityNotLinkedException extends RuntimeException {
+        public InstallerIdentityNotLinkedException(String message) { super(message); }
+    }
+
+    /** 403 — linked identity does not match the installer. Message stays opaque. */
+    public static class InstallerIdentityMismatchException extends RuntimeException {
+        public InstallerIdentityMismatchException(String message) { super(message); }
+    }
+
+    /** 410 — unbound row passed its 30-day TTL. */
+    public static class InstallationExpiredException extends RuntimeException {
+        public InstallationExpiredException(String message) { super(message); }
+    }
+
+    /** 409 — row predates the installer-identity column. Uninstall + reinstall to bind. */
+    public static class LegacyUnboundRowException extends RuntimeException {
+        public LegacyUnboundRowException(String message) { super(message); }
     }
 }

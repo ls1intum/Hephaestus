@@ -76,6 +76,23 @@ public class GithubInstallationUnbound {
     @Column(name = "expires_at", nullable = false, insertable = false)
     private Instant expiresAt;
 
+    /**
+     * GitHub user id of the human who clicked "Install" — from the webhook's
+     * {@code sender.id}. Load-bearing for the bind endpoint's identity check:
+     * the authenticated Hephaestus user must have a linked
+     * {@code IntegrationIdentity(GITHUB, this)} to bind, otherwise an attacker who
+     * observed another user's {@code installation_id} could claim it. Nullable for
+     * rows written before this column existed (the bind service rejects those as
+     * legacy 409 — operator instructs the user to re-install).
+     */
+    @Column(name = "installer_github_user_id")
+    @Nullable
+    private Long installerGithubUserId;
+
+    @Column(name = "installer_login", length = 256)
+    @Nullable
+    private String installerLogin;
+
     protected GithubInstallationUnbound() {
     }
 
@@ -92,10 +109,14 @@ public class GithubInstallationUnbound {
     public String getRepositories() { return repositories; }
     public Instant getObservedAt() { return observedAt; }
     public Instant getExpiresAt() { return expiresAt; }
+    @Nullable public Long getInstallerGithubUserId() { return installerGithubUserId; }
+    @Nullable public String getInstallerLogin() { return installerLogin; }
 
     public void setAccountId(@Nullable Long accountId) { this.accountId = accountId; }
     public void setAccountLogin(@Nullable String accountLogin) { this.accountLogin = accountLogin; }
     public void setAccountType(@Nullable String accountType) { this.accountType = accountType; }
     public void setAvatarUrl(@Nullable String avatarUrl) { this.avatarUrl = avatarUrl; }
     public void setRepositories(String repositories) { this.repositories = repositories; }
+    public void setInstallerGithubUserId(@Nullable Long id) { this.installerGithubUserId = id; }
+    public void setInstallerLogin(@Nullable String login) { this.installerLogin = login; }
 }
