@@ -17,17 +17,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link WebhookSignatureVerifier}: validates the
- * {@code X-Hub-Signature-256} HMAC-SHA256 against the raw request body using the
- * APP_GLOBAL shared secret resolved by {@link GithubWebhookSecretSource}.
- *
- * <p>This is the integration-framework-side mirror of the legacy
- * {@code gitprovider.webhook.github.HmacVerifier}; the algorithm is identical
- * (constant-time {@link MessageDigest#isEqual(byte[], byte[])} comparison, SHA-1 path
- * intentionally rejected — downgrade-resistant). Duplicating the ~20-line crypto
- * routine rather than reaching into the legacy package keeps the integration module
- * free of {@code gitprovider} dependencies during the C13 migration window — both
- * verifiers must stay green until the legacy GitHubWebhookController is retired.
+ * GitHub adapter for {@link WebhookSignatureVerifier}: validates
+ * {@code X-Hub-Signature-256} HMAC-SHA256 against the raw body using the APP_GLOBAL
+ * shared secret resolved by {@link GithubWebhookSecretSource}. Constant-time compare
+ * via {@link MessageDigest#isEqual(byte[], byte[])}; SHA-1 deliberately rejected.
  */
 @Component
 public class GithubWebhookSignatureVerifier implements WebhookSignatureVerifier {
@@ -60,7 +53,7 @@ public class GithubWebhookSignatureVerifier implements WebhookSignatureVerifier 
         }
 
         Optional<byte[]> secret = secretSource.getSecret(
-            new SecretLookup(request.subscriptionId(), request.headers())
+            new SecretLookup(request.headers())
         );
         if (secret.isEmpty()) {
             log.warn("GitHub webhook rejected: shared secret not configured");

@@ -30,26 +30,20 @@ import org.springframework.stereotype.Component;
 /**
  * Inbound webhook pipeline: verify → derive → publish.
  *
- * <p>The verification step may short-circuit with {@code RespondImmediately}
- * (Slack {@code url_verification}, Asana {@code X-Hook-Secret} echo) — in that
- * case the response body is served directly and no NATS publish happens.
- * {@code CaptureSecret} also short-circuits but additionally hands the captured
- * per-subscription secret to the registered subscription handler before
- * responding.
+ * <p>Verification can short-circuit with {@code RespondImmediately} (Slack
+ * {@code url_verification}, Asana {@code X-Hook-Secret} echo); on {@code Verified} the
+ * pipeline derives the NATS subject + dedup-id via the per-kind {@link SubjectKeyDeriver}
+ * and publishes through {@link JetStreamPublisher}.
  *
- * <p>On {@code Verified}, the pipeline routes through the kind's
- * {@link SubjectKeyDeriver} for the NATS subject + dedup-id, then publishes to
- * JetStream via {@link JetStreamPublisher}. The legacy {@code /github} and
- * {@code /gitlab} controllers delegate through this same path so both URL
- * anchors produce identical JetStream messages (verified by
- * {@code WebhookIngestParityTest}).
+ * <p>Error responses are opaque ({@code "invalid"} / {@code "missing-signature"} /
+ * {@code "stale-timestamp"}). The {@code Invalid.reason} from the verifier is logged
+ * server-side only — echoing it would leak signature-format detail to attacker probes.
  */
 @Component
 public class WebhookIngestPipeline {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookIngestPipeline.class);
 
-    /** Bridge from Servlet headers into a {@code Nats-Msg-Id} echo, matches legacy controller behaviour. */
     static final String NATS_MSG_ID = "Nats-Msg-Id";
 
     private final Map<IntegrationKind, WebhookSignatureVerifier> verifiersByKind;
@@ -107,26 +101,31 @@ public class WebhookIngestPipeline {
                 .body(Map.of("error", "no verifier wired for " + kind));
         }
 
-        WebhookRequest request = new WebhookRequest(body, headers, /* subscriptionId */ null);
+        WebhookRequest request = new WebhookRequest(body, headers);
         VerificationResult result;
         try {
             result = verifier.verify(request);
         } catch (RuntimeException e) {
             log.warn("Verifier {} threw for kind={}: {}", verifier.getClass().getSimpleName(), kind, e.toString());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("error", "verifier failure"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
         }
 
         return switch (result) {
             case VerificationResult.Verified v -> publish(kind, body, headers);
             case VerificationResult.RespondImmediately r -> respondImmediately(r);
-            case VerificationResult.CaptureSecret c -> respondImmediately(c.response());
-            case VerificationResult.StaleTimestamp s -> ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT)
-                .body(Map.of("error", "stale timestamp", "drift_seconds", s.driftSeconds()));
-            case VerificationResult.Invalid i -> ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", i.reason()));
+            case VerificationResult.StaleTimestamp s -> {
+                log.debug("Webhook rejected for kind={}: stale timestamp drift={}s", kind, s.driftSeconds());
+                yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "stale-timestamp"));
+            }
+            case VerificationResult.Invalid i -> {
+                // Server-side log carries the discriminator; HTTP response stays opaque so
+                // attacker probes cannot distinguish missing-secret from signature-mismatch
+                // from malformed-header (side channel into the signing scheme).
+                log.warn("Webhook rejected for kind={}: {}", kind, i.reason());
+                yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
+            }
             case VerificationResult.MissingSignature ms -> ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "missing signature"));
+                .body(Map.of("error", "missing-signature"));
         };
     }
 

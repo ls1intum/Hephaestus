@@ -344,7 +344,7 @@ class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
         for (var e : entries) {
             map.put(e.getKey(), e.getValue());
         }
-        return new WebhookRequest(body, map, /* subscriptionId */ null);
+        return new WebhookRequest(body, map);
     }
 
     /** Reference HMAC computation matching the verifier's "<msgId>.<timestamp>.<body>" form. */

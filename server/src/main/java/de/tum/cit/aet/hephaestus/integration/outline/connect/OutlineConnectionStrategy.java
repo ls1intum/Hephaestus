@@ -83,7 +83,7 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     @Override
     public ValidationResult validate(IntegrationRef ref, CredentialBundle credentials) {
         // Honest: auth.info probe ships with the Outline OAuth client (#1203).
-        return new ValidationResult.NotImplemented("Outline auth.info probe not wired");
+        return new ValidationResult.Failed("Outline auth.info probe not wired");
     }
 
     @Override

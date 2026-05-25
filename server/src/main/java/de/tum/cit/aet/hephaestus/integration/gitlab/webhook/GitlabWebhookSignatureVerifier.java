@@ -118,10 +118,7 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
 
 
     private Verdict verifyPlaintext(WebhookRequest request, Map<String, String> headers, String tokenHeader) {
-        Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(
-            request.subscriptionId(),
-            headers
-        ));
+        Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(headers));
         if (secret.isEmpty()) {
             log.warn("GitLab plaintext verifier: no shared secret available");
             return new Verdict(new VerificationResult.Invalid("missing-secret"));
@@ -157,10 +154,7 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
             return new Verdict(new VerificationResult.StaleTimestamp(drift));
         }
 
-        Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(
-            request.subscriptionId(),
-            headers
-        ));
+        Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(headers));
         if (secret.isEmpty()) {
             log.warn("GitLab whsec verifier: no signing secret available");
             return new Verdict(new VerificationResult.Invalid("missing-secret"));

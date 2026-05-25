@@ -26,15 +26,9 @@ public record NatsConsumerProperties(
         value = 10_000,
         message = "max-ack-pending must not exceed 10,000"
     ) int maxAckPending,
-    @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("30s") @NotNull(
-        message = "idle-heartbeat must not be null"
-    ) Duration idleHeartbeat,
     @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("2s") @NotNull(
         message = "reconnect-delay must not be null"
     ) Duration reconnectDelay,
-    @DefaultValue("60") @Positive(
-        message = "heartbeat-restart-threshold must be positive"
-    ) int heartbeatRestartThreshold,
     @Valid PoisonProperties poison
 ) {
     public NatsConsumerProperties {

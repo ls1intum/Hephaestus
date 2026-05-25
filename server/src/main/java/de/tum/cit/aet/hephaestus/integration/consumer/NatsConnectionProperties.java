@@ -9,6 +9,10 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
 import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
+// idleHeartbeat / heartbeatRestartThreshold / heartbeatLogInterval / installationStaleAfter
+// were dropped 2026-05 — they had been declared, validated and defaulted, but never read
+// by any code. The associated heartbeat-alarm restart logic from the legacy
+// NatsConsumerService has not yet been ported; track in #1198 follow-up.
 
 /**
  * Connection-level configuration for the integration framework's NATS surface.
@@ -50,29 +54,15 @@ public record NatsConnectionProperties(
             throw new IllegalStateException("hephaestus.sync.nats.server must be set when enabled=true");
         }
         if (consumer == null) {
-            consumer = new Consumer(
-                Duration.ofSeconds(60),
-                Duration.ofMinutes(5),
-                Duration.ofMinutes(5)
-            );
+            consumer = new Consumer(Duration.ofSeconds(60));
         }
     }
 
     /**
-     * Connection-side knobs that the consumer fleet shares with the publisher.
-     *
-     * <p>Heartbeat tuning, ack-wait, and poison handling live on
-     * {@link NatsConsumerProperties} — this nested record stays small on purpose.
-     *
-     * @param requestTimeout       JetStream API request timeout
-     * @param heartbeatLogInterval throttle for "no progress" log lines (keeps log volume
-     *                             bounded when a consumer is genuinely starved)
-     * @param installationStaleAfter how long a missing installation consumer is tolerated
-     *                               before health falls to {@code OUT_OF_SERVICE}
+     * Connection-side knobs shared between the consumer fleet and the publisher.
+     * Ack-wait and poison handling live on {@link NatsConsumerProperties}.
      */
     public record Consumer(
-        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("60s") Duration requestTimeout,
-        @DurationUnit(ChronoUnit.MINUTES) @DefaultValue("5m") Duration heartbeatLogInterval,
-        @DurationUnit(ChronoUnit.MINUTES) @DefaultValue("5m") Duration installationStaleAfter
+        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("60s") Duration requestTimeout
     ) {}
 }

@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSecretSource.SecretLookup;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier.VerificationResult;
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Test;
 class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
 
     private static final byte[] SECRET = "outline-subscription-secret-xyz".getBytes(StandardCharsets.UTF_8);
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** Anonymous subclass returns a fixed secret without dragging in the subscription store. */
     private OutlineWebhookSecretSource secretSourceReturning(Optional<byte[]> secret) {
@@ -47,10 +45,10 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     void validSignatureVerifies() {
         byte[] body = "{\"event\":\"documents.create\"}".getBytes(StandardCharsets.UTF_8);
         Map<String, String> headers = Map.of("Outline-Signature", sign(body));
-        WebhookRequest req = new WebhookRequest(body, headers, "sub-1");
+        WebhookRequest req = new WebhookRequest(body, headers);
 
         VerificationResult result = new OutlineWebhookSignatureVerifier(
-            objectMapper, secretSourceReturning(Optional.of(SECRET))
+            secretSourceReturning(Optional.of(SECRET))
         ).verify(req);
 
         assertThat(result).isInstanceOf(VerificationResult.Verified.class);
@@ -60,10 +58,10 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     void badSignatureIsInvalid() {
         byte[] body = "{\"event\":\"documents.create\"}".getBytes(StandardCharsets.UTF_8);
         Map<String, String> headers = Map.of("Outline-Signature", "deadbeef");
-        WebhookRequest req = new WebhookRequest(body, headers, "sub-1");
+        WebhookRequest req = new WebhookRequest(body, headers);
 
         VerificationResult result = new OutlineWebhookSignatureVerifier(
-            objectMapper, secretSourceReturning(Optional.of(SECRET))
+            secretSourceReturning(Optional.of(SECRET))
         ).verify(req);
 
         assertThat(result).isInstanceOf(VerificationResult.Invalid.class);
@@ -73,10 +71,10 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     @Test
     void missingHeaderIsMissingSignature() {
         byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
-        WebhookRequest req = new WebhookRequest(body, Map.of(), "sub-1");
+        WebhookRequest req = new WebhookRequest(body, Map.of());
 
         VerificationResult result = new OutlineWebhookSignatureVerifier(
-            objectMapper, secretSourceReturning(Optional.of(SECRET))
+            secretSourceReturning(Optional.of(SECRET))
         ).verify(req);
 
         assertThat(result).isInstanceOf(VerificationResult.MissingSignature.class);
@@ -86,10 +84,10 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     void emptySecretSourceIsMissingSignatureUntilSubscriptionWired() {
         byte[] body = "{\"event\":\"documents.create\"}".getBytes(StandardCharsets.UTF_8);
         Map<String, String> headers = Map.of("Outline-Signature", "anything");
-        WebhookRequest req = new WebhookRequest(body, headers, "sub-not-yet-known");
+        WebhookRequest req = new WebhookRequest(body, headers);
 
         VerificationResult result = new OutlineWebhookSignatureVerifier(
-            objectMapper, secretSourceReturning(Optional.empty())
+            secretSourceReturning(Optional.empty())
         ).verify(req);
 
         // Distinct from Slack's "Invalid(unconfigured)": Outline secrets are per-subscription,
@@ -101,10 +99,10 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     void headerLookupIsCaseInsensitive() {
         byte[] body = "{\"event\":\"documents.create\"}".getBytes(StandardCharsets.UTF_8);
         Map<String, String> headers = Map.of("outline-signature", sign(body));
-        WebhookRequest req = new WebhookRequest(body, headers, "sub-1");
+        WebhookRequest req = new WebhookRequest(body, headers);
 
         VerificationResult result = new OutlineWebhookSignatureVerifier(
-            objectMapper, secretSourceReturning(Optional.of(SECRET))
+            secretSourceReturning(Optional.of(SECRET))
         ).verify(req);
 
         assertThat(result).isInstanceOf(VerificationResult.Verified.class);

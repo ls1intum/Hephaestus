@@ -1,8 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
-import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.WebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSecretSource.SecretLookup;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier;
 import java.nio.charset.StandardCharsets;
@@ -23,19 +21,9 @@ import org.springframework.stereotype.Component;
 /**
  * Outline webhook signature verification.
  *
- * <p>Outline signs each delivery with HMAC-SHA256 over the raw request body, hex-encoded,
- * delivered in the {@code Outline-Signature} header. The signing secret is per-subscription
- * (Outline mints one when the webhook is created) — distinct from Slack's app-global secret
- * and GitHub's app-global secret.
- *
- * <p>The initial-subscription verification handshake (where Outline POSTs the new secret
- * in the body before normal delivery starts) requires the {@code CaptureSecret} verdict
- * to persist the freshly-issued secret. That branch is intentionally TODO for #1198:
- * the subscription store + AES-GCM converter must land first so we have a place to put
- * the captured bytes. Until then, the verifier sticks to the steady-state HMAC path.
- *
- * <p>{@link WebhookSecretSource} returns empty until the subscription store lands; that
- * surfaces here as {@link VerificationResult.MissingSignature} — fail closed.
+ * <p>HMAC-SHA256 of the raw body, hex-encoded, in the {@code Outline-Signature} header.
+ * Signing secrets are per-subscription; the {@link OutlineWebhookSecretSource} returns
+ * empty until the subscription store lands in #1203, so verification fails closed.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
@@ -46,11 +34,9 @@ public class OutlineWebhookSignatureVerifier implements WebhookSignatureVerifier
     private static final String HEADER_SIGNATURE = "Outline-Signature";
     private static final String HMAC_SHA256 = "HmacSHA256";
 
-    private final ObjectMapper objectMapper;
     private final OutlineWebhookSecretSource secretSource;
 
-    public OutlineWebhookSignatureVerifier(ObjectMapper objectMapper, OutlineWebhookSecretSource secretSource) {
-        this.objectMapper = objectMapper;
+    public OutlineWebhookSignatureVerifier(OutlineWebhookSecretSource secretSource) {
         this.secretSource = secretSource;
     }
 
@@ -64,33 +50,14 @@ public class OutlineWebhookSignatureVerifier implements WebhookSignatureVerifier
         byte[] body = request.body();
         Map<String, String> headers = request.headers();
 
-        // TODO(#1203): detect Outline's initial-subscription verification handshake
-        // (body shape carries the newly-issued signing secret) and return
-        // CaptureSecret(subscriptionId, secret, RespondImmediately(200, "application/json", "{}"))
-        // so the pipeline persists the secret before responding. We deliberately skip
-        // shape-sniffing here because the handshake format is opt-in and easy to spoof
-        // without a vetted reference. Use the {@code objectMapper} field for the parse
-        // once the spec is locked. (Field is held to keep the wiring point obvious.)
-        if (objectMapper == null) {
-            // Defensive — Spring guarantees the bean is injected, but a future test
-            // double should not be allowed to construct with null.
-            return new VerificationResult.Invalid("object mapper unavailable");
-        }
-
         String signature = headerIgnoreCase(headers, HEADER_SIGNATURE);
         if (signature == null || signature.isBlank()) {
             return new VerificationResult.MissingSignature();
         }
 
-        Optional<byte[]> secret = secretSource.getSecret(
-            new SecretLookup(request.subscriptionId(), headers)
-        );
+        Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(headers));
         if (secret.isEmpty()) {
-            // No subscription registered yet → fail closed. Different from Slack's
-            // "Invalid(unconfigured)": Outline secrets are per-subscription, so "not yet
-            // captured" is operationally indistinguishable from "no such subscription".
-            log.debug("Outline secret unavailable for subscription={}; rejecting as MissingSignature",
-                request.subscriptionId());
+            log.debug("Outline secret unavailable; rejecting as MissingSignature");
             return new VerificationResult.MissingSignature();
         }
 
@@ -108,10 +75,7 @@ public class OutlineWebhookSignatureVerifier implements WebhookSignatureVerifier
             expectedHex.getBytes(StandardCharsets.UTF_8),
             signature.trim().getBytes(StandardCharsets.UTF_8)
         );
-        if (!ok) {
-            return new VerificationResult.Invalid("signature mismatch");
-        }
-        return new VerificationResult.Verified();
+        return ok ? new VerificationResult.Verified() : new VerificationResult.Invalid("signature mismatch");
     }
 
     private static String headerIgnoreCase(Map<String, String> headers, String name) {

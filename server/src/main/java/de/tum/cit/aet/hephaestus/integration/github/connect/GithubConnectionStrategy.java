@@ -20,10 +20,10 @@ import org.springframework.stereotype.Component;
  * {@link #finalizeConnect} reads {@code installation_id} from the callback and emits a
  * {@link GithubAppCredential} for orchestrator persistence.
  *
- * <p>{@link #validate} reports {@link ValidationResult.NotImplemented} — no vendor probe
- * is wired yet. {@link #revoke} is a local no-op log: GitHub App uninstall happens on
- * GitHub's side; we observe {@code installation.deleted} via the lifecycle webhook and
- * transition our row to {@code UNINSTALLED} from there.
+ * <p>{@link #validate} fails closed ("probe not wired") until the GitHub installation
+ * health probe lands. {@link #revoke} is a local no-op log: GitHub App uninstall happens
+ * on GitHub's side; we observe {@code installation.deleted} via the lifecycle webhook
+ * and transition our row to {@code UNINSTALLED} from there.
  */
 @Component
 public class GithubConnectionStrategy implements ConnectionStrategy {
@@ -93,12 +93,10 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public ValidationResult validate(IntegrationRef ref, de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle credentials) {
-        // Honest: no vendor-side probe yet. Returning Ok would silently transition the
-        // Connection to ACTIVE on revoked installations. Follow-up wiring would call
+        // Fail closed: returning Ok would silently transition the Connection to ACTIVE on
+        // revoked installations. Follow-up wiring will call
         // GitHubAppTokenService.isInstallationSuspended against GET /app/installations/{id}.
-        return new ValidationResult.NotImplemented(
-            "GitHub installation validation probe not wired"
-        );
+        return new ValidationResult.Failed("probe not wired");
     }
 
     @Override

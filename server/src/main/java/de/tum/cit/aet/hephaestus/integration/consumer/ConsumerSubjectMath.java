@@ -70,25 +70,12 @@ public final class ConsumerSubjectMath {
 
     /**
      * Builds the NATS subject prefix for a repository identifier.
-     *
-     * <p>Mirrors the publisher-side logic in {@code GitLabSubjectBuilder} and
-     * {@code GitHubSubjectBuilder}. Provider-specific namespace conventions:
      * <ul>
-     *   <li><b>GitHub:</b> {@code owner/repo} → {@code github.owner.repo}
-     *       (always exactly 2 parts)</li>
-     *   <li><b>GitLab:</b> {@code group/subgroup/project} → {@code gitlab.group~subgroup.project}
-     *       (namespace parts joined with {@code ~}, matching {@code GitLabSubjectBuilder})</li>
+     *   <li><b>GitHub:</b> {@code owner/repo} → {@code github.owner.repo} (exactly 2 parts)</li>
+     *   <li><b>GitLab:</b> {@code group/sub/project} → {@code gitlab.group~sub.project}
+     *       (namespace parts joined with {@code ~})</li>
      * </ul>
-     *
-     * <p>Dots in any path segment are sanitized to {@code ~} so NATS' token grammar holds.
-     *
-     * @param streamName    the NATS stream name ({@code "github"} or {@code "gitlab"})
-     * @param nameWithOwner repository identifier (e.g. {@code "owner/repo"} or
-     *                      {@code "group/sub/project"})
-     * @return the subject prefix (e.g. {@code "github.owner.repo"} or
-     *         {@code "gitlab.group~sub.project"})
-     * @throws IllegalArgumentException if either argument is null/blank or the format
-     *                                  is invalid for the given stream
+     * Dots in any path segment are sanitized to {@code ~} so the NATS token grammar holds.
      */
     public static String buildSubjectPrefix(String streamName, String nameWithOwner) {
         if (streamName == null || streamName.trim().isEmpty()) {

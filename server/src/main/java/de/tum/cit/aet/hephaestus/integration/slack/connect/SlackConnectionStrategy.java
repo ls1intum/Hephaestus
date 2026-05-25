@@ -84,7 +84,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     @Override
     public ValidationResult validate(IntegrationRef ref, CredentialBundle credentials) {
         // Honest: auth.test probe ships with the Slack OAuth client (#1204).
-        return new ValidationResult.NotImplemented("Slack auth.test probe not wired");
+        return new ValidationResult.Failed("Slack auth.test probe not wired");
     }
 
     @Override

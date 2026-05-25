@@ -79,9 +79,9 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public ValidationResult validate(IntegrationRef ref, CredentialBundle credentials) {
-        // Honest: PAT not probed against GET /api/v4/user yet. Callers must treat
-        // NotImplemented as "skip", not as a green light to transition to ACTIVE.
-        return new ValidationResult.NotImplemented("GitLab PAT probe not wired");
+        // PAT not probed against GET /api/v4/user yet — fail closed so callers do not
+        // auto-transition to ACTIVE without a live vendor check.
+        return new ValidationResult.Failed("GitLab PAT probe not wired");
     }
 
     @Override

@@ -9,20 +9,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Per-subscription signing-secret source for Outline.
- *
- * <p>Outline issues a unique signing secret per webhook subscription. The full
- * implementation needs:
- * <ol>
- *   <li>An {@code integration_webhook_subscription} repository to look up the
- *       row by {@code subscriptionId}.
- *   <li>The credential-converter / AES-GCM decryptor to unseal the persisted secret.
- * </ol>
- *
- * <p>Both land as follow-ups; for #1198 this source returns {@link Optional#empty()}
- * unconditionally. The verifier surfaces this as {@code MissingSignature} so the
- * pipeline rejects unauthenticated requests cleanly while we stand up the
- * subscription store.
+ * Per-subscription signing-secret source for Outline. Returns empty until #1203 lands
+ * the subscription store + AES-GCM decryption path. The verifier surfaces this as
+ * {@code MissingSignature} so the pipeline fails closed.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
@@ -42,10 +31,8 @@ public class OutlineWebhookSecretSource implements WebhookSecretSource {
 
     @Override
     public Optional<byte[]> getSecret(SecretLookup lookup) {
-        // TODO(#1203): resolve via integration_webhook_subscription repository +
-        // AES-GCM decryption once the subscription store lands. Verifier returns
+        // #1203 wires the per-subscription store + AES-GCM decryption. Verifier returns
         // MissingSignature in the meantime — fail closed.
-        log.debug("Outline webhook secret resolution stub: subscription={}", lookup.subscriptionId());
         return Optional.empty();
     }
 }

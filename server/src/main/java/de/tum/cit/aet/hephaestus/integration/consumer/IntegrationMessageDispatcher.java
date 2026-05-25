@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.integration.handler.IntegrationMessageHandlerRe
 import de.tum.cit.aet.hephaestus.integration.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectParser;
-import io.nats.client.Message;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -119,29 +118,7 @@ public class IntegrationMessageDispatcher {
         return registry.resolve(key);
     }
 
-    /**
-     * Convenience overload: look up the handler AND, if present, invoke it with the
-     * NATS message. Unknown subjects are NOT errors — they are logged at DEBUG and the
-     * caller (consumer) ACKs the message. This is the intended behaviour during the
-     * transition window when many kinds/events have no handler yet.
-     *
-     * <p>Exceptions from {@link IntegrationMessageHandler#onMessage(Message)} propagate
-     * unchanged so the consumer dispatcher can decide between ACK/NACK/dead-letter.
-     */
-    public void dispatch(String fullSubject, Message msg) {
-        Optional<IntegrationMessageHandler> handler = dispatch(fullSubject);
-        if (handler.isEmpty()) {
-            log.debug("No handler for subject '{}' — ACKing as no-op", fullSubject);
-            return;
-        }
-        handler.get().onMessage(msg);
-    }
-
-    /**
-     * @return the number of registered {@link SubjectParser} bindings — one per
-     *     {@link IntegrationKind} that has wired up subject parsing. Stable for the
-     *     lifetime of the bean; safe to call from probe threads.
-     */
+    /** Number of {@link SubjectParser} bindings — one per registered kind. */
     public int parserCount() {
         return parsersByKind.size();
     }

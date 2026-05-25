@@ -148,6 +148,6 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
         for (var h : headers) {
             map.put(h.getKey(), h.getValue());
         }
-        return new WebhookRequest(body, map, /* subscriptionId */ null);
+        return new WebhookRequest(body, map);
     }
 }
