@@ -1,0 +1,34 @@
+{
+  "_comment": "v2: shape from a hypothetical GitLab future release with new vendor fields. Tolerant reader must IGNORE unknown keys, not throw.",
+  "object_kind": "merge_request",
+  "event_type": "merge_request",
+  "_event_uuid_v2": "00000000-0000-0000-0000-000000000001",
+  "user": {"id": 1, "username": "alice", "name": "Alice", "_avatar_url_v2": "future"},
+  "project": {
+    "id": 100,
+    "name": "smoke",
+    "namespace": "hephaestustest",
+    "path_with_namespace": "hephaestustest/smoke",
+    "default_branch": "main",
+    "web_url": "https://gitlab.lrz.de/hephaestustest/smoke",
+    "_topics_v2": ["security", "platform"]
+  },
+  "object_attributes": {
+    "id": 555,
+    "iid": 1,
+    "title": "Add feature X",
+    "description": "",
+    "state": "opened",
+    "action": "open",
+    "url": "https://gitlab.lrz.de/hephaestustest/smoke/-/merge_requests/1",
+    "source_branch": "feature-x",
+    "target_branch": "main",
+    "author_id": 1,
+    "created_at": "2026-05-25 10:00:00 UTC",
+    "updated_at": "2026-05-25 10:00:00 UTC",
+    "_blocking_discussions_resolved_v2": true,
+    "_merge_after_v2": null
+  },
+  "labels": [{"id": 7, "title": "type::feature", "_priority_v2": 2}],
+  "repository": {"name": "smoke", "homepage": "https://gitlab.lrz.de/hephaestustest/smoke"}
+}

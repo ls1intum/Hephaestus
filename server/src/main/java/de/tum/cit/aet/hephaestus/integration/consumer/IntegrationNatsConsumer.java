@@ -169,10 +169,25 @@ public class IntegrationNatsConsumer {
     public void onApplicationReady() {
         if (!connectionProperties.enabled()) {
             log.info("Integration NATS consumer disabled (hephaestus.sync.nats.enabled=false)");
+            stats.setNatsConnectionStatus("DISABLED");
             return;
         }
         validateConfiguration();
-        connectWithRetry();
+        try {
+            connectWithRetry();
+        } catch (NatsConnectionException e) {
+            // The boot listener fired in a thread Spring will swallow; if we rethrow,
+            // the application keeps running with no consumer and only a generic
+            // ApplicationListener exception in the log. Mark the health indicator
+            // explicitly so /actuator/health surfaces the failure and the operator
+            // gets a real signal instead of a silent dead consumer thread.
+            stats.setNatsConnectionStatus("FAILED_BOOT");
+            log.error(
+                "Integration NATS consumer failed to connect after {} attempts; health indicator will report DOWN",
+                MAX_RECONNECT_ATTEMPTS, e
+            );
+            return;
+        }
         log.info(
             "Integration NATS consumer ready: server={}, awaiting WorkspacesInitializedEvent for installation consumer",
             connectionProperties.server()
