@@ -42,16 +42,29 @@ public interface ApiCredentialProvider {
     sealed interface CredentialBundle permits BearerToken, GithubAppCredential, OAuthSession {
     }
 
-    /** Long-lived or short-lived bearer (PAT, Slack xoxb, Outline OAuth access token). */
+    /**
+     * Long-lived or short-lived bearer (PAT, Slack xoxb, Outline OAuth access token).
+     * {@link #toString()} redacts {@code token} so accidental log calls do not leak it;
+     * the same applies to the other two variants below.
+     */
     record BearerToken(String token, @Nullable Instant expiresAt) implements CredentialBundle {
+        @Override
+        public String toString() {
+            return "BearerToken[token=***, expiresAt=" + expiresAt + "]";
+        }
     }
 
     /** GitHub App: installation identity. Actual token minted by {@link TokenRefresher}. */
     record GithubAppCredential(long installationId, String appId) implements CredentialBundle {
     }
 
-    /** OAuth session with refresh capability. */
+    /** OAuth session with refresh capability. {@code accessToken} + {@code refreshToken} redacted. */
     record OAuthSession(String accessToken, @Nullable String refreshToken, @Nullable Instant expiresAt)
         implements CredentialBundle {
+        @Override
+        public String toString() {
+            return "OAuthSession[accessToken=***, refreshToken=" + (refreshToken == null ? "null" : "***")
+                + ", expiresAt=" + expiresAt + "]";
+        }
     }
 }

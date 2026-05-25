@@ -81,14 +81,19 @@ public class JetStreamPublisher {
             .get(timeoutMs, TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * Derives the JetStream stream name from the subject prefix (first dot-segment).
+     * Kept kind-agnostic so a new integration adapter only needs to (a) add a stream in
+     * {@link StreamBootstrap#STREAMS} and (b) emit subjects under {@code <name>.…} —
+     * no edit to this method.
+     */
     private static String streamFor(String subject) {
-        if (subject.startsWith("gitlab.")) {
-            return "gitlab";
+        int firstDot = subject.indexOf('.');
+        if (firstDot <= 0) {
+            throw new IllegalArgumentException(
+                "Subject must be '<stream>.<...>': '" + subject + "'");
         }
-        if (subject.startsWith("github.")) {
-            return "github";
-        }
-        throw new IllegalArgumentException("Unknown subject prefix: " + subject);
+        return subject.substring(0, firstDot);
     }
 
     void awaitInFlight(Duration timeout) {

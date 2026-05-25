@@ -467,6 +467,12 @@ public class IntegrationNatsConsumer {
             .deliverPolicy(DeliverPolicy.ByStartTime)
             .ackWait(consumerProperties.ackWait())
             .maxAckPending(consumerProperties.maxAckPending())
+            // Server-side cap on redeliveries. Without this, MaxDeliver=∞ would let a
+            // permanently-failing message NAK forever; the bound is enforced today only
+            // by IntegrationPoisonHandler counting deliveredCount on our side, which
+            // means a JetStream-side observability tool (`nats stream info`) cannot see
+            // the policy. Mirrors the value the poison handler uses to ACK-terminate.
+            .maxDeliver(consumerProperties.poison().maxRedeliver())
             .startTime(ZonedDateTime.now().minusDays(connectionProperties.replayTimeframeDays()));
         if (durable) {
             builder.durable(consumerName);

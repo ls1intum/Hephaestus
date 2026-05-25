@@ -15,19 +15,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Idempotently creates the {@code gitlab} and {@code github} JetStream streams at startup.
- *
+ * Idempotently creates one JetStream stream per registered integration kind at startup.
  * <ul>
- *   <li>If the stream does not exist (404): {@code addStream} with our defaults.</li>
- *   <li>If the stream exists: log INFO; for any config drift compared to our defaults, log WARN
- *       — but NEVER call {@code updateStream}. Operators handle drift explicitly via
- *       {@code nats stream edit} so retention or storage settings are never silently clobbered.</li>
+ *   <li>404: {@code addStream} with our defaults.</li>
+ *   <li>Exists: log INFO; WARN on config drift but NEVER call {@code updateStream}.
+ *       Operators handle drift explicitly via {@code nats stream edit}.</li>
  * </ul>
+ *
+ * <p>Stay in lockstep with {@code integration.webhook.IntegrationKindRouting.ROUTES} —
+ * any new integration kind needs a stream here AND a route there. The
+ * {@code IntegrationKindRoutingTest} arch check pins the routing side; this list is the
+ * matching infrastructure side. They are intentionally kept as two literal lists so the
+ * stream lifecycle stays in {@code gitprovider/} (infrastructure) while the routing stays
+ * in {@code integration/} (framework SPI).
  */
 public class StreamBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(StreamBootstrap.class);
-    private static final String[] STREAMS = { "gitlab", "github" };
+    private static final String[] STREAMS = { "gitlab", "github", "slack", "outline" };
 
     private final JetStreamManagement jsm;
     private final WebhookProperties properties;

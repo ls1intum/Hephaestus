@@ -56,6 +56,12 @@ public class ConnectionService {
      * Transition the Connection to {@code req.next()}. Idempotent: same-state is a no-op
      * (no audit row); invalid transitions throw; webhook redelivery is silenced via
      * the {@code uq_connection_audit_idempotency} constraint.
+     *
+     * <p>Side effect: transitioning to {@link IntegrationState#UNINSTALLED} clears the
+     * credential ciphertext + algorithm tag inside the same transaction. The
+     * {@code IntegrationState.UNINSTALLED} javadoc contract ("credentials cleared") is
+     * enforced here — not in the entity, not in a downstream listener — so the purge is
+     * atomic with the state change.
      */
     @Transactional
     public Connection transition(Connection connection, TransitionRequest req) {
@@ -82,6 +88,11 @@ public class ConnectionService {
         }
         connection.setState(req.next());
         connection.setStateReason(req.detail());
+        if (req.next() == IntegrationState.UNINSTALLED && connection.getCredentialsEncrypted() != null) {
+            connection.setCredentialsEncrypted(null);
+            connection.setCredentialsAlg(null);
+            log.info("Purged credentials on UNINSTALLED transition for connection={}", connection.getId());
+        }
         return connectionRepository.save(connection);
     }
 

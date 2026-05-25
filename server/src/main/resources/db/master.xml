@@ -83,4 +83,5 @@
     <include file="./changelog/1779700500000_outline_persistence.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700600000_shedlock.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779700700000_oauth_state_nonce.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1779700800000_connection_instance_key_null.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
