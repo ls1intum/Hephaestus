@@ -10,10 +10,12 @@ import org.springframework.stereotype.Component;
 /**
  * Actuator health probe for the integration-framework NATS consumer surface.
  *
- * <p>The probe is intentionally a readiness indicator, NOT a liveness one — a NATS
- * outage or a flat-lined dispatch counter should keep traffic off the instance but must
- * not crash-loop the pod. The legacy {@code WebhookHealthIndicator} already covers the
- * publisher half of the pipeline; this one closes the consumer half.
+ * <p>Wired into the {@code readiness} health group in {@code application.yml} —
+ * a NATS outage or unresolved consumer flips the pod's
+ * {@code /actuator/health/readiness} probe to DOWN, k8s pulls traffic, but
+ * liveness stays green so the pod is not crash-looped. The legacy
+ * {@code WebhookHealthIndicator} covers the publisher half of the pipeline; this
+ * one closes the consumer half.
  *
  * <h2>Reported details</h2>
  * <ul>
