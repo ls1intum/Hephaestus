@@ -461,6 +461,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             workspace.getDisplayName(),
             workspace.getAccountLogin(),
             workspace.getInstallationId(),
+            workspace.getServerUrl(),
             syncTargets,
             syncContext
         );

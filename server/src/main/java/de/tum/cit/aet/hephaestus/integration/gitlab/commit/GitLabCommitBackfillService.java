@@ -111,7 +111,18 @@ public class GitLabCommitBackfillService {
      */
     public SyncResult backfillCommits(Long scopeId, Repository repository) {
         if (!gitRepositoryManager.isEnabled()) {
-            return SyncResult.completed(0);
+            // Returning ABORTED_ERROR (not COMPLETED(0)) so GitLabWorkspaceInitializationService's
+            // if/else branching falls through to the REST-based commitSyncService instead of
+            // claiming success and silently skipping. Live-run finding 2026-05-25: with
+            // hephaestus.git.enabled=false the framework wrote 0 commits across 69 repos
+            // because the JGit path returned completed(0), so the REST fallback was never
+            // reached.
+            log.warn(
+                "Skipped JGit commit backfill: reason=gitDisabled, repoId={}, repoName={} — caller should fall through to REST commit sync",
+                repository.getId(),
+                sanitizeForLog(repository.getNameWithOwner())
+            );
+            return SyncResult.abortedError(0);
         }
 
         Long repoId = repository.getId();

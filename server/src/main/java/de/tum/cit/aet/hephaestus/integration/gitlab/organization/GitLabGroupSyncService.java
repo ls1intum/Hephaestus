@@ -79,17 +79,26 @@ public class GitLabGroupSyncService {
     }
 
     /**
-     * Resolves the GitLab provider entity from the database.
+     * Resolves the GitLab provider entity from the database for {@code serverUrl}.
+     * Falls back to the configured default ({@code hephaestus.gitlab.default-server-url})
+     * only when the caller has no per-workspace URL to pass — that fallback path stamps
+     * gitlab.com on rows that may actually live elsewhere (silent cross-instance data
+     * corruption observed live on 2026-05-25 against gitlab.lrz.de), so always prefer
+     * the workspace-bound overload.
      *
-     * @return the GitLab provider
-     * @throws IllegalStateException if no GitLab provider is found
+     * @param serverUrl  the per-workspace GitLab base URL (e.g. {@code https://gitlab.lrz.de}),
+     *                   or {@code null} to fall back to the global default
+     * @throws IllegalStateException if no GitLab provider row exists for the URL
      */
-    private GitProvider resolveProvider() {
+    private GitProvider resolveProvider(@org.springframework.lang.Nullable String serverUrl) {
+        String effective = (serverUrl == null || serverUrl.isBlank())
+            ? gitLabProperties.defaultServerUrl()
+            : serverUrl;
         return gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, effective)
             .orElseThrow(() ->
                 new IllegalStateException(
-                    "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                    "GitProvider not found for type=GITLAB, serverUrl=" + effective
                 )
             );
     }
@@ -99,10 +108,13 @@ public class GitLabGroupSyncService {
      *
      * @param scopeId       the workspace/scope ID for authentication
      * @param groupFullPath the full path of the group (e.g., {@code org/team})
+     * @param serverUrl     workspace's GitLab base URL — passed through to provider
+     *                      resolution so self-hosted instances do not get stamped with
+     *                      gitlab.com. May be null only for legacy callers.
      * @return the synced Organization entity, or empty if not found or on error
      */
     @Transactional
-    public Optional<Organization> syncGroup(Long scopeId, String groupFullPath) {
+    public Optional<Organization> syncGroup(Long scopeId, String groupFullPath, @org.springframework.lang.Nullable String serverUrl) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
             log.warn("Skipped group sync: reason=nullOrBlankGroupPath, scopeId={}", scopeId);
             return Optional.empty();
@@ -110,7 +122,7 @@ public class GitLabGroupSyncService {
         String safeGroupPath = sanitizeForLog(groupFullPath);
 
         try {
-            GitProvider provider = resolveProvider();
+            GitProvider provider = resolveProvider(serverUrl);
             Long providerId = provider.getId();
             graphQlClientProvider.acquirePermission();
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
@@ -174,13 +186,15 @@ public class GitLabGroupSyncService {
      *
      * @param scopeId       the workspace/scope ID for authentication
      * @param groupFullPath the full path of the group
+     * @param serverUrl     workspace's GitLab base URL; null = fall back to the global
+     *                      default (preserves legacy behaviour but stamps gitlab.com)
      * @return structured result with synced repositories, page counts, and error counts
      */
     // Note: intentionally NOT @Transactional — this is an orchestrator that makes multiple
     // API calls with throttle delays between pages. Each project upsert and the group sync
     // have their own @Transactional boundaries, so we don't hold a DB connection during
     // network calls or Thread.sleep().
-    public GitLabSyncResult syncGroupProjects(Long scopeId, String groupFullPath) {
+    public GitLabSyncResult syncGroupProjects(Long scopeId, String groupFullPath, @org.springframework.lang.Nullable String serverUrl) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
             log.warn("Skipped group projects sync: reason=nullOrBlankGroupPath, scopeId={}", scopeId);
             return GitLabSyncResult.aborted(GitLabSyncResult.Status.ABORTED_ERROR, Collections.emptyList(), 0, 0);
@@ -201,7 +215,7 @@ public class GitLabGroupSyncService {
         int reportedTotalCount = -1;
 
         try {
-            GitProvider provider = resolveProvider();
+            GitProvider provider = resolveProvider(serverUrl);
             Long providerId = provider.getId();
             graphQlClientProvider.acquirePermission();
 

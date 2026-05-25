@@ -225,7 +225,8 @@ public class GitlabDataSyncScheduler {
         if (groupSync == null) return;
 
         try {
-            GitLabSyncResult result = groupSync.syncGroupProjects(session.scopeId(), session.accountLogin());
+            GitLabSyncResult result = groupSync.syncGroupProjects(
+                session.scopeId(), session.accountLogin(), session.serverUrl());
             log.info(
                 "GitLab group project sync: scopeId={}, status={}, synced={}, pages={}",
                 session.scopeId(),

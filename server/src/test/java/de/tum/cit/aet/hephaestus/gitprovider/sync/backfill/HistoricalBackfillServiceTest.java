@@ -285,6 +285,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             "Test Workspace",
             "test-org",
             INSTALLATION_ID,
+            null, // serverUrl — GitHub flow doesn't use it; GitLab tests pass the workspace URL
             targets,
             new SyncContextProvider.SyncContext(SCOPE_ID, "test-workspace", "Test Workspace", INSTALLATION_ID)
         );
@@ -886,6 +887,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 "Workspace 2",
                 "org2",
                 installationId2,
+                null,
                 List.of(targetInScope2),
                 new SyncContextProvider.SyncContext(scopeId2, "workspace-2", "Workspace 2", installationId2)
             );

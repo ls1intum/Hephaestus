@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -170,7 +171,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
         when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
         when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-        when(gitLabGroupSyncService.syncGroupProjects(1L, "my-group/subgroup")).thenReturn(syncResult);
+        when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(syncResult);
         when(organizationRepository.findByLoginIgnoreCase("my-group/subgroup")).thenReturn(Optional.empty());
         when(repositoryToMonitorRepository.findByWorkspaceId(1L)).thenReturn(List.of());
     }
@@ -260,14 +261,14 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             // Discovery should still be attempted
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
             when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-            when(gitLabGroupSyncService.syncGroupProjects(1L, "my-group/subgroup")).thenReturn(
+            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(
                 GitLabSyncResult.completed(Collections.emptyList(), 1, 0, 0)
             );
 
             initService.initialize(workspace);
 
             // Discovery was still attempted
-            verify(gitLabGroupSyncService).syncGroupProjects(1L, "my-group/subgroup");
+            verify(gitLabGroupSyncService).syncGroupProjects(eq(1L), eq("my-group/subgroup"), any());
         }
     }
 
@@ -284,7 +285,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(gitLabWebhookService.registerWebhook(workspace)).thenReturn(WebhookSetupResult.success(99L, 42L));
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
             when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-            when(gitLabGroupSyncService.syncGroupProjects(1L, "my-group/subgroup")).thenReturn(syncResult);
+            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(syncResult);
 
             Organization organization = new Organization();
             ReflectionTestUtils.setField(organization, "id", 10L);
@@ -325,7 +326,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
             when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-            when(gitLabGroupSyncService.syncGroupProjects(1L, "my-group/subgroup")).thenReturn(emptyResult);
+            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(emptyResult);
 
             initService.initialize(workspace);
 
@@ -364,7 +365,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
             when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-            when(gitLabGroupSyncService.syncGroupProjects(anyLong(), any())).thenThrow(
+            when(gitLabGroupSyncService.syncGroupProjects(anyLong(), any(), any())).thenThrow(
                 new RuntimeException("GraphQL timeout")
             );
 
@@ -385,7 +386,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
             when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-            when(gitLabGroupSyncService.syncGroupProjects(1L, "my-group/subgroup")).thenReturn(syncResult);
+            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(syncResult);
             when(repositoryToMonitorRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
             initService.initialize(workspace);

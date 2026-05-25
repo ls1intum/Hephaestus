@@ -280,7 +280,11 @@ public class GitLabWorkspaceInitializationService {
         }
 
         try {
-            GitLabSyncResult result = syncService.syncGroupProjects(workspace.getId(), workspace.getAccountLogin());
+            // Pass workspace.serverUrl so per-instance repos get stamped with the matching
+            // git_provider row instead of falling back to the global default (which silently
+            // fuses cross-instance identities under gitlab.com). Live-run finding 2026-05-25.
+            GitLabSyncResult result = syncService.syncGroupProjects(
+                workspace.getId(), workspace.getAccountLogin(), workspace.getServerUrl());
             log.info(
                 "GitLab project discovery: workspaceId={}, status={}, synced={}, failed={}, pages={}",
                 workspace.getId(),

@@ -101,7 +101,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("null group path returns empty")
         void nullGroupPath_returnsEmpty() {
-            Optional<Organization> result = service.syncGroup(1L, null);
+            Optional<Organization> result = service.syncGroup(1L, null, null);
             assertThat(result).isEmpty();
             verify(graphQlClientProvider, never()).acquirePermission();
         }
@@ -109,7 +109,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("blank group path returns empty")
         void blankGroupPath_returnsEmpty() {
-            Optional<Organization> result = service.syncGroup(1L, "   ");
+            Optional<Organization> result = service.syncGroup(1L, "   ", null);
             assertThat(result).isEmpty();
             verify(graphQlClientProvider, never()).acquirePermission();
         }
@@ -135,7 +135,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             );
             when(groupProcessor.process(any(GitLabGroupResponse.class), anyLong())).thenReturn(org);
 
-            Optional<Organization> result = service.syncGroup(1L, "my-org");
+            Optional<Organization> result = service.syncGroup(1L, "my-org", null);
 
             assertThat(result).isPresent();
             assertThat(result.get().getId()).isEqualTo(42L);
@@ -148,7 +148,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         void groupNotFound_returnsEmpty() {
             mockGraphQlGroupResponse(null);
 
-            Optional<Organization> result = service.syncGroup(1L, "non-existent");
+            Optional<Organization> result = service.syncGroup(1L, "non-existent", null);
 
             assertThat(result).isEmpty();
         }
@@ -168,7 +168,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             mockRequestSpec(client, response);
 
-            Optional<Organization> result = service.syncGroup(1L, "my-org");
+            Optional<Organization> result = service.syncGroup(1L, "my-org", null);
 
             assertThat(result).isEmpty();
             verify(graphQlClientProvider).recordFailure(any());
@@ -179,7 +179,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         void exception_returnsEmptyAndRecordsFailure() {
             when(graphQlClientProvider.forScope(1L)).thenThrow(new RuntimeException("connection error"));
 
-            Optional<Organization> result = service.syncGroup(1L, "my-org");
+            Optional<Organization> result = service.syncGroup(1L, "my-org", null);
 
             assertThat(result).isEmpty();
             verify(graphQlClientProvider).recordFailure(any());
@@ -201,7 +201,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("null group path returns aborted result")
         void nullGroupPath_returnsAborted() {
-            GitLabSyncResult result = service.syncGroupProjects(1L, null);
+            GitLabSyncResult result = service.syncGroupProjects(1L, null, null);
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
             assertThat(result.synced()).isEmpty();
             verify(graphQlClientProvider, never()).acquirePermission();
@@ -210,7 +210,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("blank group path returns aborted result")
         void blankGroupPath_returnsAborted() {
-            GitLabSyncResult result = service.syncGroupProjects(1L, "   ");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "   ", null);
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
             assertThat(result.synced()).isEmpty();
             verify(graphQlClientProvider, never()).acquirePermission();
@@ -235,7 +235,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(groupProcessor.process(any(), anyLong())).thenReturn(null);
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
             assertThat(result.synced()).isEmpty();
@@ -252,7 +252,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(groupProcessor.process(any(), anyLong())).thenReturn(org);
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
             assertThat(result.synced()).isEmpty();
@@ -276,7 +276,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
             when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(repo2);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
             assertThat(result.synced()).hasSize(2);
@@ -308,7 +308,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
             when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(repo2);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
             assertThat(result.synced()).hasSize(2);
@@ -332,7 +332,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
             when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(null);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED_WITH_ERRORS);
             assertThat(result.synced()).hasSize(1);
@@ -358,7 +358,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             );
             when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(repo2);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED_WITH_ERRORS);
             assertThat(result.synced()).hasSize(1);
@@ -387,7 +387,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             Repository repo1 = createTestRepository(10L);
             when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             // Redacted nodes indicate data loss and should produce COMPLETED_WITH_ERRORS
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED_WITH_ERRORS);
@@ -442,7 +442,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             Repository repo1 = createTestRepository(10L);
             when(projectProcessor.processGraphQlResponse(eq(proj1), eq(subOrg), any())).thenReturn(repo1);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
             assertThat(result.synced()).hasSize(1);
@@ -470,7 +470,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.synced()).isEmpty();
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
@@ -500,7 +500,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
             when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
             assertThat(result.synced()).hasSize(2);
@@ -529,7 +529,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
             when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
             assertThat(result.synced()).hasSize(2);
@@ -561,7 +561,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             Repository repoA = createTestRepository(10L);
             when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             // Primary results preserved despite reconciliation failure
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
@@ -592,7 +592,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
             when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
             assertThat(result.synced()).hasSize(2);
@@ -624,7 +624,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
             when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
             assertThat(result.synced()).hasSize(2);
@@ -651,7 +651,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
             // API failure → hadApiFailure=true → reconciliation not attempted
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);

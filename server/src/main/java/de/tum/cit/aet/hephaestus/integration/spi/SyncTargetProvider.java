@@ -143,6 +143,11 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param displayName    human-readable scope name
      * @param accountLogin   GitHub organization/user login
      * @param installationId GitHub App installation ID (null for PAT auth)
+     * @param serverUrl      per-workspace provider base URL (e.g. {@code https://gitlab.lrz.de}).
+     *                       Used by GitLab sync paths to look up the matching git_provider
+     *                       row instead of stamping the global default — closes the
+     *                       cross-instance identity-fusion defect observed 2026-05-25.
+     *                       Null for GitHub workspaces (always github.com).
      * @param syncTargets    repositories to sync in this scope
      * @param syncContext    thread-local context for logging and scope isolation
      */
@@ -152,6 +157,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         String displayName,
         String accountLogin,
         Long installationId,
+        @org.springframework.lang.Nullable String serverUrl,
         List<SyncTarget> syncTargets,
         SyncContextProvider.SyncContext syncContext
     ) {}
