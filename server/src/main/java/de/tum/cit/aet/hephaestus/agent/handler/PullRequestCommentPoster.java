@@ -251,17 +251,16 @@ class PullRequestCommentPoster {
         String repoFullName = requireMetadataText(metadata, "repository_full_name");
         int prNumber = requireMetadataInt(metadata, "pr_number");
 
-        String subjectExternalId = switch (kind) {
-            case GITHUB -> {
-                String[] parts = repoFullName.split("/", 2);
-                if (parts.length != 2) {
-                    throw new JobDeliveryException("Invalid repository_full_name: " + repoFullName);
-                }
-                yield repoFullName + "#" + prNumber;
-            }
-            case GITLAB -> repoFullName + "!" + prNumber;
-            default -> throw new JobDeliveryException("Unsupported integration kind for PR feedback: " + kind);
-        };
+        // Vendor-specific subject formatting lives on the per-kind FeedbackChannel —
+        // see FeedbackChannel.formatPullRequestSubjectId. AC#8 of #1198 mandates no
+        // switch (IntegrationKind) outside the kind module.
+        FeedbackChannel channel = requireChannel(kind);
+        String subjectExternalId;
+        try {
+            subjectExternalId = channel.formatPullRequestSubjectId(repoFullName, prNumber);
+        } catch (IllegalArgumentException e) {
+            throw new JobDeliveryException(e.getMessage());
+        }
 
         // Resource URL conveys the head commit SHA for inline-finding channels that
         // need to anchor the review to a specific commit; null/absent for the summary path.

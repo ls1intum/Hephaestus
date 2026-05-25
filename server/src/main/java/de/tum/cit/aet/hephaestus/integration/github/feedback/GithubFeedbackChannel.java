@@ -44,6 +44,18 @@ public class GithubFeedbackChannel implements FeedbackChannel {
     }
 
     @Override
+    public String formatPullRequestSubjectId(String repoFullName, int prNumber) {
+        if (repoFullName == null || repoFullName.isBlank()) {
+            throw new IllegalArgumentException("repoFullName is required");
+        }
+        if (repoFullName.split("/", 3).length != 2) {
+            throw new IllegalArgumentException(
+                "GitHub repoFullName must be 'owner/repo': " + repoFullName);
+        }
+        return repoFullName + "#" + prNumber;
+    }
+
+    @Override
     public SummaryHandle postSummary(FeedbackTarget target, FeedbackContent content) {
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {

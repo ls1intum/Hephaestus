@@ -67,6 +67,14 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
     }
 
     @Override
+    public String formatPullRequestSubjectId(String repoFullName, int prNumber) {
+        if (repoFullName == null || repoFullName.isBlank()) {
+            throw new IllegalArgumentException("repoFullName is required");
+        }
+        return repoFullName + "!" + prNumber;
+    }
+
+    @Override
     public SummaryHandle postSummary(FeedbackTarget target, FeedbackContent content) {
         long scopeId = target.ref().workspaceId();
         if (gitLabProvider.isRateLimitCritical(scopeId)) {

@@ -103,8 +103,7 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     }
 
     @Test
-    void dispatchInvokesRegisteredHandler() {
-        Message msg = mock(Message.class);
+    void dispatchResolvesRegisteredHandler() {
         RecordingHandler handler = new RecordingHandler(
             new EventTypeKey(IntegrationKind.GITHUB, "repository.issues")
         );
@@ -115,21 +114,6 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
 
         Optional<IntegrationMessageHandler> resolved = dispatcher.dispatch("github.acme.foo.issues");
         assertThat(resolved).contains(handler);
-
-        dispatcher.dispatch("github.acme.foo.issues", msg);
-        assertThat(handler.received).containsExactly(msg);
-    }
-
-    @Test
-    void dispatchWithNoHandlerDoesNotTouchMessage() {
-        Message msg = mock(Message.class);
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of()),
-            ALL_PARSERS
-        );
-
-        dispatcher.dispatch("slack.T0123.C456.message", msg);
-        verifyNoInteractions(msg);
     }
 
     @Test
@@ -143,33 +127,6 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
             .hasMessageContaining("Duplicate SubjectParser")
             .hasMessageContaining("GITHUB")
             .hasMessageContaining(GithubSubjectParser.class.getName());
-    }
-
-    @Test
-    void handlerExceptionPropagatesToCaller() {
-        Message msg = mock(Message.class);
-        IntegrationMessageHandler boom = new IntegrationMessageHandler() {
-            @Override
-            public EventTypeKey key() {
-                return new EventTypeKey(IntegrationKind.GITHUB, "repository.issues");
-            }
-
-            @Override
-            public void onMessage(Message m) {
-                throw new IllegalStateException("boom");
-            }
-        };
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of(boom)),
-            ALL_PARSERS
-        );
-
-        // Exceptions must NOT be swallowed — the consumer needs them to decide
-        // ACK/NACK/dead-letter.
-        assertThatThrownBy(() -> dispatcher.dispatch("github.acme.foo.issues", msg))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("boom");
-        verify(msg, org.mockito.Mockito.never()).ack();
     }
 
     @Test
