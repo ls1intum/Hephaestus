@@ -1,0 +1,133 @@
+# ADR 0010: Hand-roll OAuth state for outbound per-workspace integrations
+
+**Status:** Accepted
+**Date:** 2026-05-25
+**Authors:** Integration framework polish (#1198)
+
+## Context
+
+Hephaestus opens outbound OAuth Authorization Code flows from per-workspace admin pages
+("Connect GitHub", "Connect GitLab", "Connect Slack", "Connect Outline"). The framework
+must:
+
+- Survive multi-step flows that may take **minutes** and span **tab close / reopen** (GitHub
+  App org-admin approval gates can pause the flow for arbitrary time).
+- Bind the resulting credential to a `Connection` row keyed by `(workspaceId, kind,
+  instanceKey)` — NOT to the Spring `SecurityContext` principal.
+- Run **without a Spring session** at the callback step: the vendor redirects back from
+  an unauthenticated browser tab; the only authoritative identity is what we signed into
+  `state`.
+- Compose with the existing Keycloak `oauth2-resource-server` chain (inbound API auth) —
+  Spring Security 6 cannot run resource-server + client filters with conflicting state
+  stores against the same `/oauth/**` paths.
+- Support **per-instance** ClientRegistration shapes (each Slack workspace has its own
+  signing secret; each GitLab self-hosted instance has its own `client_id`).
+
+Two parallel principal-engineer audits (Wave 8 + Wave 10) examined whether
+`spring-boot-starter-oauth2-client` could replace the hand-rolled `HmacOAuthStateService`
++ `OAuthStateNonceStore` + PKCE plumbing. Both arrived independently at the same answer.
+
+## Decision drivers
+
+- **Workspace-keyed token persistence**, not principal-keyed. `OAuth2AuthorizedClientService`'s
+  schema has a composite key `(client_registration_id, principal_name)`; hacking
+  `workspaceId` into `principal_name` collapses two distinct concepts and silently re-keys
+  Spring's intended invariants. See [JdbcOAuth2AuthorizedClientService](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/oauth2/client/JdbcOAuth2AuthorizedClientService.html).
+- **Multi-minute, multi-tab flows.** Spring's default `HttpSessionOAuth2AuthorizationRequestRepository`
+  binds state to a session that doesn't survive an admin closing the tab during GitHub
+  App approval. Replacing it with a JDBC-backed `AuthorizationRequestRepository` is exactly
+  re-implementing `OAuthStateNonceStore` behind Spring's interface — same code, less power
+  (no per-row TTL queries, no workspace cross-referencing).
+- **Dynamic per-tenant ClientRegistration is not first-class.**
+  [spring-security#15860](https://github.com/spring-projects/spring-security/issues/15860)
+  is an open enhancement request. Workarounds require a custom `ClientRegistrationRepository`
+  with careful concurrent-modification handling. Same effort as hand-rolled; less control.
+- **GitHub App ≠ standard OAuth Authorization Code.** GitHub App install callbacks deliver
+  `installation_id`, not `code`. There is no token-exchange at the browser callback — the
+  installation token is minted server-side via JWT-signed-with-private-key. Spring's
+  `OAuth2LoginAuthenticationFilter` at `/login/oauth2/code/{registrationId}` is the wrong
+  endpoint shape entirely.
+- **Spring's PKCE primitives are validated; we match them.** Our 32-byte SecureRandom →
+  43-char base64url-no-pad verifier matches
+  [`OAuth2AuthorizationRequestCustomizers.withPkce()`](https://github.com/spring-projects/spring-security/blob/main/oauth2/oauth2-client/src/main/java/org/springframework/security/oauth2/client/web/DefaultOAuth2AuthorizationRequestResolver.java)
+  byte-for-byte. The cryptographic choice is the same.
+
+## Considered options
+
+1. **Full replace** — rewrite using Spring Security OAuth2 Client end-to-end. Rejected.
+   The session-binding, principal-keyed persistence, and single-vendor-flow assumptions
+   are baked too deep. Net code reduction is negative once the per-tenant
+   `ClientRegistrationRepository` + JDBC `AuthorizationRequestRepository` + custom
+   `OAuth2AuthorizedClientService` are written. We'd ship the same bugs Linear / Sentry /
+   Vercel learned to avoid when their multi-tenant integration platforms reached this
+   scale.
+
+2. **Hybrid** — keep the hand-rolled state HMAC + nonce, but adopt:
+   - `org.springframework.security.oauth2.core.endpoint.PkceParameterNames` constants
+     instead of hardcoded `"code_verifier"` / `"code_challenge"` / `"code_challenge_method"`
+     literals (typo prevention on token-exchange POSTs).
+   - Reference Spring's `DefaultOAuth2AuthorizationRequestResolver` in Javadoc as the
+     primitive we deliberately match.
+
+3. **Hand-roll** the entire flow, document our cryptographic choices in line with RFC 7636
+   + RFC 9700, ArchUnit-pin the state token shape. The audits' verdict.
+
+## Decision
+
+**Option 3 (hand-roll), with the small Option 2 alignments** applied where they cost
+nothing and reduce future drift:
+
+- Keep `HmacOAuthStateService`, `OAuthStateNonceStore`, the `state` payload shape
+  `(workspaceId|kind|issuedAt|nonce|actorRef|codeVerifier?)`, and the single-use
+  `consumed_at` conditional UPDATE.
+- Keep the PKCE primitive we landed in Wave 4 (`issueWithPkce` → `IssuedState`).
+- Reference Spring's PKCE primitive in Javadoc so future readers know we matched it
+  deliberately rather than reinvented it.
+- ArchUnit pins remain: the OAuth state SPI lives under `integration/oauth/state/`
+  (Wave 1 packaging move from `manifest/` to `oauth/state/`).
+
+## Consequences
+
+**Positive:**
+- Workspace-keyed credential persistence keeps the `Connection` aggregate as the single
+  authoritative store. No second source of truth via `OAuth2AuthorizedClient`.
+- Multi-minute, multi-tab flows work because the nonce row is persistent (DB-backed,
+  TTL-pruned via `OAuthStateNonceCleanupJob`).
+- New vendor integrations plug into `ConnectionStrategy` without touching Spring Security
+  config. The framework can add Linear/Jira/etc. without registering a `ClientRegistration`
+  bean per tenant.
+
+**Neutral:**
+- Vocabulary aligned with Spring Security where it overlaps: `IssuedState`,
+  `StateBinding`, `code_verifier` / `code_challenge` follow Spring naming so future
+  migration (if the OSS landscape closes the multi-tenant gap) is a refactor, not a
+  rewrite.
+
+**Negative:**
+- Maintain ~600 LOC of OAuth state plumbing that Spring would have provided for the
+  session-bound case. We accept this cost to keep workspace-binding clean.
+- Future engineers will ask "why don't we use `spring-boot-starter-oauth2-client`?".
+  This ADR is the standing answer.
+
+## Revisit trigger
+
+Any of:
+- Spring Security ships first-class multi-tenant `ClientRegistrationRepository` + a
+  per-tenant `OAuth2AuthorizedClientService` schema that keys on something other than
+  `principal_name` (track [issue #15860](https://github.com/spring-projects/spring-security/issues/15860)).
+- GitHub App flow lands a standard `code` exchange at install time (currently `installation_id`
+  is the callback param, not `code`).
+- We reach 10+ integration kinds — at that point the per-kind `ConnectionStrategy`
+  branching may itself benefit from a registry-as-`ClientRegistrationRepository`
+  refactor, evaluated against Spring's then-current shape.
+
+## References
+
+- [RFC 9700 — Best Current Practice for OAuth 2.0 Security (Jan 2025)](https://www.rfc-editor.org/rfc/rfc9700.html)
+- [RFC 7636 — PKCE](https://www.rfc-editor.org/info/rfc7636)
+- [Spring Security OAuth2 Client docs](https://docs.spring.io/spring-security/reference/servlet/oauth2/client/index.html)
+- [`JdbcOAuth2AuthorizedClientService` schema](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/oauth2/client/JdbcOAuth2AuthorizedClientService.html)
+- [`AuthorizationRequestRepository` default — HttpSession-backed](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/oauth2/client/web/AuthorizationRequestRepository.html)
+- [spring-security/#15860 — Multi-tenant ClientRegistration enhancement request](https://github.com/spring-projects/spring-security/issues/15860)
+- [ch4mpy/spring-addons discussion #230 — multitenant dynamic ClientRegistrationRepository workaround](https://github.com/ch4mpy/spring-addons/discussions/230)
+- [GitHub Community #42351 — GitHub App approval flow loses state](https://github.com/orgs/community/discussions/42351)
