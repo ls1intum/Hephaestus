@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.events;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.net.URI;
 import java.time.Instant;
 import java.util.Map;

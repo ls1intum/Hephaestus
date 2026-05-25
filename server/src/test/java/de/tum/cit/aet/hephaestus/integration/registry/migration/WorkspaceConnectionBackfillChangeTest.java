@@ -11,8 +11,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
@@ -60,7 +61,7 @@ class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
     private static final String KEY = "0123456789abcdef0123456789abcdef";
     private static final String SAVED_KEY_PROP = "hephaestus.security.encryption-key";
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JsonMapper.builder().findAndAddModules().build();
 
     @Mock Database database;
     @Mock JdbcConnection jdbcConnection;

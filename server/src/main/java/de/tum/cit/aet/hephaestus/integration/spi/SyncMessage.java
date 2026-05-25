@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.spi;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.time.Duration;
 import java.time.Instant;
 import org.springframework.lang.Nullable;

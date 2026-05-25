@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.registry.migration;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig.GitHubAppConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig.GitHubPatConfig;
@@ -92,7 +93,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
     private static final String LEGACY_PREFIX = "ENC:";
 
     private static final SecureRandom IV_GENERATOR = new SecureRandom();
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JsonMapper.builder().findAndAddModules().build();
 
     private ResourceAccessor resourceAccessor;
 

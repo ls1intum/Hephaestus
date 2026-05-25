@@ -6,7 +6,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
@@ -251,7 +251,7 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     private static SubjectKeyDeriver stubDeriver(IntegrationKind kind, String subject, String dedupId) {
         return new SubjectKeyDeriver() {
             @Override public IntegrationKind kind() { return kind; }
-            @Override public String deriveSubject(com.fasterxml.jackson.databind.JsonNode payload, Map<String, String> headers) {
+            @Override public String deriveSubject(tools.jackson.databind.JsonNode payload, Map<String, String> headers) {
                 return subject;
             }
             @Override public String deriveDedupKey(byte[] body, Map<String, String> headers) {

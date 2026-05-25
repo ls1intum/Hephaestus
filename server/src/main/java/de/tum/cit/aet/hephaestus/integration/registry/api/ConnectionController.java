@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.registry.api;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService.TransitionRequest;

@@ -2,8 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.spi;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.json.JsonMapper;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncMessage.Cursor;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -42,8 +43,10 @@ class SyncMessageCursorTest extends BaseUnitTest {
 
     @Test
     void cursorSerializesAndDeserializesAcrossVariants() throws Exception {
-        ObjectMapper mapper = new ObjectMapper().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mapper.findAndRegisterModules();
+        ObjectMapper mapper = JsonMapper.builder()
+            .findAndAddModules()
+            .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .build();
 
         Cursor[] originals = {
             new Cursor.Opaque("token-1"),

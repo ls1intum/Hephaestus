@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.webhook;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;

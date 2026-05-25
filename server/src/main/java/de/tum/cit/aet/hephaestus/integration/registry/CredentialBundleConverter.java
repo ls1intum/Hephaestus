@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.registry;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import de.tum.cit.aet.hephaestus.core.security.EncryptionException;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
 import jakarta.persistence.AttributeConverter;
@@ -87,16 +88,11 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     }
 
     /**
-     * Wires Spring's auto-configured ObjectMapper into the static slot so the no-arg
-     * JPA constructor (and any fallback path) still gets a polymorphism-capable mapper.
-     *
-     * <p>{@code required = false} because Spring Boot 4 auto-wires
-     * {@code tools.jackson.databind.ObjectMapper} (Jackson 3), not Jackson 2.
-     * The static fallback in {@link #mapper()} handles instantiation when the bean
-     * is absent. Full Jackson 2→3 migration of the integration module is tracked
-     * separately and out of scope for #1198.
+     * Wires Spring's auto-configured Jackson 3 {@link ObjectMapper} into the static slot
+     * so the no-arg JPA constructor (and any fallback path) still gets a polymorphism-
+     * capable mapper.
      */
-    @Autowired(required = false)
+    @Autowired
     public void setObjectMapper(ObjectMapper objectMapper) {
         CredentialBundleConverter.sharedMapper = objectMapper;
     }
@@ -199,7 +195,7 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
         // required: BearerToken.expiresAt + OAuthSession.expiresAt carry Instant.
         synchronized (CredentialBundleConverter.class) {
             if (sharedMapper == null) {
-                sharedMapper = new ObjectMapper().findAndRegisterModules();
+                sharedMapper = JsonMapper.builder().findAndAddModules().build();
             }
             return sharedMapper;
         }

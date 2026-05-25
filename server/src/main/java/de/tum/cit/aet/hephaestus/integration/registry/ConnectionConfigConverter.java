@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.registry;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,10 +20,7 @@ public class ConnectionConfigConverter implements AttributeConverter<ConnectionC
     /** Static so Hibernate's no-arg materialisation still hits the wired mapper. */
     private static volatile ObjectMapper sharedMapper;
 
-    // required=false: Spring Boot 4 auto-wires tools.jackson.ObjectMapper (Jackson 3),
-    // not com.fasterxml.jackson.databind.ObjectMapper. The mapper() fallback handles
-    // instantiation. Full Jackson 2→3 migration is tracked separately.
-    @Autowired(required = false)
+    @Autowired
     public void setObjectMapper(ObjectMapper objectMapper) {
         ConnectionConfigConverter.sharedMapper = objectMapper;
     }
@@ -57,7 +55,7 @@ public class ConnectionConfigConverter implements AttributeConverter<ConnectionC
         // — the previous bare mapper silently broke as soon as a Java-time field landed.
         synchronized (ConnectionConfigConverter.class) {
             if (sharedMapper == null) {
-                sharedMapper = new ObjectMapper().findAndRegisterModules();
+                sharedMapper = JsonMapper.builder().findAndAddModules().build();
             }
             return sharedMapper;
         }

@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.sync;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncMessage;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncSource;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -146,7 +146,7 @@ public class SyncOrchestrator {
     private Optional<SyncMessage.Cursor> deserializeCursor(String json) {
         try {
             return Optional.ofNullable(objectMapper.readValue(json, SyncMessage.Cursor.class));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             log.warn("Failed to deserialize sync cursor JSON='{}': {}", json, e.toString());
             return Optional.empty();
         }
@@ -158,7 +158,7 @@ public class SyncOrchestrator {
             .orElseGet(() -> new SyncState(connection, streamName));
         try {
             state.setCursor(objectMapper.writeValueAsString(cursor));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize cursor for stream " + streamName, e);
         }
         syncStateRepository.save(state);
