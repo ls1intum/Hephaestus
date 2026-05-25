@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.integration.manifest;
+package de.tum.cit.aet.hephaestus.integration.oauth.state;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;

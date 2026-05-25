@@ -27,7 +27,7 @@ public interface OAuthStateService {
      * into the signed state. Implementations that don't support actorRef may delegate to
      * {@link #issue(long, IntegrationKind)} — the default does exactly that, dropping
      * the actorRef. Callers that need attribution should ensure an impl that honours
-     * the overload is wired (today: {@link de.tum.cit.aet.hephaestus.integration.manifest.HmacOAuthStateService}).
+     * the overload is wired (today: {@code de.tum.cit.aet.hephaestus.integration.oauth.state.HmacOAuthStateService}).
      */
     default String issue(long workspaceId, IntegrationKind kind, @Nullable String actorRef) {
         return issue(workspaceId, kind);
