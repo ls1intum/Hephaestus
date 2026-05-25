@@ -1,5 +1,6 @@
-package de.tum.cit.aet.hephaestus.integration.spi;
+package de.tum.cit.aet.hephaestus.integration.oauth.state;
 
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.time.Instant;
 import org.springframework.lang.Nullable;
 

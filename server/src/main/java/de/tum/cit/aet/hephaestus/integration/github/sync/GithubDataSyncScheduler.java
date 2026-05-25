@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.github.sync;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.spi.RateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncSession;

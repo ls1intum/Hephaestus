@@ -18,8 +18,8 @@ import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy.ConnectIniti
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.integration.spi.OAuthStateService;
-import de.tum.cit.aet.hephaestus.integration.spi.OAuthStateService.StateBinding;
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService.StateBinding;
 import de.tum.cit.aet.hephaestus.integration.webhook.IntegrationKindRouting;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;

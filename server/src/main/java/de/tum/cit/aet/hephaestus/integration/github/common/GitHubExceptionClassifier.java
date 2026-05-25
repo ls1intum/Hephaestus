@@ -53,7 +53,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * }</pre>
  *
  * @see ExponentialBackoff
- * @see de.tum.cit.aet.hephaestus.integration.spi.RateLimitTracker
+ * @see de.tum.cit.aet.hephaestus.integration.github.common.RateLimitTracker
  */
 @Component
 @Slf4j

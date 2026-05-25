@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.Credentia
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.spi.OAuthStateService;
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;

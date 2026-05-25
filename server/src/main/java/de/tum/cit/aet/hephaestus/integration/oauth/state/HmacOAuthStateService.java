@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.oauth.state;
 
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.OAuthStateService;
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;

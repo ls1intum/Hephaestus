@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.integration.spi;
+package de.tum.cit.aet.hephaestus.integration.github.common;
 
 import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHRateLimit;
 import java.time.Duration;

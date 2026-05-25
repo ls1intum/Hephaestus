@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.OAuthStateService.StateBinding;
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService.StateBinding;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
@@ -187,7 +187,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         InMemoryNonceStore store = new InMemoryNonceStore();
         HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
 
-        de.tum.cit.aet.hephaestus.integration.spi.OAuthStateService.IssuedState issued =
+        de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService.IssuedState issued =
             svc.issueWithPkce(42L, IntegrationKind.GITHUB, "alice@example.com");
 
         assertThat(issued.codeChallengeMethod()).isEqualTo("S256");
@@ -260,8 +260,8 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
     void spi_default_refusesPkce() {
         // A bare impl that only overrides consume() must NOT accidentally honour PKCE
         // requests with a no-op — that would let an OAuth flow skip PKCE silently.
-        de.tum.cit.aet.hephaestus.integration.spi.OAuthStateService bare =
-            new de.tum.cit.aet.hephaestus.integration.spi.OAuthStateService() {
+        de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService bare =
+            new de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService() {
                 @Override public String issue(long w, IntegrationKind k) { return "x"; }
                 @Override public StateBinding consume(String s) { throw new IllegalArgumentException(); }
             };

@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
-import de.tum.cit.aet.hephaestus.integration.spi.RateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
