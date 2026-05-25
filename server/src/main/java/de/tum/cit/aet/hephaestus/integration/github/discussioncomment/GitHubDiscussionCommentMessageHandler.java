@@ -5,14 +5,15 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.cit.aet.hephaestus.gitprovider.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
-import de.tum.cit.aet.hephaestus.gitprovider.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.integration.github.discussion.GitHubDiscussionProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionDTO;
 import de.tum.cit.aet.hephaestus.integration.github.discussioncomment.dto.GitHubDiscussionCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.github.discussioncomment.dto.GitHubDiscussionCommentEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -27,7 +28,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Slf4j
 @Component
-public class GitHubDiscussionCommentMessageHandler extends GitHubMessageHandler<GitHubDiscussionCommentEventDTO> {
+public class GitHubDiscussionCommentMessageHandler
+    extends AbstractIntegrationMessageHandler<GitHubDiscussionCommentEventDTO> {
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubDiscussionProcessor discussionProcessor;
@@ -40,15 +42,16 @@ public class GitHubDiscussionCommentMessageHandler extends GitHubMessageHandler<
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubDiscussionCommentEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.DISCUSSION_COMMENT.getValue(),
+            GitHubDiscussionCommentEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.discussionProcessor = discussionProcessor;
         this.commentProcessor = commentProcessor;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.DISCUSSION_COMMENT;
     }
 
     @Override

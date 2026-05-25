@@ -7,13 +7,14 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.project.Project;
 import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectRepository;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -36,7 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Slf4j
 @Component
-public class GitHubProjectMessageHandler extends GitHubMessageHandler<GitHubProjectEventDTO> {
+public class GitHubProjectMessageHandler extends AbstractIntegrationMessageHandler<GitHubProjectEventDTO> {
 
     private final GitHubProjectProcessor projectProcessor;
     private final ProjectRepository projectRepository;
@@ -51,21 +52,17 @@ public class GitHubProjectMessageHandler extends GitHubMessageHandler<GitHubProj
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubProjectEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "organization." + GitHubEventType.PROJECTS_V2.getValue(),
+            GitHubProjectEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.projectProcessor = projectProcessor;
         this.projectRepository = projectRepository;
         this.scopeIdResolver = scopeIdResolver;
         this.gitProviderRepository = gitProviderRepository;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.PROJECTS_V2;
-    }
-
-    @Override
-    public GitHubMessageDomain getDomain() {
-        return GitHubMessageDomain.ORGANIZATION;
     }
 
     @Override

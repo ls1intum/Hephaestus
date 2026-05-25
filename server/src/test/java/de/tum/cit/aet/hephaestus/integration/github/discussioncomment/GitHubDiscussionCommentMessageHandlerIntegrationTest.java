@@ -155,7 +155,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
     @Test
     @DisplayName("Should return correct event type")
     void shouldReturnCorrectEventType() {
-        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.DISCUSSION_COMMENT);
+        assertThat(handler.key().eventType()).isEqualTo("repository.discussion_comment");
     }
 
     @Test

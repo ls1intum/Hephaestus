@@ -7,9 +7,10 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequest.dto.GitHubPullRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequest.dto.GitHubPullRequestEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -19,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles all GitHub pull request webhook events.
  */
 @Component
-public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHubPullRequestEventDTO> {
+public class GitHubPullRequestMessageHandler extends AbstractIntegrationMessageHandler<GitHubPullRequestEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestMessageHandler.class);
 
@@ -32,14 +33,15 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubPullRequestEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.PULL_REQUEST.getValue(),
+            GitHubPullRequestEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.PULL_REQUEST;
     }
 
     @Override

@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler.GitHubMessageDomain;
 import de.tum.cit.aet.hephaestus.integration.github.installation.dto.GitHubInstallationTargetEventDTO;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -87,7 +85,7 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.INSTALLATION_TARGET);
+        assertThat(handler.key().eventType()).isEqualTo("installation.installation_target");
     }
 
     @Test
@@ -155,12 +153,6 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
         // When - should not throw
         handler.handleEvent(event);
         // Then - handler logs debug message for unhandled action
-    }
-
-    @Test
-    @DisplayName("Should return INSTALLATION domain")
-    void shouldReturnInstallationDomain() {
-        assertThat(handler.getDomain()).isEqualTo(GitHubMessageDomain.INSTALLATION);
     }
 
     private GitHubInstallationTargetEventDTO loadPayload(String filename) throws IOException {

@@ -7,9 +7,10 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionDTO;
 import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -23,7 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Slf4j
 @Component
-public class GitHubDiscussionMessageHandler extends GitHubMessageHandler<GitHubDiscussionEventDTO> {
+public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHandler<GitHubDiscussionEventDTO> {
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubDiscussionProcessor discussionProcessor;
@@ -34,14 +35,15 @@ public class GitHubDiscussionMessageHandler extends GitHubMessageHandler<GitHubD
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubDiscussionEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.DISCUSSION.getValue(),
+            GitHubDiscussionEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.discussionProcessor = discussionProcessor;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.DISCUSSION;
     }
 
     @Override

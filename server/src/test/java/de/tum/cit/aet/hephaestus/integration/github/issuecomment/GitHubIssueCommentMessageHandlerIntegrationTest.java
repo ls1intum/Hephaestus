@@ -131,7 +131,7 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.ISSUE_COMMENT);
+        assertThat(handler.key().eventType()).isEqualTo("repository.issue_comment");
     }
 
     @Test

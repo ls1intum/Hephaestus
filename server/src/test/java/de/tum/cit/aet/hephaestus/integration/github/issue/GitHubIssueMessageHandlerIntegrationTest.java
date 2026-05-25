@@ -160,7 +160,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should return ISSUES as event type")
         void shouldReturnCorrectEventType() {
-            assertThat(handler.getEventType()).isEqualTo(GitHubEventType.ISSUES);
+            assertThat(handler.key().eventType()).isEqualTo("repository.issues");
         }
     }
 

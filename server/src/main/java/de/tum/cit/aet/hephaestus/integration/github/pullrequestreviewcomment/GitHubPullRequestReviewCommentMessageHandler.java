@@ -7,8 +7,9 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -30,8 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubPullRequestReviewCommentMessageHandler
-    extends GitHubMessageHandler<GitHubPullRequestReviewCommentEventDTO>
-{
+    extends AbstractIntegrationMessageHandler<GitHubPullRequestReviewCommentEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewCommentMessageHandler.class);
 
@@ -44,14 +44,15 @@ public class GitHubPullRequestReviewCommentMessageHandler
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubPullRequestReviewCommentEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.PULL_REQUEST_REVIEW_COMMENT.getValue(),
+            GitHubPullRequestReviewCommentEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.commentProcessor = commentProcessor;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.PULL_REQUEST_REVIEW_COMMENT;
     }
 
     @Override

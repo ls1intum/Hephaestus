@@ -6,16 +6,17 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
-import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener.AccountType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener.InstallationData;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener.RepositorySnapshot;
-import de.tum.cit.aet.hephaestus.integration.github.installation.dto.GitHubInstallationEventDTO;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationService;
+import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
+import de.tum.cit.aet.hephaestus.integration.github.installation.dto.GitHubInstallationEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.util.Collections;
 import java.util.List;
 import org.slf4j.Logger;
@@ -27,7 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles GitHub installation webhook events and provisions scopes.
  */
 @Component
-public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHubInstallationEventDTO> {
+public class GitHubInstallationMessageHandler extends AbstractIntegrationMessageHandler<GitHubInstallationEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);
 
@@ -46,21 +47,17 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubInstallationEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "installation." + GitHubEventType.INSTALLATION.getValue(),
+            GitHubInstallationEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.gitProviderRepository = gitProviderRepository;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.INSTALLATION;
-    }
-
-    @Override
-    public GitHubMessageDomain getDomain() {
-        return GitHubMessageDomain.INSTALLATION;
     }
 
     @Override

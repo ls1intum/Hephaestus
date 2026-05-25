@@ -5,12 +5,13 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.github.installation.dto.GitHubInstallationTargetEventDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationService;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -20,7 +21,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles GitHub installation_target webhook events.
  */
 @Component
-public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler<GitHubInstallationTargetEventDTO> {
+public class GitHubInstallationTargetMessageHandler
+    extends AbstractIntegrationMessageHandler<GitHubInstallationTargetEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationTargetMessageHandler.class);
 
@@ -37,20 +39,16 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubInstallationTargetEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "installation." + GitHubEventType.INSTALLATION_TARGET.getValue(),
+            GitHubInstallationTargetEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
         this.gitProviderRepository = gitProviderRepository;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.INSTALLATION_TARGET;
-    }
-
-    @Override
-    public GitHubMessageDomain getDomain() {
-        return GitHubMessageDomain.INSTALLATION;
     }
 
     @Override

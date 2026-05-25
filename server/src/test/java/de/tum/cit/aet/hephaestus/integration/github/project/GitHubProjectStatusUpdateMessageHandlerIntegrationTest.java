@@ -87,7 +87,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
     @Test
     @DisplayName("Should return correct event type")
     void shouldReturnCorrectEventType() {
-        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.PROJECTS_V2_STATUS_UPDATE);
+        assertThat(handler.key().eventType()).isEqualTo("organization.projects_v2_status_update");
     }
 
     @Test

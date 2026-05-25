@@ -93,7 +93,7 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.ORGANIZATION);
+        assertThat(handler.key().eventType()).isEqualTo("organization.organization");
     }
 
     @Test

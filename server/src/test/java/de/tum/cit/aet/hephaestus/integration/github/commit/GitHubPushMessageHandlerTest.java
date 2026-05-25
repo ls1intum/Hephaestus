@@ -16,8 +16,8 @@ import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
@@ -181,14 +181,14 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getEventType")
-    class GetEventType {
+    @DisplayName("key")
+    class HandlerKey {
 
         @Test
-        @DisplayName("should return PUSH event type")
+        @DisplayName("should bind to repository.push under the unified registry")
         void shouldReturnPushEventType() {
-            GitHubEventType type = handler.getEventType();
-            assertThat(type).isEqualTo(GitHubEventType.PUSH);
+            assertThat(handler.key().eventType()).isEqualTo("repository.push");
+            assertThat(handler.key().kind()).isEqualTo(IntegrationKind.GITHUB);
         }
     }
 

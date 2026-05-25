@@ -172,7 +172,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         @Test
         @DisplayName("Should return DISCUSSION as event type")
         void shouldReturnCorrectEventType() {
-            assertThat(handler.getEventType()).isEqualTo(GitHubEventType.DISCUSSION);
+            assertThat(handler.key().eventType()).isEqualTo("repository.discussion");
         }
     }
 

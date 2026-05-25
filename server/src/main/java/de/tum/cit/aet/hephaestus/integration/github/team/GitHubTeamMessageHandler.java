@@ -7,17 +7,18 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.team.Team;
 import de.tum.cit.aet.hephaestus.gitprovider.team.TeamRepository;
-import de.tum.cit.aet.hephaestus.integration.github.team.dto.GitHubTeamEventDTO;
 import de.tum.cit.aet.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
 import de.tum.cit.aet.hephaestus.gitprovider.team.permission.TeamRepositoryPermissionRepository;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
+import de.tum.cit.aet.hephaestus.integration.github.team.dto.GitHubTeamEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -27,7 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles GitHub team webhook events.
  */
 @Component
-public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEventDTO> {
+public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<GitHubTeamEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubTeamMessageHandler.class);
 
@@ -48,23 +49,19 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubTeamEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "organization." + GitHubEventType.TEAM.getValue(),
+            GitHubTeamEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.teamProcessor = teamProcessor;
         this.scopeIdResolver = scopeIdResolver;
         this.gitProviderRepository = gitProviderRepository;
         this.teamRepository = teamRepository;
         this.repositoryRepository = repositoryRepository;
         this.permissionRepository = permissionRepository;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.TEAM;
-    }
-
-    @Override
-    public GitHubMessageDomain getDomain() {
-        return GitHubMessageDomain.ORGANIZATION;
     }
 
     @Override

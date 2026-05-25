@@ -7,9 +7,10 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.issue.GitHubIssueProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.issuedependency.dto.GitHubIssueDependenciesEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -52,7 +53,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  *      GitHub Webhook Events - issue_dependencies (documented but not subscribable)</a>
  */
 @Component
-public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<GitHubIssueDependenciesEventDTO> {
+public class GitHubIssueDependenciesMessageHandler
+    extends AbstractIntegrationMessageHandler<GitHubIssueDependenciesEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubIssueDependenciesMessageHandler.class);
 
@@ -67,15 +69,16 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubIssueDependenciesEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.ISSUE_DEPENDENCIES.getValue(),
+            GitHubIssueDependenciesEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
         this.issueDependencySyncService = issueDependencySyncService;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.ISSUE_DEPENDENCIES;
     }
 
     @Override

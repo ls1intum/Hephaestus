@@ -125,7 +125,7 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.SUB_ISSUES);
+        assertThat(handler.key().eventType()).isEqualTo("repository.sub_issues");
     }
 
     @Test

@@ -5,16 +5,17 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.OrganizationMembershipListener.MembershipChangedEvent;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
-import de.tum.cit.aet.hephaestus.integration.github.organization.dto.GitHubOrganizationEventDTO;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
+import de.tum.cit.aet.hephaestus.integration.github.organization.dto.GitHubOrganizationEventDTO;
 import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles GitHub organization webhook events.
  */
 @Component
-public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHubOrganizationEventDTO> {
+public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessageHandler<GitHubOrganizationEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubOrganizationMessageHandler.class);
 
@@ -46,22 +47,18 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubOrganizationEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "organization." + GitHubEventType.ORGANIZATION.getValue(),
+            GitHubOrganizationEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.organizationProcessor = organizationProcessor;
         this.userProcessor = userProcessor;
         this.gitProviderRepository = gitProviderRepository;
         this.membershipRepository = membershipRepository;
         this.membershipListener = membershipListener;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.ORGANIZATION;
-    }
-
-    @Override
-    public GitHubMessageDomain getDomain() {
-        return GitHubMessageDomain.ORGANIZATION;
     }
 
     @Override

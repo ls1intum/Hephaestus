@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.cit.aet.hephaestus.integration.consumer.exception.NatsConnectionException;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandlerRegistry;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandlerRegistry;
 import de.tum.cit.aet.hephaestus.integration.handler.IntegrationMessageHandler;
 import io.nats.client.Connection;
@@ -65,11 +64,11 @@ import org.springframework.stereotype.Service;
  *   <li>{@link ConsumerSubjectMath} — pure subject-arithmetic (wildcard filters,
  *       consumer-name conventions).</li>
  *   <li>{@link ScopeConsumer} — per-scope queue + virtual-thread dispatch.</li>
- *   <li>The two legacy registries
- *       ({@link GitHubMessageHandlerRegistry}, {@link GitLabMessageHandlerRegistry})
- *       remain wired so handlers still bound to the legacy {@code GitHub/GitLabMessageHandler}
- *       interfaces continue to receive messages while they are migrated incrementally
- *       to {@link IntegrationMessageHandler}.</li>
+ *   <li>{@link GitLabMessageHandlerRegistry} (the only remaining legacy registry)
+ *       — GitLab handlers are migrated in the slice immediately after this one; the
+ *       fallback is gone in that change. GitHub handlers all run via the unified
+ *       registry as of the slice that introduced
+ *       {@link de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler}.</li>
  * </ul>
  *
  * <h2>Routing order</h2>
@@ -158,7 +157,6 @@ public class IntegrationNatsConsumer {
     private final IntegrationMessageDispatcher dispatcher;
     private final IntegrationPoisonHandler poisonHandler;
     private final IntegrationConsumerStats stats;
-    private final GitHubMessageHandlerRegistry githubLegacyRegistry;
     private final GitLabMessageHandlerRegistry gitlabLegacyRegistry;
 
     public IntegrationNatsConsumer(
@@ -168,7 +166,6 @@ public class IntegrationNatsConsumer {
         IntegrationMessageDispatcher dispatcher,
         IntegrationPoisonHandler poisonHandler,
         IntegrationConsumerStats stats,
-        @Lazy GitHubMessageHandlerRegistry githubLegacyRegistry,
         @Lazy GitLabMessageHandlerRegistry gitlabLegacyRegistry
     ) {
         this.connectionProperties = connectionProperties;
@@ -177,7 +174,6 @@ public class IntegrationNatsConsumer {
         this.dispatcher = dispatcher;
         this.poisonHandler = poisonHandler;
         this.stats = stats;
-        this.githubLegacyRegistry = githubLegacyRegistry;
         this.gitlabLegacyRegistry = gitlabLegacyRegistry;
     }
 
@@ -565,7 +561,10 @@ public class IntegrationNatsConsumer {
         }
         String eventKey = subject.substring(subject.lastIndexOf('.') + 1);
         return switch (kind.get()) {
-            case GITHUB -> githubLegacyRegistry.getHandler(eventKey);
+            // GitHub has been fully migrated to the unified registry — the dispatcher
+            // is the sole resolver. A subject that reaches this fallback for GITHUB is
+            // an unknown event and should be ACK-as-no-op (handled by the caller).
+            case GITHUB -> null;
             case GITLAB -> gitlabLegacyRegistry.getHandler(eventKey);
             case SLACK, OUTLINE -> null; // No legacy handlers exist for these kinds.
         };

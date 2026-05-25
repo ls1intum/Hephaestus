@@ -5,15 +5,16 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.collaborator.RepositoryCollaboratorRepository;
-import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubMemberEventDTO;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
+import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubMemberEventDTO;
 import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -23,7 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles GitHub member webhook events (repository collaborator changes).
  */
 @Component
-public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMemberEventDTO> {
+public class GitHubMemberMessageHandler extends AbstractIntegrationMessageHandler<GitHubMemberEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubMemberMessageHandler.class);
 
@@ -38,15 +39,16 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubMemberEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.MEMBER.getValue(),
+            GitHubMemberEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.userProcessor = userProcessor;
         this.collaboratorRepository = collaboratorRepository;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.MEMBER;
     }
 
     @Override

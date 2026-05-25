@@ -110,7 +110,7 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should return correct event type")
     void shouldReturnCorrectEventType() {
-        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.PROJECTS_V2);
+        assertThat(handler.key().eventType()).isEqualTo("organization.projects_v2");
     }
 
     @Test

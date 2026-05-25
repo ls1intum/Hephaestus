@@ -7,9 +7,10 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.issue.GitHubIssueProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.issuecomment.dto.GitHubIssueCommentEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -30,7 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * @see GitHubIssueCommentProcessor#processWithParentCreation
  */
 @Component
-public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHubIssueCommentEventDTO> {
+public class GitHubIssueCommentMessageHandler extends AbstractIntegrationMessageHandler<GitHubIssueCommentEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubIssueCommentMessageHandler.class);
 
@@ -45,15 +46,16 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubIssueCommentEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.ISSUE_COMMENT.getValue(),
+            GitHubIssueCommentEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
         this.commentProcessor = commentProcessor;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.ISSUE_COMMENT;
     }
 
     @Override

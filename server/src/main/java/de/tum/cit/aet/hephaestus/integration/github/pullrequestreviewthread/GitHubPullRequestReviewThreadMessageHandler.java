@@ -5,13 +5,14 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequest.GitHubPullRequestProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequestreviewthread.dto.GitHubPullRequestReviewThreadEventDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -22,8 +23,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubPullRequestReviewThreadMessageHandler
-    extends GitHubMessageHandler<GitHubPullRequestReviewThreadEventDTO>
-{
+    extends AbstractIntegrationMessageHandler<GitHubPullRequestReviewThreadEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewThreadMessageHandler.class);
 
@@ -40,16 +40,17 @@ public class GitHubPullRequestReviewThreadMessageHandler
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubPullRequestReviewThreadEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.PULL_REQUEST_REVIEW_THREAD.getValue(),
+            GitHubPullRequestReviewThreadEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
         this.threadProcessor = threadProcessor;
         this.userProcessor = userProcessor;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.PULL_REQUEST_REVIEW_THREAD;
     }
 
     @Override

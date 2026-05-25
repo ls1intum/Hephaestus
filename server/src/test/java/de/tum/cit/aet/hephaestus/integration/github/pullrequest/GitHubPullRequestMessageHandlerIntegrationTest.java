@@ -176,7 +176,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         @Test
         @DisplayName("Should return PULL_REQUEST as event type")
         void shouldReturnCorrectEventType() {
-            assertThat(handler.getEventType()).isEqualTo(GitHubEventType.PULL_REQUEST);
+            assertThat(handler.key().eventType()).isEqualTo("repository.pull_request");
         }
     }
 

@@ -7,9 +7,10 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.GitHubIssueEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -19,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles all GitHub issue webhook events.
  */
 @Component
-public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueEventDTO> {
+public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler<GitHubIssueEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubIssueMessageHandler.class);
 
@@ -32,14 +33,15 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubIssueEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.ISSUES.getValue(),
+            GitHubIssueEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.ISSUES;
     }
 
     @Override

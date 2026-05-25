@@ -7,9 +7,10 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.issue.GitHubIssueProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.subissue.dto.GitHubSubIssuesEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -19,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles GitHub sub_issues webhook events.
  */
 @Component
-public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSubIssuesEventDTO> {
+public class GitHubSubIssuesMessageHandler extends AbstractIntegrationMessageHandler<GitHubSubIssuesEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubSubIssuesMessageHandler.class);
 
@@ -34,15 +35,16 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSu
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubSubIssuesEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.SUB_ISSUES.getValue(),
+            GitHubSubIssuesEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
         this.subIssueSyncService = subIssueSyncService;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.SUB_ISSUES;
     }
 
     @Override

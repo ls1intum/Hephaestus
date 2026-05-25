@@ -130,7 +130,7 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.PULL_REQUEST_REVIEW_COMMENT);
+        assertThat(handler.key().eventType()).isEqualTo("repository.pull_request_review_comment");
     }
 
     @Test

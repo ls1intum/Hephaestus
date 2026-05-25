@@ -14,9 +14,10 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
@@ -46,7 +47,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Slf4j
 @Component
-public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEventDTO> {
+public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<GitHubPushEventDTO> {
 
     private static final String ZERO_SHA = "0000000000000000000000000000000000000000";
 
@@ -71,7 +72,13 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubPushEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.PUSH.getValue(),
+            GitHubPushEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.gitRepositoryManager = gitRepositoryManager;
         this.tokenService = tokenService;
         this.repositoryRepository = repositoryRepository;
@@ -80,11 +87,6 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         this.eventPublisher = eventPublisher;
         this.scopeIdResolver = scopeIdResolver;
         this.syncTargetProvider = syncTargetProvider;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.PUSH;
     }
 
     @Override
@@ -163,11 +165,11 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
      * <p>
      * KNOWN LIMITATION: {@code ensureRepository()} (which may clone a repo
      * from scratch — potentially minutes for large repos) runs inside the
-     * {@link de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler}'s
-     * {@code TransactionTemplate} block, holding a DB connection for the
-     * entire duration. Under high push event volume with many uncached repos,
-     * this could exhaust the HikariCP connection pool. In practice, repos
-     * are cloned once and then only fetched (fast), limiting the impact.
+     * {@link AbstractIntegrationMessageHandler}'s {@code TransactionTemplate}
+     * block, holding a DB connection for the entire duration. Under high push
+     * event volume with many uncached repos, this could exhaust the HikariCP
+     * connection pool. In practice, repos are cloned once and then only
+     * fetched (fast), limiting the impact.
      */
     private void processCommitsViaLocalGit(GitHubPushEventDTO event, Repository repository) {
         String repoName = sanitizeForLog(repository.getNameWithOwner());

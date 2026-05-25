@@ -7,8 +7,9 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequestreview.dto.GitHubPullRequestReviewEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -29,7 +30,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * @see GitHubPullRequestReviewProcessor#processWithParentCreation
  */
 @Component
-public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<GitHubPullRequestReviewEventDTO> {
+public class GitHubPullRequestReviewMessageHandler
+    extends AbstractIntegrationMessageHandler<GitHubPullRequestReviewEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewMessageHandler.class);
 
@@ -42,14 +44,15 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubPullRequestReviewEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.PULL_REQUEST_REVIEW.getValue(),
+            GitHubPullRequestReviewEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.reviewProcessor = reviewProcessor;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.PULL_REQUEST_REVIEW;
     }
 
     @Override

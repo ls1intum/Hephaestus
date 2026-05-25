@@ -7,9 +7,10 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelEventDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -19,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles GitHub label webhook events.
  */
 @Component
-public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelEventDTO> {
+public class GitHubLabelMessageHandler extends AbstractIntegrationMessageHandler<GitHubLabelEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubLabelMessageHandler.class);
 
@@ -32,14 +33,15 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubLabelEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "repository." + GitHubEventType.LABEL.getValue(),
+            GitHubLabelEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.contextFactory = contextFactory;
         this.labelProcessor = labelProcessor;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.LABEL;
     }
 
     @Override

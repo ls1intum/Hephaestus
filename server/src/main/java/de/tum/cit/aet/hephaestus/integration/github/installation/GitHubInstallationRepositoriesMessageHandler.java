@@ -1,12 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.github.installation;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener.RepositorySnapshot;
+import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.installation.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
+import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,8 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubInstallationRepositoriesMessageHandler
-    extends GitHubMessageHandler<GitHubInstallationRepositoriesEventDTO>
-{
+    extends AbstractIntegrationMessageHandler<GitHubInstallationRepositoriesEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 
@@ -33,18 +33,14 @@ public class GitHubInstallationRepositoriesMessageHandler
         ProvisioningListener provisioningListener,
         TransactionTemplate transactionTemplate
     ) {
-        super(GitHubInstallationRepositoriesEventDTO.class, deserializer, transactionTemplate);
+        super(
+            IntegrationKind.GITHUB,
+            "installation." + GitHubEventType.INSTALLATION_REPOSITORIES.getValue(),
+            GitHubInstallationRepositoriesEventDTO.class,
+            deserializer,
+            transactionTemplate
+        );
         this.provisioningListener = provisioningListener;
-    }
-
-    @Override
-    public GitHubEventType getEventType() {
-        return GitHubEventType.INSTALLATION_REPOSITORIES;
-    }
-
-    @Override
-    public GitHubMessageDomain getDomain() {
-        return GitHubMessageDomain.INSTALLATION;
     }
 
     @Override

@@ -150,7 +150,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should return correct event type")
     void shouldReturnCorrectEventType() {
-        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.LABEL);
+        assertThat(handler.key().eventType()).isEqualTo("repository.label");
     }
 
     @Test

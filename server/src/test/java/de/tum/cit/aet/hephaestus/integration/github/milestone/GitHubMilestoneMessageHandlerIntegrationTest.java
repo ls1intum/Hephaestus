@@ -136,7 +136,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.MILESTONE);
+        assertThat(handler.key().eventType()).isEqualTo("repository.milestone");
     }
 
     @Test
