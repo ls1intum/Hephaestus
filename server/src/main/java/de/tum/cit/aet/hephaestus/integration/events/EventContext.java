@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import java.time.Instant;
 import java.util.UUID;
-import lombok.extern.slf4j.Slf4j;
 import org.hibernate.LazyInitializationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +14,6 @@ import org.springframework.lang.Nullable;
 /**
  * Immutable context for domain events - safe for async handling.
  */
-@Slf4j
 public record EventContext(
     @NonNull UUID eventId,
     @NonNull Instant occurredAt,
@@ -26,6 +24,9 @@ public record EventContext(
     @NonNull String correlationId,
     @Nullable GitProviderType providerType
 ) {
+
+    private static final Logger log = LoggerFactory.getLogger(EventContext.class);
+
     /**
      * Creates an EventContext from a ProcessingContext.
      *

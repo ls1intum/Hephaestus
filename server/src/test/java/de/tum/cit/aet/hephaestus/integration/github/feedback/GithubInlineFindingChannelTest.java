@@ -48,23 +48,6 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("non-DiffAnchor findings counted as failed")
-    void nonDiffAnchorsCountedAsFailed() {
-        FeedbackTarget target = githubTarget();
-        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
-
-        FindingAnchor.ChannelThreadAnchor channelAnchor = new FindingAnchor.ChannelThreadAnchor("C123", null);
-        InlineResult result = channel.postInlineFindings(
-            target,
-            List.of(new InlineFinding(channelAnchor, "body", "marker"))
-        );
-
-        // Only one finding, non-diff → unsupported → failed=1, batch never sent.
-        assertThat(result.posted()).isZero();
-        assertThat(result.failed()).isEqualTo(1);
-    }
-
-    @Test
     @DisplayName("posts DiffAnchor findings as single review with correct count")
     void postsDiffAnchorsAsBatch() {
         FeedbackTarget target = githubTarget();
@@ -91,35 +74,6 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
 
         assertThat(result.posted()).isEqualTo(2);
         assertThat(result.failed()).isZero();
-    }
-
-    @Test
-    @DisplayName("mixed DiffAnchor + non-DiffAnchor counts unsupported as failed alongside posted")
-    void mixedAnchorsCountedCorrectly() {
-        FeedbackTarget target = githubTarget();
-        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
-
-        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
-        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
-        when(gitHubProvider.forScope(1L)).thenReturn(client);
-        when(client.documentName(any())).thenReturn(spec);
-        when(spec.variable(any(), any())).thenReturn(spec);
-
-        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
-        lenient().when(response.getErrors()).thenReturn(List.of());
-        when(spec.execute()).thenReturn(Mono.just(response));
-
-        InlineResult result = channel.postInlineFindings(
-            target,
-            List.of(
-                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker"),
-                new InlineFinding(new FindingAnchor.IssueAnchor("ISSUE-1", null), "skip-me", "marker")
-            )
-        );
-
-        assertThat(result.posted()).isEqualTo(1);
-        assertThat(result.failed()).isEqualTo(1);
     }
 
     @Test

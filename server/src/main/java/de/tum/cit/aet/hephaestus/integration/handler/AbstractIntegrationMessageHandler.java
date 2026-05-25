@@ -110,12 +110,7 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
         this.transactionTemplate = transactionTemplate;
     }
 
-    // NOTE: key() and onMessage() are intentionally NOT final. Handlers that carry
-    // @Transactional methods get CGLIB-proxied by Spring; CGLIB cannot override final
-    // methods, so the JVM dispatches them on the proxy instance whose final fields are
-    // unset, returning null and breaking the unified registry at boot. Leaving them
-    // non-final lets CGLIB generate the standard delegating override that forwards to
-    // the populated target instance.
+    // Not final: CGLIB cannot override final methods on Spring-proxied beans.
 
     @Override
     public EventTypeKey key() {

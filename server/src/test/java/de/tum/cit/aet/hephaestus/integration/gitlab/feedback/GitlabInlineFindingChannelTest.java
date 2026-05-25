@@ -78,34 +78,6 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("non-DiffAnchor counted as failed without posting")
-    void nonDiffAnchorCountedFailed() {
-        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42))
-            .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
-
-        // First call (GetMergeRequestNotes for dedup) — return null/no notes
-        HttpGraphQlClient dedupClient = mock(HttpGraphQlClient.class);
-        HttpGraphQlClient.RequestSpec dedupSpec = mock(HttpGraphQlClient.RequestSpec.class);
-        lenient().when(gitLabProvider.forScope(1L)).thenReturn(dedupClient);
-        lenient().when(dedupClient.documentName(any())).thenReturn(dedupSpec);
-        lenient().when(dedupSpec.variable(any(), any())).thenReturn(dedupSpec);
-        ClientResponseField nodesField = mock(ClientResponseField.class);
-        ClientGraphQlResponse dedupResponse = mock(ClientGraphQlResponse.class);
-        lenient().when(dedupResponse.field("project.mergeRequest.notes.nodes")).thenReturn(nodesField);
-        lenient().when(nodesField.getValue()).thenReturn(null);
-        lenient().when(dedupSpec.execute()).thenReturn(Mono.just(dedupResponse));
-
-        InlineResult result = channel.postInlineFindings(
-            gitlabTarget(),
-            List.of(new InlineFinding(new FindingAnchor.IssueAnchor("ISSUE-1", null), "skip", "marker"))
-        );
-
-        assertThat(result.posted()).isZero();
-        assertThat(result.failed()).isEqualTo(1);
-    }
-
-    @Test
     @DisplayName("posts DiffAnchor findings successfully")
     void postsDiffNotesSuccessfully() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);

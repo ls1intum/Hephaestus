@@ -4,8 +4,5 @@ package de.tum.cit.aet.hephaestus.integration.spi;
 public enum IntegrationFamily {
     SCM,
     MESSAGING,
-    KNOWLEDGE,
-    PROJECT_TRACKER,
-    CI_PROVIDER,
-    OBSERVABILITY
+    KNOWLEDGE
 }

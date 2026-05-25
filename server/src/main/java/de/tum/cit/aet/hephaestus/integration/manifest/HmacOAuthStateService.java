@@ -117,23 +117,20 @@ public class HmacOAuthStateService implements OAuthStateService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("OAuth state malformed", e);
         }
-        // -1 limit preserves trailing empty fields ({@code actorSegment} is empty when
-        // the legacy no-actor overload mints the token). Without -1 a trailing empty
-        // string is dropped and the split arity check below misfires.
+        // -1 limit preserves the trailing empty actorSegment that {@link #issue} writes
+        // when actorRef is null. Without -1 a trailing empty string is dropped and the
+        // arity check below misfires.
         String[] parts = decoded.split("\\|", -1);
-        if (parts.length != 5 && parts.length != 6) {
+        if (parts.length != 6) {
             throw new IllegalArgumentException("OAuth state malformed");
         }
-        boolean hasActorSegment = parts.length == 6;
         String workspaceIdStr = parts[0];
         String kindStr = parts[1];
         String issuedAtStr = parts[2];
         String nonce = parts[3];
-        String actorSegment = hasActorSegment ? parts[4] : "";
-        String suppliedSig = parts[hasActorSegment ? 5 : 4];
-        String payload = hasActorSegment
-            ? workspaceIdStr + "|" + kindStr + "|" + issuedAtStr + "|" + nonce + "|" + actorSegment
-            : workspaceIdStr + "|" + kindStr + "|" + issuedAtStr + "|" + nonce;
+        String actorSegment = parts[4];
+        String suppliedSig = parts[5];
+        String payload = workspaceIdStr + "|" + kindStr + "|" + issuedAtStr + "|" + nonce + "|" + actorSegment;
         String expectedSig = hmac(payload);
         if (!MessageDigest.isEqual(
             expectedSig.getBytes(StandardCharsets.UTF_8),
@@ -170,7 +167,7 @@ public class HmacOAuthStateService implements OAuthStateService {
         if (nonceStore != null && !nonceStore.tryConsume(nonce)) {
             throw new IllegalArgumentException("OAuth state already consumed");
         }
-        String actorRef = hasActorSegment ? decodeActor(actorSegment) : null;
+        String actorRef = decodeActor(actorSegment);
         return new StateBinding(workspaceId, kind, issued, actorRef);
     }
 
