@@ -8,6 +8,7 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.gitprovider.common.exception.RepositoryNotFoundOnGitProviderException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -180,12 +181,16 @@ public class GitHubRepositorySyncService {
             // Use typed GraphQL model for type-safe parsing
             var repoData = response.field("repository").toEntity(GHRepository.class);
             if (repoData == null) {
+                // Definitive provider response: this repository does not exist. Distinct from
+                // a transient inability to ask GitHub (handled by Optional.empty below). The
+                // caller relies on the exception to decide whether it is safe to remove a
+                // user-configured monitoring row. See ADR-0012 and pass-14 incident.
                 log.warn(
                     "Skipped repository sync: reason=notFoundOnGitHub, scopeId={}, repoName={}",
                     scopeId,
                     safeNameWithOwner
                 );
-                return Optional.empty();
+                throw new RepositoryNotFoundOnGitProviderException(nameWithOwner);
             }
 
             // Ensure organization exists
@@ -253,8 +258,9 @@ public class GitHubRepositorySyncService {
             );
 
             return Optional.of(repository);
-        } catch (InstallationNotFoundException e) {
-            // Re-throw to abort the entire sync operation
+        } catch (InstallationNotFoundException | RepositoryNotFoundOnGitProviderException e) {
+            // Re-throw: install-gone aborts the entire scope sync; repo-gone signals
+            // definitive deletion so the caller can clean up its monitoring row.
             throw e;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);

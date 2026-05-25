@@ -13,6 +13,7 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
+import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
@@ -194,7 +195,9 @@ public class GitHubProjectSyncService {
 
         // Resolve organization outside transaction to avoid holding locks
         Organization organization = transactionTemplate.execute(status -> {
-            Organization org = organizationRepository.findByLoginIgnoreCase(organizationLogin).orElse(null);
+            Organization org = organizationRepository
+                .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, GitProviderType.GITHUB)
+                .orElse(null);
             if (org != null) {
                 // Eagerly initialize the lazy-loaded provider for use outside the transaction
                 org.getProvider().getId();

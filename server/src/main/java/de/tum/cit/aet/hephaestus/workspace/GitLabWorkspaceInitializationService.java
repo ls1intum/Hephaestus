@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
@@ -312,7 +313,7 @@ public class GitLabWorkspaceInitializationService {
             return;
         }
         organizationRepository
-            .findByLoginIgnoreCase(workspace.getAccountLogin())
+            .findByLoginIgnoreCaseAndProvider_Type(workspace.getAccountLogin(), GitProviderType.GITLAB)
             .ifPresent(org -> {
                 // Check if another workspace already references this organization
                 // (workspace.organization_id has a unique constraint)
@@ -417,7 +418,7 @@ public class GitLabWorkspaceInitializationService {
         var memberSyncService = gitLabServices.getGroupMemberSyncService();
         if (memberSyncService != null) {
             organizationRepository
-                .findByLoginIgnoreCase(workspace.getAccountLogin())
+                .findByLoginIgnoreCaseAndProvider_Type(workspace.getAccountLogin(), GitProviderType.GITLAB)
                 .ifPresent(org -> {
                     try {
                         int membersSynced = memberSyncService.syncGroupMemberships(

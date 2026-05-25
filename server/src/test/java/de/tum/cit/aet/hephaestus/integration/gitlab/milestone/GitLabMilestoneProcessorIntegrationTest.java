@@ -588,7 +588,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
         private Repository createRepository(long nativeId, String name, String fullName) {
             Organization org = organizationRepository
-                .findByLoginIgnoreCase(FIXTURE_ORG_LOGIN)
+                .findByLoginIgnoreCaseAndProvider_Type(FIXTURE_ORG_LOGIN, GitProviderType.GITLAB)
                 .orElseThrow(() -> new IllegalStateException("Test org not found"));
 
             Repository repo = new Repository();

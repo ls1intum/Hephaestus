@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.github.issue;
 
+import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
@@ -487,7 +488,10 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return issueTypeSyncService
             .findByNodeId(dto.nodeId())
             .orElseGet(() -> {
-                var orgOpt = organizationRepository.findByLoginIgnoreCase(orgLogin);
+                var orgOpt = organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
+                    orgLogin,
+                    GitProviderType.GITHUB
+                );
                 if (orgOpt.isEmpty()) {
                     log.warn(
                         "Skipped issue type creation: reason=orgNotFound, issueTypeName={}, orgLogin={}",

@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.gitprovider.common.exception.RepositoryNotFoundOnGitProviderException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.Category;
@@ -222,15 +223,28 @@ public class GithubDataSyncService {
                 scopeId,
                 safeNameWithOwner
             );
-            var syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
-            if (syncedRepository.isEmpty()) {
-                log.debug(
-                    "Skipped sync: reason=repositoryNotFoundOnGitHub, scopeId={}, repoName={}",
+            Optional<Repository> syncedRepository;
+            try {
+                syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
+            } catch (RepositoryNotFoundOnGitProviderException e) {
+                // Definitive 404 from GitHub: the repo really does not exist. Safe to drop
+                // the monitoring row so we stop polling for it.
+                log.info(
+                    "Removing sync target: reason=repositoryNotFoundOnGitHub, scopeId={}, repoName={}",
                     scopeId,
                     safeNameWithOwner
                 );
-                // Repository doesn't exist on GitHub - remove sync target to stop perpetual retries
                 syncTargetProvider.removeSyncTarget(syncTarget.id());
+                return;
+            }
+            if (syncedRepository.isEmpty()) {
+                // Transient failure (auth, transport, rate limit, classification). Leave the
+                // RTM in place so the next cycle retries. See ADR-0012 / pass-14 incident.
+                log.debug(
+                    "Skipped sync (transient): reason=syncReturnedEmpty, scopeId={}, repoName={}",
+                    scopeId,
+                    safeNameWithOwner
+                );
                 return;
             }
             repository = syncedRepository.get();
@@ -857,7 +871,9 @@ public class GithubDataSyncService {
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
         // Find the organization to get its ID
-        Organization organization = organizationRepository.findByLoginIgnoreCase(organizationLogin).orElse(null);
+        Organization organization = organizationRepository
+            .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, GitProviderType.GITHUB)
+            .orElse(null);
         if (organization == null) {
             log.debug("Skipped project items sync: reason=organizationNotFound, orgLogin={}", safeOrgLogin);
             return;

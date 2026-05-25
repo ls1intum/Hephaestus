@@ -10,6 +10,7 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
+import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
@@ -133,8 +134,11 @@ public class GitHubTeamSyncService {
         }
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
-        // Resolve the organization's provider for ProcessingContext (within @Transactional)
-        Organization organization = organizationRepository.findByLoginIgnoreCase(organizationLogin).orElse(null);
+        // Resolve the organization's provider for ProcessingContext (within @Transactional).
+        // Provider-type-scoped so a same-login GitLab org cannot collide (ADR-0012).
+        Organization organization = organizationRepository
+            .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, GitProviderType.GITHUB)
+            .orElse(null);
         if (organization == null) {
             log.warn("Skipped team sync: reason=organizationNotFound, orgLogin={}", safeOrgLogin);
             return 0;

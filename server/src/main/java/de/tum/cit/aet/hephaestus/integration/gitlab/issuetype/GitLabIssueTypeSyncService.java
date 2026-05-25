@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlResponse
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncException;
+import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.gitprovider.issuetype.IssueTypeRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
@@ -70,7 +71,9 @@ public class GitLabIssueTypeSyncService {
     public int syncIssueTypesForGroup(Long scopeId, String groupPath) {
         String safeGroupPath = sanitizeForLog(groupPath);
 
-        Organization org = organizationRepository.findByLoginIgnoreCase(groupPath).orElse(null);
+        Organization org = organizationRepository
+            .findByLoginIgnoreCaseAndProvider_Type(groupPath, GitProviderType.GITLAB)
+            .orElse(null);
         if (org == null) {
             log.debug("Organization not found, skipping issue type sync: groupPath={}", safeGroupPath);
             return 0;

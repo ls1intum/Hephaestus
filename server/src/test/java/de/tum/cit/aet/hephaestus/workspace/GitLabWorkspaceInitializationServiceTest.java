@@ -16,6 +16,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabGroupSyncService;
@@ -172,7 +173,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
         when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
         when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(syncResult);
-        when(organizationRepository.findByLoginIgnoreCase("my-group/subgroup")).thenReturn(Optional.empty());
+        when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type("my-group/subgroup", GitProviderType.GITLAB)).thenReturn(Optional.empty());
         when(repositoryToMonitorRepository.findByWorkspaceId(1L)).thenReturn(List.of());
     }
 
@@ -290,7 +291,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             Organization organization = new Organization();
             ReflectionTestUtils.setField(organization, "id", 10L);
             organization.setLogin("my-group/subgroup");
-            when(organizationRepository.findByLoginIgnoreCase("my-group/subgroup")).thenReturn(
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type("my-group/subgroup", GitProviderType.GITLAB)).thenReturn(
                 Optional.of(organization)
             );
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -331,7 +332,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             initService.initialize(workspace);
 
             verify(repositoryToMonitorRepository, never()).save(any());
-            verify(organizationRepository, never()).findByLoginIgnoreCase(any());
+            verify(organizationRepository, never()).findByLoginIgnoreCaseAndProvider_Type(any(), any());
             verifyNoInteractions(natsConsumerService);
         }
 
@@ -391,7 +392,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
             initService.initialize(workspace);
 
-            verify(organizationRepository, never()).findByLoginIgnoreCase(any());
+            verify(organizationRepository, never()).findByLoginIgnoreCaseAndProvider_Type(any(), any());
         }
 
         @Test
@@ -524,7 +525,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
             initService.linkWorkspaceToOrganization(workspace);
 
-            verify(organizationRepository, never()).findByLoginIgnoreCase(any());
+            verify(organizationRepository, never()).findByLoginIgnoreCaseAndProvider_Type(any(), any());
         }
 
         @Test
@@ -533,7 +534,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
             initService.linkWorkspaceToOrganization(workspace);
 
-            verify(organizationRepository, never()).findByLoginIgnoreCase(any());
+            verify(organizationRepository, never()).findByLoginIgnoreCaseAndProvider_Type(any(), any());
         }
 
         @Test
@@ -541,7 +542,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             Organization organization = new Organization();
             ReflectionTestUtils.setField(organization, "id", 10L);
 
-            when(organizationRepository.findByLoginIgnoreCase("my-group/subgroup")).thenReturn(
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type("my-group/subgroup", GitProviderType.GITLAB)).thenReturn(
                 Optional.of(organization)
             );
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -559,7 +560,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
         @Test
         void shouldNotLinkWhenNotFound() {
-            when(organizationRepository.findByLoginIgnoreCase("my-group/subgroup")).thenReturn(Optional.empty());
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type("my-group/subgroup", GitProviderType.GITLAB)).thenReturn(Optional.empty());
 
             initService.linkWorkspaceToOrganization(workspace);
 
@@ -569,7 +570,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         @Test
         void shouldNotLinkWhenWorkspaceDeleted() {
             Organization organization = new Organization();
-            when(organizationRepository.findByLoginIgnoreCase("my-group/subgroup")).thenReturn(
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type("my-group/subgroup", GitProviderType.GITLAB)).thenReturn(
                 Optional.of(organization)
             );
             when(workspaceRepository.findById(1L)).thenReturn(Optional.empty());

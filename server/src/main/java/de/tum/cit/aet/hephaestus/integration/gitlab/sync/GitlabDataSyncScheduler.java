@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.commit.GitLabCommitSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
@@ -289,7 +290,7 @@ public class GitlabDataSyncScheduler {
 
         try {
             organizationRepository
-                .findByLoginIgnoreCase(session.accountLogin())
+                .findByLoginIgnoreCaseAndProvider_Type(session.accountLogin(), GitProviderType.GITLAB)
                 .ifPresent(org -> {
                     int count = memberSync.syncGroupMemberships(session.scopeId(), session.accountLogin(), org);
                     log.info("GitLab membership sync: scopeId={}, membersSynced={}", session.scopeId(), count);
@@ -630,7 +631,7 @@ public class GitlabDataSyncScheduler {
      */
     private Long getGitLabProviderId(String accountLogin) {
         return organizationRepository
-            .findByLoginIgnoreCase(accountLogin)
+            .findByLoginIgnoreCaseAndProvider_Type(accountLogin, GitProviderType.GITLAB)
             .map(org -> org.getProvider() != null ? org.getProvider().getId() : null)
             .orElse(null);
     }

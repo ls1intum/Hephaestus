@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.gitprovider.sync.backfill;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
@@ -253,7 +254,7 @@ public class GitLabHistoricalBackfillService {
      */
     private Long getGitLabProviderId(String accountLogin) {
         return organizationRepository
-            .findByLoginIgnoreCase(accountLogin)
+            .findByLoginIgnoreCaseAndProvider_Type(accountLogin, GitProviderType.GITLAB)
             .map(org -> org.getProvider() != null ? org.getProvider().getId() : null)
             .orElse(null);
     }

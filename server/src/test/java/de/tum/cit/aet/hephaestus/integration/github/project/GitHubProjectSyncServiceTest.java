@@ -309,7 +309,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @DisplayName("should return completed(0) when organization is not found")
         void shouldReturnCompletedZeroWhenOrganizationNotFound() {
             // Arrange
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.empty());
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.empty());
 
             // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
@@ -324,7 +324,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldSyncSinglePageOfProjectsSuccessfully() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -365,7 +365,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldSkipProjectsWithinCooldownPeriod() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -393,7 +393,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldAbortWhenRateLimitCritical() throws InterruptedException {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -419,7 +419,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldAbortWhenGraphQlResponseInvalid() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -439,7 +439,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldRethrowInstallationNotFoundException() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -456,7 +456,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldRemoveStaleProjectsOnCompleteSync() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -493,7 +493,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldNotRemoveStaleProjectsOnAbortedSync() throws InterruptedException {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -518,7 +518,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldAbortRateLimitOnRateLimitedException() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -563,7 +563,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             );
 
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -593,7 +593,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldRethrowWhenExceptionClassifiedAsAuthError() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -612,7 +612,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldProcessMultiplePagesOfProjects() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
