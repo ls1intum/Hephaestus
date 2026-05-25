@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.Base64;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
@@ -47,7 +48,12 @@ public class HmacOAuthStateService implements OAuthStateService {
     /**
      * Spring-injected primary constructor. The {@code nonceStore} is required at
      * runtime — it provides the single-use guarantee on top of the HMAC + TTL.
+     *
+     * <p>{@code @Autowired} is required to disambiguate from the test convenience
+     * 2-arg constructor; without it Spring sees two public ctors and refuses to
+     * pick one ({@code No default constructor found}). See #1198 audit.
      */
+    @Autowired
     public HmacOAuthStateService(
         @Value("${hephaestus.integration.oauth-state.secret:${hephaestus.webhook.secret:}}") String configuredSecret,
         @Value("${hephaestus.integration.oauth-state.ttl:PT10M}") Duration ttl,

@@ -19,7 +19,10 @@ public class ConnectionConfigConverter implements AttributeConverter<ConnectionC
     /** Static so Hibernate's no-arg materialisation still hits the wired mapper. */
     private static volatile ObjectMapper sharedMapper;
 
-    @Autowired
+    // required=false: Spring Boot 4 auto-wires tools.jackson.ObjectMapper (Jackson 3),
+    // not com.fasterxml.jackson.databind.ObjectMapper. The mapper() fallback handles
+    // instantiation. Full Jackson 2→3 migration is tracked separately.
+    @Autowired(required = false)
     public void setObjectMapper(ObjectMapper objectMapper) {
         ConnectionConfigConverter.sharedMapper = objectMapper;
     }

@@ -18,13 +18,13 @@
            continue to work — the JPA model + every caller still reads the legacy
            paths. See WorkspaceConnectionBackfillChange for the per-mode shape.
 
-        Phase 2 (context="connection-cutover" — NOT applied by default):
+        Phase 2 (context="connection-cutover", NOT applied by default):
           Drops the twelve legacy columns. Activated by re-running Liquibase with
-          --contexts=connection-cutover AFTER every caller of getInstallationId /
-          getProviderType / getPersonalAccessToken / getGitlabGroupId /
-          getGitlabWebhookId / getServerUrl / getSlackToken /
-          getSlackSigningSecret / getLeaderboardNotificationTeam /
-          getLeaderboardNotificationChannelId / getInstallationLinkedAt /
+          the contexts argument set to "connection-cutover", AFTER every caller
+          of getInstallationId, getProviderType, getPersonalAccessToken,
+          getGitlabGroupId, getGitlabWebhookId, getServerUrl, getSlackToken,
+          getSlackSigningSecret, getLeaderboardNotificationTeam,
+          getLeaderboardNotificationChannelId, getInstallationLinkedAt,
           getAccountLogin has been migrated to read from the Connection registry.
           The corresponding setters must also be removed from Workspace.java
           before drop, otherwise JPA boot will fail (Hibernate maps to missing
@@ -67,9 +67,9 @@
         DROP changesets — guarded by context="connection-cutover".
 
         Liquibase only runs changesets whose contexts match the runtime context.
-        With no --contexts argument (default boot), these are SKIPPED. To apply,
-        run with `liquibase update --contexts=connection-cutover` AFTER the
-        caller refactor is complete and verified in staging.
+        With no contexts argument (default boot), these are SKIPPED. To apply,
+        run `liquibase update` with contexts set to "connection-cutover" AFTER
+        the caller refactor is complete and verified in staging.
         ────────────────────────────────────────────────────────────────────────
     -->
 

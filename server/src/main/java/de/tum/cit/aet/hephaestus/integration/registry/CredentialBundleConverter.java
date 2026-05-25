@@ -89,8 +89,14 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     /**
      * Wires Spring's auto-configured ObjectMapper into the static slot so the no-arg
      * JPA constructor (and any fallback path) still gets a polymorphism-capable mapper.
+     *
+     * <p>{@code required = false} because Spring Boot 4 auto-wires
+     * {@code tools.jackson.databind.ObjectMapper} (Jackson 3), not Jackson 2.
+     * The static fallback in {@link #mapper()} handles instantiation when the bean
+     * is absent. Full Jackson 2→3 migration of the integration module is tracked
+     * separately and out of scope for #1198.
      */
-    @Autowired
+    @Autowired(required = false)
     public void setObjectMapper(ObjectMapper objectMapper) {
         CredentialBundleConverter.sharedMapper = objectMapper;
     }
