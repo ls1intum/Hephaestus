@@ -42,9 +42,7 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             Duration.ofSeconds(2),
             new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
         );
-        // Unit-test path: no DLQ publisher wired — ackPoison falls back to direct ACK.
-        // The Wave 6 dual-path (DLQ-first-then-ACK) is exercised in IntegrationDlqPublisherTest.
-        handler = new IntegrationPoisonHandler(properties, meterRegistry, null);
+        handler = new IntegrationPoisonHandler(properties, meterRegistry);
     }
 
     @Nested

@@ -90,19 +90,8 @@ public record WebhookProperties(
         }
     }
 
-    /**
-     * @param duplicateWindow JetStream stream-level dedup TTL. Default 24h aligns with the
-     *                        longest vendor webhook retry window we currently serve
-     *                        (GitHub up to 8h, GitLab up to ~24h). At 2m (the prior
-     *                        default) the dedup only caught transport-level republishes
-     *                        within the consumer ack loop, NOT vendor retries — the
-     *                        consumer-side `connection_audit.correlation_id UNIQUE` was
-     *                        load-bearing. Bumping aligns belt + suspenders.
-     * @param maxAge          retention budget for replay-on-cold-start.
-     * @param maxMessages     hard cap.
-     */
     public record Stream(
-        @DefaultValue("24h") Duration duplicateWindow,
+        @DefaultValue("2m") Duration duplicateWindow,
         @DefaultValue("180d") Duration maxAge,
         @DefaultValue("2000000") long maxMessages
     ) {

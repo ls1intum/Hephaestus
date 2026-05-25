@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.github.installation;
 
 import de.tum.cit.aet.hephaestus.integration.identity.HephaestusUser;
-import de.tum.cit.aet.hephaestus.integration.identity.HephaestusUserRepository;
 import de.tum.cit.aet.hephaestus.integration.identity.IntegrationIdentity;
 import de.tum.cit.aet.hephaestus.integration.identity.IntegrationIdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
@@ -60,36 +59,17 @@ public class GithubInstallationBindingService {
     private final ConnectionService connectionService;
     private final WorkspaceRepository workspaceRepository;
     private final IntegrationIdentityRepository identityRepository;
-    private final HephaestusUserRepository userRepository;
 
     public GithubInstallationBindingService(GithubInstallationUnboundRepository unboundRepository,
                                             ConnectionRepository connectionRepository,
                                             ConnectionService connectionService,
                                             WorkspaceRepository workspaceRepository,
-                                            IntegrationIdentityRepository identityRepository,
-                                            HephaestusUserRepository userRepository) {
+                                            IntegrationIdentityRepository identityRepository) {
         this.unboundRepository = unboundRepository;
         this.connectionRepository = connectionRepository;
         this.connectionService = connectionService;
         this.workspaceRepository = workspaceRepository;
         this.identityRepository = identityRepository;
-        this.userRepository = userRepository;
-    }
-
-    /**
-     * Controller-facing overload: resolves the Keycloak subject string from
-     * {@code Authentication.getName()} to a {@link HephaestusUser} on this side of the
-     * service boundary so the controller stays free of repository dependencies (per
-     * {@code ArchitectureTest.controllersDoNotAccessRepositories}).
-     *
-     * @throws UnknownActorException if no HephaestusUser exists for {@code keycloakSubject}
-     */
-    @Transactional
-    public Connection bindForKeycloakSubject(long installationId, long workspaceId, String keycloakSubject) {
-        HephaestusUser user = userRepository.findByKeycloakSubject(keycloakSubject)
-            .orElseThrow(() -> new UnknownActorException(
-                "No HephaestusUser for authenticated principal — log in via Keycloak before binding"));
-        return bind(installationId, workspaceId, user);
     }
 
     /**
@@ -283,10 +263,5 @@ public class GithubInstallationBindingService {
     /** 409 — row predates the installer-identity column. Uninstall + reinstall to bind. */
     public static class LegacyUnboundRowException extends RuntimeException {
         public LegacyUnboundRowException(String message) { super(message); }
-    }
-
-    /** 401 — authenticated principal does not map to any HephaestusUser yet. */
-    public static class UnknownActorException extends RuntimeException {
-        public UnknownActorException(String message) { super(message); }
     }
 }
