@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.consumer;
 
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.handler.IntegrationMessageHandlerRegistry;
 import java.time.Instant;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
@@ -11,11 +13,19 @@ import org.springframework.stereotype.Component;
  * Actuator health probe for the integration-framework NATS consumer surface.
  *
  * <p>Wired into the {@code readiness} health group in {@code application.yml} —
- * a NATS outage or unresolved consumer flips the pod's
- * {@code /actuator/health/readiness} probe to DOWN, k8s pulls traffic, but
- * liveness stays green so the pod is not crash-looped. The legacy
- * {@code WebhookHealthIndicator} covers the publisher half of the pipeline; this
- * one closes the consumer half.
+ * a NATS outage flips the pod's {@code /actuator/health/readiness} probe to DOWN,
+ * k8s pulls traffic, but liveness stays green so the pod is not crash-looped. The
+ * legacy {@code WebhookHealthIndicator} covers the publisher half of the pipeline;
+ * this one closes the consumer half.
+ *
+ * <p><b>Runtime-role guard.</b> The indicator is registered ONLY on pods that run
+ * the integration consumer ({@code hephaestus.runtime.server.enabled=true},
+ * matching {@code IntegrationNatsConsumer}'s own {@code @ConditionalOnProperty}).
+ * Worker / webhook-only / specs pods never produce this indicator → it cannot
+ * pull them out of readiness with an OUT_OF_SERVICE for a consumer that was
+ * never supposed to start. (Spring Boot's readiness group composite uses
+ * {@code SimpleStatusAggregator} where OUT_OF_SERVICE dominates UP and maps to
+ * HTTP 503; previous wiring caused webhook-pod readiness to fail permanently.)
  *
  * <h2>Reported details</h2>
  * <ul>
@@ -53,6 +63,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnClass(HealthIndicator.class)
+@ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class IntegrationConsumerHealthIndicator implements HealthIndicator {
 
     private static final String STATUS_CONNECTED = "CONNECTED";

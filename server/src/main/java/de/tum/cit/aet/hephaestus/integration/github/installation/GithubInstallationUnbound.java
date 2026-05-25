@@ -96,8 +96,34 @@ public class GithubInstallationUnbound {
     protected GithubInstallationUnbound() {
     }
 
+    /**
+     * Legacy 1-arg constructor — accepts null installer fields. Marked
+     * {@link Deprecated} so any new call site fails CI in the next pass and so the
+     * fail-closed `LegacyUnboundRowException` path is unreachable from new code.
+     * Existing callers (the abandoned webhook handler + the dormant lookup test path)
+     * stay compilable until the webhook handler population work lands and migrates
+     * them to {@link #GithubInstallationUnbound(long, long, String)}.
+     */
+    @Deprecated(forRemoval = true, since = "1198 Wave 9")
     public GithubInstallationUnbound(long installationId) {
         this.installationId = installationId;
+    }
+
+    /**
+     * Canonical constructor — requires the installer identity captured from the
+     * {@code installation.created} webhook's {@code sender.id} / {@code sender.login}.
+     * The bind endpoint's identity check refuses any row without these fields, so
+     * making them mandatory at construction prevents the regression where a writer
+     * "forgets" to populate the installer columns and silently re-opens the
+     * confused-deputy CVE closed in Wave 5.
+     */
+    public GithubInstallationUnbound(long installationId, long installerGithubUserId, String installerLogin) {
+        if (installerLogin == null || installerLogin.isBlank()) {
+            throw new IllegalArgumentException("installerLogin must be non-blank — required for audit/forensics");
+        }
+        this.installationId = installationId;
+        this.installerGithubUserId = installerGithubUserId;
+        this.installerLogin = installerLogin;
     }
 
 
@@ -117,6 +143,14 @@ public class GithubInstallationUnbound {
     public void setAccountType(@Nullable String accountType) { this.accountType = accountType; }
     public void setAvatarUrl(@Nullable String avatarUrl) { this.avatarUrl = avatarUrl; }
     public void setRepositories(String repositories) { this.repositories = repositories; }
+    /**
+     * Setter retained for the legacy constructor's bidirectional initialisation only.
+     * New code MUST pass the installer through
+     * {@link #GithubInstallationUnbound(long, long, String)} — the setter is
+     * scheduled for removal alongside the deprecated constructor.
+     */
+    @Deprecated(forRemoval = true, since = "1198 Wave 9")
     public void setInstallerGithubUserId(@Nullable Long id) { this.installerGithubUserId = id; }
+    @Deprecated(forRemoval = true, since = "1198 Wave 9")
     public void setInstallerLogin(@Nullable String login) { this.installerLogin = login; }
 }
