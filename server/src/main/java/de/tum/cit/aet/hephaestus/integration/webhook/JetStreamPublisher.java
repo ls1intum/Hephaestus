@@ -53,7 +53,6 @@ public class JetStreamPublisher {
         try {
             Retry.decorateCallable(retry, () -> publishOnce(request)).call();
             successCounter.increment();
-            log.debug("Published webhook to NATS: subject={} dedupId={}", request.subject(), request.dedupId());
         } catch (Exception e) {
             failureCounter.increment();
             throw new PublishFailedException(

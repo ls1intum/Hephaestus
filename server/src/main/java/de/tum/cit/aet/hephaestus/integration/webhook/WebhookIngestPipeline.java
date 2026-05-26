@@ -183,7 +183,7 @@ public class WebhookIngestPipeline {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Map.of("error", "publish-failed"));
         }
-        log.debug("Published {} webhook to NATS: subject={} dedupId={}", kind, sanitizeForLog(subject), sanitizeForLog(dedupId));
+        log.info("Published {} webhook to NATS: subject={} dedupId={}", kind, sanitizeForLog(subject), sanitizeForLog(dedupId));
         return ResponseEntity.accepted().body(Map.of("status", "ok"));
     }
 

@@ -600,9 +600,9 @@ public class IntegrationNatsConsumer {
                     stats.setNatsConnectionStatus(conn.getStatus().name());
                 }
                 if (conn != null && conn.getServerInfo() != null) {
-                    log.info("NATS connection event: type={}, port={}", type, conn.getServerInfo().getPort());
+                    log.debug("NATS connection event: type={}, port={}", type, conn.getServerInfo().getPort());
                 } else {
-                    log.info("NATS connection event: type={}", type);
+                    log.debug("NATS connection event: type={}", type);
                 }
             })
             .maxReconnects(-1)
