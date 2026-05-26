@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 @Tag("architecture")
 class LocaleSafetyArchTest extends HephaestusArchitectureTest {
 
-    private static final String WEBHOOK_PACKAGE = "..gitprovider.webhook..";
+    private static final String WEBHOOK_PACKAGE = "..integration.webhook..";
 
     @Test
     void noNakedToLowerCase() {

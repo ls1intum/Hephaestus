@@ -4,10 +4,10 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenService;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
 import java.time.Duration;
 import java.time.OffsetDateTime;

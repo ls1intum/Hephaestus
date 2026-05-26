@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.github.project.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.github.organization.dto.GitHubOrganizationEventDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.project.Project;
+import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import org.springframework.lang.Nullable;

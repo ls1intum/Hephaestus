@@ -24,7 +24,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;

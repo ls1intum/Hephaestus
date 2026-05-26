@@ -1,18 +1,18 @@
 package de.tum.cit.aet.hephaestus.integration.github.project;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.github.common.BaseGitHubProcessor;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.milestone.MilestoneRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.project.Project;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectItem;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectItemRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.milestone.MilestoneRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectItem;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectItemRepository;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectItemDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
 import java.util.List;
 import java.util.Set;

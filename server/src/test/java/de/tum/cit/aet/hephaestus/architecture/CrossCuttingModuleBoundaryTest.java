@@ -122,19 +122,19 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * Account module should not depend on gitprovider sync logic.
+         * Account module should not depend on integration.scm sync logic.
          *
          * <p>Account handles user sessions and preferences, not data sync.
          */
         @Test
-        @DisplayName("Account does not depend on gitprovider sync")
+        @DisplayName("Account does not depend on integration.scm sync")
         void accountDoesNotDependOnGitproviderSync() {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage("..account..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage("..gitprovider..sync..")
+                .resideInAPackage("..integration.scm.sync..")
                 .because("Account handles user management, not data sync");
             rule.check(classes);
         }
@@ -176,19 +176,19 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * Core package should not depend on gitprovider.
+         * Core package should not depend on integration.scm.
          *
          * <p>Core utilities should be git-provider agnostic.
          */
         @Test
-        @DisplayName("Core does not depend on gitprovider")
+        @DisplayName("Core does not depend on integration.scm")
         void coreDoesNotDependOnGitprovider() {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage("..core..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage("..gitprovider..")
+                .resideInAPackage("..integration.scm..")
                 .because("Core should be infrastructure-agnostic");
             rule.check(classes);
         }
@@ -213,7 +213,7 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
                     "..notification..",
                     "..profile..",
                     "..contributors..",
-                    "..gitprovider.."
+                    "..integration.scm.."
                 )
                 .because("Shared code should not depend on feature modules");
             rule.check(classes);
@@ -327,7 +327,7 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
                 .resideInAPackage("..workspace.validation..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..", "..activity..", "..mentor..", "..gitprovider..sync..")
+                .resideInAnyPackage("..leaderboard..", "..activity..", "..mentor..", "..integration.scm.sync..")
                 .because("Validation should be pure logic without external service dependencies");
             rule.check(classes);
         }

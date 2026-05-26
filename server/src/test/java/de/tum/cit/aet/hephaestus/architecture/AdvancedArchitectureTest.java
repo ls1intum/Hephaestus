@@ -379,7 +379,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                     String returnType = method.getRawReturnType().getName();
                     // Check if return type is in entity packages
                     if (
-                        returnType.contains(".gitprovider.") &&
+                        returnType.contains(".integration.scm.") &&
                         !returnType.endsWith("DTO") &&
                         !returnType.contains("ResponseEntity") &&
                         !returnType.contains("Void") &&
@@ -523,7 +523,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             // Recognized base classes that integration tests should extend
             java.util.Set<String> validBaseClasses = java.util.Set.of(
                 "de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest",
-                "de.tum.cit.aet.hephaestus.gitprovider.github.AbstractGitHubLiveSyncIntegrationTest",
+                "de.tum.cit.aet.hephaestus.integration.github.AbstractGitHubLiveSyncIntegrationTest",
                 "de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest"
             );
 

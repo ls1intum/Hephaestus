@@ -1,14 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreview;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -9,10 +9,10 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -22,26 +22,26 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlSyncCoor
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHRepositoryPermission;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHTeam;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHTeamConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHTeamMemberConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHTeamMemberEdge;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHTeamMemberRole;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHTeamPrivacy;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHTeamRepositoryConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHTeamRepositoryEdge;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHUser;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.team.Team;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRepositoryPermission;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHTeam;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHTeamConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHTeamMemberConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHTeamMemberEdge;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHTeamMemberRole;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHTeamPrivacy;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHTeamRepositoryConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHTeamRepositoryEdge;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHUser;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.github.team.dto.GitHubTeamEventDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.team.membership.TeamMembership;
-import de.tum.cit.aet.hephaestus.gitprovider.team.membership.TeamMembershipRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
+import de.tum.cit.aet.hephaestus.integration.scm.team.membership.TeamMembership;
+import de.tum.cit.aet.hephaestus.integration.scm.team.membership.TeamMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.team.permission.TeamRepositoryPermission;
 import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
@@ -502,7 +502,7 @@ public class GitHubTeamSyncService {
 
             // Convert GraphQL User to GitHubUserDTO and ensure user exists
             GitHubUserDTO userDTO = convertUserToDTO(graphQlUser);
-            de.tum.cit.aet.hephaestus.gitprovider.user.User user = userProcessor.ensureExists(
+            de.tum.cit.aet.hephaestus.integration.scm.user.User user = userProcessor.ensureExists(
                 userDTO,
                 team.getProvider().getId()
             );

@@ -2,14 +2,14 @@ package de.tum.cit.aet.hephaestus.workspace.settings;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelInfoDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.team.Team;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.label.LabelInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.team.TeamRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;

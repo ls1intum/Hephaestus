@@ -1,14 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.label;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.LabelIdUtils;
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.LabelIdUtils;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.label.dto.GitLabLabelDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;

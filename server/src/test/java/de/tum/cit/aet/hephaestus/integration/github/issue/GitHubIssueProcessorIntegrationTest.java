@@ -2,28 +2,28 @@ package de.tum.cit.aet.hephaestus.integration.github.issue;
 
 import static org.assertj.core.api.Assertions.*;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.GitHubIssueTypeDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.issuetype.IssueType;
-import de.tum.cit.aet.hephaestus.gitprovider.issuetype.IssueTypeRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueType;
+import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueTypeRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.milestone.Milestone;
-import de.tum.cit.aet.hephaestus.gitprovider.milestone.MilestoneRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.milestone.Milestone;
+import de.tum.cit.aet.hephaestus.integration.scm.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.github.milestone.dto.GitHubMilestoneDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -1292,8 +1292,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             existing = issueRepository.save(existing);
 
             // Create a label and associate it with the issue
-            de.tum.cit.aet.hephaestus.gitprovider.label.Label label =
-                new de.tum.cit.aet.hephaestus.gitprovider.label.Label();
+            de.tum.cit.aet.hephaestus.integration.scm.label.Label label =
+                new de.tum.cit.aet.hephaestus.integration.scm.label.Label();
             label.setNativeId(100001L);
             label.setProvider(githubProvider);
             label.setName("bug");

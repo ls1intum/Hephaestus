@@ -32,7 +32,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  *   <li><b>Webhook deregistration:</b> Best-effort cleanup during workspace purge</li>
  * </ol>
  *
- * <p>All GitLab API calls are delegated to clients in {@code gitprovider.common.gitlab}.
+ * <p>All GitLab API calls are delegated to clients in {@code integration.scm.common.gitlab}.
  * This service handles idempotency, entity updates, and error handling.
  *
  * <p>Dependencies are injected via {@link ObjectProvider} to gracefully handle cases

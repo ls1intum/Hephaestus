@@ -5,10 +5,10 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitAuthorResolver;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.util.CommitUtils;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitAuthorResolver;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.util.CommitUtils;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.RepositoryRef;
@@ -18,8 +18,8 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientPr
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlSyncCoordinator;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.time.Duration;

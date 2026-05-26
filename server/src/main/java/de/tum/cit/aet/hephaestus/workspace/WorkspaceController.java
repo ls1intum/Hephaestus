@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamInfoDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.team.TeamInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserTeamsDTO;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireWorkspaceOwner;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;

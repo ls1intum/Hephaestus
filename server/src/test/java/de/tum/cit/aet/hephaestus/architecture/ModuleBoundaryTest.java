@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
  *
  * <h2>Architecture: Modular Monolith with Multi-Provider Support</h2>
  * <ul>
- *   <li><b>gitprovider</b> - Shared kernel for git provider data sync (GitHub now, GitLab coming)</li>
+ *   <li><b>integration.scm</b> - Shared kernel for git provider data sync (GitHub now, GitLab coming)</li>
  *   <li><b>workspace</b> - Cross-cutting context (multi-tenancy)</li>
  *   <li><b>Feature modules</b> - leaderboard, activity, mentor, profile depend on both</li>
  *   <li><b>Provider subpackages</b> - github/ and (future) gitlab/ isolate provider-specific logic</li>
@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
  *
  * <h2>Key Boundaries Enforced</h2>
  * <ol>
- *   <li><b>gitprovider isolation</b> - Cannot depend on feature modules (uses SPI for callbacks)</li>
+ *   <li><b>integration.scm isolation</b> - Cannot depend on feature modules (uses SPI for callbacks)</li>
  *   <li><b>SPI pattern</b> - integration.spi defines contracts; workspace.adapter implements</li>
  *   <li><b>Provider isolation</b> - GitHub-specific classes must be in github/ subpackages</li>
  *   <li><b>Domain events</b> - Cross-cutting concerns via events, not direct coupling</li>
@@ -72,10 +72,10 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * Adapters in workspace.adapter should implement SPI interfaces.
          *
          * <p>The workspace module bridges workspace-specific data (tokens, targets)
-         * to the gitprovider sync engine via adapter implementations.
+         * to the integration.scm sync engine via adapter implementations.
          */
         @Test
-        @DisplayName("Workspace adapters implement gitprovider SPIs")
+        @DisplayName("Workspace adapters implement integration.spi SPIs")
         void workspaceAdaptersImplementSpis() {
             ArchRule rule = classes()
                 .that()
@@ -92,7 +92,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .haveSimpleNameNotEndingWith("Test")
                 .should()
                 .implement(JavaClass.Predicates.resideInAPackage("..spi.."))
-                .because("Workspace adapters bridge workspace context to gitprovider via SPIs");
+                .because("Workspace adapters bridge workspace context to integration.scm via SPIs");
             rule.check(classes);
         }
 
@@ -133,17 +133,17 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         /**
          * Gitprovider should not depend on feature modules.
          *
-         * <p>The gitprovider is the core ETL engine for git data sync.
+         * <p>The integration.scm is the core ETL engine for git data sync.
          * It should not have direct dependencies on workspace, leaderboard,
          * or other feature modules - only on SPIs in {@code integration.spi}
          * that they implement.
          */
         @Test
         @DisplayName("Gitprovider does not depend on workspace internals")
-        void gitproviderDoesNotDependOnWorkspace() {
+        void scmDoesNotDependOnWorkspace() {
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..gitprovider..")
+                .resideInAPackage("..integration.scm..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..workspace..")
@@ -154,17 +154,17 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         /**
          * Gitprovider should not depend on feature modules.
          *
-         * <p>This is the SINGLE SOURCE OF TRUTH for gitprovider isolation.
+         * <p>This is the SINGLE SOURCE OF TRUTH for integration.scm isolation.
          * Cross-cutting concerns should be handled via domain events, not direct dependencies.
          *
          * <p>CRITICAL: Keep this list in sync with the actual feature modules.
          */
         @Test
         @DisplayName("Gitprovider does not depend on feature modules")
-        void gitproviderDoesNotDependOnFeatureModules() {
+        void scmDoesNotDependOnFeatureModules() {
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..gitprovider..")
+                .resideInAPackage("..integration.scm..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage(
@@ -194,7 +194,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .that()
                 .haveSimpleNameStartingWith("GitHub")
                 .and()
-                .resideInAPackage("..gitprovider..")
+                .resideInAPackage("..integration.scm..")
                 .and()
                 .resideOutsideOfPackage("..sync..") // Sync orchestrators can dispatch to providers
                 .should()
@@ -217,7 +217,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          *
          * <p>Events enable loose coupling between modules. Our cross-vendor
          * domain events live in {@code integration.events} (post-#1198) and
-         * the legacy {@code gitprovider} module no longer hosts any event
+         * the legacy {@code integration.scm} module no longer hosts any event
          * classes. Activity events are in the activity module and use the
          * activity_event ledger for persistence. Generated GraphQL model
          * classes ending in 'Event' are excluded.
@@ -229,7 +229,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .that()
                 .haveSimpleNameEndingWith("Event")
                 .and()
-                .resideInAPackage("..gitprovider..")
+                .resideInAPackage("..integration.scm..")
                 .and()
                 .resideOutsideOfPackage("..graphql..") // Exclude generated GraphQL model
                 .and()
@@ -372,31 +372,31 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
     class SpiBypassDetectionTests {
 
         /**
-         * Feature modules should only depend on gitprovider's public contracts.
+         * Feature modules should only depend on integration.scm's public contracts.
          *
          * <p>Feature modules (leaderboard, activity, profile, practices) must NOT bypass
-         * the SPI layer and directly depend on gitprovider internals like:
+         * the SPI layer and directly depend on integration.scm internals like:
          * <ul>
-         *   <li>gitprovider.sync - internal sync orchestration</li>
-         *   <li>gitprovider.installation - internal installation management</li>
-         *   <li>gitprovider.common.github - GitHub-specific internal code</li>
+         *   <li>integration.scm.sync - internal sync orchestration</li>
+         *   <li>integration.github.installation - internal installation management</li>
+         *   <li>integration.scm.common.github - GitHub-specific internal code</li>
          * </ul>
          *
          * <p>They SHOULD depend on:
          * <ul>
          *   <li>integration.spi - Service Provider Interfaces (post-#1198)</li>
          *   <li>integration.events - Cross-vendor domain events (post-#1198)</li>
-         *   <li>gitprovider entity packages (for reading data)</li>
+         *   <li>integration.scm entity packages (for reading data)</li>
          * </ul>
          */
         @Test
-        @DisplayName("Feature modules do not bypass gitprovider SPIs")
-        void featureModulesDoNotBypassGitproviderSpis() {
+        @DisplayName("Feature modules do not bypass integration.spi SPIs")
+        void featureModulesDoNotBypassScmSpis() {
             // Internal packages that should NOT be accessed directly by feature modules
             String[] forbiddenInternalPackages = {
-                "..gitprovider.sync..",
-                "..gitprovider.installation..",
-                "..gitprovider.common.github..",
+                "..integration.scm.sync..",
+                "..integration.github.installation..",
+                "..integration.github..",
             };
 
             ArchRule rule = noClasses()
@@ -406,7 +406,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .dependOnClassesThat()
                 .resideInAnyPackage(forbiddenInternalPackages)
                 .because(
-                    "Feature modules should depend on gitprovider SPIs (..spi..), DTOs (..dto..), " +
+                    "Feature modules should depend on integration.scm SPIs (..spi..), DTOs (..dto..), " +
                         "or events (..events..) - not internal packages like sync or installation"
                 );
             rule.check(classes);
@@ -415,19 +415,19 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         /**
          * Verifies that feature modules use the SPI pattern correctly.
          *
-         * <p>When feature modules need to provide functionality to gitprovider (callbacks,
+         * <p>When feature modules need to provide functionality to integration.scm (callbacks,
          * context providers), they should implement SPIs defined in integration.spi,
          * not create ad-hoc coupling.
          */
         @Test
-        @DisplayName("Feature modules do not depend on gitprovider GitHub service implementations")
+        @DisplayName("Feature modules do not depend on integration.scm GitHub service implementations")
         void featureModulesDoNotDependOnGitHubServiceImplementations() {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage("..gitprovider..github..service..")
+                .resideInAPackage("..integration.github..")
                 .because("Feature modules should use SPIs, not depend on provider-specific service implementations");
             rule.check(classes);
         }
@@ -479,7 +479,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * Mentor module should only depend on gitprovider and shared modules.
+         * Mentor module should only depend on integration.scm and shared modules.
          *
          * <p>Mentor is a standalone feature that consumes pull request data.
          */
@@ -503,14 +503,14 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * or depend on the sync engine internals.
          */
         @Test
-        @DisplayName("Profile does not depend on gitprovider sync internals")
+        @DisplayName("Profile does not depend on integration.scm sync internals")
         void profileDoesNotDependOnSyncInternals() {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage("..profile..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..gitprovider..sync..", "..gitprovider..github..service..")
+                .resideInAnyPackage("..integration.scm.sync..", "..integration.github..")
                 .because("Profile should only read data, not depend on sync internals");
             rule.check(classes);
         }

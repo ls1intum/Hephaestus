@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import java.time.Instant;
 import java.util.List;
@@ -36,7 +36,7 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
                 JOIN RepositoryToMonitor rtm1 ON rtm1.nameWithOwner = p1.repository.nameWithOwner
                 WHERE p1.author.id = :userId
                   AND rtm1.workspace.id = :workspaceId
-                  AND p1.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN), 0L),
+                  AND p1.state = de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN), 0L),
             COALESCE((SELECT COUNT(p2)
                 FROM PullRequest p2
                 JOIN RepositoryToMonitor rtm2 ON rtm2.nameWithOwner = p2.repository.nameWithOwner
@@ -59,7 +59,7 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
                 WHERE TYPE(i) = Issue
                   AND i.author.id = :userId
                   AND rtmi.workspace.id = :workspaceId
-                  AND i.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN), 0L),
+                  AND i.state = de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN), 0L),
             COALESCE((SELECT COUNT(r1)
                 FROM PullRequestReview r1
                 JOIN RepositoryToMonitor rtmr1 ON rtmr1.nameWithOwner = r1.pullRequest.repository.nameWithOwner
@@ -86,14 +86,14 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
                 JOIN prr.requestedReviewers reviewer
                 WHERE reviewer.id = :userId
                   AND rtmpr.workspace.id = :workspaceId
-                  AND prr.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN), 0L),
+                  AND prr.state = de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN), 0L),
             COALESCE((SELECT COUNT(t)
                 FROM PullRequestReviewThread t
                 JOIN RepositoryToMonitor rtmt ON rtmt.nameWithOwner = t.pullRequest.repository.nameWithOwner
                 WHERE t.pullRequest.author.id = :userId
                   AND rtmt.workspace.id = :workspaceId
-                  AND t.pullRequest.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN
-                  AND t.state = de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED), 0L)
+                  AND t.pullRequest.state = de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN
+                  AND t.state = de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED), 0L)
         )
         FROM User u
         WHERE u.id = :userId
@@ -118,7 +118,7 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
         LEFT JOIN FETCH i.milestone
         WHERE a.id = :userId
           AND rtm.workspace.id = :workspaceId
-          AND i.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN
+          AND i.state = de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN
         ORDER BY i.createdAt DESC
         """
     )
@@ -135,7 +135,7 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
         LEFT JOIN FETCH p.repository
         WHERE reviewer.id = :userId
           AND rtm.workspace.id = :workspaceId
-          AND p.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN
+          AND p.state = de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN
         ORDER BY p.createdAt DESC
         """
     )

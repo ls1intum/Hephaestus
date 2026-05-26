@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

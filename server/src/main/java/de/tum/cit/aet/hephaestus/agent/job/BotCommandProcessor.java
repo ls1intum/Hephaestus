@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionReques
 import de.tum.cit.aet.hephaestus.integration.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;

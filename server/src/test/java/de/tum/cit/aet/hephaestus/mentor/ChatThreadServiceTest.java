@@ -6,8 +6,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Optional;

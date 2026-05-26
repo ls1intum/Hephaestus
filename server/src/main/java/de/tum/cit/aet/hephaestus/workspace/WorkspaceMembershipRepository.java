@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Collection;
 import java.util.List;

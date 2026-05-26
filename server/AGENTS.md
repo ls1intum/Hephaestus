@@ -87,13 +87,19 @@ src/main/java/de/tum/cit/aet/hephaestus/
 ├── Application.java              # Entry point (@SpringBootApplication)
 ├── config/                       # @Configuration beans
 ├── workspace/                    # Multi-tenant workspace management
-├── gitprovider/                  # GitHub API integration
-│   ├── common/                   # Base entities, converters
-│   ├── pullrequest/              # PR entity, sync service
-│   ├── issue/                    # Issue entity (PR inherits from Issue)
-│   ├── user/                     # GitHub user sync
-│   ├── team/                     # Team management
-│   └── sync/                     # Data synchronization orchestration
+├── integration/                  # Unified integration framework
+│   ├── scm/                      # Provider-agnostic git domain (PR, issue, review, …)
+│   │   ├── common/               # Base entities, converters
+│   │   ├── pullrequest/          # PR entity, sync service
+│   │   ├── issue/                # Issue entity (PR inherits from Issue)
+│   │   ├── user/                 # Git user sync
+│   │   ├── team/                 # Team management
+│   │   └── sync/                 # Data synchronization orchestration
+│   ├── github/                   # GitHub vendor adapter (REST + GraphQL + webhook ingest)
+│   ├── gitlab/                   # GitLab vendor adapter (REST + GraphQL + webhook ingest)
+│   ├── slack/                    # Slack adapter
+│   ├── outline/                  # Outline adapter
+│   └── webhook/                  # Shared inbound webhook substrate (all kinds)
 ├── leaderboard/                  # Scoring, rankings, league points
 ├── activity/                     # Activity tracking (XP, leaderboard gamification)
 ├── mentor/                       # AI mentor (in-process Pi agent)

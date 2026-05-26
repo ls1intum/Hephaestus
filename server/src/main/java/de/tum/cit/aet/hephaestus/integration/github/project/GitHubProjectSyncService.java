@@ -12,10 +12,10 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.Category;
@@ -25,19 +25,19 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
 import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2Connection;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfigurationConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2StatusUpdate;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2StatusUpdateConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.project.Project;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectItem;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2Connection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2FieldConfiguration;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2FieldConfigurationConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2Item;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2StatusUpdate;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2StatusUpdateConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectItem;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectDTO;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldDTO;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldValueDTO;
@@ -117,7 +117,7 @@ import reactor.util.retry.Retry;
  * the returned {@link SyncResult} includes phase-level success/failure information for monitoring.
  *
  * @see de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants
- * @see de.tum.cit.aet.hephaestus.gitprovider.project.Project.OwnerType
+ * @see de.tum.cit.aet.hephaestus.integration.scm.project.Project.OwnerType
  * @see de.tum.cit.aet.hephaestus.integration.github.project.GitHubProjectItemSyncService
  */
 @Slf4j

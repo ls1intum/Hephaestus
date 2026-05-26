@@ -8,18 +8,18 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEvent;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivityTargetType;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileReviewActivityDTO;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceContributionActivityService;
@@ -42,7 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  *
  * <p>Tests verify the CQRS pattern: ActivityEvent is the source of truth for
  * what activity exists (same as leaderboard), with entity details hydrated
- * from gitprovider tables.
+ * from integration.scm tables.
  */
 @Tag("unit")
 @DisplayName("UserProfileService")
@@ -116,7 +116,7 @@ class UserProfileServiceTest {
     class CqrsArchitectureTests {
 
         @Test
-        @DisplayName("queries ActivityEvent first then hydrates from gitprovider")
+        @DisplayName("queries ActivityEvent first then hydrates from integration.scm")
         void queriesActivityEventFirstThenHydrates() {
             // Arrange
             User user = createUser(USER_ID, USER_LOGIN);
@@ -141,7 +141,7 @@ class UserProfileServiceTest {
                 )
             ).thenReturn(List.of(event));
 
-            // Hydrate review details from gitprovider
+            // Hydrate review details from integration.scm
             when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(400L))).thenReturn(List.of(review));
 
             // Mock assembler
@@ -161,7 +161,7 @@ class UserProfileServiceTest {
                 any()
             );
 
-            // Verify entity hydrated from gitprovider
+            // Verify entity hydrated from integration.scm
             verify(pullRequestReviewRepository).findAllByIdWithRelations(Set.of(400L));
 
             // Verify assembler was called with XP from ActivityEvent
@@ -287,7 +287,7 @@ class UserProfileServiceTest {
                 )
             ).thenReturn(List.of(event));
 
-            // Entity not found in gitprovider
+            // Entity not found in integration.scm
             when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(999L))).thenReturn(List.of());
 
             // Act

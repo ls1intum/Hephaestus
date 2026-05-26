@@ -7,14 +7,14 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@link java.util.HexFormat#of()} is the only approved hex source inside {@code gitprovider.webhook}.
+ * {@link java.util.HexFormat#of()} is the only approved hex source inside {@code integration.webhook}.
  * {@code Integer/Long.toHexString} drop leading zeros (e.g. {@code 0x0a → "a"}), silently
  * corrupting dedup IDs and HMAC signatures.
  */
 @Tag("architecture")
 class HexEncodingArchTest extends HephaestusArchitectureTest {
 
-    private static final String WEBHOOK_PACKAGE = "..gitprovider.webhook..";
+    private static final String WEBHOOK_PACKAGE = "..integration.webhook..";
 
     @Test
     void noIntegerToHexStringCall() {

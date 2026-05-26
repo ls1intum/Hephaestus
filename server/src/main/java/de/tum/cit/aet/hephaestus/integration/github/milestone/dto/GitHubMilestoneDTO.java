@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.github.milestone.dto;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.uriToString;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHMilestone;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHMilestoneState;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHMilestone;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHMilestoneState;
 import java.time.Instant;
 import org.springframework.lang.Nullable;
 

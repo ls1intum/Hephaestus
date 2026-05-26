@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlPaginationHelper.PaginationRequest;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlPaginationHelper.PaginationResult;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlPaginationHelper.TerminationReason;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPageInfo;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;

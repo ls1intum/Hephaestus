@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;

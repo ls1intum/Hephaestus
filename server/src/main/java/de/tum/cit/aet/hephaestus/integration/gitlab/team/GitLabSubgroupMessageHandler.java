@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.team;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabDescendantGroupResponse;

@@ -6,9 +6,9 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.RepositoryNotFoundOnGitProviderException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.RepositoryNotFoundOnGitProviderException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -19,14 +19,14 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubRepositoryNameP
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHOrganization;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHRepositoryOwner;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHUser;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHOrganization;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRepositoryOwner;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHUser;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;

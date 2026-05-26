@@ -144,7 +144,7 @@ hephaestus:
     #     Setting false silences all @Scheduled methods and prevents workspace bootstrap.
     #   worker  — WIRED. Gates DockerSandboxConfiguration + AgentNatsConsumerConfig.
     #     Setting false removes the Docker sandbox runtime + agent NATS pull consumer.
-    #   webhook — WIRED. Gates the gitprovider.webhook receiver (controllers, HMAC
+    #   webhook — WIRED. Gates the integration.webhook receiver (controllers, HMAC
     #     verifier, JetStream publisher, stream bootstrap, health, lifecycle).
     #     The webhook-server production container deploys with server=false + worker=false
     #     + webhook=true so it runs webhook reception in isolation — restart-independent
@@ -516,7 +516,7 @@ hephaestus:
     # Single `hephaestus.webhook` block consumed by both webhook sides (ADR 0008):
     #   - workspace.GitLabWebhookService reads external-url, secret, token-rotation.* for
     #     auto-registration with the provider.
-    #   - gitprovider.webhook.* reads secret (HMAC / token verification) and the nested
+    #   - integration.webhook.* reads secret (HMAC / token verification) and the nested
     #     publish/stream/http blocks for the inbound receiver.
     # `secret` is shared by design — same value registered with the provider and used
     # to verify incoming bodies. The receiver runs in the `webhook-server` container.
@@ -526,7 +526,7 @@ hephaestus:
         token-rotation:
             threshold-days: ${WEBHOOK_TOKEN_ROTATION_THRESHOLD_DAYS:7}
             validity-days: ${WEBHOOK_TOKEN_ROTATION_VALIDITY_DAYS:90}
-        # ─── Inbound receiver (gitprovider.webhook.*) ───
+        # ─── Inbound receiver (integration.webhook.*) ───
         publish:
             timeout: 9s          # fits within GitHub's 10s response budget
             max-retries: 5

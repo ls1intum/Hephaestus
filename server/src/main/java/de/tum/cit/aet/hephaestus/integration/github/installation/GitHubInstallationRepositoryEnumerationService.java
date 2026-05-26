@@ -26,7 +26,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * not a design choice.
  * <p>
  * Similarly, installation token minting ({@code POST /app/installations/{id}/access_tokens})
- * is REST-only. These are the only REST endpoints in the gitprovider layer.
+ * is REST-only. These are the only REST endpoints in the integration.scm layer.
  *
  * @see <a href="https://docs.github.com/en/rest/apps/installations#list-repositories-accessible-to-the-app-installation">GitHub REST API - List installation repositories</a>
  */

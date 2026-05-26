@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import org.springframework.lang.NonNull;
 
 /** Immutable leaderboard XP + activity breakdown for a single user. Use {@link Builder} to hydrate from multiple projections. */

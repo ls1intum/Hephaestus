@@ -4,7 +4,7 @@
  * <ul>
  *   <li>{@code workspace.GitLabWebhookService} — auto-registers webhooks with GitLab using
  *       {@code externalUrl} and {@code secret}; rotates PATs per {@code tokenRotation}.</li>
- *   <li>{@code gitprovider.webhook.*} — verifies incoming bodies against {@code secret} and
+ *   <li>{@code integration.webhook.*} — verifies incoming bodies against {@code secret} and
  *       publishes to JetStream per {@code publish}, {@code stream}, {@code shutdown}.</li>
  * </ul>
  *

@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.config.jackson;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2Field;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2IterationField;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2SingleSelectField;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2Field;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2IterationField;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2SingleSelectField;
 
 /**
  * Jackson mixin for GitHub GraphQL ProjectV2FieldConfiguration union type.

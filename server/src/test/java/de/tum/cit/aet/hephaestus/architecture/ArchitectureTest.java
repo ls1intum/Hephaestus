@@ -50,19 +50,19 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * make testing difficult, and prevent independent deployment.
          * This is one of the most important architectural constraints.
          *
-         * <p><b>Slice assignment note:</b> Per epic #1198 the legacy
-         * {@code gitprovider} package (entities, JPA repositories, SPI, sync
-         * orchestrator) and the unified {@code integration} package
-         * (per-vendor handlers, Connection registry) form a single SCM
-         * platform kernel. The {@code workspace} module is bidirectionally
+         * <p><b>Slice assignment note:</b> Per epic #1198 the {@code integration}
+         * package (provider-agnostic SCM kernel under {@code integration.scm},
+         * per-vendor handlers under {@code integration.github} /
+         * {@code integration.gitlab}, cross-cutting traits, Connection registry)
+         * forms a single platform kernel. The {@code workspace} module is bidirectionally
          * coupled to that kernel by design: workspace owns Connection rows
          * (integration → workspace via {@code Connection.workspace}) and
-         * provisions/queries SCM data (workspace → integration/gitprovider
+         * provisions/queries SCM data (workspace → integration.scm
          * for entities, properties, and rate-limit tooling). Collapsing the
-         * three top-level packages into a single {@code platform} slice
-         * models the post-epic architecture and prevents the gitprovider
-         * rename from mechanically tripping a cycle that pre-existed at
-         * the FQN level. Cross-platform-internal cycles are still policed
+         * two top-level packages into a single {@code platform} slice
+         * models the post-epic architecture and prevents the integration.scm →
+         * integration.scm rename from mechanically tripping a cycle that
+         * pre-existed at the FQN level. Cross-platform-internal cycles are still policed
          * by the more specific tests in {@code ModuleBoundaryTest} and
          * {@code CrossCuttingModuleBoundaryTest}.
          */
@@ -79,8 +79,8 @@ class ArchitectureTest extends HephaestusArchitectureTest {
                     String tail = pkg.substring(BASE_PACKAGE.length() + 1);
                     int dot = tail.indexOf('.');
                     String top = dot < 0 ? tail : tail.substring(0, dot);
-                    // gitprovider + integration + workspace = post-epic platform kernel.
-                    if ("gitprovider".equals(top) || "integration".equals(top) || "workspace".equals(top)) {
+                    // integration + workspace = post-epic platform kernel.
+                    if ("integration".equals(top) || "workspace".equals(top)) {
                         return SliceIdentifier.of("platform");
                     }
                     return SliceIdentifier.of(top);
@@ -88,7 +88,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
 
                 @Override
                 public String getDescription() {
-                    return "top-level slice (gitprovider+integration+workspace folded into platform during #1198)";
+                    return "top-level slice (integration+workspace folded into platform during #1198)";
                 }
             };
 
@@ -135,15 +135,15 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * within their respective feature modules.
          */
         @Test
-        @DisplayName("SPI interfaces are not added under gitprovider.common")
+        @DisplayName("SPI interfaces are not added under integration.scm.common")
         void spiInterfacesAreInSpiPackage() {
-            // Post-#1198: the legacy gitprovider.common.spi package has been
+            // Post-#1198: the legacy integration.scm.common.spi package has been
             // dissolved into integration.spi. This rule prevents Provider/
             // Resolver/Listener interfaces from creeping back into the
-            // gitprovider module by name.
+            // integration.scm module by name.
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..gitprovider.common..")
+                .resideInAPackage("..integration.scm.common..")
                 .and()
                 .areInterfaces()
                 .should()

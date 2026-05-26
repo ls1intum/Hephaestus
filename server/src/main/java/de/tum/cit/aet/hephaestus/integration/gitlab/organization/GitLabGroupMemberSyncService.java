@@ -6,9 +6,9 @@ import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncCons
 import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.adaptPageSize;
 import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.extractNumericId;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
@@ -19,11 +19,11 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupMe
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMemberRole;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMemberRole;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.user.GitLabUserClassifier;
 import java.util.HashSet;
 import java.util.List;

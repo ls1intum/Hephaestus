@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.profile;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -11,8 +11,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Lives in the profile package (not gitprovider) because it joins gitprovider entities
- * with workspace entities (RepositoryToMonitor) — the gitprovider package must not
+ * Lives in the profile package (not integration.scm) because it joins integration.scm entities
+ * with workspace entities (RepositoryToMonitor) — the integration.scm package must not
  * depend on workspace entities.
  */
 @Repository
@@ -45,7 +45,7 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
         WHERE p.author.id IN :authorIds
-            AND p.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue$State.OPEN
+            AND p.state = de.tum.cit.aet.hephaestus.integration.scm.issue.Issue$State.OPEN
             AND p.createdAt >= :since
             AND p.createdAt < :until
             AND rtm.workspace.id = :workspaceId
@@ -70,7 +70,7 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
                 WHERE tm.user = p.author
                 AND tm.team.id IN :teamIds
             )
-            AND p.state = de.tum.cit.aet.hephaestus.gitprovider.issue.Issue$State.OPEN
+            AND p.state = de.tum.cit.aet.hephaestus.integration.scm.issue.Issue$State.OPEN
             AND p.createdAt >= :since
             AND p.createdAt < :until
             AND rtm.workspace.id = :workspaceId

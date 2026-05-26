@@ -1,14 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.github.project;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.project.Project;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectStatusUpdate;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectStatusUpdateRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectStatusUpdate;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectStatusUpdateRepository;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectStatusUpdateDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

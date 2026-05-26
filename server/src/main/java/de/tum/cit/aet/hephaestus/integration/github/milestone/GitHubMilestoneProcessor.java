@@ -1,15 +1,15 @@
 package de.tum.cit.aet.hephaestus.integration.github.milestone;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.milestone.Milestone;
-import de.tum.cit.aet.hephaestus.gitprovider.milestone.MilestoneRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.milestone.Milestone;
+import de.tum.cit.aet.hephaestus.integration.scm.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.github.milestone.dto.GitHubMilestoneDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.time.Instant;

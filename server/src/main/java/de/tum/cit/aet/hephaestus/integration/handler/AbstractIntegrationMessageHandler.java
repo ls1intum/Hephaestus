@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.handler;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.PayloadParsingException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.PayloadParsingException;
 import de.tum.cit.aet.hephaestus.integration.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import io.nats.client.Message;

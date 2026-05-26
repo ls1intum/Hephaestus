@@ -3,20 +3,20 @@ package de.tum.cit.aet.hephaestus.activity;
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.project.Project;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -1586,7 +1586,7 @@ public class ActivityEventListener {
      * @return Repository reference if repository-scoped, null otherwise
      */
     @Nullable
-    private de.tum.cit.aet.hephaestus.gitprovider.repository.Repository getRepositoryForProject(
+    private de.tum.cit.aet.hephaestus.integration.scm.repository.Repository getRepositoryForProject(
         EventPayload.ProjectData projectData
     ) {
         if (projectData.ownerType() == Project.OwnerType.REPOSITORY) {
@@ -1597,7 +1597,7 @@ public class ActivityEventListener {
     }
 
     @Nullable
-    private de.tum.cit.aet.hephaestus.gitprovider.repository.Repository resolveRepositoryForProjectId(
+    private de.tum.cit.aet.hephaestus.integration.scm.repository.Repository resolveRepositoryForProjectId(
         @Nullable Long projectId
     ) {
         if (projectId == null) {
@@ -1614,7 +1614,7 @@ public class ActivityEventListener {
     }
 
     @Nullable
-    private de.tum.cit.aet.hephaestus.gitprovider.repository.Repository resolveRepositoryForProjectItem(
+    private de.tum.cit.aet.hephaestus.integration.scm.repository.Repository resolveRepositoryForProjectItem(
         EventPayload.ProjectItemData itemData,
         @Nullable Long projectId
     ) {
@@ -1680,7 +1680,7 @@ public class ActivityEventListener {
     }
 
     /**
-     * Handle commit author reconciliation events emitted by the gitprovider module
+     * Handle commit author reconciliation events emitted by the integration.scm module
      * after commit author identities have been resolved (via email lookup, provider
      * user API, or server-side author harvest) for a repository.
      *

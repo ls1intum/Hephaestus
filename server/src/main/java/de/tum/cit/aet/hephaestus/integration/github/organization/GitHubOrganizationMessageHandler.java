@@ -2,14 +2,14 @@ package de.tum.cit.aet.hephaestus.integration.github.organization;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener.MembershipChangedEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMemberRole;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMemberRole;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.organization.dto.GitHubOrganizationEventDTO;

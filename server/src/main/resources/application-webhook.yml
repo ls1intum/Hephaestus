@@ -1,5 +1,5 @@
 # Activated by SPRING_PROFILES_ACTIVE=prod,webhook on the webhook-server container.
-# Keeps the gitprovider.webhook beans + the NATS Connection bean; disables every
+# Keeps the integration.webhook beans + the NATS Connection bean; disables every
 # server-only and worker-only cluster so an application-server restart cannot
 # interrupt webhook reception (push events are not manually redeliverable).
 # See ADR 0008 for the gated bean inventory.
@@ -34,4 +34,4 @@ hephaestus:
 
 logging:
     level:
-        de.tum.cit.aet.hephaestus.gitprovider.webhook: INFO
+        de.tum.cit.aet.hephaestus.integration.webhook: INFO

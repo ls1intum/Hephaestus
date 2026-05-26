@@ -10,8 +10,8 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
@@ -22,12 +22,12 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubRepositoryNameP
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssueCommentConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssueCommentConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

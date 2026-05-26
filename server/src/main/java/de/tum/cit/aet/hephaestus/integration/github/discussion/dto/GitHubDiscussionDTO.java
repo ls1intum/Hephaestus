@@ -1,14 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.github.discussion.dto;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.uriToString;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.github.discussioncomment.dto.GitHubDiscussionCommentDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHDiscussion;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHDiscussionStateReason;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHLockReason;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHDiscussion;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHDiscussionStateReason;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHLockReason;
 import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.time.Instant;

@@ -71,7 +71,7 @@ public class WorkspaceScopeFilter {
     /**
      * Check if a workspace is allowed by its ID.
      * When only workspace ID is available and no org filter is active, returns true.
-     * This is used by gitprovider services that don't have direct access to Workspace entities.
+     * This is used by integration.scm services that do not have direct access to Workspace entities.
      *
      * @param workspaceId the workspace ID
      * @return true if allowed (or if org filter is not active)

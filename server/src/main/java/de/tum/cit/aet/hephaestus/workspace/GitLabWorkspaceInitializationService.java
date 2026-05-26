@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
@@ -9,10 +9,10 @@ import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncType;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabSyncResult;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
@@ -52,8 +52,8 @@ import org.springframework.transaction.annotation.Transactional;
  * </ol>
  *
  * <p>This service is intentionally in the {@code workspace} package because it bridges
- * workspace lifecycle (creation/activation) with gitprovider sync services. The dependency
- * direction is always {@code workspace → gitprovider}, never the reverse.
+ * workspace lifecycle (creation/activation) with integration.scm sync services. The dependency
+ * direction is always {@code workspace → integration.scm}, never the reverse.
  *
  * <p><b>Transaction note:</b> {@link #linkWorkspaceToOrganization} is {@code @Transactional}
  * and {@code public} so that Spring's proxy intercepts calls from the non-transactional

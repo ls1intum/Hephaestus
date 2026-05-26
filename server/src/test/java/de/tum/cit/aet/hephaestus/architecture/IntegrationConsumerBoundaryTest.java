@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
  * Locks the post-Slice-D consumer surface in place.
  *
  * <ol>
- *   <li>{@code gitprovider/sync/} is emptied of all non-{@code backfill} production code.
+ *   <li>{@code integration/scm/sync/} is emptied of all non-{@code backfill} production code.
  *       The unified consumer fleet lives under {@code integration/consumer/}; per-kind
  *       sync drivers live under {@code integration/<kind>/sync/}. New code in the legacy
  *       package would re-grow the boulder this slice spent dissolving.</li>
@@ -30,30 +30,30 @@ import org.junit.jupiter.api.Test;
 @Tag("architecture")
 class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
 
-    /** Packages allowed to remain under {@code gitprovider/sync/}. */
+    /** Packages allowed to remain under {@code integration/scm/sync/}. */
     private static final List<String> ALLOWED_SYNC_SUBPACKAGES = List.of(
         // Historical-backfill scheduler + service stay here for the duration of this slice;
         // they are Slice-C territory and not in scope for the consumer dissolution.
-        "de.tum.cit.aet.hephaestus.gitprovider.sync.backfill"
+        "de.tum.cit.aet.hephaestus.integration.scm.sync.backfill"
     );
 
     /**
-     * Production code must not reside directly under {@code gitprovider/sync/}; only the
+     * Production code must not reside directly under {@code integration/scm/sync/}; only the
      * allowed sub-packages ({@code backfill}) remain populated. New consumer or sync
      * orchestration code belongs under {@code integration/consumer/} or
      * {@code integration/<kind>/sync/}.
      */
     @Test
-    void gitproviderSyncIsEmptyOfNonBackfillCode() {
+    void scmSyncIsEmptyOfNonBackfillCode() {
         List<String> violations = classes
             .stream()
-            .filter(c -> c.getPackageName().equals("de.tum.cit.aet.hephaestus.gitprovider.sync"))
+            .filter(c -> c.getPackageName().equals("de.tum.cit.aet.hephaestus.integration.scm.sync"))
             .map(JavaClass::getFullName)
             .collect(Collectors.toList());
 
         assertThat(violations)
             .as(
-                "gitprovider/sync/ must be empty of production code after Slice D — the unified "
+                "integration/scm/sync/ must be empty of production code after Slice D — the unified "
                     + "consumer lives under integration/consumer/ and the per-kind sync drivers live "
                     + "under integration/<kind>/sync/. Sub-packages allowed: %s",
                 ALLOWED_SYNC_SUBPACKAGES

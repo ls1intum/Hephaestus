@@ -9,7 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.config.KeycloakProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integrations.posthog.PosthogClient;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.ws.rs.NotFoundException;

@@ -8,8 +8,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.UserAspectProvider.ActivityInsights;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.HashMap;

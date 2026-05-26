@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.user;
 
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import java.util.regex.Pattern;
 import org.springframework.lang.Nullable;
 

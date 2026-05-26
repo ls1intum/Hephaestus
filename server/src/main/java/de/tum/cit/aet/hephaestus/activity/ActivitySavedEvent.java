@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.activity;
 
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import java.time.Instant;
 import java.util.Optional;
 

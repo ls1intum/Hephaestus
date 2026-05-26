@@ -1,16 +1,16 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewthread;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

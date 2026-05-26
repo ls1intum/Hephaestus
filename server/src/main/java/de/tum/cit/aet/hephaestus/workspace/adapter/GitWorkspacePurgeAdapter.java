@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;

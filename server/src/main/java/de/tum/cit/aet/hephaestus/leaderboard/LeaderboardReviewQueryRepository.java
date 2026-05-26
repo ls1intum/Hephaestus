@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -13,8 +13,8 @@ import org.springframework.stereotype.Repository;
 /**
  * Workspace-scoped queries for pull request reviews in the leaderboard context.
  *
- * <p>This repository lives in the leaderboard package because it joins gitprovider entities
- * with workspace entities (RepositoryToMonitor, WorkspaceTeamRepositorySettings). The gitprovider
+ * <p>This repository lives in the leaderboard package because it joins integration.scm entities
+ * with workspace entities (RepositoryToMonitor, WorkspaceTeamRepositorySettings). The integration.scm domain
  * package should not depend on workspace entities to maintain clean architecture.
  *
  * <p>These queries are used for leaderboard calculations where workspace context is required.
@@ -46,7 +46,7 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
         WHERE prr.submittedAt >= :since
             AND prr.submittedAt < :until
             AND prr.author.id IN :actorIds
-            AND prr.author.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+            AND prr.author.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
             AND rtm.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
@@ -89,7 +89,7 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
         WHERE prr.submittedAt >= :since
             AND prr.submittedAt < :until
             AND prr.author.id IN :actorIds
-            AND prr.author.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+            AND prr.author.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
             AND rtm.workspace.id = :workspaceId
             AND EXISTS (
                 SELECT 1 FROM TeamRepositoryPermission trp

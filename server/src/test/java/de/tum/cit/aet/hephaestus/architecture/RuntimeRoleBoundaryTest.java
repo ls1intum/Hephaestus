@@ -41,13 +41,13 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         "org.springframework.boot.autoconfigure.condition.ConditionalOnProperties";
 
     /**
-     * Single property-gated config per role. Controllers inside {@code gitprovider.webhook} are
+     * Single property-gated config per role. Controllers inside {@code integration.webhook} are
      * implicitly gated via {@code @ConditionalOnBean(JetStreamPublisher.class)} — they auto-load
-     * iff {@link de.tum.cit.aet.hephaestus.gitprovider.webhook.WebhookConfiguration} loads, so
+     * iff {@link de.tum.cit.aet.hephaestus.integration.webhook.WebhookConfiguration} loads, so
      * listing them here would just duplicate the WebhookConfiguration gate.
      */
     private static final Map<String, String> EXPECTED_GATES = Map.of(
-        "de.tum.cit.aet.hephaestus.gitprovider.webhook.WebhookConfiguration",
+        "de.tum.cit.aet.hephaestus.integration.webhook.WebhookConfiguration",
         RuntimeRole.WEBHOOK_PROPERTY,
         "de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig",
         RuntimeRole.SERVER_PROPERTY,
@@ -127,7 +127,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     void webhookPackageIsIsolatedFromServerWorkerConcerns() {
         noClasses()
             .that()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.gitprovider.webhook..")
+            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.webhook..")
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage(

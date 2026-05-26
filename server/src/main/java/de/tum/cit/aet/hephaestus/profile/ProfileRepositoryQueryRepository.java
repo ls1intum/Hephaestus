@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.profile;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -10,8 +10,8 @@ import org.springframework.data.repository.query.Param;
 /**
  * Workspace-scoped queries for repositories in the profile context.
  *
- * <p>This repository lives in the profile package because it joins gitprovider entities
- * with workspace entities (RepositoryToMonitor). The gitprovider package should not
+ * <p>This repository lives in the profile package because it joins integration.scm entities
+ * with workspace entities (RepositoryToMonitor). The integration.scm package should not
  * depend on workspace entities to maintain clean architecture.
  *
  * <p>These queries are used for user profile display where workspace context is required.

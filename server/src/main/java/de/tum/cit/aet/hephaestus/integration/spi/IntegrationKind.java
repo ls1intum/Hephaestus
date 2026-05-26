@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.spi;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 
 /**
  * Identifies a specific external system Hephaestus integrates with.

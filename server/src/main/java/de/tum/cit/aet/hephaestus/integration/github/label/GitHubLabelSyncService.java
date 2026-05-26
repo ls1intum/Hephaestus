@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.github.label;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.LARGE_PAGE_SIZE;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
@@ -14,12 +14,12 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlPaginationHelper;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlPaginationHelper.PaginationRequest;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlPaginationHelper.PaginationResult;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHLabelConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHLabelConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -239,7 +239,7 @@ public class GitHubLabelSyncService {
      * The processor handles this by using name-based lookup as fallback.
      */
     private GitHubLabelDTO convertToDTO(
-        de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHLabel graphQlLabel
+        de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHLabel graphQlLabel
     ) {
         return GitHubLabelDTO.fromLabel(graphQlLabel);
     }

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;

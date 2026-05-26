@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHRateLimit;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRateLimit;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;

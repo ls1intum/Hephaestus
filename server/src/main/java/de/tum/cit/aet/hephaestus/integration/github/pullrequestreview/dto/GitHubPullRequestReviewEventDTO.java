@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.github.pullrequestreview.dto;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.uriToString;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubWebhookEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequest.dto.GitHubPullRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;

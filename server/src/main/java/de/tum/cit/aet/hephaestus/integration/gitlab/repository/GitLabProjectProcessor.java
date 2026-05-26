@@ -2,12 +2,12 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabProjectResponse;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.repository.dto.GitLabPushEventDTO;
 import java.time.Instant;
 import java.time.OffsetDateTime;

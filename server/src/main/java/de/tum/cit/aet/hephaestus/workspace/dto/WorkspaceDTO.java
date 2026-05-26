@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;

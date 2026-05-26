@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.github.issue.dto;
 
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssue;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssue;
 import org.springframework.lang.Nullable;
 
 /**

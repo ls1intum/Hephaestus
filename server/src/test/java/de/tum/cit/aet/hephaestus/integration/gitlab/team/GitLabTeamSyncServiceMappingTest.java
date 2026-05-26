@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.team;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.team.membership.TeamMembership;
+import de.tum.cit.aet.hephaestus.integration.scm.team.membership.TeamMembership;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;

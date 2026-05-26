@@ -2,18 +2,18 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabProjectResponse;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabGroupProcessor;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

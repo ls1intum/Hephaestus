@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserTeamsDTO;
 import de.tum.cit.aet.hephaestus.integration.registry.Connection;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;

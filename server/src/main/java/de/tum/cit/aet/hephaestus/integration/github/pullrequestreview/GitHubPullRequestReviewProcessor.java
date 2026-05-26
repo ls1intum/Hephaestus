@@ -1,19 +1,19 @@
 package de.tum.cit.aet.hephaestus.integration.github.pullrequestreview;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.github.common.BaseGitHubProcessor;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequest.dto.GitHubPullRequestDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequestreview.dto.GitHubPullRequestReviewEventDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.Set;
@@ -392,21 +392,21 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     /**
      * Converts a GitHub API state string to Issue.State enum.
      */
-    private de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State convertState(String state) {
+    private de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State convertState(String state) {
         if (state == null) {
             log.warn(
                 "PR state is null when creating stub from review webhook, defaulting to OPEN. " +
                     "This may indicate missing data in webhook payload."
             );
-            return de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN;
+            return de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN;
         }
         return switch (state.toUpperCase()) {
-            case "OPEN" -> de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN;
-            case "CLOSED" -> de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.CLOSED;
-            case "MERGED" -> de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.MERGED;
+            case "OPEN" -> de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN;
+            case "CLOSED" -> de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.CLOSED;
+            case "MERGED" -> de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.MERGED;
             default -> {
                 log.warn("Unknown PR state '{}' when creating stub from review webhook, defaulting to OPEN", state);
-                yield de.tum.cit.aet.hephaestus.gitprovider.issue.Issue.State.OPEN;
+                yield de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN;
             }
         };
     }

@@ -14,8 +14,8 @@ import org.junit.jupiter.api.Test;
  * <ul>
  *   <li>{@link #spiHasNoVendorSdkDependencies} — {@code integration/spi} stays vendor-
  *       agnostic. Today {@code RateLimitTracker} imports
- *       {@code de.tum.cit.aet.hephaestus.gitprovider.graphql.github.GHRateLimit}; that
- *       drift is acceptable while {@code gitprovider/} is still load-bearing, but new
+ *       {@code de.tum.cit.aet.hephaestus.integration.scm.graphql.github.GHRateLimit}; that
+ *       drift is acceptable while {@code integration.scm/} is still load-bearing, but new
  *       SPI surfaces must NOT add vendor-SDK imports.
  *   <li>{@link #kindModulesDoNotImportEachOther} — {@code integration/github} cannot
  *       import {@code integration/gitlab}, etc. Cross-kind coupling defeats the point

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import java.time.Instant;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
  * Workspace-scoped queries for contribution metadata.
  *
  * <p>This repository provides queries to find the earliest contributions
- * for users within a workspace context. It joins gitprovider entities
+ * for users within a workspace context. It joins integration.scm entities
  * (PullRequest, PullRequestReview, IssueComment) with workspace entities
  * (RepositoryToMonitor) to scope results to monitored repositories.
  *

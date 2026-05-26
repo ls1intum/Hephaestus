@@ -2,11 +2,11 @@ package de.tum.cit.aet.hephaestus.integration.github.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectIntegrityService;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectIntegrityService;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryEventDTO;

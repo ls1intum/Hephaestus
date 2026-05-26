@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Provides sync targets (repositories) for the gitprovider ETL engine.
+ * Provides sync targets (repositories) for the integration.scm ETL engine.
  * <p>
  * This is the main SPI (Service Provider Interface) for the sync engine to discover
  * and manage synchronization targets. It extends focused sub-interfaces to comply

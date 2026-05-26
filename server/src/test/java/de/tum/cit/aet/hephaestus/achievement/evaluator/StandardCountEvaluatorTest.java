@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.achievement.progress.LinearAchievementProgress;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivitySavedEvent;
 import de.tum.cit.aet.hephaestus.activity.ActivityTargetType;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.Optional;

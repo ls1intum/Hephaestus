@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.config.jackson;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHDraftIssue;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssue;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHDraftIssue;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssue;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequest;
 
 /**
  * Jackson mixin for GitHub GraphQL ProjectV2ItemContent union type.

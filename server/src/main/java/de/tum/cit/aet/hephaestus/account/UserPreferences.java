@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.account;
 
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -21,7 +21,7 @@ import lombok.ToString;
  * Stores Hephaestus platform preferences for a user.
  * <p>
  * This entity is separate from {@link User} to maintain domain isolation.
- * The gitprovider module should only contain data from the Git provider (GitHub),
+ * The integration.scm module should only contain data from the Git provider (GitHub),
  * while platform-specific preferences belong in the account module.
  * <p>
  * Preferences include:

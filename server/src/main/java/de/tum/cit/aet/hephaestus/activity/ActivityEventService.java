@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.activity;
 
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointProperties;
 import de.tum.cit.aet.hephaestus.activity.scoring.XpPrecision;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;

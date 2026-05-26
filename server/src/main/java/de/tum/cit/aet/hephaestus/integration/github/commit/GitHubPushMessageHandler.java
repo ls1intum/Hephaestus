@@ -2,14 +2,14 @@ package de.tum.cit.aet.hephaestus.integration.github.commit;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.commit.Commit;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitAuthorResolver;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitFileChange;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.util.CommitUtils;
-import de.tum.cit.aet.hephaestus.gitprovider.common.DataSource;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.Commit;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitAuthorResolver;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitFileChange;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.util.CommitUtils;
+import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
@@ -20,9 +20,9 @@ import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageH
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -401,7 +401,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
     /**
      * Resolves the scope ID (workspace ID) for a repository.
      * <p>
-     * Mirrors the resolution logic in {@link de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory}:
+     * Mirrors the resolution logic in {@link de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContextFactory}:
      * <ol>
      *   <li>For organization-owned repos: lookup by organization login</li>
      *   <li>For personal repos (no organization): lookup by repository nameWithOwner</li>

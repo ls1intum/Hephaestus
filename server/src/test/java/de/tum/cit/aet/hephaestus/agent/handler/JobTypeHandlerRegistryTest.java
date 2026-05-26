@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.git.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;

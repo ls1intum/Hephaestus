@@ -2,17 +2,17 @@ package de.tum.cit.aet.hephaestus.integration.github.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.project.Project;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectStatusUpdate;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectStatusUpdateRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectStatusUpdate;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectStatusUpdateRepository;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectStatusUpdateEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.github.user;
 
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;

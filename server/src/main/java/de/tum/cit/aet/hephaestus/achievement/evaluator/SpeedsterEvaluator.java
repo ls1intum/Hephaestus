@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.achievement.evaluator;
 import de.tum.cit.aet.hephaestus.achievement.UserAchievement;
 import de.tum.cit.aet.hephaestus.achievement.progress.BinaryAchievementProgress;
 import de.tum.cit.aet.hephaestus.activity.ActivitySavedEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

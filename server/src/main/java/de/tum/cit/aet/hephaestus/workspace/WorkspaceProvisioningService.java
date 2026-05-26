@@ -4,18 +4,18 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
-import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.AuthenticatedGitProviderUserService;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.time.Duration;
 import java.time.Instant;

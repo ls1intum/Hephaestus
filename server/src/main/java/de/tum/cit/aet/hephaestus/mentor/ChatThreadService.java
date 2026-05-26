@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

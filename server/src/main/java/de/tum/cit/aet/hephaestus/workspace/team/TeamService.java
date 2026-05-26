@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.workspace.team;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.team.Team;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamInfoDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
-import de.tum.cit.aet.hephaestus.gitprovider.team.permission.TeamRepositoryPermissionRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.team.TeamInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.team.TeamRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.team.permission.TeamRepositoryPermission;
+import de.tum.cit.aet.hephaestus.integration.scm.team.permission.TeamRepositoryPermissionRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;

@@ -1,24 +1,24 @@
 package de.tum.cit.aet.hephaestus.integration.github.pullrequest.dto;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.uriToString;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHMergeStateStatus;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHMergeableState;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewDecision;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPullRequestState;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHReviewRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHReviewRequestConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHUser;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHUserConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHMergeStateStatus;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHMergeableState;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequestReviewDecision;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequestState;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHReviewRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHReviewRequestConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHUser;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHUserConnection;
 import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.github.milestone.dto.GitHubMilestoneDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.MergeStateStatus;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.ReviewDecision;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.MergeStateStatus;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.ReviewDecision;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.math.BigInteger;

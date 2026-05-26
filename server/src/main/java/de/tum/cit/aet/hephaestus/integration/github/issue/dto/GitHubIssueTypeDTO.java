@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.github.issue.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssueType;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssueType;
 import org.springframework.lang.Nullable;
 
 /**

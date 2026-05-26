@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.github.label.dto;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHLabel;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHLabelConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHLabel;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHLabelConnection;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;

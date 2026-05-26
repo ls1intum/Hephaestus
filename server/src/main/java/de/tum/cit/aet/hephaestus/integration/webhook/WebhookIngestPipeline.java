@@ -4,8 +4,8 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.PublishRequest;
+import de.tum.cit.aet.hephaestus.integration.webhook.JetStreamPublisher;
+import de.tum.cit.aet.hephaestus.integration.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier;

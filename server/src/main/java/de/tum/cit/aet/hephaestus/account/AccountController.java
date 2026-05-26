@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.account;
 
 import de.tum.cit.aet.hephaestus.config.KeycloakProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.AuthenticatedGitProviderUserService;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

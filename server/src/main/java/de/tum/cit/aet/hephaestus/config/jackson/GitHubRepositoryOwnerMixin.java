@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.config.jackson;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHOrganization;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHUser;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHOrganization;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHUser;
 
 /**
  * Jackson mixin for GitHub GraphQL RepositoryOwner interface.

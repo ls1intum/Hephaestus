@@ -11,9 +11,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabUserLookup;
@@ -21,19 +21,19 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.dto.GitLabWebhookLabe
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.dto.GitLabWebhookUser;
 import de.tum.cit.aet.hephaestus.integration.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.issue.dto.GitLabIssueEventDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.issuetype.IssueType;
-import de.tum.cit.aet.hephaestus.gitprovider.issuetype.IssueTypeRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.milestone.Milestone;
-import de.tum.cit.aet.hephaestus.gitprovider.milestone.MilestoneRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueType;
+import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueTypeRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.milestone.Milestone;
+import de.tum.cit.aet.hephaestus.integration.scm.milestone.MilestoneRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.user.GitLabUserService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
@@ -977,8 +977,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         @Test
         @DisplayName("processFromSync() resolves issueTypeId when humanised type name matches")
         void shouldResolveIssueTypeIdWhenTypeNameMatches() {
-            de.tum.cit.aet.hephaestus.gitprovider.organization.Organization organization =
-                new de.tum.cit.aet.hephaestus.gitprovider.organization.Organization();
+            de.tum.cit.aet.hephaestus.integration.scm.organization.Organization organization =
+                new de.tum.cit.aet.hephaestus.integration.scm.organization.Organization();
             organization.setId(42L);
             testRepo.setOrganization(organization);
 

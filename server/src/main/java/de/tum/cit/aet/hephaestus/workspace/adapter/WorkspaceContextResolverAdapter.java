@@ -7,7 +7,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
- * Adapter that bridges the gitprovider module's ScopeIdResolver SPI to the workspace domain.
+ * Adapter that bridges the integration.scm module's ScopeIdResolver SPI to the workspace domain.
  * <p>
  * This adapter resolves scope IDs (workspace IDs) using multiple strategies:
  * <ol>

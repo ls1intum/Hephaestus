@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.organization;
 
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import java.util.Collections;
 import java.util.List;
 

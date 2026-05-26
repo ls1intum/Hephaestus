@@ -8,18 +8,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.dto.GitLabWebhookLabel;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.dto.GitLabWebhookUser;
 import de.tum.cit.aet.hephaestus.integration.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.user.GitLabUserService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
@@ -424,7 +424,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             return findOrCreateLabel(dto, repository);
         }
 
-        de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext callResolveContext(String path, String action) {
+        de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext callResolveContext(String path, String action) {
             return resolveContext(path, action);
         }
     }

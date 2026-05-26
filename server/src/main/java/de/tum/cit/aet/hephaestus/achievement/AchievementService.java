@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivitySavedEvent;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.ArrayList;

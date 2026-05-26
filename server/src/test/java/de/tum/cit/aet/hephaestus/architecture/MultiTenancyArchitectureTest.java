@@ -41,26 +41,26 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     /**
      * Package prefixes that are inherently workspace-agnostic.
      *
-     * <p>The {@code gitprovider} package is the shared SCM kernel (entities, SPIs,
-     * sync orchestrator). The per-vendor ETL handlers (former {@code gitprovider.<domain>.<kind>})
+     * <p>The {@code integration.scm} package is the shared SCM kernel (entities, SPIs,
+     * sync orchestrator). The per-vendor ETL handlers (former {@code integration.scm.<domain>.<kind>})
      * now live under {@code integration.<kind>}, but they still operate at the external
      * entity level (GitHub/GitLab IDs) and resolve workspace context through entity
      * relationships, so they remain workspace-agnostic for the purposes of this rule.
      * Workspace filtering happens at the domain/application layer, not at the
-     * gitprovider/integration ETL layer.
+     * integration.scm/integration ETL layer.
      */
-    static final String GITPROVIDER_PACKAGE = BASE_PACKAGE + ".gitprovider";
+    static final String SCM_PACKAGE = BASE_PACKAGE + ".integration.scm";
 
     static final String INTEGRATION_GITHUB_PACKAGE = BASE_PACKAGE + ".integration.github";
     static final String INTEGRATION_GITLAB_PACKAGE = BASE_PACKAGE + ".integration.gitlab";
 
     /**
-     * Checks if a class belongs to a workspace-agnostic package (gitprovider kernel
+     * Checks if a class belongs to a workspace-agnostic package (integration.scm kernel
      * or the per-vendor ETL handlers in integration.{github,gitlab}).
      */
     private static boolean isInWorkspaceAgnosticPackage(JavaClass javaClass) {
         String pkg = javaClass.getPackageName();
-        return pkg.startsWith(GITPROVIDER_PACKAGE)
+        return pkg.startsWith(SCM_PACKAGE)
             || pkg.startsWith(INTEGRATION_GITHUB_PACKAGE)
             || pkg.startsWith(INTEGRATION_GITLAB_PACKAGE);
     }
@@ -138,7 +138,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     String repoName = method.getOwner().getSimpleName();
                     String methodKey = repoName + "." + method.getName();
 
-                    // Skip gitprovider package - inherently workspace-agnostic ETL layer
+                    // Skip integration.scm package - inherently workspace-agnostic ETL layer
                     if (isInWorkspaceAgnosticPackage(method.getOwner())) {
                         return;
                     }
@@ -254,7 +254,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     String repoName = javaClass.getSimpleName();
 
-                    // Skip gitprovider package - inherently workspace-agnostic ETL layer
+                    // Skip integration.scm package - inherently workspace-agnostic ETL layer
                     if (isInWorkspaceAgnosticPackage(javaClass)) {
                         return;
                     }

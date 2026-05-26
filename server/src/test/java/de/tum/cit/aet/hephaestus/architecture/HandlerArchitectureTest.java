@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Enforces module boundaries:
  * <ul>
- *   <li>SPI package has no Spring or gitprovider dependencies
+ *   <li>SPI package has no Spring or integration.scm dependencies
  *   <li>Handler implementations do not reach into sandbox internals
  * </ul>
  *
@@ -38,15 +38,15 @@ class HandlerArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("SPI package should not depend on gitprovider")
+        @DisplayName("SPI package should not depend on integration.scm")
         void spiShouldNotDependOnGitProvider() {
             noClasses()
                 .that()
                 .resideInAPackage("..agent.handler.spi..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage("..gitprovider..")
-                .because("SPI types must remain domain-agnostic — handler implementations bridge to gitprovider")
+                .resideInAPackage("..integration.scm..")
+                .because("SPI types must remain domain-agnostic — handler implementations bridge to integration.scm")
                 .check(classes);
         }
 

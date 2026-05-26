@@ -1,19 +1,19 @@
 package de.tum.cit.aet.hephaestus.integration.github.project.dto;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHDraftIssue;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssue;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemContent;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValue;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValueConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemType;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectItem;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHDraftIssue;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssue;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2Item;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemContent;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldValue;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldValueConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemType;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectItem;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.time.Instant;

@@ -3,16 +3,16 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.git.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.github.installation.GitHubInstallationRepositoryEnumerationService;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectIntegrityService;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectIntegrityService;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
@@ -516,7 +516,7 @@ public class WorkspaceRepositoryMonitorService {
 
     /**
      * Finds a repository by its full name if it exists in the database.
-     * Repositories are global entities (gitprovider is workspace-agnostic),
+     * Repositories are global entities (integration.scm is workspace-agnostic),
      * so this lookup is intentionally not scoped to a workspace.
      */
     private Optional<Repository> findRepository(String nameWithOwner) {
@@ -679,7 +679,7 @@ public class WorkspaceRepositoryMonitorService {
      * Creates or updates a Repository entity from a snapshot (installation enumeration or provisioning).
      * This ensures the repository exists in the database with basic metadata from the payload.
      *
-     * <p>Note: Repositories are global entities (gitprovider is workspace-agnostic).
+     * <p>Note: Repositories are global entities (integration.scm is workspace-agnostic).
      * The workspace-repository association is managed through RepositoryToMonitor.
      *
      * <p>The organization is obtained from the workspace to ensure repositories from

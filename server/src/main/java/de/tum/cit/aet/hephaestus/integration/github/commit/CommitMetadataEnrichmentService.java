@@ -5,10 +5,10 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitContributor;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitContributorRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.util.CommitUtils;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitContributor;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitContributorRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.util.CommitUtils;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;

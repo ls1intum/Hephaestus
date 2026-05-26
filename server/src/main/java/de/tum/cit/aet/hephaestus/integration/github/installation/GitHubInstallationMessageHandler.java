@@ -2,15 +2,15 @@ package de.tum.cit.aet.hephaestus.integration.github.installation;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener.AccountType;
 import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener.InstallationData;
 import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener.RepositorySnapshot;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationService;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationService;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;

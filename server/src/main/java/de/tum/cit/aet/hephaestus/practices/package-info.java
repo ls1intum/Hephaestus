@@ -1,7 +1,7 @@
 /**
  * Code-health module — AI-driven practice detection and contributor findings.
  *
- * <p>Listens for {@code DomainEvent}s from {@link de.tum.cit.aet.hephaestus.gitprovider}
+ * <p>Listens for {@code DomainEvent}s from {@link de.tum.cit.aet.hephaestus.integration.scm}
  * processors, gates new reviews via {@code PracticeReviewDetectionGate}, dispatches agent
  * jobs through {@link de.tum.cit.aet.hephaestus.agent}, and persists results as
  * {@link de.tum.cit.aet.hephaestus.practices.finding.PracticeFinding}. Contributor

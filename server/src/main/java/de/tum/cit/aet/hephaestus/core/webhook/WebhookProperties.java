@@ -8,7 +8,7 @@ import org.springframework.lang.Nullable;
 /**
  * Shared webhook configuration bound to {@code hephaestus.webhook.*}. The same {@code secret} is
  * used by auto-registration ({@code workspace.GitLabWebhookService} → sent to provider) and
- * verification ({@code gitprovider.webhook.*} → matched against the incoming HMAC/token). See
+ * verification ({@code integration.webhook.*} → matched against the incoming HMAC/token). See
  * ADR 0008.
  *
  * <p>Incoming request size is capped at the {@code WebhookPayloadSizeFilter} before Spring

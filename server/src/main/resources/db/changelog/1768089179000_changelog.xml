@@ -992,7 +992,7 @@
     <!-- ==================== SECTION 20: User Preferences Extraction ==================== -->
 
     <changeSet id="1768100000000-create-user-preferences-table" author="FelixTJDietrich">
-        <comment>Create user_preferences table for platform preferences (domain isolation from gitprovider)</comment>
+        <comment>Create user_preferences table for platform preferences (domain isolation from integration.scm)</comment>
         <createTable tableName="user_preferences">
             <column name="id" type="BIGINT" autoIncrement="true">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="user_preferences_pkey"/>
@@ -2187,12 +2187,12 @@
         The backfill service will repopulate these from synced entities.
     -->
 
-    <!-- ==================== SECTION 41: Wipe GitProvider Data for Fresh Resync ==================== -->
+    <!-- ==================== SECTION 41: Wipe SCM Data for Fresh Resync ==================== -->
     <!--
         WIPE AND RESYNC STRATEGY
         ========================
         Instead of complex data migrations and activity backfill, we take the clean approach:
-        1. Wipe all gitprovider data (except users - they have stable GitHub IDs)
+        1. Wipe all SCM domain data (except users - they have stable GitHub IDs)
         2. Resync everything fresh from GitHub
         3. Activity events are generated automatically during sync via domain events
 
@@ -2204,7 +2204,7 @@
         - document (uploaded files)
 
         WIPED (will be resynced from GitHub):
-        - All gitprovider entities (organization, repository, issue, PR, reviews, comments, etc.)
+        - All SCM domain entities (organization, repository, issue, PR, reviews, comments, etc.)
         - activity_event (regenerated during sync)
         - workspace_team_* settings (regenerated from teams during sync)
     -->
@@ -2213,7 +2213,7 @@
         <!-- Accept the old checksum from before the FK drop/recreate fix was added -->
         <validCheckSum>9:d597463d692611558a615031ebe54e5d</validCheckSum>
         <comment>
-            Wipe all gitprovider data for fresh resync from GitHub.
+            Wipe all SCM domain data for fresh resync from GitHub.
             Users are preserved (stable GitHub IDs).
             Activity events will be regenerated during sync.
         </comment>

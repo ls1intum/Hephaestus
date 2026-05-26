@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.spi;
 /**
  * Listener for organization membership change events.
  * <p>
- * gitprovider defines this interface and calls it when organization membership changes.
+ * integration.scm defines this interface and calls it when organization membership changes.
  * The consuming module implements this to sync scope members accordingly.
  * <p>
- * This follows the Dependency Inversion Principle: gitprovider depends on the abstraction
+ * This follows the Dependency Inversion Principle: integration.scm depends on the abstraction
  * it defines, not on consuming module concepts.
  */
 public interface OrganizationMembershipListener {

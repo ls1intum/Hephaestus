@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;

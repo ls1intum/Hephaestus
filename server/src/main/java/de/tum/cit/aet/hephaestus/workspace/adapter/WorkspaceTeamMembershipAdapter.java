@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
 import de.tum.cit.aet.hephaestus.integration.spi.TeamMembershipListener;
-import de.tum.cit.aet.hephaestus.gitprovider.team.membership.TeamMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.team.membership.TeamMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -13,10 +13,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Adapts team membership sync events from gitprovider to workspace member reconciliation.
+ * Adapts team membership sync events from integration.scm to workspace member reconciliation.
  * <p>
- * Implements the {@link TeamMembershipListener} SPI defined by gitprovider so that the
- * workspace module can react to team membership changes without gitprovider needing to
+ * Implements the {@link TeamMembershipListener} SPI defined by integration.scm so that the
+ * workspace module can react to team membership changes without integration.scm needing to
  * know about workspace concepts.
  * <p>
  * This closes the gap where GitLab subgroup-only users (e.g. tutor maintainers on a

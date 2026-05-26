@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.lang.ArchRule;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

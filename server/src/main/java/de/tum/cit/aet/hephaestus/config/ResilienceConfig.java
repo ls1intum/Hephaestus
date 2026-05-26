@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.config;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationSuspendedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;

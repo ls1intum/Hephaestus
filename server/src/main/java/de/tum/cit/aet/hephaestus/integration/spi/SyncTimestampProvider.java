@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * Provides sync timestamp operations for the gitprovider ETL engine.
+ * Provides sync timestamp operations for the integration.scm ETL engine.
  * <p>
  * This interface handles scope-level sync timestamps, including:
  * <ul>

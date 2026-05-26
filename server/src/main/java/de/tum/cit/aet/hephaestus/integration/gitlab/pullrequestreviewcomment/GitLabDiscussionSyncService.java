@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabFieldUtils;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlResponseHandler;
@@ -13,14 +13,14 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabUserLookup;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.gitlab.issuecomment.GitLabIssueCommentProcessor;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreview.GitLabReviewReconciler;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -49,7 +49,7 @@ import org.springframework.stereotype.Service;
  * Routing logic:
  * <ul>
  *   <li>Discussions where any note has {@code position != null} &rarr; {@link PullRequestReviewThread} + {@link PullRequestReviewComment}</li>
- *   <li>General discussions (no position) &rarr; {@link de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueComment} (via existing processor)</li>
+ *   <li>General discussions (no position) &rarr; {@link de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueComment} (via existing processor)</li>
  * </ul>
  */
 @Service

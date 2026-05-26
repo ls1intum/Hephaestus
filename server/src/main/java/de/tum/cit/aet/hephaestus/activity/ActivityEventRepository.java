@@ -103,7 +103,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         FROM ActivityEvent e
         WHERE e.workspace.id = :workspaceId
         AND e.actor IS NOT NULL
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
         GROUP BY e.actor.id
@@ -128,7 +128,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         FROM ActivityEvent e
         WHERE e.workspace.id = :workspaceId
         AND e.actor IS NOT NULL
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND EXISTS (
             SELECT 1 FROM TeamMembership tm
             WHERE tm.user = e.actor
@@ -191,7 +191,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         FROM ActivityEvent e
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id IN :actorIds
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
         AND NOT (
@@ -220,7 +220,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         JOIN PullRequest pr ON pr.id = c.issue.id
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id IN :actorIds
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND e.targetType = 'issue_comment'
         AND e.eventType = de.tum.cit.aet.hephaestus.activity.ActivityEventType.COMMENT_CREATED
         AND e.occurredAt >= :since
@@ -244,7 +244,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         JOIN PullRequest pr ON pr.id = c.pullRequest.id
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id IN :actorIds
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND e.targetType = 'review_comment'
         AND e.eventType = de.tum.cit.aet.hephaestus.activity.ActivityEventType.REVIEW_COMMENT_CREATED
         AND e.occurredAt >= :since
@@ -295,7 +295,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         FROM ActivityEvent e
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id IN :actorIds
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND EXISTS (
             SELECT 1 FROM TeamMembership tm
             WHERE tm.user = e.actor
@@ -365,7 +365,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         JOIN PullRequest pr ON pr.id = c.issue.id
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id IN :actorIds
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND EXISTS (
             SELECT 1 FROM TeamMembership tm
             WHERE tm.user = e.actor
@@ -407,7 +407,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         JOIN PullRequest pr ON pr.id = c.pullRequest.id
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id IN :actorIds
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND EXISTS (
             SELECT 1 FROM TeamMembership tm
             WHERE tm.user = e.actor
@@ -481,7 +481,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         JOIN PullRequestReview r ON r.id = e.targetId
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id IN :actorIds
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND e.targetType = 'review'
         AND e.eventType IN (
             de.tum.cit.aet.hephaestus.activity.ActivityEventType.REVIEW_APPROVED,
@@ -520,7 +520,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         JOIN PullRequestReview r ON r.id = e.targetId
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id IN :actorIds
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND EXISTS (
             SELECT 1 FROM TeamMembership tm
             WHERE tm.user = e.actor
@@ -600,7 +600,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         JOIN PullRequestReview r ON r.id = e.targetId
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id = :actorId
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND e.targetType = 'review'
         AND e.eventType IN (
             de.tum.cit.aet.hephaestus.activity.ActivityEventType.REVIEW_APPROVED,
@@ -641,7 +641,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         FROM ActivityEvent e
         WHERE e.workspace.id = :workspaceId
         AND e.actor IS NOT NULL
-        AND e.actor.type = de.tum.cit.aet.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
         AND e.actor.id = :actorId
         AND e.xp > 0
         """

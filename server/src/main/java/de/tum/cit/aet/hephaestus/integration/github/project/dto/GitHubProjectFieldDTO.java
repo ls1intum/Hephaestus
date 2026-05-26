@@ -1,14 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.github.project.dto;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2Field;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2IterationField;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2SingleSelectField;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectField;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2Field;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2FieldConfiguration;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2IterationField;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2SingleSelectField;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectField;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;

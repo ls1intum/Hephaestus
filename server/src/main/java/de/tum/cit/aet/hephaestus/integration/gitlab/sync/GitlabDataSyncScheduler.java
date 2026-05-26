@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.commit.GitLabCommitSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
@@ -16,13 +16,13 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.issuedependency.GitLabIssueD
 import de.tum.cit.aet.hephaestus.integration.gitlab.issuetype.GitLabIssueTypeSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.label.GitLabLabelSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.milestone.GitLabMilestoneSyncService;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabGroupMemberSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabGroupSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest.GitLabMergeRequestSyncService;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.repository.collaborator.GitLabCollaboratorSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.subissue.GitLabSubIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.team.GitLabTeamSyncService;

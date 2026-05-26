@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;

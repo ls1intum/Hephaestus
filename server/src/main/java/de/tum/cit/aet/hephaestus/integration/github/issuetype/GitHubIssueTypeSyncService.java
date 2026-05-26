@@ -9,7 +9,7 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -21,12 +21,12 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncMetadata;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssueTypeColor;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssueTypeConnection;
-import de.tum.cit.aet.hephaestus.gitprovider.issuetype.IssueType;
-import de.tum.cit.aet.hephaestus.gitprovider.issuetype.IssueTypeRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssueTypeColor;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssueTypeConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueType;
+import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueTypeRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
 import java.time.Instant;
 import java.util.HashSet;
@@ -108,7 +108,7 @@ public class GitHubIssueTypeSyncService {
             return -1;
         }
 
-        // Load organization from gitprovider's repository
+        // Load organization from integration.scm's repository
         Organization organization = organizationRepository.findById(metadata.organizationId()).orElse(null);
         if (organization == null) {
             log.warn("Organization not found in database: orgLogin={}", safeOrgLogin);
@@ -294,7 +294,7 @@ public class GitHubIssueTypeSyncService {
     }
 
     private void syncIssueType(
-        de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHIssueType graphQlType,
+        de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssueType graphQlType,
         Organization organization
     ) {
         String id = graphQlType.getId();

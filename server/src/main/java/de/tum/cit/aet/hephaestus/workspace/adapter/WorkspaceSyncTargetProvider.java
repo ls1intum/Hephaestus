@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.SyncTargetFactory;

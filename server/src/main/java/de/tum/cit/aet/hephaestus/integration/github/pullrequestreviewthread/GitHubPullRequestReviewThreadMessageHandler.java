@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.github.pullrequestreviewthread;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContextFactory;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequest.GitHubPullRequestProcessor;

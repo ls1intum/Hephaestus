@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.settings;
 
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.label.LabelInfoDTO;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;

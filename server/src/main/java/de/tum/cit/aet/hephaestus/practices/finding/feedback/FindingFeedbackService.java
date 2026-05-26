@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.finding.feedback;
 
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.CreateFindingFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.FindingFeedbackDTO;

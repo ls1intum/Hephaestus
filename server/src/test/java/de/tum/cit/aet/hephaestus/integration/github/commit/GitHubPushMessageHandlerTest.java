@@ -12,17 +12,17 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitAuthorResolver;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitAuthorResolver;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.lang.reflect.Method;
@@ -163,7 +163,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         when(repo.getDefaultBranch()).thenReturn(defaultBranch);
         when(repo.getOrganization()).thenReturn(null);
         var provider = mock(
-            de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider.class,
+            de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider.class,
             org.mockito.Mockito.withSettings().lenient()
         );
         when(provider.getId()).thenReturn(1L);
@@ -713,7 +713,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             // After upsertCommit, findByShaAndRepositoryId must return a Commit entity for file changes
             // and for publishCommitCreated (which calls CommitData.from(commit))
             var persistedCommit = mock(
-                de.tum.cit.aet.hephaestus.gitprovider.commit.Commit.class,
+                de.tum.cit.aet.hephaestus.integration.scm.commit.Commit.class,
                 org.mockito.Mockito.withSettings().lenient()
             );
             when(persistedCommit.getId()).thenReturn(1L);
@@ -983,7 +983,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             // Mock the persisted commit lookup for publishCommitCreated
             var persistedCommit = mock(
-                de.tum.cit.aet.hephaestus.gitprovider.commit.Commit.class,
+                de.tum.cit.aet.hephaestus.integration.scm.commit.Commit.class,
                 org.mockito.Mockito.withSettings().lenient()
             );
             when(persistedCommit.getId()).thenReturn(1L);

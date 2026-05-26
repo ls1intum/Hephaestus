@@ -8,8 +8,8 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.Category;
@@ -19,15 +19,15 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlErrorUti
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2Item;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemConnection;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.EmbeddedProjectItemsDTO;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.EmbeddedProjectItemsDTO.EmbeddedProjectItem;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.EmbeddedProjectItemsDTO.EmbeddedProjectReference;
-import de.tum.cit.aet.hephaestus.gitprovider.project.Project;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectItemDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

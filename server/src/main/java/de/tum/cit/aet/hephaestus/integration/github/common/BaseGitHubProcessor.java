@@ -1,15 +1,15 @@
 package de.tum.cit.aet.hephaestus.integration.github.common;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.PostgresStringUtils;
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.PostgresStringUtils;
+import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.milestone.Milestone;
-import de.tum.cit.aet.hephaestus.gitprovider.milestone.MilestoneRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.milestone.Milestone;
+import de.tum.cit.aet.hephaestus.integration.scm.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.github.milestone.dto.GitHubMilestoneDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.util.Collection;
@@ -103,7 +103,7 @@ public abstract class BaseGitHubProcessor {
         long nativeId =
             dto.id() != null
                 ? dto.id()
-                : de.tum.cit.aet.hephaestus.gitprovider.common.LabelIdUtils.generateDeterministicId(
+                : de.tum.cit.aet.hephaestus.integration.scm.common.LabelIdUtils.generateDeterministicId(
                       repository.getId(),
                       dto.name()
                   );

@@ -8,11 +8,11 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabPageInfo;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.backfill.BackfillBatchResult;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.backfill.BackfillBatchResult;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -861,7 +861,7 @@ public class GitLabMergeRequestSyncService {
     /**
      * Extracts the participants connection as a list of {@link GitLabMergeRequestProcessor.SyncUserData}.
      * <p>
-     * Participants are harvested purely to seed {@link de.tum.cit.aet.hephaestus.gitprovider.user.User}
+     * Participants are harvested purely to seed {@link de.tum.cit.aet.hephaestus.integration.scm.user.User}
      * rows for anyone who has interacted with the merge request (notes, reviews, approvals, etc.).
      * They are <em>not</em> attached to the MR as a relationship — the entity has no participants column.
      * <p>

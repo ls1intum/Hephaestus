@@ -7,7 +7,7 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPageInfo;
 import java.time.Duration;
 import java.util.Map;
 import java.util.function.Consumer;

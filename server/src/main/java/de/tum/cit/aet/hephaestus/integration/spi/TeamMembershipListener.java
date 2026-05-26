@@ -3,12 +3,12 @@ package de.tum.cit.aet.hephaestus.integration.spi;
 /**
  * Listener for team membership sync events.
  * <p>
- * gitprovider defines this interface and calls it after a team sync completes.
+ * integration.scm defines this interface and calls it after a team sync completes.
  * Consuming modules implement this to reconcile workspace-level state with
  * the synced team membership graph (e.g. ensure that every contributor who
  * appears in a team under the workspace is also listed as a workspace member).
  * <p>
- * This follows the Dependency Inversion Principle: gitprovider depends on the
+ * This follows the Dependency Inversion Principle: integration.scm depends on the
  * abstraction it defines, not on consuming module concepts.
  */
 public interface TeamMembershipListener {

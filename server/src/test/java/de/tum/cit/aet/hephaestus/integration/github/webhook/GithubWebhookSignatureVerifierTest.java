@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit tests pinning the GitHub HMAC-SHA256 verifier to the canonical
  * {@code sha256=<hex>} layout the GitHub Apps platform sends. The HMAC routine itself
- * mirrors {@code gitprovider.webhook.github.HmacVerifier} bit-for-bit; these tests
+ * mirrors {@code integration.webhook.github.HmacVerifier} bit-for-bit; these tests
  * guard that the SPI-side adapter doesn't drift from it.
  */
 @DisplayName("GithubWebhookSignatureVerifier HMAC + verdict mapping")

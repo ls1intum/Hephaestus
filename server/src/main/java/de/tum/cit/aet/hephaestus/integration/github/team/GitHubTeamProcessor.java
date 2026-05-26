@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.github.team;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.team.Team;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.github.team.dto.GitHubTeamEventDTO;
 import java.util.Optional;
 import java.util.Set;

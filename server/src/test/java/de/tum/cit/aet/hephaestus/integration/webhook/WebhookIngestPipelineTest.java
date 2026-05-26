@@ -7,8 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import tools.jackson.databind.ObjectMapper;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.PublishRequest;
+import de.tum.cit.aet.hephaestus.integration.webhook.JetStreamPublisher;
+import de.tum.cit.aet.hephaestus.integration.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier;

@@ -6,8 +6,8 @@ import static org.mockito.Mockito.verify;
 
 import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
-import de.tum.cit.aet.hephaestus.gitprovider.webhook.PublishRequest;
+import de.tum.cit.aet.hephaestus.integration.webhook.JetStreamPublisher;
+import de.tum.cit.aet.hephaestus.integration.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.integration.github.webhook.GithubSubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.github.webhook.GithubWebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.github.webhook.GithubWebhookSignatureVerifier;

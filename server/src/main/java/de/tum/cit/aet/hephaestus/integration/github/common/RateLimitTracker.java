@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.github.common;
 
-import de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model.GHRateLimit;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRateLimit;
 import java.time.Duration;
 import java.time.Instant;
 import org.springframework.graphql.client.ClientGraphQlResponse;

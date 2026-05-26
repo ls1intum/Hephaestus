@@ -3,15 +3,15 @@ package de.tum.cit.aet.hephaestus.integration.spi;
 /**
  * Filters which repositories should be processed during sync and webhook handling.
  * <p>
- * This interface abstracts the repository filtering logic from the gitprovider module,
+ * This interface abstracts the repository filtering logic from the integration.scm module,
  * allowing the workspace module (or other host applications) to provide the actual
  * filtering implementation based on their configuration.
  * <p>
- * <b>Design rationale:</b> The gitprovider module should not depend on workspace-specific
+ * <b>Design rationale:</b> The integration.scm module should not depend on workspace-specific
  * concepts. By using this SPI, the filtering decision is delegated to the host application
  * which knows its own configuration (e.g., {@code hephaestus.sync.filters.allowed-repositories}).
  *
- * @see de.tum.cit.aet.hephaestus.gitprovider.common.ProcessingContextFactory
+ * @see de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContextFactory
  */
 public interface RepositoryScopeFilter {
     /**

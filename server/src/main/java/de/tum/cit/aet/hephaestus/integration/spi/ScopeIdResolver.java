@@ -5,7 +5,7 @@ import java.util.Optional;
 /**
  * Resolves scope ID (workspace ID) for webhook processing and sync operations.
  * <p>
- * This SPI allows the gitprovider module to resolve scope IDs without depending
+ * This SPI allows the integration.scm module to resolve scope IDs without depending
  * on workspace domain entities directly.
  *
  * <h2>Resolution Strategies</h2>
