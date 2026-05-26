@@ -10,7 +10,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
@@ -23,12 +25,14 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
+@Tag("unit")
 class WorkspaceProvisioningServiceTest {
 
     @Mock
@@ -133,6 +137,11 @@ class WorkspaceProvisioningServiceTest {
         admin.setHtmlUrl("https://example.com/admin");
         admin.setType(User.Type.USER);
 
+        GitProvider githubProvider = org.mockito.Mockito.mock(GitProvider.class);
+        when(githubProvider.getId()).thenReturn(100L);
+        when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com"))
+            .thenReturn(Optional.of(githubProvider));
+
         when(workspaceRepository.count()).thenReturn(0L);
         when(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(1L, admin.getId())).thenReturn(
             Optional.empty()
@@ -141,8 +150,8 @@ class WorkspaceProvisioningServiceTest {
             workspaceService.createWorkspace(anyString(), anyString(), anyString(), any(AccountType.class), anyLong())
         ).thenReturn(workspace);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        // User lookup for PAT bootstrap - user already exists
-        when(userRepository.findByLogin("aet-org")).thenReturn(Optional.of(owner));
+        // User lookup for PAT bootstrap — scoped by provider id post-#1198
+        when(userRepository.findByLoginAndProviderId("aet-org", 100L)).thenReturn(Optional.of(owner));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.of(admin));
 
         provisioningService.bootstrapDefaultPatWorkspace();
@@ -182,13 +191,17 @@ class WorkspaceProvisioningServiceTest {
         owner.setHtmlUrl("https://example.com");
         owner.setType(User.Type.USER);
 
+        GitProvider githubProvider = org.mockito.Mockito.mock(GitProvider.class);
+        when(githubProvider.getId()).thenReturn(100L);
+        when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com"))
+            .thenReturn(Optional.of(githubProvider));
+
         when(workspaceRepository.count()).thenReturn(0L);
         when(
             workspaceService.createWorkspace(anyString(), anyString(), anyString(), any(AccountType.class), anyLong())
         ).thenReturn(workspace);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        // User lookup for PAT bootstrap - user already exists
-        when(userRepository.findByLogin("aet-org")).thenReturn(Optional.of(owner));
+        when(userRepository.findByLoginAndProviderId("aet-org", 100L)).thenReturn(Optional.of(owner));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.empty());
 
         provisioningService.bootstrapDefaultPatWorkspace();

@@ -164,6 +164,22 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
           .hasMessageContaining("GitHubAppConfig");
     }
 
+    @Test
+    @DisplayName("@Version increments on update")
+    void version_incrementsOnUpdate() {
+        Connection conn = new Connection(
+            workspace, IntegrationKind.GITHUB, "v-test",
+            new ConnectionConfig.GitHubPatConfig("acme", null, Set.of()));
+        Connection saved = connectionRepository.save(conn);
+        entityManager.flush();
+        Long v0 = saved.getVersion();
+
+        saved.setDisplayName("changed");
+        connectionRepository.save(saved);
+        entityManager.flush();
+        assertThat(saved.getVersion()).isGreaterThan(v0);
+    }
+
     private Long persistAndClear(IntegrationKind kind, String instanceKey, ConnectionConfig config) {
         Connection conn = new Connection(workspace, kind, instanceKey, config);
         Connection saved = connectionRepository.save(conn);
