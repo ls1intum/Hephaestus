@@ -57,8 +57,6 @@ public class WorkspaceScopedTables {
         // Unified integration framework — three-layer identity model
         "hephaestus_user",          // Layer 2: one row per real person; cross-workspace
         "integration_identity",     // Layer 3: scoped by (kind, integration_instance_id, external_id), not workspace_id
-        // GitHub App pre-workspace bootstrap — rows exist before any workspace claims them
-        "github_installation_unbound",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"

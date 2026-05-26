@@ -69,6 +69,16 @@ tags:
 
      <p>Active only on the webhook runtime role.
   name: webhook-controller
+- description: Authentication discovery (public)
+  name: Auth
+- description: Manage practice definitions
+  name: Practice Catalog
+- description: Workspace-scoped team settings management
+  name: Team Settings
+- description: Team management within workspace
+  name: Teams
+- description: Contributor feedback on AI-generated practice findings
+  name: Finding Feedback
 - description: |-
     Administrative REST surface for managing per-workspace
      {@link de.tum.cit.aet.hephaestus.integration.connection.Connection de.tum.cit.aet.hephaestus.integration.connection.Connection} rows — list, read,
@@ -86,66 +96,15 @@ tags:
      annotation simple name contains <code>Workspace</code>, which the rule recognises as a
      workspace-context guard.
 
-     <p>TODO(#1198 follow-up): credential persistence — see <code>ConnectionAdminService</code>
-     for the AES-GCM converter integration plan.
-
-     <p>TODO(#1198 follow-up): the OAuth callback controller that calls
-     {@link ConnectionStrategy#finalizeConnect ConnectionStrategy#finalizeConnect} lives in a separate slice — its endpoint
-     is per-kind and must accept unauthenticated browser redirects from the vendor.
+     <p>TODO: credential persistence — see <code>ConnectionAdminService</code> for the AES-GCM
+     converter integration plan. TODO: an OAuth callback controller that calls
+     {@link ConnectionStrategy#finalizeConnect ConnectionStrategy#finalizeConnect} on per-kind unauthenticated endpoints.
   name: connection-controller
-- description: Authentication discovery (public)
-  name: Auth
-- description: Manage practice definitions
-  name: Practice Catalog
-- description: Workspace-scoped team settings management
-  name: Team Settings
-- description: Team management within workspace
-  name: Teams
-- description: |-
-    Admin endpoint for binding a pre-observed GitHub App installation to a workspace.
-
-     <p>The workspace id appears in the URL path so the arch-test
-     <code>MultiTenancyArchitectureTest.ControllerWorkspaceContextTests</code> sees a workspace
-     scope on every method.
-
-     <p>TODO(#1198 follow-up): {@link RequireWorkspaceAdminForBinding RequireWorkspaceAdminForBinding} is permissive
-     (<code>isAuthenticated()</code>). Tightening it to <code>@workspaceSecure.isAdminOfWorkspace(#workspaceId)</code>
-     needs a parameterised SpEL on <code>WorkspaceSecurityExpressions</code> that resolves the
-     workspace by id directly (without <code>WorkspaceContextHolder</code>, which is only populated
-     on <code>/workspaces/{slug</code>/...} paths). See the annotation's Javadoc for the gap details.
-  name: github-installation-controller
-- description: Contributor feedback on AI-generated practice findings
-  name: Finding Feedback
 - description: User profile and activity data
   name: Profile
 - description: Contributor rankings and league statistics
   name: Leaderboard
 paths:
-  /api/v1/admin/workspaces/{workspaceId}/integrations/github/bind:
-    post:
-      operationId: bind
-      parameters:
-      - in: path
-        name: workspaceId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BindRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BindResponse"
-          description: OK
-      tags:
-      - github-installation
   /api/v1/workspaces/{workspaceId}/connections:
     get:
       operationId: list
@@ -4902,7 +4861,7 @@ components:
           description: Whether a Personal Access Token is configured
         hasSlackSigningSecret:
           type: boolean
-          description: Whether Slack signing secret is configured (always false post-#1198)
+          description: Deprecated; signing secret is app-global. Always false.
         hasSlackToken:
           type: boolean
           description: Whether Slack token is configured

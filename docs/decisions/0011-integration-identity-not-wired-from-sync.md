@@ -4,6 +4,18 @@
 **Date:** 2026-05-25
 **Authors:** Live-run audit (#1198 pass 13)
 
+> **2026-05-26 amendment — AC#6 dropped from #1198.** The pre-workspace bind
+> surface (`github_installation_unbound` table + `GithubInstallationBindingService`
+> + `GithubInstallationController` `/bind` endpoint + `GithubInstallationCleanupJob`)
+> was deleted from #1198 after PE-2 verified the table is provably empty in
+> production: no code path ever writes to it and the bind controller always returns
+> 404. The canonical install journey today is the **inline-create-from-installation**
+> path in `GithubLifecycleListener.createOrUpdateFromInstallation()`, which creates
+> the workspace + `Connection` row directly from the `installation.created` webhook.
+> Stage B below (wiring sync to upsert into `integration_identity`) remains valid as
+> the OAuth-link follow-up — it is no longer load-bearing for any install-bind CVE
+> closure because the bind surface itself is gone.
+
 ## Context
 
 The Wave-1198 "three-layer identity model" introduced:
@@ -29,7 +41,7 @@ SELECT count(*) FROM hephaestus_user;       -- 0
 `IntegrationIdentity` is only populated today from two paths:
 
 1. `OAuthCallbackController` / `OAuthCallbackService` — when a real human completes an OAuth flow and we link their Keycloak subject to the vendor identity.
-2. (Future) `GithubInstallationBindingService` — when a workspace admin binds a pre-observed installation.
+2. ~~(Future) `GithubInstallationBindingService` — when a workspace admin binds a pre-observed installation.~~ **Deprecated when AC#6 was dropped from #1198 (2026-05-26):** the pre-workspace bind surface is gone; identity rows for installers now arrive (if at all) via path 1 only.
 
 **Neither sync path** (`GitLabIssueProcessor.findOrCreateUser`, `GitLabMergeRequestProcessor.findOrCreateUser`, `GitLabGroupMemberSyncService.syncGroupMemberships`) calls `JpaUserDirectory.upsertFromVendor` or writes to `IntegrationIdentityRepository`. As a result, **observed contributors (PR authors, MR reviewers, group members) never end up in `integration_identity`** — only the legacy `user` table.
 
@@ -37,11 +49,15 @@ The Wave-1198 audit (pass 13) called this out as a "structural defect."
 
 ## Decision drivers
 
-- The Layer-3 table is **load-bearing for the GitHub-App install-bind CVE closure** (Wave 5 — `GithubInstallationBindingService.requireInstallerIdentityMatch` does
+- ~~The Layer-3 table is **load-bearing for the GitHub-App install-bind CVE closure** (Wave 5 — `GithubInstallationBindingService.requireInstallerIdentityMatch` does
   `identityRepository.findByKindAndExternalId(GITHUB, installerGithubUserId)`). If no
   one ever populates `integration_identity` for GitHub users, the bind check has
   nothing to match against and every legitimate bind returns
-  `InstallerIdentityNotLinkedException` (412 PRECONDITION_REQUIRED).
+  `InstallerIdentityNotLinkedException` (412 PRECONDITION_REQUIRED).~~
+  **Obsolete (2026-05-26 — AC#6 dropped):** the bind surface was deleted, so the
+  install-bind CVE closure no longer applies. The inline-create path in
+  `GithubLifecycleListener` is authenticated implicitly by webhook signature +
+  workspace-creation flow, not by a Layer-3 identity match.
 - For GitLab, the same surface will matter once we add a "Connect GitLab" OAuth
   flow that needs to bind a vendor identity to a Hephaestus account.
 - Auto-populating from sync would write rows with `hephaestus_user_id = null`
@@ -52,8 +68,8 @@ The Wave-1198 audit (pass 13) called this out as a "structural defect."
 ## Considered options
 
 1. **Wire sync to auto-populate `integration_identity` with `hephaestus_user_id = null`.** Closes the "no rows ever" gap. Every observed vendor user gets a row immediately; OAuth link later fills in the Hephaestus user id.
-2. **Lazily populate at link time only.** Smaller surface, but the GitHub App install-bind CVE check fails for any user who hasn't OAuth-linked first, even if the framework has observed them via installation webhooks.
-3. **Drop the table.** Hardly viable — the Wave 5 install-bind check depends on it.
+2. **Lazily populate at link time only.** Smaller surface. (Historical: under the Wave-5 design this option failed the GitHub App install-bind CVE check for any user who hadn't OAuth-linked first. That tradeoff was deprecated when AC#6 was dropped — the bind check no longer exists.)
+3. **Drop the `integration_identity` table.** ~~Hardly viable — the Wave 5 install-bind check depends on it.~~ Reconsidered post-AC#6-drop (2026-05-26): the table is still useful for the OAuth-link path (option 1) and for cross-workspace identity resolution; we keep it.
 
 ## Decision
 
@@ -96,9 +112,11 @@ Stage B is non-trivial because:
 
 ## Revisit trigger
 
-- First production deployment that needs to bind a GitHub App installation
-  *before* the installer has done OAuth-linking.
-- Or: a multi-tenant SaaS deployment where the same vendor user (`external_id`)
+- ~~First production deployment that needs to bind a GitHub App installation
+  *before* the installer has done OAuth-linking.~~ **Obsolete (AC#6 dropped):**
+  the pre-workspace bind surface no longer exists; installations always go
+  through the inline-create-from-installation path.
+- A multi-tenant SaaS deployment where the same vendor user (`external_id`)
   appears across multiple Hephaestus workspaces — at that point Stage B's
   schema invariant is load-bearing for cross-workspace identity resolution.
 
@@ -108,6 +126,12 @@ Stage B is non-trivial because:
   2026-05-25), finding §3
 - `integration/identity/JpaUserDirectory.java:35` — the `upsertFromVendor`
   entry point that needs to be called from sync
-- `integration/github/installation/GithubInstallationBindingService.java` —
+- ~~`integration/github/installation/GithubInstallationBindingService.java` —
   the consumer of `IntegrationIdentityRepository.findByKindAndExternalId`
-  that depends on Stage B being shipped
+  that depends on Stage B being shipped~~ **Deleted 2026-05-26 (AC#6 drop):**
+  the only remaining consumer of `findByKindAndExternalId` is now
+  `OAuthCallbackService`; Stage B is no longer load-bearing for any CVE
+  closure, only for the OAuth-link UX.
+- `integration/github/lifecycle/GithubLifecycleListener.java` —
+  `createOrUpdateFromInstallation()` is the canonical install journey that
+  superseded the dropped pre-workspace bind surface.

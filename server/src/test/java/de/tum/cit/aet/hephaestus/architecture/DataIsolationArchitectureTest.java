@@ -106,9 +106,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "WorkerTokenDenylist", // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
         // Unified integration framework — three-layer identity model
         "HephaestusUser", // Layer 2 — cross-workspace per real person
-        "IntegrationIdentity", // Layer 3 — scoped by (kind, integration_instance_id, external_id); cross-workspace for SCM
-        // GitHub App pre-workspace bootstrap — rows exist before any workspace claims them
-        "GithubInstallationUnbound"
+        "IntegrationIdentity" // Layer 3 — scoped by (kind, integration_instance_id, external_id); cross-workspace for SCM
     );
 
     // ========================================================================

@@ -17,22 +17,20 @@
         Logical contents:
 
           1.  Connection aggregate + audit + partial-unique for NULL instance_key.
-          2.  github_installation_unbound pre-workspace bootstrap (with installer
-              identity columns baked in).
-          3.  integration_webhook_subscription per-subscription signing-secret sidecar.
-          4.  feedback_post cross-vendor edit-in-place tracking.
-          5.  hephaestus_user + integration_identity cross-integration identity split.
-          6.  agent_job classification columns (integration_kind, subject_class)
+          2.  integration_webhook_subscription per-subscription signing-secret sidecar.
+          3.  feedback_post cross-vendor edit-in-place tracking.
+          4.  hephaestus_user + integration_identity cross-integration identity split.
+          5.  agent_job classification columns (integration_kind, subject_class)
               + (kind, subject, created_at) index.
-          7.  practice capability gating (required_capabilities, required_aspects,
+          6.  practice capability gating (required_capabilities, required_aspects,
               required_family).
-          8.  slack_channel + slack_message persistence (ToS-compliant, see
+          7.  slack_channel + slack_message persistence (ToS-compliant, see
               SlackMessage javadoc).
-          9.  outline_collection + outline_document persistence.
-         10.  shedlock distributed-lock table (JdbcTemplateLockProvider schema).
-         11.  oauth_state_nonce (with code_verifier PKCE column declared from the
+          8.  outline_collection + outline_document persistence.
+          9.  shedlock distributed-lock table (JdbcTemplateLockProvider schema).
+         10.  oauth_state_nonce (with code_verifier PKCE column declared from the
               start) — single-use nonce + RFC 7636 S256 verifier storage.
-         12.  Unconditional drop of the eleven legacy Workspace columns superseded
+         11.  Unconditional drop of the eleven legacy Workspace columns superseded
               by the Connection registry. account_login is intentionally KEPT —
               40+ join sites depend on it as a denormalised org/group lookup column.
 
@@ -49,7 +47,7 @@
         apply on an existing DB where the column is still present.
 
         OPERATOR WARNING — DATA-LOSS GUARD INTENTIONALLY OMITTED on the DROP COLUMN
-        block (section 12 below):
+        block (section 11 below):
           * ON FRESH DB: legacy Workspace columns are empty by construction; the
             drops are no-ops on column-content. Safe.
           * ON IN-FLIGHT DB carrying real student-facing data: the eleven dropped
@@ -192,50 +190,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         2. github_installation_unbound (with installer identity from Wave 5).
-         ─────────────────────────────────────────────────────────────────────── -->
-
-    <changeSet author="hephaestus-1198" id="1779790459343-4">
-        <preConditions onFail="MARK_RAN" onFailMessage="github_installation_unbound already present">
-            <not><tableExists tableName="github_installation_unbound"/></not>
-        </preConditions>
-        <comment>
-            GitHub App pre-workspace bootstrap — installations observed before any
-            workspace claims them. installer_github_user_id + installer_login are
-            captured from the installation.created webhook so the bind service can
-            enforce installer-identity match (closes the confused-deputy CVE from
-            audit pass 3).
-        </comment>
-        <createTable tableName="github_installation_unbound">
-            <column name="installation_id" type="bigint">
-                <constraints primaryKey="true" primaryKeyName="pk_github_installation_unbound" nullable="false"/>
-            </column>
-            <column name="account_id" type="bigint"/>
-            <column name="account_login" type="varchar(256)"/>
-            <column name="account_type" type="varchar(32)"/>
-            <column name="avatar_url" type="varchar(512)"/>
-            <column name="repositories" type="jsonb" defaultValueComputed="'[]'::jsonb">
-                <constraints nullable="false"/>
-            </column>
-            <column name="installer_github_user_id" type="BIGINT"/>
-            <column name="installer_login" type="VARCHAR(256)"/>
-            <column name="observed_at" type="timestamp with time zone" defaultValueComputed="NOW()">
-                <constraints nullable="false"/>
-            </column>
-            <column name="expires_at" type="timestamp with time zone" defaultValueComputed="NOW() + INTERVAL '30 days'">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-        <createIndex tableName="github_installation_unbound" indexName="ix_github_installation_unbound_expires">
-            <column name="expires_at"/>
-        </createIndex>
-        <rollback>
-            <dropTable tableName="github_installation_unbound"/>
-        </rollback>
-    </changeSet>
-
-    <!-- ───────────────────────────────────────────────────────────────────────
-         3. integration_webhook_subscription per-subscription secret sidecar.
+         2. integration_webhook_subscription per-subscription secret sidecar.
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-5">
@@ -277,7 +232,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         4. feedback_post cross-vendor edit-in-place tracking.
+         3. feedback_post cross-vendor edit-in-place tracking.
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-6">
@@ -326,7 +281,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         5. hephaestus_user + integration_identity (cross-integration identity).
+         4. hephaestus_user + integration_identity (cross-integration identity).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-7">
@@ -404,7 +359,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         6. agent_job classification columns + index.
+         5. agent_job classification columns + index.
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-9">
@@ -452,7 +407,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         7. practice capability gating (UI surface filter).
+         6. practice capability gating (UI surface filter).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-12">
@@ -520,7 +475,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         8. Slack persistence (channels + messages).
+         7. Slack persistence (channels + messages).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-16">
@@ -624,7 +579,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         9. Outline persistence (collections + documents).
+         8. Outline persistence (collections + documents).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-18">
@@ -716,7 +671,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         10. ShedLock distributed-lock table.
+         9. ShedLock distributed-lock table.
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-20">
@@ -747,7 +702,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         11. OAuth state nonce store (with PKCE code_verifier from the start).
+         10. OAuth state nonce store (with PKCE code_verifier from the start).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-21">
@@ -786,7 +741,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         12. Unconditional drop of legacy Workspace columns superseded by the
+         11. Unconditional drop of legacy Workspace columns superseded by the
              Connection registry. account_login is intentionally KEPT.
 
              Preconditions guard against re-applying against an environment where

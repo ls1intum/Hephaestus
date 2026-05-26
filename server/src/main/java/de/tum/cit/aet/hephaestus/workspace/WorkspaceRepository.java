@@ -18,8 +18,9 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     /**
      * Reverse-lookup a workspace by its GitHub App installation id. Joins through the
      * {@code Connection} row whose {@code kind='GITHUB'} and {@code instance_key=installationId}.
-     * Cross-workspace collision is rejected by {@code GithubInstallationBindingService},
-     * so the join is at-most-one.
+     * Cross-workspace collision is structurally impossible at this layer because the
+     * inline-create-from-installation path in {@code GithubLifecycleListener} only writes a
+     * {@code Connection} row for the workspace it is creating, so the join is at-most-one.
      */
     default Optional<Workspace> findByInstallationId(Long installationId) {
         if (installationId == null) {
