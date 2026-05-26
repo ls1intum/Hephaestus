@@ -18,7 +18,7 @@
 
           1.  Connection aggregate + audit + partial-unique for NULL instance_key.
           2.  github_installation_unbound pre-workspace bootstrap (with installer
-              identity columns from Wave 5 baked in).
+              identity columns baked in).
           3.  integration_webhook_subscription per-subscription signing-secret sidecar.
           4.  feedback_post cross-vendor edit-in-place tracking.
           5.  hephaestus_user + integration_identity cross-integration identity split.
@@ -33,15 +33,13 @@
          11.  oauth_state_nonce (with code_verifier PKCE column declared from the
               start) — single-use nonce + RFC 7636 S256 verifier storage.
          12.  Unconditional drop of the eleven legacy Workspace columns superseded
-              by the Connection registry. account_login is intentionally KEPT (used
-              by 40+ join sites; Stage 1 preserved it as a denormalised
-              org/group lookup column).
+              by the Connection registry. account_login is intentionally KEPT —
+              40+ join sites depend on it as a denormalised org/group lookup column.
 
-        Decision — no data backfill: the iteration's WorkspaceConnectionBackfillChange
-        customChange + dual-format (v1/v2) credential read path are deleted in the
-        same Stage 2 commit. The branch ships as a clean migration; existing
-        Connection rows from sibling worktrees do NOT need to be preserved because
-        the branch boots against a fresh DB per the user's clean-migration directive.
+        Decision — no data backfill: the branch ships as a clean migration. The
+        interim WorkspaceConnectionBackfillChange customChange that moved data
+        from the legacy columns into Connection rows was retired together with
+        the columns it sourced from.
 
         Preconditions strategy — every changeset uses onFail="MARK_RAN" so
         re-applying against a partially-migrated environment (e.g. someone manually
@@ -61,12 +59,12 @@
             leaderboard_notification_channel_id, installation_linked_at) WILL be
             destroyed without warning. Their successor — rows in the {@code
             connection} table — must be backfilled OUT-OF-BAND BEFORE this
-            migration runs. The {@code WorkspaceConnectionBackfillChange}
-            customChange that previously performed the backfill in-Liquibase was
-            deleted in pass 16/stage 2 as part of the clean-migration directive.
-            Operators upgrading a live environment must replicate that logic
-            externally (script or admin task) and verify the {@code connection}
-            table is populated before applying this changelog.
+            migration runs. The interim WorkspaceConnectionBackfillChange
+            customChange that previously performed the backfill in-Liquibase
+            was retired with the legacy columns. Operators upgrading a live
+            environment must replicate that logic externally (script or admin
+            task) and verify the connection table is populated before applying
+            this changelog.
     -->
 
     <!-- ───────────────────────────────────────────────────────────────────────
