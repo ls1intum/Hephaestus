@@ -20,9 +20,7 @@ import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.Optional;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.type.SqlTypes;
 import org.springframework.lang.Nullable;
 
 /**
@@ -73,7 +71,6 @@ public class Connection {
     private String stateReason;
 
     @Convert(converter = ConnectionConfigConverter.class)
-    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "config", columnDefinition = "jsonb", nullable = false)
     private ConnectionConfig config;
 
