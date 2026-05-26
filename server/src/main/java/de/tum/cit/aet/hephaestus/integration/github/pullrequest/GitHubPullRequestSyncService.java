@@ -39,8 +39,8 @@ import de.tum.cit.aet.hephaestus.integration.github.pullrequestreview.dto.GitHub
 import de.tum.cit.aet.hephaestus.integration.github.pullrequestreviewcomment.GitHubPullRequestReviewCommentSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;

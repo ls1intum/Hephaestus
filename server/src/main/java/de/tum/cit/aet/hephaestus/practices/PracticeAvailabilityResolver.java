@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.integration.manifest.WorkspaceCapabilityResolver;
+import de.tum.cit.aet.hephaestus.integration.framework.WorkspaceCapabilityResolver;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import org.springframework.stereotype.Service;
 

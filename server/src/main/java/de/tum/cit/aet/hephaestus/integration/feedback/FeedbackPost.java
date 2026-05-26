@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.feedback;
 
-import de.tum.cit.aet.hephaestus.integration.registry.Connection;
+import de.tum.cit.aet.hephaestus.integration.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectClass;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

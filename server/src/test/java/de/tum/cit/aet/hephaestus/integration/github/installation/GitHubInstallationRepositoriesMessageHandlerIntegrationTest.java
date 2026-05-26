@@ -2,13 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.github.installation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.installation.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;

@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;

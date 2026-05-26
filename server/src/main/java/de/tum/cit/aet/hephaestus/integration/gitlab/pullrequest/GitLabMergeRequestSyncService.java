@@ -11,7 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabPageInf
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.sync.backfill.BackfillBatchResult;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;

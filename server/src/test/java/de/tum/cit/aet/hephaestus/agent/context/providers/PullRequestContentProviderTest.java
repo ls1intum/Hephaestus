@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.integration.scm.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;

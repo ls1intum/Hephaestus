@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.events;
 
 import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import java.time.Instant;
 import java.util.UUID;

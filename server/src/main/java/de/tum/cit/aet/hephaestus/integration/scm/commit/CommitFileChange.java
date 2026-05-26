@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.commit;
 
-import de.tum.cit.aet.hephaestus.integration.scm.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.workdir.GitRepositoryManager;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.outline.credentials;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.registry.Connection;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter;
+import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.connection.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.OAuthSession;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;

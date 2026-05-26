@@ -7,7 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.manifest.WorkspaceCapabilityResolver;
+import de.tum.cit.aet.hephaestus.integration.framework.WorkspaceCapabilityResolver;
 import de.tum.cit.aet.hephaestus.integration.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationFamily;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;

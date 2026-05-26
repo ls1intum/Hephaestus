@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.BaseGitLabProcessor;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabFieldUtils;

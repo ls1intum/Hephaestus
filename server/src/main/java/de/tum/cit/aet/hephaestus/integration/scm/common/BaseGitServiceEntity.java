@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.common;
 
+import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;

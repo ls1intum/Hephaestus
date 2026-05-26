@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.common;
 
+import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import java.time.Instant;
 import java.util.UUID;

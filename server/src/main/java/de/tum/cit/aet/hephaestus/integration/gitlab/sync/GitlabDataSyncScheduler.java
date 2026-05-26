@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.commit.GitLabCommitSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
@@ -47,8 +47,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
 
 /**
  * Scheduler for periodic GitLab data synchronization across all GitLab scopes.

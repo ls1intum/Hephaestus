@@ -71,7 +71,7 @@ tags:
   name: webhook-controller
 - description: |-
     Administrative REST surface for managing per-workspace
-     {@link de.tum.cit.aet.hephaestus.integration.registry.Connection de.tum.cit.aet.hephaestus.integration.registry.Connection} rows — list, read,
+     {@link de.tum.cit.aet.hephaestus.integration.connection.Connection de.tum.cit.aet.hephaestus.integration.connection.Connection} rows — list, read,
      initiate, suspend, reactivate, disconnect, audit.
 
      <p>Thin HTTP adapter: all repository access lives in {@link ConnectionAdminService ConnectionAdminService};

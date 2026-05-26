@@ -8,11 +8,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.registry.Connection;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService.TransitionRequest;
+import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService.TransitionRequest;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy.ConnectFinalization;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
@@ -37,7 +37,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     @Mock private ConnectionRepository connectionRepository;
     @Mock private ConnectionService connectionService;
     @Mock private WorkspaceRepository workspaceRepository;
-    @Mock private de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter credentialBundleConverter;
+    @Mock private de.tum.cit.aet.hephaestus.integration.connection.CredentialBundleConverter credentialBundleConverter;
 
     private OAuthCallbackService service;
 

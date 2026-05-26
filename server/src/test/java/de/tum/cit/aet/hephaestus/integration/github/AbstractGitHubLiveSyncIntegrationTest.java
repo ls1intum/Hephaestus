@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.github;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.integration.registry.Connection;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;

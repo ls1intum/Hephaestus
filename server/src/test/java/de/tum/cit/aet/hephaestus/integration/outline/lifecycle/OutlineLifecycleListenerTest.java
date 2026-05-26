@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.outline.refs.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.refs.OutlineDocumentRepository;
-import de.tum.cit.aet.hephaestus.integration.registry.Connection;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener.ScopeDelta;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;

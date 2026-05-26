@@ -8,7 +8,7 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.commit.util.CommitUtils;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.RepositoryRef;

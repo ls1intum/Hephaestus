@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.sync.backfill;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationReposi
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest.GitLabMergeRequestSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;

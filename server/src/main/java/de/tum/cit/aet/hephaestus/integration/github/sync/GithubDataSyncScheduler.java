@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.github.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
@@ -18,7 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.github.organization.GitHubOrganizat
 import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
 import de.tum.cit.aet.hephaestus.integration.github.project.GitHubProjectSyncService;
 import de.tum.cit.aet.hephaestus.integration.github.subissue.GitHubSubIssueSyncService;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.github.team.GitHubTeamSyncService;
 import jakarta.annotation.PostConstruct;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -34,7 +34,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
 
 /**
  * Scheduler for periodic GitHub data synchronization across all scopes.

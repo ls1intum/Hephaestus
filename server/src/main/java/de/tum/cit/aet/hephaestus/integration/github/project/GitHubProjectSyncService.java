@@ -12,8 +12,8 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
@@ -43,8 +43,8 @@ import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFie
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldValueDTO;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectItemDTO;
 import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectStatusUpdateDTO;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;

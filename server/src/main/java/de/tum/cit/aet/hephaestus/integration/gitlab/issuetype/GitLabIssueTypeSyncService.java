@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlResponse
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncException;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueTypeRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;

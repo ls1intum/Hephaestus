@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.oauth;
 
-import de.tum.cit.aet.hephaestus.integration.registry.Connection;
+import de.tum.cit.aet.hephaestus.integration.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy.ConnectFinalization;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;

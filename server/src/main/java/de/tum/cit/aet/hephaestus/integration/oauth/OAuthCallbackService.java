@@ -2,12 +2,12 @@ package de.tum.cit.aet.hephaestus.integration.oauth;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.registry.Connection;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService.TransitionRequest;
-import de.tum.cit.aet.hephaestus.integration.registry.CredentialBundleConverter;
+import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService.TransitionRequest;
+import de.tum.cit.aet.hephaestus.integration.connection.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy.ConnectFinalization;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;

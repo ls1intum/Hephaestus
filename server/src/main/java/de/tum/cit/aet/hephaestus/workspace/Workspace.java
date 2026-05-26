@@ -48,8 +48,8 @@ import lombok.ToString;
  * Authentication credentials, provider classification, and integration-specific
  * configuration (GitHub App installation id, GitLab group id / webhook id, Slack
  * channel + token, …) are <em>not</em> stored on this entity. They live on per-kind
- * {@link de.tum.cit.aet.hephaestus.integration.registry.Connection Connection} rows
- * owned by the {@link de.tum.cit.aet.hephaestus.integration.registry.ConnectionService
+ * {@link de.tum.cit.aet.hephaestus.integration.connection.Connection Connection} rows
+ * owned by the {@link de.tum.cit.aet.hephaestus.integration.connection.ConnectionService
  * ConnectionService}. Use {@code ConnectionService.findActiveProviderKind(workspaceId)}
  * to classify a workspace at runtime and the typed accessors
  * ({@code findActiveGitHubAppConfig}, {@code findActiveGitLabConfig},
@@ -78,7 +78,7 @@ import lombok.ToString;
  * @see WorkspaceContext
  * @see WorkspaceMembership
  * @see WorkspaceLifecycleService
- * @see de.tum.cit.aet.hephaestus.integration.registry.ConnectionService
+ * @see de.tum.cit.aet.hephaestus.integration.connection.ConnectionService
  */
 @Entity
 @Table(name = "workspace")
@@ -231,9 +231,9 @@ public class Workspace {
      * <p>
      * Pure UI toggle. The Slack target (team label, channel id) and credentials live on
      * the workspace's Slack
-     * {@link de.tum.cit.aet.hephaestus.integration.registry.Connection Connection} and
+     * {@link de.tum.cit.aet.hephaestus.integration.connection.Connection Connection} and
      * are read via
-     * {@link de.tum.cit.aet.hephaestus.integration.registry.ConnectionService#findSlackNotificationConfig
+     * {@link de.tum.cit.aet.hephaestus.integration.connection.ConnectionService#findSlackNotificationConfig
      * ConnectionService.findSlackNotificationConfig}.
      */
     @Column(name = "leaderboard_notification_enabled")

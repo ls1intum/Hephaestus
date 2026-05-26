@@ -3,14 +3,14 @@
  *
  * <p>Houses all vendor adapters (GitHub, GitLab, Slack, Outline, …) end-to-end plus the
  * cross-cutting trait modules (webhook ingest, realtime ingest, NATS consumer, identity,
- * feedback-post tracking, connection registry, manifest validation, sync substrate) and
- * the family libraries (scm-lib, messaging-lib, knowledge-lib, project-tracker-lib).
+ * feedback-post tracking, connection aggregate, framework bootstrap) and the family
+ * libraries (scm-lib, messaging-lib, knowledge-lib, project-tracker-lib).
  *
  * <p>Three coexisting structural axes:
  * <ul>
  *   <li><b>Vendor coherence</b> — {@code integration/{github,gitlab,slack,outline}/...}
  *   <li><b>Family-shared abstractions</b> — {@code integration/{scm,messaging,knowledge,project-tracker}-lib/...}
- *   <li><b>Cross-cutting traits</b> — {@code integration/{webhook,realtime,consumer,identity,feedback,registry,manifest,sync}/...}
+ *   <li><b>Cross-cutting traits</b> — {@code integration/{webhook,realtime,consumer,identity,feedback,connection,framework}/...}
  * </ul>
  *
  * <p>What is NOT an integration: per-user, outbound-first, ephemeral-subject endpoints

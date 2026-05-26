@@ -27,7 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueTypeRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;

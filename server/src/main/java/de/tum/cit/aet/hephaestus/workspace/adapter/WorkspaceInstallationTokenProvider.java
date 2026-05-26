@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;

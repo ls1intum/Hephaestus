@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -67,7 +67,7 @@ public record WorkspaceDTO(
      * <p>{@code installation_linked_at} is derived from the active GitHub App
      * connection's {@code createdAt} — the migration backfilled it from the legacy
      * column for existing rows, and freshly-bound installations stamp it via the
-     * standard {@code @CreationTimestamp} on {@link de.tum.cit.aet.hephaestus.integration.registry.Connection}.
+     * standard {@code @CreationTimestamp} on {@link de.tum.cit.aet.hephaestus.integration.connection.Connection}.
      *
      * <p>{@code hasSlackSigningSecret} is always {@code false}: per-workspace signing
      * secrets are dead at runtime (Slack signing-secret comes from the app-global

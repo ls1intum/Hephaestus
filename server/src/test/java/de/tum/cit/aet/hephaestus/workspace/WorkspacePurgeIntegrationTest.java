@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
-import de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
@@ -268,7 +268,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     class SensitiveFieldClearing {
 
         @Autowired
-        private de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository connectionRepository;
+        private de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository connectionRepository;
 
         /**
          * Per-workspace credentials now live on the {@code Connection} aggregate (PAT,

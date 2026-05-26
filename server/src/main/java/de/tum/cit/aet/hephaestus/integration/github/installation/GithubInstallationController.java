@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallat
 import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.InstallerIdentityNotLinkedException;
 import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.LegacyUnboundRowException;
 import de.tum.cit.aet.hephaestus.integration.github.installation.GithubInstallationBindingService.UnknownActorException;
-import de.tum.cit.aet.hephaestus.integration.registry.Connection;
+import de.tum.cit.aet.hephaestus.integration.connection.Connection;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;

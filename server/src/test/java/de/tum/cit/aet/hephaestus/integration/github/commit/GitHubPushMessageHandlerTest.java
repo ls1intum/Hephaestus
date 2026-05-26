@@ -20,7 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
@@ -163,7 +163,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         when(repo.getDefaultBranch()).thenReturn(defaultBranch);
         when(repo.getOrganization()).thenReturn(null);
         var provider = mock(
-            de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider.class,
+            de.tum.cit.aet.hephaestus.integration.connection.GitProvider.class,
             org.mockito.Mockito.withSettings().lenient()
         );
         when(provider.getId()).thenReturn(1L);

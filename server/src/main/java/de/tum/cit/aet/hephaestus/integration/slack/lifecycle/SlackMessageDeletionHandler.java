@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.lifecycle;
 
-import de.tum.cit.aet.hephaestus.integration.registry.Connection;
-import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.refs.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.time.Clock;

@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.milestone.dto.GitLabMilestoneDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.sync.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

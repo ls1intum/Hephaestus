@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * if it begins with {@code whsec_}, and treats it as opaque bytes otherwise.
  *
  * <p>TODO(#1198 follow-up): per-workspace {@code whsec_*} secrets live in each
- * Connection's {@link de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig.GitLabConfig}
+ * Connection's {@link de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig.GitLabConfig}
  * blob, decrypted via the per-Connection credential converter. Switching this source
  * to {@code Scope.WORKSPACE} requires that converter, which ships in the credential
  * provider follow-up. Until then, multi-tenant setups using Standard Webhooks must

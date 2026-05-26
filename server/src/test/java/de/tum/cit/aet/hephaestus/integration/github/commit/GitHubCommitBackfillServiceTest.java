@@ -19,7 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
-import de.tum.cit.aet.hephaestus.integration.scm.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -112,7 +112,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         lenient().when(repo.getId()).thenReturn(id);
         lenient().when(repo.getNameWithOwner()).thenReturn(nameWithOwner);
         lenient().when(repo.getDefaultBranch()).thenReturn(defaultBranch);
-        var provider = mock(de.tum.cit.aet.hephaestus.integration.scm.common.GitProvider.class);
+        var provider = mock(de.tum.cit.aet.hephaestus.integration.connection.GitProvider.class);
         lenient().when(provider.getId()).thenReturn(1L);
         lenient().when(repo.getProvider()).thenReturn(provider);
         return repo;
