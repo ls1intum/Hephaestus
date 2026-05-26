@@ -15,14 +15,20 @@ else
   # (e.g. server/application-server/... before the #1097 module rename).
   copy_first_hit() {
     local dest="$1"; shift
+    local idx=0
     for src_rel in "$@"; do
       local src="$JEAN_ROOT_PATH/$src_rel"
       if [ -f "$src" ]; then
         mkdir -p "$(dirname "$dest")"
         cp "$src" "$dest"
-        echo "  copied $dest (from $src_rel)"
+        if [ "$idx" -gt 0 ]; then
+          echo "  WARN: legacy layout — copied $dest (from $src_rel)"
+        else
+          echo "  copied $dest (from $src_rel)"
+        fi
         return
       fi
+      idx=$((idx + 1))
     done
     echo "  skipped $dest (no candidate found in root: $*)"
   }
@@ -40,6 +46,6 @@ else
 fi
 
 echo "Installing npm dependencies..."
-pnpm install
+pnpm install --frozen-lockfile
 
 echo "✅ Jean worktree setup complete."

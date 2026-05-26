@@ -13,6 +13,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
@@ -207,5 +209,30 @@ public class Connection {
 
     private EncryptionContext encryptionContext() {
         return EncryptionContext.forConnectionCredentials(workspace.getId(), kind, instanceKey);
+    }
+
+    /**
+     * Guards against {@code (kind, config)} drift — e.g. a {@code kind=GITLAB} row pointing
+     * at a {@code GitHubAppConfig} payload after a buggy mutator path. Fails the flush.
+     */
+    @PrePersist
+    @PreUpdate
+    void assertKindMatchesConfigSubtype() {
+        if (kind == null || config == null) {
+            return;
+        }
+        boolean ok = switch (kind) {
+            case GITHUB -> config instanceof ConnectionConfig.GitHubAppConfig
+                || config instanceof ConnectionConfig.GitHubPatConfig;
+            case GITLAB -> config instanceof ConnectionConfig.GitLabConfig;
+            case SLACK -> config instanceof ConnectionConfig.SlackConfig;
+            case OUTLINE -> config instanceof ConnectionConfig.OutlineConfig;
+        };
+        if (!ok) {
+            throw new IllegalStateException(
+                "Connection kind=" + kind + " incompatible with config="
+                    + config.getClass().getSimpleName()
+            );
+        }
     }
 }

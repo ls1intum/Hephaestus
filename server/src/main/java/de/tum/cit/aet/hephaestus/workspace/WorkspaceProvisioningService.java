@@ -209,9 +209,18 @@ public class WorkspaceProvisioningService {
             );
         }
 
-        // Check if a workspace already exists for this group path
-        if (workspaceRepository.findByAccountLoginIgnoreCase(groupPath).isPresent()) {
-            log.debug("Skipped GitLab PAT workspace creation: reason=workspaceAlreadyExists, groupPath={}", groupPath);
+        // Skip only if a workspace with this login already has an ACTIVE GitLab Connection.
+        // Bare findByAccountLoginIgnoreCase would false-skip when a different-kind workspace
+        // (e.g. GitHub-only) happens to share the same login string — mirrors the cross-vendor
+        // guard in GithubLifecycleListener#createOrUpdateFromInstallation.
+        Optional<Workspace> existing = workspaceRepository.findByAccountLoginIgnoreCase(groupPath);
+        if (existing.isPresent()
+            && connectionService.findActive(existing.get().getId(), IntegrationKind.GITLAB).isPresent()) {
+            log.debug(
+                "Skipped GitLab PAT workspace creation, workspace has ACTIVE GitLab Connection: workspaceId={}, groupPath={}",
+                existing.get().getId(),
+                groupPath
+            );
             return;
         }
 

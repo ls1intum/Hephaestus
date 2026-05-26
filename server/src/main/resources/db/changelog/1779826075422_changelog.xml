@@ -1,0 +1,29 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        #1198 — Enforce "one ACTIVE SCM provider per workspace" at the database level.
+        Belt to the @PrePersist suspenders + the ConnectionService.findActiveProviderKind
+        loud-fail invariant. PostgreSQL partial unique index — covers only ACTIVE rows
+        of GITHUB/GITLAB kind so SUSPENDED/UNINSTALLED history rows remain unaffected.
+    -->
+    <changeSet id="1779826075422-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="uq_connection_one_active_scm_per_workspace already present">
+            <not><indexExists indexName="uq_connection_one_active_scm_per_workspace"/></not>
+        </preConditions>
+        <comment>One ACTIVE SCM Connection per workspace (partial unique on workspace_id).</comment>
+        <sql>
+            CREATE UNIQUE INDEX uq_connection_one_active_scm_per_workspace
+                ON connection (workspace_id)
+                WHERE state = 'ACTIVE' AND kind IN ('GITHUB','GITLAB');
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS uq_connection_one_active_scm_per_workspace;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
