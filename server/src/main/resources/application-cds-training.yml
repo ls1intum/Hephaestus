@@ -39,3 +39,10 @@ hephaestus:
     workspace:
         init-default: false
         init-gitlab-default: false
+    # OAuth-state HMAC + webhook secret — required at boot by HmacOAuthStateService.
+    # Placeholders only; runtime SPRING_PROFILES_ACTIVE=prod provides the real values.
+    integration:
+        oauth-state:
+            secret: cds-training-placeholder-not-secret
+    webhook:
+        secret: cds-training-placeholder-not-secret
