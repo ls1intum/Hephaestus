@@ -20,6 +20,7 @@ import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.Optional;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -67,6 +68,7 @@ public class Connection {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
+    @ColumnDefault("'PENDING'")
     private IntegrationState state = IntegrationState.PENDING;
 
     @Column(name = "state_reason", length = 512)
@@ -103,6 +105,7 @@ public class Connection {
 
     @Version
     @Column(nullable = false)
+    @ColumnDefault("0")
     private Long version = 0L;
 
     protected Connection() {}

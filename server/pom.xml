@@ -966,6 +966,16 @@
                     <referenceUrl>
                         hibernate:spring:de.tum.cit.aet.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
                     </referenceUrl>
+                    <!--
+                        Exclude Liquibase-managed sidecar tables that have no JPA entity
+                        and never will (managed by external libraries / forward-looking).
+                          - shedlock: ShedLock distributed lock table (managed by the
+                            ShedLock library via JdbcTemplateLockProvider, not JPA).
+                          - integration_webhook_subscription: per-webhook signing-secret
+                            sidecar created by #1198 for future Outline/Notion/MS Graph/
+                            Asana/Linear connectors; no JPA entity yet by design.
+                    -->
+                    <diffExcludeObjects>table:shedlock,table:integration_webhook_subscription</diffExcludeObjects>
                     <verbose>true</verbose>
                 </configuration>
                 <dependencies>

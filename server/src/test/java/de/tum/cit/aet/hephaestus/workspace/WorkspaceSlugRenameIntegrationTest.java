@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
@@ -153,8 +154,8 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
             "beta-account",
             AccountType.ORG,
             ownerB.getId(),
-            null,
-            null,
+            IntegrationKind.GITHUB,
+            "ghp_dummy_token_for_test",
             null
         );
 

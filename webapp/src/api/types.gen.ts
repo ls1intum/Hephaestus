@@ -199,7 +199,7 @@ export type Workspace = {
      */
     hasPersonalAccessToken: boolean;
     /**
-     * Whether Slack signing secret is configured (always false post-#1198)
+     * Deprecated; signing secret is app-global. Always false.
      */
     hasSlackSigningSecret: boolean;
     /**

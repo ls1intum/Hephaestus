@@ -125,8 +125,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "mentor-org",
             AccountType.ORG,
             owner.getId(),
-            null,
-            null,
+            IntegrationKind.GITHUB,
+            "ghp_dummy_token_for_test",
             null
         );
 
@@ -154,8 +154,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "controller",
             AccountType.ORG,
             owner.getId(),
-            null,
-            null,
+            IntegrationKind.GITHUB,
+            "ghp_dummy_token_for_test",
             null
         );
 
@@ -534,8 +534,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "duplicate",
             AccountType.ORG,
             owner.getId(),
-            null,
-            null,
+            IntegrationKind.GITHUB,
+            "ghp_dummy_token_for_test",
             null
         );
 

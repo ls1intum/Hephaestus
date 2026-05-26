@@ -152,7 +152,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-            .containsKey("tokenProvidedForGitLab");
+            .containsKey("tokenProvided");
 
         assertThat(workspaceRepository.findByWorkspaceSlug("gitlab-notoken")).isEmpty();
     }
