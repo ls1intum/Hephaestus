@@ -81,18 +81,27 @@ public class SlackLifecycleListener implements IntegrationLifecycleListener {
         }
         Optional<Connection> connectionOpt = resolveConnection(ref);
         if (connectionOpt.isEmpty()) {
-            log.warn("Slack scope-change for unknown connection ref={}, skipping deletion of {} channels",
-                ref, delta.removedExternalIds().size());
+            log.warn(
+                "Slack scope-change for unknown connection ref={}, skipping deletion of {} channels",
+                ref,
+                delta.removedExternalIds().size()
+            );
             return;
         }
         long connectionId = connectionOpt.get().getId();
         for (String channelId : delta.removedExternalIds()) {
             int messages = messageRepository.deleteByConnectionIdAndChannelId(connectionId, channelId);
-            log.info("Slack channel removal: connection={}, channel={}, messagesPurged={}",
-                connectionId, channelId, messages);
+            log.info(
+                "Slack channel removal: connection={}, channel={}, messagesPurged={}",
+                connectionId,
+                channelId,
+                messages
+            );
         }
         int channels = channelRepository.deleteByConnectionIdAndChannelIdIn(
-            connectionId, List.copyOf(delta.removedExternalIds()));
+            connectionId,
+            List.copyOf(delta.removedExternalIds())
+        );
         log.info("Slack channel removal: connection={}, channelsPurged={}", connectionId, channels);
     }
 
@@ -110,6 +119,9 @@ public class SlackLifecycleListener implements IntegrationLifecycleListener {
             return Optional.empty();
         }
         return connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(
-            ref.workspaceId(), ref.kind(), ref.instanceKey());
+            ref.workspaceId(),
+            ref.kind(),
+            ref.instanceKey()
+        );
     }
 }

@@ -7,10 +7,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubWebhookEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequest.dto.GitHubPullRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequestReview;
 import java.time.Instant;
 import org.springframework.lang.Nullable;
 

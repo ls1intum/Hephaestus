@@ -27,10 +27,10 @@ class IntegrationSubjectBoundariesTest extends HephaestusArchitectureTest {
             .should()
             .haveRawParameterTypes(String.class)
             .because(
-                "ADR-0012 — provider-scoped lookups only. Unscoped findByLogin*(String) "
-                    + "creates cross-instance identity-fusion (HephaestusTest on github.com "
-                    + "vs hephaestustest on gitlab.lrz.de get merged into one row). Use "
-                    + "findByLoginIgnoreCaseAndProviderId or findByLoginIgnoreCaseAndProvider_Type."
+                "ADR-0012 — provider-scoped lookups only. Unscoped findByLogin*(String) " +
+                    "creates cross-instance identity-fusion (HephaestusTest on github.com " +
+                    "vs hephaestustest on gitlab.lrz.de get merged into one row). Use " +
+                    "findByLoginIgnoreCaseAndProviderId or findByLoginIgnoreCaseAndProvider_Type."
             );
         rule.check(classes);
     }

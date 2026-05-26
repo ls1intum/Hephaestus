@@ -3,21 +3,21 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.integration.scm.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.github.installation.GitHubInstallationRepositoryEnumerationService;
+import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectIntegrityService;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
-import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
-import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.scm.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
@@ -607,7 +607,9 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
         if (repositoryAllowed) {
-            getGitHubDataSyncService().syncSyncTargetAsync(SyncTargetFactory.create(workspace, monitor, connectionService));
+            getGitHubDataSyncService().syncSyncTargetAsync(
+                SyncTargetFactory.create(workspace, monitor, connectionService)
+            );
         } else {
             log.debug(
                 "Persisted repository without sync: reason=filteredByScope, repoName={}",
@@ -739,15 +741,19 @@ public class WorkspaceRepositoryMonitorService {
 
     /** Workspace is bound to a GitHub App installation (vs GitHub PAT or GitLab PAT). */
     private boolean isGitHubAppWorkspace(Workspace workspace) {
-        return connectionService.findActiveProviderKind(workspace.getId())
-            .map(k -> k == IntegrationKind.GITHUB)
-            .orElse(false)
-            && connectionService.findActiveGitHubAppConfig(workspace.getId()).isPresent();
+        return (
+            connectionService
+                .findActiveProviderKind(workspace.getId())
+                .map(k -> k == IntegrationKind.GITHUB)
+                .orElse(false) &&
+            connectionService.findActiveGitHubAppConfig(workspace.getId()).isPresent()
+        );
     }
 
     /** Workspace is bound to a GitLab PAT (vs GitHub of either flavour). */
     private boolean isGitLabWorkspace(Workspace workspace) {
-        return connectionService.findActiveProviderKind(workspace.getId())
+        return connectionService
+            .findActiveProviderKind(workspace.getId())
             .map(k -> k == IntegrationKind.GITLAB)
             .orElse(false);
     }

@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.connection;
 
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 import de.tum.cit.aet.hephaestus.core.security.EncryptionException;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
 import jakarta.persistence.AttributeConverter;
@@ -18,6 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * AES-256-GCM encrypter for {@link CredentialBundle}. The GCM AAD binds the
@@ -73,8 +73,8 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
                 );
             }
             log.warn(
-                "Skipped credential encryption configuration: reason=missing_key, "
-                    + "action=set_hephaestus_security_encryption_key_in_production"
+                "Skipped credential encryption configuration: reason=missing_key, " +
+                    "action=set_hephaestus_security_encryption_key_in_production"
             );
             this.secretKey = null;
             this.enabled = false;
@@ -118,8 +118,9 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     public byte[] convertToDatabaseColumn(@Nullable CredentialBundle attribute) {
         if (attribute == null) return null;
         throw new EncryptionException(
-            "CredentialBundleConverter.convertToDatabaseColumn requires per-row EncryptionContext — "
-                + "use encrypt(bundle, ctx)");
+            "CredentialBundleConverter.convertToDatabaseColumn requires per-row EncryptionContext — " +
+                "use encrypt(bundle, ctx)"
+        );
     }
 
     /**
@@ -136,7 +137,8 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
         byte version = versionByte(dbData);
         if (version == FORMAT_VERSION_V2) {
             throw new EncryptionException(
-                "v2 blob requires per-row EncryptionContext — use decrypt(byte[], EncryptionContext)");
+                "v2 blob requires per-row EncryptionContext — use decrypt(byte[], EncryptionContext)"
+            );
         }
         throw unsupportedVersion(version);
     }
@@ -186,8 +188,12 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     private byte[] decryptInternal(byte[] dbData, int headerLen, byte[] aad) {
         if (dbData.length < headerLen + GCM_IV_LENGTH + 1) {
             throw new EncryptionException(
-                "Credential ciphertext too short: " + dbData.length + " bytes (need > "
-                    + (headerLen + GCM_IV_LENGTH) + ")");
+                "Credential ciphertext too short: " +
+                    dbData.length +
+                    " bytes (need > " +
+                    (headerLen + GCM_IV_LENGTH) +
+                    ")"
+            );
         }
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
@@ -212,14 +218,14 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     }
 
     private static EncryptionException unsupportedVersion(byte b) {
-        return new EncryptionException(
-            "Unsupported credential blob version: 0x" + Integer.toHexString(b & 0xFF));
+        return new EncryptionException("Unsupported credential blob version: 0x" + Integer.toHexString(b & 0xFF));
     }
 
     private void requireEnabled(String op) {
         if (!enabled) {
             throw new EncryptionException(
-                "CredentialBundleConverter is not enabled; cannot " + op + " credentials without a configured key");
+                "CredentialBundleConverter is not enabled; cannot " + op + " credentials without a configured key"
+            );
         }
     }
 

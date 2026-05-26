@@ -2,13 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.issuecomment;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.BotCommandReceivedEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventAction;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookContextResolver;
@@ -16,6 +10,12 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.issuecomment.dto.GitLabNoteE
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest.GitLabMergeRequestProcessor;
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment.GitLabDiffNoteWebhookProcessor;
 import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

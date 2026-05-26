@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.oauth.state;
 
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
@@ -41,6 +41,7 @@ public class HmacOAuthStateService implements OAuthStateService {
 
     private final byte[] secret;
     private final Duration ttl;
+
     @Nullable
     private final OAuthStateNonceStore nonceStore;
 
@@ -93,8 +94,12 @@ public class HmacOAuthStateService implements OAuthStateService {
         return doIssue(workspaceId, kind, actorRef, null);
     }
 
-    private String doIssue(long workspaceId, IntegrationKind kind, @Nullable String actorRef,
-                           @Nullable String codeVerifier) {
+    private String doIssue(
+        long workspaceId,
+        IntegrationKind kind,
+        @Nullable String actorRef,
+        @Nullable String codeVerifier
+    ) {
         long issuedAt = Instant.now().getEpochSecond();
         byte[] nonceBytes = new byte[12];
         RANDOM.nextBytes(nonceBytes);
@@ -107,7 +112,8 @@ public class HmacOAuthStateService implements OAuthStateService {
         if (nonceStore != null) {
             nonceStore.issue(nonce, workspaceId, kind, Instant.ofEpochSecond(issuedAt), codeVerifier);
         }
-        return Base64.getUrlEncoder().withoutPadding()
+        return Base64.getUrlEncoder()
+            .withoutPadding()
             .encodeToString((payload + "|" + sig).getBytes(StandardCharsets.UTF_8));
     }
 
@@ -159,10 +165,12 @@ public class HmacOAuthStateService implements OAuthStateService {
         String suppliedSig = parts[5];
         String payload = workspaceIdStr + "|" + kindStr + "|" + issuedAtStr + "|" + nonce + "|" + actorSegment;
         String expectedSig = hmac(payload);
-        if (!MessageDigest.isEqual(
-            expectedSig.getBytes(StandardCharsets.UTF_8),
-            suppliedSig.getBytes(StandardCharsets.UTF_8)
-        )) {
+        if (
+            !MessageDigest.isEqual(
+                expectedSig.getBytes(StandardCharsets.UTF_8),
+                suppliedSig.getBytes(StandardCharsets.UTF_8)
+            )
+        ) {
             throw new IllegalArgumentException("OAuth state signature mismatch");
         }
         long issuedAt;
@@ -215,8 +223,7 @@ public class HmacOAuthStateService implements OAuthStateService {
 
     private static String encodeActor(@Nullable String actorRef) {
         if (actorRef == null || actorRef.isEmpty()) return "";
-        return Base64.getUrlEncoder().withoutPadding()
-            .encodeToString(actorRef.getBytes(StandardCharsets.UTF_8));
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(actorRef.getBytes(StandardCharsets.UTF_8));
     }
 
     @Nullable

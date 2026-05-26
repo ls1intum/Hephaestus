@@ -15,7 +15,6 @@ import java.util.Set;
  * redelivery floods.
  */
 public enum IntegrationState {
-
     /** OAuth in flight, or pending vendor-side accept. */
     PENDING,
 
@@ -29,10 +28,14 @@ public enum IntegrationState {
     UNINSTALLED;
 
     private static final Map<IntegrationState, Set<IntegrationState>> LEGAL = Map.of(
-        PENDING,     Set.of(ACTIVE, UNINSTALLED),
-        ACTIVE,      Set.of(SUSPENDED, UNINSTALLED),
-        SUSPENDED,   Set.of(ACTIVE, UNINSTALLED),
-        UNINSTALLED, Set.of()
+        PENDING,
+        Set.of(ACTIVE, UNINSTALLED),
+        ACTIVE,
+        Set.of(SUSPENDED, UNINSTALLED),
+        SUSPENDED,
+        Set.of(ACTIVE, UNINSTALLED),
+        UNINSTALLED,
+        Set.of()
     );
 
     public boolean canTransitionTo(IntegrationState next) {

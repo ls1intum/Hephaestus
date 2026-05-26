@@ -6,7 +6,6 @@ package de.tum.cit.aet.hephaestus.integration.spi;
  * {@link Capability#APPROVAL_WORKFLOW} never resolve via this registry.
  */
 public interface ApprovalChannel {
-
     IntegrationKind kind();
 
     void approve(FeedbackChannel.FeedbackTarget target, String message);

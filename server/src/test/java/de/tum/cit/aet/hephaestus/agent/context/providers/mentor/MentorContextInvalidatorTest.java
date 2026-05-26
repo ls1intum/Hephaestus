@@ -6,12 +6,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;

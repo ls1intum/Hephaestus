@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.outline.connect;
 
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -59,11 +59,15 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     @Override
     public ConnectInitiation initiate(InitiateRequest request) {
         String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.OUTLINE);
-        StringBuilder url = new StringBuilder(serverUrl).append("/oauth/authorize?")
-            .append("client_id=").append(enc(clientId))
+        StringBuilder url = new StringBuilder(serverUrl)
+            .append("/oauth/authorize?")
+            .append("client_id=")
+            .append(enc(clientId))
             .append("&response_type=code")
-            .append("&scope=").append(enc(scopes))
-            .append("&state=").append(enc(state));
+            .append("&scope=")
+            .append(enc(scopes))
+            .append("&state=")
+            .append(enc(state));
         if (redirectUri != null && !redirectUri.isBlank()) {
             url.append("&redirect_uri=").append(enc(redirectUri));
         }
@@ -75,8 +79,11 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
         // TODO(#1203): POST to <serverUrl>/oauth.access with grant_type=authorization_code,
         // exchange code for { access_token, refresh_token, expires_in, team.id, team.name },
         // return ConnectFinalization.Completed(team.id, OAuthSession(access, refresh, expires), team.name).
-        log.warn("Outline finalizeConnect called but OAuth code exchange not yet wired (workspace={}, params keys={})",
-            ref.workspaceId(), callbackParams == null ? null : callbackParams.keySet());
+        log.warn(
+            "Outline finalizeConnect called but OAuth code exchange not yet wired (workspace={}, params keys={})",
+            ref.workspaceId(),
+            callbackParams == null ? null : callbackParams.keySet()
+        );
         return new ConnectFinalization.Failed("OAuth code exchange not yet wired");
     }
 

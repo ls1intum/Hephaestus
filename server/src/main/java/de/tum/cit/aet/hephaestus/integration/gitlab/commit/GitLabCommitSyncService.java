@@ -2,12 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.commit;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.commit.Commit;
-import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitAuthorResolver;
-import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitContributor;
-import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitContributorRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
@@ -15,6 +9,12 @@ import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.Commit;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitAuthorResolver;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitContributor;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitContributorRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
 import java.net.URLEncoder;

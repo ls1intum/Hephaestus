@@ -24,11 +24,7 @@ import org.springframework.stereotype.Component;
  * capability would lie to the UI's practice-gating check.
  */
 @Component
-@ConditionalOnProperty(
-    name = "hephaestus.integration.gitlab.enabled",
-    havingValue = "true",
-    matchIfMissing = true
-)
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = true)
 public class GitLabManifest implements IntegrationManifest {
 
     private final boolean gitlabStackEnabled;

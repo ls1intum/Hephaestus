@@ -55,9 +55,7 @@ public class WorkspaceCapabilityResolver {
      * during a partial deploy) contribute the empty set rather than crashing.
      */
     public Set<Capability> activeCapabilitiesFor(long workspaceId) {
-        List<Connection> active = connectionRepository.findByWorkspaceIdAndState(
-            workspaceId, IntegrationState.ACTIVE
-        );
+        List<Connection> active = connectionRepository.findByWorkspaceIdAndState(workspaceId, IntegrationState.ACTIVE);
         if (active.isEmpty()) {
             return Set.of();
         }
@@ -75,9 +73,7 @@ public class WorkspaceCapabilityResolver {
      * answer "what's plugged in here?".
      */
     public Set<IntegrationKind> activeKindsFor(long workspaceId) {
-        List<Connection> active = connectionRepository.findByWorkspaceIdAndState(
-            workspaceId, IntegrationState.ACTIVE
-        );
+        List<Connection> active = connectionRepository.findByWorkspaceIdAndState(workspaceId, IntegrationState.ACTIVE);
         if (active.isEmpty()) {
             return Set.of();
         }
@@ -113,16 +109,13 @@ public class WorkspaceCapabilityResolver {
             return true;
         }
 
-        List<Connection> active = connectionRepository.findByWorkspaceIdAndState(
-            workspaceId, IntegrationState.ACTIVE
-        );
+        List<Connection> active = connectionRepository.findByWorkspaceIdAndState(workspaceId, IntegrationState.ACTIVE);
         if (active.isEmpty()) {
             return false;
         }
 
         if (requiredFamily != null) {
-            boolean familyPresent = active.stream()
-                .anyMatch(c -> c.getKind().family() == requiredFamily);
+            boolean familyPresent = active.stream().anyMatch(c -> c.getKind().family() == requiredFamily);
             if (!familyPresent) {
                 return false;
             }

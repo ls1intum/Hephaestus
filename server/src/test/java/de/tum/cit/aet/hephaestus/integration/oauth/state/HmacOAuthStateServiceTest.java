@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.oauth.state;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService.StateBinding;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
@@ -38,14 +38,16 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         HmacOAuthStateService svc = HmacOAuthStateService.withoutNonceStore(SECRET, Duration.ofMinutes(10));
         String state = svc.issue(42L, IntegrationKind.GITHUB);
         String tampered = state.substring(0, state.length() - 2) + "AA";
-        assertThatThrownBy(() -> svc.consume(tampered))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> svc.consume(tampered)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void issuedWithDifferentSecretRejected() {
         HmacOAuthStateService a = HmacOAuthStateService.withoutNonceStore(SECRET, Duration.ofMinutes(10));
-        HmacOAuthStateService b = HmacOAuthStateService.withoutNonceStore("another-secret-of-equivalent-length-xx", Duration.ofMinutes(10));
+        HmacOAuthStateService b = HmacOAuthStateService.withoutNonceStore(
+            "another-secret-of-equivalent-length-xx",
+            Duration.ofMinutes(10)
+        );
         String state = a.issue(42L, IntegrationKind.GITHUB);
         assertThatThrownBy(() -> b.consume(state))
             .isInstanceOf(IllegalArgumentException.class)
@@ -54,19 +56,19 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
 
     @Test
     void blankSecretRejectedAtConstruction() {
-        assertThatThrownBy(() -> HmacOAuthStateService.withoutNonceStore("", Duration.ofMinutes(10)))
-            .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> HmacOAuthStateService.withoutNonceStore(null, Duration.ofMinutes(10)))
-            .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> HmacOAuthStateService.withoutNonceStore("", Duration.ofMinutes(10))).isInstanceOf(
+            IllegalStateException.class
+        );
+        assertThatThrownBy(() -> HmacOAuthStateService.withoutNonceStore(null, Duration.ofMinutes(10))).isInstanceOf(
+            IllegalStateException.class
+        );
     }
 
     @Test
     void blankStateRejected() {
         HmacOAuthStateService svc = HmacOAuthStateService.withoutNonceStore(SECRET, Duration.ofMinutes(10));
-        assertThatThrownBy(() -> svc.consume(""))
-            .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> svc.consume(null))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> svc.consume("")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> svc.consume(null)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -117,8 +119,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         // Flipping a base64 char in the payload (not the signature) MUST still fail —
         // the actor segment is part of the signed payload.
         String tampered = state.substring(0, 4) + "AAAA" + state.substring(8);
-        assertThatThrownBy(() -> svc.consume(tampered))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> svc.consume(tampered)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -157,8 +158,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         String state = svc.issue(42L, IntegrationKind.GITHUB);
         String tampered = state.substring(0, state.length() - 2) + "AA";
 
-        assertThatThrownBy(() -> svc.consume(tampered))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> svc.consume(tampered)).isInstanceOf(IllegalArgumentException.class);
         // The nonce row must NOT have been consumed — the legitimate caller should
         // still be able to use the real state.
         assertThat(store.consumedCount()).isEqualTo(0);
@@ -173,7 +173,11 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         // 1ms TTL forces immediate expiry.
         HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMillis(1), store);
         String state = svc.issue(42L, IntegrationKind.GITHUB);
-        try { Thread.sleep(50); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+        try {
+            Thread.sleep(50);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
 
         assertThatThrownBy(() -> svc.consume(state))
             .isInstanceOf(IllegalArgumentException.class)
@@ -187,14 +191,17 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         InMemoryNonceStore store = new InMemoryNonceStore();
         HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
 
-        de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService.IssuedState issued =
-            svc.issueWithPkce(42L, IntegrationKind.GITHUB, "alice@example.com");
+        de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService.IssuedState issued = svc.issueWithPkce(
+            42L,
+            IntegrationKind.GITHUB,
+            "alice@example.com"
+        );
 
         assertThat(issued.codeChallengeMethod()).isEqualTo("S256");
-        assertThat(issued.codeChallenge()).hasSize(43);   // SHA-256 → 32 bytes → base64url-no-pad
+        assertThat(issued.codeChallenge()).hasSize(43); // SHA-256 → 32 bytes → base64url-no-pad
         // The verifier survives in the store; the consume path will hand it back via StateBinding.
         String verifier = store.lastVerifier();
-        assertThat(verifier).hasSizeBetween(43, 128);     // RFC 7636 §4.1 ABNF range
+        assertThat(verifier).hasSizeBetween(43, 128); // RFC 7636 §4.1 ABNF range
         assertThat(verifier).matches("[A-Za-z0-9\\-_.~]+"); // unreserved
         // Verify the challenge derivation against the actual verifier the service stored.
         java.security.MessageDigest sha = java.security.MessageDigest.getInstance("SHA-256");
@@ -230,7 +237,9 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @org.junit.jupiter.api.DisplayName("PKCE: second consume of the same state is rejected (verifier shares single-use)")
+    @org.junit.jupiter.api.DisplayName(
+        "PKCE: second consume of the same state is rejected (verifier shares single-use)"
+    )
     void pkce_replayRejected() {
         InMemoryNonceStore store = new InMemoryNonceStore();
         HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
@@ -256,17 +265,27 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @org.junit.jupiter.api.DisplayName("OAuthStateService.issueWithPkce default impl refuses — strategies cannot silently fall through")
+    @org.junit.jupiter.api.DisplayName(
+        "OAuthStateService.issueWithPkce default impl refuses — strategies cannot silently fall through"
+    )
     void spi_default_refusesPkce() {
         // A bare impl that only overrides consume() must NOT accidentally honour PKCE
         // requests with a no-op — that would let an OAuth flow skip PKCE silently.
         de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService bare =
             new de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService() {
-                @Override public String issue(long w, IntegrationKind k) { return "x"; }
-                @Override public StateBinding consume(String s) { throw new IllegalArgumentException(); }
+                @Override
+                public String issue(long w, IntegrationKind k) {
+                    return "x";
+                }
+
+                @Override
+                public StateBinding consume(String s) {
+                    throw new IllegalArgumentException();
+                }
             };
-        assertThatThrownBy(() -> bare.issueWithPkce(1L, IntegrationKind.GITHUB, null))
-            .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> bare.issueWithPkce(1L, IntegrationKind.GITHUB, null)).isInstanceOf(
+            UnsupportedOperationException.class
+        );
     }
 
     /**
@@ -276,7 +295,9 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
      * consumed=false. PKCE verifiers are stored alongside the nonce.
      */
     private static final class InMemoryNonceStore extends OAuthStateNonceStore {
+
         private record Row(boolean consumed, @org.springframework.lang.Nullable String verifier) {}
+
         private final java.util.Map<String, Row> rows = new java.util.concurrent.ConcurrentHashMap<>();
         private volatile String lastVerifier;
 
@@ -290,8 +311,13 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         }
 
         @Override
-        public void issue(String nonce, long workspaceId, IntegrationKind kind,
-                          java.time.Instant issuedAt, @org.springframework.lang.Nullable String codeVerifier) {
+        public void issue(
+            String nonce,
+            long workspaceId,
+            IntegrationKind kind,
+            java.time.Instant issuedAt,
+            @org.springframework.lang.Nullable String codeVerifier
+        ) {
             rows.putIfAbsent(nonce, new Row(false, codeVerifier));
             if (codeVerifier != null) this.lastVerifier = codeVerifier;
         }
@@ -311,7 +337,9 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
             return swapped ? ConsumeResult.consumed(row.verifier()) : ConsumeResult.notConsumed();
         }
 
-        int size() { return rows.size(); }
+        int size() {
+            return rows.size();
+        }
 
         int consumedCount() {
             int n = 0;
@@ -319,6 +347,8 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
             return n;
         }
 
-        String lastVerifier() { return lastVerifier; }
+        String lastVerifier() {
+            return lastVerifier;
+        }
     }
 }

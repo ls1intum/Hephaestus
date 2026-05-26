@@ -91,12 +91,7 @@ class GitlabMrResolver {
         return new MrCoordinates(projectPath, iid);
     }
 
-    record MrInfo(
-        String globalId,
-        @Nullable String baseSha,
-        @Nullable String headSha,
-        @Nullable String startSha
-    ) {}
+    record MrInfo(String globalId, @Nullable String baseSha, @Nullable String headSha, @Nullable String startSha) {}
 
     record MrCoordinates(String projectPath, int iid) {}
 }

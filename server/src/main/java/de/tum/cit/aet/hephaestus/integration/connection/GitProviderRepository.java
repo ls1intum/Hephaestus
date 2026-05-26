@@ -15,7 +15,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
  * <p>Git providers are auto-created when workspaces are activated. The
  * {@link #findByTypeAndServerUrl} lookup is the primary resolution path.
  */
-@WorkspaceAgnostic("GitProvider models a vendor instance (github.com, gitlab.lrz.de) shared across all workspaces; tenant scoping is enforced on the Connection aggregate.")
+@WorkspaceAgnostic(
+    "GitProvider models a vendor instance (github.com, gitlab.lrz.de) shared across all workspaces; tenant scoping is enforced on the Connection aggregate."
+)
 public interface GitProviderRepository extends JpaRepository<GitProvider, Long> {
     Optional<GitProvider> findByTypeAndServerUrl(GitProviderType type, String serverUrl);
 }

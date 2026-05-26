@@ -86,9 +86,7 @@ public class IntegrationFrameworkBootstrap {
         }
         if (!violations.isEmpty()) {
             String joined = String.join("\n  - ", violations);
-            throw new IllegalStateException(
-                "IntegrationManifest validation failed:\n  - " + joined
-            );
+            throw new IllegalStateException("IntegrationManifest validation failed:\n  - " + joined);
         }
         log.info("Integration framework bootstrap OK ({} kinds registered)", manifests.registeredKinds().size());
     }
@@ -100,11 +98,20 @@ public class IntegrationFrameworkBootstrap {
         // Universal: every registered kind needs a lifecycle listener so Connection state
         // transitions can be wired into the right vendor adapter (even when the body is
         // a no-op stub — that's per-kind policy, not a framework gap).
-        require(kind, "IntegrationLifecycleListener",
-            anyMatchKind(lifecycleListeners, l -> l.kind() == kind), violations);
+        require(
+            kind,
+            "IntegrationLifecycleListener",
+            anyMatchKind(lifecycleListeners, l -> l.kind() == kind),
+            violations
+        );
 
         if (declared.contains(Capability.WEBHOOK_INGEST)) {
-            require(kind, "WebhookSignatureVerifier", anyMatchKind(signatureVerifiers, v -> v.kind() == kind), violations);
+            require(
+                kind,
+                "WebhookSignatureVerifier",
+                anyMatchKind(signatureVerifiers, v -> v.kind() == kind),
+                violations
+            );
             require(kind, "WebhookSecretSource", anyMatchKind(secretSources, s -> s.kind() == kind), violations);
             require(kind, "SubjectKeyDeriver", anyMatchKind(subjectKeyDerivers, s -> s.kind() == kind), violations);
             require(kind, "SubjectParser", anyMatchKind(subjectParsers, s -> s.kind() == kind), violations);
@@ -112,12 +119,20 @@ public class IntegrationFrameworkBootstrap {
         if (declared.contains(Capability.URL_VERIFICATION_HANDSHAKE)) {
             // Currently piggy-backs on WebhookSignatureVerifier (Slack's verifier short-
             // circuits on url_verification). Enforce both so the manifest can't drift.
-            require(kind, "WebhookSignatureVerifier (url_verification handshake)",
-                anyMatchKind(signatureVerifiers, v -> v.kind() == kind), violations);
+            require(
+                kind,
+                "WebhookSignatureVerifier (url_verification handshake)",
+                anyMatchKind(signatureVerifiers, v -> v.kind() == kind),
+                violations
+            );
         }
         if (declared.contains(Capability.REPLAY_PROTECTION)) {
-            require(kind, "WebhookSignatureVerifier (replay-window check)",
-                anyMatchKind(signatureVerifiers, v -> v.kind() == kind), violations);
+            require(
+                kind,
+                "WebhookSignatureVerifier (replay-window check)",
+                anyMatchKind(signatureVerifiers, v -> v.kind() == kind),
+                violations
+            );
         }
         if (declared.contains(Capability.TOKEN_REFRESH)) {
             require(kind, "TokenRefresher", anyMatchKind(tokenRefreshers, t -> t.kind() == kind), violations);
@@ -126,7 +141,12 @@ public class IntegrationFrameworkBootstrap {
             require(kind, "FeedbackChannel", anyMatchKind(feedbackChannels, f -> f.kind() == kind), violations);
         }
         if (declared.contains(Capability.INLINE_FINDINGS)) {
-            require(kind, "InlineFindingChannel", anyMatchKind(inlineFindingChannels, f -> f.kind() == kind), violations);
+            require(
+                kind,
+                "InlineFindingChannel",
+                anyMatchKind(inlineFindingChannels, f -> f.kind() == kind),
+                violations
+            );
         }
         if (declared.contains(Capability.APPROVAL_WORKFLOW)) {
             require(kind, "ApprovalChannel", anyMatchKind(approvalChannels, f -> f.kind() == kind), violations);
@@ -135,8 +155,12 @@ public class IntegrationFrameworkBootstrap {
             // SCOPE_CHANGES says "this vendor will fire onScopeChanged" — the listener
             // must therefore have a real body. We can't introspect for that, but we
             // can at least force the listener bean to be wired.
-            require(kind, "IntegrationLifecycleListener (scope-change emitter)",
-                anyMatchKind(lifecycleListeners, l -> l.kind() == kind), violations);
+            require(
+                kind,
+                "IntegrationLifecycleListener (scope-change emitter)",
+                anyMatchKind(lifecycleListeners, l -> l.kind() == kind),
+                violations
+            );
         }
 
         // Forward-compat: the moment a new Capability is added to the enum without a
@@ -145,8 +169,12 @@ public class IntegrationFrameworkBootstrap {
         Set<Capability> unmapped = EnumSet.copyOf(declared);
         unmapped.removeAll(ENFORCED_CAPABILITIES);
         for (Capability cap : unmapped) {
-            violations.add(kind + " declares capability " + cap
-                + " but the bootstrap has no enforcement rule for it — add a require() branch");
+            violations.add(
+                kind +
+                    " declares capability " +
+                    cap +
+                    " but the bootstrap has no enforcement rule for it — add a require() branch"
+            );
         }
     }
 

@@ -13,7 +13,6 @@ import org.springframework.lang.Nullable;
  * live in per-kind implementations; the orchestrator stays vendor-neutral.
  */
 public interface ConnectionStrategy {
-
     IntegrationKind kind();
 
     /**
@@ -41,31 +40,31 @@ public interface ConnectionStrategy {
     record InitiateRequest(
         long workspaceId,
         IntegrationKind kind,
-        Map<String, String> userInput,        // pasted PAT, configured server URL, etc.
-        @Nullable URI redirectAfter           // where to bounce the user post-OAuth
-    ) {
-    }
+        Map<String, String> userInput, // pasted PAT, configured server URL, etc.
+        @Nullable URI redirectAfter // where to bounce the user post-OAuth
+    ) {}
 
-    sealed interface ConnectInitiation
-        permits ConnectInitiation.RedirectToVendor, ConnectInitiation.AcceptInline {
-
+    sealed interface ConnectInitiation permits ConnectInitiation.RedirectToVendor, ConnectInitiation.AcceptInline {
         record RedirectToVendor(URI vendorUrl, String oauthState) implements ConnectInitiation {}
 
         record AcceptInline(CredentialBundle credentials, @Nullable String instanceKey) implements ConnectInitiation {}
     }
 
-    sealed interface ConnectFinalization
-        permits ConnectFinalization.Completed, ConnectFinalization.Failed {
-
-        record Completed(String instanceKey, CredentialBundle credentials, @Nullable String displayName)
-            implements ConnectFinalization {
-        }
+    sealed interface ConnectFinalization permits ConnectFinalization.Completed, ConnectFinalization.Failed {
+        record Completed(
+            String instanceKey,
+            CredentialBundle credentials,
+            @Nullable String displayName
+        ) implements ConnectFinalization {}
 
         record Failed(String reason) implements ConnectFinalization {}
     }
 
     sealed interface ValidationResult permits ValidationResult.Ok, ValidationResult.Failed {
-        record Ok(@Nullable String observedInstanceKey, @Nullable String observedDisplayName) implements ValidationResult {}
+        record Ok(
+            @Nullable String observedInstanceKey,
+            @Nullable String observedDisplayName
+        ) implements ValidationResult {}
 
         /**
          * Probe negative. Callers MUST NOT transition the Connection to {@code ACTIVE}.

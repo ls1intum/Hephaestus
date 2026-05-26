@@ -11,37 +11,38 @@ import org.springframework.lang.Nullable;
  * deserialises the discriminator below back into the right record subtype.
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
-@JsonSubTypes({
-    @JsonSubTypes.Type(value = ConnectionConfig.GitHubAppConfig.class, name = "GITHUB_APP"),
-    @JsonSubTypes.Type(value = ConnectionConfig.GitHubPatConfig.class, name = "GITHUB_PAT"),
-    @JsonSubTypes.Type(value = ConnectionConfig.GitLabConfig.class, name = "GITLAB"),
-    @JsonSubTypes.Type(value = ConnectionConfig.SlackConfig.class, name = "SLACK"),
-    @JsonSubTypes.Type(value = ConnectionConfig.OutlineConfig.class, name = "OUTLINE")
-})
+@JsonSubTypes(
+    {
+        @JsonSubTypes.Type(value = ConnectionConfig.GitHubAppConfig.class, name = "GITHUB_APP"),
+        @JsonSubTypes.Type(value = ConnectionConfig.GitHubPatConfig.class, name = "GITHUB_PAT"),
+        @JsonSubTypes.Type(value = ConnectionConfig.GitLabConfig.class, name = "GITLAB"),
+        @JsonSubTypes.Type(value = ConnectionConfig.SlackConfig.class, name = "SLACK"),
+        @JsonSubTypes.Type(value = ConnectionConfig.OutlineConfig.class, name = "OUTLINE"),
+    }
+)
 public sealed interface ConnectionConfig
-    permits ConnectionConfig.GitHubAppConfig,
-            ConnectionConfig.GitHubPatConfig,
-            ConnectionConfig.GitLabConfig,
-            ConnectionConfig.SlackConfig,
-            ConnectionConfig.OutlineConfig {
-
+    permits
+        ConnectionConfig.GitHubAppConfig,
+        ConnectionConfig.GitHubPatConfig,
+        ConnectionConfig.GitLabConfig,
+        ConnectionConfig.SlackConfig,
+        ConnectionConfig.OutlineConfig
+{
     /** Enabled sync streams (subset of the source's catalog). */
     Set<String> enabledStreams();
 
     record GitHubAppConfig(
         @Nullable Long installationId,
         @Nullable String orgLogin,
-        @Nullable String serverUrl,              // null for github.com, set for GHES
+        @Nullable String serverUrl, // null for github.com, set for GHES
         Set<String> enabledStreams
-    ) implements ConnectionConfig {
-    }
+    ) implements ConnectionConfig {}
 
     record GitHubPatConfig(
         @Nullable String orgLogin,
         @Nullable String serverUrl,
         Set<String> enabledStreams
-    ) implements ConnectionConfig {
-    }
+    ) implements ConnectionConfig {}
 
     /** GitLab — supports both legacy plaintext token verifier and 19.0+ HMAC whsec_*. */
     record GitLabConfig(
@@ -53,7 +54,7 @@ public sealed interface ConnectionConfig
     ) implements ConnectionConfig {
         public enum SigningMode {
             PLAINTEXT,
-            WHSEC
+            WHSEC,
         }
 
         /**
@@ -87,13 +88,11 @@ public sealed interface ConnectionConfig
         @Nullable String notificationChannelId,
         @Nullable String teamLabel,
         Set<String> enabledStreams
-    ) implements ConnectionConfig {
-    }
+    ) implements ConnectionConfig {}
 
     record OutlineConfig(
         String serverUrl,
         @Nullable String workspaceExternalId,
         Set<String> enabledStreams
-    ) implements ConnectionConfig {
-    }
+    ) implements ConnectionConfig {}
 }

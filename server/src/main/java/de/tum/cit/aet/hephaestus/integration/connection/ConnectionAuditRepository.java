@@ -8,15 +8,14 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ConnectionAuditRepository extends JpaRepository<ConnectionAudit, Long> {
-
     List<ConnectionAudit> findByConnectionIdOrderByOccurredAtDesc(long connectionId);
 
     boolean existsByConnectionIdAndEventTypeAndCorrelationId(long connectionId, String eventType, String correlationId);
 
     @Query(
-        "SELECT a FROM ConnectionAudit a "
-            + "WHERE a.connection.workspace.id = :workspaceId "
-            + "ORDER BY a.occurredAt DESC"
+        "SELECT a FROM ConnectionAudit a " +
+            "WHERE a.connection.workspace.id = :workspaceId " +
+            "ORDER BY a.occurredAt DESC"
     )
     List<ConnectionAudit> findByWorkspaceId(@Param("workspaceId") long workspaceId);
 }

@@ -11,12 +11,18 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ConnectionRepository extends JpaRepository<Connection, Long> {
-
-    Optional<Connection> findByWorkspaceIdAndKindAndInstanceKey(long workspaceId, IntegrationKind kind, String instanceKey);
+    Optional<Connection> findByWorkspaceIdAndKindAndInstanceKey(
+        long workspaceId,
+        IntegrationKind kind,
+        String instanceKey
+    );
 
     /** Lookup for kinds where there is at most one row per (workspace, kind). */
     Optional<Connection> findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-        long workspaceId, IntegrationKind kind, IntegrationState state);
+        long workspaceId,
+        IntegrationKind kind,
+        IntegrationState state
+    );
 
     List<Connection> findByWorkspaceIdAndState(long workspaceId, IntegrationState state);
 

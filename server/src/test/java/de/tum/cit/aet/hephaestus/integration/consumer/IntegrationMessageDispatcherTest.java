@@ -104,9 +104,7 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
 
     @Test
     void dispatchResolvesRegisteredHandler() {
-        RecordingHandler handler = new RecordingHandler(
-            new EventTypeKey(IntegrationKind.GITHUB, "repository.issues")
-        );
+        RecordingHandler handler = new RecordingHandler(new EventTypeKey(IntegrationKind.GITHUB, "repository.issues"));
         IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
             new IntegrationMessageHandlerRegistry(List.of(handler)),
             ALL_PARSERS
@@ -133,10 +131,10 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     void prefixLookupIsCaseInsensitiveAndAllowListed() {
         // Static helper exposed package-private so we can pin its allow-list semantics
         // without spinning up the full dispatcher.
-        assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("GITHUB.acme.foo.issues"))
-            .contains(IntegrationKind.GITHUB);
-        assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("Gitlab.x.y.z"))
-            .contains(IntegrationKind.GITLAB);
+        assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("GITHUB.acme.foo.issues")).contains(
+            IntegrationKind.GITHUB
+        );
+        assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("Gitlab.x.y.z")).contains(IntegrationKind.GITLAB);
         assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("bitbucket.x.y.z")).isEmpty();
         assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix(null)).isEmpty();
         assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("")).isEmpty();

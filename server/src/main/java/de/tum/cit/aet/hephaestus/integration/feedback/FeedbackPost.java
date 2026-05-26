@@ -29,7 +29,7 @@ import org.hibernate.annotations.CreationTimestamp;
     name = "feedback_post",
     uniqueConstraints = @UniqueConstraint(
         name = "uq_feedback_post",
-        columnNames = {"connection_id", "subject_external_id", "post_kind", "external_post_id"}
+        columnNames = { "connection_id", "subject_external_id", "post_kind", "external_post_id" }
     )
 )
 public class FeedbackPost {
@@ -63,11 +63,16 @@ public class FeedbackPost {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    protected FeedbackPost() {
-    }
+    protected FeedbackPost() {}
 
-    public FeedbackPost(Connection connection, String subjectExternalId, SubjectClass subjectClass,
-                        PostKind postKind, String externalPostId, String vendorMetadata) {
+    public FeedbackPost(
+        Connection connection,
+        String subjectExternalId,
+        SubjectClass subjectClass,
+        PostKind postKind,
+        String externalPostId,
+        String vendorMetadata
+    ) {
         this.connection = connection;
         this.subjectExternalId = subjectExternalId;
         this.subjectClass = subjectClass;
@@ -79,15 +84,38 @@ public class FeedbackPost {
     public enum PostKind {
         SUMMARY,
         INLINE_FINDING,
-        APPROVAL
+        APPROVAL,
     }
 
-    public Long getId() { return id; }
-    public Connection getConnection() { return connection; }
-    public String getSubjectExternalId() { return subjectExternalId; }
-    public SubjectClass getSubjectClass() { return subjectClass; }
-    public PostKind getPostKind() { return postKind; }
-    public String getExternalPostId() { return externalPostId; }
-    public String getVendorMetadata() { return vendorMetadata; }
-    public Instant getCreatedAt() { return createdAt; }
+    public Long getId() {
+        return id;
+    }
+
+    public Connection getConnection() {
+        return connection;
+    }
+
+    public String getSubjectExternalId() {
+        return subjectExternalId;
+    }
+
+    public SubjectClass getSubjectClass() {
+        return subjectClass;
+    }
+
+    public PostKind getPostKind() {
+        return postKind;
+    }
+
+    public String getExternalPostId() {
+        return externalPostId;
+    }
+
+    public String getVendorMetadata() {
+        return vendorMetadata;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
 }

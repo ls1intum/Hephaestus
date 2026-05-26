@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.connection.api;
 
-import de.tum.cit.aet.hephaestus.integration.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionAudit;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionAuditRepository;
@@ -9,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService.TransitionRequest;
 import de.tum.cit.aet.hephaestus.integration.connection.CredentialBundleConverter;
+import de.tum.cit.aet.hephaestus.integration.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
@@ -52,12 +52,14 @@ public class ConnectionAdminService {
     private final IntegrationManifestRegistry manifests;
     private final CredentialBundleConverter credentialConverter;
 
-    public ConnectionAdminService(ConnectionRepository connectionRepository,
-                                  ConnectionAuditRepository auditRepository,
-                                  ConnectionService connectionService,
-                                  WorkspaceRepository workspaceRepository,
-                                  IntegrationManifestRegistry manifests,
-                                  CredentialBundleConverter credentialConverter) {
+    public ConnectionAdminService(
+        ConnectionRepository connectionRepository,
+        ConnectionAuditRepository auditRepository,
+        ConnectionService connectionService,
+        WorkspaceRepository workspaceRepository,
+        IntegrationManifestRegistry manifests,
+        CredentialBundleConverter credentialConverter
+    ) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.connectionService = connectionService;
@@ -79,12 +81,17 @@ public class ConnectionAdminService {
      */
     @Transactional(readOnly = true)
     public Connection findInWorkspaceOrThrow(long workspaceId, long id) {
-        Connection connection = connectionRepository.findById(id)
+        Connection connection = connectionRepository
+            .findById(id)
             .orElseThrow(() -> new NoSuchElementException("Connection not found: id=" + id));
         Long actualWorkspaceId = connection.getWorkspace() == null ? null : connection.getWorkspace().getId();
         if (!Objects.equals(actualWorkspaceId, workspaceId)) {
-            log.info("Cross-workspace read attempt: connection={} actualWorkspace={} requestedWorkspace={}",
-                id, actualWorkspaceId, workspaceId);
+            log.info(
+                "Cross-workspace read attempt: connection={} actualWorkspace={} requestedWorkspace={}",
+                id,
+                actualWorkspaceId,
+                workspaceId
+            );
             throw new NoSuchElementException("Connection not found in workspace " + workspaceId + ": id=" + id);
         }
         return connection;
@@ -92,8 +99,7 @@ public class ConnectionAdminService {
 
     @Transactional(readOnly = true)
     public List<ConnectionAudit> auditForConnection(long connectionId, int limit) {
-        return auditRepository.findByConnectionIdOrderByOccurredAtDesc(connectionId)
-            .stream().limit(limit).toList();
+        return auditRepository.findByConnectionIdOrderByOccurredAtDesc(connectionId).stream().limit(limit).toList();
     }
 
     public IntegrationManifestRegistry manifests() {
@@ -107,13 +113,16 @@ public class ConnectionAdminService {
      * pair stays in lockstep through {@link Connection#setCredentials}.
      */
     @Transactional
-    public Connection createInlineConnection(long workspaceId,
-                                             IntegrationKind kind,
-                                             @Nullable String instanceKey,
-                                             CredentialBundle credentials,
-                                             Map<String, String> userInput,
-                                             String actorRef) {
-        Workspace workspace = workspaceRepository.findById(workspaceId)
+    public Connection createInlineConnection(
+        long workspaceId,
+        IntegrationKind kind,
+        @Nullable String instanceKey,
+        CredentialBundle credentials,
+        Map<String, String> userInput,
+        String actorRef
+    ) {
+        Workspace workspace = workspaceRepository
+            .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace not found: id=" + workspaceId));
 
         ConnectionConfig config = buildConfigForInlineKind(kind, userInput, instanceKey);
@@ -123,16 +132,18 @@ public class ConnectionAdminService {
         persistCredentials(connection, credentials);
 
         String correlationId = "initiate-" + connection.getId() + "-" + UUID.randomUUID();
-        connection = connectionService.transition(connection, new TransitionRequest(
-            IntegrationState.ACTIVE,
-            "INITIATE",
-            "ADMIN",
-            actorRef,
-            correlationId,
-            "Inline credentials accepted"
-        ));
-        log.info("Initiated inline Connection id={} workspace={} kind={}",
-            connection.getId(), workspaceId, kind);
+        connection = connectionService.transition(
+            connection,
+            new TransitionRequest(
+                IntegrationState.ACTIVE,
+                "INITIATE",
+                "ADMIN",
+                actorRef,
+                correlationId,
+                "Inline credentials accepted"
+            )
+        );
+        log.info("Initiated inline Connection id={} workspace={} kind={}", connection.getId(), workspaceId, kind);
         return connection;
     }
 
@@ -147,8 +158,12 @@ public class ConnectionAdminService {
             return;
         }
         connection.setCredentials(bundle, credentialConverter);
-        log.debug("Encrypted credentials for connection={} kind={} (bundle type={})",
-            connection.getId(), connection.getKind(), bundle.getClass().getSimpleName());
+        log.debug(
+            "Encrypted credentials for connection={} kind={} (bundle type={})",
+            connection.getId(),
+            connection.getKind(),
+            bundle.getClass().getSimpleName()
+        );
     }
 
     /**
@@ -156,9 +171,11 @@ public class ConnectionAdminService {
      * {@code AcceptInline} initiation are handled here — others should never reach
      * this branch because their strategies return {@code RedirectToVendor}.
      */
-    private ConnectionConfig buildConfigForInlineKind(IntegrationKind kind,
-                                                      Map<String, String> userInput,
-                                                      @Nullable String instanceKey) {
+    private ConnectionConfig buildConfigForInlineKind(
+        IntegrationKind kind,
+        Map<String, String> userInput,
+        @Nullable String instanceKey
+    ) {
         Set<String> enabledStreams = new HashSet<>();
         return switch (kind) {
             case GITLAB -> {

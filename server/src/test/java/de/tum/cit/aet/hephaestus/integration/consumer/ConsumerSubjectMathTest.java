@@ -23,20 +23,21 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
 
         @Test
         void repositoryFilterForGitHubAppendsWildcardSuffix() {
-            assertThat(ConsumerSubjectMath.repositoryFilter("github", "ls1intum/Artemis"))
-                .isEqualTo("github.ls1intum.Artemis.>");
+            assertThat(ConsumerSubjectMath.repositoryFilter("github", "ls1intum/Artemis")).isEqualTo(
+                "github.ls1intum.Artemis.>"
+            );
         }
 
         @Test
         void repositoryFilterForGitLabUsesTildeJoinedNamespace() {
-            assertThat(ConsumerSubjectMath.repositoryFilter("gitlab", "group/sub/project"))
-                .isEqualTo("gitlab.group~sub.project.>");
+            assertThat(ConsumerSubjectMath.repositoryFilter("gitlab", "group/sub/project")).isEqualTo(
+                "gitlab.group~sub.project.>"
+            );
         }
 
         @Test
         void organizationFilterPlacesPlaceholderInRepoSlot() {
-            assertThat(ConsumerSubjectMath.organizationFilter("github", "ls1intum"))
-                .isEqualTo("github.ls1intum.?.>");
+            assertThat(ConsumerSubjectMath.organizationFilter("github", "ls1intum")).isEqualTo("github.ls1intum.?.>");
         }
 
         @Test
@@ -51,14 +52,14 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
 
         @Test
         void recognisesKnownKindsCaseInsensitively() {
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("github.acme.foo.issues"))
-                .contains(IntegrationKind.GITHUB);
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("GitLab.x.y.z"))
-                .contains(IntegrationKind.GITLAB);
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("SLACK.t.c.m"))
-                .contains(IntegrationKind.SLACK);
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("outline.w.c.d.publish"))
-                .contains(IntegrationKind.OUTLINE);
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("github.acme.foo.issues")).contains(
+                IntegrationKind.GITHUB
+            );
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("GitLab.x.y.z")).contains(IntegrationKind.GITLAB);
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("SLACK.t.c.m")).contains(IntegrationKind.SLACK);
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("outline.w.c.d.publish")).contains(
+                IntegrationKind.OUTLINE
+            );
         }
 
         @Test
@@ -111,26 +112,31 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
 
         @Test
         void scopeConsumerNameAppendsScopeIdSuffix() {
-            assertThat(ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", 42L))
-                .isEqualTo("hephaestus-consumer-scope-42");
+            assertThat(ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", 42L)).isEqualTo(
+                "hephaestus-consumer-scope-42"
+            );
         }
 
         @Test
         void installationConsumerNameAppendsInstallationSuffix() {
-            assertThat(ConsumerSubjectMath.installationConsumerName("hephaestus-consumer"))
-                .isEqualTo("hephaestus-consumer-installation");
+            assertThat(ConsumerSubjectMath.installationConsumerName("hephaestus-consumer")).isEqualTo(
+                "hephaestus-consumer-installation"
+            );
         }
 
         @Test
         void blankBaseNameIsRejected() {
             // Catching the misconfiguration here is cheaper than letting NATS reject a
             // consumer create with a partially-built name like "-scope-42".
-            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName(null, 1L))
-                .isInstanceOf(IllegalArgumentException.class);
-            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName("", 1L))
-                .isInstanceOf(IllegalArgumentException.class);
-            assertThatThrownBy(() -> ConsumerSubjectMath.installationConsumerName("   "))
-                .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName(null, 1L)).isInstanceOf(
+                IllegalArgumentException.class
+            );
+            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName("", 1L)).isInstanceOf(
+                IllegalArgumentException.class
+            );
+            assertThatThrownBy(() -> ConsumerSubjectMath.installationConsumerName("   ")).isInstanceOf(
+                IllegalArgumentException.class
+            );
         }
     }
 }

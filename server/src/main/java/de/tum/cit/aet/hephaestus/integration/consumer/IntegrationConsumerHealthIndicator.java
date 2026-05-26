@@ -105,8 +105,14 @@ public class IntegrationConsumerHealthIndicator implements HealthIndicator {
             .withDetail("handlerCount", handlerRegistry.handlerCount())
             .withDetail("parserCount", dispatcher.parserCount());
 
-        stats.lastDispatchAt().map(Instant::toString).ifPresent(ts -> builder.withDetail("lastDispatchAt", ts));
-        stats.lastNakAt().map(Instant::toString).ifPresent(ts -> builder.withDetail("lastNakAt", ts));
+        stats
+            .lastDispatchAt()
+            .map(Instant::toString)
+            .ifPresent(ts -> builder.withDetail("lastDispatchAt", ts));
+        stats
+            .lastNakAt()
+            .map(Instant::toString)
+            .ifPresent(ts -> builder.withDetail("lastNakAt", ts));
 
         return builder.build();
     }

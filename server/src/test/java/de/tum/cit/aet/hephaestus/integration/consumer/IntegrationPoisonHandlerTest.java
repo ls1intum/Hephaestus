@@ -90,10 +90,12 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             handler.nakWithBackoff(gh);
             handler.nakWithBackoff(gl);
 
-            assertThat(meterRegistry.counter(IntegrationPoisonHandler.NAK_COUNTER, "kind", "github").count())
-                .isEqualTo(1.0);
-            assertThat(meterRegistry.counter(IntegrationPoisonHandler.NAK_COUNTER, "kind", "gitlab").count())
-                .isEqualTo(1.0);
+            assertThat(meterRegistry.counter(IntegrationPoisonHandler.NAK_COUNTER, "kind", "github").count()).isEqualTo(
+                1.0
+            );
+            assertThat(meterRegistry.counter(IntegrationPoisonHandler.NAK_COUNTER, "kind", "gitlab").count()).isEqualTo(
+                1.0
+            );
         }
 
         @Test

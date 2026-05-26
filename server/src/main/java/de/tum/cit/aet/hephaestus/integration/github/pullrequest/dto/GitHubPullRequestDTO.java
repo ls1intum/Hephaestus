@@ -6,6 +6,10 @@ import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.uri
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
+import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
+import de.tum.cit.aet.hephaestus.integration.github.milestone.dto.GitHubMilestoneDTO;
+import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
+import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHMergeStateStatus;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHMergeableState;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequest;
@@ -15,12 +19,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHReviewRe
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHReviewRequestConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHUser;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHUserConnection;
-import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
-import de.tum.cit.aet.hephaestus.integration.github.milestone.dto.GitHubMilestoneDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.MergeStateStatus;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.ReviewDecision;
-import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
-import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Collections;

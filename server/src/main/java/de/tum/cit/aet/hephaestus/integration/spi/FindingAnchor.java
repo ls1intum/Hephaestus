@@ -7,7 +7,6 @@ import org.springframework.lang.Nullable;
  * them at compile time. Today only SCM diff coordinates are produced.
  */
 public sealed interface FindingAnchor permits FindingAnchor.DiffAnchor {
-
     /** SCM diff coordinates. {@code side} disambiguates multi-line inline shapes (Bitbucket). */
     record DiffAnchor(
         String filePath,
@@ -20,5 +19,9 @@ public sealed interface FindingAnchor permits FindingAnchor.DiffAnchor {
         }
     }
 
-    enum DiffSide { LEFT, RIGHT, BOTH }
+    enum DiffSide {
+        LEFT,
+        RIGHT,
+        BOTH,
+    }
 }

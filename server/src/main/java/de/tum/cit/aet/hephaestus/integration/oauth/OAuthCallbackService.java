@@ -49,10 +49,12 @@ public class OAuthCallbackService {
     private final WorkspaceRepository workspaceRepository;
     private final CredentialBundleConverter credentialBundleConverter;
 
-    public OAuthCallbackService(ConnectionRepository connectionRepository,
-                                ConnectionService connectionService,
-                                WorkspaceRepository workspaceRepository,
-                                CredentialBundleConverter credentialBundleConverter) {
+    public OAuthCallbackService(
+        ConnectionRepository connectionRepository,
+        ConnectionService connectionService,
+        WorkspaceRepository workspaceRepository,
+        CredentialBundleConverter credentialBundleConverter
+    ) {
         this.connectionRepository = connectionRepository;
         this.connectionService = connectionService;
         this.workspaceRepository = workspaceRepository;
@@ -67,19 +69,24 @@ public class OAuthCallbackService {
      */
     @Transactional
     public Connection findOrCreatePendingConnection(long workspaceId, IntegrationKind kind) {
-        Optional<Connection> pending = connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId, kind, IntegrationState.PENDING);
+        Optional<Connection> pending = connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+            workspaceId,
+            kind,
+            IntegrationState.PENDING
+        );
         if (pending.isPresent()) {
             return pending.get();
         }
-        Optional<Connection> active = connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId, kind, IntegrationState.ACTIVE);
+        Optional<Connection> active = connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+            workspaceId,
+            kind,
+            IntegrationState.ACTIVE
+        );
         if (active.isPresent()) {
             return active.get();
         }
-        Workspace workspace = workspaceRepository.findById(workspaceId)
+        Workspace workspace = workspaceRepository
+            .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace not found: id=" + workspaceId));
         Connection fresh = new Connection(workspace, kind, /* instanceKey */ null, defaultConfig(kind));
         return connectionRepository.save(fresh);
@@ -95,26 +102,36 @@ public class OAuthCallbackService {
      * translates that into HTTP 409.
      */
     @Transactional
-    public Connection completeConnection(Connection connection,
-                                         ConnectFinalization.Completed completed,
-                                         @Nullable String actorRef) {
+    public Connection completeConnection(
+        Connection connection,
+        ConnectFinalization.Completed completed,
+        @Nullable String actorRef
+    ) {
         applyVendorMetadata(connection, completed);
         connection.setCredentials(completed.credentials(), credentialBundleConverter);
         connection = connectionRepository.save(connection);
 
         String actor = actorRef != null ? actorRef : ACTOR_FALLBACK;
         String correlationId = "oauth-" + completed.instanceKey() + "-" + UUID.randomUUID();
-        connection = connectionService.transition(connection, new TransitionRequest(
-            IntegrationState.ACTIVE,
-            "OAUTH_COMPLETE",
-            "USER",
-            actor,
-            correlationId,
-            completed.displayName()
-        ));
-        log.info("OAuth complete: kind={} workspace={} connection={} instanceKey={} actor={}",
-            connection.getKind(), connection.getWorkspace().getId(),
-            connection.getId(), sanitizeForLog(completed.instanceKey()), sanitizeForLog(actor));
+        connection = connectionService.transition(
+            connection,
+            new TransitionRequest(
+                IntegrationState.ACTIVE,
+                "OAUTH_COMPLETE",
+                "USER",
+                actor,
+                correlationId,
+                completed.displayName()
+            )
+        );
+        log.info(
+            "OAuth complete: kind={} workspace={} connection={} instanceKey={} actor={}",
+            connection.getKind(),
+            connection.getWorkspace().getId(),
+            connection.getId(),
+            sanitizeForLog(completed.instanceKey()),
+            sanitizeForLog(actor)
+        );
         return connection;
     }
 
@@ -127,14 +144,14 @@ public class OAuthCallbackService {
         return switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, new HashSet<>());
             case GITLAB -> new ConnectionConfig.GitLabConfig(
-                "https://gitlab.com", null, null,
+                "https://gitlab.com",
+                null,
+                null,
                 ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
                 new HashSet<>()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, new HashSet<>());
-            case OUTLINE -> new ConnectionConfig.OutlineConfig(
-                "https://app.getoutline.com", null, new HashSet<>()
-            );
+            case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, new HashSet<>());
         };
     }
 

@@ -19,16 +19,18 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.integration.consumer")
 public record NatsConsumerProperties(
-    @DurationUnit(ChronoUnit.MINUTES) @DefaultValue("5m") @NotNull(
-        message = "ack-wait must not be null"
-    ) Duration ackWait,
-    @DefaultValue("500") @Min(value = 1, message = "max-ack-pending must be at least 1") @Max(
-        value = 10_000,
-        message = "max-ack-pending must not exceed 10,000"
-    ) int maxAckPending,
-    @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("2s") @NotNull(
-        message = "reconnect-delay must not be null"
-    ) Duration reconnectDelay,
+    @DurationUnit(ChronoUnit.MINUTES)
+    @DefaultValue("5m")
+    @NotNull(message = "ack-wait must not be null")
+    Duration ackWait,
+    @DefaultValue("500")
+    @Min(value = 1, message = "max-ack-pending must be at least 1")
+    @Max(value = 10_000, message = "max-ack-pending must not exceed 10,000")
+    int maxAckPending,
+    @DurationUnit(ChronoUnit.SECONDS)
+    @DefaultValue("2s")
+    @NotNull(message = "reconnect-delay must not be null")
+    Duration reconnectDelay,
     @Valid PoisonProperties poison
 ) {
     public NatsConsumerProperties {

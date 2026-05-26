@@ -34,10 +34,17 @@ import org.mockito.MockitoAnnotations;
 @DisplayName("OAuthCallbackService — unit")
 class OAuthCallbackServiceTest extends BaseUnitTest {
 
-    @Mock private ConnectionRepository connectionRepository;
-    @Mock private ConnectionService connectionService;
-    @Mock private WorkspaceRepository workspaceRepository;
-    @Mock private de.tum.cit.aet.hephaestus.integration.connection.CredentialBundleConverter credentialBundleConverter;
+    @Mock
+    private ConnectionRepository connectionRepository;
+
+    @Mock
+    private ConnectionService connectionService;
+
+    @Mock
+    private WorkspaceRepository workspaceRepository;
+
+    @Mock
+    private de.tum.cit.aet.hephaestus.integration.connection.CredentialBundleConverter credentialBundleConverter;
 
     private OAuthCallbackService service;
 
@@ -45,15 +52,24 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new OAuthCallbackService(
-            connectionRepository, connectionService, workspaceRepository, credentialBundleConverter);
+            connectionRepository,
+            connectionService,
+            workspaceRepository,
+            credentialBundleConverter
+        );
     }
 
     @Test
     @DisplayName("findOrCreatePendingConnection reuses PENDING row if present")
     void findOrCreate_reusesPending() {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
-        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            42L, IntegrationKind.SLACK, IntegrationState.PENDING)).thenReturn(Optional.of(pending));
+        when(
+            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                42L,
+                IntegrationKind.SLACK,
+                IntegrationState.PENDING
+            )
+        ).thenReturn(Optional.of(pending));
 
         Connection result = service.findOrCreatePendingConnection(42L, IntegrationKind.SLACK);
 
@@ -66,10 +82,20 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     @DisplayName("findOrCreatePendingConnection reuses ACTIVE row (credential refresh on reconnect)")
     void findOrCreate_reusesActiveForReconnect() {
         Connection active = newConnection(7L, 42L, IntegrationKind.SLACK, "T1", IntegrationState.ACTIVE);
-        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            42L, IntegrationKind.SLACK, IntegrationState.PENDING)).thenReturn(Optional.empty());
-        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            42L, IntegrationKind.SLACK, IntegrationState.ACTIVE)).thenReturn(Optional.of(active));
+        when(
+            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                42L,
+                IntegrationKind.SLACK,
+                IntegrationState.PENDING
+            )
+        ).thenReturn(Optional.empty());
+        when(
+            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                42L,
+                IntegrationKind.SLACK,
+                IntegrationState.ACTIVE
+            )
+        ).thenReturn(Optional.of(active));
 
         Connection result = service.findOrCreatePendingConnection(42L, IntegrationKind.SLACK);
 
@@ -81,8 +107,13 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     @Test
     @DisplayName("findOrCreatePendingConnection creates a fresh row when no PENDING/ACTIVE exists")
     void findOrCreate_createsFreshWhenNoneExists() {
-        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            any(Long.class), any(), any())).thenReturn(Optional.empty());
+        when(
+            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                any(Long.class),
+                any(),
+                any()
+            )
+        ).thenReturn(Optional.empty());
         Workspace workspace = Mockito.mock(Workspace.class);
         when(workspaceRepository.findById(42L)).thenReturn(Optional.of(workspace));
         when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -98,8 +129,13 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     @Test
     @DisplayName("findOrCreatePendingConnection throws if workspace doesn't exist")
     void findOrCreate_missingWorkspace_throws() {
-        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            any(Long.class), any(), any())).thenReturn(Optional.empty());
+        when(
+            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                any(Long.class),
+                any(),
+                any()
+            )
+        ).thenReturn(Optional.empty());
         when(workspaceRepository.findById(42L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findOrCreatePendingConnection(42L, IntegrationKind.SLACK))
@@ -108,20 +144,23 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("completeConnection stamps instance_key on a fresh PENDING row + transitions ACTIVE with the captured actorRef")
+    @DisplayName(
+        "completeConnection stamps instance_key on a fresh PENDING row + transitions ACTIVE with the captured actorRef"
+    )
     void complete_stampsInstanceKeyAndTransitions() {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
-            "T123", new BearerToken("xoxb", null), "Acme"
+            "T123",
+            new BearerToken("xoxb", null),
+            "Acme"
         );
         when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
-            .thenAnswer(inv -> {
-                Connection c = inv.getArgument(0);
-                c.setState(IntegrationState.ACTIVE);
-                return c;
-            });
-        when(credentialBundleConverter.encrypt(any(), any())).thenReturn(new byte[]{0x02, 1, 2, 3});
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+            Connection c = inv.getArgument(0);
+            c.setState(IntegrationState.ACTIVE);
+            return c;
+        });
+        when(credentialBundleConverter.encrypt(any(), any())).thenReturn(new byte[] { 0x02, 1, 2, 3 });
 
         Connection result = service.completeConnection(pending, completed, "alice@example.com");
 
@@ -145,11 +184,14 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     void complete_nullActorRef_usesSentinel() {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
-            "T1", new BearerToken("t", null), null
+            "T1",
+            new BearerToken("t", null),
+            null
         );
         when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv ->
+            inv.getArgument(0)
+        );
 
         service.completeConnection(pending, completed, null);
 
@@ -163,10 +205,13 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     void complete_conflictingInstanceKey_throws() {
         Connection existing = newConnection(7L, 42L, IntegrationKind.SLACK, "T_ORIG", IntegrationState.ACTIVE);
         ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
-            "T_NEW", new BearerToken("t", null), "Renamed"
+            "T_NEW",
+            new BearerToken("t", null),
+            "Renamed"
         );
-        org.assertj.core.api.Assertions
-            .assertThatThrownBy(() -> service.completeConnection(existing, completed, "alice"))
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            service.completeConnection(existing, completed, "alice")
+        )
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("instance_key");
     }
@@ -176,11 +221,14 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     void complete_transitionGuardRejects_throwsThrough() {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
-            "T1", new BearerToken("t", null), null
+            "T1",
+            new BearerToken("t", null),
+            null
         );
         when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
-            .thenThrow(new IllegalStateException("Illegal transition for connection 7"));
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenThrow(
+            new IllegalStateException("Illegal transition for connection 7")
+        );
 
         assertThatThrownBy(() -> service.completeConnection(pending, completed, "alice"))
             .isInstanceOf(IllegalStateException.class)
@@ -193,8 +241,9 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         ConnectFinalization.Completed completed = new ConnectFinalization.Completed("T1", null, null);
         when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv ->
+            inv.getArgument(0)
+        );
 
         Connection result = service.completeConnection(pending, completed, "alice");
 
@@ -205,15 +254,23 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
 
     // ── helpers ─────────────────────────────────────────────────────────────
 
-    private static Connection newConnection(long id, long workspaceId, IntegrationKind kind,
-                                            String instanceKey, IntegrationState state) {
+    private static Connection newConnection(
+        long id,
+        long workspaceId,
+        IntegrationKind kind,
+        String instanceKey,
+        IntegrationState state
+    ) {
         Workspace ws = Mockito.mock(Workspace.class);
         Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
         ConnectionConfig cfg = switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, java.util.Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(
-                "https://gitlab.com", null, null,
-                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, java.util.Set.of()
+                "https://gitlab.com",
+                null,
+                null,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                java.util.Set.of()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, java.util.Set.of());
             case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, java.util.Set.of());

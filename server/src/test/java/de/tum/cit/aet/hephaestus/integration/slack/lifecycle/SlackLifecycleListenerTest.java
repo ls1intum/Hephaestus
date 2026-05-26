@@ -29,9 +29,14 @@ import org.mockito.Mockito;
 @DisplayName("SlackLifecycleListener — unit")
 class SlackLifecycleListenerTest extends BaseUnitTest {
 
-    @Mock private ConnectionRepository connectionRepository;
-    @Mock private SlackChannelRepository channelRepository;
-    @Mock private SlackMessageRepository messageRepository;
+    @Mock
+    private ConnectionRepository connectionRepository;
+
+    @Mock
+    private SlackChannelRepository channelRepository;
+
+    @Mock
+    private SlackMessageRepository messageRepository;
 
     private SlackLifecycleListener listener;
 
@@ -45,9 +50,9 @@ class SlackLifecycleListenerTest extends BaseUnitTest {
     void emptyDeltaIsNoOp() {
         listener.onScopeChanged(
             new IntegrationRef(IntegrationKind.SLACK, 1L, "T1"),
-            new ScopeDelta(List.of(), List.of()));
-        verify(connectionRepository, never()).findByWorkspaceIdAndKindAndInstanceKey(
-            anyLong(), any(), anyString());
+            new ScopeDelta(List.of(), List.of())
+        );
+        verify(connectionRepository, never()).findByWorkspaceIdAndKindAndInstanceKey(anyLong(), any(), anyString());
         verify(channelRepository, never()).deleteByConnectionIdAndChannelIdIn(anyLong(), any());
     }
 
@@ -55,8 +60,9 @@ class SlackLifecycleListenerTest extends BaseUnitTest {
     @DisplayName("onScopeChanged with unknown connection logs + skips (no exception)")
     void unknownConnectionIsSilent() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.SLACK, 1L, "T-unknown");
-        when(connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(1L, IntegrationKind.SLACK, "T-unknown"))
-            .thenReturn(Optional.empty());
+        when(
+            connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(1L, IntegrationKind.SLACK, "T-unknown")
+        ).thenReturn(Optional.empty());
 
         listener.onScopeChanged(ref, new ScopeDelta(List.of(), List.of("C-gone")));
 
@@ -70,8 +76,9 @@ class SlackLifecycleListenerTest extends BaseUnitTest {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.SLACK, 1L, "T1");
         Connection connection = Mockito.mock(Connection.class);
         when(connection.getId()).thenReturn(77L);
-        when(connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(1L, IntegrationKind.SLACK, "T1"))
-            .thenReturn(Optional.of(connection));
+        when(connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(1L, IntegrationKind.SLACK, "T1")).thenReturn(
+            Optional.of(connection)
+        );
         when(messageRepository.deleteByConnectionIdAndChannelId(77L, "C-removed")).thenReturn(12);
         when(channelRepository.deleteByConnectionIdAndChannelIdIn(eq(77L), any())).thenReturn(1);
 

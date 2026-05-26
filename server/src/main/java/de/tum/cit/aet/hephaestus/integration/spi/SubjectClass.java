@@ -12,5 +12,5 @@ public enum SubjectClass {
     PULL_REQUEST,
     ISSUE,
     OUTLINE_DOCUMENT,
-    SLACK_MESSAGE_THREAD
+    SLACK_MESSAGE_THREAD,
 }

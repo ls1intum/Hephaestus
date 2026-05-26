@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
-import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
-import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.util.ArrayList;
@@ -171,8 +171,10 @@ public class WorkspaceActivationService {
             case GITHUB -> {
                 // GitHub PAT variant requires a token; App variant mints on demand and
                 // never carries a blob, so only the PAT branch gates activation.
-                if (connectionService.findActiveGitHubPatConfig(workspace.getId()).isPresent()
-                    && !hasBearerToken(workspace.getId(), IntegrationKind.GITHUB)) {
+                if (
+                    connectionService.findActiveGitHubPatConfig(workspace.getId()).isPresent() &&
+                    !hasBearerToken(workspace.getId(), IntegrationKind.GITHUB)
+                ) {
                     log.info(
                         "Skipped workspace activation: reason=patModeWithoutToken, workspaceId={}",
                         workspace.getId()

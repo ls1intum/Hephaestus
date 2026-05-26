@@ -102,10 +102,7 @@ public class IntegrationPoisonHandler {
         } catch (Exception nakWithDelayFailed) {
             // Closed connection / shutdown / etc. — fall back to immediate NAK so the
             // server-side ack-wait timeout becomes the only thing the message is waiting on.
-            log.debug(
-                "Failed to NAK with delay, using immediate NAK: error={}",
-                nakWithDelayFailed.getMessage()
-            );
+            log.debug("Failed to NAK with delay, using immediate NAK: error={}", nakWithDelayFailed.getMessage());
             try {
                 msg.nak();
             } catch (Exception immediateNakFailed) {
@@ -175,14 +172,15 @@ public class IntegrationPoisonHandler {
 
     private Counter nakCounter(Message msg) {
         String kindTag = kindTag(msg);
-        return nakCounters.computeIfAbsent(kindTag, k -> Counter.builder(NAK_COUNTER).tag("kind", k).register(meterRegistry));
+        return nakCounters.computeIfAbsent(kindTag, k ->
+            Counter.builder(NAK_COUNTER).tag("kind", k).register(meterRegistry)
+        );
     }
 
     private Counter poisonCounter(Message msg) {
         String kindTag = kindTag(msg);
-        return poisonCounters.computeIfAbsent(
-            kindTag,
-            k -> Counter.builder(POISON_COUNTER).tag("kind", k).register(meterRegistry)
+        return poisonCounters.computeIfAbsent(kindTag, k ->
+            Counter.builder(POISON_COUNTER).tag("kind", k).register(meterRegistry)
         );
     }
 
@@ -210,6 +208,8 @@ public class IntegrationPoisonHandler {
             return UNKNOWN_KIND_TAG;
         }
         String subject = msg.getSubject();
-        return ConsumerSubjectMath.kindFromSubjectPrefix(subject).map(k -> k.name().toLowerCase()).orElse(UNKNOWN_KIND_TAG);
+        return ConsumerSubjectMath.kindFromSubjectPrefix(subject)
+            .map(k -> k.name().toLowerCase())
+            .orElse(UNKNOWN_KIND_TAG);
     }
 }

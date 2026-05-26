@@ -1,11 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.github.feedback;
 
-import de.tum.cit.aet.hephaestus.integration.spi.ApprovalChannel;
-
 import static de.tum.cit.aet.hephaestus.integration.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.github.feedback.GithubFeedbackChannel.PrCoordinates;
+import de.tum.cit.aet.hephaestus.integration.spi.ApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
@@ -27,10 +26,7 @@ public class GithubApprovalChannel implements ApprovalChannel {
     private final GitHubGraphQlClientProvider gitHubProvider;
     private final GithubPrNodeIdResolver prNodeIdResolver;
 
-    public GithubApprovalChannel(
-        GitHubGraphQlClientProvider gitHubProvider,
-        GithubPrNodeIdResolver prNodeIdResolver
-    ) {
+    public GithubApprovalChannel(GitHubGraphQlClientProvider gitHubProvider, GithubPrNodeIdResolver prNodeIdResolver) {
         this.gitHubProvider = gitHubProvider;
         this.prNodeIdResolver = prNodeIdResolver;
     }
@@ -44,9 +40,7 @@ public class GithubApprovalChannel implements ApprovalChannel {
     public void approve(FeedbackChannel.FeedbackTarget target, String message) {
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
-            throw new FeedbackDeliveryException(
-                "GitHub rate limit critical — skipping approval for scope " + scopeId
-            );
+            throw new FeedbackDeliveryException("GitHub rate limit critical — skipping approval for scope " + scopeId);
         }
 
         PrCoordinates pr = GithubFeedbackChannel.parseSubjectExternalId(target.subjectExternalId());
@@ -70,7 +64,11 @@ public class GithubApprovalChannel implements ApprovalChannel {
         }
 
         String reviewId = response.field("addPullRequestReview.pullRequestReview.id").getValue();
-        log.info("Posted GitHub approval review: workspaceId={}, prNodeId={}, reviewId={}",
-            scopeId, prNodeId, reviewId);
+        log.info(
+            "Posted GitHub approval review: workspaceId={}, prNodeId={}, reviewId={}",
+            scopeId,
+            prNodeId,
+            reviewId
+        );
     }
 }

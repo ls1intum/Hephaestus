@@ -3,31 +3,32 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.sync;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.commit.GitLabCommitSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncSession;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.issue.GitLabIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.issuedependency.GitLabIssueDependencySyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.issuetype.GitLabIssueTypeSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.label.GitLabLabelSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.milestone.GitLabMilestoneSyncService;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabGroupMemberSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabGroupSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest.GitLabMergeRequestSyncService;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.gitlab.repository.collaborator.GitLabCollaboratorSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.subissue.GitLabSubIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.team.GitLabTeamSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncSession;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncType;
 import jakarta.annotation.PostConstruct;
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -40,6 +41,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -47,8 +49,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
 
 /**
  * Scheduler for periodic GitLab data synchronization across all GitLab scopes.
@@ -227,7 +227,10 @@ public class GitlabDataSyncScheduler {
 
         try {
             GitLabSyncResult result = groupSync.syncGroupProjects(
-                session.scopeId(), session.accountLogin(), session.serverUrl());
+                session.scopeId(),
+                session.accountLogin(),
+                session.serverUrl()
+            );
             log.info(
                 "GitLab group project sync: scopeId={}, status={}, synced={}, pages={}",
                 session.scopeId(),

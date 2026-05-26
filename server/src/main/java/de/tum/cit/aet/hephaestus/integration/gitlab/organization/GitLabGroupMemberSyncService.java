@@ -17,14 +17,14 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupMe
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupMemberResponse.GitLabAccessLevel;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupMemberResponse.GitLabMemberUser;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabPageInfo;
-import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener;
-import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
+import de.tum.cit.aet.hephaestus.integration.gitlab.user.GitLabUserClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMembershipRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.gitlab.user.GitLabUserClassifier;
+import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;

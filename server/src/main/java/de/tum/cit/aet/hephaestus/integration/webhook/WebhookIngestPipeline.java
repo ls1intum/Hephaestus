@@ -2,15 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.webhook;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import de.tum.cit.aet.hephaestus.integration.webhook.JetStreamPublisher;
-import de.tum.cit.aet.hephaestus.integration.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier.VerificationResult;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier.WebhookRequest;
+import de.tum.cit.aet.hephaestus.integration.webhook.JetStreamPublisher;
+import de.tum.cit.aet.hephaestus.integration.webhook.PublishRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.Collections;
@@ -26,6 +24,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Inbound webhook pipeline: verify → derive → publish.
@@ -48,8 +48,10 @@ public class WebhookIngestPipeline {
 
     private final Map<IntegrationKind, WebhookSignatureVerifier> verifiersByKind;
     private final Map<IntegrationKind, SubjectKeyDeriver> deriversByKind;
+
     @Nullable
     private final JetStreamPublisher jetStreamPublisher;
+
     private final ObjectMapper objectMapper;
 
     public WebhookIngestPipeline(
@@ -58,26 +60,20 @@ public class WebhookIngestPipeline {
         @Nullable JetStreamPublisher jetStreamPublisher,
         ObjectMapper objectMapper
     ) {
-        this.verifiersByKind = verifiers.stream()
-            .collect(Collectors.toUnmodifiableMap(
-                WebhookSignatureVerifier::kind,
-                Function.identity(),
-                (a, b) -> {
-                    throw new IllegalStateException(
-                        "Duplicate WebhookSignatureVerifier for kind=" + a.kind()
-                    );
-                }
-            ));
-        this.deriversByKind = derivers.stream()
-            .collect(Collectors.toUnmodifiableMap(
-                SubjectKeyDeriver::kind,
-                Function.identity(),
-                (a, b) -> {
-                    throw new IllegalStateException(
-                        "Duplicate SubjectKeyDeriver for kind=" + a.kind()
-                    );
-                }
-            ));
+        this.verifiersByKind = verifiers
+            .stream()
+            .collect(
+                Collectors.toUnmodifiableMap(WebhookSignatureVerifier::kind, Function.identity(), (a, b) -> {
+                    throw new IllegalStateException("Duplicate WebhookSignatureVerifier for kind=" + a.kind());
+                })
+            );
+        this.deriversByKind = derivers
+            .stream()
+            .collect(
+                Collectors.toUnmodifiableMap(SubjectKeyDeriver::kind, Function.identity(), (a, b) -> {
+                    throw new IllegalStateException("Duplicate SubjectKeyDeriver for kind=" + a.kind());
+                })
+            );
         this.jetStreamPublisher = jetStreamPublisher;
         this.objectMapper = objectMapper;
     }
@@ -98,8 +94,9 @@ public class WebhookIngestPipeline {
         if (verifier == null) {
             // No verifier wired — kind is allow-listed but not yet implemented.
             log.warn("No WebhookSignatureVerifier registered for kind={}; rejecting", kind);
-            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                .body(Map.of("error", "no verifier wired for " + kind));
+            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(
+                Map.of("error", "no verifier wired for " + kind)
+            );
         }
 
         WebhookRequest request = new WebhookRequest(body, headers);
@@ -125,8 +122,9 @@ public class WebhookIngestPipeline {
                 log.warn("Webhook rejected for kind={}: {}", kind, i.reason());
                 yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
             }
-            case VerificationResult.MissingSignature ms -> ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "missing-signature"));
+            case VerificationResult.MissingSignature ms -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                Map.of("error", "missing-signature")
+            );
         };
     }
 
@@ -135,28 +133,24 @@ public class WebhookIngestPipeline {
             // No publisher bean — the webhook runtime role is disabled. Vendor will retry.
             // 503 is the right surface here: the verification succeeded, but the downstream
             // pipe is intentionally not wired on this pod.
-            log.warn(
-                "WebhookIngestPipeline: verified {} webhook but no JetStreamPublisher bean — replying 503",
-                kind
-            );
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(Map.of("error", "publisher not wired"));
+            log.warn("WebhookIngestPipeline: verified {} webhook but no JetStreamPublisher bean — replying 503", kind);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "publisher not wired"));
         }
         SubjectKeyDeriver deriver = deriversByKind.get(kind);
         if (deriver == null) {
             // Kind has a verifier but no derivation — surface as NOT_IMPLEMENTED so the
             // operator notices the gap rather than silently dropping into a default subject.
             log.warn("WebhookIngestPipeline: no SubjectKeyDeriver wired for kind={}", kind);
-            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                .body(Map.of("error", "no subject deriver for " + kind));
+            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(
+                Map.of("error", "no subject deriver for " + kind)
+            );
         }
 
         JsonNode payload;
         try {
             payload = objectMapper.readTree(body);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("error", "invalid-json"));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "invalid-json"));
         }
 
         String subject = deriver.deriveSubject(payload, headers);
@@ -178,12 +172,18 @@ public class WebhookIngestPipeline {
         } catch (JetStreamPublisher.PublishFailedException e) {
             log.error(
                 "WebhookIngestPipeline: publish failed for kind={} subject={}: {}",
-                kind, sanitizeForLog(subject), e.getMessage()
+                kind,
+                sanitizeForLog(subject),
+                e.getMessage()
             );
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(Map.of("error", "publish-failed"));
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "publish-failed"));
         }
-        log.info("Published {} webhook to NATS: subject={} dedupId={}", kind, sanitizeForLog(subject), sanitizeForLog(dedupId));
+        log.info(
+            "Published {} webhook to NATS: subject={} dedupId={}",
+            kind,
+            sanitizeForLog(subject),
+            sanitizeForLog(dedupId)
+        );
         return ResponseEntity.accepted().body(Map.of("status", "ok"));
     }
 
@@ -207,8 +207,7 @@ public class WebhookIngestPipeline {
     }
 
     private ResponseEntity<?> respondImmediately(VerificationResult.RespondImmediately r) {
-        var resp = ResponseEntity.status(r.statusCode())
-            .contentType(MediaType.parseMediaType(r.contentType()));
+        var resp = ResponseEntity.status(r.statusCode()).contentType(MediaType.parseMediaType(r.contentType()));
         for (Map.Entry<String, String> h : r.headers().entrySet()) {
             resp = resp.header(h.getKey(), h.getValue());
         }

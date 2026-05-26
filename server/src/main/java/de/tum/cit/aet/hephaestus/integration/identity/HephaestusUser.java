@@ -26,10 +26,7 @@ import org.springframework.lang.Nullable;
 @Entity
 @Table(
     name = "hephaestus_user",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uq_hephaestus_user_kc_subject",
-        columnNames = {"keycloak_subject"}
-    )
+    uniqueConstraints = @UniqueConstraint(name = "uq_hephaestus_user_kc_subject", columnNames = { "keycloak_subject" })
 )
 public class HephaestusUser {
 
@@ -56,8 +53,7 @@ public class HephaestusUser {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected HephaestusUser() {
-    }
+    protected HephaestusUser() {}
 
     public HephaestusUser(String keycloakSubject, @Nullable String email, @Nullable String displayName) {
         this.keycloakSubject = keycloakSubject;
@@ -65,13 +61,37 @@ public class HephaestusUser {
         this.displayName = displayName;
     }
 
-    public Long getId() { return id; }
-    public String getKeycloakSubject() { return keycloakSubject; }
-    @Nullable public String getEmail() { return email; }
-    @Nullable public String getDisplayName() { return displayName; }
-    public Instant getCreatedAt() { return createdAt; }
-    public Instant getUpdatedAt() { return updatedAt; }
+    public Long getId() {
+        return id;
+    }
 
-    public void setEmail(@Nullable String email) { this.email = email; }
-    public void setDisplayName(@Nullable String displayName) { this.displayName = displayName; }
+    public String getKeycloakSubject() {
+        return keycloakSubject;
+    }
+
+    @Nullable
+    public String getEmail() {
+        return email;
+    }
+
+    @Nullable
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setEmail(@Nullable String email) {
+        this.email = email;
+    }
+
+    public void setDisplayName(@Nullable String displayName) {
+        this.displayName = displayName;
+    }
 }

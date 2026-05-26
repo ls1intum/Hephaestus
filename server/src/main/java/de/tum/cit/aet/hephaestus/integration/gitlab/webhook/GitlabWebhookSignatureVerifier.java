@@ -81,12 +81,11 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
     }
 
     private static WebhookSecretSource pickGitlabSource(List<WebhookSecretSource> sources) {
-        return sources.stream()
+        return sources
+            .stream()
             .filter(s -> s.kind() == IntegrationKind.GITLAB)
             .findFirst()
-            .orElseThrow(() -> new IllegalStateException(
-                "No WebhookSecretSource bean registered for GITLAB"
-            ));
+            .orElseThrow(() -> new IllegalStateException("No WebhookSecretSource bean registered for GITLAB"));
     }
 
     @Override
@@ -112,8 +111,11 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         return new VerificationResult.MissingSignature();
     }
 
-
-    private VerificationResult verifyPlaintext(WebhookRequest request, Map<String, String> headers, String tokenHeader) {
+    private VerificationResult verifyPlaintext(
+        WebhookRequest request,
+        Map<String, String> headers,
+        String tokenHeader
+    ) {
         Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(headers));
         if (secret.isEmpty()) {
             log.warn("GitLab plaintext verifier: no shared secret available");
@@ -126,8 +128,11 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         return new VerificationResult.Invalid("token-mismatch");
     }
 
-
-    private VerificationResult verifyWhsec(WebhookRequest request, Map<String, String> headers, String signatureHeader) {
+    private VerificationResult verifyWhsec(
+        WebhookRequest request,
+        Map<String, String> headers,
+        String signatureHeader
+    ) {
         String msgId = headers.get(HEADER_WEBHOOK_ID);
         String timestampHeader = headers.get(HEADER_WEBHOOK_TIMESTAMP);
         if (msgId == null || msgId.isBlank()) {
@@ -238,5 +243,4 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         }
         return out;
     }
-
 }

@@ -33,9 +33,7 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
     @DisplayName("uses retention to compute cutoff and increments counter by row-count")
     void incrementsCounterByRowCount() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        OAuthStateNonceCleanupJob job = new OAuthStateNonceCleanupJob(
-            repository, Duration.ofDays(7), registry
-        );
+        OAuthStateNonceCleanupJob job = new OAuthStateNonceCleanupJob(repository, Duration.ofDays(7), registry);
         when(repository.deleteByIssuedAtBefore(any(Instant.class))).thenReturn(5);
 
         job.cleanupExpired();
@@ -48,9 +46,7 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
     @DisplayName("zero-row sweep does not increment counter")
     void zeroRowSweep() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        OAuthStateNonceCleanupJob job = new OAuthStateNonceCleanupJob(
-            repository, Duration.ofDays(7), registry
-        );
+        OAuthStateNonceCleanupJob job = new OAuthStateNonceCleanupJob(repository, Duration.ofDays(7), registry);
         when(repository.deleteByIssuedAtBefore(any(Instant.class))).thenReturn(0);
 
         job.cleanupExpired();
@@ -61,9 +57,9 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
     @Test
     @DisplayName("@SchedulerLock present on cleanupExpired with bounded lockAtMostFor / lockAtLeastFor")
     void schedulerLockPresent() throws NoSuchMethodException {
-        SchedulerLock lock = OAuthStateNonceCleanupJob.class
-            .getMethod("cleanupExpired")
-            .getAnnotation(SchedulerLock.class);
+        SchedulerLock lock = OAuthStateNonceCleanupJob.class.getMethod("cleanupExpired").getAnnotation(
+            SchedulerLock.class
+        );
         assertThat(lock).as("@SchedulerLock must be present").isNotNull();
         assertThat(lock.name()).isEqualTo("oauth-state-nonce-cleanup");
         assertThat(lock.lockAtMostFor()).isEqualTo("PT10M");

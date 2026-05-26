@@ -9,8 +9,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.dto.GitLabWebhookProject;
@@ -19,8 +17,10 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.issuecomment.dto.GitLabNoteE
 import de.tum.cit.aet.hephaestus.integration.gitlab.issuecomment.dto.GitLabNoteEventDTO.EmbeddedIssue;
 import de.tum.cit.aet.hephaestus.integration.gitlab.issuecomment.dto.GitLabNoteEventDTO.EmbeddedMergeRequest;
 import de.tum.cit.aet.hephaestus.integration.gitlab.issuecomment.dto.GitLabNoteEventDTO.NoteAttributes;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment.GitLabDiffNoteWebhookProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;

@@ -26,7 +26,8 @@ import org.mockito.MockitoAnnotations;
 @DisplayName("SlackCredentialProvider — unit")
 class SlackCredentialProviderTest extends BaseUnitTest {
 
-    @Mock private ConnectionService connectionService;
+    @Mock
+    private ConnectionService connectionService;
 
     private CredentialBundleConverter converter;
     private SlackCredentialProvider provider;
@@ -44,16 +45,18 @@ class SlackCredentialProviderTest extends BaseUnitTest {
         long workspaceId = 17L;
         Workspace ws = Mockito.mock(Workspace.class);
         Connection connection = new Connection(
-            ws, IntegrationKind.SLACK, "T12345",
+            ws,
+            IntegrationKind.SLACK,
+            "T12345",
             new ConnectionConfig.SlackConfig("T12345", "Acme", null, null, Set.of())
         );
         connection.setCredentials(new BearerToken("xoxb-secret-bot-token", null), converter);
         connection.setState(IntegrationState.ACTIVE);
-        when(connectionService.findActive(workspaceId, IntegrationKind.SLACK))
-            .thenReturn(Optional.of(connection));
+        when(connectionService.findActive(workspaceId, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
 
         Optional<CredentialBundle> resolved = provider.resolve(
-            new IntegrationRef(IntegrationKind.SLACK, workspaceId, "T12345"));
+            new IntegrationRef(IntegrationKind.SLACK, workspaceId, "T12345")
+        );
 
         assertThat(resolved).contains(new BearerToken("xoxb-secret-bot-token", null));
     }

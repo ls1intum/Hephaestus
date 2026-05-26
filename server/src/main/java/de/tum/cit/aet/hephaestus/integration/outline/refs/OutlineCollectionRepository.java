@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface OutlineCollectionRepository extends JpaRepository<OutlineCollection, Long> {
-
     Optional<OutlineCollection> findByConnectionIdAndCollectionId(long connectionId, String collectionId);
 
     List<OutlineCollection> findByConnectionId(long connectionId);
@@ -29,11 +28,11 @@ public interface OutlineCollectionRepository extends JpaRepository<OutlineCollec
     @Modifying
     @Transactional
     @Query(
-        "UPDATE OutlineCollection c SET c.deletedAt = :at "
-            + "WHERE c.connection.workspace.id = :workspaceId "
-            + "AND c.connection.id = :connectionId "
-            + "AND c.collectionId IN :collectionIds "
-            + "AND c.deletedAt IS NULL"
+        "UPDATE OutlineCollection c SET c.deletedAt = :at " +
+            "WHERE c.connection.workspace.id = :workspaceId " +
+            "AND c.connection.id = :connectionId " +
+            "AND c.collectionId IN :collectionIds " +
+            "AND c.deletedAt IS NULL"
     )
     int softDeleteByConnectionIdAndCollectionIdIn(
         @Param("workspaceId") long workspaceId,

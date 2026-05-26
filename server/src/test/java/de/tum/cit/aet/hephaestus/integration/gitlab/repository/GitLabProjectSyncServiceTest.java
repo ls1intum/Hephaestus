@@ -20,8 +20,8 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlResponse
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabProjectResponse;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabGroupProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;

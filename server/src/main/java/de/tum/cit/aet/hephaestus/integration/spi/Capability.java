@@ -10,7 +10,6 @@ package de.tum.cit.aet.hephaestus.integration.spi;
  * today. New capabilities re-add once their SPI lands.
  */
 public enum Capability {
-
     /** Receives HTTP webhook events. */
     WEBHOOK_INGEST,
     /** Vendor sends a verification handshake the pipeline answers in-band (Slack). */
@@ -27,5 +26,5 @@ public enum Capability {
     /** Implements {@code ApprovalChannel.approve}. */
     APPROVAL_WORKFLOW,
     /** Listener emits {@code onScopeChanged} (channel join/leave, repo add/remove). */
-    SCOPE_CHANGES
+    SCOPE_CHANGES,
 }

@@ -89,8 +89,7 @@ public class JetStreamPublisher {
     private static String streamFor(String subject) {
         int firstDot = subject.indexOf('.');
         if (firstDot <= 0) {
-            throw new IllegalArgumentException(
-                "Subject must be '<stream>.<...>': '" + subject + "'");
+            throw new IllegalArgumentException("Subject must be '<stream>.<...>': '" + subject + "'");
         }
         return subject.substring(0, firstDot);
     }

@@ -1,8 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.github.discussion;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
-import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.uriToString;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.DISCUSSION_SYNC_PAGE_SIZE;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.JITTER_FACTOR;
@@ -11,9 +9,9 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.uriToString;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.Category;
@@ -26,21 +24,23 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubRepositoryNameP
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.discussion.Discussion;
-import de.tum.cit.aet.hephaestus.integration.scm.discussion.DiscussionRepository;
 import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.discussioncomment.DiscussionComment;
-import de.tum.cit.aet.hephaestus.integration.scm.discussioncomment.DiscussionCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.github.discussioncomment.GitHubDiscussionCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.github.discussioncomment.dto.GitHubDiscussionCommentDTO;
+import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.discussion.Discussion;
+import de.tum.cit.aet.hephaestus.integration.scm.discussion.DiscussionRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.discussioncomment.DiscussionComment;
+import de.tum.cit.aet.hephaestus.integration.scm.discussioncomment.DiscussionCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHDiscussionCommentConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHDiscussionConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
-import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;

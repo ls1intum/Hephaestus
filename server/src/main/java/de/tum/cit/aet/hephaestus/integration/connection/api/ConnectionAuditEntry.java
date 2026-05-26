@@ -21,7 +21,6 @@ public record ConnectionAuditEntry(
     @Nullable String correlationId,
     Instant occurredAt
 ) {
-
     public static ConnectionAuditEntry from(ConnectionAudit audit) {
         return new ConnectionAuditEntry(
             audit.getEventType(),

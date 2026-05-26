@@ -20,16 +20,16 @@ import java.net.URI;
  * schema for richer credential prompts).
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
-@JsonSubTypes({
-    @JsonSubTypes.Type(value = InitiateConnectionResponse.Redirect.class, name = "redirect"),
-    @JsonSubTypes.Type(value = InitiateConnectionResponse.Linked.class, name = "linked")
-})
+@JsonSubTypes(
+    {
+        @JsonSubTypes.Type(value = InitiateConnectionResponse.Redirect.class, name = "redirect"),
+        @JsonSubTypes.Type(value = InitiateConnectionResponse.Linked.class, name = "linked"),
+    }
+)
 public sealed interface InitiateConnectionResponse
-    permits InitiateConnectionResponse.Redirect, InitiateConnectionResponse.Linked {
+    permits InitiateConnectionResponse.Redirect, InitiateConnectionResponse.Linked
+{
+    record Redirect(URI vendorUrl, String state) implements InitiateConnectionResponse {}
 
-    record Redirect(URI vendorUrl, String state) implements InitiateConnectionResponse {
-    }
-
-    record Linked(Long connectionId) implements InitiateConnectionResponse {
-    }
+    record Linked(Long connectionId) implements InitiateConnectionResponse {}
 }

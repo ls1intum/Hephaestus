@@ -35,8 +35,10 @@ public class GitlabCredentialProvider implements ApiCredentialProvider {
     private final ConnectionService connectionService;
     private final CredentialBundleConverter credentialConverter;
 
-    public GitlabCredentialProvider(ConnectionService connectionService,
-                                    CredentialBundleConverter credentialConverter) {
+    public GitlabCredentialProvider(
+        ConnectionService connectionService,
+        CredentialBundleConverter credentialConverter
+    ) {
         this.connectionService = connectionService;
         this.credentialConverter = credentialConverter;
     }
@@ -58,8 +60,7 @@ public class GitlabCredentialProvider implements ApiCredentialProvider {
         }
         Connection conn = connection.get();
         if (conn.getCredentialsEncrypted() == null) {
-            log.warn("GitLab Connection {} has no credentials_encrypted blob; cannot resolve PAT",
-                conn.getId());
+            log.warn("GitLab Connection {} has no credentials_encrypted blob; cannot resolve PAT", conn.getId());
             return Optional.empty();
         }
         return conn.credentials(credentialConverter);

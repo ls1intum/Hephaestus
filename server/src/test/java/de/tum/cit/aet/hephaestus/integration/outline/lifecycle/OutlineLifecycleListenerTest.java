@@ -8,10 +8,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.outline.refs.OutlineCollectionRepository;
-import de.tum.cit.aet.hephaestus.integration.outline.refs.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.refs.OutlineCollectionRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.refs.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener.ScopeDelta;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
@@ -33,9 +33,14 @@ class OutlineLifecycleListenerTest extends BaseUnitTest {
     private static final Instant FIXED = Instant.parse("2026-05-24T12:00:00Z");
     private static final Clock CLOCK = Clock.fixed(FIXED, ZoneOffset.UTC);
 
-    @Mock private ConnectionRepository connectionRepository;
-    @Mock private OutlineCollectionRepository collectionRepository;
-    @Mock private OutlineDocumentRepository documentRepository;
+    @Mock
+    private ConnectionRepository connectionRepository;
+
+    @Mock
+    private OutlineCollectionRepository collectionRepository;
+
+    @Mock
+    private OutlineDocumentRepository documentRepository;
 
     private OutlineLifecycleListener listener;
 
@@ -49,7 +54,8 @@ class OutlineLifecycleListenerTest extends BaseUnitTest {
     void emptyDeltaIsNoOp() {
         listener.onScopeChanged(
             new IntegrationRef(IntegrationKind.OUTLINE, 1L, "ws"),
-            new ScopeDelta(List.of(), List.of()));
+            new ScopeDelta(List.of(), List.of())
+        );
         verify(connectionRepository, never()).findByWorkspaceIdAndKindAndInstanceKey(anyLong(), any(), anyString());
     }
 
@@ -57,14 +63,19 @@ class OutlineLifecycleListenerTest extends BaseUnitTest {
     @DisplayName("unknown connection logs + skips without exception")
     void unknownConnectionIsSilent() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, 1L, "ws-gone");
-        when(connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(1L, IntegrationKind.OUTLINE, "ws-gone"))
-            .thenReturn(Optional.empty());
+        when(
+            connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(1L, IntegrationKind.OUTLINE, "ws-gone")
+        ).thenReturn(Optional.empty());
 
         listener.onScopeChanged(ref, new ScopeDelta(List.of(), List.of("col_1")));
 
         verify(documentRepository, never()).softDeleteByCollection(anyLong(), anyLong(), anyString(), any());
-        verify(collectionRepository, never())
-            .softDeleteByConnectionIdAndCollectionIdIn(anyLong(), anyLong(), any(), any());
+        verify(collectionRepository, never()).softDeleteByConnectionIdAndCollectionIdIn(
+            anyLong(),
+            anyLong(),
+            any(),
+            any()
+        );
     }
 
     @Test
@@ -73,11 +84,13 @@ class OutlineLifecycleListenerTest extends BaseUnitTest {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, 1L, "ws");
         Connection conn = Mockito.mock(Connection.class);
         when(conn.getId()).thenReturn(77L);
-        when(connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(1L, IntegrationKind.OUTLINE, "ws"))
-            .thenReturn(Optional.of(conn));
+        when(connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(1L, IntegrationKind.OUTLINE, "ws")).thenReturn(
+            Optional.of(conn)
+        );
         when(documentRepository.softDeleteByCollection(1L, 77L, "col_1", FIXED)).thenReturn(5);
-        when(collectionRepository.softDeleteByConnectionIdAndCollectionIdIn(1L, 77L, List.of("col_1"), FIXED))
-            .thenReturn(1);
+        when(
+            collectionRepository.softDeleteByConnectionIdAndCollectionIdIn(1L, 77L, List.of("col_1"), FIXED)
+        ).thenReturn(1);
 
         listener.onScopeChanged(ref, new ScopeDelta(List.of(), List.of("col_1")));
 

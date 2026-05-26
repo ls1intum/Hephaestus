@@ -40,18 +40,24 @@ public class WebhookController {
     @PostMapping("/webhooks/{kind}")
     @PreAuthorize("permitAll()")
     public ResponseEntity<?> ingest(@PathVariable String kind, HttpServletRequest req) throws IOException {
-        return routing.resolve(kind)
+        return routing
+            .resolve(kind)
             .<ResponseEntity<?>>map(k -> doHandle(k, req))
-            .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("error", "unknown integration kind: " + kind)));
+            .orElseGet(() ->
+                ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "unknown integration kind: " + kind))
+            );
     }
 
-    private ResponseEntity<?> doHandle(de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind k, HttpServletRequest req) {
+    private ResponseEntity<?> doHandle(
+        de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind k,
+        HttpServletRequest req
+    ) {
         try {
             return pipeline.handle(k, req);
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("error", "could not read body: " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                Map.of("error", "could not read body: " + e.getMessage())
+            );
         }
     }
 }

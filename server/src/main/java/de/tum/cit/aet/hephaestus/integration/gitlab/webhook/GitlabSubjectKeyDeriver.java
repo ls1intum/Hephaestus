@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.webhook;
 
-import tools.jackson.databind.JsonNode;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Builds NATS subjects + dedup keys for GitLab webhook payloads under the unified

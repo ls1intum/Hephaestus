@@ -5,22 +5,21 @@ import org.springframework.lang.Nullable;
 
 /** Per-kind webhook signature verification. */
 public interface WebhookSignatureVerifier {
-
     IntegrationKind kind();
 
     VerificationResult verify(WebhookRequest request);
 
     /** Body + headers. Workspace context is resolved by the verifier itself when needed. */
-    record WebhookRequest(byte[] body, Map<String, String> headers) {
-    }
+    record WebhookRequest(byte[] body, Map<String, String> headers) {}
 
     sealed interface VerificationResult
-        permits VerificationResult.Verified,
-                VerificationResult.Invalid,
-                VerificationResult.MissingSignature,
-                VerificationResult.StaleTimestamp,
-                VerificationResult.RespondImmediately {
-
+        permits
+            VerificationResult.Verified,
+            VerificationResult.Invalid,
+            VerificationResult.MissingSignature,
+            VerificationResult.StaleTimestamp,
+            VerificationResult.RespondImmediately
+    {
         record Verified() implements VerificationResult {}
 
         /**

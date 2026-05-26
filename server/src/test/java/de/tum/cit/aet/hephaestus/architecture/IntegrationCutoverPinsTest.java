@@ -70,8 +70,8 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
                             SimpleConditionEvent.violated(
                                 method,
                                 String.format(
-                                    "%s declares legacy per-vendor webhook route '%s' — only "
-                                        + "WebhookController.@PostMapping(\"/webhooks/{kind}\") is permitted",
+                                    "%s declares legacy per-vendor webhook route '%s' — only " +
+                                        "WebhookController.@PostMapping(\"/webhooks/{kind}\") is permitted",
                                     method.getFullName(),
                                     trimmed
                                 )
@@ -87,8 +87,8 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
             .areAnnotatedWith(PostMapping.class)
             .should(notDeclareLegacyVendorRoute)
             .because(
-                "all vendor webhook receivers live behind /webhooks/{kind}; re-adding /github, "
-                    + "/gitlab, /slack, or /outline would bypass the unified verification framework"
+                "all vendor webhook receivers live behind /webhooks/{kind}; re-adding /github, " +
+                    "/gitlab, /slack, or /outline would bypass the unified verification framework"
             );
         rule.check(classes);
     }
@@ -126,8 +126,8 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
                         SimpleConditionEvent.violated(
                             field,
                             String.format(
-                                "%s re-introduces a legacy Connection-owned field name on a JPA "
-                                    + "entity — the Connection registry now owns this data.",
+                                "%s re-introduces a legacy Connection-owned field name on a JPA " +
+                                    "entity — the Connection registry now owns this data.",
                                 field.getFullName()
                             )
                         )
@@ -140,15 +140,18 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
         // `.areDeclaredInClassesThat()` fluents on the ArchRule builder ORs them and would
         // sweep DTOs/context records that legitimately keep these field names on the wire.
         com.tngtech.archunit.base.DescribedPredicate<com.tngtech.archunit.core.domain.JavaClass> entityInWorkspace =
-            com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage("..workspace..")
-                .and(com.tngtech.archunit.core.domain.properties.CanBeAnnotated.Predicates.annotatedWith(jakarta.persistence.Entity.class));
+            com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage("..workspace..").and(
+                com.tngtech.archunit.core.domain.properties.CanBeAnnotated.Predicates.annotatedWith(
+                    jakarta.persistence.Entity.class
+                )
+            );
         ArchRule rule = fields()
             .that()
             .areDeclaredInClassesThat(entityInWorkspace)
             .should(notCarryLegacyName)
             .because(
-                "the Connection registry owns these fields; re-declaring them on a JPA entity "
-                    + "in the workspace package would re-create the dual-source-of-truth bug"
+                "the Connection registry owns these fields; re-declaring them on a JPA entity " +
+                    "in the workspace package would re-create the dual-source-of-truth bug"
             );
         rule.check(classes);
     }

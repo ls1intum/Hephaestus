@@ -2,16 +2,16 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.label;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabPageInfo;
+import de.tum.cit.aet.hephaestus.integration.gitlab.label.dto.GitLabLabelDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.integration.gitlab.label.dto.GitLabLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
 import java.util.HashSet;

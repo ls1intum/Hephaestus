@@ -1,9 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.connection.api;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import de.tum.cit.aet.hephaestus.integration.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationFamily;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
@@ -11,6 +9,8 @@ import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
 import java.time.Instant;
 import java.util.Set;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Detailed view of a single Connection — extends {@link ConnectionSummary} with the
@@ -35,7 +35,6 @@ public record ConnectionDetail(
     Set<Capability> capabilities,
     @Nullable JsonNode config
 ) {
-
     public static ConnectionDetail from(Connection c, IntegrationManifestRegistry manifests, ObjectMapper mapper) {
         JsonNode configNode = c.getConfig() == null ? null : mapper.valueToTree(c.getConfig());
         return new ConnectionDetail(

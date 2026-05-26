@@ -19,7 +19,6 @@ import org.springframework.lang.Nullable;
  * and refresh happen via that separate SPI.
  */
 public interface ApiCredentialProvider {
-
     IntegrationKind kind();
 
     Optional<CredentialBundle> resolve(IntegrationRef ref);
@@ -34,13 +33,14 @@ public interface ApiCredentialProvider {
      * time, not at compile time, so keep them in sync.
      */
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
-    @JsonSubTypes({
-        @JsonSubTypes.Type(value = BearerToken.class, name = "BEARER"),
-        @JsonSubTypes.Type(value = GithubAppCredential.class, name = "GITHUB_APP"),
-        @JsonSubTypes.Type(value = OAuthSession.class, name = "OAUTH_SESSION")
-    })
-    sealed interface CredentialBundle permits BearerToken, GithubAppCredential, OAuthSession {
-    }
+    @JsonSubTypes(
+        {
+            @JsonSubTypes.Type(value = BearerToken.class, name = "BEARER"),
+            @JsonSubTypes.Type(value = GithubAppCredential.class, name = "GITHUB_APP"),
+            @JsonSubTypes.Type(value = OAuthSession.class, name = "OAUTH_SESSION"),
+        }
+    )
+    sealed interface CredentialBundle permits BearerToken, GithubAppCredential, OAuthSession {}
 
     /**
      * Long-lived or short-lived bearer (PAT, Slack xoxb, Outline OAuth access token).
@@ -55,16 +55,23 @@ public interface ApiCredentialProvider {
     }
 
     /** GitHub App: installation identity. Actual token minted by {@link TokenRefresher}. */
-    record GithubAppCredential(long installationId, String appId) implements CredentialBundle {
-    }
+    record GithubAppCredential(long installationId, String appId) implements CredentialBundle {}
 
     /** OAuth session with refresh capability. {@code accessToken} + {@code refreshToken} redacted. */
-    record OAuthSession(String accessToken, @Nullable String refreshToken, @Nullable Instant expiresAt)
-        implements CredentialBundle {
+    record OAuthSession(
+        String accessToken,
+        @Nullable String refreshToken,
+        @Nullable Instant expiresAt
+    ) implements CredentialBundle {
         @Override
         public String toString() {
-            return "OAuthSession[accessToken=***, refreshToken=" + (refreshToken == null ? "null" : "***")
-                + ", expiresAt=" + expiresAt + "]";
+            return (
+                "OAuthSession[accessToken=***, refreshToken=" +
+                (refreshToken == null ? "null" : "***") +
+                ", expiresAt=" +
+                expiresAt +
+                "]"
+            );
         }
     }
 }

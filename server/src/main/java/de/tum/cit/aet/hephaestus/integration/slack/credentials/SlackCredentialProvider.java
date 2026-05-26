@@ -30,8 +30,7 @@ public class SlackCredentialProvider implements ApiCredentialProvider {
     private final ConnectionService connectionService;
     private final CredentialBundleConverter credentialConverter;
 
-    public SlackCredentialProvider(ConnectionService connectionService,
-                                   CredentialBundleConverter credentialConverter) {
+    public SlackCredentialProvider(ConnectionService connectionService, CredentialBundleConverter credentialConverter) {
         this.connectionService = connectionService;
         this.credentialConverter = credentialConverter;
     }

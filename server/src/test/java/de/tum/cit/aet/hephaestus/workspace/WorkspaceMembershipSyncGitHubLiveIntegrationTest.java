@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.github.AbstractGitHubLiveSyncIntegrationTest;
+import de.tum.cit.aet.hephaestus.integration.github.organization.GitHubOrganizationSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMembershipRepository;
-import de.tum.cit.aet.hephaestus.integration.github.organization.GitHubOrganizationSyncService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

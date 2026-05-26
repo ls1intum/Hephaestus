@@ -34,13 +34,8 @@ import org.springframework.lang.Nullable;
 @Entity
 @Table(
     name = "slack_channel",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uq_slack_channel",
-        columnNames = {"connection_id", "channel_id"}
-    ),
-    indexes = {
-        @Index(name = "ix_slack_channel_connection", columnList = "connection_id")
-    }
+    uniqueConstraints = @UniqueConstraint(name = "uq_slack_channel", columnNames = { "connection_id", "channel_id" }),
+    indexes = { @Index(name = "ix_slack_channel_connection", columnList = "connection_id") }
 )
 public class SlackChannel {
 
@@ -82,8 +77,7 @@ public class SlackChannel {
     @Column(name = "ingested_at", nullable = false, updatable = false)
     private Instant ingestedAt;
 
-    protected SlackChannel() {
-    }
+    protected SlackChannel() {}
 
     public SlackChannel(Connection connection, String channelId, @Nullable String name) {
         this.connection = connection;
@@ -91,21 +85,66 @@ public class SlackChannel {
         this.name = name;
     }
 
-    public Long getId() { return id; }
-    public Connection getConnection() { return connection; }
-    public String getChannelId() { return channelId; }
-    @Nullable public String getName() { return name; }
-    @Nullable public String getTopic() { return topic; }
-    @Nullable public String getPurpose() { return purpose; }
-    public boolean isArchived() { return isArchived; }
-    @Nullable public Instant getArchivedAt() { return archivedAt; }
-    @Nullable public Integer getMemberCount() { return memberCount; }
-    public Instant getIngestedAt() { return ingestedAt; }
+    public Long getId() {
+        return id;
+    }
 
-    public void setName(@Nullable String name) { this.name = name; }
-    public void setTopic(@Nullable String topic) { this.topic = topic; }
-    public void setPurpose(@Nullable String purpose) { this.purpose = purpose; }
-    public void setMemberCount(@Nullable Integer memberCount) { this.memberCount = memberCount; }
+    public Connection getConnection() {
+        return connection;
+    }
+
+    public String getChannelId() {
+        return channelId;
+    }
+
+    @Nullable
+    public String getName() {
+        return name;
+    }
+
+    @Nullable
+    public String getTopic() {
+        return topic;
+    }
+
+    @Nullable
+    public String getPurpose() {
+        return purpose;
+    }
+
+    public boolean isArchived() {
+        return isArchived;
+    }
+
+    @Nullable
+    public Instant getArchivedAt() {
+        return archivedAt;
+    }
+
+    @Nullable
+    public Integer getMemberCount() {
+        return memberCount;
+    }
+
+    public Instant getIngestedAt() {
+        return ingestedAt;
+    }
+
+    public void setName(@Nullable String name) {
+        this.name = name;
+    }
+
+    public void setTopic(@Nullable String topic) {
+        this.topic = topic;
+    }
+
+    public void setPurpose(@Nullable String purpose) {
+        this.purpose = purpose;
+    }
+
+    public void setMemberCount(@Nullable Integer memberCount) {
+        this.memberCount = memberCount;
+    }
 
     /**
      * Mark the channel archived. Idempotent — calling on an already-archived row preserves

@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.account;
 
+import de.tum.cit.aet.hephaestus.analytics.posthog.PosthogClient;
+import de.tum.cit.aet.hephaestus.analytics.posthog.PosthogClientException;
 import de.tum.cit.aet.hephaestus.config.KeycloakProperties;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
-import de.tum.cit.aet.hephaestus.analytics.posthog.PosthogClient;
-import de.tum.cit.aet.hephaestus.analytics.posthog.PosthogClientException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;

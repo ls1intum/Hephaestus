@@ -16,9 +16,9 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabProjectResponse;
+import de.tum.cit.aet.hephaestus.integration.gitlab.repository.GitLabProjectProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.gitlab.repository.GitLabProjectProcessor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -91,15 +91,11 @@ public class GitLabGroupSyncService {
      * @throws IllegalStateException if no GitLab provider row exists for the URL
      */
     private GitProvider resolveProvider(@org.springframework.lang.Nullable String serverUrl) {
-        String effective = (serverUrl == null || serverUrl.isBlank())
-            ? gitLabProperties.defaultServerUrl()
-            : serverUrl;
+        String effective = (serverUrl == null || serverUrl.isBlank()) ? gitLabProperties.defaultServerUrl() : serverUrl;
         return gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITLAB, effective)
             .orElseThrow(() ->
-                new IllegalStateException(
-                    "GitProvider not found for type=GITLAB, serverUrl=" + effective
-                )
+                new IllegalStateException("GitProvider not found for type=GITLAB, serverUrl=" + effective)
             );
     }
 
@@ -114,7 +110,11 @@ public class GitLabGroupSyncService {
      * @return the synced Organization entity, or empty if not found or on error
      */
     @Transactional
-    public Optional<Organization> syncGroup(Long scopeId, String groupFullPath, @org.springframework.lang.Nullable String serverUrl) {
+    public Optional<Organization> syncGroup(
+        Long scopeId,
+        String groupFullPath,
+        @org.springframework.lang.Nullable String serverUrl
+    ) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
             log.warn("Skipped group sync: reason=nullOrBlankGroupPath, scopeId={}", scopeId);
             return Optional.empty();
@@ -194,7 +194,11 @@ public class GitLabGroupSyncService {
     // API calls with throttle delays between pages. Each project upsert and the group sync
     // have their own @Transactional boundaries, so we don't hold a DB connection during
     // network calls or Thread.sleep().
-    public GitLabSyncResult syncGroupProjects(Long scopeId, String groupFullPath, @org.springframework.lang.Nullable String serverUrl) {
+    public GitLabSyncResult syncGroupProjects(
+        Long scopeId,
+        String groupFullPath,
+        @org.springframework.lang.Nullable String serverUrl
+    ) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
             log.warn("Skipped group projects sync: reason=nullOrBlankGroupPath, scopeId={}", scopeId);
             return GitLabSyncResult.aborted(GitLabSyncResult.Status.ABORTED_ERROR, Collections.emptyList(), 0, 0);

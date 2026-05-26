@@ -13,7 +13,6 @@ import java.util.Set;
  * <p>Manifests live in vendor packages ({@code integration/<kind>/manifest/...}).
  */
 public interface IntegrationManifest {
-
     IntegrationKind kind();
 
     String displayName();

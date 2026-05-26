@@ -47,11 +47,11 @@ import org.springframework.lang.Nullable;
     name = "slack_message",
     uniqueConstraints = @UniqueConstraint(
         name = "uq_slack_message",
-        columnNames = {"connection_id", "team_id", "channel_id", "ts"}
+        columnNames = { "connection_id", "team_id", "channel_id", "ts" }
     ),
     indexes = {
         // O(log n) thread fetch: SELECT WHERE connection_id=? AND channel_id=? ORDER BY ts DESC
-        @Index(name = "ix_slack_message_thread", columnList = "connection_id, channel_id, ts DESC")
+        @Index(name = "ix_slack_message_thread", columnList = "connection_id, channel_id, ts DESC"),
     }
 )
 public class SlackMessage {
@@ -97,8 +97,7 @@ public class SlackMessage {
     @Nullable
     private Instant deletedAt;
 
-    protected SlackMessage() {
-    }
+    protected SlackMessage() {}
 
     public SlackMessage(Connection connection, String teamId, String channelId, String ts) {
         this.connection = connection;
@@ -107,22 +106,70 @@ public class SlackMessage {
         this.ts = ts;
     }
 
-    public Long getId() { return id; }
-    public Connection getConnection() { return connection; }
-    public String getTeamId() { return teamId; }
-    public String getChannelId() { return channelId; }
-    public String getTs() { return ts; }
-    @Nullable public String getThreadTs() { return threadTs; }
-    @Nullable public String getUserId() { return userId; }
-    @Nullable public String getText() { return text; }
-    @Nullable public String getBlocks() { return blocks; }
-    public Instant getIngestedAt() { return ingestedAt; }
-    @Nullable public Instant getDeletedAt() { return deletedAt; }
+    public Long getId() {
+        return id;
+    }
 
-    public void setThreadTs(@Nullable String threadTs) { this.threadTs = threadTs; }
-    public void setUserId(@Nullable String userId) { this.userId = userId; }
-    public void setText(@Nullable String text) { this.text = text; }
-    public void setBlocks(@Nullable String blocks) { this.blocks = blocks; }
+    public Connection getConnection() {
+        return connection;
+    }
+
+    public String getTeamId() {
+        return teamId;
+    }
+
+    public String getChannelId() {
+        return channelId;
+    }
+
+    public String getTs() {
+        return ts;
+    }
+
+    @Nullable
+    public String getThreadTs() {
+        return threadTs;
+    }
+
+    @Nullable
+    public String getUserId() {
+        return userId;
+    }
+
+    @Nullable
+    public String getText() {
+        return text;
+    }
+
+    @Nullable
+    public String getBlocks() {
+        return blocks;
+    }
+
+    public Instant getIngestedAt() {
+        return ingestedAt;
+    }
+
+    @Nullable
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setThreadTs(@Nullable String threadTs) {
+        this.threadTs = threadTs;
+    }
+
+    public void setUserId(@Nullable String userId) {
+        this.userId = userId;
+    }
+
+    public void setText(@Nullable String text) {
+        this.text = text;
+    }
+
+    public void setBlocks(@Nullable String blocks) {
+        this.blocks = blocks;
+    }
 
     /**
      * Mark a message tombstoned because Slack delivered a {@code message_deleted} event.

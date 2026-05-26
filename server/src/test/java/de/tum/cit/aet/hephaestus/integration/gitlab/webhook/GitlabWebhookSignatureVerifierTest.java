@@ -198,11 +198,7 @@ class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
     @Test
     void whsecMissingWebhookTimestampInvalid() {
         var verifier = newVerifierWhsec();
-        var request = req(
-            body("{}"),
-            header("webhook-id", "msg_x"),
-            header("X-Gitlab-Signature", "v1,deadbeef")
-        );
+        var request = req(body("{}"), header("webhook-id", "msg_x"), header("X-Gitlab-Signature", "v1,deadbeef"));
 
         VerificationResult result = verifier.verify(request);
         assertThat(result).isInstanceOf(VerificationResult.Invalid.class);
@@ -293,19 +289,13 @@ class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private static GitlabWebhookSignatureVerifier newVerifier(String secret) {
-        return new GitlabWebhookSignatureVerifier(
-            staticSource(secret.getBytes(StandardCharsets.UTF_8)),
-            CLOCK
-        );
+        return new GitlabWebhookSignatureVerifier(staticSource(secret.getBytes(StandardCharsets.UTF_8)), CLOCK);
     }
 
     /** Returns a verifier whose source serves a {@code whsec_<base64>} secret. */
     private static GitlabWebhookSignatureVerifier newVerifierWhsec() {
         String whsec = "whsec_" + Base64.getEncoder().encodeToString(WHSEC_KEY);
-        return new GitlabWebhookSignatureVerifier(
-            staticSource(whsec.getBytes(StandardCharsets.UTF_8)),
-            CLOCK
-        );
+        return new GitlabWebhookSignatureVerifier(staticSource(whsec.getBytes(StandardCharsets.UTF_8)), CLOCK);
     }
 
     private static GitlabWebhookSignatureVerifier newVerifierWithSource(WebhookSecretSource source) {
@@ -314,9 +304,18 @@ class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
 
     private static WebhookSecretSource staticSource(byte[] secretBytes) {
         return new WebhookSecretSource() {
-            @Override public IntegrationKind kind() { return IntegrationKind.GITLAB; }
-            @Override public Scope scope() { return Scope.APP_GLOBAL; }
-            @Override public Optional<byte[]> getSecret(SecretLookup lookup) {
+            @Override
+            public IntegrationKind kind() {
+                return IntegrationKind.GITLAB;
+            }
+
+            @Override
+            public Scope scope() {
+                return Scope.APP_GLOBAL;
+            }
+
+            @Override
+            public Optional<byte[]> getSecret(SecretLookup lookup) {
                 return Optional.of(secretBytes.clone());
             }
         };
@@ -324,9 +323,20 @@ class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
 
     private static WebhookSecretSource emptySource() {
         return new WebhookSecretSource() {
-            @Override public IntegrationKind kind() { return IntegrationKind.GITLAB; }
-            @Override public Scope scope() { return Scope.APP_GLOBAL; }
-            @Override public Optional<byte[]> getSecret(SecretLookup lookup) { return Optional.empty(); }
+            @Override
+            public IntegrationKind kind() {
+                return IntegrationKind.GITLAB;
+            }
+
+            @Override
+            public Scope scope() {
+                return Scope.APP_GLOBAL;
+            }
+
+            @Override
+            public Optional<byte[]> getSecret(SecretLookup lookup) {
+                return Optional.empty();
+            }
         };
     }
 

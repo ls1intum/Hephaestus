@@ -10,17 +10,22 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface FeedbackPostRepository extends JpaRepository<FeedbackPost, Long> {
-
     List<FeedbackPost> findByConnectionIdAndSubjectExternalIdAndPostKind(
-        long connectionId, String subjectExternalId, PostKind postKind);
+        long connectionId,
+        String subjectExternalId,
+        PostKind postKind
+    );
 
     Optional<FeedbackPost> findFirstByConnectionIdAndSubjectExternalIdAndPostKindOrderByCreatedAtDesc(
-        long connectionId, String subjectExternalId, PostKind postKind);
+        long connectionId,
+        String subjectExternalId,
+        PostKind postKind
+    );
 
     @Query(
-        "SELECT p FROM FeedbackPost p "
-            + "WHERE p.connection.workspace.id = :workspaceId "
-            + "ORDER BY p.createdAt DESC"
+        "SELECT p FROM FeedbackPost p " +
+            "WHERE p.connection.workspace.id = :workspaceId " +
+            "ORDER BY p.createdAt DESC"
     )
     List<FeedbackPost> findByWorkspaceId(@Param("workspaceId") long workspaceId);
 }

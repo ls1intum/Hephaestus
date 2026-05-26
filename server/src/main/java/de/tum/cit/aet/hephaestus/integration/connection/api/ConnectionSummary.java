@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.connection.api;
 
-import de.tum.cit.aet.hephaestus.integration.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationFamily;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
@@ -29,7 +29,6 @@ public record ConnectionSummary(
     @Nullable Instant lastActivityAt,
     Set<Capability> capabilities
 ) {
-
     public static ConnectionSummary from(Connection c, IntegrationManifestRegistry manifests) {
         return new ConnectionSummary(
             c.getId(),

@@ -37,7 +37,15 @@ class GitlabSubjectParserTest extends BaseUnitTest {
         // Smoke-test that the common GitLab object_kind values round-trip the parser
         // without surprise normalization.
         for (String event : new String[] {
-            "merge_request", "push", "issue", "note", "pipeline", "build", "wiki_page", "tag_push", "release"
+            "merge_request",
+            "push",
+            "issue",
+            "note",
+            "pipeline",
+            "build",
+            "wiki_page",
+            "tag_push",
+            "release",
         }) {
             EventTypeKey key = parser.parse("gitlab.acme.web." + event);
             assertThat(key.eventType()).isEqualTo(event);
@@ -50,11 +58,9 @@ class GitlabSubjectParserTest extends BaseUnitTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("at least 4 components");
 
-        assertThatThrownBy(() -> parser.parse("gitlab.acme"))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> parser.parse("gitlab.acme")).isInstanceOf(IllegalArgumentException.class);
 
-        assertThatThrownBy(() -> parser.parse("gitlab"))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> parser.parse("gitlab")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -66,12 +72,9 @@ class GitlabSubjectParserTest extends BaseUnitTest {
 
     @Test
     void blankOrNullSubjectThrows() {
-        assertThatThrownBy(() -> parser.parse(null))
-            .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> parser.parse(""))
-            .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> parser.parse("  "))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> parser.parse(null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> parser.parse("")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> parser.parse("  ")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

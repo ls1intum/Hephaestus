@@ -14,8 +14,7 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 
 import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.Category;
@@ -24,7 +23,13 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientPr
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectDTO;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldDTO;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldValueDTO;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectItemDTO;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectStatusUpdateDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2Connection;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2FieldConfiguration;
@@ -38,13 +43,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationReposi
 import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectItem;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectDTO;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldDTO;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldValueDTO;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectItemDTO;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectStatusUpdateDTO;
+import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
-import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;

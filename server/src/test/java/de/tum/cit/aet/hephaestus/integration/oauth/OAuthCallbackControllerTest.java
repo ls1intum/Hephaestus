@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService.StateBinding;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy;
@@ -18,8 +20,6 @@ import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy.ConnectIniti
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
-import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService.StateBinding;
 import de.tum.cit.aet.hephaestus.integration.webhook.IntegrationKindRouting;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -51,11 +51,13 @@ import org.springframework.http.ResponseEntity;
 @DisplayName("OAuthCallbackController — unit")
 class OAuthCallbackControllerTest extends BaseUnitTest {
 
-    private static final OAuthCallbackProperties PROPS =
-        new OAuthCallbackProperties("/integrations?status=success");
+    private static final OAuthCallbackProperties PROPS = new OAuthCallbackProperties("/integrations?status=success");
 
-    @Mock private OAuthStateService oauthStateService;
-    @Mock private OAuthCallbackService callbackService;
+    @Mock
+    private OAuthStateService oauthStateService;
+
+    @Mock
+    private OAuthCallbackService callbackService;
 
     private IntegrationKindRouting routing;
     private FakeStrategy slackStrategy;
@@ -90,30 +92,31 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
 
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         when(callbackService.findOrCreatePendingConnection(42L, IntegrationKind.SLACK)).thenReturn(pending);
-        when(callbackService.completeConnection(any(Connection.class), any(), any()))
-            .thenAnswer(inv -> {
-                Connection c = inv.getArgument(0);
-                c.setState(IntegrationState.ACTIVE);
-                return c;
-            });
+        when(callbackService.completeConnection(any(Connection.class), any(), any())).thenAnswer(inv -> {
+            Connection c = inv.getArgument(0);
+            c.setState(IntegrationState.ACTIVE);
+            return c;
+        });
 
         slackStrategy.nextFinalization = new ConnectFinalization.Completed(
-            "T123ABC", new BearerToken("xoxb-fake", null), "Acme Workspace"
+            "T123ABC",
+            new BearerToken("xoxb-fake", null),
+            "Acme Workspace"
         );
 
         Map<String, String> allParams = new HashMap<>();
         allParams.put("code", "vendor-code");
         allParams.put("state", state);
 
-        ResponseEntity<?> response = controller.callbackGet(
-            "slack", "vendor-code", state, null, null, allParams
-        );
+        ResponseEntity<?> response = controller.callbackGet("slack", "vendor-code", state, null, null, allParams);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
         assertThat(response.getHeaders().getLocation()).isNotNull();
         assertThat(response.getHeaders().getLocation().toString()).isEqualTo(PROPS.successRedirect());
 
-        ArgumentCaptor<ConnectFinalization.Completed> completed = ArgumentCaptor.forClass(ConnectFinalization.Completed.class);
+        ArgumentCaptor<ConnectFinalization.Completed> completed = ArgumentCaptor.forClass(
+            ConnectFinalization.Completed.class
+        );
         ArgumentCaptor<String> actor = ArgumentCaptor.forClass(String.class);
         verify(callbackService).completeConnection(eq(pending), completed.capture(), actor.capture());
         assertThat(completed.getValue().instanceKey()).isEqualTo("T123ABC");
@@ -135,9 +138,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         when(callbackService.findOrCreatePendingConnection(42L, IntegrationKind.SLACK)).thenReturn(pending);
         when(callbackService.completeConnection(any(Connection.class), any(), any())).thenReturn(pending);
-        slackStrategy.nextFinalization = new ConnectFinalization.Completed(
-            "T123", new BearerToken("tok", null), null
-        );
+        slackStrategy.nextFinalization = new ConnectFinalization.Completed("T123", new BearerToken("tok", null), null);
 
         controller.callbackGet("slack", "c", state, null, null, Map.of("code", "c", "state", state));
 
@@ -179,9 +180,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     @Test
     @DisplayName("Missing state → 400")
     void missingState_returns400() {
-        ResponseEntity<?> response = controller.callbackGet(
-            "slack", "code", null, null, null, Map.of("code", "code")
-        );
+        ResponseEntity<?> response = controller.callbackGet("slack", "code", null, null, null, Map.of("code", "code"));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         @SuppressWarnings("unchecked")
         Map<String, String> body = (Map<String, String>) response.getBody();
@@ -191,11 +190,17 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     @Test
     @DisplayName("Bad state (HMAC mismatch / expired) → 400 with reason from OAuthStateService")
     void badState_returns400() {
-        when(oauthStateService.consume("tampered"))
-            .thenThrow(new IllegalArgumentException("OAuth state signature mismatch"));
+        when(oauthStateService.consume("tampered")).thenThrow(
+            new IllegalArgumentException("OAuth state signature mismatch")
+        );
 
         ResponseEntity<?> response = controller.callbackGet(
-            "slack", "c", "tampered", null, null, Map.of("code", "c", "state", "tampered")
+            "slack",
+            "c",
+            "tampered",
+            null,
+            null,
+            Map.of("code", "c", "state", "tampered")
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -216,7 +221,11 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         when(oauthStateService.consume("slack-state")).thenReturn(binding);
 
         ResponseEntity<?> response = controller.callbackGet(
-            "outline", "c", "slack-state", null, null,
+            "outline",
+            "c",
+            "slack-state",
+            null,
+            null,
             Map.of("code", "c", "state", "slack-state")
         );
 
@@ -243,7 +252,12 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         slackStrategy.nextFinalization = new ConnectFinalization.Failed("vendor rejected the code");
 
         ResponseEntity<?> response = controller.callbackGet(
-            "slack", "c", "s", null, null, Map.of("code", "c", "state", "s")
+            "slack",
+            "c",
+            "s",
+            null,
+            null,
+            Map.of("code", "c", "state", "s")
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -266,7 +280,12 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         slackStrategy.throwOnFinalize = new RuntimeException("vendor 500");
 
         ResponseEntity<?> response = controller.callbackGet(
-            "slack", "c", "s", null, null, Map.of("code", "c", "state", "s")
+            "slack",
+            "c",
+            "s",
+            null,
+            null,
+            Map.of("code", "c", "state", "s")
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         @SuppressWarnings("unchecked")
@@ -283,14 +302,18 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         when(oauthStateService.consume("s")).thenReturn(binding);
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         when(callbackService.findOrCreatePendingConnection(42L, IntegrationKind.SLACK)).thenReturn(pending);
-        slackStrategy.nextFinalization = new ConnectFinalization.Completed(
-            "T1", new BearerToken("t", null), null
+        slackStrategy.nextFinalization = new ConnectFinalization.Completed("T1", new BearerToken("t", null), null);
+        when(callbackService.completeConnection(any(), any(), any())).thenThrow(
+            new IllegalStateException("Illegal transition for connection 7: UNINSTALLED → ACTIVE")
         );
-        when(callbackService.completeConnection(any(), any(), any()))
-            .thenThrow(new IllegalStateException("Illegal transition for connection 7: UNINSTALLED → ACTIVE"));
 
         ResponseEntity<?> response = controller.callbackGet(
-            "slack", "c", "s", null, null, Map.of("code", "c", "state", "s")
+            "slack",
+            "c",
+            "s",
+            null,
+            null,
+            Map.of("code", "c", "state", "s")
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
@@ -305,7 +328,12 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     @DisplayName("Unknown kind path segment → 404")
     void unknownKind_returns404() {
         ResponseEntity<?> response = controller.callbackGet(
-            "bitbucket", "c", "s", null, null, Map.of("code", "c", "state", "s")
+            "bitbucket",
+            "c",
+            "s",
+            null,
+            null,
+            Map.of("code", "c", "state", "s")
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         @SuppressWarnings("unchecked")
@@ -321,14 +349,16 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     void noStrategy_returns500() {
         // Build a controller with NO strategies registered.
         OAuthCallbackController bare = new OAuthCallbackController(
-            routing, oauthStateService, callbackService, List.of(), PROPS
+            routing,
+            oauthStateService,
+            callbackService,
+            List.of(),
+            PROPS
         );
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("s")).thenReturn(binding);
 
-        ResponseEntity<?> response = bare.callbackGet(
-            "slack", "c", "s", null, null, Map.of("code", "c", "state", "s")
-        );
+        ResponseEntity<?> response = bare.callbackGet("slack", "c", "s", null, null, Map.of("code", "c", "state", "s"));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         @SuppressWarnings("unchecked")
         Map<String, String> body = (Map<String, String>) response.getBody();
@@ -345,12 +375,15 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         when(callbackService.findOrCreatePendingConnection(42L, IntegrationKind.SLACK)).thenReturn(pending);
         when(callbackService.completeConnection(any(), any(), any())).thenReturn(pending);
-        slackStrategy.nextFinalization = new ConnectFinalization.Completed(
-            "T1", new BearerToken("t", null), null
-        );
+        slackStrategy.nextFinalization = new ConnectFinalization.Completed("T1", new BearerToken("t", null), null);
 
         ResponseEntity<?> response = controller.callbackPost(
-            "slack", "c", "s", null, null, Map.of("code", "c", "state", "s")
+            "slack",
+            "c",
+            "s",
+            null,
+            null,
+            Map.of("code", "c", "state", "s")
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
@@ -365,23 +398,32 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     void duplicateStrategy_throwsAtWiringTime() {
         FakeStrategy a = new FakeStrategy(IntegrationKind.SLACK);
         FakeStrategy b = new FakeStrategy(IntegrationKind.SLACK);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new OAuthCallbackController(
-            routing, oauthStateService, callbackService, List.of(a, b), PROPS
-        )).isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining("Duplicate ConnectionStrategy");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            new OAuthCallbackController(routing, oauthStateService, callbackService, List.of(a, b), PROPS)
+        )
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Duplicate ConnectionStrategy");
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────
 
-    private static Connection newConnection(long id, long workspaceId, IntegrationKind kind,
-                                            String instanceKey, IntegrationState state) {
+    private static Connection newConnection(
+        long id,
+        long workspaceId,
+        IntegrationKind kind,
+        String instanceKey,
+        IntegrationState state
+    ) {
         Workspace ws = Mockito.mock(Workspace.class);
         Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
         ConnectionConfig cfg = switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, java.util.Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(
-                "https://gitlab.com", null, null,
-                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, java.util.Set.of()
+                "https://gitlab.com",
+                null,
+                null,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                java.util.Set.of()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, java.util.Set.of());
             case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, java.util.Set.of());
@@ -408,6 +450,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
      * NOT — invoked.
      */
     static final class FakeStrategy implements ConnectionStrategy {
+
         private final IntegrationKind kind;
         ConnectFinalization nextFinalization;
         RuntimeException throwOnFinalize;
@@ -418,7 +461,10 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
             this.kind = kind;
         }
 
-        @Override public IntegrationKind kind() { return kind; }
+        @Override
+        public IntegrationKind kind() {
+            return kind;
+        }
 
         @Override
         public ConnectInitiation initiate(InitiateRequest request) {

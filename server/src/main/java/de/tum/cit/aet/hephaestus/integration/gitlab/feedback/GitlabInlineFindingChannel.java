@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.feedback;
 
-import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
-
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.GRAPHQL_TIMEOUT;
 
@@ -10,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.Mr
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FindingAnchor;
+import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.util.HashMap;
 import java.util.List;
@@ -63,8 +62,11 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         }
         long scopeId = target.ref().workspaceId();
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
-            log.warn("GitLab rate limit critical — skipping {} inline findings: workspaceId={}",
-                findings.size(), scopeId);
+            log.warn(
+                "GitLab rate limit critical — skipping {} inline findings: workspaceId={}",
+                findings.size(),
+                scopeId
+            );
             return new InlineResult(0, findings.size());
         }
 
@@ -291,12 +293,21 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
             List<String> errors = response.field("createNote.errors").getValue();
             if (errors != null && !errors.isEmpty()) {
-                log.warn("Fallback MR comment failed: workspaceId={}, errors={}", scopeId, sanitizeForLog(errors.toString()));
+                log.warn(
+                    "Fallback MR comment failed: workspaceId={}, errors={}",
+                    scopeId,
+                    sanitizeForLog(errors.toString())
+                );
                 return false;
             }
             return true;
         } catch (Exception e) {
-            log.warn("Fallback MR comment failed: workspaceId={}, file={}", scopeId, sanitizeForLog(diff.filePath()), e);
+            log.warn(
+                "Fallback MR comment failed: workspaceId={}, file={}",
+                scopeId,
+                sanitizeForLog(diff.filePath()),
+                e
+            );
             return false;
         }
     }

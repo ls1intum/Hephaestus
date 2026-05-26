@@ -70,9 +70,7 @@ public class GithubWebhookSignatureVerifier implements WebhookSignatureVerifier 
             return new VerificationResult.Invalid("unsupported-signature-algo");
         }
 
-        Optional<byte[]> secret = secretSource.getSecret(
-            new SecretLookup(request.headers())
-        );
+        Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(request.headers()));
         if (secret.isEmpty()) {
             log.warn("GitHub webhook rejected: shared secret not configured");
             return new VerificationResult.Invalid("missing-secret");

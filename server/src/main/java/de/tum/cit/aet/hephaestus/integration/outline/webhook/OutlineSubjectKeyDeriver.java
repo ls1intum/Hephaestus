@@ -1,15 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
-import tools.jackson.databind.JsonNode;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Map;
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Outline {@link SubjectKeyDeriver}.

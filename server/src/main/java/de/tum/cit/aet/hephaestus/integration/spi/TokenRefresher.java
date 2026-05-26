@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.Credentia
  * MUST provide an impl.
  */
 public interface TokenRefresher {
-
     IntegrationKind kind();
 
     /**

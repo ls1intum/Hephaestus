@@ -8,11 +8,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@WorkspaceAgnostic("integration_identity is scoped by (kind, integration_instance_id) — for SCM this is the shared git_provider id (cross-workspace identity); for Slack/Outline this is the connection id. Tenant isolation is enforced by the integration_instance_id semantics, not workspace_id.")
+@WorkspaceAgnostic(
+    "integration_identity is scoped by (kind, integration_instance_id) — for SCM this is the shared git_provider id (cross-workspace identity); for Slack/Outline this is the connection id. Tenant isolation is enforced by the integration_instance_id semantics, not workspace_id."
+)
 public interface IntegrationIdentityRepository extends JpaRepository<IntegrationIdentity, Long> {
-
     Optional<IntegrationIdentity> findByKindAndIntegrationInstanceIdAndExternalId(
-        IntegrationKind kind, long integrationInstanceId, String externalId);
+        IntegrationKind kind,
+        long integrationInstanceId,
+        String externalId
+    );
 
     /**
      * Cross-instance lookup by (kind, external_id). Used by the GitHub App bind

@@ -47,11 +47,13 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
         // shape the old getProviderType() fallback produced.
         String streamName = connectionService
             .findActiveProviderKind(workspace.getId())
-            .map(kind -> switch (kind) {
-                case GITHUB -> "github";
-                case GITLAB -> "gitlab";
-                case SLACK, OUTLINE -> "github";
-            })
+            .map(kind ->
+                switch (kind) {
+                    case GITHUB -> "github";
+                    case GITLAB -> "gitlab";
+                    case SLACK, OUTLINE -> "github";
+                }
+            )
             .orElse("github");
 
         return new NatsSubscriptionInfo(workspace.getId(), repositoryNames, workspace.getAccountLogin(), streamName);

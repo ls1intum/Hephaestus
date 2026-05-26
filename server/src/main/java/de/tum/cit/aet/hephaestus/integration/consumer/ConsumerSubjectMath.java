@@ -54,10 +54,14 @@ public final class ConsumerSubjectMath {
      * the consumer's pure-utility surface and the (non-pure) dispatcher bean.
      */
     private static final Map<String, IntegrationKind> PREFIX_TO_KIND = Map.of(
-        "github", IntegrationKind.GITHUB,
-        "gitlab", IntegrationKind.GITLAB,
-        "slack", IntegrationKind.SLACK,
-        "outline", IntegrationKind.OUTLINE
+        "github",
+        IntegrationKind.GITHUB,
+        "gitlab",
+        IntegrationKind.GITLAB,
+        "slack",
+        IntegrationKind.SLACK,
+        "outline",
+        IntegrationKind.OUTLINE
     );
 
     private ConsumerSubjectMath() {

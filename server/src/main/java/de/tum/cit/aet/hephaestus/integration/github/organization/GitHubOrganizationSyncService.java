@@ -11,7 +11,6 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -21,6 +20,10 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlSyncCoor
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
+import de.tum.cit.aet.hephaestus.integration.github.organization.dto.GitHubOrganizationEventDTO;
+import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHOrganization;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHOrganizationMemberConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHOrganizationMemberEdge;
@@ -30,10 +33,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHUser;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMembershipRepository;
-import de.tum.cit.aet.hephaestus.integration.github.organization.dto.GitHubOrganizationEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
-import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
-import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;

@@ -227,13 +227,13 @@ class PullRequestCommentPoster {
         FeedbackChannel channel = channels.get(kind);
         if (channel == null) {
             throw new JobDeliveryException(
-                "No FeedbackChannel wired for kind " + kind +
+                "No FeedbackChannel wired for kind " +
+                    kind +
                     " — check that the vendor integration is enabled and its channel bean is registered"
             );
         }
         return channel;
     }
-
 
     FeedbackTarget buildTarget(AgentJob job, IntegrationKind kind, long workspaceId) {
         JsonNode metadata = job.getMetadata();
@@ -404,9 +404,7 @@ class PullRequestCommentPoster {
         }
 
         sb.append("</sub>\n");
-        sb.append(
-            "<sub>AI-generated feedback can be inaccurate. React with 👍 or 👎 to give feedback.</sub>\n"
-        );
+        sb.append("<sub>AI-generated feedback can be inaccurate. React with 👍 or 👎 to give feedback.</sub>\n");
     }
 
     static String formatDuration(Duration duration) {

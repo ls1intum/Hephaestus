@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
@@ -16,11 +17,10 @@ import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.user.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -139,8 +139,9 @@ class WorkspaceProvisioningServiceTest {
 
         GitProvider githubProvider = org.mockito.Mockito.mock(GitProvider.class);
         when(githubProvider.getId()).thenReturn(100L);
-        when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com"))
-            .thenReturn(Optional.of(githubProvider));
+        when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")).thenReturn(
+            Optional.of(githubProvider)
+        );
 
         when(workspaceRepository.count()).thenReturn(0L);
         when(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(1L, admin.getId())).thenReturn(
@@ -193,8 +194,9 @@ class WorkspaceProvisioningServiceTest {
 
         GitProvider githubProvider = org.mockito.Mockito.mock(GitProvider.class);
         when(githubProvider.getId()).thenReturn(100L);
-        when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com"))
-            .thenReturn(Optional.of(githubProvider));
+        when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")).thenReturn(
+            Optional.of(githubProvider)
+        );
 
         when(workspaceRepository.count()).thenReturn(0L);
         when(

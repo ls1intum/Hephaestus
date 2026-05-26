@@ -9,8 +9,7 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.Category;
@@ -23,10 +22,6 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubRepositoryNameP
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssueConnection;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPageInfo;
-import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.EmbeddedCommentsDTO;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.EmbeddedProjectItemsDTO;
 import de.tum.cit.aet.hephaestus.integration.github.issue.dto.IssueWithComments;
@@ -34,10 +29,15 @@ import de.tum.cit.aet.hephaestus.integration.github.issuecomment.GitHubIssueComm
 import de.tum.cit.aet.hephaestus.integration.github.issuecomment.GitHubIssueCommentSyncService;
 import de.tum.cit.aet.hephaestus.integration.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.github.project.GitHubProjectItemSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssueConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
-import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;

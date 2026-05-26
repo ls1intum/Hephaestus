@@ -32,8 +32,7 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
     void validSignatureVerified() {
         byte[] body = body("{\"action\":\"opened\"}");
         String sig = "sha256=" + hmacHex(body);
-        VerificationResult result = newVerifier(SECRET)
-            .verify(req(body, header("X-Hub-Signature-256", sig)));
+        VerificationResult result = newVerifier(SECRET).verify(req(body, header("X-Hub-Signature-256", sig)));
 
         assertThat(result).isInstanceOf(VerificationResult.Verified.class);
     }
@@ -44,8 +43,7 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
         String sig = "sha256=" + hmacHex(signedBody);
         byte[] tampered = body("{\"action\":\"OPENED\"}");
 
-        VerificationResult result = newVerifier(SECRET)
-            .verify(req(tampered, header("X-Hub-Signature-256", sig)));
+        VerificationResult result = newVerifier(SECRET).verify(req(tampered, header("X-Hub-Signature-256", sig)));
 
         assertThat(result).isInstanceOf(VerificationResult.Invalid.class);
         assertThat(((VerificationResult.Invalid) result).reason()).isEqualTo("signature-mismatch");
@@ -55,8 +53,9 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
     void wrongAlgorithmPrefixInvalid() {
         // SHA-1 path (legacy X-Hub-Signature) must NOT be accepted via the new header name.
         byte[] body = body("{}");
-        VerificationResult result = newVerifier(SECRET)
-            .verify(req(body, header("X-Hub-Signature-256", "sha1=deadbeef")));
+        VerificationResult result = newVerifier(SECRET).verify(
+            req(body, header("X-Hub-Signature-256", "sha1=deadbeef"))
+        );
 
         assertThat(result).isInstanceOf(VerificationResult.Invalid.class);
         assertThat(((VerificationResult.Invalid) result).reason()).isEqualTo("unsupported-signature-algo");
@@ -74,8 +73,7 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
         byte[] body = body("{}");
         String sig = "sha256=" + hmacHex(body);
 
-        VerificationResult result = newVerifier(null)
-            .verify(req(body, header("X-Hub-Signature-256", sig)));
+        VerificationResult result = newVerifier(null).verify(req(body, header("X-Hub-Signature-256", sig)));
 
         assertThat(result).isInstanceOf(VerificationResult.Invalid.class);
         assertThat(((VerificationResult.Invalid) result).reason()).isEqualTo("missing-secret");
@@ -83,8 +81,7 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
 
     @Test
     void blankSignatureHeaderTreatedAsMissing() {
-        VerificationResult result = newVerifier(SECRET)
-            .verify(req(body("{}"), header("X-Hub-Signature-256", "   ")));
+        VerificationResult result = newVerifier(SECRET).verify(req(body("{}"), header("X-Hub-Signature-256", "   ")));
 
         assertThat(result).isInstanceOf(VerificationResult.MissingSignature.class);
     }
@@ -94,8 +91,7 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
         byte[] body = body("{}");
         String sig = "sha256=" + hmacHex(body);
 
-        VerificationResult result = newVerifier(SECRET)
-            .verify(req(body, header("x-hub-signature-256", sig)));
+        VerificationResult result = newVerifier(SECRET).verify(req(body, header("x-hub-signature-256", sig)));
 
         assertThat(result).isInstanceOf(VerificationResult.Verified.class);
     }

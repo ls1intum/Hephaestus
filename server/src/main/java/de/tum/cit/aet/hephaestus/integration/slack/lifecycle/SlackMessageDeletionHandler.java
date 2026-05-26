@@ -75,8 +75,11 @@ public class SlackMessageDeletionHandler {
      */
     @Transactional
     public Optional<Integer> onMessageDeleted(long workspaceId, String teamId, String channelId, String ts) {
-        Optional<Connection> connectionOpt = connectionRepository
-            .findByWorkspaceIdAndKindAndInstanceKey(workspaceId, IntegrationKind.SLACK, teamId);
+        Optional<Connection> connectionOpt = connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(
+            workspaceId,
+            IntegrationKind.SLACK,
+            teamId
+        );
         if (connectionOpt.isEmpty()) {
             log.warn("Slack message_deleted for unknown team workspace={} team={}", workspaceId, teamId);
             return Optional.empty();
@@ -85,8 +88,12 @@ public class SlackMessageDeletionHandler {
         Instant now = Instant.now(clock);
         int updated = messageRepository.softDelete(workspaceId, connectionId, channelId, ts, now);
         if (updated == 0) {
-            log.debug("Slack message_deleted noop (replayed or never ingested) connection={} channel={} ts={}",
-                connectionId, channelId, ts);
+            log.debug(
+                "Slack message_deleted noop (replayed or never ingested) connection={} channel={} ts={}",
+                connectionId,
+                channelId,
+                ts
+            );
         } else {
             log.info("Slack message tombstoned connection={} channel={} ts={}", connectionId, channelId, ts);
         }

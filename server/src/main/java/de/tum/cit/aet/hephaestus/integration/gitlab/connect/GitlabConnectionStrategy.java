@@ -90,8 +90,10 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
         // third parties. The Connection state transition to UNINSTALLED is performed
         // by the orchestrator via ConnectionService — we just log here so audit
         // trails can correlate the call.
-        log.info("GitLab revoke called for workspace={} instanceKey={} (no vendor-side revoke API; state change handled by caller)",
+        log.info(
+            "GitLab revoke called for workspace={} instanceKey={} (no vendor-side revoke API; state change handled by caller)",
             ref == null ? null : ref.workspaceId(),
-            ref == null ? null : ref.instanceKey());
+            ref == null ? null : ref.instanceKey()
+        );
     }
 }

@@ -28,11 +28,9 @@ import org.springframework.lang.Nullable;
     name = "outline_collection",
     uniqueConstraints = @UniqueConstraint(
         name = "uq_outline_collection",
-        columnNames = {"connection_id", "collection_id"}
+        columnNames = { "connection_id", "collection_id" }
     ),
-    indexes = {
-        @Index(name = "ix_outline_collection_connection", columnList = "connection_id")
-    }
+    indexes = { @Index(name = "ix_outline_collection_connection", columnList = "connection_id") }
 )
 public class OutlineCollection {
 
@@ -67,8 +65,7 @@ public class OutlineCollection {
     @Nullable
     private Instant deletedAt;
 
-    protected OutlineCollection() {
-    }
+    protected OutlineCollection() {}
 
     public OutlineCollection(Connection connection, String collectionId, @Nullable String name) {
         this.connection = connection;
@@ -76,18 +73,53 @@ public class OutlineCollection {
         this.name = name;
     }
 
-    public Long getId() { return id; }
-    public Connection getConnection() { return connection; }
-    public String getCollectionId() { return collectionId; }
-    @Nullable public String getName() { return name; }
-    @Nullable public String getDescription() { return description; }
-    @Nullable public String getUrl() { return url; }
-    public Instant getIngestedAt() { return ingestedAt; }
-    @Nullable public Instant getDeletedAt() { return deletedAt; }
+    public Long getId() {
+        return id;
+    }
 
-    public void setName(@Nullable String name) { this.name = name; }
-    public void setDescription(@Nullable String description) { this.description = description; }
-    public void setUrl(@Nullable String url) { this.url = url; }
+    public Connection getConnection() {
+        return connection;
+    }
+
+    public String getCollectionId() {
+        return collectionId;
+    }
+
+    @Nullable
+    public String getName() {
+        return name;
+    }
+
+    @Nullable
+    public String getDescription() {
+        return description;
+    }
+
+    @Nullable
+    public String getUrl() {
+        return url;
+    }
+
+    public Instant getIngestedAt() {
+        return ingestedAt;
+    }
+
+    @Nullable
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setName(@Nullable String name) {
+        this.name = name;
+    }
+
+    public void setDescription(@Nullable String description) {
+        this.description = description;
+    }
+
+    public void setUrl(@Nullable String url) {
+        this.url = url;
+    }
 
     public void softDelete(Instant at) {
         if (this.deletedAt != null) {

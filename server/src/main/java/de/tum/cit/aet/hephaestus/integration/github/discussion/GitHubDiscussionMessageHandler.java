@@ -2,14 +2,14 @@ package de.tum.cit.aet.hephaestus.integration.github.discussion;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionDTO;
 import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionEventDTO;
 import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

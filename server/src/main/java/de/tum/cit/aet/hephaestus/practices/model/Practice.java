@@ -178,7 +178,9 @@ public class Practice {
                 log.warn(
                     "Practice id={} slug={} declares unknown capability '{}' — skipping. " +
                         "Drift between catalog data and Capability enum.",
-                    id, slug, raw
+                    id,
+                    slug,
+                    raw
                 );
             }
         }

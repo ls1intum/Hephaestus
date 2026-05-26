@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.feedback;
 
-import de.tum.cit.aet.hephaestus.integration.feedback.FeedbackPost.PostKind;
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.feedback.FeedbackPost.PostKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectClass;
 import java.util.List;
 import java.util.Optional;
@@ -28,24 +28,37 @@ public class FeedbackPostService {
     @Transactional(readOnly = true)
     public Optional<FeedbackPost> findExisting(Connection connection, String subjectExternalId, PostKind postKind) {
         return repository.findFirstByConnectionIdAndSubjectExternalIdAndPostKindOrderByCreatedAtDesc(
-            connection.getId(), subjectExternalId, postKind);
+            connection.getId(),
+            subjectExternalId,
+            postKind
+        );
     }
 
     @Transactional(readOnly = true)
     public List<FeedbackPost> listFor(Connection connection, String subjectExternalId, PostKind postKind) {
         return repository.findByConnectionIdAndSubjectExternalIdAndPostKind(
-            connection.getId(), subjectExternalId, postKind);
+            connection.getId(),
+            subjectExternalId,
+            postKind
+        );
     }
 
     @Transactional
-    public FeedbackPost recordPost(Connection connection,
-                                   String subjectExternalId,
-                                   SubjectClass subjectClass,
-                                   PostKind postKind,
-                                   String externalPostId,
-                                   String vendorMetadataJson) {
+    public FeedbackPost recordPost(
+        Connection connection,
+        String subjectExternalId,
+        SubjectClass subjectClass,
+        PostKind postKind,
+        String externalPostId,
+        String vendorMetadataJson
+    ) {
         FeedbackPost post = new FeedbackPost(
-            connection, subjectExternalId, subjectClass, postKind, externalPostId, vendorMetadataJson
+            connection,
+            subjectExternalId,
+            subjectClass,
+            postKind,
+            externalPostId,
+            vendorMetadataJson
         );
         return repository.save(post);
     }

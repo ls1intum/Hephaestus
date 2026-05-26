@@ -19,7 +19,6 @@ import org.springframework.lang.Nullable;
  * {@code Authentication} in the SecurityContext at that point to read.
  */
 public interface OAuthStateService {
-
     /** Mints a state parameter binding the OAuth flow to {@code workspaceId} + {@code kind}. */
     String issue(long workspaceId, IntegrationKind kind);
 
@@ -46,8 +45,10 @@ public interface OAuthStateService {
      */
     default IssuedState issueWithPkce(long workspaceId, IntegrationKind kind, @Nullable String actorRef) {
         throw new UnsupportedOperationException(
-            "PKCE-aware issue not supported by " + getClass().getName()
-                + " — wire HmacOAuthStateService for OAuth code-grant flows.");
+            "PKCE-aware issue not supported by " +
+                getClass().getName() +
+                " — wire HmacOAuthStateService for OAuth code-grant flows."
+        );
     }
 
     /** Verifies the state; returns the binding if valid and not expired+used; throws otherwise. */
@@ -63,8 +64,13 @@ public interface OAuthStateService {
      * {@link #issueWithPkce}: the per-vendor strategy's {@code finalizeConnect} MUST
      * include it as {@code code_verifier} on the token-exchange POST per RFC 7636 §4.5.
      */
-    record StateBinding(long workspaceId, IntegrationKind kind, Instant issuedAt,
-                        @Nullable String actorRef, @Nullable String codeVerifier) {
+    record StateBinding(
+        long workspaceId,
+        IntegrationKind kind,
+        Instant issuedAt,
+        @Nullable String actorRef,
+        @Nullable String codeVerifier
+    ) {
         /** Convenience constructor that defaults actorRef + verifier to null. */
         public StateBinding(long workspaceId, IntegrationKind kind, Instant issuedAt) {
             this(workspaceId, kind, issuedAt, null, null);
@@ -82,6 +88,5 @@ public interface OAuthStateService {
      * — strategies MUST NOT downgrade to {@code plain}; RFC 7636 §4.2 restricts plain to
      * deployments that cannot SHA-256).
      */
-    record IssuedState(String state, String codeChallenge, String codeChallengeMethod) {
-    }
+    record IssuedState(String state, String codeChallenge, String codeChallengeMethod) {}
 }

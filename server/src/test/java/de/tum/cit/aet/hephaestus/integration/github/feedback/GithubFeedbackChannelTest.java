@@ -117,8 +117,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
         when(spec.variable(any(), any())).thenReturn(spec);
 
         ClientGraphQlResponse errorResponse = mock(ClientGraphQlResponse.class);
-        when(errorResponse.getErrors())
-            .thenReturn(List.of(mock(org.springframework.graphql.ResponseError.class)));
+        when(errorResponse.getErrors()).thenReturn(List.of(mock(org.springframework.graphql.ResponseError.class)));
         when(spec.execute()).thenReturn(Mono.just(errorResponse));
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))

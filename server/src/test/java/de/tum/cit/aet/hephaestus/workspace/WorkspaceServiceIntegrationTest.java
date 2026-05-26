@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import org.junit.jupiter.api.DisplayName;
@@ -82,11 +82,16 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private void persistSlackConnection(Workspace workspace) {
         de.tum.cit.aet.hephaestus.integration.connection.Connection conn =
             new de.tum.cit.aet.hephaestus.integration.connection.Connection(
-                workspace, IntegrationKind.SLACK, "test-team-id",
-                new ConnectionConfig.SlackConfig(
-                    "test-team-id", "Test Team", null, null, java.util.Set.of()));
+                workspace,
+                IntegrationKind.SLACK,
+                "test-team-id",
+                new ConnectionConfig.SlackConfig("test-team-id", "Test Team", null, null, java.util.Set.of())
+            );
         org.springframework.test.util.ReflectionTestUtils.setField(
-            conn, "state", de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.ACTIVE);
+            conn,
+            "state",
+            de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.ACTIVE
+        );
         connectionRepository.save(conn);
     }
 
@@ -138,10 +143,10 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         // provider mode + installation id live on the Connection
         // registry now, not on Workspace.
-        assertThat(connectionService.findActiveProviderKind(promoted.getId()))
-            .hasValue(IntegrationKind.GITHUB);
-        assertThat(connectionService.findActiveGitHubAppConfig(promoted.getId()))
-            .hasValueSatisfying(cfg -> assertThat(cfg.installationId()).isEqualTo(95711017L));
+        assertThat(connectionService.findActiveProviderKind(promoted.getId())).hasValue(IntegrationKind.GITHUB);
+        assertThat(connectionService.findActiveGitHubAppConfig(promoted.getId())).hasValueSatisfying(cfg ->
+            assertThat(cfg.installationId()).isEqualTo(95711017L)
+        );
         assertThat(connectionService.findActiveBearerToken(promoted.getId(), IntegrationKind.GITHUB))
             .as("App-mode Connections do not store a bearer credential blob")
             .isEmpty();

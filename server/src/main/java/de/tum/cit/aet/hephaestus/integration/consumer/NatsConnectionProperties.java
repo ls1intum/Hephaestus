@@ -9,6 +9,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
 import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
+
 // idleHeartbeat / heartbeatRestartThreshold / heartbeatLogInterval / installationStaleAfter
 // were dropped — declared but never read. Heartbeat-alarm restart logic from the legacy
 // NatsConsumerService has not been ported.
@@ -61,7 +62,5 @@ public record NatsConnectionProperties(
      * Connection-side knobs shared between the consumer fleet and the publisher.
      * Ack-wait and poison handling live on {@link NatsConsumerProperties}.
      */
-    public record Consumer(
-        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("60s") Duration requestTimeout
-    ) {}
+    public record Consumer(@DurationUnit(ChronoUnit.SECONDS) @DefaultValue("60s") Duration requestTimeout) {}
 }

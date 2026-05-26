@@ -26,8 +26,7 @@ public class ConnectionPurgeContributor implements WorkspacePurgeContributor {
     private final ConnectionRepository connectionRepository;
     private final ConnectionService connectionService;
 
-    public ConnectionPurgeContributor(ConnectionRepository connectionRepository,
-                                      ConnectionService connectionService) {
+    public ConnectionPurgeContributor(ConnectionRepository connectionRepository, ConnectionService connectionService) {
         this.connectionRepository = connectionRepository;
         this.connectionService = connectionService;
     }
@@ -40,14 +39,17 @@ public class ConnectionPurgeContributor implements WorkspacePurgeContributor {
                 continue;
             }
             try {
-                connectionService.transition(c, new ConnectionService.TransitionRequest(
-                    IntegrationState.UNINSTALLED,
-                    "WORKSPACE_PURGED",
-                    "SYSTEM",
-                    "workspace-purge",
-                    "workspace-" + workspaceId + "-purge",
-                    "Cascade from workspace PURGE"
-                ));
+                connectionService.transition(
+                    c,
+                    new ConnectionService.TransitionRequest(
+                        IntegrationState.UNINSTALLED,
+                        "WORKSPACE_PURGED",
+                        "SYSTEM",
+                        "workspace-purge",
+                        "workspace-" + workspaceId + "-purge",
+                        "Cascade from workspace PURGE"
+                    )
+                );
             } catch (RuntimeException e) {
                 // Don't let one connection block the rest — log + continue.
                 log.warn("Failed to cascade PURGE → UNINSTALLED for connection={}: {}", c.getId(), e.toString());

@@ -45,8 +45,13 @@ public class OAuthStateNonceStore {
      * transaction is separate.
      */
     @Transactional
-    public void issue(String nonce, long workspaceId, IntegrationKind kind, Instant issuedAt,
-                      @org.springframework.lang.Nullable String codeVerifier) {
+    public void issue(
+        String nonce,
+        long workspaceId,
+        IntegrationKind kind,
+        Instant issuedAt,
+        @org.springframework.lang.Nullable String codeVerifier
+    ) {
         if (nonce == null || nonce.isEmpty()) {
             throw new IllegalArgumentException("nonce must be non-empty");
         }
@@ -116,6 +121,7 @@ public class OAuthStateNonceStore {
         public static ConsumeResult notConsumed() {
             return new ConsumeResult(false, java.util.Optional.empty());
         }
+
         public static ConsumeResult consumed(@org.springframework.lang.Nullable String verifier) {
             return new ConsumeResult(true, java.util.Optional.ofNullable(verifier));
         }

@@ -6,9 +6,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.integration.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRateLimit;
+import de.tum.cit.aet.hephaestus.integration.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.time.Instant;

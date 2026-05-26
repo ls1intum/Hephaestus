@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.slack.webhook;
 
-import tools.jackson.databind.JsonNode;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
 import java.nio.charset.StandardCharsets;
@@ -9,9 +8,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Slack {@link SubjectKeyDeriver}.
@@ -51,9 +50,8 @@ public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
                 channelId = sanitizeToken(chan.asText());
             }
             JsonNode evType = event.get("type");
-            eventType = evType != null && evType.isTextual()
-                ? sanitizeToken(evType.asText())
-                : textOrUnknown(payload, "type");
+            eventType =
+                evType != null && evType.isTextual() ? sanitizeToken(evType.asText()) : textOrUnknown(payload, "type");
         } else {
             eventType = textOrUnknown(payload, "type");
         }

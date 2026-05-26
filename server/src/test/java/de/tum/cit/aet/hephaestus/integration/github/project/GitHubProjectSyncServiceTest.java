@@ -17,14 +17,17 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties.BackfillProperties;
+import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties.FilterProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.Category;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
-import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHIssue;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2;
@@ -42,11 +45,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationReposi
 import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectItem;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectDTO;
+import de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
-import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
-import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties.BackfillProperties;
-import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties.FilterProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigInteger;
 import java.time.Duration;
@@ -309,7 +309,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @DisplayName("should return completed(0) when organization is not found")
         void shouldReturnCompletedZeroWhenOrganizationNotFound() {
             // Arrange
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.empty());
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.empty());
 
             // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
@@ -324,7 +326,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldSyncSinglePageOfProjectsSuccessfully() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -365,7 +369,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldSkipProjectsWithinCooldownPeriod() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -393,7 +399,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldAbortWhenRateLimitCritical() throws InterruptedException {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -419,7 +427,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldAbortWhenGraphQlResponseInvalid() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -439,7 +449,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldRethrowInstallationNotFoundException() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -456,7 +468,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldRemoveStaleProjectsOnCompleteSync() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -493,7 +507,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldNotRemoveStaleProjectsOnAbortedSync() throws InterruptedException {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -518,7 +534,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldAbortRateLimitOnRateLimitedException() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -563,7 +581,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             );
 
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -593,7 +613,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldRethrowWhenExceptionClassifiedAsAuthError() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -612,7 +634,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldProcessMultiplePagesOfProjects() {
             // Arrange
             Organization org = createOrganization();
-            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)).thenReturn(Optional.of(org));
+            when(
+                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
+            ).thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 

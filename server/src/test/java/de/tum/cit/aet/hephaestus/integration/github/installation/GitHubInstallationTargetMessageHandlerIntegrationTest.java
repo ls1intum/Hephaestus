@@ -2,13 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.github.installation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.installation.dto.GitHubInstallationTargetEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -76,12 +76,18 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
         // Create workspace + matching ACTIVE GitHub App Connection in one shot.
         // Provider classification + installation id come from the Connection registry,
         // not from legacy Workspace columns.
-        WorkspaceTestFixtures.WorkspaceBuilder builder = WorkspaceTestFixtures
-            .installationWorkspace(installationId, login)
+        WorkspaceTestFixtures.WorkspaceBuilder builder = WorkspaceTestFixtures.installationWorkspace(
+            installationId,
+            login
+        )
             .withSlug(login.toLowerCase())
             .withAccountType(AccountType.ORG);
         Workspace saved = WorkspaceTestFixtures.persistInstallationWorkspace(
-            workspaceRepository, connectionRepository, builder, installationId);
+            workspaceRepository,
+            connectionRepository,
+            builder,
+            installationId
+        );
         saved.setIsPubliclyViewable(true);
         saved.setOrganization(org);
         workspaceRepository.save(saved);

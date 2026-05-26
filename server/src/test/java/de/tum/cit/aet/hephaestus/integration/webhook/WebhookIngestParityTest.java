@@ -4,10 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
-import de.tum.cit.aet.hephaestus.integration.webhook.JetStreamPublisher;
-import de.tum.cit.aet.hephaestus.integration.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.integration.github.webhook.GithubSubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.github.webhook.GithubWebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.github.webhook.GithubWebhookSignatureVerifier;
@@ -15,6 +12,8 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.webhook.GitlabSubjectKeyDeri
 import de.tum.cit.aet.hephaestus.integration.gitlab.webhook.GitlabWebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.gitlab.webhook.GitlabWebhookSignatureVerifier;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.webhook.JetStreamPublisher;
+import de.tum.cit.aet.hephaestus.integration.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -28,6 +27,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Pins the unified {@code /webhooks/{kind}} pipeline contract for GitHub and GitLab.
@@ -56,8 +56,10 @@ class WebhookIngestParityTest extends BaseUnitTest {
     @Test
     @DisplayName("GitHub webhook: unified pipeline publishes with expected subject + dedup id")
     void githubUnified() {
-        byte[] body = ("{\"repository\":{\"owner\":{\"login\":\"acme\"},\"name\":\"hephaestus\"},"
-            + "\"action\":\"opened\"}").getBytes(StandardCharsets.UTF_8);
+        byte[] body = (
+            "{\"repository\":{\"owner\":{\"login\":\"acme\"},\"name\":\"hephaestus\"}," +
+            "\"action\":\"opened\"}"
+        ).getBytes(StandardCharsets.UTF_8);
         String sig = "sha256=" + hmacHex(SHARED_SECRET, body);
         String deliveryId = "11112222-3333-4444-5555-666677778888";
 
@@ -111,9 +113,10 @@ class WebhookIngestParityTest extends BaseUnitTest {
     @Test
     @DisplayName("GitLab webhook: unified pipeline publishes with expected subject + dedup id")
     void gitlabUnified() {
-        byte[] body = ("{\"object_kind\":\"push\","
-            + "\"project\":{\"path_with_namespace\":\"ase/ipraktikum/ios2526/introcourse\"}}")
-            .getBytes(StandardCharsets.UTF_8);
+        byte[] body = (
+            "{\"object_kind\":\"push\"," +
+            "\"project\":{\"path_with_namespace\":\"ase/ipraktikum/ios2526/introcourse\"}}"
+        ).getBytes(StandardCharsets.UTF_8);
         String eventUuid = "aaaa1111-bbbb-2222-cccc-333344445555";
 
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(

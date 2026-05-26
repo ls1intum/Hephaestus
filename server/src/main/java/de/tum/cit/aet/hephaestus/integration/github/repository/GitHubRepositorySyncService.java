@@ -7,8 +7,6 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.RepositoryNotFoundOnGitProviderException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -19,6 +17,8 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubRepositoryNameP
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.RepositoryNotFoundOnGitProviderException;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHOrganization;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRepositoryOwner;

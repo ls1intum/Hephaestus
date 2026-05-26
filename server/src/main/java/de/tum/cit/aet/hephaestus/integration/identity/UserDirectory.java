@@ -14,7 +14,6 @@ import org.springframework.lang.Nullable;
  * {@link HephaestusUser}.
  */
 public interface UserDirectory {
-
     /**
      * Look up the Hephaestus User behind a vendor-side identity.
      * Returns empty if the identity exists but is unlinked, or if it isn't yet observed.
@@ -22,8 +21,12 @@ public interface UserDirectory {
     Optional<HephaestusUser> findUser(IntegrationKind kind, long integrationInstanceId, String externalId);
 
     /** Idempotent upsert of an observed identity from a webhook actor block or backfill. */
-    IntegrationIdentity upsertFromVendor(IntegrationKind kind, long integrationInstanceId,
-                                         String externalId, VendorUserInfo info);
+    IntegrationIdentity upsertFromVendor(
+        IntegrationKind kind,
+        long integrationInstanceId,
+        String externalId,
+        VendorUserInfo info
+    );
 
     /** Link an existing identity row to a Hephaestus User (typically after OAuth claim). */
     IntegrationIdentity linkToUser(IntegrationIdentity identity, HephaestusUser user);
@@ -39,6 +42,5 @@ public interface UserDirectory {
         @Nullable String externalEmail,
         @Nullable String displayName,
         @Nullable String rawAttributesJson
-    ) {
-    }
+    ) {}
 }

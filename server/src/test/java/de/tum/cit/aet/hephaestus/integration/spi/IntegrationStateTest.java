@@ -38,5 +38,4 @@ class IntegrationStateTest extends BaseUnitTest {
                 .isFalse();
         }
     }
-
 }

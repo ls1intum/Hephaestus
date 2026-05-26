@@ -40,8 +40,11 @@ public record WorkspaceContext(
      * {@code ConnectionService.findActiveGitHubAppConfig(...)} at the call site so the
      * context record itself stays free of Spring service dependencies).
      */
-    public static WorkspaceContext fromWorkspace(Workspace workspace, Set<WorkspaceRole> roles,
-                                                 @Nullable Long installationId) {
+    public static WorkspaceContext fromWorkspace(
+        Workspace workspace,
+        Set<WorkspaceRole> roles,
+        @Nullable Long installationId
+    ) {
         return new WorkspaceContext(
             workspace.getId(),
             workspace.getWorkspaceSlug(),

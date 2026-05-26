@@ -21,9 +21,17 @@ class CredentialBundleConverterTest extends BaseUnitTest {
     private static final String OTHER_KEY = "ABCDEFabcdef0123ABCDEFabcdef0123";
 
     private static final EncryptionContext CTX_A = new EncryptionContext(
-        42L, IntegrationKind.GITHUB, "installation-100", "connection.credentials_encrypted");
+        42L,
+        IntegrationKind.GITHUB,
+        "installation-100",
+        "connection.credentials_encrypted"
+    );
     private static final EncryptionContext CTX_B = new EncryptionContext(
-        42L, IntegrationKind.GITHUB, "installation-999", "connection.credentials_encrypted");
+        42L,
+        IntegrationKind.GITHUB,
+        "installation-999",
+        "connection.credentials_encrypted"
+    );
 
     private static CredentialBundleConverter enabled() {
         return new CredentialBundleConverter(KEY, "dev");
@@ -63,7 +71,10 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         void oauthSession_roundTrips() {
             CredentialBundleConverter c = enabled();
             OAuthSession withRefresh = new OAuthSession(
-                "ya29.access-token-here", "refresh-token-xyz", Instant.parse("2030-06-15T12:00:00Z"));
+                "ya29.access-token-here",
+                "refresh-token-xyz",
+                Instant.parse("2030-06-15T12:00:00Z")
+            );
             OAuthSession withoutRefresh = new OAuthSession("opaque-access", null, null);
 
             assertThat(c.decrypt(c.encrypt(withRefresh, CTX_A), CTX_A)).isEqualTo(withRefresh);
@@ -96,7 +107,11 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         void nullInstanceKey_roundTrips() {
             CredentialBundleConverter c = enabled();
             EncryptionContext pending = new EncryptionContext(
-                42L, IntegrationKind.GITHUB, null, "connection.credentials_encrypted");
+                42L,
+                IntegrationKind.GITHUB,
+                null,
+                "connection.credentials_encrypted"
+            );
             BearerToken bundle = new BearerToken("pending-token", null);
 
             byte[] blob = c.encrypt(bundle, pending);
@@ -148,8 +163,7 @@ class CredentialBundleConverterTest extends BaseUnitTest {
             CredentialBundleConverter reader = new CredentialBundleConverter(OTHER_KEY, "dev");
             byte[] ciphertext = writer.encrypt(new BearerToken("secret", null), CTX_A);
 
-            assertThatThrownBy(() -> reader.decrypt(ciphertext, CTX_A))
-                .isInstanceOf(EncryptionException.class);
+            assertThatThrownBy(() -> reader.decrypt(ciphertext, CTX_A)).isInstanceOf(EncryptionException.class);
         }
 
         @Test
@@ -159,8 +173,7 @@ class CredentialBundleConverterTest extends BaseUnitTest {
             byte[] tampered = Arrays.copyOf(ciphertext, ciphertext.length);
             tampered[tampered.length - 1] ^= 0x01;
 
-            assertThatThrownBy(() -> c.decrypt(tampered, CTX_A))
-                .isInstanceOf(EncryptionException.class);
+            assertThatThrownBy(() -> c.decrypt(tampered, CTX_A)).isInstanceOf(EncryptionException.class);
         }
 
         @Test
@@ -168,8 +181,7 @@ class CredentialBundleConverterTest extends BaseUnitTest {
             CredentialBundleConverter c = enabled();
             byte[] tooShort = new byte[10];
 
-            assertThatThrownBy(() -> c.decrypt(tooShort, CTX_A))
-                .isInstanceOf(EncryptionException.class);
+            assertThatThrownBy(() -> c.decrypt(tooShort, CTX_A)).isInstanceOf(EncryptionException.class);
         }
 
         /**
@@ -186,17 +198,33 @@ class CredentialBundleConverterTest extends BaseUnitTest {
                 .isInstanceOf(EncryptionException.class)
                 .hasRootCauseInstanceOf(javax.crypto.AEADBadTagException.class);
             // wrong workspaceId
-            assertThatThrownBy(() -> c.decrypt(blobForA, new EncryptionContext(
-                99L, CTX_A.kind(), CTX_A.instanceKey(), CTX_A.columnFqn())))
-                .isInstanceOf(EncryptionException.class);
+            assertThatThrownBy(() ->
+                c.decrypt(blobForA, new EncryptionContext(99L, CTX_A.kind(), CTX_A.instanceKey(), CTX_A.columnFqn()))
+            ).isInstanceOf(EncryptionException.class);
             // wrong kind
-            assertThatThrownBy(() -> c.decrypt(blobForA, new EncryptionContext(
-                CTX_A.workspaceId(), IntegrationKind.GITLAB, CTX_A.instanceKey(), CTX_A.columnFqn())))
-                .isInstanceOf(EncryptionException.class);
+            assertThatThrownBy(() ->
+                c.decrypt(
+                    blobForA,
+                    new EncryptionContext(
+                        CTX_A.workspaceId(),
+                        IntegrationKind.GITLAB,
+                        CTX_A.instanceKey(),
+                        CTX_A.columnFqn()
+                    )
+                )
+            ).isInstanceOf(EncryptionException.class);
             // wrong columnFqn
-            assertThatThrownBy(() -> c.decrypt(blobForA, new EncryptionContext(
-                CTX_A.workspaceId(), CTX_A.kind(), CTX_A.instanceKey(), "connection.some_other_column")))
-                .isInstanceOf(EncryptionException.class);
+            assertThatThrownBy(() ->
+                c.decrypt(
+                    blobForA,
+                    new EncryptionContext(
+                        CTX_A.workspaceId(),
+                        CTX_A.kind(),
+                        CTX_A.instanceKey(),
+                        "connection.some_other_column"
+                    )
+                )
+            ).isInstanceOf(EncryptionException.class);
         }
     }
 
@@ -248,8 +276,7 @@ class CredentialBundleConverterTest extends BaseUnitTest {
             byte[] anyBytes = new byte[32];
             anyBytes[0] = CredentialBundleConverter.FORMAT_VERSION_V2;
 
-            assertThatThrownBy(() -> disabled.decrypt(anyBytes, CTX_A))
-                .isInstanceOf(EncryptionException.class);
+            assertThatThrownBy(() -> disabled.decrypt(anyBytes, CTX_A)).isInstanceOf(EncryptionException.class);
         }
 
         @Test

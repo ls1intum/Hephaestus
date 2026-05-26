@@ -49,11 +49,13 @@ class PracticeAvailabilityResolverTest extends BaseUnitTest {
             new LinkedHashSet<>(List.of("INLINE_FINDINGS", "FEEDBACK_DELIVERY")),
             IntegrationFamily.SCM
         );
-        when(capabilityResolver.isAvailable(
-            eq(WORKSPACE_ID),
-            eq(Set.of(Capability.INLINE_FINDINGS, Capability.FEEDBACK_DELIVERY)),
-            eq(IntegrationFamily.SCM)
-        )).thenReturn(true);
+        when(
+            capabilityResolver.isAvailable(
+                eq(WORKSPACE_ID),
+                eq(Set.of(Capability.INLINE_FINDINGS, Capability.FEEDBACK_DELIVERY)),
+                eq(IntegrationFamily.SCM)
+            )
+        ).thenReturn(true);
 
         assertThat(resolver.isAvailable(WORKSPACE_ID, practice)).isTrue();
     }
@@ -61,15 +63,10 @@ class PracticeAvailabilityResolverTest extends BaseUnitTest {
     @Test
     @DisplayName("drops unknown capability strings before delegating")
     void dropsUnknownCapabilities() {
-        Practice practice = practiceWith(
-            new LinkedHashSet<>(List.of("INLINE_FINDINGS", "REMOVED_CAPABILITY")),
-            null
-        );
-        when(capabilityResolver.isAvailable(
-            eq(WORKSPACE_ID),
-            eq(Set.of(Capability.INLINE_FINDINGS)),
-            eq(null)
-        )).thenReturn(true);
+        Practice practice = practiceWith(new LinkedHashSet<>(List.of("INLINE_FINDINGS", "REMOVED_CAPABILITY")), null);
+        when(
+            capabilityResolver.isAvailable(eq(WORKSPACE_ID), eq(Set.of(Capability.INLINE_FINDINGS)), eq(null))
+        ).thenReturn(true);
 
         assertThat(resolver.isAvailable(WORKSPACE_ID, practice)).isTrue();
     }

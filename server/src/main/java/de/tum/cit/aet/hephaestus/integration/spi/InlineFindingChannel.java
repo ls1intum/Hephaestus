@@ -9,14 +9,11 @@ import java.util.List;
  * compile-time excluded.
  */
 public interface InlineFindingChannel {
-
     IntegrationKind kind();
 
     InlineResult postInlineFindings(FeedbackChannel.FeedbackTarget target, List<InlineFinding> findings);
 
-    record InlineFinding(FindingAnchor anchor, String body, String marker) {
-    }
+    record InlineFinding(FindingAnchor anchor, String body, String marker) {}
 
-    record InlineResult(int posted, int failed) {
-    }
+    record InlineResult(int posted, int failed) {}
 }

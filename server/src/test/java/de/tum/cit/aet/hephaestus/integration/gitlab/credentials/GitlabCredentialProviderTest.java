@@ -33,7 +33,8 @@ import org.mockito.MockitoAnnotations;
 @DisplayName("GitlabCredentialProvider — unit")
 class GitlabCredentialProviderTest extends BaseUnitTest {
 
-    @Mock private ConnectionService connectionService;
+    @Mock
+    private ConnectionService connectionService;
 
     private CredentialBundleConverter converter;
     private GitlabCredentialProvider provider;
@@ -52,11 +53,11 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
         Connection connection = newGitlabConnection(workspaceId);
         connection.setCredentials(new BearerToken("glpat-secret", null), converter);
         connection.setState(IntegrationState.ACTIVE);
-        when(connectionService.findActive(workspaceId, IntegrationKind.GITLAB))
-            .thenReturn(Optional.of(connection));
+        when(connectionService.findActive(workspaceId, IntegrationKind.GITLAB)).thenReturn(Optional.of(connection));
 
         Optional<CredentialBundle> resolved = provider.resolve(
-            new IntegrationRef(IntegrationKind.GITLAB, workspaceId, "200"));
+            new IntegrationRef(IntegrationKind.GITLAB, workspaceId, "200")
+        );
 
         assertThat(resolved).contains(new BearerToken("glpat-secret", null));
     }
@@ -67,18 +68,15 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
         long workspaceId = 17L;
         Connection connection = newGitlabConnection(workspaceId);
         connection.setState(IntegrationState.ACTIVE);
-        when(connectionService.findActive(workspaceId, IntegrationKind.GITLAB))
-            .thenReturn(Optional.of(connection));
+        when(connectionService.findActive(workspaceId, IntegrationKind.GITLAB)).thenReturn(Optional.of(connection));
 
-        assertThat(provider.resolve(new IntegrationRef(IntegrationKind.GITLAB, workspaceId, "200")))
-            .isEmpty();
+        assertThat(provider.resolve(new IntegrationRef(IntegrationKind.GITLAB, workspaceId, "200"))).isEmpty();
     }
 
     @Test
     @DisplayName("Wrong-kind ref short-circuits without touching the repo")
     void wrongKindRef_returnsEmpty() {
-        assertThat(provider.resolve(new IntegrationRef(IntegrationKind.GITHUB, 17L, "100")))
-            .isEmpty();
+        assertThat(provider.resolve(new IntegrationRef(IntegrationKind.GITHUB, 17L, "100"))).isEmpty();
         Mockito.verifyNoInteractions(connectionService);
     }
 
@@ -86,10 +84,16 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
         Workspace ws = Mockito.mock(Workspace.class);
         Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
         return new Connection(
-            ws, IntegrationKind.GITLAB, "200",
+            ws,
+            IntegrationKind.GITLAB,
+            "200",
             new ConnectionConfig.GitLabConfig(
-                "https://gitlab.example.com", 200L, null,
-                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of())
+                "https://gitlab.example.com",
+                200L,
+                null,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                Set.of()
+            )
         );
     }
 }

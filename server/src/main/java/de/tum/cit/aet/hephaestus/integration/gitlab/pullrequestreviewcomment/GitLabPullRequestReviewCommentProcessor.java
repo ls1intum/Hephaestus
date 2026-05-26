@@ -2,12 +2,12 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment;
 
 import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.common.PostgresStringUtils;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants;
+import de.tum.cit.aet.hephaestus.integration.scm.common.PostgresStringUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewcomment.PullRequestReviewComment;

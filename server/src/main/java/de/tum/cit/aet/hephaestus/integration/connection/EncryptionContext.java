@@ -36,12 +36,10 @@ public record EncryptionContext(
     @Nullable String instanceKey,
     String columnFqn
 ) {
-
     /** AAD schema version. Bump when fields change shape; tolerant decrypt switches on this byte. */
     public static final byte SCHEMA_VERSION_V2 = 0x02;
 
-    private static final byte[] DOMAIN_SEPARATOR =
-        "hephaestus-credential-bundle".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] DOMAIN_SEPARATOR = "hephaestus-credential-bundle".getBytes(StandardCharsets.UTF_8);
 
     public EncryptionContext {
         if (kind == null) {
@@ -56,7 +54,11 @@ public record EncryptionContext(
      * Canonical context for {@code Connection.credentials_encrypted}. Only call site
      * outside this package is the JPA entity {@link Connection}; arch-test pins this.
      */
-    static EncryptionContext forConnectionCredentials(long workspaceId, IntegrationKind kind, @Nullable String instanceKey) {
+    static EncryptionContext forConnectionCredentials(
+        long workspaceId,
+        IntegrationKind kind,
+        @Nullable String instanceKey
+    ) {
         return new EncryptionContext(workspaceId, kind, instanceKey, "connection.credentials_encrypted");
     }
 
@@ -67,12 +69,17 @@ public record EncryptionContext(
         byte[] instanceBytes = (instanceKey == null ? "" : instanceKey).getBytes(StandardCharsets.UTF_8);
         byte[] columnBytes = columnFqn.getBytes(StandardCharsets.UTF_8);
 
-        int len = DOMAIN_SEPARATOR.length
-            + 1                                          // schema version
-            + 2 + workspaceBytes.length
-            + 2 + kindBytes.length
-            + 2 + instanceBytes.length
-            + 2 + columnBytes.length;
+        int len =
+            DOMAIN_SEPARATOR.length +
+            1 + // schema version
+            2 +
+            workspaceBytes.length +
+            2 +
+            kindBytes.length +
+            2 +
+            instanceBytes.length +
+            2 +
+            columnBytes.length;
 
         ByteBuffer buf = ByteBuffer.allocate(len);
         buf.put(DOMAIN_SEPARATOR);

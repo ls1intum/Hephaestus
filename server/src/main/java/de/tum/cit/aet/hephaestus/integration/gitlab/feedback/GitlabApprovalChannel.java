@@ -1,12 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.feedback;
 
-import de.tum.cit.aet.hephaestus.integration.spi.ApprovalChannel;
-
 import static de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrInfo;
+import de.tum.cit.aet.hephaestus.integration.spi.ApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
@@ -52,9 +51,7 @@ public class GitlabApprovalChannel implements ApprovalChannel {
     public void approve(FeedbackChannel.FeedbackTarget target, String message) {
         long scopeId = target.ref().workspaceId();
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
-            throw new FeedbackDeliveryException(
-                "GitLab rate limit critical — skipping approval for scope " + scopeId
-            );
+            throw new FeedbackDeliveryException("GitLab rate limit critical — skipping approval for scope " + scopeId);
         }
 
         MrCoordinates mr = GitlabMrResolver.parseSubjectExternalId(target.subjectExternalId());

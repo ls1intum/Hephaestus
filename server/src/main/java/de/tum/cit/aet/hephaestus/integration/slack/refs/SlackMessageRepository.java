@@ -12,9 +12,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long> {
-
     Optional<SlackMessage> findByConnectionIdAndTeamIdAndChannelIdAndTs(
-        long connectionId, String teamId, String channelId, String ts);
+        long connectionId,
+        String teamId,
+        String channelId,
+        String ts
+    );
 
     /**
      * Newest-first listing within a channel. Hits {@code ix_slack_message_thread}
@@ -24,11 +27,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     List<SlackMessage> findByConnectionIdAndChannelIdOrderByTsDesc(long connectionId, String channelId);
 
     /** Workspace-scoped newest-first listing for mentor context across all channels of a workspace. */
-    @Query(
-        "SELECT m FROM SlackMessage m "
-            + "WHERE m.connection.workspace.id = :workspaceId "
-            + "ORDER BY m.ts DESC"
-    )
+    @Query("SELECT m FROM SlackMessage m " + "WHERE m.connection.workspace.id = :workspaceId " + "ORDER BY m.ts DESC")
     List<SlackMessage> findByWorkspaceIdOrderByTsDesc(@Param("workspaceId") long workspaceId);
 
     /**
@@ -51,11 +50,11 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     @Modifying
     @Transactional
     @Query(
-        "UPDATE SlackMessage m SET m.deletedAt = :at "
-            + "WHERE m.connection.workspace.id = :workspaceId "
-            + "AND m.connection.id = :connectionId "
-            + "AND m.channelId = :channelId AND m.ts = :ts "
-            + "AND m.deletedAt IS NULL"
+        "UPDATE SlackMessage m SET m.deletedAt = :at " +
+            "WHERE m.connection.workspace.id = :workspaceId " +
+            "AND m.connection.id = :connectionId " +
+            "AND m.channelId = :channelId AND m.ts = :ts " +
+            "AND m.deletedAt IS NULL"
     )
     int softDelete(
         @Param("workspaceId") long workspaceId,

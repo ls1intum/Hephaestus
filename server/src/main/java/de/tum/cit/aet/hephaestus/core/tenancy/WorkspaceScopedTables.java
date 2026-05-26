@@ -55,8 +55,8 @@ public class WorkspaceScopedTables {
         // Fleet-wide worker JWT revocation; worker JWTs are not workspace-scoped
         "worker_token_denylist",
         // Unified integration framework — three-layer identity model
-        "hephaestus_user",          // Layer 2: one row per real person; cross-workspace
-        "integration_identity",     // Layer 3: scoped by (kind, integration_instance_id, external_id), not workspace_id
+        "hephaestus_user", // Layer 2: one row per real person; cross-workspace
+        "integration_identity", // Layer 3: scoped by (kind, integration_instance_id, external_id), not workspace_id
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"

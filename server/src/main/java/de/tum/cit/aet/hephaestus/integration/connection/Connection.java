@@ -40,7 +40,7 @@ import org.springframework.lang.Nullable;
     name = "connection",
     uniqueConstraints = @UniqueConstraint(
         name = "uq_connection",
-        columnNames = {"workspace_id", "kind", "instance_key"}
+        columnNames = { "workspace_id", "kind", "instance_key" }
     )
 )
 public class Connection {
@@ -105,13 +105,14 @@ public class Connection {
     @Column(nullable = false)
     private Long version = 0L;
 
-    protected Connection() {
-    }
+    protected Connection() {}
 
-    public Connection(de.tum.cit.aet.hephaestus.workspace.Workspace workspace,
-                      IntegrationKind kind,
-                      @Nullable String instanceKey,
-                      ConnectionConfig config) {
+    public Connection(
+        de.tum.cit.aet.hephaestus.workspace.Workspace workspace,
+        IntegrationKind kind,
+        @Nullable String instanceKey,
+        ConnectionConfig config
+    ) {
         this.workspace = workspace;
         this.kind = kind;
         this.instanceKey = instanceKey;
@@ -135,8 +136,7 @@ public class Connection {
         }
         if (!this.instanceKey.equals(instanceKey)) {
             throw new IllegalStateException(
-                "Cannot rebind Connection " + id + " from instance_key="
-                    + this.instanceKey + " to " + instanceKey
+                "Cannot rebind Connection " + id + " from instance_key=" + this.instanceKey + " to " + instanceKey
             );
         }
     }
@@ -145,31 +145,104 @@ public class Connection {
         return new IntegrationRef(kind, workspace.getId(), instanceKey);
     }
 
+    public Long getId() {
+        return id;
+    }
 
-    public Long getId() { return id; }
-    public de.tum.cit.aet.hephaestus.workspace.Workspace getWorkspace() { return workspace; }
-    public IntegrationKind getKind() { return kind; }
-    @Nullable public String getInstanceKey() { return instanceKey; }
-    @Nullable public String getDisplayName() { return displayName; }
-    public IntegrationState getState() { return state; }
-    @Nullable public String getStateReason() { return stateReason; }
-    public ConnectionConfig getConfig() { return config; }
-    @Nullable public byte[] getCredentialsEncrypted() { return credentialsEncrypted; }
-    @Nullable public String getCredentialsAlg() { return credentialsAlg; }
-    @Nullable public Long getReplacesConnectionId() { return replacesConnectionId; }
-    public Instant getCreatedAt() { return createdAt; }
-    public Instant getUpdatedAt() { return updatedAt; }
-    @Nullable public Instant getLastActivityAt() { return lastActivityAt; }
-    public Long getVersion() { return version; }
+    public de.tum.cit.aet.hephaestus.workspace.Workspace getWorkspace() {
+        return workspace;
+    }
 
-    public void setDisplayName(@Nullable String displayName) { this.displayName = displayName; }
-    public void setState(IntegrationState state) { this.state = state; }
-    public void setStateReason(@Nullable String stateReason) { this.stateReason = stateReason; }
-    public void setConfig(ConnectionConfig config) { this.config = config; }
-    public void setCredentialsEncrypted(@Nullable byte[] credentialsEncrypted) { this.credentialsEncrypted = credentialsEncrypted; }
-    public void setCredentialsAlg(@Nullable String credentialsAlg) { this.credentialsAlg = credentialsAlg; }
-    public void setReplacesConnectionId(@Nullable Long replacesConnectionId) { this.replacesConnectionId = replacesConnectionId; }
-    public void setLastActivityAt(@Nullable Instant lastActivityAt) { this.lastActivityAt = lastActivityAt; }
+    public IntegrationKind getKind() {
+        return kind;
+    }
+
+    @Nullable
+    public String getInstanceKey() {
+        return instanceKey;
+    }
+
+    @Nullable
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public IntegrationState getState() {
+        return state;
+    }
+
+    @Nullable
+    public String getStateReason() {
+        return stateReason;
+    }
+
+    public ConnectionConfig getConfig() {
+        return config;
+    }
+
+    @Nullable
+    public byte[] getCredentialsEncrypted() {
+        return credentialsEncrypted;
+    }
+
+    @Nullable
+    public String getCredentialsAlg() {
+        return credentialsAlg;
+    }
+
+    @Nullable
+    public Long getReplacesConnectionId() {
+        return replacesConnectionId;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    @Nullable
+    public Instant getLastActivityAt() {
+        return lastActivityAt;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setDisplayName(@Nullable String displayName) {
+        this.displayName = displayName;
+    }
+
+    public void setState(IntegrationState state) {
+        this.state = state;
+    }
+
+    public void setStateReason(@Nullable String stateReason) {
+        this.stateReason = stateReason;
+    }
+
+    public void setConfig(ConnectionConfig config) {
+        this.config = config;
+    }
+
+    public void setCredentialsEncrypted(@Nullable byte[] credentialsEncrypted) {
+        this.credentialsEncrypted = credentialsEncrypted;
+    }
+
+    public void setCredentialsAlg(@Nullable String credentialsAlg) {
+        this.credentialsAlg = credentialsAlg;
+    }
+
+    public void setReplacesConnectionId(@Nullable Long replacesConnectionId) {
+        this.replacesConnectionId = replacesConnectionId;
+    }
+
+    public void setLastActivityAt(@Nullable Instant lastActivityAt) {
+        this.lastActivityAt = lastActivityAt;
+    }
 
     //
     // The entity owns the encryption context — `(workspaceId, kind, instanceKey)` is
@@ -232,8 +305,13 @@ public class Connection {
         };
         if (expected != kind) {
             throw new IllegalStateException(
-                "Connection kind=" + kind + " incompatible with config="
-                    + config.getClass().getSimpleName() + " (expected kind=" + expected + ")"
+                "Connection kind=" +
+                    kind +
+                    " incompatible with config=" +
+                    config.getClass().getSimpleName() +
+                    " (expected kind=" +
+                    expected +
+                    ")"
             );
         }
     }

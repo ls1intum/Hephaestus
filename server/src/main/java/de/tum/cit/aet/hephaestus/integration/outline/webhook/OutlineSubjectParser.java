@@ -32,8 +32,8 @@ public class OutlineSubjectParser implements SubjectParser {
         String[] parts = fullSubject.split("\\.", -1);
         if (parts.length != 4) {
             throw new IllegalArgumentException(
-                "Outline subject must be 4 dot-separated tokens (outline.workspace.collection.event), got: "
-                    + fullSubject
+                "Outline subject must be 4 dot-separated tokens (outline.workspace.collection.event), got: " +
+                    fullSubject
             );
         }
         String eventType = parts[3];

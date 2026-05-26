@@ -19,6 +19,8 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassi
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldDTO;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldValueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2Field;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldTextValue;
@@ -27,8 +29,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectField;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectFieldRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectFieldValueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectItemRepository;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldDTO;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldValueDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;

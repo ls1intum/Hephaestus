@@ -57,12 +57,12 @@ class OAuthStateNonceStoreTest extends BaseUnitTest {
     @Test
     @DisplayName("issue rejects null + empty nonce")
     void issueRejectsBlank() {
-        assertThatThrownBy(() ->
-            store.issue(null, 1L, IntegrationKind.GITHUB, Instant.now())
-        ).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() ->
-            store.issue("", 1L, IntegrationKind.GITHUB, Instant.now())
-        ).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.issue(null, 1L, IntegrationKind.GITHUB, Instant.now())).isInstanceOf(
+            IllegalArgumentException.class
+        );
+        assertThatThrownBy(() -> store.issue("", 1L, IntegrationKind.GITHUB, Instant.now())).isInstanceOf(
+            IllegalArgumentException.class
+        );
     }
 
     @Test
@@ -92,10 +92,7 @@ class OAuthStateNonceStoreTest extends BaseUnitTest {
     void tryConsumeMapsRowCountFaithfully() {
         // Simulate the repository returning row-count for a sequence of attempts.
         // The store must NOT add extra state — it's a thin mapper.
-        when(repository.markConsumed(eq("abc"), any(Instant.class)))
-            .thenReturn(1)
-            .thenReturn(0)
-            .thenReturn(0);
+        when(repository.markConsumed(eq("abc"), any(Instant.class))).thenReturn(1).thenReturn(0).thenReturn(0);
 
         assertThat(store.tryConsume("abc")).isTrue();
         assertThat(store.tryConsume("abc")).isFalse();

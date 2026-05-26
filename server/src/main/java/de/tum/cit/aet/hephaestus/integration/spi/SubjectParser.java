@@ -9,7 +9,6 @@ package de.tum.cit.aet.hephaestus.integration.spi;
  * parses to {@code EventTypeKey(GITHUB, "installation.installation")}.
  */
 public interface SubjectParser {
-
     IntegrationKind kind();
 
     EventTypeKey parse(String fullSubject);

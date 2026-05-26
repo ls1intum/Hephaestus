@@ -36,16 +36,18 @@ class IntegrationNatsConsumerTest {
     class ReconnectBackoffMs {
 
         @ParameterizedTest(name = "attempt={0} → delay in [{1}, {2}] ms")
-        @CsvSource({
-            // attempt, minMs (= base * 2^attempt, no jitter floor), maxMs (= base * 2^attempt + JITTER_MAX, capped at 30_000)
-            "0, 1000, 2000",
-            "1, 2000, 3000",
-            "2, 4000, 5000",
-            "3, 8000, 9000",
-            "4, 16000, 17000",
-            "5, 30000, 30000",
-            "6, 30000, 30000",
-        })
+        @CsvSource(
+            {
+                // attempt, minMs (= base * 2^attempt, no jitter floor), maxMs (= base * 2^attempt + JITTER_MAX, capped at 30_000)
+                "0, 1000, 2000",
+                "1, 2000, 3000",
+                "2, 4000, 5000",
+                "3, 8000, 9000",
+                "4, 16000, 17000",
+                "5, 30000, 30000",
+                "6, 30000, 30000",
+            }
+        )
         void clampedExponentialWithJitter(int attempt, long minExpected, long maxExpected) {
             long delay = IntegrationNatsConsumer.reconnectBackoffMs(attempt);
             assertThat(delay)

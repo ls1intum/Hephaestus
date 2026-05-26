@@ -24,10 +24,6 @@ public class SlackManifest implements IntegrationManifest {
 
     @Override
     public Set<Capability> declaredCapabilities() {
-        return Set.of(
-            Capability.WEBHOOK_INGEST,
-            Capability.URL_VERIFICATION_HANDSHAKE,
-            Capability.REPLAY_PROTECTION
-        );
+        return Set.of(Capability.WEBHOOK_INGEST, Capability.URL_VERIFICATION_HANDSHAKE, Capability.REPLAY_PROTECTION);
     }
 }

@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface SlackChannelRepository extends JpaRepository<SlackChannel, Long> {
-
     Optional<SlackChannel> findByConnectionIdAndChannelId(long connectionId, String channelId);
 
     List<SlackChannel> findByConnectionId(long connectionId);

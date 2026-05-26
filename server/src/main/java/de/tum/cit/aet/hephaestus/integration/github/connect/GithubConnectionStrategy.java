@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.github.connect;
 
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.GithubAppCredential;
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -62,8 +62,7 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
         String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.GITHUB);
         String separator = installUrl.contains("?") ? "&" : "?";
         URI vendorUrl = URI.create(
-            installUrl + separator + CALLBACK_PARAM_STATE + "=" +
-                URLEncoder.encode(state, StandardCharsets.UTF_8)
+            installUrl + separator + CALLBACK_PARAM_STATE + "=" + URLEncoder.encode(state, StandardCharsets.UTF_8)
         );
         return new ConnectInitiation.RedirectToVendor(vendorUrl, state);
     }
@@ -92,7 +91,10 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     }
 
     @Override
-    public ValidationResult validate(IntegrationRef ref, de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle credentials) {
+    public ValidationResult validate(
+        IntegrationRef ref,
+        de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle credentials
+    ) {
         // Fail closed: returning Ok would silently transition the Connection to ACTIVE on
         // revoked installations. Follow-up wiring will call
         // GitHubAppTokenService.isInstallationSuspended against GET /app/installations/{id}.

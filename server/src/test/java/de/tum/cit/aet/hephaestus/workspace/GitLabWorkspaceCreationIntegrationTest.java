@@ -319,9 +319,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         // installations come in via GithubLifecycleListener), so its providerType is
         // null. The GitLab workspace created via the REST API path provisions a GitLab
         // Connection inline and surfaces as GITLAB.
-        assertThat(workspaces)
-            .extracting(WorkspaceListItemDTO::providerType)
-            .contains(GitProviderType.GITLAB);
+        assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).contains(GitProviderType.GITLAB);
     }
 
     @Test

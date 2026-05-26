@@ -26,14 +26,19 @@ public class JpaUserDirectory implements UserDirectory {
     @Override
     @Transactional(readOnly = true)
     public Optional<HephaestusUser> findUser(IntegrationKind kind, long integrationInstanceId, String externalId) {
-        return identityRepository.findByKindAndIntegrationInstanceIdAndExternalId(kind, integrationInstanceId, externalId)
+        return identityRepository
+            .findByKindAndIntegrationInstanceIdAndExternalId(kind, integrationInstanceId, externalId)
             .map(IntegrationIdentity::getHephaestusUser);
     }
 
     @Override
     @Transactional
-    public IntegrationIdentity upsertFromVendor(IntegrationKind kind, long integrationInstanceId,
-                                                String externalId, VendorUserInfo info) {
+    public IntegrationIdentity upsertFromVendor(
+        IntegrationKind kind,
+        long integrationInstanceId,
+        String externalId,
+        VendorUserInfo info
+    ) {
         IntegrationIdentity identity = identityRepository
             .findByKindAndIntegrationInstanceIdAndExternalId(kind, integrationInstanceId, externalId)
             .orElseGet(() -> new IntegrationIdentity(kind, integrationInstanceId, externalId));

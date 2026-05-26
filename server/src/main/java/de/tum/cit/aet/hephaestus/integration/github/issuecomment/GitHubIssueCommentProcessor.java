@@ -1,20 +1,22 @@
 package de.tum.cit.aet.hephaestus.integration.github.issuecomment;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.AuthorAssociation;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.github.common.BaseGitHubProcessor;
+import de.tum.cit.aet.hephaestus.integration.github.issue.dto.GitHubIssueDTO;
+import de.tum.cit.aet.hephaestus.integration.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
+import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
+import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.common.AuthorAssociation;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.integration.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueCommentRepository;
-import de.tum.cit.aet.hephaestus.integration.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
@@ -22,8 +24,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestReposito
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
-import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Optional;

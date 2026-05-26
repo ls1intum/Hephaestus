@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.workspace.adapter;
 
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.SyncTargetFactory;
@@ -82,7 +82,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     }
 
     private boolean hasActiveProvider(Workspace workspace, IntegrationKind kind) {
-        return connectionService.findActiveProviderKind(workspace.getId())
+        return connectionService
+            .findActiveProviderKind(workspace.getId())
             .map(k -> k == kind)
             .orElse(false);
     }
@@ -467,10 +468,16 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         String serverUrl = connectionService
             .findActiveGitLabConfig(workspaceId)
             .map(ConnectionConfig.GitLabConfig::serverUrl)
-            .or(() -> connectionService.findActiveGitHubAppConfig(workspaceId)
-                .map(ConnectionConfig.GitHubAppConfig::serverUrl))
-            .or(() -> connectionService.findActiveGitHubPatConfig(workspaceId)
-                .map(ConnectionConfig.GitHubPatConfig::serverUrl))
+            .or(() ->
+                connectionService
+                    .findActiveGitHubAppConfig(workspaceId)
+                    .map(ConnectionConfig.GitHubAppConfig::serverUrl)
+            )
+            .or(() ->
+                connectionService
+                    .findActiveGitHubPatConfig(workspaceId)
+                    .map(ConnectionConfig.GitHubPatConfig::serverUrl)
+            )
             .orElse(null);
 
         SyncContextProvider.SyncContext syncContext = new SyncContextProvider.SyncContext(

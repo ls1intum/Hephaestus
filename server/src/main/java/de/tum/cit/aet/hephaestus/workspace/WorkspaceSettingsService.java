@@ -98,8 +98,10 @@ public class WorkspaceSettingsService {
             connectionService.updateConfig(workspaceId, IntegrationKind.SLACK, cfg -> {
                 if (!(cfg instanceof ConnectionConfig.SlackConfig slack)) {
                     throw new IllegalStateException(
-                        "Expected SlackConfig on workspace=" + workspaceId
-                            + " but got " + cfg.getClass().getSimpleName()
+                        "Expected SlackConfig on workspace=" +
+                            workspaceId +
+                            " but got " +
+                            cfg.getClass().getSimpleName()
                     );
                 }
                 return new ConnectionConfig.SlackConfig(
@@ -128,10 +130,13 @@ public class WorkspaceSettingsService {
         IntegrationKind kind = connectionService
             .findActiveProviderKind(workspaceId)
             .filter(k -> k == IntegrationKind.GITHUB || k == IntegrationKind.GITLAB)
-            .orElseThrow(() -> new IllegalStateException(
-                "Cannot rotate PAT for workspace " + workspaceId
-                    + ": no active GitHub or GitLab Connection. Bind a provider first."
-            ));
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "Cannot rotate PAT for workspace " +
+                        workspaceId +
+                        ": no active GitHub or GitLab Connection. Bind a provider first."
+                )
+            );
         connectionService.rotateBearerToken(workspaceId, kind, new BearerToken(token, null));
         log.info("Updated workspace PAT: workspaceId={}, kind={}", workspaceId, kind);
         return workspace;
@@ -154,10 +159,13 @@ public class WorkspaceSettingsService {
         if (slackToken != null) {
             connectionService
                 .rotateBearerToken(workspaceId, IntegrationKind.SLACK, new BearerToken(slackToken, null))
-                .orElseThrow(() -> new IllegalStateException(
-                    "Cannot rotate Slack credentials for workspace " + workspaceId
-                        + ": no active Slack Connection. Complete the Slack OAuth install first."
-                ));
+                .orElseThrow(() ->
+                    new IllegalStateException(
+                        "Cannot rotate Slack credentials for workspace " +
+                            workspaceId +
+                            ": no active Slack Connection. Complete the Slack OAuth install first."
+                    )
+                );
         }
         if (slackSigningSecret != null) {
             log.debug(

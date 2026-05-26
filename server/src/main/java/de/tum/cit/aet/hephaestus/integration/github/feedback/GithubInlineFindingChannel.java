@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.github.feedback;
 
-import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
-
 import static de.tum.cit.aet.hephaestus.integration.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
@@ -9,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.github.feedback.GithubFeedbackChann
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.FindingAnchor;
+import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,8 +58,11 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         }
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
-            log.warn("GitHub rate limit critical — skipping {} inline findings: workspaceId={}",
-                findings.size(), scopeId);
+            log.warn(
+                "GitHub rate limit critical — skipping {} inline findings: workspaceId={}",
+                findings.size(),
+                scopeId
+            );
             return new InlineResult(0, findings.size());
         }
 
@@ -124,12 +126,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         } catch (FeedbackDeliveryException e) {
             throw e;
         } catch (Exception e) {
-            log.warn(
-                "GitHub inline finding batch failed: workspaceId={}, threadCount={}",
-                scopeId,
-                threads.size(),
-                e
-            );
+            log.warn("GitHub inline finding batch failed: workspaceId={}, threadCount={}", scopeId, threads.size(), e);
             return new InlineResult(0, threads.size() + unsupportedAnchorCount);
         }
     }

@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig.GitLabConfig;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenRotationClient;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookClient;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookClient.WebhookConfig;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookClient.WebhookInfo;
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig.GitLabConfig;
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import java.time.LocalDate;
@@ -141,7 +141,8 @@ public class GitLabWebhookService {
     }
 
     private boolean isGitLabWorkspace(Workspace workspace) {
-        return connectionService.findActiveProviderKind(workspace.getId())
+        return connectionService
+            .findActiveProviderKind(workspace.getId())
             .map(k -> k == IntegrationKind.GITLAB)
             .orElse(false);
     }
@@ -193,11 +194,7 @@ public class GitLabWebhookService {
             if (currentWebhookId != null && currentGroupId != null) {
                 Optional<WebhookInfo> existing = client.getGroupWebhook(scopeId, currentGroupId, currentWebhookId);
                 if (existing.isPresent()) {
-                    log.debug(
-                        "Webhook already registered: workspaceId={}, webhookId={}",
-                        scopeId,
-                        currentWebhookId
-                    );
+                    log.debug("Webhook already registered: workspaceId={}, webhookId={}", scopeId, currentWebhookId);
                     return WebhookSetupResult.success(currentWebhookId, currentGroupId);
                 }
                 // Webhook was deleted externally — clear local id and re-register
@@ -331,11 +328,7 @@ public class GitLabWebhookService {
         }
 
         try {
-            client.deregisterGroupWebhook(
-                workspace.getId(),
-                config.gitlabGroupId(),
-                config.gitlabWebhookId()
-            );
+            client.deregisterGroupWebhook(workspace.getId(), config.gitlabGroupId(), config.gitlabWebhookId());
         } catch (Exception e) {
             // Best-effort: log and continue. 401/403 = GitLab auto-disables failing webhooks.
             log.warn(

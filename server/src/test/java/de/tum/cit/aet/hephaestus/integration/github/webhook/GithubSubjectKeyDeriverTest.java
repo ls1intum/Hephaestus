@@ -2,14 +2,14 @@ package de.tum.cit.aet.hephaestus.integration.github.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("GithubSubjectKeyDeriver four-segment subject + dedup key derivation")
 class GithubSubjectKeyDeriverTest extends BaseUnitTest {
@@ -19,9 +19,7 @@ class GithubSubjectKeyDeriverTest extends BaseUnitTest {
 
     @Test
     void buildsRepositorySubject() throws Exception {
-        JsonNode payload = objectMapper.readTree(
-            "{\"repository\":{\"name\":\"web\",\"owner\":{\"login\":\"acme\"}}}"
-        );
+        JsonNode payload = objectMapper.readTree("{\"repository\":{\"name\":\"web\",\"owner\":{\"login\":\"acme\"}}}");
         String subject = deriver.deriveSubject(payload, Map.of("X-GitHub-Event", "pull_request"));
 
         assertThat(subject).isEqualTo("github.acme.web.pull_request");
@@ -55,9 +53,7 @@ class GithubSubjectKeyDeriverTest extends BaseUnitTest {
 
     @Test
     void missingEventHeaderBecomesPlaceholder() throws Exception {
-        JsonNode payload = objectMapper.readTree(
-            "{\"repository\":{\"name\":\"web\",\"owner\":{\"login\":\"acme\"}}}"
-        );
+        JsonNode payload = objectMapper.readTree("{\"repository\":{\"name\":\"web\",\"owner\":{\"login\":\"acme\"}}}");
         String subject = deriver.deriveSubject(payload, Map.of());
 
         assertThat(subject).isEqualTo("github.acme.web.?");
@@ -65,9 +61,7 @@ class GithubSubjectKeyDeriverTest extends BaseUnitTest {
 
     @Test
     void headerLookupIsCaseInsensitive() throws Exception {
-        JsonNode payload = objectMapper.readTree(
-            "{\"repository\":{\"name\":\"web\",\"owner\":{\"login\":\"acme\"}}}"
-        );
+        JsonNode payload = objectMapper.readTree("{\"repository\":{\"name\":\"web\",\"owner\":{\"login\":\"acme\"}}}");
         String subject = deriver.deriveSubject(payload, Map.of("x-github-event", "ping"));
 
         assertThat(subject).isEqualTo("github.acme.web.ping");

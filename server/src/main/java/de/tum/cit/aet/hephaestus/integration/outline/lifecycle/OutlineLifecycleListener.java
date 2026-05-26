@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.outline.lifecycle;
 
-import de.tum.cit.aet.hephaestus.integration.outline.refs.OutlineCollectionRepository;
-import de.tum.cit.aet.hephaestus.integration.outline.refs.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.refs.OutlineCollectionRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.refs.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
@@ -66,8 +66,11 @@ public class OutlineLifecycleListener implements IntegrationLifecycleListener {
         }
         Optional<Connection> connectionOpt = resolveConnection(ref);
         if (connectionOpt.isEmpty()) {
-            log.warn("Outline scope-change for unknown connection ref={}, skipping soft-delete of {} collections",
-                ref, delta.removedExternalIds().size());
+            log.warn(
+                "Outline scope-change for unknown connection ref={}, skipping soft-delete of {} collections",
+                ref,
+                delta.removedExternalIds().size()
+            );
             return;
         }
         long connectionId = connectionOpt.get().getId();
@@ -81,13 +84,26 @@ public class OutlineLifecycleListener implements IntegrationLifecycleListener {
         // a guaranteed no-op rather than a cross-tenant leak.
         for (String collectionId : delta.removedExternalIds()) {
             int docs = documentRepository.softDeleteByCollection(workspaceId, connectionId, collectionId, now);
-            log.info("Outline collection soft-delete: workspace={}, connection={}, collection={}, documentsTombstoned={}",
-                workspaceId, connectionId, collectionId, docs);
+            log.info(
+                "Outline collection soft-delete: workspace={}, connection={}, collection={}, documentsTombstoned={}",
+                workspaceId,
+                connectionId,
+                collectionId,
+                docs
+            );
         }
         int collections = collectionRepository.softDeleteByConnectionIdAndCollectionIdIn(
-            workspaceId, connectionId, List.copyOf(delta.removedExternalIds()), now);
-        log.info("Outline collection soft-delete: workspace={}, connection={}, collectionsTombstoned={}",
-            workspaceId, connectionId, collections);
+            workspaceId,
+            connectionId,
+            List.copyOf(delta.removedExternalIds()),
+            now
+        );
+        log.info(
+            "Outline collection soft-delete: workspace={}, connection={}, collectionsTombstoned={}",
+            workspaceId,
+            connectionId,
+            collections
+        );
     }
 
     @Override
@@ -100,6 +116,9 @@ public class OutlineLifecycleListener implements IntegrationLifecycleListener {
             return Optional.empty();
         }
         return connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(
-            ref.workspaceId(), ref.kind(), ref.instanceKey());
+            ref.workspaceId(),
+            ref.kind(),
+            ref.instanceKey()
+        );
     }
 }

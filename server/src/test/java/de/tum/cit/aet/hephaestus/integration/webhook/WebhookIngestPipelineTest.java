@@ -6,14 +6,13 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import tools.jackson.databind.ObjectMapper;
-import de.tum.cit.aet.hephaestus.integration.webhook.JetStreamPublisher;
-import de.tum.cit.aet.hephaestus.integration.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier.VerificationResult;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier.WebhookRequest;
+import de.tum.cit.aet.hephaestus.integration.webhook.JetStreamPublisher;
+import de.tum.cit.aet.hephaestus.integration.webhook.PublishRequest;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -25,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Unit tests for {@link WebhookIngestPipeline}. Drives the verify → derive → publish
@@ -45,8 +45,7 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     @Test
     @DisplayName("verified webhook is published to JetStream with kind-derived subject + dedup-id")
     void publishesOnVerified() {
-        SubjectKeyDeriver deriver = stubDeriver(IntegrationKind.GITHUB,
-            "github.acme.repo.push", "github-DEADBEEF");
+        SubjectKeyDeriver deriver = stubDeriver(IntegrationKind.GITHUB, "github.acme.repo.push", "github-DEADBEEF");
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
             List.of(stubVerifier(IntegrationKind.GITHUB, new VerificationResult.Verified())),
             List.of(deriver),
@@ -55,8 +54,11 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
         );
 
         Map<String, String> headers = headers("X-GitHub-Event", "push", "X-GitHub-Delivery", "DEADBEEF");
-        ResponseEntity<?> resp = pipeline.handle(IntegrationKind.GITHUB,
-            "{\"action\":\"opened\"}".getBytes(StandardCharsets.UTF_8), headers);
+        ResponseEntity<?> resp = pipeline.handle(
+            IntegrationKind.GITHUB,
+            "{\"action\":\"opened\"}".getBytes(StandardCharsets.UTF_8),
+            headers
+        );
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         ArgumentCaptor<PublishRequest> captor = ArgumentCaptor.forClass(PublishRequest.class);
@@ -79,8 +81,11 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
             objectMapper
         );
 
-        ResponseEntity<?> resp = pipeline.handle(IntegrationKind.GITHUB,
-            "{}".getBytes(StandardCharsets.UTF_8), headers());
+        ResponseEntity<?> resp = pipeline.handle(
+            IntegrationKind.GITHUB,
+            "{}".getBytes(StandardCharsets.UTF_8),
+            headers()
+        );
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(publisher, never()).publish(any());
@@ -89,12 +94,13 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     @Test
     @DisplayName("missing verifier → 501 without touching the publisher")
     void missingVerifier() {
-        WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
-            List.of(), List.of(), publisher, objectMapper
-        );
+        WebhookIngestPipeline pipeline = new WebhookIngestPipeline(List.of(), List.of(), publisher, objectMapper);
 
-        ResponseEntity<?> resp = pipeline.handle(IntegrationKind.SLACK,
-            "{}".getBytes(StandardCharsets.UTF_8), headers());
+        ResponseEntity<?> resp = pipeline.handle(
+            IntegrationKind.SLACK,
+            "{}".getBytes(StandardCharsets.UTF_8),
+            headers()
+        );
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
         verify(publisher, never()).publish(any());
@@ -110,8 +116,11 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
             objectMapper
         );
 
-        ResponseEntity<?> resp = pipeline.handle(IntegrationKind.GITHUB,
-            "{}".getBytes(StandardCharsets.UTF_8), headers());
+        ResponseEntity<?> resp = pipeline.handle(
+            IntegrationKind.GITHUB,
+            "{}".getBytes(StandardCharsets.UTF_8),
+            headers()
+        );
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
         verify(publisher, never()).publish(any());
@@ -127,8 +136,11 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
             objectMapper
         );
 
-        ResponseEntity<?> resp = pipeline.handle(IntegrationKind.GITHUB,
-            "{}".getBytes(StandardCharsets.UTF_8), headers());
+        ResponseEntity<?> resp = pipeline.handle(
+            IntegrationKind.GITHUB,
+            "{}".getBytes(StandardCharsets.UTF_8),
+            headers()
+        );
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
@@ -143,10 +155,14 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
             objectMapper
         );
         doThrow(new JetStreamPublisher.PublishFailedException("nats down", new RuntimeException()))
-            .when(publisher).publish(any());
+            .when(publisher)
+            .publish(any());
 
-        ResponseEntity<?> resp = pipeline.handle(IntegrationKind.GITLAB,
-            "{}".getBytes(StandardCharsets.UTF_8), headers());
+        ResponseEntity<?> resp = pipeline.handle(
+            IntegrationKind.GITLAB,
+            "{}".getBytes(StandardCharsets.UTF_8),
+            headers()
+        );
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
@@ -161,8 +177,11 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
             objectMapper
         );
 
-        ResponseEntity<?> resp = pipeline.handle(IntegrationKind.GITHUB,
-            "not json".getBytes(StandardCharsets.UTF_8), headers());
+        ResponseEntity<?> resp = pipeline.handle(
+            IntegrationKind.GITHUB,
+            "not json".getBytes(StandardCharsets.UTF_8),
+            headers()
+        );
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         verify(publisher, never()).publish(any());
@@ -178,8 +197,11 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
             objectMapper
         );
 
-        ResponseEntity<?> resp = pipeline.handle(IntegrationKind.SLACK,
-            "{}".getBytes(StandardCharsets.UTF_8), headers());
+        ResponseEntity<?> resp = pipeline.handle(
+            IntegrationKind.SLACK,
+            "{}".getBytes(StandardCharsets.UTF_8),
+            headers()
+        );
 
         // All auth failures (missing / bad signature / stale) collapse to opaque 401 so
         // attackers can't probe the signing scheme through status-code side channels.
@@ -192,15 +214,22 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     void respondImmediatelyShortCircuits() {
         byte[] echoBody = "challenge-ack".getBytes(StandardCharsets.UTF_8);
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
-            List.of(stubVerifier(IntegrationKind.SLACK,
-                new VerificationResult.RespondImmediately(200, "text/plain", echoBody))),
+            List.of(
+                stubVerifier(
+                    IntegrationKind.SLACK,
+                    new VerificationResult.RespondImmediately(200, "text/plain", echoBody)
+                )
+            ),
             List.of(),
             publisher,
             objectMapper
         );
 
-        ResponseEntity<?> resp = pipeline.handle(IntegrationKind.SLACK,
-            "{}".getBytes(StandardCharsets.UTF_8), headers());
+        ResponseEntity<?> resp = pipeline.handle(
+            IntegrationKind.SLACK,
+            "{}".getBytes(StandardCharsets.UTF_8),
+            headers()
+        );
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody()).isEqualTo(echoBody);
@@ -220,7 +249,8 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
                 publisher,
                 objectMapper
             )
-        ).isInstanceOf(IllegalStateException.class)
+        )
+            .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("Duplicate WebhookSignatureVerifier");
     }
 
@@ -230,14 +260,12 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
             new WebhookIngestPipeline(
                 List.of(),
-                List.of(
-                    stubDeriver(IntegrationKind.GITHUB, "s", "d"),
-                    stubDeriver(IntegrationKind.GITHUB, "s", "d")
-                ),
+                List.of(stubDeriver(IntegrationKind.GITHUB, "s", "d"), stubDeriver(IntegrationKind.GITHUB, "s", "d")),
                 publisher,
                 objectMapper
             )
-        ).isInstanceOf(IllegalStateException.class)
+        )
+            .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("Duplicate SubjectKeyDeriver");
     }
 
@@ -245,18 +273,32 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
 
     private static WebhookSignatureVerifier stubVerifier(IntegrationKind kind, VerificationResult result) {
         return new WebhookSignatureVerifier() {
-            @Override public IntegrationKind kind() { return kind; }
-            @Override public VerificationResult verify(WebhookRequest request) { return result; }
+            @Override
+            public IntegrationKind kind() {
+                return kind;
+            }
+
+            @Override
+            public VerificationResult verify(WebhookRequest request) {
+                return result;
+            }
         };
     }
 
     private static SubjectKeyDeriver stubDeriver(IntegrationKind kind, String subject, String dedupId) {
         return new SubjectKeyDeriver() {
-            @Override public IntegrationKind kind() { return kind; }
-            @Override public String deriveSubject(tools.jackson.databind.JsonNode payload, Map<String, String> headers) {
+            @Override
+            public IntegrationKind kind() {
+                return kind;
+            }
+
+            @Override
+            public String deriveSubject(tools.jackson.databind.JsonNode payload, Map<String, String> headers) {
                 return subject;
             }
-            @Override public String deriveDedupKey(byte[] body, Map<String, String> headers) {
+
+            @Override
+            public String deriveDedupKey(byte[] body, Map<String, String> headers) {
                 return dedupId;
             }
         };

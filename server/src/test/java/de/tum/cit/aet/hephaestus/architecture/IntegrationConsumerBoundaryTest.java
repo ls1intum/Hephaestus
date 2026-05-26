@@ -53,9 +53,9 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
 
         assertThat(violations)
             .as(
-                "integration/scm/sync/ must be empty of production code after Slice D — the unified "
-                    + "consumer lives under integration/consumer/ and the per-kind sync drivers live "
-                    + "under integration/<kind>/sync/. Sub-packages allowed: %s",
+                "integration/scm/sync/ must be empty of production code after Slice D — the unified " +
+                    "consumer lives under integration/consumer/ and the per-kind sync drivers live " +
+                    "under integration/<kind>/sync/. Sub-packages allowed: %s",
                 ALLOWED_SYNC_SUBPACKAGES
             )
             .isEmpty();
@@ -76,9 +76,9 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
             .dependOnClassesThat()
             .resideInAPackage("de.tum.cit.aet.hephaestus.integration.consumer..")
             .because(
-                "agent runtime role uses its own NATS connection (hephaestus.agent.nats.*); "
-                    + "depending on integration.consumer would mix bean clusters across roles and "
-                    + "break the runtime-role isolation locked by RuntimeRoleBoundaryTest"
+                "agent runtime role uses its own NATS connection (hephaestus.agent.nats.*); " +
+                    "depending on integration.consumer would mix bean clusters across roles and " +
+                    "break the runtime-role isolation locked by RuntimeRoleBoundaryTest"
             )
             .check(classes);
     }

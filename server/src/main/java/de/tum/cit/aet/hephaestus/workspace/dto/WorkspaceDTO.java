@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -69,7 +69,8 @@ public record WorkspaceDTO(
         var gitLab = connectionService.findActiveGitLabConfig(workspaceId);
         var slackCfg = connectionService.findSlackNotificationConfig(workspaceId);
 
-        String serverUrl = gitLab.map(ConnectionConfig.GitLabConfig::serverUrl)
+        String serverUrl = gitLab
+            .map(ConnectionConfig.GitLabConfig::serverUrl)
             .or(() -> gitHubApp.map(ConnectionConfig.GitHubAppConfig::serverUrl))
             .or(() -> gitHubPat.map(ConnectionConfig.GitHubPatConfig::serverUrl))
             .orElse(null);
@@ -85,24 +86,22 @@ public record WorkspaceDTO(
         boolean hasPat = connectionService
             .findActiveBearerToken(workspaceId, IntegrationKind.GITHUB)
             .map(b -> b.token() != null && !b.token().isEmpty())
-            .orElseGet(() -> connectionService
-                .findActiveBearerToken(workspaceId, IntegrationKind.GITLAB)
-                .map(b -> b.token() != null && !b.token().isEmpty())
-                .orElse(false));
+            .orElseGet(() ->
+                connectionService
+                    .findActiveBearerToken(workspaceId, IntegrationKind.GITLAB)
+                    .map(b -> b.token() != null && !b.token().isEmpty())
+                    .orElse(false)
+            );
 
         boolean hasSlackToken = connectionService
             .findActiveBearerToken(workspaceId, IntegrationKind.SLACK)
             .map(b -> b.token() != null && !b.token().isEmpty())
             .orElse(false);
 
-        String leaderboardTeam = slackCfg
-            .map(s -> s.teamLabel() != null ? s.teamLabel() : s.teamName())
-            .orElse(null);
+        String leaderboardTeam = slackCfg.map(s -> s.teamLabel() != null ? s.teamLabel() : s.teamName()).orElse(null);
         String leaderboardChannelId = slackCfg.map(ConnectionConfig.SlackConfig::notificationChannelId).orElse(null);
 
-        boolean gitlabWebhookRegistered = gitLab
-            .map(c -> c.gitlabWebhookId() != null)
-            .orElse(false);
+        boolean gitlabWebhookRegistered = gitLab.map(c -> c.gitlabWebhookId() != null).orElse(false);
 
         return new WorkspaceDTO(
             workspaceId,

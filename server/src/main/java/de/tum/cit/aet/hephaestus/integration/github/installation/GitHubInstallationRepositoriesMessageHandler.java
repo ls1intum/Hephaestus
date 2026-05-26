@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.github.installation;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener.RepositorySnapshot;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.installation.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.spi.ProvisioningListener.RepositorySnapshot;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +22,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubInstallationRepositoriesMessageHandler
-    extends AbstractIntegrationMessageHandler<GitHubInstallationRepositoriesEventDTO> {
+    extends AbstractIntegrationMessageHandler<GitHubInstallationRepositoriesEventDTO>
+{
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 

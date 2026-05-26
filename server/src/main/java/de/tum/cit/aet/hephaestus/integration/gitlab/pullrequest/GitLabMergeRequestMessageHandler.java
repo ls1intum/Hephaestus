@@ -2,13 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventAction;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequest.dto.GitLabMergeRequestEventDTO;
 import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

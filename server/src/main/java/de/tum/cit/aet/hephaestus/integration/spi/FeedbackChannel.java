@@ -10,7 +10,6 @@ package de.tum.cit.aet.hephaestus.integration.spi;
  * the agent module never branches on {@link IntegrationKind}.
  */
 public interface FeedbackChannel {
-
     IntegrationKind kind();
 
     SummaryHandle postSummary(FeedbackTarget target, FeedbackContent content);
@@ -27,17 +26,10 @@ public interface FeedbackChannel {
     String formatPullRequestSubjectId(String repoFullName, int prNumber);
 
     /** Hephaestus's typed reference to the subject the feedback attaches to. */
-    record FeedbackTarget(
-        IntegrationRef ref,
-        String subjectExternalId,
-        String resourceUrl
-    ) {
-    }
+    record FeedbackTarget(IntegrationRef ref, String subjectExternalId, String resourceUrl) {}
 
-    record FeedbackContent(String body, String marker) {
-    }
+    record FeedbackContent(String body, String marker) {}
 
     /** Vendor-side post identifier used by {@code FeedbackPostService} for edit-in-place. */
-    record SummaryHandle(String externalId) {
-    }
+    record SummaryHandle(String externalId) {}
 }

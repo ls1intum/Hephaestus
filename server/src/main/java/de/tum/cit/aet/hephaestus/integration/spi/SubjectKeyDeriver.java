@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.spi;
 
-import tools.jackson.databind.JsonNode;
 import java.util.Map;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Per-kind NATS subject + dedup-key derivation on the publisher side.
@@ -11,7 +11,6 @@ import java.util.Map;
  * {@link #kind()}.
  */
 public interface SubjectKeyDeriver {
-
     IntegrationKind kind();
 
     /** Builds the JetStream subject from payload + headers. */

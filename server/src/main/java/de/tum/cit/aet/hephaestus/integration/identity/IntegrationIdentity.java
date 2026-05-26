@@ -36,7 +36,7 @@ import org.springframework.lang.Nullable;
     name = "integration_identity",
     uniqueConstraints = @UniqueConstraint(
         name = "uq_integration_identity",
-        columnNames = {"kind", "integration_instance_id", "external_id"}
+        columnNames = { "kind", "integration_instance_id", "external_id" }
     )
 )
 public class IntegrationIdentity {
@@ -83,8 +83,7 @@ public class IntegrationIdentity {
     @Nullable
     private Instant linkedAt;
 
-    protected IntegrationIdentity() {
-    }
+    protected IntegrationIdentity() {}
 
     public IntegrationIdentity(IntegrationKind kind, long integrationInstanceId, String externalId) {
         this.kind = kind;
@@ -92,25 +91,72 @@ public class IntegrationIdentity {
         this.externalId = externalId;
     }
 
-    public Long getId() { return id; }
-    @Nullable public HephaestusUser getHephaestusUser() { return hephaestusUser; }
-    public IntegrationKind getKind() { return kind; }
-    public long getIntegrationInstanceId() { return integrationInstanceId; }
-    public String getExternalId() { return externalId; }
-    @Nullable public String getExternalLogin() { return externalLogin; }
-    @Nullable public String getExternalEmail() { return externalEmail; }
-    @Nullable public String getDisplayName() { return displayName; }
-    public String getRawAttributes() { return rawAttributes; }
-    public Instant getFirstSeenAt() { return firstSeenAt; }
-    @Nullable public Instant getLinkedAt() { return linkedAt; }
+    public Long getId() {
+        return id;
+    }
+
+    @Nullable
+    public HephaestusUser getHephaestusUser() {
+        return hephaestusUser;
+    }
+
+    public IntegrationKind getKind() {
+        return kind;
+    }
+
+    public long getIntegrationInstanceId() {
+        return integrationInstanceId;
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    @Nullable
+    public String getExternalLogin() {
+        return externalLogin;
+    }
+
+    @Nullable
+    public String getExternalEmail() {
+        return externalEmail;
+    }
+
+    @Nullable
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public String getRawAttributes() {
+        return rawAttributes;
+    }
+
+    public Instant getFirstSeenAt() {
+        return firstSeenAt;
+    }
+
+    @Nullable
+    public Instant getLinkedAt() {
+        return linkedAt;
+    }
 
     public void setHephaestusUser(@Nullable HephaestusUser user) {
         this.hephaestusUser = user;
         this.linkedAt = user == null ? null : Instant.now();
     }
-    public void setExternalLogin(@Nullable String externalLogin) { this.externalLogin = externalLogin; }
-    public void setExternalEmail(@Nullable String externalEmail) { this.externalEmail = externalEmail; }
-    public void setDisplayName(@Nullable String displayName) { this.displayName = displayName; }
+
+    public void setExternalLogin(@Nullable String externalLogin) {
+        this.externalLogin = externalLogin;
+    }
+
+    public void setExternalEmail(@Nullable String externalEmail) {
+        this.externalEmail = externalEmail;
+    }
+
+    public void setDisplayName(@Nullable String displayName) {
+        this.displayName = displayName;
+    }
+
     public void setRawAttributes(String rawAttributes) {
         this.rawAttributes = rawAttributes == null ? "{}" : rawAttributes;
     }

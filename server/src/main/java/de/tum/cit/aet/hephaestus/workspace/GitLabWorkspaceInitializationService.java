@@ -1,22 +1,22 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncType;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabSyncResult;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
+import de.tum.cit.aet.hephaestus.integration.gitlab.organization.GitLabSyncResult;
+import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncType;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.time.Duration;
@@ -148,7 +148,11 @@ public class GitLabWorkspaceInitializationService {
                 // Set workspace context for entire lifecycle (init + sync + NATS).
                 // initialize() checks contextOwner and won't double-set/clear.
                 // GitLab workspaces never have a GitHub App installation id.
-                WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, Set.of(), /* installationId */ null);
+                WorkspaceContext context = WorkspaceContext.fromWorkspace(
+                    workspace,
+                    Set.of(),
+                    /* installationId */ null
+                );
                 WorkspaceContextHolder.setContext(context);
                 try {
                     initialize(workspace);
@@ -305,7 +309,10 @@ public class GitLabWorkspaceInitializationService {
                 .map(ConnectionConfig.GitLabConfig::serverUrl)
                 .orElse(null);
             GitLabSyncResult result = syncService.syncGroupProjects(
-                workspace.getId(), workspace.getAccountLogin(), serverUrl);
+                workspace.getId(),
+                workspace.getAccountLogin(),
+                serverUrl
+            );
             log.info(
                 "GitLab project discovery: workspaceId={}, status={}, synced={}, failed={}, pages={}",
                 workspace.getId(),

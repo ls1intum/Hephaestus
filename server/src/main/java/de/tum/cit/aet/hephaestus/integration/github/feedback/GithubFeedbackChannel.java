@@ -1,10 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.github.feedback;
 
-import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
-
 import static de.tum.cit.aet.hephaestus.integration.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
@@ -30,10 +29,7 @@ public class GithubFeedbackChannel implements FeedbackChannel {
     private final GitHubGraphQlClientProvider gitHubProvider;
     private final GithubPrNodeIdResolver prNodeIdResolver;
 
-    public GithubFeedbackChannel(
-        GitHubGraphQlClientProvider gitHubProvider,
-        GithubPrNodeIdResolver prNodeIdResolver
-    ) {
+    public GithubFeedbackChannel(GitHubGraphQlClientProvider gitHubProvider, GithubPrNodeIdResolver prNodeIdResolver) {
         this.gitHubProvider = gitHubProvider;
         this.prNodeIdResolver = prNodeIdResolver;
     }
@@ -49,8 +45,7 @@ public class GithubFeedbackChannel implements FeedbackChannel {
             throw new IllegalArgumentException("repoFullName is required");
         }
         if (repoFullName.split("/", 3).length != 2) {
-            throw new IllegalArgumentException(
-                "GitHub repoFullName must be 'owner/repo': " + repoFullName);
+            throw new IllegalArgumentException("GitHub repoFullName must be 'owner/repo': " + repoFullName);
         }
         return repoFullName + "#" + prNumber;
     }

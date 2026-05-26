@@ -50,8 +50,9 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     void postSummaryReturnsNoteId() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42))
-            .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
+        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
+            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
+        );
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -73,8 +74,9 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     void postSummaryEscapesSlashCommands() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42))
-            .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
+        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
+            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
+        );
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -107,8 +109,9 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     void throwsOnMutationErrors() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42))
-            .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
+        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
+            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
+        );
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -128,11 +131,7 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     private static FeedbackTarget gitlabTarget() {
-        return new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITLAB, 1L, null),
-            "group/project!42",
-            null
-        );
+        return new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project!42", null);
     }
 
     @SuppressWarnings("unchecked")

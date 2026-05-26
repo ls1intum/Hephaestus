@@ -1,18 +1,18 @@
 package de.tum.cit.aet.hephaestus.integration.github.lifecycle;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
+import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationService;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
-import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
-import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
@@ -426,7 +426,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         // workspace (PAT or stale App) and either re-uses or creates the new App row.
         // Correlation id is stable per installation so webhook redelivery is idempotent.
         connectionService.upsertGitHubAppConnection(
-            saved, installationId, accountLogin,
+            saved,
+            installationId,
+            accountLogin,
             "install-bind-" + installationId
         );
 

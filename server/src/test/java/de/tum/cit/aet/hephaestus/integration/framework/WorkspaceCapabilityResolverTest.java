@@ -35,25 +35,32 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
     void setUp() {
         // Build a real registry from in-memory manifests so the assertions exercise the
         // actual lookup path (capabilitiesFor returns {} for unregistered kinds).
-        manifestRegistry = new IntegrationManifestRegistry(List.of(
-            stubManifest(IntegrationKind.GITHUB, Set.of(
-                Capability.WEBHOOK_INGEST,
-                Capability.FEEDBACK_DELIVERY,
-                Capability.INLINE_FINDINGS,
-                Capability.SCOPE_CHANGES,
-                Capability.APPROVAL_WORKFLOW
-            )),
-            stubManifest(IntegrationKind.GITLAB, Set.of(
-                Capability.WEBHOOK_INGEST,
-                Capability.FEEDBACK_DELIVERY,
-                Capability.SCOPE_CHANGES
-            )),
-            stubManifest(IntegrationKind.SLACK, Set.of(
-                Capability.WEBHOOK_INGEST,
-                Capability.URL_VERIFICATION_HANDSHAKE,
-                Capability.FEEDBACK_DELIVERY
-            ))
-        ));
+        manifestRegistry = new IntegrationManifestRegistry(
+            List.of(
+                stubManifest(
+                    IntegrationKind.GITHUB,
+                    Set.of(
+                        Capability.WEBHOOK_INGEST,
+                        Capability.FEEDBACK_DELIVERY,
+                        Capability.INLINE_FINDINGS,
+                        Capability.SCOPE_CHANGES,
+                        Capability.APPROVAL_WORKFLOW
+                    )
+                ),
+                stubManifest(
+                    IntegrationKind.GITLAB,
+                    Set.of(Capability.WEBHOOK_INGEST, Capability.FEEDBACK_DELIVERY, Capability.SCOPE_CHANGES)
+                ),
+                stubManifest(
+                    IntegrationKind.SLACK,
+                    Set.of(
+                        Capability.WEBHOOK_INGEST,
+                        Capability.URL_VERIFICATION_HANDSHAKE,
+                        Capability.FEEDBACK_DELIVERY
+                    )
+                )
+            )
+        );
         resolver = new WorkspaceCapabilityResolver(connectionRepository, manifestRegistry);
     }
 
@@ -66,8 +73,9 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         @Test
         @DisplayName("empty workspace -> empty set")
         void emptyWorkspaceReturnsEmpty() {
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(List.of());
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(List.of());
 
             assertThat(resolver.activeCapabilitiesFor(WORKSPACE_ID)).isEmpty();
         }
@@ -76,17 +84,17 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         @DisplayName("single GitHub ACTIVE -> manifest capabilities")
         void singleGithubConnectionReturnsManifestCapabilities() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.GITHUB));
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(connections);
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(connections);
 
-            assertThat(resolver.activeCapabilitiesFor(WORKSPACE_ID))
-                .containsExactlyInAnyOrder(
-                    Capability.WEBHOOK_INGEST,
-                    Capability.FEEDBACK_DELIVERY,
-                    Capability.INLINE_FINDINGS,
-                    Capability.SCOPE_CHANGES,
-                    Capability.APPROVAL_WORKFLOW
-                );
+            assertThat(resolver.activeCapabilitiesFor(WORKSPACE_ID)).containsExactlyInAnyOrder(
+                Capability.WEBHOOK_INGEST,
+                Capability.FEEDBACK_DELIVERY,
+                Capability.INLINE_FINDINGS,
+                Capability.SCOPE_CHANGES,
+                Capability.APPROVAL_WORKFLOW
+            );
         }
 
         @Test
@@ -96,16 +104,16 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                 connectionOf(IntegrationKind.GITLAB),
                 connectionOf(IntegrationKind.SLACK)
             );
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(connections);
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(connections);
 
-            assertThat(resolver.activeCapabilitiesFor(WORKSPACE_ID))
-                .containsExactlyInAnyOrder(
-                    Capability.WEBHOOK_INGEST,
-                    Capability.FEEDBACK_DELIVERY,
-                    Capability.SCOPE_CHANGES,
-                    Capability.URL_VERIFICATION_HANDSHAKE
-                );
+            assertThat(resolver.activeCapabilitiesFor(WORKSPACE_ID)).containsExactlyInAnyOrder(
+                Capability.WEBHOOK_INGEST,
+                Capability.FEEDBACK_DELIVERY,
+                Capability.SCOPE_CHANGES,
+                Capability.URL_VERIFICATION_HANDSHAKE
+            );
         }
 
         @Test
@@ -116,17 +124,17 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                 connectionOf(IntegrationKind.GITHUB),
                 connectionOf(IntegrationKind.OUTLINE)
             );
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(connections);
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(connections);
 
-            assertThat(resolver.activeCapabilitiesFor(WORKSPACE_ID))
-                .containsExactlyInAnyOrder(
-                    Capability.WEBHOOK_INGEST,
-                    Capability.FEEDBACK_DELIVERY,
-                    Capability.INLINE_FINDINGS,
-                    Capability.SCOPE_CHANGES,
-                    Capability.APPROVAL_WORKFLOW
-                );
+            assertThat(resolver.activeCapabilitiesFor(WORKSPACE_ID)).containsExactlyInAnyOrder(
+                Capability.WEBHOOK_INGEST,
+                Capability.FEEDBACK_DELIVERY,
+                Capability.INLINE_FINDINGS,
+                Capability.SCOPE_CHANGES,
+                Capability.APPROVAL_WORKFLOW
+            );
         }
     }
 
@@ -138,8 +146,9 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
 
         @Test
         void emptyWorkspaceReturnsEmpty() {
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(List.of());
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(List.of());
 
             assertThat(resolver.activeKindsFor(WORKSPACE_ID)).isEmpty();
         }
@@ -150,11 +159,14 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                 connectionOf(IntegrationKind.GITHUB),
                 connectionOf(IntegrationKind.SLACK)
             );
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(connections);
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(connections);
 
-            assertThat(resolver.activeKindsFor(WORKSPACE_ID))
-                .containsExactlyInAnyOrder(IntegrationKind.GITHUB, IntegrationKind.SLACK);
+            assertThat(resolver.activeKindsFor(WORKSPACE_ID)).containsExactlyInAnyOrder(
+                IntegrationKind.GITHUB,
+                IntegrationKind.SLACK
+            );
         }
     }
 
@@ -167,12 +179,13 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         @Test
         @DisplayName("empty workspace + non-empty requirement -> false")
         void emptyWorkspaceRejectsConstrainedRequirement() {
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(List.of());
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(List.of());
 
-            assertThat(resolver.isAvailable(
-                WORKSPACE_ID, Set.of(Capability.WEBHOOK_INGEST), IntegrationFamily.SCM
-            )).isFalse();
+            assertThat(
+                resolver.isAvailable(WORKSPACE_ID, Set.of(Capability.WEBHOOK_INGEST), IntegrationFamily.SCM)
+            ).isFalse();
         }
 
         @Test
@@ -192,8 +205,9 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         @DisplayName("GitHub ACTIVE + required={WEBHOOK_INGEST} -> true")
         void githubSatisfiesWebhookIngest() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.GITHUB));
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(connections);
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(connections);
 
             assertThat(resolver.isAvailable(WORKSPACE_ID, Set.of(Capability.WEBHOOK_INGEST), null)).isTrue();
         }
@@ -202,8 +216,9 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         @DisplayName("GitLab ACTIVE + required={INLINE_FINDINGS} -> false (not declared)")
         void gitlabDoesNotSatisfyInlineFindings() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.GITLAB));
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(connections);
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(connections);
 
             assertThat(resolver.isAvailable(WORKSPACE_ID, Set.of(Capability.INLINE_FINDINGS), null)).isFalse();
         }
@@ -215,8 +230,9 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
                 connectionOf(IntegrationKind.GITLAB),
                 connectionOf(IntegrationKind.GITHUB)
             );
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(connections);
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(connections);
 
             assertThat(resolver.isAvailable(WORKSPACE_ID, Set.of(Capability.INLINE_FINDINGS), null)).isTrue();
         }
@@ -225,32 +241,39 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         @DisplayName("requiredFamily=SCM + only Slack ACTIVE -> false")
         void scmFamilyRequiredButOnlyMessagingActive() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.SLACK));
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(connections);
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(connections);
 
-            assertThat(resolver.isAvailable(
-                WORKSPACE_ID, Set.of(Capability.WEBHOOK_INGEST), IntegrationFamily.SCM
-            )).isFalse();
+            assertThat(
+                resolver.isAvailable(WORKSPACE_ID, Set.of(Capability.WEBHOOK_INGEST), IntegrationFamily.SCM)
+            ).isFalse();
         }
 
         @Test
         @DisplayName("requiredFamily=MESSAGING + Slack ACTIVE + capability satisfied -> true")
         void messagingFamilySatisfied() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.SLACK));
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(connections);
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(connections);
 
-            assertThat(resolver.isAvailable(
-                WORKSPACE_ID, Set.of(Capability.URL_VERIFICATION_HANDSHAKE), IntegrationFamily.MESSAGING
-            )).isTrue();
+            assertThat(
+                resolver.isAvailable(
+                    WORKSPACE_ID,
+                    Set.of(Capability.URL_VERIFICATION_HANDSHAKE),
+                    IntegrationFamily.MESSAGING
+                )
+            ).isTrue();
         }
 
         @Test
         @DisplayName("requiredFamily without capabilities -> family-only gate")
         void familyOnlyGate() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.GITHUB));
-            when(connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE)))
-                .thenReturn(connections);
+            when(
+                connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
+            ).thenReturn(connections);
 
             assertThat(resolver.isAvailable(WORKSPACE_ID, Set.of(), IntegrationFamily.SCM)).isTrue();
             assertThat(resolver.isAvailable(WORKSPACE_ID, Set.of(), IntegrationFamily.KNOWLEDGE)).isFalse();
@@ -261,9 +284,20 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
 
     private static IntegrationManifest stubManifest(IntegrationKind kind, Set<Capability> capabilities) {
         return new IntegrationManifest() {
-            @Override public IntegrationKind kind() { return kind; }
-            @Override public String displayName() { return kind.name() + " (test)"; }
-            @Override public Set<Capability> declaredCapabilities() { return capabilities; }
+            @Override
+            public IntegrationKind kind() {
+                return kind;
+            }
+
+            @Override
+            public String displayName() {
+                return kind.name() + " (test)";
+            }
+
+            @Override
+            public Set<Capability> declaredCapabilities() {
+                return capabilities;
+            }
         };
     }
 

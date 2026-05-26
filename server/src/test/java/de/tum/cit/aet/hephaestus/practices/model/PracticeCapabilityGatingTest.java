@@ -59,27 +59,19 @@ class PracticeCapabilityGatingTest extends BaseUnitTest {
         practice.setRequiredCapabilities(new LinkedHashSet<>(Set.of("INLINE_FINDINGS", "FEEDBACK_DELIVERY")));
 
         Set<Capability> resolved = practice.getRequiredCapabilitySet();
-        assertThat(resolved).containsExactlyInAnyOrder(
-            Capability.INLINE_FINDINGS,
-            Capability.FEEDBACK_DELIVERY
-        );
+        assertThat(resolved).containsExactlyInAnyOrder(Capability.INLINE_FINDINGS, Capability.FEEDBACK_DELIVERY);
     }
 
     @Test
     @DisplayName("getRequiredCapabilitySet drops unknown names without throwing")
     void requiredCapabilitySetDropsUnknownNames() {
         Practice practice = new Practice();
-        practice.setRequiredCapabilities(new LinkedHashSet<>(Set.of(
-            "INLINE_FINDINGS",
-            "CAPABILITY_THAT_WAS_REMOVED",
-            "FEEDBACK_DELIVERY"
-        )));
+        practice.setRequiredCapabilities(
+            new LinkedHashSet<>(Set.of("INLINE_FINDINGS", "CAPABILITY_THAT_WAS_REMOVED", "FEEDBACK_DELIVERY"))
+        );
 
         Set<Capability> resolved = practice.getRequiredCapabilitySet();
-        assertThat(resolved).containsExactlyInAnyOrder(
-            Capability.INLINE_FINDINGS,
-            Capability.FEEDBACK_DELIVERY
-        );
+        assertThat(resolved).containsExactlyInAnyOrder(Capability.INLINE_FINDINGS, Capability.FEEDBACK_DELIVERY);
     }
 
     @Test

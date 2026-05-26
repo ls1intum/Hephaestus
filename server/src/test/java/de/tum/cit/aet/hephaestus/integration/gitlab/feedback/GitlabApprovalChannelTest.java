@@ -51,8 +51,9 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     void approveInvokesMutation() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42))
-            .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
+        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
+            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
+        );
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -88,8 +89,9 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     void approveThrowsOnMutationErrors() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42))
-            .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
+        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
+            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
+        );
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -109,10 +111,6 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     }
 
     private static FeedbackTarget gitlabTarget() {
-        return new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITLAB, 1L, null),
-            "group/project!42",
-            null
-        );
+        return new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project!42", null);
     }
 }

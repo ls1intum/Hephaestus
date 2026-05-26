@@ -61,12 +61,9 @@ class GithubSubjectParserTest extends BaseUnitTest {
 
     @Test
     void blankOrNullSubjectThrows() {
-        assertThatThrownBy(() -> parser.parse(null))
-            .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> parser.parse(""))
-            .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> parser.parse("   "))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> parser.parse(null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> parser.parse("")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> parser.parse("   ")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

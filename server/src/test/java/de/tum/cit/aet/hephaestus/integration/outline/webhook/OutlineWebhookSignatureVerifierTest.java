@@ -86,9 +86,9 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
         Map<String, String> headers = Map.of("Outline-Signature", "anything");
         WebhookRequest req = new WebhookRequest(body, headers);
 
-        VerificationResult result = new OutlineWebhookSignatureVerifier(
-            secretSourceReturning(Optional.empty())
-        ).verify(req);
+        VerificationResult result = new OutlineWebhookSignatureVerifier(secretSourceReturning(Optional.empty())).verify(
+            req
+        );
 
         // Distinct from Slack's "Invalid(unconfigured)": Outline secrets are per-subscription,
         // so "no secret captured yet" is operationally the same as "unknown subscription".
@@ -111,7 +111,6 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     /** Sanity: WebhookSecretSource interface contract — this is a real SubscriptionScope source. */
     @Test
     void secretSourceUsesSubscriptionScope() {
-        assertThat(new OutlineWebhookSecretSource().scope())
-            .isEqualTo(WebhookSecretSource.Scope.SUBSCRIPTION);
+        assertThat(new OutlineWebhookSecretSource().scope()).isEqualTo(WebhookSecretSource.Scope.SUBSCRIPTION);
     }
 }

@@ -172,7 +172,9 @@ public final class ScopeConsumer {
             return;
         }
         ConsumerConfiguration existing = context.getConsumerInfo().getConsumerConfiguration();
-        streamContext.createOrUpdateConsumer(ConsumerConfiguration.builder(existing).filterSubjects(newSubjects).build());
+        streamContext.createOrUpdateConsumer(
+            ConsumerConfiguration.builder(existing).filterSubjects(newSubjects).build()
+        );
         currentSubjects = newSubjects.clone();
         closeSubscriptionQuietly();
         subscription = context.consume(this::enqueueMessage);
@@ -224,12 +226,7 @@ public final class ScopeConsumer {
                 // Per-message failures must not kill the loop; the handler is responsible
                 // for ACK/NAK and surfaces ITS errors via the poison handler. Anything that
                 // escapes the handler here is an UNEXPECTED bug we log loudly.
-                log.error(
-                    "Unexpected error in dispatch loop: consumerName={}, scopeId={}",
-                    consumerName,
-                    scopeId,
-                    e
-                );
+                log.error("Unexpected error in dispatch loop: consumerName={}, scopeId={}", consumerName, scopeId, e);
             }
         }
         log.debug("Dispatch loop stopped: consumerName={}, scopeId={}", consumerName, scopeId);

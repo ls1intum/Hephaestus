@@ -11,13 +11,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import tools.jackson.databind.ObjectMapper;
-import de.tum.cit.aet.hephaestus.integration.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionAudit;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService.TransitionRequest;
+import de.tum.cit.aet.hephaestus.integration.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.GithubAppCredential;
 import de.tum.cit.aet.hephaestus.integration.spi.Capability;
@@ -45,6 +44,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Pure unit tests for {@link ConnectionController}. Exercises the controller directly
@@ -57,9 +57,14 @@ import org.springframework.security.core.Authentication;
 @DisplayName("ConnectionController — unit")
 class ConnectionControllerTest extends BaseUnitTest {
 
-    @Mock private ConnectionAdminService admin;
-    @Mock private ConnectionService connectionService;
-    @Mock private IntegrationManifestRegistry manifests;
+    @Mock
+    private ConnectionAdminService admin;
+
+    @Mock
+    private ConnectionService connectionService;
+
+    @Mock
+    private IntegrationManifestRegistry manifests;
 
     private ObjectMapper objectMapper;
     private FakeStrategy githubStrategy;
@@ -76,7 +81,9 @@ class ConnectionControllerTest extends BaseUnitTest {
         // wire it lazily-lenient so list/read/suspend/reactivate tests don't all need to restate it.
         Mockito.lenient().when(admin.manifests()).thenReturn(manifests);
         controller = new ConnectionController(
-            admin, connectionService, objectMapper,
+            admin,
+            connectionService,
+            objectMapper,
             List.of(githubStrategy, gitlabStrategy)
         );
     }
@@ -86,9 +93,17 @@ class ConnectionControllerTest extends BaseUnitTest {
     void list_returnsRowsWithCapabilitiesFromManifests() {
         long workspaceId = 42L;
         Connection a = newConnection(11L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
-        Connection b = newConnection(12L, workspaceId, IntegrationKind.GITLAB, "gitlab.com:200", IntegrationState.SUSPENDED);
+        Connection b = newConnection(
+            12L,
+            workspaceId,
+            IntegrationKind.GITLAB,
+            "gitlab.com:200",
+            IntegrationState.SUSPENDED
+        );
         when(admin.listForWorkspace(workspaceId)).thenReturn(List.of(a, b));
-        when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of(Capability.WEBHOOK_INGEST, Capability.TOKEN_REFRESH));
+        when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(
+            Set.of(Capability.WEBHOOK_INGEST, Capability.TOKEN_REFRESH)
+        );
         when(manifests.capabilitiesFor(IntegrationKind.GITLAB)).thenReturn(Set.of(Capability.WEBHOOK_INGEST));
 
         ResponseEntity<List<ConnectionSummary>> response = controller.list(workspaceId);
@@ -99,7 +114,8 @@ class ConnectionControllerTest extends BaseUnitTest {
         assertThat(body.get(0).id()).isEqualTo(11L);
         assertThat(body.get(0).kind()).isEqualTo(IntegrationKind.GITHUB);
         assertThat(body.get(0).capabilities()).containsExactlyInAnyOrder(
-            Capability.WEBHOOK_INGEST, Capability.TOKEN_REFRESH
+            Capability.WEBHOOK_INGEST,
+            Capability.TOKEN_REFRESH
         );
         assertThat(body.get(1).kind()).isEqualTo(IntegrationKind.GITLAB);
         assertThat(body.get(1).capabilities()).containsExactly(Capability.WEBHOOK_INGEST);
@@ -108,17 +124,18 @@ class ConnectionControllerTest extends BaseUnitTest {
     @Test
     @DisplayName("read 404s on missing id")
     void read_missingId_throwsNotFound() {
-        when(admin.findInWorkspaceOrThrow(1L, 999L))
-            .thenThrow(new NoSuchElementException("Connection not found: id=999"));
-        assertThatThrownBy(() -> controller.read(1L, 999L))
-            .isInstanceOf(NoSuchElementException.class);
+        when(admin.findInWorkspaceOrThrow(1L, 999L)).thenThrow(
+            new NoSuchElementException("Connection not found: id=999")
+        );
+        assertThatThrownBy(() -> controller.read(1L, 999L)).isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
     @DisplayName("read 404s when connection belongs to a different workspace")
     void read_wrongWorkspace_throwsNotFound() {
-        when(admin.findInWorkspaceOrThrow(999L, 7L))
-            .thenThrow(new NoSuchElementException("Connection not found in workspace 999: id=7"));
+        when(admin.findInWorkspaceOrThrow(999L, 7L)).thenThrow(
+            new NoSuchElementException("Connection not found in workspace 999: id=7")
+        );
         assertThatThrownBy(() -> controller.read(999L, 7L))
             .isInstanceOf(NoSuchElementException.class)
             .hasMessageContaining("workspace 999");
@@ -130,9 +147,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         URI vendor = URI.create("https://github.com/apps/x/installations/new?state=abc");
         githubStrategy.nextInitiation = new ConnectInitiation.RedirectToVendor(vendor, "abc");
 
-        InitiateConnectionRequest req = new InitiateConnectionRequest(
-            IntegrationKind.GITHUB, Map.of(), null
-        );
+        InitiateConnectionRequest req = new InitiateConnectionRequest(IntegrationKind.GITHUB, Map.of(), null);
         ResponseEntity<InitiateConnectionResponse> response = controller.initiate(7L, req, null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
@@ -147,15 +162,19 @@ class ConnectionControllerTest extends BaseUnitTest {
     @DisplayName("initiate with GITLAB (AcceptInline) creates Connection + ACTIVE transition → {type:'linked'}")
     void initiate_gitlab_acceptInline_createsRow() {
         long workspaceId = 17L;
-        gitlabStrategy.nextInitiation = new ConnectInitiation.AcceptInline(
-            new BearerToken("glpat-fake", null), "200"
-        );
+        gitlabStrategy.nextInitiation = new ConnectInitiation.AcceptInline(new BearerToken("glpat-fake", null), "200");
 
         Connection saved = newConnection(99L, workspaceId, IntegrationKind.GITLAB, "200", IntegrationState.ACTIVE);
-        when(admin.createInlineConnection(
-            eq(workspaceId), eq(IntegrationKind.GITLAB), eq("200"),
-            any(BearerToken.class), any(), eq("alice@example.com")
-        )).thenReturn(saved);
+        when(
+            admin.createInlineConnection(
+                eq(workspaceId),
+                eq(IntegrationKind.GITLAB),
+                eq("200"),
+                any(BearerToken.class),
+                any(),
+                eq("alice@example.com")
+            )
+        ).thenReturn(saved);
 
         InitiateConnectionRequest req = new InitiateConnectionRequest(
             IntegrationKind.GITLAB,
@@ -170,21 +189,25 @@ class ConnectionControllerTest extends BaseUnitTest {
         assertThat(linked.connectionId()).isEqualTo(99L);
 
         verify(admin).createInlineConnection(
-            eq(workspaceId), eq(IntegrationKind.GITLAB), eq("200"),
-            any(BearerToken.class), any(Map.class), eq("alice@example.com")
+            eq(workspaceId),
+            eq(IntegrationKind.GITLAB),
+            eq("200"),
+            any(BearerToken.class),
+            any(Map.class),
+            eq("alice@example.com")
         );
     }
 
     @Test
     @DisplayName("initiate with no registered strategy returns 400")
     void initiate_unknownKind_throws400() {
-        ConnectionController bare = new ConnectionController(
-            admin, connectionService, objectMapper, List.of()
-        );
+        ConnectionController bare = new ConnectionController(admin, connectionService, objectMapper, List.of());
         InitiateConnectionRequest req = new InitiateConnectionRequest(IntegrationKind.SLACK, Map.of(), null);
-        assertThatThrownBy(() -> bare.initiate(1L, req, null))
-            .satisfies(e -> assertThat(((org.springframework.web.server.ResponseStatusException) e).getStatusCode().value())
-                .isEqualTo(400));
+        assertThatThrownBy(() -> bare.initiate(1L, req, null)).satisfies(e ->
+            assertThat(((org.springframework.web.server.ResponseStatusException) e).getStatusCode().value()).isEqualTo(
+                400
+            )
+        );
     }
 
     @Test
@@ -193,17 +216,19 @@ class ConnectionControllerTest extends BaseUnitTest {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
-            .thenAnswer(inv -> {
-                Connection conn = inv.getArgument(0);
-                conn.setState(IntegrationState.SUSPENDED);
-                conn.setStateReason(((TransitionRequest) inv.getArgument(1)).detail());
-                return conn;
-            });
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+            Connection conn = inv.getArgument(0);
+            conn.setState(IntegrationState.SUSPENDED);
+            conn.setStateReason(((TransitionRequest) inv.getArgument(1)).detail());
+            return conn;
+        });
         when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of());
 
         ResponseEntity<ConnectionSummary> response = controller.suspend(
-            workspaceId, 7L, new ConnectionController.ReasonRequest("scheduled maintenance"), null
+            workspaceId,
+            7L,
+            new ConnectionController.ReasonRequest("scheduled maintenance"),
+            null
         );
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
@@ -224,12 +249,11 @@ class ConnectionControllerTest extends BaseUnitTest {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.SUSPENDED);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
-            .thenAnswer(inv -> {
-                Connection conn = inv.getArgument(0);
-                conn.setState(IntegrationState.ACTIVE);
-                return conn;
-            });
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+            Connection conn = inv.getArgument(0);
+            conn.setState(IntegrationState.ACTIVE);
+            return conn;
+        });
         when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of());
 
         ResponseEntity<ConnectionSummary> response = controller.reactivate(workspaceId, 7L, null, null);
@@ -249,12 +273,11 @@ class ConnectionControllerTest extends BaseUnitTest {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
-            .thenAnswer(inv -> {
-                Connection conn = inv.getArgument(0);
-                conn.setState(IntegrationState.UNINSTALLED);
-                return conn;
-            });
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+            Connection conn = inv.getArgument(0);
+            conn.setState(IntegrationState.UNINSTALLED);
+            return conn;
+        });
 
         ResponseEntity<Void> response = controller.disconnect(workspaceId, 7L, null);
 
@@ -274,8 +297,9 @@ class ConnectionControllerTest extends BaseUnitTest {
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
         githubStrategy.revokeThrows = true;
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv ->
+            inv.getArgument(0)
+        );
 
         ResponseEntity<Void> response = controller.disconnect(workspaceId, 7L, null);
 
@@ -291,10 +315,24 @@ class ConnectionControllerTest extends BaseUnitTest {
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
 
         ConnectionAudit a1 = new ConnectionAudit(
-            c, "INITIATE", null, IntegrationState.ACTIVE, "ADMIN", "alice", "corr-1", "started"
+            c,
+            "INITIATE",
+            null,
+            IntegrationState.ACTIVE,
+            "ADMIN",
+            "alice",
+            "corr-1",
+            "started"
         );
         ConnectionAudit a2 = new ConnectionAudit(
-            c, "SUSPEND", IntegrationState.ACTIVE, IntegrationState.SUSPENDED, "ADMIN", "bob", "corr-2", "vacation"
+            c,
+            "SUSPEND",
+            IntegrationState.ACTIVE,
+            IntegrationState.SUSPENDED,
+            "ADMIN",
+            "bob",
+            "corr-2",
+            "vacation"
         );
         when(admin.auditForConnection(eq(7L), anyInt())).thenReturn(List.of(a2, a1));
 
@@ -312,18 +350,19 @@ class ConnectionControllerTest extends BaseUnitTest {
     @Test
     @DisplayName("audit 404s if the connection isn't in the path workspace")
     void audit_wrongWorkspace_throwsNotFound() {
-        when(admin.findInWorkspaceOrThrow(999L, 7L))
-            .thenThrow(new NoSuchElementException("Connection not found in workspace 999: id=7"));
-        assertThatThrownBy(() -> controller.audit(999L, 7L))
-            .isInstanceOf(NoSuchElementException.class);
+        when(admin.findInWorkspaceOrThrow(999L, 7L)).thenThrow(
+            new NoSuchElementException("Connection not found in workspace 999: id=7")
+        );
+        assertThatThrownBy(() -> controller.audit(999L, 7L)).isInstanceOf(NoSuchElementException.class);
         verify(admin, never()).auditForConnection(anyLong(), anyInt());
     }
 
     @Test
     @DisplayName("ExceptionHandler maps IllegalStateException (transition-guard) to 409")
     void exceptionHandler_illegalState_to409() {
-        ResponseEntity<Map<String, String>> response =
-            controller.handleIllegalTransition(new IllegalStateException("Illegal transition for connection 7: UNINSTALLED → ACTIVE"));
+        ResponseEntity<Map<String, String>> response = controller.handleIllegalTransition(
+            new IllegalStateException("Illegal transition for connection 7: UNINSTALLED → ACTIVE")
+        );
 
         assertThat(response.getStatusCode().value()).isEqualTo(409);
         assertThat(response.getBody()).containsKey("error");
@@ -333,8 +372,9 @@ class ConnectionControllerTest extends BaseUnitTest {
     @Test
     @DisplayName("ExceptionHandler maps NoSuchElementException to 404")
     void exceptionHandler_notFound_to404() {
-        ResponseEntity<Map<String, String>> response =
-            controller.handleNotFound(new NoSuchElementException("Connection not found: id=999"));
+        ResponseEntity<Map<String, String>> response = controller.handleNotFound(
+            new NoSuchElementException("Connection not found: id=999")
+        );
         assertThat(response.getStatusCode().value()).isEqualTo(404);
         assertThat(response.getBody().get("error")).contains("999");
     }
@@ -344,7 +384,8 @@ class ConnectionControllerTest extends BaseUnitTest {
     void exceptionHandler_dataIntegrity_to409() {
         org.springframework.dao.DataIntegrityViolationException e =
             new org.springframework.dao.DataIntegrityViolationException(
-                "duplicate key", new RuntimeException("uq_connection violation")
+                "duplicate key",
+                new RuntimeException("uq_connection violation")
             );
         ResponseEntity<Map<String, String>> response = controller.handleDbConflict(e);
         assertThat(response.getStatusCode().value()).isEqualTo(409);
@@ -354,15 +395,23 @@ class ConnectionControllerTest extends BaseUnitTest {
     @Test
     @DisplayName("HttpStatus alignment: handler maps map to the correct HTTP status codes")
     void exceptionHandler_statusCodesAlign() {
-        assertThat(controller.handleNotFound(new NoSuchElementException("x")).getStatusCode())
-            .isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(controller.handleIllegalTransition(new IllegalStateException("x")).getStatusCode())
-            .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(controller.handleNotFound(new NoSuchElementException("x")).getStatusCode()).isEqualTo(
+            HttpStatus.NOT_FOUND
+        );
+        assertThat(controller.handleIllegalTransition(new IllegalStateException("x")).getStatusCode()).isEqualTo(
+            HttpStatus.CONFLICT
+        );
     }
 
     // ── helpers ──────────────────────────────────────────────────────────
 
-    private Connection newConnection(long id, long workspaceId, IntegrationKind kind, String instanceKey, IntegrationState state) {
+    private Connection newConnection(
+        long id,
+        long workspaceId,
+        IntegrationKind kind,
+        String instanceKey,
+        IntegrationState state
+    ) {
         Workspace ws = Mockito.mock(Workspace.class);
         // lenient: a few tests don't traverse the workspace-id check path — keeping the stub
         // centralised in the helper is worth more than micromanaging per-test.
@@ -370,8 +419,11 @@ class ConnectionControllerTest extends BaseUnitTest {
         ConnectionConfig cfg = switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(
-                "https://gitlab.com", 200L, null,
-                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of()
+                "https://gitlab.com",
+                200L,
+                null,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                Set.of()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, Set.of());
             case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, Set.of());
@@ -405,6 +457,7 @@ class ConnectionControllerTest extends BaseUnitTest {
 
     /** Per-kind strategy stub — initiate output is dictated by the test. */
     static final class FakeStrategy implements ConnectionStrategy {
+
         private final IntegrationKind kind;
         ConnectInitiation nextInitiation;
         int revokeCalls = 0;
@@ -414,7 +467,10 @@ class ConnectionControllerTest extends BaseUnitTest {
             this.kind = kind;
         }
 
-        @Override public IntegrationKind kind() { return kind; }
+        @Override
+        public IntegrationKind kind() {
+            return kind;
+        }
 
         @Override
         public ConnectInitiation initiate(InitiateRequest request) {
@@ -425,15 +481,22 @@ class ConnectionControllerTest extends BaseUnitTest {
         }
 
         @Override
-        public ConnectFinalization finalizeConnect(de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef ref, Map<String, String> callbackParams) {
+        public ConnectFinalization finalizeConnect(
+            de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef ref,
+            Map<String, String> callbackParams
+        ) {
             return new ConnectFinalization.Completed(
-                "unused-instance-key", new GithubAppCredential(0L, "unused"), null
+                "unused-instance-key",
+                new GithubAppCredential(0L, "unused"),
+                null
             );
         }
 
         @Override
-        public ValidationResult validate(de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef ref,
-                                         de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle credentials) {
+        public ValidationResult validate(
+            de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef ref,
+            de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle credentials
+        ) {
             return new ValidationResult.Ok(null, null);
         }
 

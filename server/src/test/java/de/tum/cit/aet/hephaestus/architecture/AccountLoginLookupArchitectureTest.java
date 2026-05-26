@@ -29,12 +29,14 @@ class AccountLoginLookupArchitectureTest extends HephaestusArchitectureTest {
         ArchRule rule = noClasses()
             .that()
             .doNotHaveFullyQualifiedName("de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository")
-            .and(new com.tngtech.archunit.base.DescribedPredicate<>("are not allowlisted callers") {
-                @Override
-                public boolean test(com.tngtech.archunit.core.domain.JavaClass input) {
-                    return !ALLOWED_CALLERS.contains(input.getFullName());
+            .and(
+                new com.tngtech.archunit.base.DescribedPredicate<>("are not allowlisted callers") {
+                    @Override
+                    public boolean test(com.tngtech.archunit.core.domain.JavaClass input) {
+                        return !ALLOWED_CALLERS.contains(input.getFullName());
+                    }
                 }
-            })
+            )
             .should()
             .callMethod(
                 de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository.class,
@@ -42,10 +44,10 @@ class AccountLoginLookupArchitectureTest extends HephaestusArchitectureTest {
                 String.class
             )
             .because(
-                "bare account-login lookups false-collapse workspaces that share the same login across "
-                    + "different SCM vendors (e.g. GitHub org and GitLab group with identical name). "
-                    + "New code must use a kind-aware lookup via ConnectionService.findActive(workspaceId, kind) "
-                    + "or scope by the active provider kind."
+                "bare account-login lookups false-collapse workspaces that share the same login across " +
+                    "different SCM vendors (e.g. GitHub org and GitLab group with identical name). " +
+                    "New code must use a kind-aware lookup via ConnectionService.findActive(workspaceId, kind) " +
+                    "or scope by the active provider kind."
             );
         rule.check(classes);
     }

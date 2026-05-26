@@ -1,18 +1,18 @@
 package de.tum.cit.aet.hephaestus.integration.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.github.common.BaseGitHubProcessor;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectDTO;
+import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;

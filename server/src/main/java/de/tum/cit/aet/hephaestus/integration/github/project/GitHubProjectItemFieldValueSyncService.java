@@ -17,13 +17,13 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlErrorUti
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldDTO;
+import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldValueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldValueConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectField;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectFieldRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectFieldValueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectItemRepository;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldDTO;
-import de.tum.cit.aet.hephaestus.integration.github.project.dto.GitHubProjectFieldValueDTO;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;

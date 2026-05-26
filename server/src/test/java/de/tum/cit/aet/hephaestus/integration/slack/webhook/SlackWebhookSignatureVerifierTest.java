@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.slack.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier.VerificationResult;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier.WebhookRequest;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -14,6 +13,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("SlackWebhookSignatureVerifier")
 class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
@@ -58,10 +58,7 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
     void validSignatureWithFreshTimestampVerifies() {
         String body = "{\"type\":\"event_callback\",\"event\":{\"type\":\"message\"}}";
         String ts = Long.toString(Instant.now().getEpochSecond());
-        Map<String, String> headers = Map.of(
-            "X-Slack-Signature", sign(ts, body),
-            "X-Slack-Request-Timestamp", ts
-        );
+        Map<String, String> headers = Map.of("X-Slack-Signature", sign(ts, body), "X-Slack-Request-Timestamp", ts);
         WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers);
 
         assertThat(defaultVerifier().verify(req)).isInstanceOf(VerificationResult.Verified.class);
@@ -74,8 +71,10 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
         long staleTs = now - 400; // > 300s window
         String tsStr = Long.toString(staleTs);
         Map<String, String> headers = Map.of(
-            "X-Slack-Signature", sign(tsStr, body),
-            "X-Slack-Request-Timestamp", tsStr
+            "X-Slack-Signature",
+            sign(tsStr, body),
+            "X-Slack-Request-Timestamp",
+            tsStr
         );
         WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers);
 
@@ -90,10 +89,7 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
     void badSignatureIsInvalid() {
         String body = "{\"type\":\"event_callback\"}";
         String ts = Long.toString(Instant.now().getEpochSecond());
-        Map<String, String> headers = Map.of(
-            "X-Slack-Signature", "v0=deadbeef",
-            "X-Slack-Request-Timestamp", ts
-        );
+        Map<String, String> headers = Map.of("X-Slack-Signature", "v0=deadbeef", "X-Slack-Request-Timestamp", ts);
         WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers);
 
         VerificationResult result = defaultVerifier().verify(req);
@@ -105,7 +101,9 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
     @Test
     void missingHeadersAreReportedAsMissingSignature() {
         WebhookRequest req = new WebhookRequest(
-            "{\"type\":\"event_callback\"}".getBytes(StandardCharsets.UTF_8), Map.of());
+            "{\"type\":\"event_callback\"}".getBytes(StandardCharsets.UTF_8),
+            Map.of()
+        );
         assertThat(defaultVerifier().verify(req)).isInstanceOf(VerificationResult.MissingSignature.class);
     }
 
@@ -113,10 +111,7 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
     void missingSecretIsInvalidWithUnconfiguredMessage() {
         String body = "{\"type\":\"event_callback\"}";
         String ts = Long.toString(Instant.now().getEpochSecond());
-        Map<String, String> headers = Map.of(
-            "X-Slack-Signature", sign(ts, body),
-            "X-Slack-Request-Timestamp", ts
-        );
+        Map<String, String> headers = Map.of("X-Slack-Signature", sign(ts, body), "X-Slack-Request-Timestamp", ts);
         WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers);
 
         VerificationResult result = verifierWithoutSecret().verify(req);
@@ -130,10 +125,7 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
         // Servlet containers may normalize header case; verifier must tolerate both.
         String body = "{\"type\":\"event_callback\"}";
         String ts = Long.toString(Instant.now().getEpochSecond());
-        Map<String, String> headers = Map.of(
-            "x-slack-signature", sign(ts, body),
-            "x-slack-request-timestamp", ts
-        );
+        Map<String, String> headers = Map.of("x-slack-signature", sign(ts, body), "x-slack-request-timestamp", ts);
         WebhookRequest req = new WebhookRequest(body.getBytes(StandardCharsets.UTF_8), headers);
 
         assertThat(defaultVerifier().verify(req)).isInstanceOf(VerificationResult.Verified.class);

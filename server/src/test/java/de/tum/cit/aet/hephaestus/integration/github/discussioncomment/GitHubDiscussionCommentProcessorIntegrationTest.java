@@ -2,23 +2,23 @@ package de.tum.cit.aet.hephaestus.integration.github.discussioncomment;
 
 import static org.assertj.core.api.Assertions.*;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.github.discussioncomment.dto.GitHubDiscussionCommentDTO;
+import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.common.AuthorAssociation;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.integration.scm.discussion.DiscussionRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.discussioncomment.DiscussionComment;
 import de.tum.cit.aet.hephaestus.integration.scm.discussioncomment.DiscussionCommentRepository;
-import de.tum.cit.aet.hephaestus.integration.github.discussioncomment.dto.GitHubDiscussionCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;

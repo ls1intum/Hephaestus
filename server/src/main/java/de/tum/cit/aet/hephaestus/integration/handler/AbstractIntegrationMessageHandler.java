@@ -147,5 +147,4 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
         String lastSegment = lastDot >= 0 ? subject.substring(lastDot + 1) : subject;
         return subjectEventToken.equals(lastSegment);
     }
-
 }

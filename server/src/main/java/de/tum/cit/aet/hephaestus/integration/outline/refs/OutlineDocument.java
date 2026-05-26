@@ -38,11 +38,11 @@ import org.springframework.lang.Nullable;
     name = "outline_document",
     uniqueConstraints = @UniqueConstraint(
         name = "uq_outline_document",
-        columnNames = {"connection_id", "document_id"}
+        columnNames = { "connection_id", "document_id" }
     ),
     indexes = {
         @Index(name = "ix_outline_document_connection", columnList = "connection_id"),
-        @Index(name = "ix_outline_document_collection", columnList = "connection_id, collection_id")
+        @Index(name = "ix_outline_document_collection", columnList = "connection_id, collection_id"),
     }
 )
 public class OutlineDocument {
@@ -86,30 +86,78 @@ public class OutlineDocument {
     @Nullable
     private Instant deletedAt;
 
-    protected OutlineDocument() {
-    }
+    protected OutlineDocument() {}
 
     public OutlineDocument(Connection connection, String documentId) {
         this.connection = connection;
         this.documentId = documentId;
     }
 
-    public Long getId() { return id; }
-    public Connection getConnection() { return connection; }
-    public String getDocumentId() { return documentId; }
-    @Nullable public String getCollectionId() { return collectionId; }
-    @Nullable public String getTitle() { return title; }
-    @Nullable public String getUrl() { return url; }
-    @Nullable public String getLastRevisionId() { return lastRevisionId; }
-    @Nullable public Instant getLastModifiedAt() { return lastModifiedAt; }
-    public Instant getIngestedAt() { return ingestedAt; }
-    @Nullable public Instant getDeletedAt() { return deletedAt; }
+    public Long getId() {
+        return id;
+    }
 
-    public void setCollectionId(@Nullable String collectionId) { this.collectionId = collectionId; }
-    public void setTitle(@Nullable String title) { this.title = title; }
-    public void setUrl(@Nullable String url) { this.url = url; }
-    public void setLastRevisionId(@Nullable String lastRevisionId) { this.lastRevisionId = lastRevisionId; }
-    public void setLastModifiedAt(@Nullable Instant lastModifiedAt) { this.lastModifiedAt = lastModifiedAt; }
+    public Connection getConnection() {
+        return connection;
+    }
+
+    public String getDocumentId() {
+        return documentId;
+    }
+
+    @Nullable
+    public String getCollectionId() {
+        return collectionId;
+    }
+
+    @Nullable
+    public String getTitle() {
+        return title;
+    }
+
+    @Nullable
+    public String getUrl() {
+        return url;
+    }
+
+    @Nullable
+    public String getLastRevisionId() {
+        return lastRevisionId;
+    }
+
+    @Nullable
+    public Instant getLastModifiedAt() {
+        return lastModifiedAt;
+    }
+
+    public Instant getIngestedAt() {
+        return ingestedAt;
+    }
+
+    @Nullable
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setCollectionId(@Nullable String collectionId) {
+        this.collectionId = collectionId;
+    }
+
+    public void setTitle(@Nullable String title) {
+        this.title = title;
+    }
+
+    public void setUrl(@Nullable String url) {
+        this.url = url;
+    }
+
+    public void setLastRevisionId(@Nullable String lastRevisionId) {
+        this.lastRevisionId = lastRevisionId;
+    }
+
+    public void setLastModifiedAt(@Nullable Instant lastModifiedAt) {
+        this.lastModifiedAt = lastModifiedAt;
+    }
 
     public void softDelete(Instant at) {
         if (this.deletedAt != null) {

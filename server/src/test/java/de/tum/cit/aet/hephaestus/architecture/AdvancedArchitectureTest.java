@@ -285,7 +285,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
 
                     // Any class under integration.<kind>.* is a per-vendor adapter by
                     // definition (webhook/credentials/connect/lifecycle/sync/…).
-                    boolean inIntegrationVendorPackage = javaClass.getPackageName()
+                    boolean inIntegrationVendorPackage = javaClass
+                        .getPackageName()
                         .matches("^de\\.tum\\.cit\\.aet\\.hephaestus\\.integration\\.[a-z]+\\..*");
 
                     boolean inAdapterPackage =

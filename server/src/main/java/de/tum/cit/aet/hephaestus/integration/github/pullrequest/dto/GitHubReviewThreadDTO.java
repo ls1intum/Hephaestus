@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.github.pullrequest.dto;
 
+import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequestReviewCommentConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequestReviewThread;
-import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import org.springframework.lang.Nullable;
 
 /**

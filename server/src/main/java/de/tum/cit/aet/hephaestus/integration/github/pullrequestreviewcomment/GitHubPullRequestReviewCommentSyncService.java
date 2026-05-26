@@ -11,8 +11,6 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -24,6 +22,12 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubRepositoryNameP
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
+import de.tum.cit.aet.hephaestus.integration.github.pullrequest.dto.GitHubReviewThreadDTO;
+import de.tum.cit.aet.hephaestus.integration.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO;
+import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHCommentAuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHDiffSide;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPageInfo;
@@ -33,14 +37,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequ
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHPullRequestReviewThreadConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHUser;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.github.pullrequest.dto.GitHubReviewThreadDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.integration.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
-import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;

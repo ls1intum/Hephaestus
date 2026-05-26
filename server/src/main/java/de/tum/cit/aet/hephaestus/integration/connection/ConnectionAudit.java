@@ -31,7 +31,7 @@ import org.springframework.lang.Nullable;
     name = "connection_audit",
     uniqueConstraints = @UniqueConstraint(
         name = "uq_connection_audit_idempotency",
-        columnNames = {"connection_id", "event_type", "correlation_id"}
+        columnNames = { "connection_id", "event_type", "correlation_id" }
     )
 )
 public class ConnectionAudit {
@@ -77,13 +77,18 @@ public class ConnectionAudit {
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private Instant occurredAt;
 
-    protected ConnectionAudit() {
-    }
+    protected ConnectionAudit() {}
 
-    public ConnectionAudit(Connection connection, String eventType,
-                           @Nullable IntegrationState fromState, @Nullable IntegrationState toState,
-                           String actorKind, @Nullable String actorRef,
-                           @Nullable String correlationId, @Nullable String detail) {
+    public ConnectionAudit(
+        Connection connection,
+        String eventType,
+        @Nullable IntegrationState fromState,
+        @Nullable IntegrationState toState,
+        String actorKind,
+        @Nullable String actorRef,
+        @Nullable String correlationId,
+        @Nullable String detail
+    ) {
         this.connection = connection;
         this.eventType = eventType;
         this.fromState = fromState;
@@ -94,14 +99,48 @@ public class ConnectionAudit {
         this.detail = detail;
     }
 
-    public Long getId() { return id; }
-    public Connection getConnection() { return connection; }
-    public String getEventType() { return eventType; }
-    @Nullable public IntegrationState getFromState() { return fromState; }
-    @Nullable public IntegrationState getToState() { return toState; }
-    public String getActorKind() { return actorKind; }
-    @Nullable public String getActorRef() { return actorRef; }
-    @Nullable public String getCorrelationId() { return correlationId; }
-    @Nullable public String getDetail() { return detail; }
-    public Instant getOccurredAt() { return occurredAt; }
+    public Long getId() {
+        return id;
+    }
+
+    public Connection getConnection() {
+        return connection;
+    }
+
+    public String getEventType() {
+        return eventType;
+    }
+
+    @Nullable
+    public IntegrationState getFromState() {
+        return fromState;
+    }
+
+    @Nullable
+    public IntegrationState getToState() {
+        return toState;
+    }
+
+    public String getActorKind() {
+        return actorKind;
+    }
+
+    @Nullable
+    public String getActorRef() {
+        return actorRef;
+    }
+
+    @Nullable
+    public String getCorrelationId() {
+        return correlationId;
+    }
+
+    @Nullable
+    public String getDetail() {
+        return detail;
+    }
+
+    public Instant getOccurredAt() {
+        return occurredAt;
+    }
 }

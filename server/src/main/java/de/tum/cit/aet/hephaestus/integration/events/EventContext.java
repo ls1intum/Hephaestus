@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.events;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import java.time.Instant;
 import java.util.UUID;
@@ -24,7 +24,6 @@ public record EventContext(
     @NonNull String correlationId,
     @Nullable GitProviderType providerType
 ) {
-
     private static final Logger log = LoggerFactory.getLogger(EventContext.class);
 
     /**

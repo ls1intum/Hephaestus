@@ -4,10 +4,10 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
-import de.tum.cit.aet.hephaestus.integration.spi.NatsSubscriptionProvider;
-import de.tum.cit.aet.hephaestus.integration.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.cit.aet.hephaestus.integration.consumer.exception.NatsConnectionException;
 import de.tum.cit.aet.hephaestus.integration.handler.IntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.spi.NatsSubscriptionProvider;
+import de.tum.cit.aet.hephaestus.integration.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.JetStreamApiException;
@@ -184,7 +184,8 @@ public class IntegrationNatsConsumer {
             stats.setNatsConnectionStatus("FAILED_BOOT");
             log.error(
                 "Integration NATS consumer failed to connect after {} attempts; health indicator will report DOWN",
-                MAX_RECONNECT_ATTEMPTS, e
+                MAX_RECONNECT_ATTEMPTS,
+                e
             );
             return;
         }
@@ -319,11 +320,7 @@ public class IntegrationNatsConsumer {
                 }
                 String[] newSubjects = buildScopeSubjects(infoOpt.get());
                 existing.updateSubjects(newSubjects);
-                log.info(
-                    "Updated scope consumer subjects: scopeId={}, subjectCount={}",
-                    scopeId,
-                    newSubjects.length
-                );
+                log.info("Updated scope consumer subjects: scopeId={}, subjectCount={}", scopeId, newSubjects.length);
             } catch (Exception e) {
                 log.error("Failed to update scope consumer: scopeId={}", scopeId, e);
             }

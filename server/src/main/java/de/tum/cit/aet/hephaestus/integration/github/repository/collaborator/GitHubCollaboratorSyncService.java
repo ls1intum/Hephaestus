@@ -9,7 +9,6 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -21,6 +20,9 @@ import de.tum.cit.aet.hephaestus.integration.github.common.GitHubRepositoryNameP
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.github.common.GraphQlConnectionOverflowDetector;
+import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRepositoryCollaboratorConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRepositoryCollaboratorEdge;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRepositoryPermission;
@@ -29,8 +31,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository
 import de.tum.cit.aet.hephaestus.integration.scm.repository.collaborator.RepositoryCollaborator;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.collaborator.RepositoryCollaboratorRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
-import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
-import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;

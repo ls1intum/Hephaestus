@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionAudit;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionAuditRepository;
@@ -14,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService.TransitionRequest;
 import de.tum.cit.aet.hephaestus.integration.connection.CredentialBundleConverter;
+import de.tum.cit.aet.hephaestus.integration.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
@@ -42,11 +42,20 @@ import org.mockito.MockitoAnnotations;
 @DisplayName("ConnectionAdminService — unit")
 class ConnectionAdminServiceTest extends BaseUnitTest {
 
-    @Mock private ConnectionRepository connectionRepository;
-    @Mock private ConnectionAuditRepository auditRepository;
-    @Mock private ConnectionService connectionService;
-    @Mock private WorkspaceRepository workspaceRepository;
-    @Mock private IntegrationManifestRegistry manifests;
+    @Mock
+    private ConnectionRepository connectionRepository;
+
+    @Mock
+    private ConnectionAuditRepository auditRepository;
+
+    @Mock
+    private ConnectionService connectionService;
+
+    @Mock
+    private WorkspaceRepository workspaceRepository;
+
+    @Mock
+    private IntegrationManifestRegistry manifests;
 
     private CredentialBundleConverter credentialConverter;
     private ConnectionAdminService service;
@@ -57,7 +66,11 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
         // Real converter so the encrypt/round-trip behaviour is exercised end-to-end.
         credentialConverter = new CredentialBundleConverter("a".repeat(32), "dev");
         service = new ConnectionAdminService(
-            connectionRepository, auditRepository, connectionService, workspaceRepository, manifests,
+            connectionRepository,
+            auditRepository,
+            connectionService,
+            workspaceRepository,
+            manifests,
             credentialConverter
         );
     }
@@ -76,8 +89,12 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
         long workspaceId = 7L;
         Workspace ws = Mockito.mock(Workspace.class);
         when(ws.getId()).thenReturn(workspaceId);
-        Connection c = new Connection(ws, IntegrationKind.GITHUB, "100",
-            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
+        Connection c = new Connection(
+            ws,
+            IntegrationKind.GITHUB,
+            "100",
+            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of())
+        );
         when(connectionRepository.findById(42L)).thenReturn(Optional.of(c));
 
         assertThat(service.findInWorkspaceOrThrow(workspaceId, 42L)).isSameAs(c);
@@ -87,8 +104,7 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     @DisplayName("findInWorkspaceOrThrow 404s on missing id")
     void findInWorkspaceOrThrow_missingId_throws() {
         when(connectionRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.findInWorkspaceOrThrow(7L, 99L))
-            .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> service.findInWorkspaceOrThrow(7L, 99L)).isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
@@ -96,21 +112,28 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     void findInWorkspaceOrThrow_wrongWorkspace_throws() {
         Workspace ws = Mockito.mock(Workspace.class);
         when(ws.getId()).thenReturn(1L);
-        Connection c = new Connection(ws, IntegrationKind.GITHUB, "100",
-            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
+        Connection c = new Connection(
+            ws,
+            IntegrationKind.GITHUB,
+            "100",
+            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of())
+        );
         when(connectionRepository.findById(42L)).thenReturn(Optional.of(c));
 
         // requested workspace 999 != actual 1
-        assertThatThrownBy(() -> service.findInWorkspaceOrThrow(999L, 42L))
-            .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> service.findInWorkspaceOrThrow(999L, 42L)).isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
     @DisplayName("auditForConnection applies the page cap")
     void auditForConnection_appliesLimit() {
         Workspace ws = Mockito.mock(Workspace.class);
-        Connection c = new Connection(ws, IntegrationKind.GITHUB, "100",
-            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
+        Connection c = new Connection(
+            ws,
+            IntegrationKind.GITHUB,
+            "100",
+            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of())
+        );
         List<ConnectionAudit> entries = List.of(
             new ConnectionAudit(c, "A", null, IntegrationState.ACTIVE, "ADMIN", "x", "1", null),
             new ConnectionAudit(c, "B", IntegrationState.ACTIVE, IntegrationState.SUSPENDED, "ADMIN", "x", "2", null),
@@ -134,12 +157,11 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
             setId(saved, 99L);
             return saved;
         });
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
-            .thenAnswer(inv -> {
-                Connection conn = inv.getArgument(0);
-                conn.setState(IntegrationState.ACTIVE);
-                return conn;
-            });
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+            Connection conn = inv.getArgument(0);
+            conn.setState(IntegrationState.ACTIVE);
+            return conn;
+        });
 
         Connection result = service.createInlineConnection(
             workspaceId,
@@ -160,8 +182,7 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
         assertThat(result.getCredentialsAlg()).isEqualTo(CredentialBundleConverter.ALGORITHM_TAG);
         assertThat(result.getCredentialsEncrypted()).isNotNull();
         // Round-trip the freshly-encrypted blob to prove it's not a placeholder.
-        assertThat(result.credentials(credentialConverter))
-            .contains(new BearerToken("glpat-test", null));
+        assertThat(result.credentials(credentialConverter)).contains(new BearerToken("glpat-test", null));
 
         ArgumentCaptor<TransitionRequest> req = ArgumentCaptor.forClass(TransitionRequest.class);
         Mockito.verify(connectionService).transition(any(Connection.class), req.capture());
@@ -175,10 +196,16 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     @DisplayName("createInlineConnection EntityNotFoundException on missing workspace")
     void createInlineConnection_missingWorkspace_throws() {
         when(workspaceRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.createInlineConnection(
-            99L, IntegrationKind.GITLAB, "x",
-            new BearerToken("t", null), Map.of(), "alice"
-        )).isInstanceOf(EntityNotFoundException.class);
+        assertThatThrownBy(() ->
+            service.createInlineConnection(
+                99L,
+                IntegrationKind.GITLAB,
+                "x",
+                new BearerToken("t", null),
+                Map.of(),
+                "alice"
+            )
+        ).isInstanceOf(EntityNotFoundException.class);
     }
 
     private static void setId(Connection c, long id) {

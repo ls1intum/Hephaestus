@@ -18,7 +18,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Consumed pre-workspace at OAuth callback")
 public interface OAuthStateNonceRepository extends JpaRepository<OAuthStateNonce, String> {
-
     /**
      * Atomically claim a nonce. The {@code consumed_at IS NULL} guard ensures
      * exactly one caller wins even under concurrent OAuth callback floods (a
@@ -29,10 +28,7 @@ public interface OAuthStateNonceRepository extends JpaRepository<OAuthStateNonce
      * @return 1 if this caller flipped the row from unconsumed → consumed; 0 otherwise.
      */
     @Modifying
-    @Query(
-        "UPDATE OAuthStateNonce n SET n.consumedAt = :now "
-            + "WHERE n.nonce = :nonce AND n.consumedAt IS NULL"
-    )
+    @Query("UPDATE OAuthStateNonce n SET n.consumedAt = :now " + "WHERE n.nonce = :nonce AND n.consumedAt IS NULL")
     int markConsumed(@Param("nonce") String nonce, @Param("now") Instant now);
 
     /**

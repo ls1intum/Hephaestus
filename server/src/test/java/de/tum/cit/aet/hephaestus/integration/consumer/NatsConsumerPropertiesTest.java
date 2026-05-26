@@ -27,7 +27,11 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
         @DisplayName("null poison block is replaced by the canonical defaults")
         void nullPoisonBlockUsesDefaults() {
             NatsConsumerProperties props = new NatsConsumerProperties(
-                Duration.ofMinutes(5), 500, Duration.ofSeconds(2), null);
+                Duration.ofMinutes(5),
+                500,
+                Duration.ofSeconds(2),
+                null
+            );
 
             assertThat(props.poison()).isNotNull();
             assertThat(props.poison().maxRedeliver()).isEqualTo(10);
@@ -39,9 +43,16 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
         @DisplayName("explicit poison block is preserved verbatim")
         void explicitPoisonBlockKept() {
             NatsConsumerProperties.PoisonProperties custom = new NatsConsumerProperties.PoisonProperties(
-                3, Duration.ofSeconds(5), Duration.ofMinutes(1));
+                3,
+                Duration.ofSeconds(5),
+                Duration.ofMinutes(1)
+            );
             NatsConsumerProperties props = new NatsConsumerProperties(
-                Duration.ofMinutes(5), 500, Duration.ofSeconds(2), custom);
+                Duration.ofMinutes(5),
+                500,
+                Duration.ofSeconds(2),
+                custom
+            );
 
             assertThat(props.poison()).isSameAs(custom);
         }
@@ -55,8 +66,10 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
         static class TestConfiguration {}
 
         private ApplicationContextRunner runner() {
-            return new ApplicationContextRunner()
-                .withUserConfiguration(TestConfiguration.class, ValidationAutoConfiguration.class);
+            return new ApplicationContextRunner().withUserConfiguration(
+                TestConfiguration.class,
+                ValidationAutoConfiguration.class
+            );
         }
 
         @Test

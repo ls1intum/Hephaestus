@@ -32,10 +32,7 @@ class DiffNotePoster {
     private final PullRequestCommentPoster commentPoster;
     private final Map<IntegrationKind, InlineFindingChannel> channels;
 
-    DiffNotePoster(
-        PullRequestCommentPoster commentPoster,
-        List<InlineFindingChannel> inlineFindingChannels
-    ) {
+    DiffNotePoster(PullRequestCommentPoster commentPoster, List<InlineFindingChannel> inlineFindingChannels) {
         this.commentPoster = commentPoster;
         EnumMap<IntegrationKind, InlineFindingChannel> map = new EnumMap<>(IntegrationKind.class);
         for (InlineFindingChannel channel : inlineFindingChannels) {
@@ -74,7 +71,8 @@ class DiffNotePoster {
         InlineFindingChannel channel = channels.get(kind);
         if (channel == null) {
             throw new JobDeliveryException(
-                "No InlineFindingChannel wired for kind " + kind +
+                "No InlineFindingChannel wired for kind " +
+                    kind +
                     " — check that the vendor integration is enabled and its channel bean is registered"
             );
         }

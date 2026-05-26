@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.connection.api;
 
-import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService.TransitionRequest;
@@ -31,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Administrative REST surface for managing per-workspace
@@ -67,41 +67,50 @@ public class ConnectionController {
     private final ObjectMapper objectMapper;
     private final Map<IntegrationKind, ConnectionStrategy> strategies;
 
-    public ConnectionController(ConnectionAdminService admin,
-                                ConnectionService connectionService,
-                                ObjectMapper objectMapper,
-                                List<ConnectionStrategy> strategyBeans) {
+    public ConnectionController(
+        ConnectionAdminService admin,
+        ConnectionService connectionService,
+        ObjectMapper objectMapper,
+        List<ConnectionStrategy> strategyBeans
+    ) {
         this.admin = admin;
         this.connectionService = connectionService;
         this.objectMapper = objectMapper;
-        this.strategies = strategyBeans.stream().collect(Collectors.toUnmodifiableMap(
-            ConnectionStrategy::kind,
-            s -> s,
-            (a, b) -> {
-                throw new IllegalStateException(
-                    "Duplicate ConnectionStrategy for kind=" + a.kind() + ": "
-                        + a.getClass() + " vs " + b.getClass()
-                );
-            }
-        ));
+        this.strategies = strategyBeans
+            .stream()
+            .collect(
+                Collectors.toUnmodifiableMap(
+                    ConnectionStrategy::kind,
+                    s -> s,
+                    (a, b) -> {
+                        throw new IllegalStateException(
+                            "Duplicate ConnectionStrategy for kind=" +
+                                a.kind() +
+                                ": " +
+                                a.getClass() +
+                                " vs " +
+                                b.getClass()
+                        );
+                    }
+                )
+            );
     }
-
 
     @GetMapping
     public ResponseEntity<List<ConnectionSummary>> list(@PathVariable Long workspaceId) {
-        List<ConnectionSummary> summaries = admin.listForWorkspace(workspaceId).stream()
+        List<ConnectionSummary> summaries = admin
+            .listForWorkspace(workspaceId)
+            .stream()
             .map(c -> ConnectionSummary.from(c, admin.manifests()))
             .toList();
         return ResponseEntity.ok(summaries);
     }
-
 
     @GetMapping("/{id}")
     public ResponseEntity<ConnectionDetail> read(@PathVariable Long workspaceId, @PathVariable Long id) {
         Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
         return ResponseEntity.ok(ConnectionDetail.from(connection, admin.manifests(), objectMapper));
     }
-
 
     @PostMapping
     public ResponseEntity<InitiateConnectionResponse> initiate(
@@ -115,16 +124,18 @@ public class ConnectionController {
 
         ConnectionStrategy strategy = strategies.get(body.kind());
         if (strategy == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "No ConnectionStrategy registered for kind=" + body.kind());
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "No ConnectionStrategy registered for kind=" + body.kind()
+            );
         }
 
         Map<String, String> userInput = body.userInput() == null ? Map.of() : body.userInput();
         ConnectInitiation initiation;
         try {
-            initiation = strategy.initiate(new ConnectionStrategy.InitiateRequest(
-                workspaceId, body.kind(), userInput, body.redirectAfter()
-            ));
+            initiation = strategy.initiate(
+                new ConnectionStrategy.InitiateRequest(workspaceId, body.kind(), userInput, body.redirectAfter())
+            );
         } catch (IllegalArgumentException e) {
             // Strategy-level validation failure (e.g. missing 'pat' for GitLab) → 400.
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
@@ -136,14 +147,17 @@ public class ConnectionController {
             );
             case ConnectInitiation.AcceptInline inline -> {
                 Connection connection = admin.createInlineConnection(
-                    workspaceId, body.kind(), inline.instanceKey(),
-                    inline.credentials(), userInput, actorRef(authentication)
+                    workspaceId,
+                    body.kind(),
+                    inline.instanceKey(),
+                    inline.credentials(),
+                    userInput,
+                    actorRef(authentication)
                 );
                 yield ResponseEntity.ok(new InitiateConnectionResponse.Linked(connection.getId()));
             }
         };
     }
-
 
     @PostMapping("/{id}/suspend")
     public ResponseEntity<ConnectionSummary> suspend(
@@ -154,14 +168,17 @@ public class ConnectionController {
     ) {
         Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
         String reason = body == null ? null : body.reason();
-        connection = connectionService.transition(connection, new TransitionRequest(
-            IntegrationState.SUSPENDED,
-            "SUSPEND",
-            "ADMIN",
-            actorRef(authentication),
-            "suspend-" + connection.getId() + "-" + UUID.randomUUID(),
-            reason
-        ));
+        connection = connectionService.transition(
+            connection,
+            new TransitionRequest(
+                IntegrationState.SUSPENDED,
+                "SUSPEND",
+                "ADMIN",
+                actorRef(authentication),
+                "suspend-" + connection.getId() + "-" + UUID.randomUUID(),
+                reason
+            )
+        );
         return ResponseEntity.ok(ConnectionSummary.from(connection, admin.manifests()));
     }
 
@@ -174,17 +191,19 @@ public class ConnectionController {
     ) {
         Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
         String reason = body == null ? null : body.reason();
-        connection = connectionService.transition(connection, new TransitionRequest(
-            IntegrationState.ACTIVE,
-            "REACTIVATE",
-            "ADMIN",
-            actorRef(authentication),
-            "reactivate-" + connection.getId() + "-" + UUID.randomUUID(),
-            reason
-        ));
+        connection = connectionService.transition(
+            connection,
+            new TransitionRequest(
+                IntegrationState.ACTIVE,
+                "REACTIVATE",
+                "ADMIN",
+                actorRef(authentication),
+                "reactivate-" + connection.getId() + "-" + UUID.randomUUID(),
+                reason
+            )
+        );
         return ResponseEntity.ok(ConnectionSummary.from(connection, admin.manifests()));
     }
-
 
     @PostMapping("/{id}/disconnect")
     public ResponseEntity<Void> disconnect(
@@ -202,52 +221,56 @@ public class ConnectionController {
             try {
                 strategy.revoke(connection.toRef());
             } catch (RuntimeException e) {
-                log.warn("Vendor-side revoke failed for connection={} kind={}: {} — proceeding with local UNINSTALLED transition",
-                    connection.getId(), connection.getKind(), e.toString());
+                log.warn(
+                    "Vendor-side revoke failed for connection={} kind={}: {} — proceeding with local UNINSTALLED transition",
+                    connection.getId(),
+                    connection.getKind(),
+                    e.toString()
+                );
             }
         } else {
-            log.warn("No ConnectionStrategy registered for kind={} on disconnect of connection={} — local transition only",
-                connection.getKind(), connection.getId());
+            log.warn(
+                "No ConnectionStrategy registered for kind={} on disconnect of connection={} — local transition only",
+                connection.getKind(),
+                connection.getId()
+            );
         }
 
-        connectionService.transition(connection, new TransitionRequest(
-            IntegrationState.UNINSTALLED,
-            "DISCONNECT",
-            "ADMIN",
-            actorRef(authentication),
-            "disconnect-" + connection.getId() + "-" + UUID.randomUUID(),
-            null
-        ));
+        connectionService.transition(
+            connection,
+            new TransitionRequest(
+                IntegrationState.UNINSTALLED,
+                "DISCONNECT",
+                "ADMIN",
+                actorRef(authentication),
+                "disconnect-" + connection.getId() + "-" + UUID.randomUUID(),
+                null
+            )
+        );
         return ResponseEntity.noContent().build();
     }
 
-
     @GetMapping("/{id}/audit")
-    public ResponseEntity<List<ConnectionAuditEntry>> audit(
-        @PathVariable Long workspaceId,
-        @PathVariable Long id
-    ) {
+    public ResponseEntity<List<ConnectionAuditEntry>> audit(@PathVariable Long workspaceId, @PathVariable Long id) {
         // findInWorkspaceOrThrow enforces the workspace scope before we expose audit history,
         // so cross-workspace audit reads return 404 rather than leaking a partial trail.
         admin.findInWorkspaceOrThrow(workspaceId, id);
-        List<ConnectionAuditEntry> entries = admin.auditForConnection(id, AUDIT_PAGE_CAP).stream()
+        List<ConnectionAuditEntry> entries = admin
+            .auditForConnection(id, AUDIT_PAGE_CAP)
+            .stream()
             .map(ConnectionAuditEntry::from)
             .toList();
         return ResponseEntity.ok(entries);
     }
-
 
     private static String actorRef(@Nullable Authentication authentication) {
         if (authentication == null || authentication.getName() == null) return "anonymous";
         return authentication.getName();
     }
 
-
     /** Lifecycle-action body — reason is optional, applied to both suspend and reactivate. */
     @io.swagger.v3.oas.annotations.media.Schema(name = "ReasonRequest")
-    public record ReasonRequest(@Nullable String reason) {
-    }
-
+    public record ReasonRequest(@Nullable String reason) {}
 
     @ExceptionHandler(NoSuchElementException.class)
     ResponseEntity<Map<String, String>> handleNotFound(NoSuchElementException e) {
@@ -270,7 +293,8 @@ public class ConnectionController {
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<Map<String, String>> handleDbConflict(DataIntegrityViolationException e) {
         log.warn("Connection DB conflict (409): {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(Map.of("error", "Conflict: " + e.getMostSpecificCause().getMessage()));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+            Map.of("error", "Conflict: " + e.getMostSpecificCause().getMessage())
+        );
     }
 }

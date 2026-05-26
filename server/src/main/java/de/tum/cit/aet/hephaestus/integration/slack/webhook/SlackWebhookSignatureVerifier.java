@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.slack.webhook;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.spi.WebhookSecretSource.SecretLookup;
@@ -21,6 +19,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Slack webhook signature verification.
@@ -102,11 +102,11 @@ public class SlackWebhookSignatureVerifier implements WebhookSignatureVerifier {
         }
 
         // 4. Secret.
-        Optional<byte[]> secret = secretSource.getSecret(
-            new SecretLookup(headers)
-        );
+        Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(headers));
         if (secret.isEmpty()) {
-            log.warn("Slack signing secret unconfigured — set hephaestus.slack.signing-secret or hephaestus.webhook.secret");
+            log.warn(
+                "Slack signing secret unconfigured — set hephaestus.slack.signing-secret or hephaestus.webhook.secret"
+            );
             return new VerificationResult.Invalid("signing secret unconfigured");
         }
 

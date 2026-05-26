@@ -49,7 +49,11 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @DisplayName("GitHubAppConfig round-trips through JSONB")
     void gitHubAppConfig_roundTrips() {
         ConnectionConfig.GitHubAppConfig original = new ConnectionConfig.GitHubAppConfig(
-            42L, "acme-org", "https://ghes.example.com", Set.of("issues", "pulls"));
+            42L,
+            "acme-org",
+            "https://ghes.example.com",
+            Set.of("issues", "pulls")
+        );
         Long id = persistAndClear(IntegrationKind.GITHUB, "installation-42", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -67,7 +71,10 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @DisplayName("GitHubPatConfig round-trips through JSONB")
     void gitHubPatConfig_roundTrips() {
         ConnectionConfig.GitHubPatConfig original = new ConnectionConfig.GitHubPatConfig(
-            "acme-org", null, Set.of("repos"));
+            "acme-org",
+            null,
+            Set.of("repos")
+        );
         Long id = persistAndClear(IntegrationKind.GITHUB, "pat", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -84,8 +91,12 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @DisplayName("GitLabConfig PLAINTEXT round-trips through JSONB")
     void gitLabConfig_plaintext_roundTrips() {
         ConnectionConfig.GitLabConfig original = new ConnectionConfig.GitLabConfig(
-            "https://gitlab.example.com", 1234L, 5678L,
-            ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of("merge_requests"));
+            "https://gitlab.example.com",
+            1234L,
+            5678L,
+            ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+            Set.of("merge_requests")
+        );
         Long id = persistAndClear(IntegrationKind.GITLAB, "https://gitlab.example.com", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -104,8 +115,12 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @DisplayName("GitLabConfig WHSEC signing mode round-trips through JSONB")
     void gitLabConfig_whsec_roundTrips() {
         ConnectionConfig.GitLabConfig original = new ConnectionConfig.GitLabConfig(
-            "https://gitlab.example.com", null, null,
-            ConnectionConfig.GitLabConfig.SigningMode.WHSEC, Set.of());
+            "https://gitlab.example.com",
+            null,
+            null,
+            ConnectionConfig.GitLabConfig.SigningMode.WHSEC,
+            Set.of()
+        );
         Long id = persistAndClear(IntegrationKind.GITLAB, "https://gitlab.example.com/whsec", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -117,7 +132,12 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @DisplayName("SlackConfig round-trips through JSONB")
     void slackConfig_roundTrips() {
         ConnectionConfig.SlackConfig original = new ConnectionConfig.SlackConfig(
-            "T123", "Acme Slack", "C456", "Engineering", Set.of("leaderboard"));
+            "T123",
+            "Acme Slack",
+            "C456",
+            "Engineering",
+            Set.of("leaderboard")
+        );
         Long id = persistAndClear(IntegrationKind.SLACK, "T123", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -136,7 +156,10 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @DisplayName("OutlineConfig round-trips through JSONB")
     void outlineConfig_roundTrips() {
         ConnectionConfig.OutlineConfig original = new ConnectionConfig.OutlineConfig(
-            "https://outline.example.com", "ws-ext-1", Set.of("documents"));
+            "https://outline.example.com",
+            "ws-ext-1",
+            Set.of("documents")
+        );
         Long id = persistAndClear(IntegrationKind.OUTLINE, "https://outline.example.com", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -152,24 +175,27 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Connection.@PrePersist rejects kind/config subtype mismatch")
     void prePersist_rejectsKindConfigMismatch() {
-        ConnectionConfig.GitHubAppConfig wrong = new ConnectionConfig.GitHubAppConfig(
-            1L, "acme", null, Set.of());
+        ConnectionConfig.GitHubAppConfig wrong = new ConnectionConfig.GitHubAppConfig(1L, "acme", null, Set.of());
         Connection bad = new Connection(workspace, IntegrationKind.GITLAB, "instance-x", wrong);
         // Spring wraps the @PrePersist IllegalStateException in InvalidDataAccessApiUsageException.
         assertThatThrownBy(() -> {
             connectionRepository.save(bad);
             entityManager.flush();
-        }).hasRootCauseInstanceOf(IllegalStateException.class)
-          .hasMessageContaining("GITLAB")
-          .hasMessageContaining("GitHubAppConfig");
+        })
+            .hasRootCauseInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("GITLAB")
+            .hasMessageContaining("GitHubAppConfig");
     }
 
     @Test
     @DisplayName("@Version increments on update")
     void version_incrementsOnUpdate() {
         Connection conn = new Connection(
-            workspace, IntegrationKind.GITHUB, "v-test",
-            new ConnectionConfig.GitHubPatConfig("acme", null, Set.of()));
+            workspace,
+            IntegrationKind.GITHUB,
+            "v-test",
+            new ConnectionConfig.GitHubPatConfig("acme", null, Set.of())
+        );
         Connection saved = connectionRepository.save(conn);
         entityManager.flush();
         Long v0 = saved.getVersion();

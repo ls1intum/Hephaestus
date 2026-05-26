@@ -63,8 +63,8 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
 
         assertThat(reintroduced)
             .as(
-                "Legacy per-kind GitHub/GitLab message-handler registries are deleted; "
-                    + "re-introducing them under any of these FQNs splits the routing surface."
+                "Legacy per-kind GitHub/GitLab message-handler registries are deleted; " +
+                    "re-introducing them under any of these FQNs splits the routing surface."
             )
             .isEmpty();
     }
@@ -101,10 +101,10 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
 
         assertThat(violations)
             .as(
-                "Every concrete *MessageHandler class under integration/<kind>/ must extend "
-                    + "AbstractIntegrationMessageHandler or implement IntegrationMessageHandler "
-                    + "directly. Anything else cannot be picked up by the unified registry and "
-                    + "would silently NOT receive messages."
+                "Every concrete *MessageHandler class under integration/<kind>/ must extend " +
+                    "AbstractIntegrationMessageHandler or implement IntegrationMessageHandler " +
+                    "directly. Anything else cannot be picked up by the unified registry and " +
+                    "would silently NOT receive messages."
             )
             .isEmpty();
     }
@@ -122,10 +122,10 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
 
         assertThat(count)
             .as(
-                "The unified IntegrationMessageHandlerRegistry must carry the full handler "
-                    + "fleet. 30 is the floor (24 GitHub + 8 GitLab − 2 slack/whitespace) "
-                    + "that survives normal additions/removals; anything below means the "
-                    + "registry is silently empty and traffic falls to ACK-as-no-op."
+                "The unified IntegrationMessageHandlerRegistry must carry the full handler " +
+                    "fleet. 30 is the floor (24 GitHub + 8 GitLab − 2 slack/whitespace) " +
+                    "that survives normal additions/removals; anything below means the " +
+                    "registry is silently empty and traffic falls to ACK-as-no-op."
             )
             .isGreaterThanOrEqualTo(30);
     }

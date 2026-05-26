@@ -24,7 +24,6 @@ import org.springframework.lang.Nullable;
  * </ul>
  */
 public interface IntegrationLifecycleListener {
-
     IntegrationKind kind();
 
     /** Vendor confirmed install. Default no-op so vendors that don't react can stay
@@ -42,42 +41,24 @@ public interface IntegrationLifecycleListener {
     /** Vendor-side tenant rename. Default no-op — display-name only, no integrity impact. */
     default void onTenantRenamed(IntegrationRef ref, String oldName, String newName) {}
 
-    record InstanceProvisioned(
-        IntegrationRef ref,
-        TenantAccount account,
-        List<ScopedResource> initialResources
-    ) {
-    }
+    record InstanceProvisioned(IntegrationRef ref, TenantAccount account, List<ScopedResource> initialResources) {}
 
-    record TenantAccount(
-        String externalId,
-        String displayName,
-        AccountKind kind,
-        @Nullable String avatarUrl
-    ) {
-    }
+    record TenantAccount(String externalId, String displayName, AccountKind kind, @Nullable String avatarUrl) {}
 
     enum AccountKind {
         ORGANIZATION,
         USER,
-        TEAM_WORKSPACE
+        TEAM_WORKSPACE,
     }
 
-    record ScopedResource(
-        String externalId,
-        String displayName,
-        ResourceKind kind,
-        boolean isPrivate
-    ) {
-    }
+    record ScopedResource(String externalId, String displayName, ResourceKind kind, boolean isPrivate) {}
 
     enum ResourceKind {
         REPOSITORY,
         CHANNEL,
         COLLECTION,
-        NAMESPACE
+        NAMESPACE,
     }
 
-    record ScopeDelta(List<ScopedResource> added, List<String> removedExternalIds) {
-    }
+    record ScopeDelta(List<ScopedResource> added, List<String> removedExternalIds) {}
 }

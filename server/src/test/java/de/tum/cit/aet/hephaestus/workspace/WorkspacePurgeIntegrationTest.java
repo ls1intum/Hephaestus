@@ -289,18 +289,20 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             // encrypted PAT blob and is ACTIVE.
             var connections = connectionRepository.findByWorkspaceId(workspaceId);
             assertThat(connections).isNotEmpty();
-            assertThat(connections).anyMatch(c ->
-                c.getKind() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB
-                    && c.getState() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.ACTIVE
-                    && c.getCredentialsEncrypted() != null
+            assertThat(connections).anyMatch(
+                c ->
+                    c.getKind() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB &&
+                    c.getState() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.ACTIVE &&
+                    c.getCredentialsEncrypted() != null
             );
 
             workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
 
             // Post-purge: every Connection is UNINSTALLED and its credential blob is null.
             var postPurge = connectionRepository.findByWorkspaceId(workspaceId);
-            assertThat(postPurge)
-                .allMatch(c -> c.getState() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.UNINSTALLED);
+            assertThat(postPurge).allMatch(
+                c -> c.getState() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.UNINSTALLED
+            );
             assertThat(postPurge).allMatch(c -> c.getCredentialsEncrypted() == null);
             assertThat(postPurge).allMatch(c -> c.getCredentialsAlg() == null);
         }

@@ -52,11 +52,7 @@ public class OAuthStateNonceCleanupJob {
 
     /** Runs daily at 04:00 server time. */
     @Scheduled(cron = "0 0 4 * * *")
-    @SchedulerLock(
-        name = "oauth-state-nonce-cleanup",
-        lockAtMostFor = "PT10M",
-        lockAtLeastFor = "PT1M"
-    )
+    @SchedulerLock(name = "oauth-state-nonce-cleanup", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     @Transactional
     public void cleanupExpired() {
         Instant cutoff = Instant.now().minus(retention);
@@ -64,7 +60,11 @@ public class OAuthStateNonceCleanupJob {
         if (deleted > 0) {
             prunedCounter.increment(deleted);
         }
-        log.info("OAuthStateNonceCleanupJob: pruned {} nonces older than {} (retention={})",
-            deleted, cutoff, retention);
+        log.info(
+            "OAuthStateNonceCleanupJob: pruned {} nonces older than {} (retention={})",
+            deleted,
+            cutoff,
+            retention
+        );
     }
 }

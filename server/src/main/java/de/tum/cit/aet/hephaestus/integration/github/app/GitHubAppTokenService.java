@@ -7,9 +7,9 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.tum.cit.aet.hephaestus.integration.github.GitHubProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationSuspendedException;
-import de.tum.cit.aet.hephaestus.integration.github.GitHubProperties;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -474,9 +474,7 @@ public class GitHubAppTokenService {
                 )
             );
         } catch (RuntimeException e) {
-            throw new UncheckedIOException(
-                new IOException("GitHub error deleting installation " + installationId, e)
-            );
+            throw new UncheckedIOException(new IOException("GitHub error deleting installation " + installationId, e));
         } finally {
             // Drop local caches no matter what — even on failure the next call will
             // re-mint; on success they're now wrong.

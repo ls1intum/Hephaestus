@@ -2,14 +2,14 @@ package de.tum.cit.aet.hephaestus.integration.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.github.pullrequest.GitHubPullRequestSyncService;
+import de.tum.cit.aet.hephaestus.integration.github.pullrequestreview.GitHubPullRequestReviewSyncService;
+import de.tum.cit.aet.hephaestus.integration.github.repository.GitHubRepositorySyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.integration.github.pullrequest.GitHubPullRequestSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReviewRepository;
-import de.tum.cit.aet.hephaestus.integration.github.pullrequestreview.GitHubPullRequestReviewSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.github.repository.GitHubRepositorySyncService;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
 import java.time.Instant;
 import java.util.List;

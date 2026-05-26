@@ -51,17 +51,16 @@ class ScopeConsumerTest {
 
         @Test
         void rejectsNullStreamName() {
-            assertThatThrownBy(
-                () ->
-                    new ScopeConsumer(
-                        SCOPE_ID,
-                        CONSUMER_NAME,
-                        null,
-                        mock(ConsumerContext.class),
-                        mock(StreamContext.class),
-                        SUBJECTS,
-                        msg -> {}
-                    )
+            assertThatThrownBy(() ->
+                new ScopeConsumer(
+                    SCOPE_ID,
+                    CONSUMER_NAME,
+                    null,
+                    mock(ConsumerContext.class),
+                    mock(StreamContext.class),
+                    SUBJECTS,
+                    msg -> {}
+                )
             )
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("streamName");
@@ -69,33 +68,31 @@ class ScopeConsumerTest {
 
         @Test
         void rejectsBlankConsumerName() {
-            assertThatThrownBy(
-                () ->
-                    new ScopeConsumer(
-                        SCOPE_ID,
-                        "  ",
-                        STREAM,
-                        mock(ConsumerContext.class),
-                        mock(StreamContext.class),
-                        SUBJECTS,
-                        msg -> {}
-                    )
+            assertThatThrownBy(() ->
+                new ScopeConsumer(
+                    SCOPE_ID,
+                    "  ",
+                    STREAM,
+                    mock(ConsumerContext.class),
+                    mock(StreamContext.class),
+                    SUBJECTS,
+                    msg -> {}
+                )
             ).isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
         void rejectsNullMessageHandler() {
-            assertThatThrownBy(
-                () ->
-                    new ScopeConsumer(
-                        SCOPE_ID,
-                        CONSUMER_NAME,
-                        STREAM,
-                        mock(ConsumerContext.class),
-                        mock(StreamContext.class),
-                        SUBJECTS,
-                        null
-                    )
+            assertThatThrownBy(() ->
+                new ScopeConsumer(
+                    SCOPE_ID,
+                    CONSUMER_NAME,
+                    STREAM,
+                    mock(ConsumerContext.class),
+                    mock(StreamContext.class),
+                    SUBJECTS,
+                    null
+                )
             )
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("messageHandler");
@@ -181,7 +178,9 @@ class ScopeConsumerTest {
                 SUBJECTS,
                 msg -> {
                     int idx = order.getAndIncrement();
-                    observedOrder[idx] = Integer.parseInt(msg.getSubject().substring(msg.getSubject().lastIndexOf('.') + 1));
+                    observedOrder[idx] = Integer.parseInt(
+                        msg.getSubject().substring(msg.getSubject().lastIndexOf('.') + 1)
+                    );
                     done.countDown();
                 }
             );

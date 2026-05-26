@@ -414,8 +414,9 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         @DisplayName("should resolve GitHub via job.integrationKind and dispatch to GitHub channel")
         void resolvesGithubChannelByJobIntegrationKind() {
             AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            when(githubChannel.postSummary(any(), any()))
-                .thenReturn(new FeedbackChannel.SummaryHandle("IC_comment456"));
+            when(githubChannel.postSummary(any(), any())).thenReturn(
+                new FeedbackChannel.SummaryHandle("IC_comment456")
+            );
 
             String commentId = poster.postComment(job, "Review body", "Summary");
 
@@ -427,8 +428,9 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         @DisplayName("should resolve GitLab via job.integrationKind and dispatch to GitLab channel")
         void resolvesGitlabChannelByJobIntegrationKind() {
             AgentJob job = createTestJob(IntegrationKind.GITLAB);
-            when(gitlabChannel.postSummary(any(), any()))
-                .thenReturn(new FeedbackChannel.SummaryHandle("gid://gitlab/Note/123"));
+            when(gitlabChannel.postSummary(any(), any())).thenReturn(
+                new FeedbackChannel.SummaryHandle("gid://gitlab/Note/123")
+            );
 
             String noteId = poster.postComment(job, "Review body", "Summary");
 
@@ -480,8 +482,9 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         @DisplayName("should throw JobDeliveryException when channel raises FeedbackDeliveryException")
         void wrapsChannelFailures() {
             AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            when(githubChannel.postSummary(any(), any()))
-                .thenThrow(new FeedbackDeliveryException("rate limit critical"));
+            when(githubChannel.postSummary(any(), any())).thenThrow(
+                new FeedbackDeliveryException("rate limit critical")
+            );
 
             assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
                 .isInstanceOf(JobDeliveryException.class)
@@ -494,9 +497,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             FeedbackChannel anotherGithub = mock(FeedbackChannel.class);
             lenient().when(anotherGithub.kind()).thenReturn(IntegrationKind.GITHUB);
 
-            assertThatThrownBy(
-                () -> new PullRequestCommentPoster(List.of(githubChannel, anotherGithub))
-            )
+            assertThatThrownBy(() -> new PullRequestCommentPoster(List.of(githubChannel, anotherGithub)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Duplicate FeedbackChannel for kind GITHUB");
         }
@@ -513,9 +514,9 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             // Validation lives on the per-kind FeedbackChannel SPI. Stub it to reject the
             // malformed input the way GithubFeedbackChannel does; the poster wraps the
             // IllegalArgumentException as a JobDeliveryException.
-            when(githubChannel.formatPullRequestSubjectId("repo-without-owner", 42))
-                .thenThrow(new IllegalArgumentException(
-                    "GitHub repoFullName must be 'owner/repo': repo-without-owner"));
+            when(githubChannel.formatPullRequestSubjectId("repo-without-owner", 42)).thenThrow(
+                new IllegalArgumentException("GitHub repoFullName must be 'owner/repo': repo-without-owner")
+            );
 
             assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
                 .isInstanceOf(JobDeliveryException.class)

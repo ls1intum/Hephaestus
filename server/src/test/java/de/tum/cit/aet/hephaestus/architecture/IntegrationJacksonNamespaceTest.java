@@ -28,10 +28,10 @@ class IntegrationJacksonNamespaceTest extends HephaestusArchitectureTest {
             .dependOnClassesThat()
             .resideInAPackage("com.fasterxml.jackson.databind..")
             .because(
-                "Spring Boot 4 auto-wires tools.jackson.databind.ObjectMapper (Jackson 3). "
-                    + "Jackson 2 databind types must not be reintroduced under integration/. "
-                    + "Annotation imports under com.fasterxml.jackson.annotation.* remain "
-                    + "allowed — that namespace is shared between Jackson 2 and Jackson 3."
+                "Spring Boot 4 auto-wires tools.jackson.databind.ObjectMapper (Jackson 3). " +
+                    "Jackson 2 databind types must not be reintroduced under integration/. " +
+                    "Annotation imports under com.fasterxml.jackson.annotation.* remain " +
+                    "allowed — that namespace is shared between Jackson 2 and Jackson 3."
             );
         rule.check(classes);
     }

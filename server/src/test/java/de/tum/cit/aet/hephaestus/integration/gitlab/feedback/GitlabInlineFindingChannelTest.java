@@ -45,8 +45,7 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     @Test
     @DisplayName("empty findings returns (0, 0)")
     void emptyFindings() {
-        assertThat(channel.postInlineFindings(gitlabTarget(), List.of()))
-            .isEqualTo(new InlineResult(0, 0));
+        assertThat(channel.postInlineFindings(gitlabTarget(), List.of())).isEqualTo(new InlineResult(0, 0));
     }
 
     @Test
@@ -66,8 +65,9 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     void missingDiffRefsSkips() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         // diffRefs absent → headSha/startSha null
-        when(mrResolver.resolve(1L, "group/project", 42))
-            .thenReturn(new MrInfo("gid://gitlab/MR/42", null, null, null));
+        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
+            new MrInfo("gid://gitlab/MR/42", null, null, null)
+        );
 
         InlineResult result = channel.postInlineFindings(
             gitlabTarget(),
@@ -81,8 +81,9 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     @DisplayName("posts DiffAnchor findings successfully")
     void postsDiffNotesSuccessfully() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42))
-            .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
+        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
+            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
+        );
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -114,10 +115,6 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     private static FeedbackTarget gitlabTarget() {
-        return new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITLAB, 1L, null),
-            "group/project!42",
-            null
-        );
+        return new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project!42", null);
     }
 }

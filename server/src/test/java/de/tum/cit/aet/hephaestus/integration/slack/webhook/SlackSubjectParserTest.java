@@ -44,7 +44,6 @@ class SlackSubjectParserTest extends BaseUnitTest {
 
     @Test
     void rejectsNullSubject() {
-        assertThatThrownBy(() -> parser.parse(null))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> parser.parse(null)).isInstanceOf(IllegalArgumentException.class);
     }
 }

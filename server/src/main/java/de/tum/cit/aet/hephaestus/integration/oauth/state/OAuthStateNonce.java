@@ -63,15 +63,19 @@ public class OAuthStateNonce {
     @Nullable
     private String codeVerifier;
 
-    protected OAuthStateNonce() {
-    }
+    protected OAuthStateNonce() {}
 
     public OAuthStateNonce(String nonce, long workspaceId, String kind, Instant issuedAt) {
         this(nonce, workspaceId, kind, issuedAt, null);
     }
 
-    public OAuthStateNonce(String nonce, long workspaceId, String kind, Instant issuedAt,
-                           @Nullable String codeVerifier) {
+    public OAuthStateNonce(
+        String nonce,
+        long workspaceId,
+        String kind,
+        Instant issuedAt,
+        @Nullable String codeVerifier
+    ) {
         this.nonce = nonce;
         this.workspaceId = workspaceId;
         this.kind = kind;
@@ -79,10 +83,29 @@ public class OAuthStateNonce {
         this.codeVerifier = codeVerifier;
     }
 
-    public String getNonce() { return nonce; }
-    public Long getWorkspaceId() { return workspaceId; }
-    public String getKind() { return kind; }
-    public Instant getIssuedAt() { return issuedAt; }
-    @Nullable public Instant getConsumedAt() { return consumedAt; }
-    @Nullable public String getCodeVerifier() { return codeVerifier; }
+    public String getNonce() {
+        return nonce;
+    }
+
+    public Long getWorkspaceId() {
+        return workspaceId;
+    }
+
+    public String getKind() {
+        return kind;
+    }
+
+    public Instant getIssuedAt() {
+        return issuedAt;
+    }
+
+    @Nullable
+    public Instant getConsumedAt() {
+        return consumedAt;
+    }
+
+    @Nullable
+    public String getCodeVerifier() {
+        return codeVerifier;
+    }
 }

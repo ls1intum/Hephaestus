@@ -20,16 +20,24 @@ public class IntegrationManifestRegistry {
     private final Map<IntegrationKind, IntegrationManifest> byKind;
 
     public IntegrationManifestRegistry(List<IntegrationManifest> manifests) {
-        this.byKind = manifests.stream().collect(Collectors.toUnmodifiableMap(
-            IntegrationManifest::kind,
-            m -> m,
-            (a, b) -> {
-                throw new IllegalStateException(
-                    "Duplicate IntegrationManifest for kind=" + a.kind() + ": "
-                        + a.getClass() + " vs " + b.getClass()
-                );
-            }
-        ));
+        this.byKind = manifests
+            .stream()
+            .collect(
+                Collectors.toUnmodifiableMap(
+                    IntegrationManifest::kind,
+                    m -> m,
+                    (a, b) -> {
+                        throw new IllegalStateException(
+                            "Duplicate IntegrationManifest for kind=" +
+                                a.kind() +
+                                ": " +
+                                a.getClass() +
+                                " vs " +
+                                b.getClass()
+                        );
+                    }
+                )
+            );
     }
 
     public Set<IntegrationKind> registeredKinds() {

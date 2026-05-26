@@ -34,15 +34,10 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
             .resideInAPackage("..integration.spi..")
             .should()
             .dependOnClassesThat()
-            .resideInAnyPackage(
-                "org.kohsuke..",
-                "com.slack..",
-                "org.gitlab4j..",
-                "com.linecorp.bot.."
-            )
+            .resideInAnyPackage("org.kohsuke..", "com.slack..", "org.gitlab4j..", "com.linecorp.bot..")
             .because(
-                "The unified SPI must remain vendor-neutral. Vendor SDK types belong in "
-                    + "integration/<kind>/internal/, never on a cross-vendor port."
+                "The unified SPI must remain vendor-neutral. Vendor SDK types belong in " +
+                    "integration/<kind>/internal/, never on a cross-vendor port."
             );
         rule.check(classes);
     }
@@ -50,26 +45,42 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
     @Test
     @DisplayName("integration/<kind>/ modules do not import each other")
     void kindModulesDoNotImportEachOther() {
-        check(noClasses()
-            .that().resideInAPackage("..integration.github..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                "..integration.gitlab..", "..integration.slack..", "..integration.outline..")
-            .because("Cross-kind coupling defeats the SPI. Use the shared integration/spi surface."));
-        check(noClasses()
-            .that().resideInAPackage("..integration.gitlab..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                "..integration.github..", "..integration.slack..", "..integration.outline..")
-            .because("Cross-kind coupling defeats the SPI."));
-        check(noClasses()
-            .that().resideInAPackage("..integration.slack..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                "..integration.github..", "..integration.gitlab..", "..integration.outline..")
-            .because("Cross-kind coupling defeats the SPI."));
-        check(noClasses()
-            .that().resideInAPackage("..integration.outline..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                "..integration.github..", "..integration.gitlab..", "..integration.slack..")
-            .because("Cross-kind coupling defeats the SPI."));
+        check(
+            noClasses()
+                .that()
+                .resideInAPackage("..integration.github..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..integration.gitlab..", "..integration.slack..", "..integration.outline..")
+                .because("Cross-kind coupling defeats the SPI. Use the shared integration/spi surface.")
+        );
+        check(
+            noClasses()
+                .that()
+                .resideInAPackage("..integration.gitlab..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..integration.github..", "..integration.slack..", "..integration.outline..")
+                .because("Cross-kind coupling defeats the SPI.")
+        );
+        check(
+            noClasses()
+                .that()
+                .resideInAPackage("..integration.slack..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..integration.github..", "..integration.gitlab..", "..integration.outline..")
+                .because("Cross-kind coupling defeats the SPI.")
+        );
+        check(
+            noClasses()
+                .that()
+                .resideInAPackage("..integration.outline..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..integration.github..", "..integration.gitlab..", "..integration.slack..")
+                .because("Cross-kind coupling defeats the SPI.")
+        );
     }
 
     @Test
@@ -84,25 +95,39 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
         // dispatch on the SPI side. New violations of the spirit of AC#8 will surface
         // as: a new switch-statement requires a new constant somewhere agent/-side,
         // which the channel-via-registry pattern does not need.
-        check(noClasses()
-            .that().resideInAPackage("..agent..")
-            .and().doNotHaveSimpleName("PullRequestCommentPoster")
-            .and().doNotHaveSimpleName("DiffNotePoster")
-            .and().doNotHaveSimpleName("FeedbackDeliveryService")
-            .and().doNotHaveSimpleName("JobTypeHandlerConfiguration")
-            .and().doNotHaveSimpleName("AgentJob")
-            .and().doNotHaveSimpleName("AgentJobEventListener")
-            .and().doNotHaveSimpleName("BotCommandProcessor")
-            .and().doNotHaveSimpleName("AgentJobService")
-            .and().doNotHaveSimpleName("PullRequestReviewHandler")
-            .and().doNotHaveSimpleName("PullRequestReviewSubmissionRequest")
-            .should().dependOnClassesThat()
-            .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind")
-            .because(
-                "The IntegrationKind enum should only be referenced by agent/ code that "
-                    + "passes it through to the SPI registry. New uses indicate a switch-on-"
-                    + "kind smell — add the behaviour to the per-kind SPI adapter instead."
-            ));
+        check(
+            noClasses()
+                .that()
+                .resideInAPackage("..agent..")
+                .and()
+                .doNotHaveSimpleName("PullRequestCommentPoster")
+                .and()
+                .doNotHaveSimpleName("DiffNotePoster")
+                .and()
+                .doNotHaveSimpleName("FeedbackDeliveryService")
+                .and()
+                .doNotHaveSimpleName("JobTypeHandlerConfiguration")
+                .and()
+                .doNotHaveSimpleName("AgentJob")
+                .and()
+                .doNotHaveSimpleName("AgentJobEventListener")
+                .and()
+                .doNotHaveSimpleName("BotCommandProcessor")
+                .and()
+                .doNotHaveSimpleName("AgentJobService")
+                .and()
+                .doNotHaveSimpleName("PullRequestReviewHandler")
+                .and()
+                .doNotHaveSimpleName("PullRequestReviewSubmissionRequest")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind")
+                .because(
+                    "The IntegrationKind enum should only be referenced by agent/ code that " +
+                        "passes it through to the SPI registry. New uses indicate a switch-on-" +
+                        "kind smell — add the behaviour to the per-kind SPI adapter instead."
+                )
+        );
     }
 
     private static void check(ArchRule rule) {

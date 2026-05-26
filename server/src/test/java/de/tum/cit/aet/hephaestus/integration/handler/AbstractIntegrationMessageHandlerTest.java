@@ -139,15 +139,15 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
     @Test
     @DisplayName("constructor rejects blank eventType")
     void blankEventType_rejected() {
-        assertThatThrownBy(() -> new TestHandler(IntegrationKind.GITHUB, "  "))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new TestHandler(IntegrationKind.GITHUB, "  ")).isInstanceOf(
+            IllegalArgumentException.class
+        );
     }
 
     @Test
     @DisplayName("constructor rejects null kind")
     void nullKind_rejected() {
-        assertThatThrownBy(() -> new TestHandler(null, "push"))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new TestHandler(null, "push")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

@@ -31,9 +31,11 @@ public class ConnectionService {
     private final ConnectionAuditRepository auditRepository;
     private final CredentialBundleConverter credentialConverter;
 
-    public ConnectionService(ConnectionRepository connectionRepository,
-                             ConnectionAuditRepository auditRepository,
-                             CredentialBundleConverter credentialConverter) {
+    public ConnectionService(
+        ConnectionRepository connectionRepository,
+        ConnectionAuditRepository auditRepository,
+        CredentialBundleConverter credentialConverter
+    ) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.credentialConverter = credentialConverter;
@@ -42,20 +44,27 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<Connection> findActive(long workspaceId, IntegrationKind kind) {
         return connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            workspaceId, kind, IntegrationState.ACTIVE);
+            workspaceId,
+            kind,
+            IntegrationState.ACTIVE
+        );
     }
 
     @Transactional(readOnly = true)
     public Connection requireActive(long workspaceId, IntegrationKind kind) {
         return findActive(workspaceId, kind).orElseThrow(() ->
-            new NoSuchElementException("No ACTIVE Connection for workspace=" + workspaceId + " kind=" + kind));
+            new NoSuchElementException("No ACTIVE Connection for workspace=" + workspaceId + " kind=" + kind)
+        );
     }
 
     @Transactional(readOnly = true)
     public Optional<Connection> findByRef(IntegrationRef ref) {
         if (ref.instanceKey() == null) return Optional.empty();
         return connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(
-            ref.workspaceId(), ref.kind(), ref.instanceKey());
+            ref.workspaceId(),
+            ref.kind(),
+            ref.instanceKey()
+        );
     }
 
     /**
@@ -81,8 +90,10 @@ public class ConnectionService {
         boolean gitlab = findActive(workspaceId, IntegrationKind.GITLAB).isPresent();
         if (github && gitlab) {
             throw new IllegalStateException(
-                "Workspace " + workspaceId + " has ACTIVE Connections for both GITHUB and GITLAB; "
-                    + "out-of-band fix required"
+                "Workspace " +
+                    workspaceId +
+                    " has ACTIVE Connections for both GITHUB and GITLAB; " +
+                    "out-of-band fix required"
             );
         }
         if (github) return Optional.of(IntegrationKind.GITHUB);
@@ -140,8 +151,11 @@ public class ConnectionService {
      * must return the same sealed-subtype variant; cross-variant returns throw.
      */
     @Transactional
-    public Optional<Connection> updateConfig(long workspaceId, IntegrationKind kind,
-                                             UnaryOperator<ConnectionConfig> mutator) {
+    public Optional<Connection> updateConfig(
+        long workspaceId,
+        IntegrationKind kind,
+        UnaryOperator<ConnectionConfig> mutator
+    ) {
         return findActive(workspaceId, kind).map(c -> {
             ConnectionConfig next = mutator.apply(c.getConfig());
             if (next == null) {
@@ -151,8 +165,12 @@ public class ConnectionService {
             }
             if (!next.getClass().equals(c.getConfig().getClass())) {
                 throw new IllegalArgumentException(
-                    "Mutator changed config variant on connection " + c.getId() + ": "
-                        + c.getConfig().getClass().getSimpleName() + " → " + next.getClass().getSimpleName()
+                    "Mutator changed config variant on connection " +
+                        c.getId() +
+                        ": " +
+                        c.getConfig().getClass().getSimpleName() +
+                        " → " +
+                        next.getClass().getSimpleName()
                 );
             }
             c.setConfig(next);
@@ -180,37 +198,47 @@ public class ConnectionService {
      * {@code correlationId}.
      */
     @Transactional
-    public Connection upsertGitHubAppConnection(Workspace workspace,
-                                                long installationId,
-                                                @Nullable String accountLogin,
-                                                String correlationId) {
+    public Connection upsertGitHubAppConnection(
+        Workspace workspace,
+        long installationId,
+        @Nullable String accountLogin,
+        String correlationId
+    ) {
         String instanceKey = Long.toString(installationId);
 
         // Retire any non-matching SCM-side row before introducing the new instance_key
         // (invariant: one ACTIVE GitHub Connection per workspace).
         for (Connection existing : connectionRepository.findByWorkspaceIdAndState(
-            workspace.getId(), IntegrationState.ACTIVE)) {
+            workspace.getId(),
+            IntegrationState.ACTIVE
+        )) {
             if (existing.getKind() != IntegrationKind.GITHUB) {
                 continue;
             }
             if (instanceKey.equals(existing.getInstanceKey())) {
                 continue;
             }
-            transition(existing, new TransitionRequest(
-                IntegrationState.UNINSTALLED,
-                "REPLACED_BY_INSTALL",
-                "SYSTEM",
-                "github-install-" + installationId,
-                correlationId + "-retire-" + existing.getId(),
-                "Replaced by GitHub App installation " + installationId
-            ));
+            transition(
+                existing,
+                new TransitionRequest(
+                    IntegrationState.UNINSTALLED,
+                    "REPLACED_BY_INSTALL",
+                    "SYSTEM",
+                    "github-install-" + installationId,
+                    correlationId + "-retire-" + existing.getId(),
+                    "Replaced by GitHub App installation " + installationId
+                )
+            );
         }
 
         Connection connection = connectionRepository
             .findByWorkspaceIdAndKindAndInstanceKey(workspace.getId(), IntegrationKind.GITHUB, instanceKey)
             .orElseGet(() -> {
                 ConnectionConfig.GitHubAppConfig config = new ConnectionConfig.GitHubAppConfig(
-                    installationId, accountLogin, /* serverUrl */ null, Set.of()
+                    installationId,
+                    accountLogin,
+                    /* serverUrl */ null,
+                    Set.of()
                 );
                 Connection fresh = new Connection(workspace, IntegrationKind.GITHUB, instanceKey, config);
                 fresh.setDisplayName(accountLogin);
@@ -218,25 +246,36 @@ public class ConnectionService {
             });
 
         // Refresh accountLogin/orgLogin if renamed since first bind.
-        if (accountLogin != null && !accountLogin.isBlank()
-            && connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig current
-            && !accountLogin.equals(current.orgLogin())) {
-            connection.setConfig(new ConnectionConfig.GitHubAppConfig(
-                installationId, accountLogin, current.serverUrl(), current.enabledStreams()
-            ));
+        if (
+            accountLogin != null &&
+            !accountLogin.isBlank() &&
+            connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig current &&
+            !accountLogin.equals(current.orgLogin())
+        ) {
+            connection.setConfig(
+                new ConnectionConfig.GitHubAppConfig(
+                    installationId,
+                    accountLogin,
+                    current.serverUrl(),
+                    current.enabledStreams()
+                )
+            );
             connection.setDisplayName(accountLogin);
             connection = connectionRepository.save(connection);
         }
 
         if (connection.getState() != IntegrationState.ACTIVE) {
-            connection = transition(connection, new TransitionRequest(
-                IntegrationState.ACTIVE,
-                "INSTALL_BIND",
-                "GITHUB_WEBHOOK",
-                "github-install-" + installationId,
-                correlationId,
-                "Linked workspace to GitHub App installation " + installationId
-            ));
+            connection = transition(
+                connection,
+                new TransitionRequest(
+                    IntegrationState.ACTIVE,
+                    "INSTALL_BIND",
+                    "GITHUB_WEBHOOK",
+                    "github-install-" + installationId,
+                    correlationId,
+                    "Linked workspace to GitHub App installation " + installationId
+                )
+            );
         }
 
         return connection;
@@ -247,12 +286,14 @@ public class ConnectionService {
      * {@code (workspace, kind, instanceKey)}.
      */
     @Transactional
-    public void provisionPatConnection(Workspace workspace,
-                                       IntegrationKind kind,
-                                       String instanceKey,
-                                       ConnectionConfig config,
-                                       String token,
-                                       String correlationId) {
+    public void provisionPatConnection(
+        Workspace workspace,
+        IntegrationKind kind,
+        String instanceKey,
+        ConnectionConfig config,
+        String token,
+        String correlationId
+    ) {
         Connection connection = connectionRepository
             .findByWorkspaceIdAndKindAndInstanceKey(workspace.getId(), kind, instanceKey)
             .orElseGet(() -> {
@@ -262,14 +303,17 @@ public class ConnectionService {
             });
 
         if (connection.getState() != IntegrationState.ACTIVE) {
-            connection = transition(connection, new TransitionRequest(
-                IntegrationState.ACTIVE,
-                "PAT_PROVISIONED",
-                "SYSTEM",
-                "scm-connection-provisioner",
-                correlationId,
-                "Provisioned PAT connection on workspace creation"
-            ));
+            connection = transition(
+                connection,
+                new TransitionRequest(
+                    IntegrationState.ACTIVE,
+                    "PAT_PROVISIONED",
+                    "SYSTEM",
+                    "scm-connection-provisioner",
+                    correlationId,
+                    "Provisioned PAT connection on workspace creation"
+                )
+            );
         }
 
         if (token != null && !token.isBlank()) {
@@ -295,14 +339,24 @@ public class ConnectionService {
             );
         }
         ConnectionAudit audit = new ConnectionAudit(
-            connection, req.eventType(), current, req.next(),
-            req.actorKind(), req.actorRef(), req.correlationId(), req.detail()
+            connection,
+            req.eventType(),
+            current,
+            req.next(),
+            req.actorKind(),
+            req.actorRef(),
+            req.correlationId(),
+            req.detail()
         );
         try {
             auditRepository.save(audit);
         } catch (DataIntegrityViolationException e) {
-            log.info("Idempotent {} for connection={} corr={} (already recorded)", req.eventType(),
-                connection.getId(), req.correlationId());
+            log.info(
+                "Idempotent {} for connection={} corr={} (already recorded)",
+                req.eventType(),
+                connection.getId(),
+                req.correlationId()
+            );
             return connection;
         }
         connection.setState(req.next());
@@ -323,6 +377,5 @@ public class ConnectionService {
         @Nullable String actorRef,
         @Nullable String correlationId,
         @Nullable String detail
-    ) {
-    }
+    ) {}
 }

@@ -5,10 +5,10 @@ import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.uri
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHCommentAuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHDiscussionComment;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHDiscussionCommentConnection;
-import de.tum.cit.aet.hephaestus.integration.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;

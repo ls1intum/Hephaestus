@@ -18,5 +18,4 @@ public record InitiateConnectionRequest(
     IntegrationKind kind,
     Map<String, String> userInput,
     @Nullable URI redirectAfter
-) {
-}
+) {}

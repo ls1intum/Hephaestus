@@ -4,12 +4,12 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointCalculator;
-import de.tum.cit.aet.hephaestus.integration.scm.commit.Commit;
-import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.commit.Commit;
+import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.integration.scm.discussioncomment.DiscussionComment;
 import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;

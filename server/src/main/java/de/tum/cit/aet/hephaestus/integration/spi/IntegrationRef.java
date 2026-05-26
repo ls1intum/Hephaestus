@@ -18,11 +18,7 @@ import org.springframework.lang.Nullable;
  *   <li>Outline: {@code instanceKey} = workspace id (their workspace)
  * </ul>
  */
-public record IntegrationRef(
-    @NonNull IntegrationKind kind,
-    long workspaceId,
-    @Nullable String instanceKey
-) {
+public record IntegrationRef(@NonNull IntegrationKind kind, long workspaceId, @Nullable String instanceKey) {
     public IntegrationRef {
         if (kind == null) throw new IllegalArgumentException("kind must not be null");
     }

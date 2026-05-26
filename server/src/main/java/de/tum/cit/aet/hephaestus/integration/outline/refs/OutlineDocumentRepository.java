@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument, Long> {
-
     Optional<OutlineDocument> findByConnectionIdAndDocumentId(long connectionId, String documentId);
 
     List<OutlineDocument> findByConnectionIdAndCollectionId(long connectionId, String collectionId);
@@ -28,10 +27,10 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     @Modifying
     @Transactional
     @Query(
-        "UPDATE OutlineDocument d SET d.deletedAt = :at "
-            + "WHERE d.connection.workspace.id = :workspaceId "
-            + "AND d.connection.id = :connectionId AND d.documentId = :documentId "
-            + "AND d.deletedAt IS NULL"
+        "UPDATE OutlineDocument d SET d.deletedAt = :at " +
+            "WHERE d.connection.workspace.id = :workspaceId " +
+            "AND d.connection.id = :connectionId AND d.documentId = :documentId " +
+            "AND d.deletedAt IS NULL"
     )
     int softDelete(
         @Param("workspaceId") long workspaceId,
@@ -47,10 +46,10 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     @Modifying
     @Transactional
     @Query(
-        "UPDATE OutlineDocument d SET d.deletedAt = :at "
-            + "WHERE d.connection.workspace.id = :workspaceId "
-            + "AND d.connection.id = :connectionId AND d.collectionId = :collectionId "
-            + "AND d.deletedAt IS NULL"
+        "UPDATE OutlineDocument d SET d.deletedAt = :at " +
+            "WHERE d.connection.workspace.id = :workspaceId " +
+            "AND d.connection.id = :connectionId AND d.collectionId = :collectionId " +
+            "AND d.deletedAt IS NULL"
     )
     int softDeleteByCollection(
         @Param("workspaceId") long workspaceId,

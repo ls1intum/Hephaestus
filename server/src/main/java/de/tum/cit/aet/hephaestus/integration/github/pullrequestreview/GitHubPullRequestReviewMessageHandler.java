@@ -2,13 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.github.pullrequestreview;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequestreview.dto.GitHubPullRequestReviewEventDTO;
 import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +31,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubPullRequestReviewMessageHandler
-    extends AbstractIntegrationMessageHandler<GitHubPullRequestReviewEventDTO> {
+    extends AbstractIntegrationMessageHandler<GitHubPullRequestReviewEventDTO>
+{
 
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewMessageHandler.class);
 

@@ -79,7 +79,11 @@ public final class SyncTargetFactory {
         );
     }
 
-    private static String resolveBearerToken(ConnectionService connectionService, long workspaceId, IntegrationKind kind) {
+    private static String resolveBearerToken(
+        ConnectionService connectionService,
+        long workspaceId,
+        IntegrationKind kind
+    ) {
         Optional<BearerToken> bundle = connectionService.findActiveBearerToken(workspaceId, kind);
         return bundle.map(BearerToken::token).orElse(null);
     }

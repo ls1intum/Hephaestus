@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.oauth;
 
 import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
+import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService.StateBinding;
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy.ConnectFinalization;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
-import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService.StateBinding;
 import de.tum.cit.aet.hephaestus.integration.webhook.IntegrationKindRouting;
 import java.net.URI;
 import java.util.Collections;
@@ -75,16 +75,24 @@ public class OAuthCallbackController {
         this.kindRouting = kindRouting;
         this.oauthStateService = oauthStateService;
         this.callbackService = callbackService;
-        this.strategies = strategyBeans.stream().collect(Collectors.toUnmodifiableMap(
-            ConnectionStrategy::kind,
-            s -> s,
-            (a, b) -> {
-                throw new IllegalStateException(
-                    "Duplicate ConnectionStrategy for kind=" + a.kind() + ": "
-                        + a.getClass() + " vs " + b.getClass()
-                );
-            }
-        ));
+        this.strategies = strategyBeans
+            .stream()
+            .collect(
+                Collectors.toUnmodifiableMap(
+                    ConnectionStrategy::kind,
+                    s -> s,
+                    (a, b) -> {
+                        throw new IllegalStateException(
+                            "Duplicate ConnectionStrategy for kind=" +
+                                a.kind() +
+                                ": " +
+                                a.getClass() +
+                                " vs " +
+                                b.getClass()
+                        );
+                    }
+                )
+            );
         this.properties = properties;
     }
 
@@ -133,8 +141,11 @@ public class OAuthCallbackController {
         if (kindOpt.isEmpty()) {
             log.info("OAuth callback for unknown kind path segment: {}", sanitize(kindPathSegment));
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                errorBody(kindPathSegment, "unknown_kind",
-                    "No integration registered for path segment: " + sanitize(kindPathSegment))
+                errorBody(
+                    kindPathSegment,
+                    "unknown_kind",
+                    "No integration registered for path segment: " + sanitize(kindPathSegment)
+                )
             );
         }
         IntegrationKind kind = kindOpt.get();
@@ -142,8 +153,12 @@ public class OAuthCallbackController {
         // The state may still be present and valid; we leave it usable (it'll expire
         // naturally via TTL) rather than racing the user who might immediately retry.
         if (vendorError != null && !vendorError.isBlank()) {
-            log.info("OAuth callback for kind={} returned vendor error={} description={}",
-                kind, sanitize(vendorError), sanitize(vendorErrorDescription));
+            log.info(
+                "OAuth callback for kind={} returned vendor error={} description={}",
+                kind,
+                sanitize(vendorError),
+                sanitize(vendorErrorDescription)
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                 errorBody(kind.name(), vendorError, vendorErrorDescription)
             );
@@ -168,21 +183,29 @@ public class OAuthCallbackController {
         }
 
         if (binding.kind() != kind) {
-            log.warn("OAuth state-kind mismatch: path={} stateKind={} workspace={}",
-                kind, binding.kind(), binding.workspaceId());
+            log.warn(
+                "OAuth state-kind mismatch: path={} stateKind={} workspace={}",
+                kind,
+                binding.kind(),
+                binding.workspaceId()
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                errorBody(kind.name(), "kind_mismatch",
-                    "State issued for kind=" + binding.kind() + " replayed against callback path /oauth/callback/" + kindPathSegment)
+                errorBody(
+                    kind.name(),
+                    "kind_mismatch",
+                    "State issued for kind=" +
+                        binding.kind() +
+                        " replayed against callback path /oauth/callback/" +
+                        kindPathSegment
+                )
             );
         }
 
         ConnectionStrategy strategy = strategies.get(kind);
         if (strategy == null) {
-            log.error("No ConnectionStrategy bean for kind={} but routing accepted it — wiring bug",
-                kind);
+            log.error("No ConnectionStrategy bean for kind={} but routing accepted it — wiring bug", kind);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                errorBody(kind.name(), "no_strategy",
-                    "No ConnectionStrategy registered for kind=" + kind)
+                errorBody(kind.name(), "no_strategy", "No ConnectionStrategy registered for kind=" + kind)
             );
         }
 
@@ -202,8 +225,12 @@ public class OAuthCallbackController {
             }
             result = strategy.finalizeConnect(ref, callbackParams);
         } catch (RuntimeException e) {
-            log.warn("Strategy.finalizeConnect threw for kind={} workspace={}: {}",
-                kind, binding.workspaceId(), e.toString());
+            log.warn(
+                "Strategy.finalizeConnect threw for kind={} workspace={}: {}",
+                kind,
+                binding.workspaceId(),
+                e.toString()
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                 errorBody(kind.name(), "strategy_error", e.getMessage())
             );
@@ -214,7 +241,6 @@ public class OAuthCallbackController {
             case ConnectFinalization.Failed f -> handleFailed(kind, binding, f);
         };
     }
-
 
     private ResponseEntity<?> handleCompleted(
         Connection connection,
@@ -227,8 +253,11 @@ public class OAuthCallbackController {
         } catch (IllegalStateException e) {
             // Transition guard rejection (e.g. UNINSTALLED → ACTIVE). Unusual but
             // possible if a webhook UNINSTALLED the row between create and finalize.
-            log.warn("OAuth complete rejected by transition guard for connection={}: {}",
-                connection.getId(), e.getMessage());
+            log.warn(
+                "OAuth complete rejected by transition guard for connection={}: {}",
+                connection.getId(),
+                e.getMessage()
+            );
             return ResponseEntity.status(HttpStatus.CONFLICT).body(
                 errorBody(kind.name(), "transition_conflict", e.getMessage())
             );
@@ -241,8 +270,7 @@ public class OAuthCallbackController {
         StateBinding binding,
         ConnectFinalization.Failed failed
     ) {
-        log.warn("OAuth callback failed for kind={} workspace={}: {}",
-            kind, binding.workspaceId(), failed.reason());
+        log.warn("OAuth callback failed for kind={} workspace={}: {}", kind, binding.workspaceId(), failed.reason());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
             errorBody(kind.name(), "finalize_failed", failed.reason())
         );
@@ -270,5 +298,4 @@ public class OAuthCallbackController {
         String stripped = input.replaceAll("[\\p{Cntrl}]", "_");
         return stripped.length() > 200 ? stripped.substring(0, 200) + "…" : stripped;
     }
-
 }

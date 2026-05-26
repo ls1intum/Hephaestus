@@ -60,9 +60,11 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
      */
     private static boolean isInWorkspaceAgnosticPackage(JavaClass javaClass) {
         String pkg = javaClass.getPackageName();
-        return pkg.startsWith(SCM_PACKAGE)
-            || pkg.startsWith(INTEGRATION_GITHUB_PACKAGE)
-            || pkg.startsWith(INTEGRATION_GITLAB_PACKAGE);
+        return (
+            pkg.startsWith(SCM_PACKAGE) ||
+            pkg.startsWith(INTEGRATION_GITHUB_PACKAGE) ||
+            pkg.startsWith(INTEGRATION_GITLAB_PACKAGE)
+        );
     }
 
     /**

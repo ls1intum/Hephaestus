@@ -1,22 +1,22 @@
 package de.tum.cit.aet.hephaestus.integration.github.discussion;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.github.common.BaseGitHubProcessor;
+import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionCategoryDTO;
+import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionDTO;
+import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.integration.scm.discussion.DiscussionCategory;
 import de.tum.cit.aet.hephaestus.integration.scm.discussion.DiscussionCategoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.discussion.DiscussionRepository;
-import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionCategoryDTO;
-import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;

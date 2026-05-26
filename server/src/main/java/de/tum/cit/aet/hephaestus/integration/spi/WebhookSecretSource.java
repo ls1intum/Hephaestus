@@ -18,7 +18,6 @@ import java.util.Optional;
  * </ul>
  */
 public interface WebhookSecretSource {
-
     IntegrationKind kind();
 
     Scope scope();
@@ -32,10 +31,9 @@ public interface WebhookSecretSource {
     enum Scope {
         APP_GLOBAL,
         WORKSPACE,
-        SUBSCRIPTION
+        SUBSCRIPTION,
     }
 
     /** Best-effort identification of the request before signature verification. */
-    record SecretLookup(Map<String, String> headers) {
-    }
+    record SecretLookup(Map<String, String> headers) {}
 }
