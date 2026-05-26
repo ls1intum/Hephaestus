@@ -6,10 +6,9 @@ import java.util.Set;
 import org.springframework.lang.Nullable;
 
 /**
- * Sealed per-kind Connection configuration. Persisted as JSONB via
- * {@code ConnectionConfigConverter} (Spring ObjectMapper + AttributeConverter for
- * polymorphic safety — Hibernate's native JSON binding is not used here because
- * sealed-type discriminator semantics aren't proven via {@code @JdbcTypeCode(SqlTypes.JSON)}).
+ * Sealed per-kind Connection configuration. Persisted as JSONB via Hibernate 7's
+ * native {@code @JdbcTypeCode(SqlTypes.JSON)} on {@code Connection.config}; Jackson 3
+ * deserialises the discriminator below back into the right record subtype.
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes({

@@ -276,6 +276,25 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             // Check if there's an existing workspace for this account
             Workspace existingByLogin = workspaceRepository.findByAccountLoginIgnoreCase(accountLogin).orElse(null);
 
+            // Refuse cross-vendor attach. A GitHub install for "HephaestusTest" must not
+            // co-tenant onto a workspace whose ACTIVE Connection is GITLAB/SLACK/OUTLINE
+            // — they are separate tenants that happen to share the account-login string.
+            if (existingByLogin != null) {
+                boolean hasNonGithubActive =
+                    connectionService.findActive(existingByLogin.getId(), IntegrationKind.GITLAB).isPresent() ||
+                    connectionService.findActive(existingByLogin.getId(), IntegrationKind.SLACK).isPresent() ||
+                    connectionService.findActive(existingByLogin.getId(), IntegrationKind.OUTLINE).isPresent();
+                if (hasNonGithubActive) {
+                    log.info(
+                        "Skipped GitHub App installation cross-attach, workspace has non-GITHUB ACTIVE Connection: workspaceId={}, accountLogin={}, installationId={}",
+                        existingByLogin.getId(),
+                        LoggingUtils.sanitizeForLog(accountLogin),
+                        installationId
+                    );
+                    existingByLogin = null;
+                }
+            }
+
             if (existingByLogin != null) {
                 boolean isPatWorkspace = connectionService
                     .findActiveGitHubPatConfig(existingByLogin.getId())

@@ -9,23 +9,34 @@ echo "Setting up Jean worktree..."
 if [ -z "${JEAN_ROOT_PATH:-}" ]; then
   echo "  JEAN_ROOT_PATH is not set — skipping config file copy."
 else
-  copy_if_exists() {
-    local src="$JEAN_ROOT_PATH/$1"
-    if [ -f "$src" ]; then
-      mkdir -p "$(dirname "$1")"
-      cp "$src" "$1"
-      echo "  copied $1"
-    else
-      echo "  skipped $1 (not found in root)"
-    fi
+  # First arg = destination path in this worktree. Subsequent args are candidate
+  # source paths under $JEAN_ROOT_PATH; first hit wins. Lets us pick up files
+  # that the main worktree may still carry under a legacy directory layout
+  # (e.g. server/application-server/... before the #1097 module rename).
+  copy_first_hit() {
+    local dest="$1"; shift
+    for src_rel in "$@"; do
+      local src="$JEAN_ROOT_PATH/$src_rel"
+      if [ -f "$src" ]; then
+        mkdir -p "$(dirname "$dest")"
+        cp "$src" "$dest"
+        echo "  copied $dest (from $src_rel)"
+        return
+      fi
+    done
+    echo "  skipped $dest (no candidate found in root: $*)"
   }
 
   echo "Copying local config files..."
-  copy_if_exists "server/src/main/resources/application-local.yml"
-  copy_if_exists "server/src/test/resources/application-live-local.yml"
-  copy_if_exists "server/.env"
-  copy_if_exists "docker/.env"
-  copy_if_exists ".claude/settings.local.json"
+  copy_first_hit "server/src/main/resources/application-local.yml" \
+    "server/src/main/resources/application-local.yml" \
+    "server/application-server/src/main/resources/application-local.yml"
+  copy_first_hit "server/src/test/resources/application-live-local.yml" \
+    "server/src/test/resources/application-live-local.yml" \
+    "server/application-server/src/test/resources/application-live-local.yml"
+  copy_first_hit "server/.env" "server/.env" "server/application-server/.env"
+  copy_first_hit "docker/.env" "docker/.env"
+  copy_first_hit ".claude/settings.local.json" ".claude/settings.local.json"
 fi
 
 echo "Installing npm dependencies..."
