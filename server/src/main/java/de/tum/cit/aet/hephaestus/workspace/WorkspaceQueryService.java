@@ -177,15 +177,8 @@ public class WorkspaceQueryService {
     }
 
     /**
-     * Find a workspace by GitHub App installation ID.
-     *
-     * <p>Post #1198 the {@code installation_id} column on {@code workspace} is gone — the
-     * durable identity lives on the GitHub Connection's {@code instance_key} now. The
-     * lookup-by-installation has moved into {@link WorkspaceRepository#findByInstallationId}
-     * which joins through {@code Connection}.
-     *
-     * @param installationId the GitHub App installation ID
-     * @return the workspace if found
+     * Find a workspace by GitHub App installation ID. Joins through the GitHub
+     * Connection's {@code instance_key} (the durable identity).
      */
     public Optional<Workspace> findByGitHubInstallationId(Long installationId) {
         return workspaceRepository.findByInstallationId(installationId);

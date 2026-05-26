@@ -78,11 +78,11 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "Discussion", // through Repository -> Organization <- Workspace
         "DiscussionCategory", // through Repository -> Organization <- Workspace
         "DiscussionComment", // through Discussion -> Repository -> Organization <- Workspace
-        // #1198 unified integration framework
+        // Unified integration framework
         "Connection", // has direct Workspace field
         "ConnectionAudit", // through Connection.workspace
         "FeedbackPost", // through Connection.workspace
-        // #1198 Slack + Outline persistence (#1204/#1205 runtime tables)
+        // Slack + Outline persistence (#1204/#1205 runtime tables)
         // Workspace-scoped via Connection.workspace; deletion rules + ToS contract in entity Javadoc.
         "SlackChannel",
         "SlackMessage",
@@ -104,10 +104,10 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "GitProvider", // Global provider instances (e.g., github.com, gitlab.com)
         "ModelPricing", // Vendor list prices per LLM model — not tenant-scoped
         "WorkerTokenDenylist", // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
-        // #1198 unified integration framework — three-layer identity model
+        // Unified integration framework — three-layer identity model
         "HephaestusUser", // Layer 2 — cross-workspace per real person
         "IntegrationIdentity", // Layer 3 — scoped by (kind, integration_instance_id, external_id); cross-workspace for SCM
-        // #1198 GitHub App pre-workspace bootstrap — rows exist before any workspace claims them
+        // GitHub App pre-workspace bootstrap — rows exist before any workspace claims them
         "GithubInstallationUnbound"
     );
 

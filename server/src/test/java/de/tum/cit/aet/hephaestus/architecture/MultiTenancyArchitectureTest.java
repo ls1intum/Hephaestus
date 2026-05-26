@@ -67,11 +67,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
     /**
      * Schedulers that are legitimately workspace-agnostic.
-     *
-     * <p>These scheduled jobs operate on system-wide data or infrastructure,
-     * not tenant-specific data. Each entry is documented with its justification.
-     *
-     * <p><b>EMPTY:</b> All schedulers now use {@link WorkspaceAgnostic} annotation directly.
      */
     static final Set<String> WORKSPACE_AGNOSTIC_SCHEDULERS = Set.of();
 

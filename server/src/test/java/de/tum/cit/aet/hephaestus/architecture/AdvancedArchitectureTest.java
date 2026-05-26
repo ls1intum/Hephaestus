@@ -283,11 +283,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // #1198 unified integration framework: any class living under
-                    // integration.<kind>.* (where <kind> in {github,gitlab,slack,outline,…}) is
-                    // BY DEFINITION a per-vendor adapter — the sub-packages (webhook,
-                    // credentials, connect, lifecycle, installation, manifest, refs, sync,
-                    // feedback, context) are the adapter pattern at the framework level.
+                    // Any class under integration.<kind>.* is a per-vendor adapter by
+                    // definition (webhook/credentials/connect/lifecycle/sync/…).
                     boolean inIntegrationVendorPackage = javaClass.getPackageName()
                         .matches("^de\\.tum\\.cit\\.aet\\.hephaestus\\.integration\\.[a-z]+\\..*");
 
@@ -297,8 +294,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         javaClass.getPackageName().contains(".impl") ||
                         javaClass.getPackageName().contains(".handler") || // Job type handlers implement handler SPI
                         javaClass.getPackageName().contains(".notification") || // Notification module implements activity SPIs
-                        javaClass.getPackageName().contains(".manifest") || // #1198 IntegrationManifest impls + bootstrap utilities
-                        javaClass.getPackageName().contains(".registry") || // #1198 ConnectionPurgeContributor lives with the entity
+                        javaClass.getPackageName().contains(".manifest") || // IntegrationManifest impls + bootstrap utilities
+                        javaClass.getPackageName().contains(".registry") || // ConnectionPurgeContributor lives with the entity
                         javaClass.getSimpleName().endsWith("Adapter") ||
                         javaClass.getSimpleName().endsWith("Provider") ||
                         javaClass.getSimpleName().endsWith("Tracker") || // Rate limit trackers implement RateLimitTracker SPI

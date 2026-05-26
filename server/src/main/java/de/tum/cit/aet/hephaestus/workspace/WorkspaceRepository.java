@@ -16,15 +16,10 @@ import org.springframework.stereotype.Repository;
 @WorkspaceAgnostic("Workspace is the tenant root - queries manage workspaces themselves")
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     /**
-     * Reverse-lookup a workspace by its GitHub App installation id.
-     *
-     * <p>Post #1198 the {@code installation_id} column on {@code workspace} is gone. The
-     * durable identity lives on the {@code Connection} row whose {@code kind = 'GITHUB'} and
-     * {@code instance_key = <installationId>}. We materialize that join here so the many
-     * legacy call sites that look up by installation id keep working without ferrying
-     * {@code ConnectionService} into every collaborator. (Cross-workspace collision on
-     * installation id is rejected at provisioning time by
-     * {@code GithubInstallationBindingService}, so the join is at-most-one.)
+     * Reverse-lookup a workspace by its GitHub App installation id. Joins through the
+     * {@code Connection} row whose {@code kind='GITHUB'} and {@code instance_key=installationId}.
+     * Cross-workspace collision is rejected by {@code GithubInstallationBindingService},
+     * so the join is at-most-one.
      */
     default Optional<Workspace> findByInstallationId(Long installationId) {
         if (installationId == null) {

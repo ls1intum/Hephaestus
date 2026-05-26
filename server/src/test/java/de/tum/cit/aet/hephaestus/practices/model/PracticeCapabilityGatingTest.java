@@ -15,8 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit-level guard rails for the capability-gating fields added to {@link Practice} in
- * #1198. Focuses on:
+ * Unit-level guard rails for the capability-gating fields on {@link Practice}. Focuses on:
  *
  * <ul>
  *   <li>Default-collection initialization (so JSONB NOT NULL is satisfied on fresh inserts)

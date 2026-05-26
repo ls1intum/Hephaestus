@@ -10,9 +10,8 @@ import org.springframework.boot.convert.DurationUnit;
 import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 // idleHeartbeat / heartbeatRestartThreshold / heartbeatLogInterval / installationStaleAfter
-// were dropped 2026-05 — they had been declared, validated and defaulted, but never read
-// by any code. The associated heartbeat-alarm restart logic from the legacy
-// NatsConsumerService has not yet been ported; track in #1198 follow-up.
+// were dropped — declared but never read. Heartbeat-alarm restart logic from the legacy
+// NatsConsumerService has not been ported.
 
 /**
  * Connection-level configuration for the integration framework's NATS surface.

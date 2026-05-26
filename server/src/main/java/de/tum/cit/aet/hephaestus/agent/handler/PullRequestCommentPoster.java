@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.integration.connection.JobIntegrationKindResolver;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel.FeedbackContent;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel.FeedbackTarget;
@@ -15,6 +14,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -24,18 +24,9 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Posts agent review results as comments on PRs/MRs by dispatching to the per-vendor
- * {@link FeedbackChannel}. This wrapper owns sanitization (agent output is untrusted),
- * formatting (structured markdown with metadata footer), and metadata extraction; the
- * actual GraphQL call lives in the vendor channel under
+ * {@link FeedbackChannel}. Owns sanitization, formatting, and metadata extraction;
+ * the GraphQL call lives in the vendor channel under
  * {@code integration/<kind>/feedback/}.
- *
- * <p>Vendor dispatch is keyed off {@link AgentJob#getIntegrationKind()} for new jobs
- * (post-#1198) and falls back to mapping {@code workspace.git_provider_mode} for
- * legacy rows whose {@code integration_kind} backfill hasn't completed.
- *
- * <p>Package-private — created as {@code @Bean} in {@link JobTypeHandlerConfiguration}
- * and injected into {@link FeedbackDeliveryService}. Not a Spring proxy, so
- * {@code @Transactional} annotations on this class would be silently ignored.
  */
 class PullRequestCommentPoster {
 
@@ -157,12 +148,8 @@ class PullRequestCommentPoster {
     private static final Pattern EXCESSIVE_NEWLINES = Pattern.compile("\\n{3,}");
 
     private final Map<IntegrationKind, FeedbackChannel> channels;
-    private final JobIntegrationKindResolver kindResolver;
 
-    PullRequestCommentPoster(
-        List<FeedbackChannel> feedbackChannels,
-        JobIntegrationKindResolver kindResolver
-    ) {
+    PullRequestCommentPoster(List<FeedbackChannel> feedbackChannels) {
         EnumMap<IntegrationKind, FeedbackChannel> map = new EnumMap<>(IntegrationKind.class);
         for (FeedbackChannel channel : feedbackChannels) {
             FeedbackChannel previous = map.putIfAbsent(channel.kind(), channel);
@@ -178,7 +165,6 @@ class PullRequestCommentPoster {
             }
         }
         this.channels = map;
-        this.kindResolver = kindResolver;
     }
 
     /**
@@ -212,7 +198,10 @@ class PullRequestCommentPoster {
     @Nullable
     String postFormattedBody(AgentJob job, String formattedBody) {
         long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = kindResolver.resolve(job.getIntegrationKind(), job.getWorkspace().getId());
+        IntegrationKind kind = Objects.requireNonNull(
+            job.getIntegrationKind(),
+            "AgentJob.integrationKind must not be null"
+        );
         FeedbackChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
         try {
@@ -252,8 +241,7 @@ class PullRequestCommentPoster {
         int prNumber = requireMetadataInt(metadata, "pr_number");
 
         // Vendor-specific subject formatting lives on the per-kind FeedbackChannel —
-        // see FeedbackChannel.formatPullRequestSubjectId. AC#8 of #1198 mandates no
-        // switch (IntegrationKind) outside the kind module.
+        // see FeedbackChannel.formatPullRequestSubjectId.
         FeedbackChannel channel = requireChannel(kind);
         String subjectExternalId;
         try {

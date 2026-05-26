@@ -69,7 +69,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
 
         WorkspaceDTO workspace = Objects.requireNonNull(created);
         assertThat(workspace.workspaceSlug()).isEqualTo("gitlab-space");
-        // Stage-1 (#1198): provider classification is derived from the active Connection
+        // provider classification is derived from the active Connection
         // and surfaced via `kind` (the renamed field). The legacy gitProviderMode field
         // is gone.
         assertThat(workspace.kind()).isEqualTo("GITLAB");
@@ -314,7 +314,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             .getResponseBody();
 
         assertThat(workspaces).isNotNull();
-        // Stage-1 (#1198): providerType is now derived from the active Connection. The
+        // providerType is now derived from the active Connection. The
         // GitHub workspace created via the 5-arg path has no Connection (App
         // installations come in via GithubLifecycleListener), so its providerType is
         // null. The GitLab workspace created via the REST API path provisions a GitLab

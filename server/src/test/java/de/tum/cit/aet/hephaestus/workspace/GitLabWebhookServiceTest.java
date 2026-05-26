@@ -49,7 +49,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 /**
  * Unit tests for {@link GitLabWebhookService}.
  *
- * <p>Stage-1 (#1198) migration: legacy {@code Workspace.gitlab*} setters are gone; the
+ * <p>legacy {@code Workspace.gitlab*} setters are gone; the
  * service now reads/writes the {@code GitLabConfig} on the active GitLab Connection
  * via {@link ConnectionService}. Tests mirror the new flow via a small in-memory map
  * stand-in for the registry so we don't need an integration test container here.

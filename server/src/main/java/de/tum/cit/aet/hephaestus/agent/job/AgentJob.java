@@ -92,13 +92,8 @@ public class AgentJob {
 
     /**
      * Identifies which external system this job runs against. Resolves the per-kind
-     * {@code FeedbackChannel} / {@code InlineFindingChannel} via the unified
-     * integration manifest registry — replaces dispatch keyed off
-     * {@code workspace.git_provider_mode}.
-     *
-     * <p>Nullable for legacy rows created before #1198; the backfill in changeset
-     * {@code 1779700100000-3} maps {@code git_provider_mode} to a {@link IntegrationKind}
-     * for all existing rows. New rows MUST set this at submit time.
+     * {@code FeedbackChannel} / {@code InlineFindingChannel}. New rows MUST set this
+     * at submit time; nullable on the column only because legacy rows are backfilled.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "integration_kind", length = 48)

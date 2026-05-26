@@ -108,7 +108,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         var builder = WorkspaceTestFixtures.installationWorkspace(INSTALLATION_ID, "HephaestusTest")
             .withRepositorySelection(selection)
             .withSlug("ws-install-" + INSTALLATION_ID + "-" + selection.name().toLowerCase(Locale.ENGLISH));
-        // Stage-1 (#1198): the provider classification used by
+        // the provider classification used by
         // WorkspaceRepositoryMonitorService.isGitHubAppWorkspace pulls from the
         // Connection registry, so the fixture must persist the GitHub App connection
         // alongside the Workspace.

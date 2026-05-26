@@ -189,7 +189,7 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(created).as("workspace should be created with fallback slug").isNotNull();
         assertThat(created.getWorkspaceSlug()).isNotEqualTo("install-alpha");
         assertThat(created.getWorkspaceSlug()).startsWith("install-alpha".substring(0, 3));
-        // Stage-1 (#1198): provider mode lives on the Connection registry now, not on Workspace.
+        // provider mode lives on the Connection registry now, not on Workspace.
         assertThat(connectionService.findActiveGitHubAppConfig(created.getId()))
             .as("GitHub App Connection should be active after createOrUpdateFromInstallation")
             .isPresent();

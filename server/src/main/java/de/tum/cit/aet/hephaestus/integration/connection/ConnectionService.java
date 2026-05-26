@@ -18,18 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Orchestrates Connection lookups + state transitions.
- *
- * <p>Transitions are guarded by {@link IntegrationState#canTransitionTo}; same-state
- * calls are idempotent no-ops. Audit-row INSERT carries {@code correlation_id} with a
- * uniqueness constraint, so webhook redelivery never causes state flap.
- *
- * <p>Runtime helpers ({@code findActiveProviderKind}, {@code findActiveGitHubAppConfig},
- * {@code findActiveGitLabConfig}, {@code findSlackNotificationConfig},
- * {@code findActiveBearerToken}, {@code updateConfig}) are the only path callers should
- * use to read or mutate per-Connection state. The legacy {@code Workspace} columns
- * ({@code installation_id}, {@code personal_access_token}, …) are gone after the Stage 1
- * cutover; this service is their authoritative replacement.
+ * Connection lookups + state transitions. Transitions are guarded by
+ * {@link IntegrationState#canTransitionTo}; same-state calls are no-ops. The audit
+ * row's correlation_id uniqueness silences webhook redelivery.
  */
 @Service
 public class ConnectionService {
@@ -68,18 +59,8 @@ public class ConnectionService {
     }
 
     /**
-     * Reverse lookup: workspace id from a GitHub App {@code installationId}.
-     *
-     * <p>Replaces the legacy {@code WorkspaceRepository.findByInstallationId} after
-     * the {@code installation_id} column is dropped — the durable identity lives in
-     * the GitHub Connection's {@code instance_key} now. Returns the FIRST matching
-     * binding; cross-workspace collision is rejected at
-     * {@code GithubInstallationBindingService}, so at most one row exists.
-     *
-     * <p>{@link Optional#empty()} when no GitHub Connection carries this installation
-     * id (uninstalled, never bound, or backfill incomplete). Callers MUST treat empty
-     * the same way they treated the old {@code Optional<Workspace>} — no implicit
-     * create.
+     * Workspace id for a GitHub App installation id. Empty when no GitHub Connection
+     * carries this installation id; callers MUST NOT auto-create on empty.
      */
     @Transactional(readOnly = true)
     public Optional<Long> findWorkspaceIdByGitHubInstallationId(long installationId) {
@@ -90,31 +71,22 @@ public class ConnectionService {
             .map(c -> c.getWorkspace().getId());
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // Runtime helpers — replace the legacy Workspace getInstallationId() /
-    // getPersonalAccessToken() / getGitlabGroupId() / … readers. All return
-    // Optional and never throw on the "no Connection yet" case — callers must
-    // handle the empty path explicitly (the same shape the legacy nullable
-    // columns gave them, no behavioural drift on freshly-provisioned workspaces).
-    // ────────────────────────────────────────────────────────────────────────
-
     /**
-     * Returns the kind of the workspace's SCM Connection.
-     *
-     * <p>Prefers {@link IntegrationKind#GITHUB} if both somehow exist — the legacy
-     * invariant was "one workspace, one SCM provider". A workspace that ends up with
-     * both an ACTIVE GitHub and an ACTIVE GitLab Connection is misconfigured; we pick
-     * GitHub because that matches the historical GitHub-first bootstrap path and gives
-     * deterministic behaviour rather than a coin-flip on row insertion order.
+     * Kind of the workspace's SCM Connection. The invariant is "one workspace, one
+     * SCM provider" — if both ACTIVE rows exist that's corrupt data and we fail loud.
      */
     @Transactional(readOnly = true)
     public Optional<IntegrationKind> findActiveProviderKind(long workspaceId) {
-        if (findActive(workspaceId, IntegrationKind.GITHUB).isPresent()) {
-            return Optional.of(IntegrationKind.GITHUB);
+        boolean github = findActive(workspaceId, IntegrationKind.GITHUB).isPresent();
+        boolean gitlab = findActive(workspaceId, IntegrationKind.GITLAB).isPresent();
+        if (github && gitlab) {
+            throw new IllegalStateException(
+                "Workspace " + workspaceId + " has ACTIVE Connections for both GITHUB and GITLAB; "
+                    + "out-of-band fix required"
+            );
         }
-        if (findActive(workspaceId, IntegrationKind.GITLAB).isPresent()) {
-            return Optional.of(IntegrationKind.GITLAB);
-        }
+        if (github) return Optional.of(IntegrationKind.GITHUB);
+        if (gitlab) return Optional.of(IntegrationKind.GITLAB);
         return Optional.empty();
     }
 
@@ -151,11 +123,8 @@ public class ConnectionService {
     }
 
     /**
-     * Decrypts the stored {@link BearerToken} for the workspace's ACTIVE Connection of
-     * the given kind, if any. The credential blob is decoded against the per-row AAD
-     * (see {@link Connection#credentials}) so tampering or cross-row substitution
-     * surfaces as {@link de.tum.cit.aet.hephaestus.core.security.EncryptionException}
-     * rather than a silent "no auth available".
+     * Decrypts the stored {@link BearerToken} for the workspace's ACTIVE Connection,
+     * if any. Tampering/cross-row substitution surfaces as {@code EncryptionException}.
      */
     @Transactional(readOnly = true)
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
@@ -166,18 +135,9 @@ public class ConnectionService {
     }
 
     /**
-     * Atomically mutate the {@link ConnectionConfig} on the workspace's ACTIVE
-     * Connection of the given kind.
-     *
-     * <p>This is the only sanctioned write path for config-only changes (e.g. stamping
-     * {@code gitlab_webhook_id} on an existing GitLab connection after webhook
-     * registration succeeds). Returns the updated Connection, or empty if no ACTIVE
-     * row exists — callers must handle the "no connection bound yet" path; we will
-     * NOT auto-create on update.
-     *
-     * <p>Mutator gets the current config and must return the replacement variant of
-     * the same sealed subtype. The repository call uses Hibernate's version column to
-     * prevent lost updates under concurrent writes.
+     * Mutate the {@link ConnectionConfig} on the workspace's ACTIVE Connection.
+     * Empty when no ACTIVE row exists — callers MUST NOT auto-create. The mutator
+     * must return the same sealed-subtype variant; cross-variant returns throw.
      */
     @Transactional
     public Optional<Connection> updateConfig(long workspaceId, IntegrationKind kind,
@@ -201,10 +161,8 @@ public class ConnectionService {
     }
 
     /**
-     * Replace the credential blob on the workspace's ACTIVE Connection of the given
-     * kind. Used by GitLab PAT rotation (old token revoked by GitLab → new token must
-     * be persisted immediately). Returns the updated Connection or empty if no ACTIVE
-     * row exists.
+     * Replace the credential blob on the workspace's ACTIVE Connection. Empty when
+     * no ACTIVE row exists.
      */
     @Transactional
     public Optional<Connection> rotateBearerToken(long workspaceId, IntegrationKind kind, BearerToken bundle) {
@@ -215,32 +173,11 @@ public class ConnectionService {
     }
 
     /**
-     * Upsert the workspace's GitHub App binding so it reflects {@code installationId}.
-     *
-     * <p>Two-step rebind:
-     * <ol>
-     *   <li>If a non-UNINSTALLED GitHub Connection exists for this workspace with a
-     *       different {@code instance_key} (PAT row, or a stale App row pointing at a
-     *       different installation), transition it to UNINSTALLED — that path clears
-     *       its credential blob inside the same transaction (per
-     *       {@link IntegrationState#UNINSTALLED} contract).</li>
-     *   <li>Either re-use an existing {@code (workspace, GITHUB, installationId)} row
-     *       (re-bind) or create a new one. The transition to {@code ACTIVE} is wrapped
-     *       in {@link #transition} so the audit row + idempotency contract are honoured.</li>
-     * </ol>
-     *
-     * <p>Used by {@code GithubLifecycleListener.createOrUpdateFromInstallation} on the
-     * PAT→App promotion path. {@code GithubInstallationBindingService.bind} owns the
-     * higher-trust "OAuth-driven bind" entry — it adds the installer-identity check
-     * and the cross-workspace collision guard. This helper is the lifecycle-driven
-     * counterpart: webhook says "install on org X" and we have to make the binding
-     * truthful regardless of what the PAT-mode workspace looked like before.
-     *
-     * @param workspace      the target workspace
-     * @param installationId the GitHub App installation id (becomes the {@code instance_key})
-     * @param accountLogin   GitHub org/user login stored in {@link ConnectionConfig.GitHubAppConfig}
-     * @param correlationId  audit correlation key; webhook redelivery with the same id is silenced
-     * @return the ACTIVE GitHub App connection
+     * Upsert the workspace's GitHub App binding to {@code installationId}. Retires
+     * any non-matching SCM-side row first (clearing its credentials via the
+     * {@link IntegrationState#UNINSTALLED} transition), then activates the
+     * {@code (workspace, GITHUB, installationId)} row. Idempotent on
+     * {@code correlationId}.
      */
     @Transactional
     public Connection upsertGitHubAppConnection(Workspace workspace,
@@ -249,11 +186,8 @@ public class ConnectionService {
                                                 String correlationId) {
         String instanceKey = Long.toString(installationId);
 
-        // Step 1: retire any non-matching SCM-side row on this workspace. The legacy
-        // PAT workspace carries instance_key='pat'; a previously-bound App installation
-        // could carry a different number. Either way, retire it before introducing the
-        // new instance_key to keep the invariant "one ACTIVE GitHub Connection per
-        // workspace" intact.
+        // Retire any non-matching SCM-side row before introducing the new instance_key
+        // (invariant: one ACTIVE GitHub Connection per workspace).
         for (Connection existing : connectionRepository.findByWorkspaceIdAndState(
             workspace.getId(), IntegrationState.ACTIVE)) {
             if (existing.getKind() != IntegrationKind.GITHUB) {
@@ -272,7 +206,6 @@ public class ConnectionService {
             ));
         }
 
-        // Step 2: upsert the (workspace, GITHUB, installationId) row.
         Connection connection = connectionRepository
             .findByWorkspaceIdAndKindAndInstanceKey(workspace.getId(), IntegrationKind.GITHUB, instanceKey)
             .orElseGet(() -> {
@@ -284,8 +217,7 @@ public class ConnectionService {
                 return connectionRepository.save(fresh);
             });
 
-        // Refresh stored accountLogin/orgLogin if the webhook carries a non-blank one
-        // (handles the rare-but-real case where the org renamed since first bind).
+        // Refresh accountLogin/orgLogin if renamed since first bind.
         if (accountLogin != null && !accountLogin.isBlank()
             && connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig current
             && !accountLogin.equals(current.orgLogin())) {
@@ -311,15 +243,44 @@ public class ConnectionService {
     }
 
     /**
-     * Transition the Connection to {@code req.next()}. Idempotent: same-state is a no-op
-     * (no audit row); invalid transitions throw; webhook redelivery is silenced via
-     * the {@code uq_connection_audit_idempotency} constraint.
-     *
-     * <p>Side effect: transitioning to {@link IntegrationState#UNINSTALLED} clears the
-     * credential ciphertext + algorithm tag inside the same transaction. The
-     * {@code IntegrationState.UNINSTALLED} javadoc contract ("credentials cleared") is
-     * enforced here — not in the entity, not in a downstream listener — so the purge is
-     * atomic with the state change.
+     * Upsert + activate the workspace's PAT Connection row. Idempotent on
+     * {@code (workspace, kind, instanceKey)}.
+     */
+    @Transactional
+    public void provisionPatConnection(Workspace workspace,
+                                       IntegrationKind kind,
+                                       String instanceKey,
+                                       ConnectionConfig config,
+                                       String token,
+                                       String correlationId) {
+        Connection connection = connectionRepository
+            .findByWorkspaceIdAndKindAndInstanceKey(workspace.getId(), kind, instanceKey)
+            .orElseGet(() -> {
+                Connection fresh = new Connection(workspace, kind, instanceKey, config);
+                fresh.setDisplayName(workspace.getAccountLogin());
+                return connectionRepository.save(fresh);
+            });
+
+        if (connection.getState() != IntegrationState.ACTIVE) {
+            connection = transition(connection, new TransitionRequest(
+                IntegrationState.ACTIVE,
+                "PAT_PROVISIONED",
+                "SYSTEM",
+                "scm-connection-provisioner",
+                correlationId,
+                "Provisioned PAT connection on workspace creation"
+            ));
+        }
+
+        if (token != null && !token.isBlank()) {
+            rotateBearerToken(workspace.getId(), kind, new BearerToken(token, null));
+        }
+    }
+
+    /**
+     * Transition the Connection to {@code req.next()}. Idempotent on same-state and on
+     * duplicate {@code correlationId}; invalid transitions throw. Transitioning to
+     * {@link IntegrationState#UNINSTALLED} clears credentials atomically.
      */
     @Transactional
     public Connection transition(Connection connection, TransitionRequest req) {

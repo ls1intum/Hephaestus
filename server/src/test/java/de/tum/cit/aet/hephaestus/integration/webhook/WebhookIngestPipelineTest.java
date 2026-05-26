@@ -181,9 +181,8 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
         ResponseEntity<?> resp = pipeline.handle(IntegrationKind.SLACK,
             "{}".getBytes(StandardCharsets.UTF_8), headers());
 
-        // Wave 1B collapsed all auth failures (including stale timestamp) to opaque 401
-        // so attackers cannot probe the distinction between "missing", "bad signature",
-        // and "stale" — would otherwise be a side-channel into the signing scheme.
+        // All auth failures (missing / bad signature / stale) collapse to opaque 401 so
+        // attackers can't probe the signing scheme through status-code side channels.
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(publisher, never()).publish(any());
     }

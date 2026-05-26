@@ -25,7 +25,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -95,7 +95,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
 
         // Workspace with accountLogin = "org" so WorkspaceResolver heuristic matches "org/repo"
-        workspace = WorkspaceTestFactory.activeWorkspace("gate-test");
+        workspace = WorkspaceTestFixtures.activeWorkspace("gate-test");
         workspace.setAccountLogin("org");
         workspace.getFeatures().setPracticesEnabled(true);
         workspace = workspaceRepository.save(workspace);

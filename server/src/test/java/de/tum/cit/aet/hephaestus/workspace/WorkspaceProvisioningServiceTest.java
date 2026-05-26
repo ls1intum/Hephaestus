@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener;
@@ -67,7 +68,7 @@ class WorkspaceProvisioningServiceTest {
     private AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
 
     @Mock
-    private ScmConnectionProvisioner scmConnectionProvisioner;
+    private ConnectionService connectionService;
 
     private WorkspaceProvisioningService provisioningService;
 
@@ -105,7 +106,7 @@ class WorkspaceProvisioningServiceTest {
             workspaceScopeFilter,
             gitLabProperties,
             authenticatedGitProviderUserService,
-            scmConnectionProvisioner
+            connectionService
         );
     }
 
@@ -155,11 +156,7 @@ class WorkspaceProvisioningServiceTest {
         // workspace creations
         verify(workspaceService).createWorkspace(anyString(), anyString(), anyString(), any(), anyLong());
 
-        // The PAT is no longer persisted on Workspace.personal_access_token — the
-        // bootstrap path provisions a GitHub Connection row via ScmConnectionProvisioner
-        // and the credential is stored encrypted on that row. Assert the call carried
-        // the configured token.
-        verify(scmConnectionProvisioner).provisionPatConnection(
+        verify(connectionService).provisionPatConnection(
             eq(workspace),
             eq(IntegrationKind.GITHUB),
             eq("pat"),

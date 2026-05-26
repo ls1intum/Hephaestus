@@ -40,7 +40,8 @@ public record WorkspaceDTO(
     @Schema(description = "Slack channel ID for leaderboard notifications") String leaderboardNotificationChannelId,
     @NonNull @Schema(description = "Whether a Personal Access Token is configured") Boolean hasPersonalAccessToken,
     @NonNull @Schema(description = "Whether Slack token is configured") Boolean hasSlackToken,
-    @NonNull @Schema(description = "Whether Slack signing secret is configured (always false post-#1198)")
+    @NonNull
+    @Schema(description = "Deprecated; signing secret is app-global. Always false.")
     Boolean hasSlackSigningSecret,
     @NonNull
     @Schema(description = "Whether a GitLab webhook has been auto-registered for this workspace")
@@ -58,22 +59,7 @@ public record WorkspaceDTO(
     @Schema(description = "Whether manual practice reviews triggered via bot command are enabled")
     Boolean practiceReviewManualTriggerEnabled
 ) {
-    /**
-     * Builds a {@link WorkspaceDTO} pulling integration-mode metadata from the
-     * {@code Connection} registry rather than from the (now retired) legacy
-     * {@code Workspace} columns. Pass the request-scoped {@code ConnectionService}
-     * so the lookups can run inside the caller's transaction.
-     *
-     * <p>{@code installation_linked_at} is derived from the active GitHub App
-     * connection's {@code createdAt} — the migration backfilled it from the legacy
-     * column for existing rows, and freshly-bound installations stamp it via the
-     * standard {@code @CreationTimestamp} on {@link de.tum.cit.aet.hephaestus.integration.connection.Connection}.
-     *
-     * <p>{@code hasSlackSigningSecret} is always {@code false}: per-workspace signing
-     * secrets are dead at runtime (Slack signing-secret comes from the app-global
-     * {@code hephaestus.slack.signing-secret}). The DTO field is kept for openapi /
-     * webapp compatibility.
-     */
+    /** Builds a DTO pulling integration metadata from the Connection registry. */
     public static WorkspaceDTO from(Workspace workspace, ConnectionService connectionService) {
         long workspaceId = workspace.getId();
 
@@ -90,8 +76,6 @@ public record WorkspaceDTO(
 
         Long installationId = gitHubApp.map(ConnectionConfig.GitHubAppConfig::installationId).orElse(null);
 
-        // installation_linked_at: createdAt on the App connection mirrors what the
-        // legacy column tracked. Empty for non-App workspaces.
         Instant installationLinkedAt = connectionService
             .findActive(workspaceId, IntegrationKind.GITHUB)
             .filter(c -> c.getConfig() instanceof ConnectionConfig.GitHubAppConfig)

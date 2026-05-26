@@ -30,7 +30,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -103,7 +103,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     void setUp() {
         databaseTestUtils.cleanDatabase();
 
-        workspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("delivery-test"));
+        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("delivery-test"));
 
         createPractice("pr-description-quality", "PR Description Quality");
         createPractice("error-handling", "Error Handling");

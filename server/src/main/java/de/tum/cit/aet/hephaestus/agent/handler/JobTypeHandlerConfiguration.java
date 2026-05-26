@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
-import de.tum.cit.aet.hephaestus.integration.connection.JobIntegrationKindResolver;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
@@ -55,20 +54,16 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    PullRequestCommentPoster pullRequestCommentPoster(
-        List<FeedbackChannel> feedbackChannels,
-        JobIntegrationKindResolver kindResolver
-    ) {
-        return new PullRequestCommentPoster(feedbackChannels, kindResolver);
+    PullRequestCommentPoster pullRequestCommentPoster(List<FeedbackChannel> feedbackChannels) {
+        return new PullRequestCommentPoster(feedbackChannels);
     }
 
     @Bean
     DiffNotePoster diffNotePoster(
         PullRequestCommentPoster commentPoster,
-        JobIntegrationKindResolver kindResolver,
         List<InlineFindingChannel> inlineFindingChannels
     ) {
-        return new DiffNotePoster(commentPoster, kindResolver, inlineFindingChannels);
+        return new DiffNotePoster(commentPoster, inlineFindingChannels);
     }
 
     @Bean

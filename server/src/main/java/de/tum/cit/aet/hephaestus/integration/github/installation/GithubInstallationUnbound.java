@@ -104,7 +104,7 @@ public class GithubInstallationUnbound {
      * stay compilable until the webhook handler population work lands and migrates
      * them to {@link #GithubInstallationUnbound(long, long, String)}.
      */
-    @Deprecated(forRemoval = true, since = "1198 Wave 9")
+    @Deprecated(forRemoval = true)
     public GithubInstallationUnbound(long installationId) {
         this.installationId = installationId;
     }
@@ -115,7 +115,7 @@ public class GithubInstallationUnbound {
      * The bind endpoint's identity check refuses any row without these fields, so
      * making them mandatory at construction prevents the regression where a writer
      * "forgets" to populate the installer columns and silently re-opens the
-     * confused-deputy CVE closed in Wave 5.
+     * confused-deputy CVE on the installer identity check.
      */
     public GithubInstallationUnbound(long installationId, long installerGithubUserId, String installerLogin) {
         if (installerLogin == null || installerLogin.isBlank()) {
@@ -149,8 +149,8 @@ public class GithubInstallationUnbound {
      * {@link #GithubInstallationUnbound(long, long, String)} — the setter is
      * scheduled for removal alongside the deprecated constructor.
      */
-    @Deprecated(forRemoval = true, since = "1198 Wave 9")
+    @Deprecated(forRemoval = true)
     public void setInstallerGithubUserId(@Nullable Long id) { this.installerGithubUserId = id; }
-    @Deprecated(forRemoval = true, since = "1198 Wave 9")
+    @Deprecated(forRemoval = true)
     public void setInstallerLogin(@Nullable String login) { this.installerLogin = login; }
 }

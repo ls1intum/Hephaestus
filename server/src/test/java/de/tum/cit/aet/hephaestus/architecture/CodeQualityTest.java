@@ -62,10 +62,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "GitHubPullRequestSyncService", // Coordinates review, review comment, and project item sub-sync services
                 "WorkspaceProvisioningService", // Orchestrates provisioning across GitHub and GitLab providers
                 "MentorChatService", // Coordinates persistence, SSE, runner, lock, metrics, executor, llm config, context build
-                // #1198 Stage 1: ConnectionService dependency added to read per-Connection state
-                // (GitHub installation id, GitLab server url, PAT) instead of legacy Workspace columns.
-                // Both services are full provider-lifecycle orchestrators — splitting them further
-                // would scatter related logic without reducing coupling.
+                // Full provider-lifecycle orchestrators with broad ConnectionService usage —
+                // splitting them further scatters related logic without reducing coupling.
                 "GitLabWorkspaceInitializationService",
                 "WorkspaceRepositoryMonitorService"
             );

@@ -8,20 +8,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * App-global GitLab webhook secret source.
+ * App-global GitLab webhook secret source. Returns the shared
+ * {@code hephaestus.webhook.secret} for both verification modes: the plaintext path
+ * byte-compares this value, the {@code whsec_*} path interprets a {@code whsec_<b64>}
+ * prefix as a Standard Webhooks signing secret and treats anything else as opaque bytes.
  *
- * <p>First cut for #1198: returns the same shared {@code hephaestus.webhook.secret}
- * for both verification modes. The plaintext path byte-compares this value directly;
- * the {@code whsec_*} path interprets it as the {@code whsec_<b64>} signing secret
- * if it begins with {@code whsec_}, and treats it as opaque bytes otherwise.
- *
- * <p>TODO(#1198 follow-up): per-workspace {@code whsec_*} secrets live in each
- * Connection's {@link de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig.GitLabConfig}
- * blob, decrypted via the per-Connection credential converter. Switching this source
- * to {@code Scope.WORKSPACE} requires that converter, which ships in the credential
- * provider follow-up. Until then, multi-tenant setups using Standard Webhooks must
- * share one signing secret cluster-wide — acceptable for the migration first cut,
- * not acceptable long-term.
+ * <p>TODO: per-workspace {@code whsec_*} secrets in {@code GitLabConfig} blobs — requires
+ * the per-Connection credential converter and {@code Scope.WORKSPACE} wiring. Until then,
+ * multi-tenant Standard Webhooks setups share one cluster-wide signing secret.
  */
 @Component
 public class GitlabWebhookSecretSource implements WebhookSecretSource {

@@ -85,16 +85,6 @@ public class Connection {
     @Nullable
     private String credentialsAlg;
 
-    /**
-     * Mirrors the first byte of {@link #credentialsEncrypted} ({@code 0x02} for every
-     * row written by the v2-only converter). Kept as a column so ops queries can
-     * count credential-bearing rows by format without decrypting; will become trivially
-     * uniform now that v1 is gone, but is retained for future format roll-outs.
-     */
-    @Column(name = "credentials_format_version")
-    @Nullable
-    private Short credentialsFormatVersion;
-
     @Column(name = "replaces_connection_id")
     @Nullable
     private Long replacesConnectionId;
@@ -196,17 +186,10 @@ public class Connection {
         if (bundle == null) {
             this.credentialsEncrypted = null;
             this.credentialsAlg = null;
-            this.credentialsFormatVersion = null;
             return;
         }
-        byte[] encrypted = converter.encrypt(bundle, encryptionContext());
-        this.credentialsEncrypted = encrypted;
+        this.credentialsEncrypted = converter.encrypt(bundle, encryptionContext());
         this.credentialsAlg = CredentialBundleConverter.ALGORITHM_TAG;
-        // `encrypted` is null in a few mock-converter test paths; clear the format
-        // version to keep it in lockstep with the absent blob rather than NPE.
-        this.credentialsFormatVersion = (encrypted == null || encrypted.length == 0)
-            ? null
-            : (short) (encrypted[0] & 0xFF);
     }
 
     /**

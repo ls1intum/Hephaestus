@@ -8,12 +8,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins #1198 AC#8 — agent-side code must not depend on the legacy
- * {@link GitProviderType} enum. Dispatch by vendor lives behind
- * {@code integration.spi.IntegrationKind} and the helper
- * {@code integration.connection.JobIntegrationKindResolver}, which is the only
- * place the legacy enum-to-kind mapping survives until the connection-cutover
- * changeset drops the column.
+ * Agent-side code must dispatch by {@link de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind}
+ * only — never by the legacy {@link GitProviderType} enum.
  */
 class AgentDoesNotBranchOnGitProviderTypeTest extends HephaestusArchitectureTest {
 
@@ -26,12 +22,7 @@ class AgentDoesNotBranchOnGitProviderTypeTest extends HephaestusArchitectureTest
             .should()
             .dependOnClassesThat()
             .haveFullyQualifiedName(GitProviderType.class.getName())
-            .because(
-                "#1198 AC#8: agent-side code (DiffNotePoster, PullRequestCommentPoster, "
-                    + "FeedbackDeliveryService) dispatches by IntegrationKind only. Mapping from "
-                    + "the legacy GitProviderType enum belongs in integration/connection/"
-                    + "JobIntegrationKindResolver and disappears at connection-cutover."
-            );
+            .because("agent/** dispatches by IntegrationKind only");
         rule.check(classes);
     }
 }

@@ -50,21 +50,10 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * make testing difficult, and prevent independent deployment.
          * This is one of the most important architectural constraints.
          *
-         * <p><b>Slice assignment note:</b> Per epic #1198 the {@code integration}
-         * package (provider-agnostic SCM kernel under {@code integration.scm},
-         * per-vendor handlers under {@code integration.github} /
-         * {@code integration.gitlab}, cross-cutting traits, Connection registry)
-         * forms a single platform kernel. The {@code workspace} module is bidirectionally
-         * coupled to that kernel by design: workspace owns Connection rows
-         * (integration → workspace via {@code Connection.workspace}) and
-         * provisions/queries SCM data (workspace → integration.scm
-         * for entities, properties, and rate-limit tooling). Collapsing the
-         * two top-level packages into a single {@code platform} slice
-         * models the post-epic architecture and prevents the integration.scm →
-         * integration.scm rename from mechanically tripping a cycle that
-         * pre-existed at the FQN level. Cross-platform-internal cycles are still policed
-         * by the more specific tests in {@code ModuleBoundaryTest} and
-         * {@code CrossCuttingModuleBoundaryTest}.
+         * <p><b>Slice note:</b> {@code integration} and {@code workspace} are folded
+         * into a single {@code platform} slice — they are bidirectionally coupled by
+         * design (Connection rows are workspace-owned). Inner cycles are policed by
+         * {@code ModuleBoundaryTest} and {@code CrossCuttingModuleBoundaryTest}.
          */
         @Test
         @DisplayName("No cycles between top-level modules")
@@ -88,7 +77,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
 
                 @Override
                 public String getDescription() {
-                    return "top-level slice (integration+workspace folded into platform during #1198)";
+                    return "top-level slice (integration+workspace folded into platform)";
                 }
             };
 
@@ -137,10 +126,8 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         @DisplayName("SPI interfaces are not added under integration.scm.common")
         void spiInterfacesAreInSpiPackage() {
-            // Post-#1198: the legacy integration.scm.common.spi package has been
-            // dissolved into integration.spi. This rule prevents Provider/
-            // Resolver/Listener interfaces from creeping back into the
-            // integration.scm module by name.
+            // Prevent Provider/Resolver/Listener SPI interfaces from creeping back
+            // into integration.scm — they belong in integration.spi.
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage("..integration.scm.common..")

@@ -20,9 +20,8 @@ import org.junit.jupiter.api.Test;
  *   <li>{@link #kindModulesDoNotImportEachOther} — {@code integration/github} cannot
  *       import {@code integration/gitlab}, etc. Cross-kind coupling defeats the point
  *       of the SPI.
- *   <li>{@link #agentDoesNotBranchOnIntegrationKind} — closes AC#8 of #1198 for the new
- *       enum. {@code AgentDoesNotBranchOnGitProviderTypeTest} only covers the legacy
- *       {@code GitProviderType}; this catches the same smell on {@code IntegrationKind}.
+ *   <li>{@link #agentDoesNotBranchOnIntegrationKind} — agent/** must dispatch via SPI
+ *       rather than switching on {@code IntegrationKind}.
  * </ul>
  */
 class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {

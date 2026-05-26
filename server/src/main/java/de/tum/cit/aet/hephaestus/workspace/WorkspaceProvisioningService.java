@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.scm.user.AuthenticatedGitProviderUserService;
@@ -54,7 +55,7 @@ public class WorkspaceProvisioningService {
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitLabProperties gitLabProperties;
     private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
-    private final ScmConnectionProvisioner scmConnectionProvisioner;
+    private final ConnectionService connectionService;
     private final WebClient webClient;
 
     public WorkspaceProvisioningService(
@@ -72,7 +73,7 @@ public class WorkspaceProvisioningService {
         WorkspaceScopeFilter workspaceScopeFilter,
         GitLabProperties gitLabProperties,
         AuthenticatedGitProviderUserService authenticatedGitProviderUserService,
-        ScmConnectionProvisioner scmConnectionProvisioner
+        ConnectionService connectionService
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
@@ -88,7 +89,7 @@ public class WorkspaceProvisioningService {
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitLabProperties = gitLabProperties;
         this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
-        this.scmConnectionProvisioner = scmConnectionProvisioner;
+        this.connectionService = connectionService;
         this.webClient = WebClient.builder()
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
@@ -147,7 +148,7 @@ public class WorkspaceProvisioningService {
         // Provision the GitHub PAT Connection row. instance_key="pat" matches the
         // backfill convention for legacy PAT workspaces — single PAT row per workspace,
         // ACTIVE state, bearer credential stored encrypted via the per-row AAD.
-        scmConnectionProvisioner.provisionPatConnection(
+        connectionService.provisionPatConnection(
             savedWorkspace,
             IntegrationKind.GITHUB,
             "pat",
@@ -237,7 +238,7 @@ public class WorkspaceProvisioningService {
         // co-exist if needed; the group id isn't known yet at bootstrap so we use the
         // server URL alone — webhook registration will fill in the group id later.
         String instanceKey = serverUrl;
-        scmConnectionProvisioner.provisionPatConnection(
+        connectionService.provisionPatConnection(
             savedWorkspace,
             IntegrationKind.GITLAB,
             instanceKey,

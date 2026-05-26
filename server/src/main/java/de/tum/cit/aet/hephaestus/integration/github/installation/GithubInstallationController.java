@@ -30,11 +30,8 @@ import org.springframework.web.server.ResponseStatusException;
  * {@code MultiTenancyArchitectureTest.ControllerWorkspaceContextTests} sees a workspace
  * scope on every method.
  *
- * <p>TODO(#1198 follow-up): {@link RequireWorkspaceAdminForBinding} is permissive
- * ({@code isAuthenticated()}). Tightening it to {@code @workspaceSecure.isAdminOfWorkspace(#workspaceId)}
- * needs a parameterised SpEL on {@code WorkspaceSecurityExpressions} that resolves the
- * workspace by id directly (without {@code WorkspaceContextHolder}, which is only populated
- * on {@code /workspaces/{slug}/...} paths). See the annotation's Javadoc for the gap details.
+ * <p>TODO: {@link RequireWorkspaceAdminForBinding} is permissive
+ * ({@code isAuthenticated()}); see its javadoc for the parameterised-SpEL gap.
  */
 @RestController
 @RequestMapping("/api/v1/admin/workspaces/{workspaceId}/integrations/github")

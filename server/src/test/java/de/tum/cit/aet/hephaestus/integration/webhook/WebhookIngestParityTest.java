@@ -30,8 +30,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 /**
- * Pins the unified {@code /webhooks/{kind}} pipeline contract for GitHub and GitLab
- * after the legacy URL-anchor controllers were retired in Stage 2.
+ * Pins the unified {@code /webhooks/{kind}} pipeline contract for GitHub and GitLab.
  *
  * <p>Confirms:
  * <ul>

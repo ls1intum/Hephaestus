@@ -15,40 +15,22 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.PostMapping;
 
 /**
- * Pins the #1198 integration cutover so a future commit cannot silently re-introduce the
- * three regressions PE-C surfaced during the audit:
- *
+ * Pins the integration cutover so a future commit cannot silently re-introduce:
  * <ol>
- *   <li>Re-introducing the {@code gitprovider} package (renamed to {@code integration.scm}
- *       in pass 16/stage 3).</li>
- *   <li>Re-adding per-vendor webhook routes ({@code /github}, {@code /gitlab}, {@code /slack},
- *       {@code /outline}) alongside the unified {@code /webhooks/{kind}} endpoint.</li>
- *   <li>Re-declaring the legacy denormalised columns on {@code Workspace} that the Connection
- *       registry now owns.</li>
+ *   <li>The legacy {@code gitprovider} package (now {@code integration.scm}).</li>
+ *   <li>Per-vendor webhook routes alongside the unified {@code /webhooks/{kind}}.</li>
+ *   <li>Denormalised SCM columns on {@code Workspace} that the Connection registry owns.</li>
  * </ol>
- *
- * <p>Each rule pins a contract that cost real iteration effort to establish. The failure
- * messages name the offending site so a regressing PR fails fast at CI time.
  */
 class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
 
-    /**
-     * Forbid the legacy {@code ..gitprovider..} package from being re-introduced.
-     *
-     * <p>The package was renamed to {@code integration.scm} in pass 16/stage 3 of the #1198
-     * branch ({@code 2488e48fa}). A blanket noClasses-resideIn rule is the cheapest way to
-     * prevent a partial revert from re-creating the legacy package as a sibling.
-     */
     @Test
     @DisplayName("no class resides in the legacy gitprovider package")
     void noClassResidesInGitProviderPackage() {
         ArchRule rule = noClasses()
             .should()
             .resideInAPackage("..gitprovider..")
-            .because(
-                "#1198 pass 16/stage 3 renamed gitprovider/ → integration.scm/. Re-introducing "
-                    + "the legacy package would silently fork the module graph."
-            );
+            .because("gitprovider/ was renamed to integration.scm/; re-introducing it forks the module graph");
         rule.check(classes);
     }
 
@@ -105,26 +87,17 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
             .areAnnotatedWith(PostMapping.class)
             .should(notDeclareLegacyVendorRoute)
             .because(
-                "#1198 cutover collapsed all vendor webhook receivers behind /webhooks/{kind}; "
-                    + "re-adding /github, /gitlab, /slack, or /outline as a top-level ingress "
-                    + "route would create a second, unverified webhook endpoint that bypasses "
-                    + "the unified verification framework."
+                "all vendor webhook receivers live behind /webhooks/{kind}; re-adding /github, "
+                    + "/gitlab, /slack, or /outline would bypass the unified verification framework"
             );
         rule.check(classes);
     }
 
     /**
      * Forbid legacy denormalised connection columns from re-appearing on JPA entities
-     * (specifically {@code Workspace}).
-     *
-     * <p>Pass 16/commit 3 deleted eleven JPA fields that the Connection registry now owns —
-     * silently re-adding them on the entity would re-create the dual-source-of-truth bug the
-     * audit surfaced (workspace row says one thing, connection row says another).
-     *
-     * <p>The rule scopes to {@code @Entity}-annotated classes only. DTOs that intentionally
-     * accept these field names on the API surface (e.g. {@code CreateWorkspaceRequestDTO})
-     * are out of scope — they translate user input into Connection rows server-side and
-     * carry no schema footprint of their own.
+     * in {@code ..workspace..}. The Connection registry owns this data; re-declaring
+     * them on the entity recreates a dual-source-of-truth bug. DTOs keep these field
+     * names on the wire and are out of scope (entity-only filter below).
      */
     @Test
     @DisplayName("Workspace entity does not re-declare legacy Connection-owned fields")
@@ -154,8 +127,7 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
                             field,
                             String.format(
                                 "%s re-introduces a legacy Connection-owned field name on a JPA "
-                                    + "entity — the Connection registry now owns this data. See "
-                                    + "#1198 pass 16/commit 3.",
+                                    + "entity — the Connection registry now owns this data.",
                                 field.getFullName()
                             )
                         )
@@ -164,16 +136,9 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
             }
         };
 
-        // Scope to @Entity classes in the workspace package only. DTOs (CreateWorkspaceRequestDTO,
-        // WorkspaceDTO, GitLabPreflightRequestDTO, …) and context records (WorkspaceContext) MUST
-        // keep these field names on the wire — they're how clients pass credentials in, and how
-        // the server reports back which workspace owns which installation. The dual-source bug
-        // only happens when these field names re-appear as JPA columns; the rule pins that
-        // narrow regression and lets the API surface evolve independently.
-        //
-        // We compose the entity-AND-workspace-package filter via {@link DescribedPredicate#and}
-        // — chaining two `.areDeclaredInClassesThat()` fluents on the ArchRule builder would
-        // OR them, scooping up DTOs and context records the rule was never meant to touch.
+        // Compose entity-AND-workspace-package via DescribedPredicate#and — chaining two
+        // `.areDeclaredInClassesThat()` fluents on the ArchRule builder ORs them and would
+        // sweep DTOs/context records that legitimately keep these field names on the wire.
         com.tngtech.archunit.base.DescribedPredicate<com.tngtech.archunit.core.domain.JavaClass> entityInWorkspace =
             com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage("..workspace..")
                 .and(com.tngtech.archunit.core.domain.properties.CanBeAnnotated.Predicates.annotatedWith(jakarta.persistence.Entity.class));
@@ -182,10 +147,8 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
             .areDeclaredInClassesThat(entityInWorkspace)
             .should(notCarryLegacyName)
             .because(
-                "#1198 pass 16/commit 3 dropped eleven denormalised columns from the Workspace "
-                    + "entity and moved their data into the Connection registry. Re-declaring "
-                    + "those field names on a JPA entity in the workspace package would "
-                    + "silently re-create the dual-source-of-truth bug."
+                "the Connection registry owns these fields; re-declaring them on a JPA entity "
+                    + "in the workspace package would re-create the dual-source-of-truth bug"
             );
         rule.check(classes);
     }

@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -63,7 +63,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
 
-        workspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("finding-test"));
+        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("finding-test"));
 
         practice = new Practice();
         practice.setWorkspace(workspace);
@@ -248,7 +248,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         @DisplayName("purging workspace A does not affect workspace B findings")
         void purgeDoesNotAffectOtherWorkspace() {
             // Create workspace B with its own practice and finding
-            Workspace workspaceB = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("ws-b"));
+            Workspace workspaceB = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("ws-b"));
             Practice practiceB = new Practice();
             practiceB.setWorkspace(workspaceB);
             practiceB.setSlug("practice-b");
@@ -454,7 +454,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("workspace isolation: excludes findings from other workspaces")
         void workspaceIsolation() {
-            Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("other-ws"));
+            Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("other-ws"));
             Practice otherPractice = new Practice();
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("test-practice"); // Same slug, different workspace

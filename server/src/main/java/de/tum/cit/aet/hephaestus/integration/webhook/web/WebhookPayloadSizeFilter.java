@@ -14,16 +14,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Rejects oversized webhook POSTs before Spring buffers the body. Tomcat's
- * {@code max-http-post-size} only enforces on form bodies, so JSON webhooks would otherwise
- * be unconstrained. Missing {@code Content-Length} (chunked / unknown length) is rejected with
- * {@code 411 Length Required} — webhook providers always send {@code Content-Length}, so
- * chunked traffic on these endpoints is either a misconfigured client or an attempt to bypass
- * the size cap.
- *
- * <p>Bound to the unified ingest path {@code /webhooks/<kind>} via {@link
- * de.tum.cit.aet.hephaestus.integration.webhook.WebhookConfiguration#webhookPayloadSizeFilter}.
- * Legacy per-kind paths ({@code /github}, {@code /gitlab}) were retired in pass 16/stage 2 and
- * are no longer routed.
+ * {@code max-http-post-size} only enforces on form bodies, so JSON webhooks would
+ * otherwise be unconstrained. Missing {@code Content-Length} is rejected with 411.
+ * Bound to {@code /webhooks/<kind>}.
  */
 public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
 

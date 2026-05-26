@@ -13,22 +13,22 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Set;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * Shared test fixtures for workspace-related integration tests.
- * <p>
- * The Workspace entity no longer carries provider classification or integration
- * credentials — those live on per-kind {@link Connection} rows owned by the
- * Connection registry. Tests that need a workspace with an active GitHub App or
- * GitLab binding should go through {@link #persistInstallationWorkspace} or
- * {@link #persistGitLabWorkspace}, which create both the {@link Workspace} and
- * the matching ACTIVE Connection row in one shot. Tests that need a real bearer
- * token blob (e.g. GitLab PAT rotation flows) should additionally call
- * {@code ConnectionService.rotateBearerToken(...)} — these fixtures intentionally
- * skip the credential blob so unit-level tests don't need encryption seed wiring.
- */
+/** Shared test fixtures for workspace + matching Connection rows. */
 public final class WorkspaceTestFixtures {
 
     private WorkspaceTestFixtures() {}
+
+    /** Unsaved active workspace with conventional defaults. */
+    public static Workspace activeWorkspace(String slug) {
+        Workspace workspace = new Workspace();
+        workspace.setWorkspaceSlug(slug);
+        workspace.setDisplayName("Workspace " + slug);
+        workspace.setAccountLogin(slug + "-org");
+        workspace.setAccountType(AccountType.ORG);
+        workspace.setIsPubliclyViewable(true);
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        return workspace;
+    }
 
     /**
      * Creates an unsaved GitHub App installation workspace with standard defaults.

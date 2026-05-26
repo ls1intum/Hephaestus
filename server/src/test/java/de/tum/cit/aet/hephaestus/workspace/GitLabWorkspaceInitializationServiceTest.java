@@ -136,7 +136,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         workspace.setAccountLogin("my-group/subgroup");
         ReflectionTestUtils.setField(workspace, "id", 1L);
 
-        // Stage-1 (#1198) migration: GitLab integration metadata lives on a Connection
+        // GitLab integration metadata lives on a Connection
         // row now, not on Workspace. Each test that triggers initialize() needs to see
         // an active GitLab Connection + bearer token; default-configure that here so the
         // existing test bodies don't have to know about the Connection registry.

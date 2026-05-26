@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.integration.connection.JobIntegrationKindResolver;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.spi.FindingAnchor;
@@ -13,23 +12,15 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Posts inline diff notes on PRs/MRs by dispatching to the per-vendor
- * {@link InlineFindingChannel}. Vendor-specific posting (atomic GitHub review with
- * threads, per-note GitLab createDiffNote with hunk-fallback) lives in the channels
- * under {@code integration/<kind>/feedback/}; this wrapper handles sanitization,
- * mapping the agent-side {@link DiffNote} record to {@link InlineFindingChannel.InlineFinding},
- * and vendor dispatch.
- *
- * <p>Vendor dispatch is keyed off {@link AgentJob#getIntegrationKind()} (post-#1198)
- * via {@link JobIntegrationKindResolver}, which handles the legacy-row fallback
- * outside the agent module so this class stays free of {@code GitProviderType}
- * references.
- *
- * <p>Package-private — created as {@code @Bean} in {@link JobTypeHandlerConfiguration}.
+ * {@link InlineFindingChannel}. Sanitization and DiffNote→InlineFinding mapping
+ * live here; the GraphQL calls live in the channel under
+ * {@code integration/<kind>/feedback/}.
  */
 class DiffNotePoster {
 
@@ -39,16 +30,13 @@ class DiffNotePoster {
     static final String HEPHAESTUS_MARKER = "<!-- hephaestus-diff-note -->";
 
     private final PullRequestCommentPoster commentPoster;
-    private final JobIntegrationKindResolver kindResolver;
     private final Map<IntegrationKind, InlineFindingChannel> channels;
 
     DiffNotePoster(
         PullRequestCommentPoster commentPoster,
-        JobIntegrationKindResolver kindResolver,
         List<InlineFindingChannel> inlineFindingChannels
     ) {
         this.commentPoster = commentPoster;
-        this.kindResolver = kindResolver;
         EnumMap<IntegrationKind, InlineFindingChannel> map = new EnumMap<>(IntegrationKind.class);
         for (InlineFindingChannel channel : inlineFindingChannels) {
             InlineFindingChannel previous = map.putIfAbsent(channel.kind(), channel);
@@ -79,7 +67,10 @@ class DiffNotePoster {
             return new DiffNoteResult(0, 0);
         }
 
-        IntegrationKind kind = kindResolver.resolve(job.getIntegrationKind(), job.getWorkspace().getId());
+        IntegrationKind kind = Objects.requireNonNull(
+            job.getIntegrationKind(),
+            "AgentJob.integrationKind must not be null"
+        );
         InlineFindingChannel channel = channels.get(kind);
         if (channel == null) {
             throw new JobDeliveryException(

@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
@@ -71,7 +72,7 @@ public class WorkspaceService {
     private final LeaguePointsRecalculator leaguePointsRecalculator;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService;
-    private final ScmConnectionProvisioner scmConnectionProvisioner;
+    private final ConnectionService connectionService;
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
@@ -81,7 +82,7 @@ public class WorkspaceService {
         LeaguePointsRecalculator leaguePointsRecalculator,
         WorkspaceMembershipService workspaceMembershipService,
         GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService,
-        ScmConnectionProvisioner scmConnectionProvisioner
+        ConnectionService connectionService
     ) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
@@ -90,7 +91,7 @@ public class WorkspaceService {
         this.leaguePointsRecalculator = leaguePointsRecalculator;
         this.workspaceMembershipService = workspaceMembershipService;
         this.gitLabWorkspaceInitializationService = gitLabWorkspaceInitializationService;
-        this.scmConnectionProvisioner = scmConnectionProvisioner;
+        this.connectionService = connectionService;
     }
 
     // ========================================================================
@@ -193,7 +194,7 @@ public class WorkspaceService {
             String serverUrl = (request.serverUrl() != null && !request.serverUrl().isBlank())
                 ? request.serverUrl().trim()
                 : null;
-            scmConnectionProvisioner.provisionPatConnection(
+            connectionService.provisionPatConnection(
                 workspace,
                 IntegrationKind.GITLAB,
                 serverUrl,
@@ -215,7 +216,7 @@ public class WorkspaceService {
             String serverUrl = (request.serverUrl() != null && !request.serverUrl().isBlank())
                 ? request.serverUrl().trim()
                 : null;
-            scmConnectionProvisioner.provisionPatConnection(
+            connectionService.provisionPatConnection(
                 workspace,
                 IntegrationKind.GITHUB,
                 "pat",

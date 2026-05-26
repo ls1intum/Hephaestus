@@ -20,13 +20,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
  * call from this controller will see a null context and return false (= every bind
  * permanently 403s). We name this annotation explicitly so {@code grep} finds the gap.
  *
- * <p>TODO(#1198 follow-up): replace with
+ * <p>TODO: replace with
  * {@code @PreAuthorize("@workspaceSecure.isAdminOfWorkspace(#workspaceId)")} once a
- * parameterised admin-check method is added to {@link
- * de.tum.cit.aet.hephaestus.workspace.authorization.WorkspaceSecurityExpressions} that
- * resolves the workspace by id (without depending on {@code WorkspaceContextHolder}).
- * That change is out of scope for the framework dissolution slice — it lives in the
- * workspace-authorization module.
+ * parameterised admin-check method (resolving workspace by id) is added to
+ * {@code WorkspaceSecurityExpressions}.
  */
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)

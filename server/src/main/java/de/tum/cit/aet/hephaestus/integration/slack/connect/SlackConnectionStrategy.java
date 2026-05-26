@@ -22,9 +22,8 @@ import org.springframework.stereotype.Component;
  * minted by {@link OAuthStateService} (HMAC-signed, single-use, CSRF-safe).
  *
  * <p>{@link #finalizeConnect} is a stub — the {@code oauth.v2.access} HTTP call
- * lands with the {@code SlackOAuthClient} bean in a follow-up. For #1198 we surface
- * a clear {@link ConnectFinalization.Failed} so end-to-end tests can wire through
- * the redirect path without claiming success on a half-baked exchange.
+ * lands with a future {@code SlackOAuthClient} bean. Returns a clear
+ * {@link ConnectFinalization.Failed} so callers don't claim success on a stub.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
@@ -73,7 +72,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public ConnectFinalization finalizeConnect(IntegrationRef ref, Map<String, String> callbackParams) {
-        // TODO(#1198 next slice): wire a SlackOAuthClient that POSTs to
+        // TODO: wire a SlackOAuthClient that POSTs to
         // https://slack.com/api/oauth.v2.access with client_id + client_secret + code,
         // then returns ConnectFinalization.Completed(team_id, BearerToken(bot_token), team_name).
         log.warn("Slack finalizeConnect called but OAuth code exchange not yet wired (workspace={}, params keys={})",
@@ -89,7 +88,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public void revoke(IntegrationRef ref) {
-        // TODO(#1198 next slice): call https://slack.com/api/auth.revoke best-effort.
+        // TODO: call https://slack.com/api/auth.revoke best-effort.
         log.debug("Slack revoke stub for workspace={}", ref.workspaceId());
     }
 

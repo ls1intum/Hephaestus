@@ -20,20 +20,11 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Encrypts {@link CredentialBundle} ↔ raw ciphertext bytes with AES-256-GCM and a
- * per-row AAD derived from {@link EncryptionContext}.
- *
- * <p>The AAD binds the ciphertext to its {@code (workspaceId, kind, instanceKey,
- * columnFqn)} row coordinates, so a blob copied into a different row fails GCM
- * authentication ({@link javax.crypto.AEADBadTagException}) — closes the cross-row
- * substitution CVE flagged in audit pass 3.
- *
- * <p>The wire format is a single version (v2, {@code 0x02}). The {@link
- * AttributeConverter} interface is implemented for symmetry with JPA discovery but
- * the legacy {@code convertToEntityAttribute(byte[])} path is intentionally
- * context-less: it rejects every v2 blob it sees. Runtime reads go through {@link
- * Connection#credentials(CredentialBundleConverter)} which holds the {@link
- * EncryptionContext} for its row.
+ * AES-256-GCM encrypter for {@link CredentialBundle}. The GCM AAD binds the
+ * ciphertext to its {@code (workspaceId, kind, instanceKey, columnFqn)} row, so a
+ * blob copied to a different row fails authentication. The {@link AttributeConverter}
+ * context-less paths reject all blobs — runtime reads must go through
+ * {@link Connection#credentials(CredentialBundleConverter)}.
  */
 @Component
 @Converter(autoApply = false)
@@ -44,7 +35,7 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     /** Tag persisted on {@code connection.credentials_alg} for any blob written by this converter. */
     public static final String ALGORITHM_TAG = "aesgcm-v1";
 
-    /** First byte of every v2-format ciphertext (per-row AAD). v1 was retired with Stage 2. */
+    /** First byte of every v2-format ciphertext (per-row AAD). */
     public static final byte FORMAT_VERSION_V2 = 0x02;
 
     private static final String ALGORITHM = "AES/GCM/NoPadding";
@@ -156,8 +147,6 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
      * columnFqn)} tuple.
      */
     public byte[] encrypt(CredentialBundle bundle, EncryptionContext ctx) {
-        if (bundle == null) throw new IllegalArgumentException("bundle must not be null");
-        if (ctx == null) throw new IllegalArgumentException("ctx must not be null");
         requireEnabled("persist");
         return encryptInternal(serialize(bundle), ctx.toAad(), FORMAT_VERSION_V2);
     }
@@ -167,8 +156,6 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
      * or unsupported version → {@link EncryptionException}.
      */
     public CredentialBundle decrypt(byte[] dbData, EncryptionContext ctx) {
-        if (dbData == null) throw new IllegalArgumentException("dbData must not be null");
-        if (ctx == null) throw new IllegalArgumentException("ctx must not be null");
         requireEnabled("decrypt");
         byte version = versionByte(dbData);
         if (version != FORMAT_VERSION_V2) {
@@ -176,10 +163,6 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
         }
         return deserialize(decryptInternal(dbData, 1, ctx.toAad()));
     }
-
-    // -----------------------------------------------------------------------
-    // Internal helpers
-    // -----------------------------------------------------------------------
 
     private byte[] encryptInternal(byte[] plaintext, byte[] aad, byte versionByte) {
         try {

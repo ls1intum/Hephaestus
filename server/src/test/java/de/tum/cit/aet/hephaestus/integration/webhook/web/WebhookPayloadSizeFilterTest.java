@@ -132,9 +132,8 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
 
     @Test
     void bypassesLegacyWebhookPaths() throws Exception {
-        // Legacy /gitlab and /github URLs were retired in #1198 stage 2. The filter must NOT
-        // match them — they should fall through to a normal 404 from Spring rather than be
-        // accepted by the size filter (which would imply the route still exists).
+        // Legacy /gitlab and /github URLs are retired. The filter must NOT match them —
+        // they should fall through to a 404 rather than be accepted by the size filter.
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/gitlab");
         request.setContentType("application/json");
         request.setContent(new byte[2048]);

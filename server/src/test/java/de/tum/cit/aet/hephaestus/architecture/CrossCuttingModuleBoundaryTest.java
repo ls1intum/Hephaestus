@@ -233,9 +233,6 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          *
          * <p>Analytics adapters (PostHog) are outbound clients. Feature modules
          * may consume them; they must not pull feature internals.
-         *
-         * <p>Renamed from {@code integrations/} in #1198 — see
-         * {@code analytics/package-info.java} for rationale.
          */
         @Test
         @DisplayName("Analytics does not depend on feature module internals")

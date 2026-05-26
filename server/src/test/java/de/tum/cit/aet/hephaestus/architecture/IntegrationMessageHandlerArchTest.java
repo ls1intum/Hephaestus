@@ -63,9 +63,8 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
 
         assertThat(reintroduced)
             .as(
-                "The legacy per-kind GitHub/GitLab message-handler registries and their "
-                    + "abstract bases were deleted in #1198 Slice F. Re-introducing them under "
-                    + "any of these fully-qualified names splits the routing surface again."
+                "Legacy per-kind GitHub/GitLab message-handler registries are deleted; "
+                    + "re-introducing them under any of these FQNs splits the routing surface."
             )
             .isEmpty();
     }

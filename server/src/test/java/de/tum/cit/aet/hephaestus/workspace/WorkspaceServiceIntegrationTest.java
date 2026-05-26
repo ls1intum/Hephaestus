@@ -56,7 +56,7 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
             owner
         );
 
-        // Stage-1 (#1198): team + channelId live on the Slack Connection's config now,
+        // team + channelId live on the Slack Connection's config now,
         // so updateNotifications requires an ACTIVE Slack Connection to exist.
         // Seed one ourselves — the OAuth callback path normally provisions it; here we
         // shortcut for the test.
@@ -136,7 +136,7 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
             RepositorySelection.ALL
         );
 
-        // Stage-1 (#1198): provider mode + installation id live on the Connection
+        // provider mode + installation id live on the Connection
         // registry now, not on Workspace.
         assertThat(connectionService.findActiveProviderKind(promoted.getId()))
             .hasValue(IntegrationKind.GITHUB);

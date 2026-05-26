@@ -21,7 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -82,7 +82,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
 
-        workspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("submit-test"));
+        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("submit-test"));
 
         agentConfig = new AgentConfig();
         agentConfig.setWorkspace(workspace);

@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -33,7 +33,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        workspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("practice-test"));
+        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("practice-test"));
     }
 
     private Practice createPractice(String slug, String name, String category) {
@@ -95,7 +95,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             practiceRepository.save(createPractice("shared-slug", "First", "cat"));
 
             Workspace otherWorkspace = workspaceRepository.save(
-                WorkspaceTestFactory.activeWorkspace("other-workspace")
+                WorkspaceTestFixtures.activeWorkspace("other-workspace")
             );
             Practice otherPractice = createPractice("shared-slug", "Second", "cat");
             otherPractice.setWorkspace(otherWorkspace);
@@ -152,7 +152,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             practiceRepository.save(createPractice("one", "One", "cat"));
             practiceRepository.save(createPractice("two", "Two", "cat"));
 
-            Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("other-ws"));
+            Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("other-ws"));
             Practice otherPractice = createPractice("other", "Other", "cat");
             otherPractice.setWorkspace(otherWorkspace);
             practiceRepository.save(otherPractice);

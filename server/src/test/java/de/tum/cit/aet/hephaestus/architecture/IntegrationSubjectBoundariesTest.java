@@ -7,16 +7,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins #1198 pass-14: the bare {@code OrganizationRepository#findByLoginIgnoreCase(String)}
- * method (no provider scoping) must never be reintroduced.
- *
- * <p>Background: pre-pass-14, a `HephaestusTest` org on github.com and a `hephaestustest`
- * group on gitlab.lrz.de got fused into one row by unscoped case-insensitive lookup.
- * The fix removed the unscoped method and migrated every call site to
- * {@code findByLoginIgnoreCaseAndProviderId} or
- * {@code findByLoginIgnoreCaseAndProvider_Type}. This rule prevents regression.
- *
- * <p>See ADR-0012 — Cross-instance identity safety on sync paths.
+ * The bare {@code OrganizationRepository#findByLoginIgnoreCase(String)} (no provider
+ * scoping) MUST NOT be reintroduced — it fuses same-named orgs across providers
+ * (e.g. {@code HephaestusTest} on github.com vs {@code hephaestustest} on gitlab.lrz.de)
+ * into one row. Use {@code findByLoginIgnoreCaseAndProviderId} or
+ * {@code findByLoginIgnoreCaseAndProvider_Type}. See ADR-0012.
  */
 class IntegrationSubjectBoundariesTest extends HephaestusArchitectureTest {
 

@@ -12,13 +12,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit-level guard rails for the integration-classification fields added to {@link AgentJob}
- * in #1198 (changeset {@code 1779700100000_agent_job_integration_classification}).
- *
- * <p>Boots no Spring context — the fields are simple Lombok-generated bean properties and
- * the JPA mapping shape (column name, length, enum-string discriminator) is asserted
- * reflectively. A full schema-DDL parity check happens in the Liquibase + Hibernate
- * integration suite; this keeps the contract green in the fast unit lane.
+ * Unit-level guard rails for the integration-classification fields on {@link AgentJob}.
+ * Asserts column name/length/discriminator reflectively (no Spring context).
  */
 @DisplayName("AgentJob integration classification — schema + accessors")
 class AgentJobIntegrationClassificationTest extends BaseUnitTest {

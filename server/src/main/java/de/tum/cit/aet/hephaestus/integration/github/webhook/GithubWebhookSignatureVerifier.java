@@ -28,8 +28,8 @@ import org.springframework.stereotype.Component;
  * App is installed to confirm reachability and treats any non-2xx as the App being
  * unreachable. The ping carries a valid signature in normal operation, but verifying
  * it here would still gate liveness on a configured secret which the operator may
- * not have wired yet during initial install. Returning {@code "pong"} matches the
- * pre-Stage-2 controller behaviour without leaking secret state.
+ * not have wired yet during initial install. Returning {@code "pong"} acknowledges
+ * the ping without leaking secret state.
  */
 @Component
 public class GithubWebhookSignatureVerifier implements WebhookSignatureVerifier {

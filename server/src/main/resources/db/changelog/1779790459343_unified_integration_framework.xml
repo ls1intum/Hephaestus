@@ -16,8 +16,7 @@
 
         Logical contents:
 
-          1.  Connection aggregate + audit + partial-unique for NULL instance_key
-              + credentials_format_version observability column.
+          1.  Connection aggregate + audit + partial-unique for NULL instance_key.
           2.  github_installation_unbound pre-workspace bootstrap (with installer
               identity columns from Wave 5 baked in).
           3.  integration_webhook_subscription per-subscription signing-secret sidecar.
@@ -104,9 +103,6 @@
             </column>
             <column name="credentials_encrypted" type="bytea"/>
             <column name="credentials_alg" type="varchar(64)"/>
-            <!-- v2-only after Stage 2: blob[0] is always 0x02. NULL when no
-                 credential is persisted (App-mode installs mint tokens on demand). -->
-            <column name="credentials_format_version" type="SMALLINT"/>
             <column name="replaces_connection_id" type="bigint"/>
             <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
                 <constraints nullable="false"/>

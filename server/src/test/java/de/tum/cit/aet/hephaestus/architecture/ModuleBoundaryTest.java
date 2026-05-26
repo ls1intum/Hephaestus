@@ -215,12 +215,9 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         /**
          * Application domain events should be in events packages.
          *
-         * <p>Events enable loose coupling between modules. Our cross-vendor
-         * domain events live in {@code integration.events} (post-#1198) and
-         * the legacy {@code integration.scm} module no longer hosts any event
-         * classes. Activity events are in the activity module and use the
-         * activity_event ledger for persistence. Generated GraphQL model
-         * classes ending in 'Event' are excluded.
+         * <p>Cross-vendor domain events live in {@code integration.events}; activity
+         * events use the activity_event ledger. Generated GraphQL model classes
+         * ending in 'Event' are excluded.
          */
         @Test
         @DisplayName("Domain events are in events packages")
@@ -384,8 +381,8 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          *
          * <p>They SHOULD depend on:
          * <ul>
-         *   <li>integration.spi - Service Provider Interfaces (post-#1198)</li>
-         *   <li>integration.events - Cross-vendor domain events (post-#1198)</li>
+         *   <li>integration.spi - Service Provider Interfaces</li>
+         *   <li>integration.events - Cross-vendor domain events</li>
          *   <li>integration.scm entity packages (for reading data)</li>
          * </ul>
          */
