@@ -213,7 +213,9 @@ public class Connection {
 
     /**
      * Guards against {@code (kind, config)} drift — e.g. a {@code kind=GITLAB} row pointing
-     * at a {@code GitHubAppConfig} payload after a buggy mutator path. Fails the flush.
+     * at a {@code GitHubAppConfig} payload after a buggy mutator path. Pattern-matches on
+     * the sealed {@link ConnectionConfig} hierarchy so adding a new subtype is a compile
+     * error here, not a silent runtime mismatch.
      */
     @PrePersist
     @PreUpdate
@@ -221,17 +223,17 @@ public class Connection {
         if (kind == null || config == null) {
             return;
         }
-        boolean ok = switch (kind) {
-            case GITHUB -> config instanceof ConnectionConfig.GitHubAppConfig
-                || config instanceof ConnectionConfig.GitHubPatConfig;
-            case GITLAB -> config instanceof ConnectionConfig.GitLabConfig;
-            case SLACK -> config instanceof ConnectionConfig.SlackConfig;
-            case OUTLINE -> config instanceof ConnectionConfig.OutlineConfig;
+        IntegrationKind expected = switch (config) {
+            case ConnectionConfig.GitHubAppConfig __ -> IntegrationKind.GITHUB;
+            case ConnectionConfig.GitHubPatConfig __ -> IntegrationKind.GITHUB;
+            case ConnectionConfig.GitLabConfig __ -> IntegrationKind.GITLAB;
+            case ConnectionConfig.SlackConfig __ -> IntegrationKind.SLACK;
+            case ConnectionConfig.OutlineConfig __ -> IntegrationKind.OUTLINE;
         };
-        if (!ok) {
+        if (expected != kind) {
             throw new IllegalStateException(
                 "Connection kind=" + kind + " incompatible with config="
-                    + config.getClass().getSimpleName()
+                    + config.getClass().getSimpleName() + " (expected kind=" + expected + ")"
             );
         }
     }

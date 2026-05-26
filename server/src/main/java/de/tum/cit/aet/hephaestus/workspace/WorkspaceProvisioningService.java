@@ -209,16 +209,25 @@ public class WorkspaceProvisioningService {
             );
         }
 
-        // Skip only if a workspace with this login already has an ACTIVE GitLab Connection.
-        // Bare findByAccountLoginIgnoreCase would false-skip when a different-kind workspace
-        // (e.g. GitHub-only) happens to share the same login string — mirrors the cross-vendor
-        // guard in GithubLifecycleListener#createOrUpdateFromInstallation.
+        // A workspace already exists for this account-login. Two cases:
+        //   (a) it has an ACTIVE GitLab Connection → already bootstrapped, no-op.
+        //   (b) it has an ACTIVE non-GitLab Connection (e.g. GitHub) → refuse cross-vendor
+        //       attach. Symmetric with GithubLifecycleListener#createOrUpdateFromInstallation.
+        //       Falling through to createWorkspace would crash on the slug unique constraint.
         Optional<Workspace> existing = workspaceRepository.findByAccountLoginIgnoreCase(groupPath);
-        if (existing.isPresent()
-            && connectionService.findActive(existing.get().getId(), IntegrationKind.GITLAB).isPresent()) {
-            log.debug(
-                "Skipped GitLab PAT workspace creation, workspace has ACTIVE GitLab Connection: workspaceId={}, groupPath={}",
-                existing.get().getId(),
+        if (existing.isPresent()) {
+            long existingId = existing.get().getId();
+            if (connectionService.findActive(existingId, IntegrationKind.GITLAB).isPresent()) {
+                log.debug(
+                    "Skipped GitLab PAT workspace creation, workspace has ACTIVE GitLab Connection: workspaceId={}, groupPath={}",
+                    existingId,
+                    groupPath
+                );
+                return;
+            }
+            log.warn(
+                "Skipped GitLab PAT workspace creation, workspace has ACTIVE non-GITLAB Connection (cross-vendor refuse): workspaceId={}, groupPath={}",
+                existingId,
                 groupPath
             );
             return;
