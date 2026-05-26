@@ -165,11 +165,9 @@ public class WorkspaceService {
     }
 
     /**
-     * Creates a workspace from a DTO, including optional git provider configuration.
-     *
-     * <p>For GitLab workspaces, the DTO should include {@code gitProviderMode = GITLAB_PAT}
-     * along with a personal access token and optional server URL. The PAT is automatically
-     * encrypted at rest via {@link de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter}.
+     * Creates a workspace from a DTO and provisions the matching {@link IntegrationKind}
+     * Connection. The PAT travels through {@code ConnectionService.rotateBearerToken}
+     * which encrypts at rest under the registry's AES-256-GCM converter.
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
@@ -185,8 +183,7 @@ public class WorkspaceService {
             ownerUserId
         );
 
-        boolean isGitLab = request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT;
-        boolean isGitHubPat = request.gitProviderMode() == Workspace.GitProviderMode.PAT_ORG;
+        boolean isGitLab = request.kind() == IntegrationKind.GITLAB;
 
         if (isGitLab) {
             // GitLab PAT workspaces monitor all repositories in the group by default.
@@ -210,7 +207,10 @@ public class WorkspaceService {
                 request.personalAccessToken(),
                 "create-workspace-" + workspace.getId()
             );
-        } else if (isGitHubPat) {
+        } else {
+            // kind == GITHUB → PAT-backed; App installations bypass this DTO entirely
+            // (they arrive via GithubLifecycleListener.createOrUpdateFromInstallation).
+            // The DTO validator rejects any other kind.
             workspaceRepository.save(workspace);
             String serverUrl = (request.serverUrl() != null && !request.serverUrl().isBlank())
                 ? request.serverUrl().trim()
@@ -223,11 +223,6 @@ public class WorkspaceService {
                 request.personalAccessToken(),
                 "create-workspace-" + workspace.getId()
             );
-        } else {
-            // GITHUB_APP_INSTALLATION via this DTO path is not supported — App workspaces
-            // come in through GithubLifecycleListener.createOrUpdateFromInstallation. Fall
-            // through to a plain save so the workspace row is persisted.
-            workspaceRepository.save(workspace);
         }
 
         return workspace;
@@ -249,7 +244,7 @@ public class WorkspaceService {
         // Trigger async repository discovery for GitLab PAT workspaces.
         // The @Transactional createWorkspace() has already committed at this point,
         // so the async thread will find the workspace in the database.
-        if (request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+        if (request.kind() == IntegrationKind.GITLAB) {
             gitLabWorkspaceInitializationService.initializeAsync(workspace.getId());
         }
 

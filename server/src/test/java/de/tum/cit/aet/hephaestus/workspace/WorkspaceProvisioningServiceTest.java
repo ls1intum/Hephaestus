@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,6 +13,8 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
@@ -151,7 +154,20 @@ class WorkspaceProvisioningServiceTest {
         // Default admin handling should not throw and should not trigger redundant
         // workspace creations
         verify(workspaceService).createWorkspace(anyString(), anyString(), anyString(), any(), anyLong());
-        assertThat(workspace.getPersonalAccessToken()).isEqualTo("pat-token");
+
+        // The PAT is no longer persisted on Workspace.personal_access_token — the
+        // bootstrap path provisions a GitHub Connection row via ScmConnectionProvisioner
+        // and the credential is stored encrypted on that row. Assert the call carried
+        // the configured token.
+        verify(scmConnectionProvisioner).provisionPatConnection(
+            eq(workspace),
+            eq(IntegrationKind.GITHUB),
+            eq("pat"),
+            any(ConnectionConfig.GitHubPatConfig.class),
+            eq("pat-token"),
+            anyString()
+        );
+        assertThat(workspace.getId()).isEqualTo(1L);
     }
 
     @Test

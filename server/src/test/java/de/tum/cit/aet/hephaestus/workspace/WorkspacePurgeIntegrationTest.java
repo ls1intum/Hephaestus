@@ -69,7 +69,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 slug + "-group",
                 AccountType.ORG,
                 owner.getId(),
-                Workspace.GitProviderMode.GITLAB_PAT,
+                de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
                 "glpat-purge-test-token",
                 null
             )
@@ -147,7 +147,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "cleanup-group",
                     AccountType.ORG,
                     owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
+                    de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
                     "glpat-cleanup-token",
                     null
                 )
@@ -216,7 +216,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "idempotent-group",
                     AccountType.ORG,
                     owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
+                    de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
                     "glpat-idempotent-token",
                     null
                 )
@@ -321,7 +321,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "chat-cleanup-group",
                     AccountType.ORG,
                     owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
+                    de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
                     "glpat-chat-cleanup-token",
                     null
                 )
@@ -387,7 +387,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "non-owner-group",
                     AccountType.ORG,
                     owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
+                    de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
                     "glpat-non-owner-token",
                     null
                 )

@@ -49,7 +49,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group/my-project",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
             "glpat-test-token-12345",
             "https://gitlab.example.com"
         );
@@ -96,7 +96,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
             "glpat-test-token-67890",
             null
         );
@@ -130,7 +130,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
             null, // missing token
             null
         );
@@ -168,7 +168,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
             "glpat-test-token",
             "http://insecure.example.com" // not HTTPS
         );
@@ -206,7 +206,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "owner-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
             "glpat-owner-token",
             null
         );
@@ -244,7 +244,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "secret-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
             secretToken,
             null
         );
@@ -283,7 +283,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "gitlab-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
             "glpat-list-token",
             null
         );
@@ -335,7 +335,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 "lifecycle-group",
                 AccountType.ORG,
                 owner.getId(),
-                Workspace.GitProviderMode.GITLAB_PAT,
+                de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
                 "glpat-lifecycle-token",
                 null
             )

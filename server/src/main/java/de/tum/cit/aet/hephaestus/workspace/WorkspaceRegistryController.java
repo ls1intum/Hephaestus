@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.GitLabGroupDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.GitLabPreflightRequestDTO;
@@ -68,7 +69,7 @@ public class WorkspaceRegistryController {
         @Valid @RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest
     ) {
         if (
-            createWorkspaceRequest.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT &&
+            createWorkspaceRequest.kind() == IntegrationKind.GITLAB &&
             !featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
         ) {
             throw new org.springframework.security.access.AccessDeniedException(
@@ -78,7 +79,7 @@ public class WorkspaceRegistryController {
 
         // For GitLab PAT workspaces, ensure the user has a linked GitLab identity.
         // This creates the User entity from JWT claims or returns 409 if no GitLab account is linked.
-        if (createWorkspaceRequest.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+        if (createWorkspaceRequest.kind() == IntegrationKind.GITLAB) {
             workspaceProvisioningService.ensureAuthenticatedUserExists(createWorkspaceRequest.serverUrl());
         }
 

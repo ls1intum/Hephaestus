@@ -64,7 +64,6 @@ import org.springframework.validation.annotation.Validated;
  * @param initGitlabDefault whether to initialize a default GitLab PAT workspace at startup (default: {@code false})
  * @param gitlabDefault configuration for the default GitLab workspace; required when {@code initGitlabDefault} is {@code true}
  * @see DefaultProperties
- * @see Workspace.GitProviderMode
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.workspace")

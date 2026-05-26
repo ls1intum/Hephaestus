@@ -16,8 +16,15 @@ import org.springframework.test.util.ReflectionTestUtils;
 /**
  * Shared test fixtures for workspace-related integration tests.
  * <p>
- * These builders create unsaved entities. Call the appropriate repository's save()
- * method to persist them.
+ * The Workspace entity no longer carries provider classification or integration
+ * credentials — those live on per-kind {@link Connection} rows owned by the
+ * Connection registry. Tests that need a workspace with an active GitHub App or
+ * GitLab binding should go through {@link #persistInstallationWorkspace} or
+ * {@link #persistGitLabWorkspace}, which create both the {@link Workspace} and
+ * the matching ACTIVE Connection row in one shot. Tests that need a real bearer
+ * token blob (e.g. GitLab PAT rotation flows) should additionally call
+ * {@code ConnectionService.rotateBearerToken(...)} — these fixtures intentionally
+ * skip the credential blob so unit-level tests don't need encryption seed wiring.
  */
 public final class WorkspaceTestFixtures {
 
@@ -25,6 +32,8 @@ public final class WorkspaceTestFixtures {
 
     /**
      * Creates an unsaved GitHub App installation workspace with standard defaults.
+     * Provider classification is supplied by the matching Connection row — call
+     * {@link #persistInstallationWorkspace} to persist both atomically.
      */
     public static WorkspaceBuilder installationWorkspace(long installationId, String login) {
         return new WorkspaceBuilder(installationId, login);
@@ -32,12 +41,9 @@ public final class WorkspaceTestFixtures {
 
     /**
      * Persist a GitHub App installation workspace AND its backing {@code Connection} row.
-     * The legacy {@code Workspace.installation_id} column is still populated for
-     * compatibility with code paths that haven't migrated yet; the runtime sources
-     * provider classification + installation id from the Connection.
      *
-     * <p>Returns the saved Workspace; use the repositories the caller passed in to
-     * find the Connection if needed.
+     * <p>Returns the saved Workspace; the matching ACTIVE GitHub Connection is keyed
+     * by {@code installationId} and discoverable via {@code ConnectionRepository.findByWorkspaceIdAndKind}.
      */
     public static Workspace persistInstallationWorkspace(WorkspaceRepository workspaceRepository,
                                                          ConnectionRepository connectionRepository,
@@ -84,7 +90,9 @@ public final class WorkspaceTestFixtures {
     }
 
     /**
-     * Creates an unsaved GitLab PAT workspace with standard defaults.
+     * Creates an unsaved GitLab PAT workspace with standard defaults. Provider
+     * classification is supplied by the matching Connection row — call
+     * {@link #persistGitLabWorkspace} to persist both atomically.
      */
     public static GitLabWorkspaceBuilder gitLabPatWorkspace(String groupPath) {
         return new GitLabWorkspaceBuilder(groupPath);
@@ -103,8 +111,6 @@ public final class WorkspaceTestFixtures {
             workspace.setDisplayName("Workspace " + installationId);
             workspace.setAccountLogin(login);
             workspace.setAccountType(AccountType.ORG);
-            workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
-            workspace.setInstallationId(installationId);
             workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
             workspace.setIsPubliclyViewable(false);
         }
@@ -147,19 +153,8 @@ public final class WorkspaceTestFixtures {
             workspace.setDisplayName("GitLab " + groupPath);
             workspace.setAccountLogin(groupPath);
             workspace.setAccountType(AccountType.ORG);
-            workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
             workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
             workspace.setIsPubliclyViewable(false);
-        }
-
-        public GitLabWorkspaceBuilder withServerUrl(String url) {
-            workspace.setServerUrl(url);
-            return this;
-        }
-
-        public GitLabWorkspaceBuilder withToken(String token) {
-            workspace.setPersonalAccessToken(token);
-            return this;
         }
 
         public GitLabWorkspaceBuilder withSlug(String slug) {

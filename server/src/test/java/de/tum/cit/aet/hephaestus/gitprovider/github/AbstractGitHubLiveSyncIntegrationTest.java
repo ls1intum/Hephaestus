@@ -4,6 +4,11 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.registry.Connection;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
@@ -46,6 +51,9 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
 
     @Autowired
     protected GitProviderRepository gitProviderRepository;
+
+    @Autowired
+    protected ConnectionRepository connectionRepository;
 
     @Autowired
     protected HttpGraphQlClient gitHubGraphQlClient;
@@ -130,14 +138,33 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
 
     protected Workspace createWorkspace() {
         var ws = new Workspace();
-        ws.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
-        ws.setInstallationId(githubInstallationId());
         ws.setWorkspaceSlug(generateWorkspaceSlug());
         ws.setDisplayName(githubOrganization());
         ws.setAccountLogin(githubOrganization());
         ws.setAccountType(AccountType.ORG);
         ws.setRepositorySelection(RepositorySelection.ALL);
-        return workspaceRepository.save(ws);
+        Workspace saved = workspaceRepository.save(ws);
+
+        // Provider classification + installation id live on the Connection registry,
+        // not on the Workspace entity. Persist the matching ACTIVE GitHub Connection
+        // so downstream components (token resolution, NATS routing, …) can find it.
+        ConnectionConfig.GitHubAppConfig cfg = new ConnectionConfig.GitHubAppConfig(
+            githubInstallationId(),
+            saved.getAccountLogin(),
+            /* serverUrl */ null,
+            java.util.Set.of()
+        );
+        Connection connection = new Connection(
+            saved,
+            IntegrationKind.GITHUB,
+            Long.toString(githubInstallationId()),
+            cfg
+        );
+        connection.setDisplayName(saved.getAccountLogin());
+        org.springframework.test.util.ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
+        connectionRepository.save(connection);
+
+        return saved;
     }
 
     private String generateWorkspaceSlug() {

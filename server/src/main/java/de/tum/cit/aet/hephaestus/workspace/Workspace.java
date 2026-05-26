@@ -1,11 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -44,18 +41,23 @@ import lombok.ToString;
  * <ul>
  *   <li><b>Isolation:</b> Each workspace operates independently with its own data, settings, and members</li>
  *   <li><b>Identity:</b> Uniquely identified by {@link #workspaceSlug} (URL-safe) and internal {@link #id}</li>
- *   <li><b>Ownership:</b> Linked to a git provider account via {@link #accountLogin} and optionally a GitHub App installation</li>
+ *   <li><b>Ownership:</b> Linked to a git provider account via {@link #accountLogin}</li>
  * </ul>
  *
- * <h2>Authentication Modes</h2>
- * The workspace supports multiple authentication modes for git provider API access:
- * <ul>
- *   <li>{@link GitProviderMode#PAT_ORG} – GitHub PAT for local development (stored encrypted)</li>
- *   <li>{@link GitProviderMode#GITHUB_APP_INSTALLATION} – GitHub App installation for production (preferred)</li>
- *   <li>{@link GitProviderMode#GITLAB_PAT} – GitLab Personal Access Token</li>
- * </ul>
- *
- * <p>See {@link WorkspaceProperties} for configuration of local development PAT mode.
+ * <h2>Authentication &amp; Provider Identity</h2>
+ * Authentication credentials, provider classification, and integration-specific
+ * configuration (GitHub App installation id, GitLab group id / webhook id, Slack
+ * channel + token, …) are <em>not</em> stored on this entity. They live on per-kind
+ * {@link de.tum.cit.aet.hephaestus.integration.registry.Connection Connection} rows
+ * owned by the {@link de.tum.cit.aet.hephaestus.integration.registry.ConnectionService
+ * ConnectionService}. Use {@code ConnectionService.findActiveProviderKind(workspaceId)}
+ * to classify a workspace at runtime and the typed accessors
+ * ({@code findActiveGitHubAppConfig}, {@code findActiveGitLabConfig},
+ * {@code findSlackNotificationConfig}, {@code findActiveBearerToken}) to read
+ * per-Connection state. The {@link #leaderboardNotificationEnabled} flag is the
+ * only notification setting that remains on the workspace — it is a pure UI toggle
+ * that controls whether the leaderboard pipeline <em>attempts</em> to deliver via
+ * Slack; the credentials and channel id come from the Slack Connection.
  *
  * <h2>Lifecycle States</h2>
  * Workspaces follow a defined lifecycle managed by {@link WorkspaceLifecycleService}:
@@ -76,6 +78,7 @@ import lombok.ToString;
  * @see WorkspaceContext
  * @see WorkspaceMembership
  * @see WorkspaceLifecycleService
+ * @see de.tum.cit.aet.hephaestus.integration.registry.ConnectionService
  */
 @Entity
 @Table(name = "workspace")
@@ -172,31 +175,8 @@ public class Workspace {
     private Set<RepositoryToMonitor> repositoriesToMonitor = new HashSet<>();
 
     // ========================================================================
-    // Git Provider Configuration
+    // Git Provider Account
     // ========================================================================
-
-    /**
-     * Authentication mode for git provider API access.
-     * Determines authentication strategy (PAT, GitHub App, OAuth) and provider identity.
-     */
-    @Enumerated(EnumType.STRING)
-    private GitProviderMode gitProviderMode = GitProviderMode.PAT_ORG;
-
-    /**
-     * Custom server URL for self-hosted git provider instances.
-     * <p>
-     * When {@code null}, defaults are derived from the provider type:
-     * <ul>
-     *   <li>GitHub: {@code https://api.github.com}</li>
-     *   <li>GitLab: {@code https://gitlab.com}</li>
-     * </ul>
-     * Set this for GitHub Enterprise Server or self-hosted GitLab instances.
-     */
-    @Column(name = "server_url", length = 512)
-    private String serverUrl;
-
-    /** GitHub App installation ID (null for PAT-based and GitLab workspaces) */
-    private Long installationId;
 
     /** Git provider account login (GitHub org login or GitLab group path, e.g., "ls1intum" or "org/team") */
     @Column(name = "account_login", nullable = false, length = 120)
@@ -209,39 +189,10 @@ public class Workspace {
     @NotNull(message = "Account type is required")
     private AccountType accountType;
 
-    /**
-     * Personal Access Token for GitHub API (legacy authentication mode).
-     * Encrypted at rest using AES-256-GCM via {@link EncryptedStringConverter}.
-     * Null when using GitHub App installation authentication.
-     */
-    @Convert(converter = EncryptedStringConverter.class)
-    @Column(name = "personal_access_token", columnDefinition = "TEXT")
-    @ToString.Exclude
-    private String personalAccessToken;
-
-    /**
-     * GitLab group numeric ID (stable across renames).
-     * Used for REST API calls: {@code POST/DELETE /groups/:id/hooks}.
-     * Populated during webhook auto-registration; null for non-GitLab workspaces.
-     */
-    @Column(name = "gitlab_group_id")
-    private Long gitlabGroupId;
-
-    /**
-     * GitLab webhook ID returned on successful registration.
-     * Used for deregistration and idempotency checks.
-     * Null when webhook was not registered (e.g., insufficient permissions).
-     */
-    @Column(name = "gitlab_webhook_id")
-    private Long gitlabWebhookId;
-
     /** Repository selection mode: ALL repositories or SELECTED subset */
     @Enumerated(EnumType.STRING)
     @Column(name = "repository_selection")
     private RepositorySelection repositorySelection;
-
-    /** Timestamp when GitHub App installation was linked to this workspace */
-    private Instant installationLinkedAt;
 
     /**
      * Synced organization entity — GitHub organization or GitLab group
@@ -264,7 +215,7 @@ public class Workspace {
     private Instant updatedAt;
 
     // ========================================================================
-    // Leaderboard Configuration
+    // Leaderboard Schedule
     // ========================================================================
 
     /** Day of week for scheduled leaderboard generation (1=Monday, 7=Sunday) */
@@ -275,39 +226,18 @@ public class Workspace {
     @Column(name = "leaderboard_schedule_time", length = 10)
     private String leaderboardScheduleTime;
 
-    /** Whether to send Slack notifications when leaderboard is generated */
+    /**
+     * Whether the leaderboard pipeline should attempt Slack delivery on each generation.
+     * <p>
+     * Pure UI toggle. The Slack target (team label, channel id) and credentials live on
+     * the workspace's Slack
+     * {@link de.tum.cit.aet.hephaestus.integration.registry.Connection Connection} and
+     * are read via
+     * {@link de.tum.cit.aet.hephaestus.integration.registry.ConnectionService#findSlackNotificationConfig
+     * ConnectionService.findSlackNotificationConfig}.
+     */
     @Column(name = "leaderboard_notification_enabled")
     private Boolean leaderboardNotificationEnabled;
-
-    /** Slack team/workspace ID for leaderboard notifications */
-    @Column(name = "leaderboard_notification_team", length = 100)
-    private String leaderboardNotificationTeam;
-
-    /** Slack channel ID where leaderboard notifications are posted */
-    @Column(name = "leaderboard_notification_channel_id", length = 100)
-    private String leaderboardNotificationChannelId;
-
-    // ========================================================================
-    // Slack Integration (encrypted credentials)
-    // ========================================================================
-
-    /**
-     * Slack Bot OAuth token for posting messages.
-     * Encrypted at rest using AES-256-GCM via {@link EncryptedStringConverter}.
-     */
-    @Convert(converter = EncryptedStringConverter.class)
-    @Column(name = "slack_token", columnDefinition = "TEXT")
-    @ToString.Exclude
-    private String slackToken;
-
-    /**
-     * Slack signing secret for webhook signature verification.
-     * Encrypted at rest using AES-256-GCM via {@link EncryptedStringConverter}.
-     */
-    @Convert(converter = EncryptedStringConverter.class)
-    @Column(name = "slack_signing_secret", columnDefinition = "TEXT")
-    @ToString.Exclude
-    private String slackSigningSecret;
 
     // ========================================================================
     // Feature Flags
@@ -323,21 +253,6 @@ public class Workspace {
     @Valid
     private WorkspaceFeatures features = new WorkspaceFeatures();
 
-    /**
-     * Returns the high-level provider type (GITHUB or GITLAB) derived from the authentication mode.
-     *
-     * @return the provider type, defaulting to {@link GitProviderType#GITHUB} if mode is null
-     */
-    public GitProviderType getProviderType() {
-        if (gitProviderMode == null) {
-            return GitProviderType.GITHUB;
-        }
-        return switch (gitProviderMode) {
-            case PAT_ORG, GITHUB_APP_INSTALLATION -> GitProviderType.GITHUB;
-            case GITLAB_PAT -> GitProviderType.GITLAB;
-        };
-    }
-
     @PrePersist
     public void prePersist() {
         this.createdAt = Instant.now();
@@ -352,54 +267,6 @@ public class Workspace {
     // ========================================================================
     // Nested Enums
     // ========================================================================
-
-    /**
-     * Authentication mode for git provider API access.
-     *
-     * <h2>Production vs Development</h2>
-     * <ul>
-     *   <li><b>{@link #GITHUB_APP_INSTALLATION}</b> - Production mode, automatic workspace provisioning via GitHub App</li>
-     *   <li><b>{@link #PAT_ORG}</b> - Local development mode, manual workspace bootstrap with a GitHub PAT</li>
-     * </ul>
-     *
-     * <h2>Migration Path</h2>
-     * PAT workspaces without a stored token are automatically promoted to GitHub App mode
-     * when the GitHub App is installed on the same organization. PAT workspaces with a
-     * stored token are preserved to support ongoing local development.
-     *
-     * @see WorkspaceProvisioningService#bootstrapDefaultPatWorkspace() for PAT workspace creation
-     * @see de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener#createOrUpdateFromInstallation for migration logic
-     */
-    public enum GitProviderMode {
-        /**
-         * Personal Access Token authentication for local development.
-         * <p>
-         * This mode is intended for local development environments where setting up
-         * a full GitHub App with webhooks is impractical. Configure via:
-         * <ul>
-         *   <li>{@code hephaestus.workspace.init-default: true}</li>
-         *   <li>{@code hephaestus.workspace.default.token: <your-PAT>}</li>
-         *   <li>{@code hephaestus.workspace.default.login: <org-or-user>}</li>
-         * </ul>
-         * <p>
-         * <b>Not recommended for production</b> - use GitHub App installation instead.
-         */
-        PAT_ORG,
-        /**
-         * GitHub App installation authentication (production mode).
-         * <p>
-         * Uses short-lived installation tokens with automatic rotation.
-         * Workspaces are automatically created when the GitHub App is installed.
-         */
-        GITHUB_APP_INSTALLATION,
-        /**
-         * GitLab Personal Access Token authentication.
-         * <p>
-         * Uses a long-lived PAT to access the GitLab API.
-         * Suitable for self-hosted GitLab instances or GitLab.com.
-         */
-        GITLAB_PAT,
-    }
 
     /**
      * Workspace lifecycle states with defined transition rules.

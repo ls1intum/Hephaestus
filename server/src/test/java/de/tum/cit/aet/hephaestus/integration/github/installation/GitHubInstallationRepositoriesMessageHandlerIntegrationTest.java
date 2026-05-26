@@ -8,7 +8,9 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.installation.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -43,6 +45,9 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     private GitProviderRepository gitProviderRepository;
 
     @Autowired
+    private ConnectionRepository connectionRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @BeforeEach
@@ -68,18 +73,18 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
         org.setProvider(gitProvider);
         org = organizationRepository.save(org);
 
-        // Create workspace
-        Workspace workspace = new Workspace();
-        workspace.setWorkspaceSlug(login.toLowerCase());
-        workspace.setDisplayName(login);
-        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
-        workspace.setIsPubliclyViewable(true);
-        workspace.setOrganization(org);
-        workspace.setAccountLogin(login);
-        workspace.setAccountType(AccountType.ORG);
-        workspace.setInstallationId(installationId);
-        workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
-        workspaceRepository.save(workspace);
+        // Create workspace + matching ACTIVE GitHub App Connection in one shot.
+        // Provider classification + installation id come from the Connection registry,
+        // not from legacy Workspace columns.
+        WorkspaceTestFixtures.WorkspaceBuilder builder = WorkspaceTestFixtures
+            .installationWorkspace(installationId, login)
+            .withSlug(login.toLowerCase())
+            .withAccountType(AccountType.ORG);
+        Workspace saved = WorkspaceTestFixtures.persistInstallationWorkspace(
+            workspaceRepository, connectionRepository, builder, installationId);
+        saved.setIsPubliclyViewable(true);
+        saved.setOrganization(org);
+        workspaceRepository.save(saved);
     }
 
     @Test
