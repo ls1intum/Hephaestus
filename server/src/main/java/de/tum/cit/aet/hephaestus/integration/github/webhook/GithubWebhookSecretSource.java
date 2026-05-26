@@ -10,9 +10,8 @@ import org.springframework.stereotype.Component;
 /**
  * GitHub adapter for {@link WebhookSecretSource}. GitHub Apps share a single
  * app-wide signing secret across all installations, so the scope is
- * {@link Scope#APP_GLOBAL} and the secret is read from {@code hephaestus.webhook.secret}
- * (same property the legacy {@code GitHubWebhookController} consults — keeps the two
- * verifiers in lock-step during the C13 migration window).
+ * {@link Scope#APP_GLOBAL} and the secret is read from
+ * {@code hephaestus.webhook.secret}.
  *
  * <p>Returns {@link Optional#empty()} when the secret is unconfigured; the verifier
  * upstream surfaces this as an "invalid: missing-secret" reject rather than crashing,

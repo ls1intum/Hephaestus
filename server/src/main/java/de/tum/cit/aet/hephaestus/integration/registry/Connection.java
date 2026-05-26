@@ -86,9 +86,10 @@ public class Connection {
     private String credentialsAlg;
 
     /**
-     * Mirrors the first byte of {@link #credentialsEncrypted} (0x01 = v1, 0x02 = v2).
-     * Lets ops count remaining v1 rows without decrypting; once zero the legacy
-     * branch in {@link CredentialBundleConverter} can be deleted.
+     * Mirrors the first byte of {@link #credentialsEncrypted} ({@code 0x02} for every
+     * row written by the v2-only converter). Kept as a column so ops queries can
+     * count credential-bearing rows by format without decrypting; will become trivially
+     * uniform now that v1 is gone, but is retained for future format roll-outs.
      */
     @Column(name = "credentials_format_version")
     @Nullable
@@ -211,11 +212,10 @@ public class Connection {
     /**
      * Decrypt the credential blob if present. Empty when no blob is stored.
      *
-     * <p>Tolerant of v1 (legacy static AAD) and v2 (per-row AAD) blobs. Throws
-     * {@link de.tum.cit.aet.hephaestus.core.security.EncryptionException} on tamper,
-     * unsupported version, or — for v2 — a context mismatch (the closure the AAD
-     * binding provides). Callers must treat that as an unrecoverable data error, not
-     * "no auth available".
+     * <p>v2 (per-row AAD) only. Throws {@link
+     * de.tum.cit.aet.hephaestus.core.security.EncryptionException} on tamper,
+     * unsupported version, or context mismatch (the closure the AAD binding provides).
+     * Callers must treat that as an unrecoverable data error, not "no auth available".
      */
     public Optional<CredentialBundle> credentials(CredentialBundleConverter converter) {
         if (credentialsEncrypted == null) {

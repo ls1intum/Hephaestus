@@ -20,23 +20,20 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Encrypts {@link CredentialBundle} ↔ raw ciphertext bytes with AES-256-GCM. Two
- * formats coexist during the v1→v2 rollout:
+ * Encrypts {@link CredentialBundle} ↔ raw ciphertext bytes with AES-256-GCM and a
+ * per-row AAD derived from {@link EncryptionContext}.
  *
- * <ul>
- *   <li><b>v1</b> ({@code FORMAT_VERSION_V1}): static AAD ({@link #contextAad()}).
- *       Read-only after this commit — only the Liquibase backfill writes v1.</li>
- *   <li><b>v2</b> ({@code FORMAT_VERSION_V2}): per-row AAD derived from
- *       {@link EncryptionContext}. New writes always v2; reader switches on the
- *       first byte. Cross-row substitution → {@code AEADBadTagException}.</li>
- * </ul>
+ * <p>The AAD binds the ciphertext to its {@code (workspaceId, kind, instanceKey,
+ * columnFqn)} row coordinates, so a blob copied into a different row fails GCM
+ * authentication ({@link javax.crypto.AEADBadTagException}) — closes the cross-row
+ * substitution CVE flagged in audit pass 3.
  *
- * <p>The {@link AttributeConverter} interface methods write v1 — they're only used by
- * the legacy Liquibase backfill ({@code WorkspaceConnectionBackfillChange}) which
- * predates per-row context. {@link Connection#setCredentials(CredentialBundle)} drives
- * the runtime path via {@link #encrypt(CredentialBundle, EncryptionContext)} /
- * {@link #decrypt(byte[], EncryptionContext)} so every new write is v2 and every old v1
- * row migrates lazily on next save.
+ * <p>The wire format is a single version (v2, {@code 0x02}). The {@link
+ * AttributeConverter} interface is implemented for symmetry with JPA discovery but
+ * the legacy {@code convertToEntityAttribute(byte[])} path is intentionally
+ * context-less: it rejects every v2 blob it sees. Runtime reads go through {@link
+ * Connection#credentials(CredentialBundleConverter)} which holds the {@link
+ * EncryptionContext} for its row.
  */
 @Component
 @Converter(autoApply = false)
@@ -47,19 +44,8 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     /** Tag persisted on {@code connection.credentials_alg} for any blob written by this converter. */
     public static final String ALGORITHM_TAG = "aesgcm-v1";
 
-    /** First byte of v1-format ciphertexts. Read-only after Wave 3 — backfill only. */
-    public static final byte FORMAT_VERSION_V1 = 0x01;
-
-    /** First byte of v2-format ciphertexts (per-row AAD). All new writes. */
+    /** First byte of every v2-format ciphertext (per-row AAD). v1 was retired with Stage 2. */
     public static final byte FORMAT_VERSION_V2 = 0x02;
-
-    /** v1 AAD — fixed string, no row binding. Kept ONLY for tolerant decrypt of legacy rows. */
-    private static final byte[] CONTEXT_AAD_V1 = "hephaestus-credential-bundle-v1".getBytes(StandardCharsets.UTF_8);
-
-    /** Exposed for the Liquibase backfill so it produces v1-format blobs identical to legacy writes. */
-    public static byte[] contextAad() {
-        return CONTEXT_AAD_V1.clone();
-    }
 
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_IV_LENGTH = 12;
@@ -75,8 +61,8 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
 
     /**
      * No-arg constructor for JPA/Hibernate when the converter is materialized outside the
-     * Spring context (Liquibase, plain Hibernate diff). Encryption is disabled — any
-     * write attempt throws so we don't silently persist plaintext credentials.
+     * Spring context (plain Hibernate diff, etc.). Encryption is disabled — any write
+     * attempt throws so we don't silently persist plaintext credentials.
      */
     public CredentialBundleConverter() {
         this.secretKey = null;
@@ -131,34 +117,37 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     }
 
     /**
-     * v1 write path. Used ONLY by the legacy Liquibase backfill — runtime writes go
-     * through {@link #encrypt(CredentialBundle, EncryptionContext)} and produce v2.
+     * Context-less {@link AttributeConverter} write path. Unsupported on a v2-only
+     * codebase — every runtime write goes through {@link #encrypt(CredentialBundle,
+     * EncryptionContext)} which binds the AAD to the row. Calling this throws so any
+     * silent fall-back to context-less encryption is caught at unit-test time.
      */
     @Override
     @Nullable
     public byte[] convertToDatabaseColumn(@Nullable CredentialBundle attribute) {
         if (attribute == null) return null;
-        requireEnabled("persist");
-        return encryptInternal(serialize(attribute), CONTEXT_AAD_V1, FORMAT_VERSION_V1);
+        throw new EncryptionException(
+            "CredentialBundleConverter.convertToDatabaseColumn requires per-row EncryptionContext — "
+                + "use encrypt(bundle, ctx)");
     }
 
     /**
-     * Tolerant read: decrypts v1 (static AAD) and v2 (per-row AAD). Used by the
-     * legacy backfill (v1-only state) and by callers that lack {@link EncryptionContext}
-     * (none, post-Wave 3, except tests). Production reads go through
-     * {@link #decrypt(byte[], EncryptionContext)} which rejects v2 without context.
+     * Context-less {@link AttributeConverter} read path. Always rejects v2 blobs so the
+     * tolerant fallback is forced through the explicit {@link #decrypt(byte[],
+     * EncryptionContext)} entrypoint. Returns {@code null} for {@code null} input so JPA
+     * mapping of a NULL column stays sane.
      */
     @Override
     @Nullable
     public CredentialBundle convertToEntityAttribute(@Nullable byte[] dbData) {
         if (dbData == null) return null;
         requireEnabled("decrypt");
-        return switch (versionByte(dbData)) {
-            case FORMAT_VERSION_V1 -> deserialize(decryptInternal(dbData, 1, CONTEXT_AAD_V1));
-            case FORMAT_VERSION_V2 -> throw new EncryptionException(
+        byte version = versionByte(dbData);
+        if (version == FORMAT_VERSION_V2) {
+            throw new EncryptionException(
                 "v2 blob requires per-row EncryptionContext — use decrypt(byte[], EncryptionContext)");
-            default -> throw unsupportedVersion(dbData[0]);
-        };
+        }
+        throw unsupportedVersion(version);
     }
 
     /**
@@ -174,27 +163,18 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     }
 
     /**
-     * Tolerant v1/v2 decrypt:
-     * <ul>
-     *   <li>v1: decrypts with the static legacy AAD (context arg ignored — v1 carries no binding).</li>
-     *   <li>v2: decrypts with AAD derived from {@code ctx}. Wrong context →
-     *       {@link javax.crypto.AEADBadTagException} (wrapped as {@link EncryptionException}).</li>
-     * </ul>
+     * v2 decrypt: decrypts with AAD derived from {@code ctx}. Wrong context, tamper,
+     * or unsupported version → {@link EncryptionException}.
      */
     public CredentialBundle decrypt(byte[] dbData, EncryptionContext ctx) {
         if (dbData == null) throw new IllegalArgumentException("dbData must not be null");
         if (ctx == null) throw new IllegalArgumentException("ctx must not be null");
         requireEnabled("decrypt");
-        return switch (versionByte(dbData)) {
-            case FORMAT_VERSION_V1 -> deserialize(decryptInternal(dbData, 1, CONTEXT_AAD_V1));
-            case FORMAT_VERSION_V2 -> deserialize(decryptInternal(dbData, 1, ctx.toAad()));
-            default -> throw unsupportedVersion(dbData[0]);
-        };
-    }
-
-    /** True when the blob is in legacy v1 format and would benefit from re-encrypt on next save. */
-    public static boolean isLegacyV1(@Nullable byte[] dbData) {
-        return dbData != null && dbData.length >= 1 && dbData[0] == FORMAT_VERSION_V1;
+        byte version = versionByte(dbData);
+        if (version != FORMAT_VERSION_V2) {
+            throw unsupportedVersion(version);
+        }
+        return deserialize(decryptInternal(dbData, 1, ctx.toAad()));
     }
 
     // -----------------------------------------------------------------------

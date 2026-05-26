@@ -89,8 +89,9 @@ public class WebhookIngestPipeline {
     }
 
     /**
-     * Pre-read overload — used by the legacy {@code /github} and {@code /gitlab}
-     * controller shims that already consumed the body via {@code @RequestBody byte[]}.
+     * Pre-read overload — useful when the body has already been consumed (tests,
+     * future re-entrant call sites). The {@code /webhooks/{kind}} controller path
+     * uses the {@link HttpServletRequest} overload above.
      */
     public ResponseEntity<?> handle(IntegrationKind kind, byte[] body, Map<String, String> headers) {
         WebhookSignatureVerifier verifier = verifiersByKind.get(kind);
@@ -161,11 +162,10 @@ public class WebhookIngestPipeline {
         String subject = deriver.deriveSubject(payload, headers);
         String dedupId = deriver.deriveDedupKey(body, headers);
 
-        // Match the legacy controller's header set: pass the vendor event header
-        // through unchanged when present, and ALWAYS attach the Nats-Msg-Id for
-        // server-side dedup. JetStreamPublisher already echoes the latter through
-        // its PublishOptions; including it on the headers keeps the wire trace
-        // self-describing.
+        // Pass the vendor event header through unchanged when present, and ALWAYS
+        // attach the Nats-Msg-Id for server-side dedup. JetStreamPublisher already
+        // echoes the latter through its PublishOptions; including it on the headers
+        // keeps the wire trace self-describing.
         Map<String, String> outboundHeaders = new LinkedHashMap<>();
         passthroughHeader(outboundHeaders, headers, "X-GitHub-Event");
         passthroughHeader(outboundHeaders, headers, "X-GitHub-Delivery");

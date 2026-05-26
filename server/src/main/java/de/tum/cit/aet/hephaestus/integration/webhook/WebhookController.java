@@ -15,12 +15,13 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Unified webhook ingest controller.
  *
- * <p>{@code POST /webhooks/{kind}} serves new integrations (slack, outline, future
- * bitbucket / linear / etc.). The legacy {@code /github} and {@code /gitlab} paths
- * are preserved as <b>permanent URL anchors</b> — vendor-side webhook configurations
- * are pinned per-workspace on the vendor's side, and bulk-rewriting them across
- * thousands of installations is infeasible (per agent D3 / plan v4 D13). Both
- * legacy paths route through the same pipeline.
+ * <p>{@code POST /webhooks/{kind}} is the sole webhook entry point. Per-kind
+ * routing resolves the {@link IntegrationKindRouting kind} from the path and
+ * delegates to {@link WebhookIngestPipeline}, which dispatches signature
+ * verification, subject derivation and JetStream publication through the per-kind
+ * {@link de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier} and
+ * {@link de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver} beans.
+ * GitHub, GitLab, Slack and Outline all share this endpoint.
  *
  * <p>Active only on the webhook runtime role.
  */

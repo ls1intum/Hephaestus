@@ -16,20 +16,23 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the AES-256-GCM round-trip behaviour of {@link CredentialBundleConverter}.
+ * Pins the AES-256-GCM round-trip behaviour of {@link CredentialBundleConverter}
+ * after the Stage-2 v1 removal. The converter is now v2-only: every write produces a
+ * blob whose first byte is {@link CredentialBundleConverter#FORMAT_VERSION_V2} and
+ * binds the AAD to a per-row {@link EncryptionContext}.
  *
  * <p>Why the wider coverage than typical "happy path + null":
  * <ul>
  *   <li>The output format is on-disk and we can't migrate it without a rewrite — the
- *       IV-prepend layout is therefore tested explicitly so accidental drift
- *       (e.g. someone "just" Base64-wrapping the bytes for symmetry with
+ *       layout is therefore tested explicitly so accidental drift (e.g. someone "just"
+ *       Base64-wrapping the bytes for symmetry with
  *       {@link de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter}) is
  *       caught at unit-test time, not after the column has prod data.</li>
  *   <li>Wrong-key + tampered-ciphertext cases prove the converter is actually
  *       encrypting + authenticating, not a Base64 no-op masquerading as encryption.</li>
- *   <li>Sealed-type polymorphism for {@link CredentialBundle} round-trips ALL three
- *       variants — adding a 4th permits without the matching {@code @JsonSubTypes.Type}
- *       fails serialization at runtime, so we lock the existing three here.</li>
+ *   <li>Cross-row substitution coverage closes the audit-pass-3 CVE: a ciphertext
+ *       copied into a row with a different {@code (workspaceId, kind, instanceKey,
+ *       columnFqn)} tuple must fail GCM authentication.</li>
  * </ul>
  */
 @DisplayName("CredentialBundleConverter — AES-GCM round-trip")
@@ -40,90 +43,96 @@ class CredentialBundleConverterTest extends BaseUnitTest {
     /** Different 32-char key — proves wrong-key decryption fails. */
     private static final String OTHER_KEY = "ABCDEFabcdef0123ABCDEFabcdef0123";
 
+    private static final EncryptionContext CTX = new EncryptionContext(
+        42L, de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITHUB,
+        "installation-100", "connection.credentials_encrypted");
+
     private static CredentialBundleConverter enabled() {
         return new CredentialBundleConverter(KEY, "dev");
     }
 
     @Nested
-    @DisplayName("Round-trips")
+    @DisplayName("Round-trips (v2 per-row AAD)")
     class RoundTrips {
 
         @Test
         @DisplayName("BearerToken with and without expiry round-trips")
         void bearerToken_roundTrips() {
-            CredentialBundleConverter converter = enabled();
+            CredentialBundleConverter c = enabled();
             BearerToken withExpiry = new BearerToken("glpat-Q1w2E3r4T5y6", Instant.parse("2030-01-01T00:00:00Z"));
             BearerToken withoutExpiry = new BearerToken("xoxb-12345-67890-abcdef", null);
 
-            assertThat(converter.convertToEntityAttribute(converter.convertToDatabaseColumn(withExpiry)))
-                .isEqualTo(withExpiry);
-            assertThat(converter.convertToEntityAttribute(converter.convertToDatabaseColumn(withoutExpiry)))
-                .isEqualTo(withoutExpiry);
+            assertThat(c.decrypt(c.encrypt(withExpiry, CTX), CTX)).isEqualTo(withExpiry);
+            assertThat(c.decrypt(c.encrypt(withoutExpiry, CTX), CTX)).isEqualTo(withoutExpiry);
         }
 
         @Test
         @DisplayName("BearerToken with unicode + control characters round-trips losslessly")
         void bearerToken_specialChars_roundTrips() {
-            CredentialBundleConverter converter = enabled();
+            CredentialBundleConverter c = enabled();
             // Throw the kitchen sink at it — backslashes, quotes, tabs, emoji, RTL,
             // and a literal interpolation-marker (the kind of thing that bit the agent
             // pipeline historically).
             String weird = "xoxb-\"backslash\\quote\" \tTAB‫RTL‬ 🚀 \\(notSwiftInterp)";
             BearerToken tok = new BearerToken(weird, null);
 
-            BearerToken decoded = (BearerToken) converter.convertToEntityAttribute(
-                converter.convertToDatabaseColumn(tok));
+            BearerToken decoded = (BearerToken) c.decrypt(c.encrypt(tok, CTX), CTX);
             assertThat(decoded.token()).isEqualTo(weird);
         }
 
         @Test
         @DisplayName("GithubAppCredential round-trips")
         void githubAppCredential_roundTrips() {
-            CredentialBundleConverter converter = enabled();
+            CredentialBundleConverter c = enabled();
             GithubAppCredential bundle = new GithubAppCredential(987654L, "12345");
 
-            assertThat(converter.convertToEntityAttribute(converter.convertToDatabaseColumn(bundle)))
-                .isEqualTo(bundle);
+            assertThat(c.decrypt(c.encrypt(bundle, CTX), CTX)).isEqualTo(bundle);
         }
 
         @Test
         @DisplayName("OAuthSession with and without refresh round-trips")
         void oauthSession_roundTrips() {
-            CredentialBundleConverter converter = enabled();
+            CredentialBundleConverter c = enabled();
             OAuthSession withRefresh = new OAuthSession(
                 "ya29.access-token-here", "refresh-token-xyz", Instant.parse("2030-06-15T12:00:00Z"));
             OAuthSession withoutRefresh = new OAuthSession("opaque-access", null, null);
 
-            assertThat(converter.convertToEntityAttribute(converter.convertToDatabaseColumn(withRefresh)))
-                .isEqualTo(withRefresh);
-            assertThat(converter.convertToEntityAttribute(converter.convertToDatabaseColumn(withoutRefresh)))
-                .isEqualTo(withoutRefresh);
+            assertThat(c.decrypt(c.encrypt(withRefresh, CTX), CTX)).isEqualTo(withRefresh);
+            assertThat(c.decrypt(c.encrypt(withoutRefresh, CTX), CTX)).isEqualTo(withoutRefresh);
         }
 
         @Test
         @DisplayName("Polymorphic discriminator is honoured — encode-as-Bundle, decode-as-Bundle")
         void polymorphism_preservesVariant() {
-            CredentialBundleConverter converter = enabled();
+            CredentialBundleConverter c = enabled();
             CredentialBundle asInterface = new GithubAppCredential(42L, "appid");
 
-            CredentialBundle decoded = converter.convertToEntityAttribute(
-                converter.convertToDatabaseColumn(asInterface));
+            CredentialBundle decoded = c.decrypt(c.encrypt(asInterface, CTX), CTX);
             assertThat(decoded).isInstanceOf(GithubAppCredential.class).isEqualTo(asInterface);
         }
 
         @Test
         @DisplayName("Two encrypts of the same plaintext produce different ciphertexts (random IV)")
         void encryptIsNonDeterministic() {
-            CredentialBundleConverter converter = enabled();
+            CredentialBundleConverter c = enabled();
             BearerToken bundle = new BearerToken("same-input-twice", null);
 
-            byte[] first = converter.convertToDatabaseColumn(bundle);
-            byte[] second = converter.convertToDatabaseColumn(bundle);
+            byte[] first = c.encrypt(bundle, CTX);
+            byte[] second = c.encrypt(bundle, CTX);
 
             assertThat(first).isNotEqualTo(second);
             // Both decrypt back to the same plaintext though.
-            assertThat(converter.convertToEntityAttribute(first)).isEqualTo(bundle);
-            assertThat(converter.convertToEntityAttribute(second)).isEqualTo(bundle);
+            assertThat(c.decrypt(first, CTX)).isEqualTo(bundle);
+            assertThat(c.decrypt(second, CTX)).isEqualTo(bundle);
+        }
+
+        @Test
+        @DisplayName("Encrypted blob is always v2-tagged (first byte = 0x02)")
+        void encryptedBlob_isAlwaysV2() {
+            CredentialBundleConverter c = enabled();
+            byte[] blob = c.encrypt(new BearerToken("x", null), CTX);
+
+            assertThat(blob[0]).isEqualTo(CredentialBundleConverter.FORMAT_VERSION_V2);
         }
     }
 
@@ -132,11 +141,11 @@ class CredentialBundleConverterTest extends BaseUnitTest {
     class Nulls {
 
         @Test
-        @DisplayName("null in → null out, both directions")
+        @DisplayName("Context-less AttributeConverter null in → null out, both directions")
         void nullPassesThrough() {
-            CredentialBundleConverter converter = enabled();
-            assertThat(converter.convertToDatabaseColumn(null)).isNull();
-            assertThat(converter.convertToEntityAttribute(null)).isNull();
+            CredentialBundleConverter c = enabled();
+            assertThat(c.convertToDatabaseColumn(null)).isNull();
+            assertThat(c.convertToEntityAttribute(null)).isNull();
         }
 
         @Test
@@ -155,45 +164,44 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         void wrongKey_throws() {
             CredentialBundleConverter writer = enabled();
             CredentialBundleConverter reader = new CredentialBundleConverter(OTHER_KEY, "dev");
-            byte[] ciphertext = writer.convertToDatabaseColumn(new BearerToken("secret", null));
+            byte[] ciphertext = writer.encrypt(new BearerToken("secret", null), CTX);
 
-            assertThatThrownBy(() -> reader.convertToEntityAttribute(ciphertext))
+            assertThatThrownBy(() -> reader.decrypt(ciphertext, CTX))
                 .isInstanceOf(EncryptionException.class);
         }
 
         @Test
         @DisplayName("Decrypt of a flipped-bit ciphertext throws (AES-GCM auth tag check)")
         void tamperedCiphertext_throws() {
-            CredentialBundleConverter converter = enabled();
-            byte[] ciphertext = converter.convertToDatabaseColumn(new BearerToken("secret", null));
+            CredentialBundleConverter c = enabled();
+            byte[] ciphertext = c.encrypt(new BearerToken("secret", null), CTX);
             byte[] tampered = Arrays.copyOf(ciphertext, ciphertext.length);
-            // Flip a bit in the encrypted body (skip past the 12-byte IV so we hit ciphertext).
+            // Flip a bit in the encrypted body (skip past the 1-byte version + 12-byte IV).
             tampered[tampered.length - 1] ^= 0x01;
 
-            assertThatThrownBy(() -> converter.convertToEntityAttribute(tampered))
+            assertThatThrownBy(() -> c.decrypt(tampered, CTX))
                 .isInstanceOf(EncryptionException.class);
         }
 
         @Test
         @DisplayName("Decrypt of truncated ciphertext throws cleanly (no array-bounds blow-up)")
         void tooShortCiphertext_throws() {
-            CredentialBundleConverter converter = enabled();
-            byte[] tooShort = new byte[10]; // less than the 12-byte IV
+            CredentialBundleConverter c = enabled();
+            byte[] tooShort = new byte[10]; // less than 1-byte version + 12-byte IV
 
-            assertThatThrownBy(() -> converter.convertToEntityAttribute(tooShort))
+            assertThatThrownBy(() -> c.decrypt(tooShort, CTX))
                 .isInstanceOf(EncryptionException.class);
         }
 
         @Test
-        @DisplayName("Ciphertext starts with the 12-byte IV, doesn't carry a text-prefix like EncryptedStringConverter")
+        @DisplayName("Ciphertext starts with the v2 marker, doesn't carry a text-prefix like EncryptedStringConverter")
         void ciphertextLayoutIsRawBytes() {
-            CredentialBundleConverter converter = enabled();
-            byte[] ciphertext = converter.convertToDatabaseColumn(new BearerToken("x", null));
+            CredentialBundleConverter c = enabled();
+            byte[] ciphertext = c.encrypt(new BearerToken("x", null), CTX);
 
-            // 12-byte IV + at least the auth tag + 1 byte of payload — bound below.
-            assertThat(ciphertext.length).isGreaterThan(12 + 16);
-            // No "ENC:" text prefix; the column is BYTEA, not TEXT.
-            assertThat(ciphertext[0]).matches(b -> true, "any random IV byte allowed");
+            // 1-byte version + 12-byte IV + at least the auth tag + 1 byte of payload — bound below.
+            assertThat(ciphertext.length).isGreaterThan(1 + 12 + 16);
+            assertThat(ciphertext[0]).isEqualTo(CredentialBundleConverter.FORMAT_VERSION_V2);
         }
     }
 
@@ -202,28 +210,29 @@ class CredentialBundleConverterTest extends BaseUnitTest {
     class Disabled {
 
         @Test
-        @DisplayName("No-key converter throws on write (refuses silent plaintext persistence)")
+        @DisplayName("No-key converter throws on encrypt (refuses silent plaintext persistence)")
         void disabled_writeThrows() {
             CredentialBundleConverter disabled = new CredentialBundleConverter("", "dev");
             assertThat(disabled.isEnabled()).isFalse();
 
-            assertThatThrownBy(() -> disabled.convertToDatabaseColumn(new BearerToken("x", null)))
+            assertThatThrownBy(() -> disabled.encrypt(new BearerToken("x", null), CTX))
                 .isInstanceOf(EncryptionException.class)
                 .hasMessageContaining("not enabled");
         }
 
         @Test
-        @DisplayName("No-key converter throws on read (refuses to pretend a ciphertext is plaintext JSON)")
+        @DisplayName("No-key converter throws on decrypt (refuses to pretend a ciphertext is plaintext JSON)")
         void disabled_readThrows() {
             CredentialBundleConverter disabled = new CredentialBundleConverter("", "dev");
             byte[] anyBytes = new byte[32];
+            anyBytes[0] = CredentialBundleConverter.FORMAT_VERSION_V2;
 
-            assertThatThrownBy(() -> disabled.convertToEntityAttribute(anyBytes))
+            assertThatThrownBy(() -> disabled.decrypt(anyBytes, CTX))
                 .isInstanceOf(EncryptionException.class);
         }
 
         @Test
-        @DisplayName("No-key converter still treats null as null in both directions")
+        @DisplayName("No-key converter still treats null as null in the AttributeConverter API")
         void disabled_nullStillPassesThrough() {
             CredentialBundleConverter disabled = new CredentialBundleConverter("", "dev");
             assertThat(disabled.convertToDatabaseColumn(null)).isNull();
@@ -342,20 +351,16 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("v1 blob is read by the v2-aware decrypt — context arg is ignored (legacy compat)")
-        void v1_blob_decryptsThroughV2Api() {
+        @DisplayName("Context-less AttributeConverter write refuses any non-null bundle (forces explicit context)")
+        void contextLessWrite_throws() {
             CredentialBundleConverter c = enabled();
-            // Write via the v1 attribute-converter API (matches the legacy backfill path).
-            byte[] v1Blob = c.convertToDatabaseColumn(new BearerToken("legacy-token", null));
-            assertThat(v1Blob[0]).isEqualTo(CredentialBundleConverter.FORMAT_VERSION_V1);
-
-            // Any context passed in is ignored for v1 — proves the tolerant-read branch.
-            assertThat(c.decrypt(v1Blob, CTX_A)).isEqualTo(new BearerToken("legacy-token", null));
-            assertThat(c.decrypt(v1Blob, CTX_B)).isEqualTo(new BearerToken("legacy-token", null));
+            assertThatThrownBy(() -> c.convertToDatabaseColumn(new BearerToken("x", null)))
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("requires per-row EncryptionContext");
         }
 
         @Test
-        @DisplayName("Tolerant attributeConverter read REJECTS v2 blobs — they require per-row context")
+        @DisplayName("Context-less AttributeConverter read REJECTS v2 blobs — they require per-row context")
         void v2_blob_attributeConverterReadRejects() {
             CredentialBundleConverter c = enabled();
             byte[] v2Blob = c.encrypt(new BearerToken("s", null), CTX_A);
@@ -378,16 +383,15 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("isLegacyV1 reports true for v1 blobs, false for v2 and null")
-        void isLegacyV1_introspection() {
+        @DisplayName("Legacy v1 blob (0x01) is rejected as Unsupported — v1 was retired in Stage 2")
+        void v1_blob_rejected() {
             CredentialBundleConverter c = enabled();
-            byte[] v1 = c.convertToDatabaseColumn(new BearerToken("x", null));
-            byte[] v2 = c.encrypt(new BearerToken("x", null), CTX_A);
+            byte[] v1Shaped = new byte[1 + 12 + 17];
+            v1Shaped[0] = 0x01;
 
-            assertThat(CredentialBundleConverter.isLegacyV1(v1)).isTrue();
-            assertThat(CredentialBundleConverter.isLegacyV1(v2)).isFalse();
-            assertThat(CredentialBundleConverter.isLegacyV1(null)).isFalse();
-            assertThat(CredentialBundleConverter.isLegacyV1(new byte[0])).isFalse();
+            assertThatThrownBy(() -> c.decrypt(v1Shaped, CTX_A))
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("Unsupported");
         }
 
         @Test

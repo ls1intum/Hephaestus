@@ -75,16 +75,5 @@
     <include file="./changelog/1779118456457_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779173113243_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779520390544_worker_runtime_substrate.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779700000000_integration_framework.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779700100000_agent_job_integration_classification.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779700200000_practice_capability_gating.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779700300000_workspace_connection_backfill.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779700400000_slack_persistence.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779700500000_outline_persistence.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779700600000_shedlock.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779700700000_oauth_state_nonce.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779700800000_connection_instance_key_null.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779700900000_credentials_format_version.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779701000000_oauth_state_pkce.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779701100000_installation_unbound_installer_identity.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1779790459343_unified_integration_framework.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

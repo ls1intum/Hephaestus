@@ -8,11 +8,9 @@ import tools.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.JetStreamPublisher;
 import de.tum.cit.aet.hephaestus.gitprovider.webhook.PublishRequest;
-import de.tum.cit.aet.hephaestus.integration.github.webhook.GitHubWebhookController;
 import de.tum.cit.aet.hephaestus.integration.github.webhook.GithubSubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.github.webhook.GithubWebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.github.webhook.GithubWebhookSignatureVerifier;
-import de.tum.cit.aet.hephaestus.integration.gitlab.webhook.GitLabWebhookController;
 import de.tum.cit.aet.hephaestus.integration.gitlab.webhook.GitlabSubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.gitlab.webhook.GitlabWebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.gitlab.webhook.GitlabWebhookSignatureVerifier;
@@ -32,13 +30,21 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 /**
- * Parity test for the {@code /github} + {@code /gitlab} URL anchors and the
- * {@link WebhookIngestPipeline}. Confirms that BOTH the legacy controller path
- * AND a direct pipeline invocation emit the same JetStream {@link PublishRequest}
- * — same subject, same dedup-id, same body. Without this guard, the controller
- * shims could drift away from the pipeline silently.
+ * Pins the unified {@code /webhooks/{kind}} pipeline contract for GitHub and GitLab
+ * after the legacy URL-anchor controllers were retired in Stage 2.
+ *
+ * <p>Confirms:
+ * <ul>
+ *   <li>a verified GitHub webhook produces the expected NATS subject + dedup-id;</li>
+ *   <li>a verified GitLab webhook does the same; and</li>
+ *   <li>the GitHub {@code ping} setup event still short-circuits to 200 OK without
+ *       publishing to NATS (moved from the deleted controller into
+ *       {@link GithubWebhookSignatureVerifier#verify} as a
+ *       {@link de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier.VerificationResult.RespondImmediately
+ *       RespondImmediately}).</li>
+ * </ul>
  */
-@DisplayName("Webhook ingest parity: legacy controllers ⇄ unified pipeline")
+@DisplayName("Webhook ingest pipeline — unified /webhooks/{kind}")
 class WebhookIngestParityTest extends BaseUnitTest {
 
     private static final String SHARED_SECRET = "parity-test-shared-secret-32-bytes-long-XYZ";
@@ -49,8 +55,8 @@ class WebhookIngestParityTest extends BaseUnitTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    @DisplayName("GitHub webhook: legacy /github controller + unified pipeline emit identical PublishRequest")
-    void githubParity() {
+    @DisplayName("GitHub webhook: unified pipeline publishes with expected subject + dedup id")
+    void githubUnified() {
         byte[] body = ("{\"repository\":{\"owner\":{\"login\":\"acme\"},\"name\":\"hephaestus\"},"
             + "\"action\":\"opened\"}").getBytes(StandardCharsets.UTF_8);
         String sig = "sha256=" + hmacHex(SHARED_SECRET, body);
@@ -63,11 +69,7 @@ class WebhookIngestParityTest extends BaseUnitTest {
             publisher,
             objectMapper
         );
-        GitHubWebhookController controller = new GitHubWebhookController(pipeline);
 
-        // Path A: through the legacy controller shim.
-        controller.receive(body, "pull_request", deliveryId, sig);
-        // Path B: directly through the unified pipeline.
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("X-GitHub-Event", "pull_request");
         headers.put("X-GitHub-Delivery", deliveryId);
@@ -75,24 +77,15 @@ class WebhookIngestParityTest extends BaseUnitTest {
         pipeline.handle(IntegrationKind.GITHUB, body, headers);
 
         ArgumentCaptor<PublishRequest> captor = ArgumentCaptor.forClass(PublishRequest.class);
-        verify(publisher, times(2)).publish(captor.capture());
-        PublishRequest legacy = captor.getAllValues().get(0);
-        PublishRequest unified = captor.getAllValues().get(1);
+        verify(publisher, times(1)).publish(captor.capture());
+        PublishRequest req = captor.getValue();
 
-        assertThat(legacy.subject())
-            .as("subject must match the unified pipeline")
-            .isEqualTo(unified.subject())
-            .isEqualTo("github.acme.hephaestus.pull_request");
-        assertThat(legacy.dedupId())
-            .as("dedup id derives from X-GitHub-Delivery — must match")
-            .isEqualTo(unified.dedupId())
-            .isEqualTo("github-" + deliveryId);
-        assertThat(legacy.body()).containsExactly(unified.body());
-        assertThat(legacy.headers()).isEqualTo(unified.headers());
+        assertThat(req.subject()).isEqualTo("github.acme.hephaestus.pull_request");
+        assertThat(req.dedupId()).isEqualTo("github-" + deliveryId);
     }
 
     @Test
-    @DisplayName("GitHub webhook: ping is short-circuited at the controller (no publish)")
+    @DisplayName("GitHub webhook: ping is short-circuited in the verifier (no publish, 200 OK)")
     void githubPingShortCircuits() {
         WebhookProperties props = props(SHARED_SECRET);
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
@@ -101,34 +94,36 @@ class WebhookIngestParityTest extends BaseUnitTest {
             publisher,
             objectMapper
         );
-        GitHubWebhookController controller = new GitHubWebhookController(pipeline);
 
-        var resp = controller.receive("{}".getBytes(StandardCharsets.UTF_8), "ping", "delivery-id", "sha256=ignored");
+        Map<String, String> pingHeaders = new LinkedHashMap<>();
+        pingHeaders.put("X-GitHub-Event", "ping");
+        pingHeaders.put("X-GitHub-Delivery", "delivery-id");
+        // No signature header — GitHub may post the install-time ping before the secret
+        // is wired and the verifier must still return 200. Verifier intercepts ping
+        // BEFORE the signature check.
+        var resp = pipeline.handle(IntegrationKind.GITHUB, "{}".getBytes(StandardCharsets.UTF_8), pingHeaders);
 
         assertThat(resp.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(resp.getBody()).isInstanceOf(byte[].class);
+        assertThat(new String((byte[]) resp.getBody(), StandardCharsets.UTF_8)).contains("pong");
         verify(publisher, times(0)).publish(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
-    @DisplayName("GitLab webhook: legacy /gitlab controller + unified pipeline emit identical PublishRequest")
-    void gitlabParity() {
+    @DisplayName("GitLab webhook: unified pipeline publishes with expected subject + dedup id")
+    void gitlabUnified() {
         byte[] body = ("{\"object_kind\":\"push\","
             + "\"project\":{\"path_with_namespace\":\"ase/ipraktikum/ios2526/introcourse\"}}")
             .getBytes(StandardCharsets.UTF_8);
         String eventUuid = "aaaa1111-bbbb-2222-cccc-333344445555";
 
-        WebhookProperties props = props(SHARED_SECRET);
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
             List.of(new GitlabWebhookSignatureVerifier(List.of(new GitlabWebhookSecretSource(SHARED_SECRET)))),
             List.of(new GitlabSubjectKeyDeriver()),
             publisher,
             objectMapper
         );
-        GitLabWebhookController controller = new GitLabWebhookController(pipeline);
 
-        // Path A: legacy controller shim.
-        controller.receive(body, SHARED_SECRET, "Push Hook", eventUuid, /* idempotency */ null, /* webhookUuid */ null);
-        // Path B: unified pipeline directly.
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("X-Gitlab-Token", SHARED_SECRET);
         headers.put("X-Gitlab-Event", "Push Hook");
@@ -136,20 +131,11 @@ class WebhookIngestParityTest extends BaseUnitTest {
         pipeline.handle(IntegrationKind.GITLAB, body, headers);
 
         ArgumentCaptor<PublishRequest> captor = ArgumentCaptor.forClass(PublishRequest.class);
-        verify(publisher, times(2)).publish(captor.capture());
-        PublishRequest legacy = captor.getAllValues().get(0);
-        PublishRequest unified = captor.getAllValues().get(1);
+        verify(publisher, times(1)).publish(captor.capture());
+        PublishRequest req = captor.getValue();
 
-        assertThat(legacy.subject())
-            .as("subject is namespace~joined + project + event")
-            .isEqualTo(unified.subject())
-            .isEqualTo("gitlab.ase~ipraktikum~ios2526.introcourse.push");
-        assertThat(legacy.dedupId())
-            .as("dedup id derives from X-Gitlab-Event-UUID — must match")
-            .isEqualTo(unified.dedupId())
-            .isEqualTo("gitlab-" + eventUuid);
-        assertThat(legacy.body()).containsExactly(unified.body());
-        assertThat(legacy.headers()).isEqualTo(unified.headers());
+        assertThat(req.subject()).isEqualTo("gitlab.ase~ipraktikum~ios2526.introcourse.push");
+        assertThat(req.dedupId()).isEqualTo("gitlab-" + eventUuid);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

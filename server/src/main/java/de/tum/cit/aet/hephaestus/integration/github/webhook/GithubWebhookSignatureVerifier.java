@@ -14,6 +14,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,15 +22,26 @@ import org.springframework.stereotype.Component;
  * {@code X-Hub-Signature-256} HMAC-SHA256 against the raw body using the APP_GLOBAL
  * shared secret resolved by {@link GithubWebhookSecretSource}. Constant-time compare
  * via {@link MessageDigest#isEqual(byte[], byte[])}; SHA-1 deliberately rejected.
+ *
+ * <p>Short-circuits the {@code ping} setup event with {@link
+ * VerificationResult.RespondImmediately} — GitHub posts a ping immediately after the
+ * App is installed to confirm reachability and treats any non-2xx as the App being
+ * unreachable. The ping carries a valid signature in normal operation, but verifying
+ * it here would still gate liveness on a configured secret which the operator may
+ * not have wired yet during initial install. Returning {@code "pong"} matches the
+ * pre-Stage-2 controller behaviour without leaking secret state.
  */
 @Component
 public class GithubWebhookSignatureVerifier implements WebhookSignatureVerifier {
 
     private static final Logger log = LoggerFactory.getLogger(GithubWebhookSignatureVerifier.class);
 
+    private static final String HEADER_EVENT = "X-GitHub-Event";
     private static final String HEADER_SIGNATURE_256 = "X-Hub-Signature-256";
+    private static final String PING_EVENT = "ping";
     private static final String SHA256_PREFIX = "sha256=";
     private static final String HMAC_SHA256 = "HmacSHA256";
+    private static final byte[] PONG_BODY = "{\"status\":\"pong\"}".getBytes(StandardCharsets.UTF_8);
 
     private final WebhookSecretSource secretSource;
 
@@ -44,6 +56,12 @@ public class GithubWebhookSignatureVerifier implements WebhookSignatureVerifier 
 
     @Override
     public VerificationResult verify(WebhookRequest request) {
+        String eventType = headerCaseInsensitive(request, HEADER_EVENT);
+        if (PING_EVENT.equalsIgnoreCase(eventType)) {
+            // Setup-only liveness ping — no payload to publish; 200 OK with a pong body
+            // is enough for GitHub to mark the App as reachable.
+            return new VerificationResult.RespondImmediately(200, MediaType.APPLICATION_JSON_VALUE, PONG_BODY);
+        }
         String signature = headerCaseInsensitive(request, HEADER_SIGNATURE_256);
         if (signature == null || signature.isBlank()) {
             return new VerificationResult.MissingSignature();

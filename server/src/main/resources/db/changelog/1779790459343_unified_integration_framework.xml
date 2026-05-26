@@ -1,0 +1,918 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        #1198 Unified Integration Framework — consolidated branch-scoped changelog.
+
+        This single file replaces twelve incremental changesets that accreted across
+        the long #1198 audit loop. The branch is the unit of release: collapsing the
+        history into one timestamped file with each table declared in its FINAL shape
+        is cheaper to review and removes the obsolete two-phase (backfill → cutover)
+        plumbing the iteration carried.
+
+        Logical contents:
+
+          1.  Connection aggregate + audit + partial-unique for NULL instance_key
+              + credentials_format_version observability column.
+          2.  github_installation_unbound pre-workspace bootstrap (with installer
+              identity columns from Wave 5 baked in).
+          3.  integration_webhook_subscription per-subscription signing-secret sidecar.
+          4.  feedback_post cross-vendor edit-in-place tracking.
+          5.  hephaestus_user + integration_identity cross-integration identity split.
+          6.  agent_job classification columns (integration_kind, subject_class)
+              + (kind, subject, created_at) index.
+          7.  practice capability gating (required_capabilities, required_aspects,
+              required_family).
+          8.  slack_channel + slack_message persistence (ToS-compliant, see
+              SlackMessage javadoc).
+          9.  outline_collection + outline_document persistence.
+         10.  shedlock distributed-lock table (JdbcTemplateLockProvider schema).
+         11.  oauth_state_nonce (with code_verifier PKCE column declared from the
+              start) — single-use nonce + RFC 7636 S256 verifier storage.
+         12.  Unconditional drop of the eleven legacy Workspace columns superseded
+              by the Connection registry. account_login is intentionally KEPT (used
+              by 40+ join sites; Stage 1 preserved it as a denormalised
+              org/group lookup column).
+
+        Decision — no data backfill: the iteration's WorkspaceConnectionBackfillChange
+        customChange + dual-format (v1/v2) credential read path are deleted in the
+        same Stage 2 commit. The branch ships as a clean migration; existing
+        Connection rows from sibling worktrees do NOT need to be preserved because
+        the branch boots against a fresh DB per the user's clean-migration directive.
+
+        Preconditions strategy — every changeset still uses
+        onFail="MARK_RAN" so re-applying against a partially-migrated environment
+        (e.g. someone manually applied a subset of the old 12 files locally) stays
+        forward-only safe. The DROP COLUMN changesets carry preconditions in the
+        same belt-and-braces style; they no-op on a fresh DB where the column was
+        never created, and apply on an existing DB where the column is still
+        carrying legacy data.
+    -->
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         1. Connection aggregate + audit + format-version + NULL-collision guard.
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="connection table already present">
+            <not><tableExists tableName="connection"/></not>
+        </preConditions>
+        <comment>Connection aggregate — multi-instance natural key (workspace_id, kind, instance_key).</comment>
+        <createTable tableName="connection">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_connection" nullable="false"/>
+            </column>
+            <column name="workspace_id" type="bigint">
+                <constraints nullable="false" referencedTableName="workspace" referencedColumnNames="id"
+                             foreignKeyName="fk_connection_workspace"/>
+            </column>
+            <column name="kind" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Nullable from the start — pre-bind OAuth slots carry NULL until the
+                 vendor returns the instance handle. NULL-collision protection lives
+                 on the partial unique index uq_connection_pending below. -->
+            <column name="instance_key" type="varchar(128)"/>
+            <column name="display_name" type="varchar(256)"/>
+            <column name="state" type="varchar(32)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="state_reason" type="varchar(512)"/>
+            <column name="config" type="jsonb" defaultValueComputed="'{}'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="credentials_encrypted" type="bytea"/>
+            <column name="credentials_alg" type="varchar(64)"/>
+            <!-- v2-only after Stage 2: blob[0] is always 0x02. NULL when no
+                 credential is persisted (App-mode installs mint tokens on demand). -->
+            <column name="credentials_format_version" type="SMALLINT"/>
+            <column name="replaces_connection_id" type="bigint"/>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_activity_at" type="timestamp with time zone"/>
+            <column name="version" type="bigint" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="connection"
+                             columnNames="workspace_id, kind, instance_key"
+                             constraintName="uq_connection"/>
+        <sql>
+            ALTER TABLE connection ADD CONSTRAINT ck_connection_kind
+                CHECK (kind IN ('GITHUB','GITLAB','SLACK','OUTLINE'));
+            ALTER TABLE connection ADD CONSTRAINT ck_connection_state
+                CHECK (state IN ('PENDING','ACTIVE','SUSPENDED','UNINSTALLED'));
+        </sql>
+        <createIndex tableName="connection" indexName="ix_connection_active">
+            <column name="workspace_id"/>
+            <column name="kind"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="connection"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="uq_connection_pending partial index already present">
+            <not><indexExists indexName="uq_connection_pending"/></not>
+        </preConditions>
+        <comment>
+            Partial unique over (workspace_id, kind) WHERE instance_key IS NULL — closes
+            the NULL-collision gap left by the base uq_connection (PostgreSQL treats
+            NULL as distinct in standard unique constraints, so a workspace could
+            otherwise install the same vendor twice in the pre-bind state).
+        </comment>
+        <sql>
+            CREATE UNIQUE INDEX uq_connection_pending
+                ON connection (workspace_id, kind)
+                WHERE instance_key IS NULL;
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS uq_connection_pending;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="connection_audit already present">
+            <not><tableExists tableName="connection_audit"/></not>
+        </preConditions>
+        <comment>Connection audit — append-only with correlation-id idempotency on webhook replay.</comment>
+        <createTable tableName="connection_audit">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_connection_audit" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false" referencedTableName="connection" referencedColumnNames="id"
+                             foreignKeyName="fk_connection_audit_connection"/>
+            </column>
+            <column name="event_type" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="from_state" type="varchar(32)"/>
+            <column name="to_state" type="varchar(32)"/>
+            <column name="actor_kind" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="actor_ref" type="varchar(256)"/>
+            <column name="correlation_id" type="varchar(64)"/>
+            <column name="detail" type="jsonb"/>
+            <column name="occurred_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="connection_audit"
+                             columnNames="connection_id, event_type, correlation_id"
+                             constraintName="uq_connection_audit_idempotency"/>
+        <createIndex tableName="connection_audit" indexName="ix_connection_audit_lookup">
+            <column name="connection_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="connection_audit"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         2. github_installation_unbound (with installer identity from Wave 5).
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="github_installation_unbound already present">
+            <not><tableExists tableName="github_installation_unbound"/></not>
+        </preConditions>
+        <comment>
+            GitHub App pre-workspace bootstrap — installations observed before any
+            workspace claims them. installer_github_user_id + installer_login are
+            captured from the installation.created webhook so the bind service can
+            enforce installer-identity match (closes the confused-deputy CVE from
+            audit pass 3).
+        </comment>
+        <createTable tableName="github_installation_unbound">
+            <column name="installation_id" type="bigint">
+                <constraints primaryKey="true" primaryKeyName="pk_github_installation_unbound" nullable="false"/>
+            </column>
+            <column name="account_id" type="bigint"/>
+            <column name="account_login" type="varchar(256)"/>
+            <column name="account_type" type="varchar(32)"/>
+            <column name="avatar_url" type="varchar(512)"/>
+            <column name="repositories" type="jsonb" defaultValueComputed="'[]'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="installer_github_user_id" type="BIGINT"/>
+            <column name="installer_login" type="VARCHAR(256)"/>
+            <column name="observed_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="timestamp with time zone" defaultValueComputed="NOW() + INTERVAL '30 days'">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="github_installation_unbound" indexName="ix_github_installation_unbound_expires">
+            <column name="expires_at"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="github_installation_unbound"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         3. integration_webhook_subscription per-subscription secret sidecar.
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="integration_webhook_subscription already present">
+            <not><tableExists tableName="integration_webhook_subscription"/></not>
+        </preConditions>
+        <comment>Per-subscription signing-secret sidecar (Outline, Notion, MS Graph, Asana, Linear).</comment>
+        <createTable tableName="integration_webhook_subscription">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_integration_webhook_subscription" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false" referencedTableName="connection" referencedColumnNames="id"
+                             foreignKeyName="fk_iws_connection"/>
+            </column>
+            <column name="subscription_id" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="signing_secret_encrypted" type="bytea">
+                <constraints nullable="false"/>
+            </column>
+            <column name="credentials_alg" type="varchar(64)" defaultValue="aesgcm-v1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="events_subscribed" type="jsonb" defaultValueComputed="'[]'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_delivery_at" type="timestamp with time zone"/>
+        </createTable>
+        <addUniqueConstraint tableName="integration_webhook_subscription"
+                             columnNames="connection_id, subscription_id"
+                             constraintName="uq_integration_webhook_subscription"/>
+        <rollback>
+            <dropTable tableName="integration_webhook_subscription"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         4. feedback_post cross-vendor edit-in-place tracking.
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-6">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_post already present">
+            <not><tableExists tableName="feedback_post"/></not>
+        </preConditions>
+        <comment>Cross-vendor edit-in-place tracking — Slack chat.update, Outline comments.update, GitHub PR comments.</comment>
+        <createTable tableName="feedback_post">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_feedback_post" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false" referencedTableName="connection" referencedColumnNames="id"
+                             foreignKeyName="fk_feedback_post_connection"/>
+            </column>
+            <column name="subject_external_id" type="varchar(256)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subject_class" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="post_kind" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="external_post_id" type="varchar(256)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="vendor_metadata" type="jsonb" defaultValueComputed="'{}'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="feedback_post"
+                             columnNames="connection_id, subject_external_id, post_kind, external_post_id"
+                             constraintName="uq_feedback_post"/>
+        <createIndex tableName="feedback_post" indexName="ix_feedback_post_lookup">
+            <column name="connection_id"/>
+            <column name="subject_external_id"/>
+            <column name="post_kind"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="feedback_post"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         5. hephaestus_user + integration_identity (cross-integration identity).
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-7">
+        <preConditions onFail="MARK_RAN" onFailMessage="hephaestus_user already present">
+            <not><tableExists tableName="hephaestus_user"/></not>
+        </preConditions>
+        <comment>Cross-integration identity Layer 2 — created on first Keycloak login. Aggregates a real person's vendor identities.</comment>
+        <createTable tableName="hephaestus_user">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_hephaestus_user" nullable="false"/>
+            </column>
+            <column name="keycloak_subject" type="varchar(128)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_hephaestus_user_kc_subject"/>
+            </column>
+            <column name="email" type="varchar(320)"/>
+            <column name="display_name" type="varchar(256)"/>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <rollback>
+            <dropTable tableName="hephaestus_user"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-8">
+        <preConditions onFail="MARK_RAN" onFailMessage="integration_identity already present">
+            <not><tableExists tableName="integration_identity"/></not>
+        </preConditions>
+        <comment>
+            Cross-integration identity Layer 3 — per-(integration-instance, kind, external_id).
+            For GITHUB/GITLAB the integration_instance is the shared git_provider id (cross-workspace identities);
+            for SLACK/OUTLINE it's the connection_id (per-workspace identity universes).
+        </comment>
+        <createTable tableName="integration_identity">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_integration_identity" nullable="false"/>
+            </column>
+            <column name="hephaestus_user_id" type="bigint">
+                <constraints referencedTableName="hephaestus_user" referencedColumnNames="id"
+                             foreignKeyName="fk_integration_identity_user"/>
+            </column>
+            <column name="kind" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="integration_instance_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="external_id" type="varchar(256)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="external_login" type="varchar(256)"/>
+            <column name="external_email" type="varchar(320)"/>
+            <column name="display_name" type="varchar(256)"/>
+            <column name="raw_attributes" type="jsonb" defaultValueComputed="'{}'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="first_seen_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="linked_at" type="timestamp with time zone"/>
+        </createTable>
+        <addUniqueConstraint tableName="integration_identity"
+                             columnNames="kind, integration_instance_id, external_id"
+                             constraintName="uq_integration_identity"/>
+        <createIndex tableName="integration_identity" indexName="ix_integration_identity_user">
+            <column name="hephaestus_user_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="integration_identity"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         6. agent_job classification columns + index.
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-9">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.integration_kind already present">
+            <not><columnExists tableName="agent_job" columnName="integration_kind"/></not>
+        </preConditions>
+        <comment>Add integration_kind: enables per-kind dispatch (GITHUB/GITLAB/SLACK/OUTLINE).</comment>
+        <addColumn tableName="agent_job">
+            <column name="integration_kind" type="varchar(48)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="integration_kind"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-10">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.subject_class already present">
+            <not><columnExists tableName="agent_job" columnName="subject_class"/></not>
+        </preConditions>
+        <comment>Add subject_class: drives polymorphic dispatch (PULL_REQUEST, ISSUE, ...).</comment>
+        <addColumn tableName="agent_job">
+            <column name="subject_class" type="varchar(48)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="subject_class"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-11">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_agent_job_subject already present">
+            <not><indexExists indexName="idx_agent_job_subject"/></not>
+        </preConditions>
+        <comment>
+            Index for agent-job filter queries: per-(kind, subject) timelines and
+            kind-scoped recent-jobs listings. created_at DESC supports cursor pagination.
+        </comment>
+        <createIndex tableName="agent_job" indexName="idx_agent_job_subject">
+            <column name="integration_kind"/>
+            <column name="subject_class"/>
+            <column name="created_at" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="agent_job" indexName="idx_agent_job_subject"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         7. practice capability gating (UI surface filter).
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-12">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.required_capabilities already present">
+            <not><columnExists tableName="practice" columnName="required_capabilities"/></not>
+        </preConditions>
+        <comment>UI gating set of integration.spi.Capability names.</comment>
+        <addColumn tableName="practice">
+            <column name="required_capabilities" type="jsonb" defaultValueComputed="'[]'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="practice" columnName="required_capabilities"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-13">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.required_aspects already present">
+            <not><columnExists tableName="practice" columnName="required_aspects"/></not>
+        </preConditions>
+        <comment>Context aspects unioned across enabled practices.</comment>
+        <addColumn tableName="practice">
+            <column name="required_aspects" type="jsonb" defaultValueComputed="'[]'::jsonb">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="practice" columnName="required_aspects"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-14">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.required_family already present">
+            <not><columnExists tableName="practice" columnName="required_family"/></not>
+        </preConditions>
+        <comment>Narrow practice to a single IntegrationFamily.Family (SCM, MESSAGING, ...). Null = family-agnostic.</comment>
+        <addColumn tableName="practice">
+            <column name="required_family" type="varchar(32)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="practice" columnName="required_family"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-15">
+        <preConditions onFail="MARK_RAN" onFailMessage="required_family backfill already applied">
+            <and>
+                <columnExists tableName="practice" columnName="required_family"/>
+                <sqlCheck expectedResult="0">
+                    SELECT COUNT(*) FROM practice WHERE required_family IS NOT NULL
+                </sqlCheck>
+            </and>
+        </preConditions>
+        <comment>
+            One-time backfill required_family = 'SCM' for every existing practice — today's
+            catalog is exclusively code-review practices that apply to pull/merge requests.
+        </comment>
+        <sql>
+            UPDATE practice SET required_family = 'SCM' WHERE required_family IS NULL;
+        </sql>
+        <rollback>
+            <!-- Backfill is data-only; the schema rollback is on the addColumn changeset. -->
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         8. Slack persistence (channels + messages).
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-16">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_channel table already present">
+            <not><tableExists tableName="slack_channel"/></not>
+        </preConditions>
+        <comment>Slack channel metadata — one row per (connection, channel_id).</comment>
+        <createTable tableName="slack_channel">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_slack_channel" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="channel_id" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="varchar(256)"/>
+            <column name="topic" type="text"/>
+            <column name="purpose" type="text"/>
+            <column name="is_archived" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="archived_at" type="timestamp with time zone"/>
+            <column name="member_count" type="integer"/>
+            <column name="ingested_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="slack_channel"
+            baseColumnNames="connection_id"
+            referencedTableName="connection"
+            referencedColumnNames="id"
+            constraintName="fk_slack_channel_connection"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="slack_channel"
+                             columnNames="connection_id, channel_id"
+                             constraintName="uq_slack_channel"/>
+        <createIndex tableName="slack_channel" indexName="ix_slack_channel_connection">
+            <column name="connection_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="slack_channel"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-17">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_message table already present">
+            <not><tableExists tableName="slack_message"/></not>
+        </preConditions>
+        <comment>Slack message — workspace-scoped via Connection. Soft-deleted on message_deleted.</comment>
+        <createTable tableName="slack_message">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_slack_message" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="team_id" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="channel_id" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ts" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="thread_ts" type="varchar(64)"/>
+            <column name="user_id" type="varchar(64)"/>
+            <column name="text" type="text"/>
+            <column name="blocks" type="jsonb"/>
+            <column name="ingested_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp with time zone"/>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="slack_message"
+            baseColumnNames="connection_id"
+            referencedTableName="connection"
+            referencedColumnNames="id"
+            constraintName="fk_slack_message_connection"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="slack_message"
+                             columnNames="connection_id, team_id, channel_id, ts"
+                             constraintName="uq_slack_message"/>
+        <!--
+            Composite (connection_id, channel_id, ts DESC) supports the dominant access
+            pattern: newest-first thread fetch within a channel. ts DESC must be the trailing
+            column so the scan terminates after K rows for K-window mentor context loads.
+        -->
+        <sql>
+            CREATE INDEX ix_slack_message_thread
+                ON slack_message (connection_id, channel_id, ts DESC);
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS ix_slack_message_thread;</sql>
+            <dropTable tableName="slack_message"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         9. Outline persistence (collections + documents).
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-18">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_collection table already present">
+            <not><tableExists tableName="outline_collection"/></not>
+        </preConditions>
+        <comment>Outline collection — one row per (connection, collection_id).</comment>
+        <createTable tableName="outline_collection">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_outline_collection" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="collection_id" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="varchar(256)"/>
+            <column name="description" type="text"/>
+            <column name="url" type="varchar(1024)"/>
+            <column name="ingested_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp with time zone"/>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="outline_collection"
+            baseColumnNames="connection_id"
+            referencedTableName="connection"
+            referencedColumnNames="id"
+            constraintName="fk_outline_collection_connection"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="outline_collection"
+                             columnNames="connection_id, collection_id"
+                             constraintName="uq_outline_collection"/>
+        <createIndex tableName="outline_collection" indexName="ix_outline_collection_connection">
+            <column name="connection_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="outline_collection"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-19">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_document table already present">
+            <not><tableExists tableName="outline_document"/></not>
+        </preConditions>
+        <comment>Outline document — workspace-scoped via Connection.</comment>
+        <createTable tableName="outline_document">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="pk_outline_document" nullable="false"/>
+            </column>
+            <column name="connection_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="document_id" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="collection_id" type="varchar(64)"/>
+            <column name="title" type="varchar(512)"/>
+            <column name="url" type="varchar(1024)"/>
+            <column name="last_revision_id" type="varchar(64)"/>
+            <column name="last_modified_at" type="timestamp with time zone"/>
+            <column name="ingested_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp with time zone"/>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="outline_document"
+            baseColumnNames="connection_id"
+            referencedTableName="connection"
+            referencedColumnNames="id"
+            constraintName="fk_outline_document_connection"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="outline_document"
+                             columnNames="connection_id, document_id"
+                             constraintName="uq_outline_document"/>
+        <createIndex tableName="outline_document" indexName="ix_outline_document_connection">
+            <column name="connection_id"/>
+        </createIndex>
+        <createIndex tableName="outline_document" indexName="ix_outline_document_collection">
+            <column name="connection_id"/>
+            <column name="collection_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="outline_document"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         10. ShedLock distributed-lock table.
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-20">
+        <preConditions onFail="MARK_RAN" onFailMessage="shedlock table already present">
+            <not><tableExists tableName="shedlock"/></not>
+        </preConditions>
+        <comment>
+            ShedLock lock-coordination table (one row per named lock). Schema is dictated
+            by JdbcTemplateLockProvider — column names + types MUST match exactly.
+        </comment>
+        <createTable tableName="shedlock">
+            <column name="name" type="varchar(64)">
+                <constraints primaryKey="true" primaryKeyName="pk_shedlock" nullable="false"/>
+            </column>
+            <column name="lock_until" type="timestamp without time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="locked_at" type="timestamp without time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="locked_by" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <rollback>
+            <dropTable tableName="shedlock"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         11. OAuth state nonce store (with PKCE code_verifier from the start).
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-21">
+        <preConditions onFail="MARK_RAN" onFailMessage="oauth_state_nonce table already present">
+            <not><tableExists tableName="oauth_state_nonce"/></not>
+        </preConditions>
+        <comment>
+            Single-use nonce store for OAuth state — closes the within-TTL replay window
+            left open by HMAC-only state. PKCE verifier (RFC 7636 §4.1, 43–128 chars,
+            opt-in per strategy) is persisted on the same row so the redirect carries
+            only the SHA-256 challenge while the verifier survives the token-exchange
+            POST round-trip.
+        </comment>
+        <createTable tableName="oauth_state_nonce">
+            <column name="nonce" type="varchar(32)">
+                <constraints primaryKey="true" primaryKeyName="pk_oauth_state_nonce" nullable="false"/>
+            </column>
+            <column name="workspace_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="kind" type="varchar(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="issued_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="consumed_at" type="timestamp with time zone"/>
+            <column name="code_verifier" type="VARCHAR(128)"/>
+        </createTable>
+        <createIndex tableName="oauth_state_nonce" indexName="ix_oauth_state_nonce_issued_at">
+            <column name="issued_at"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="oauth_state_nonce"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         12. Unconditional drop of legacy Workspace columns superseded by the
+             Connection registry. account_login is intentionally KEPT.
+
+             Preconditions guard against re-applying against an environment where
+             a sibling worktree (e.g. main) doesn't carry these columns at all —
+             onFail="MARK_RAN" makes the drop forward-only safe.
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-22">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.installation_id already dropped">
+            <columnExists tableName="workspace" columnName="installation_id"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="installation_id"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="installation_id" type="bigint"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-23">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.personal_access_token already dropped">
+            <columnExists tableName="workspace" columnName="personal_access_token"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="personal_access_token"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="personal_access_token" type="TEXT"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-24">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.git_provider_mode already dropped">
+            <columnExists tableName="workspace" columnName="git_provider_mode"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="git_provider_mode"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="git_provider_mode" type="varchar(64)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-25">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.gitlab_group_id already dropped">
+            <columnExists tableName="workspace" columnName="gitlab_group_id"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="gitlab_group_id"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="gitlab_group_id" type="bigint"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-26">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.gitlab_webhook_id already dropped">
+            <columnExists tableName="workspace" columnName="gitlab_webhook_id"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="gitlab_webhook_id"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="gitlab_webhook_id" type="bigint"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-27">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.server_url already dropped">
+            <columnExists tableName="workspace" columnName="server_url"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="server_url"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="server_url" type="varchar(512)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-28">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.slack_token already dropped">
+            <columnExists tableName="workspace" columnName="slack_token"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="slack_token"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="slack_token" type="TEXT"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-29">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.slack_signing_secret already dropped">
+            <columnExists tableName="workspace" columnName="slack_signing_secret"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="slack_signing_secret"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="slack_signing_secret" type="TEXT"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-30">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_notification_team already dropped">
+            <columnExists tableName="workspace" columnName="leaderboard_notification_team"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="leaderboard_notification_team"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="leaderboard_notification_team" type="varchar(100)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-31">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_notification_channel_id already dropped">
+            <columnExists tableName="workspace" columnName="leaderboard_notification_channel_id"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="leaderboard_notification_channel_id"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="leaderboard_notification_channel_id" type="varchar(100)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-32">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.installation_linked_at already dropped">
+            <columnExists tableName="workspace" columnName="installation_linked_at"/>
+        </preConditions>
+        <dropColumn tableName="workspace" columnName="installation_linked_at"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="installation_linked_at" type="timestamp with time zone"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
