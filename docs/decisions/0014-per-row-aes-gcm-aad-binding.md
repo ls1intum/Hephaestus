@@ -72,10 +72,14 @@ byte[] encrypt(CredentialBundle, EncryptionContext);    // writes v2 only
 CredentialBundle decrypt(byte[], EncryptionContext);    // tolerant of v1 + v2
 ```
 
-The legacy `AttributeConverter#convertToDatabaseColumn` / `convertToEntityAttribute`
-methods still produce v1 — used **only** by the Liquibase backfill
-(`WorkspaceConnectionBackfillChange`). All runtime writes go through
-`Connection.setCredentials(bundle, converter)` → `encrypt()` → v2 blob.
+All runtime writes go through
+`Connection.setCredentials(bundle, converter)` → `encrypt()` → v2 blob; v1 is
+read-only legacy and produced nowhere in current code. (An interim Liquibase
+`WorkspaceConnectionBackfillChange` customChange wrote v1 during the iterative
+migration; it was retired in pass 16/stage 2 when the branch consolidated to a
+clean, no-backfill migration. See
+`server/src/main/resources/db/changelog/1779790459343_unified_integration_framework.xml`
+for the consolidated changelog and its operator-warning header.)
 
 A `credentials_format_version` column on the `connection` table mirrors the blob
 version byte. Unknown versions are rejected with a typed `EncryptionException` — no

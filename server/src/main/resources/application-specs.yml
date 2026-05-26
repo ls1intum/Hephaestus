@@ -33,6 +33,10 @@ github:
     auth-token: ""
 
 hephaestus:
+    # OpenAPI generation boots the full Spring context; HmacOAuthStateService fails fast
+    # without a webhook/oauth-state secret. Use a deterministic placeholder for the spec run.
+    webhook:
+        secret: "specs-only-placeholder-secret-do-not-use-in-prod"
     workspace:
         init-default: false
     keycloak:

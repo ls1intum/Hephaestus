@@ -126,6 +126,13 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(requests -> {
                 requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+                // OpenAPI / Swagger endpoints are public on the resource-server chain; they must
+                // also be public on the lockdown chain so spec generation works on no-Keycloak boots
+                // (the `specs` profile boots without a JwtDecoder and would otherwise 403 on
+                // `mvn verify -Dapp.profiles=specs`).
+                requests
+                    .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
+                    .permitAll();
                 if (devTriggerEnabled) {
                     requests.requestMatchers("/api/dev/**").permitAll();
                 }

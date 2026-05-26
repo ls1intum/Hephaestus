@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.slack.api.bolt.App;
-import de.tum.cit.aet.hephaestus.integrations.posthog.PosthogClient;
-import de.tum.cit.aet.hephaestus.integrations.posthog.PosthogProperties;
+import de.tum.cit.aet.hephaestus.analytics.posthog.PosthogClient;
+import de.tum.cit.aet.hephaestus.analytics.posthog.PosthogProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;

@@ -247,6 +247,7 @@ public class ConnectionController {
 
 
     /** Lifecycle-action body — reason is optional, applied to both suspend and reactivate. */
+    @io.swagger.v3.oas.annotations.media.Schema(name = "ReasonRequest")
     public record ReasonRequest(@Nullable String reason) {
     }
 

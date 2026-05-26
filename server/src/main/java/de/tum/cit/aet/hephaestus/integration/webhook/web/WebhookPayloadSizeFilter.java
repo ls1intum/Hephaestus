@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -21,12 +20,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * chunked traffic on these endpoints is either a misconfigured client or an attempt to bypass
  * the size cap.
  *
- * <p>Covers both the legacy per-kind controller paths ({@code /github}, {@code /gitlab}) and
- * the unified {@code /webhooks/<kind>} controller introduced in #1198.
+ * <p>Bound to the unified ingest path {@code /webhooks/<kind>} via {@link
+ * de.tum.cit.aet.hephaestus.integration.webhook.WebhookConfiguration#webhookPayloadSizeFilter}.
+ * Legacy per-kind paths ({@code /github}, {@code /gitlab}) were retired in pass 16/stage 2 and
+ * are no longer routed.
  */
 public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
 
-    private static final Set<String> LEGACY_WEBHOOK_PATHS = Set.of("/gitlab", "/github");
     private static final String UNIFIED_WEBHOOK_PREFIX = "/webhooks/";
 
     private final long maxPayloadBytes;
@@ -43,8 +43,7 @@ public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
         if (!"POST".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
-        String uri = request.getRequestURI();
-        return !(LEGACY_WEBHOOK_PATHS.contains(uri) || uri.startsWith(UNIFIED_WEBHOOK_PREFIX));
+        return !request.getRequestURI().startsWith(UNIFIED_WEBHOOK_PREFIX);
     }
 
     @Override
@@ -66,12 +65,10 @@ public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
     }
 
     private static String providerTag(String uri) {
-        if (uri.startsWith(UNIFIED_WEBHOOK_PREFIX)) {
-            String tail = uri.substring(UNIFIED_WEBHOOK_PREFIX.length());
-            int slash = tail.indexOf('/');
-            return slash >= 0 ? tail.substring(0, slash) : tail;
-        }
-        return uri.startsWith("/") ? uri.substring(1) : uri;
+        // Filter only binds to /webhooks/*, so the prefix is guaranteed here.
+        String tail = uri.substring(UNIFIED_WEBHOOK_PREFIX.length());
+        int slash = tail.indexOf('/');
+        return slash >= 0 ? tail.substring(0, slash) : tail;
     }
 
     private void rejected(String provider, String reason) {

@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.integrations.posthog;
+package de.tum.cit.aet.hephaestus.analytics.posthog;
 
 public class PosthogClientException extends RuntimeException {
 

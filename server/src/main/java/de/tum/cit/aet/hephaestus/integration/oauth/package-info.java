@@ -13,4 +13,5 @@
  * unauthenticated. The HMAC over the state parameter IS the auth mechanism. See the
  * controller Javadoc for the full security model.
  */
+@org.springframework.modulith.NamedInterface("oauth")
 package de.tum.cit.aet.hephaestus.integration.oauth;

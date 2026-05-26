@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.integrations.posthog;
+package de.tum.cit.aet.hephaestus.analytics.posthog;
 
 import org.hibernate.validator.constraints.URL;
 import org.springframework.boot.context.properties.ConfigurationProperties;

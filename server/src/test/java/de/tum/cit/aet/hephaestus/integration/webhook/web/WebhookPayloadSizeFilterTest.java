@@ -36,7 +36,7 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
 
     @Test
     void rejectsOversizedGitlabPostWith413() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/gitlab");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/gitlab");
         request.setContentType("application/json");
         request.setContent(new byte[2048]);
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -52,7 +52,7 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
 
     @Test
     void allowsBodyExactlyAtMaxSize() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/github");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/github");
         request.setContentType("application/json");
         request.setContent(new byte[(int) MAX]);
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -66,7 +66,7 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
 
     @Test
     void rejectsBodyOneByteOverMaxSize() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/github");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/github");
         request.setContentType("application/json");
         request.setContent(new byte[(int) MAX + 1]);
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -80,7 +80,7 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
 
     @Test
     void rejectsMissingContentLengthWith411() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/gitlab") {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/gitlab") {
             @Override
             public long getContentLengthLong() {
                 return -1; // chunked transfer encoding or no Content-Length
@@ -121,12 +121,29 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
 
     @Test
     void bypassesGetRequests() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gitlab");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/webhooks/gitlab");
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
         filter.doFilter(request, response, chain);
 
         verify(chain, times(1)).doFilter(request, response);
+    }
+
+    @Test
+    void bypassesLegacyWebhookPaths() throws Exception {
+        // Legacy /gitlab and /github URLs were retired in #1198 stage 2. The filter must NOT
+        // match them — they should fall through to a normal 404 from Spring rather than be
+        // accepted by the size filter (which would imply the route still exists).
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/gitlab");
+        request.setContentType("application/json");
+        request.setContent(new byte[2048]);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain, times(1)).doFilter(request, response);
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
     }
 }

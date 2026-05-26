@@ -5,7 +5,7 @@ TITLE FORMAT (required):
   Types: feat | fix | docs | refactor | test | ci | perf | revert
   Scopes (Service): webapp | server | ai | docs
   Scopes (Infra - NO RELEASE): ci | config | deps | deps-dev | docker | scripts | security | db | no-release
-  Scopes (Feature): gitprovider | leaderboard | mentor | notifications | profile | teams | workspace
+  Scopes (Feature): integration | scm | leaderboard | mentor | notifications | profile | teams | workspace
 
   Breaking: Add ! before colon (feat!: or feat(scope)!:)
 

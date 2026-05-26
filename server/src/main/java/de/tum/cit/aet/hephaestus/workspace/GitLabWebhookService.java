@@ -182,7 +182,7 @@ public class GitLabWebhookService {
 
         Long scopeId = workspace.getId();
         String baseUrl = webhookProperties.externalUrl().replaceAll("/+$", "");
-        String webhookUrl = baseUrl + "/gitlab";
+        String webhookUrl = baseUrl + "/webhooks/gitlab";
 
         GitLabConfig config = configOpt.get();
         Long currentWebhookId = config.gitlabWebhookId();

@@ -255,7 +255,7 @@ function GitLabWizardPage() {
 				displayName: state.displayName,
 				accountLogin: state.selectedGroup.fullPath,
 				accountType: "ORG",
-				gitProviderMode: "GITLAB_PAT",
+				kind: "GITLAB",
 				personalAccessToken: state.personalAccessToken,
 				serverUrl: state.serverUrl || undefined,
 			},

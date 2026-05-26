@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
  *   <li><b>config</b> - Application configuration</li>
  *   <li><b>core</b> - Shared core utilities</li>
  *   <li><b>shared</b> - Cross-cutting shared code</li>
- *   <li><b>integrations</b> - External service integrations</li>
+ *   <li><b>analytics</b> - Product analytics adapters (PostHog)</li>
  * </ul>
  *
  * @see ArchitectureTestConstants
@@ -221,25 +221,28 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
     }
 
     // ========================================================================
-    // INTEGRATIONS MODULE ISOLATION
+    // ANALYTICS MODULE ISOLATION
     // ========================================================================
 
     @Nested
-    @DisplayName("Integrations Module Isolation")
-    class IntegrationsModuleTests {
+    @DisplayName("Analytics Module Isolation")
+    class AnalyticsModuleTests {
 
         /**
-         * Integrations module should not depend on feature module internals.
+         * Analytics module should not depend on feature module internals.
          *
-         * <p>Integrations connect to external services. Feature modules
-         * should consume integrations, not vice versa.
+         * <p>Analytics adapters (PostHog) are outbound clients. Feature modules
+         * may consume them; they must not pull feature internals.
+         *
+         * <p>Renamed from {@code integrations/} in #1198 — see
+         * {@code analytics/package-info.java} for rationale.
          */
         @Test
-        @DisplayName("Integrations does not depend on feature module internals")
-        void integrationsDoesNotDependOnFeatureInternals() {
+        @DisplayName("Analytics does not depend on feature module internals")
+        void analyticsDoesNotDependOnFeatureInternals() {
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..integrations..")
+                .resideInAPackage("..analytics..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage(
@@ -248,7 +251,7 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
                     "..mentor..service..",
                     "..profile..service.."
                 )
-                .because("Integrations are consumed by features, not vice versa");
+                .because("Analytics adapters are consumed by features, not vice versa");
             rule.check(classes);
         }
     }

@@ -72,7 +72,7 @@ jobs:
         hephaestus.component=application-server
 
   # Note: the inbound webhook receiver lives in the application-server image
-  # (gitprovider.webhook package) and is deployed as a separate container via
+  # (integration.webhook package) and is deployed as a separate container via
   # SPRING_PROFILES_ACTIVE=prod,webhook. No separate image build is required. See
   # docker/compose.core.yaml (webhook-server service) and ADR 0008.
 

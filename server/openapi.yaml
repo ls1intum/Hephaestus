@@ -38,8 +38,61 @@ tags:
   name: workspace-membership-controller
 - description: Workspace-scoped agent job monitoring
   name: Agent Jobs
+- description: |-
+    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
+     the browser arrives without a Hephaestus session — so identity comes from the
+     HMAC-signed <code>state</code> param (<code>(workspaceId, kind, issuedAt, actorRef)</code>,
+     minted by {@link OAuthStateService OAuthStateService}). The path's <code>{kind</code>} MUST equal the
+     state's kind, otherwise a state issued for kind A could be replayed against kind B's
+     callback.
+
+     <p>Browser audience: success and vendor-side cancellations return 302 redirects.
+     Framework errors (bad state, unknown kind, strategy throw) return 4xx JSON so dev
+     tools surface the failure clearly.
+
+     <p>Repository access lives in {@link OAuthCallbackService OAuthCallbackService} (architecture rule). The
+     workspace-context allow-list exempts this controller — workspace identity is from
+     the verified state, never from the request.
+  name: o-auth-callback-controller
 - description: "User account management (settings, deletion)"
   name: Account
+- description: |-
+    Unified webhook ingest controller.
+
+     <p><code>POST /webhooks/{kind</code>} is the sole webhook entry point. Per-kind
+     routing resolves the {@link IntegrationKindRouting kind} from the path and
+     delegates to {@link WebhookIngestPipeline WebhookIngestPipeline}, which dispatches signature
+     verification, subject derivation and JetStream publication through the per-kind
+     {@link de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier} and
+     {@link de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver} beans.
+     GitHub, GitLab, Slack and Outline all share this endpoint.
+
+     <p>Active only on the webhook runtime role.
+  name: webhook-controller
+- description: |-
+    Administrative REST surface for managing per-workspace
+     {@link de.tum.cit.aet.hephaestus.integration.registry.Connection de.tum.cit.aet.hephaestus.integration.registry.Connection} rows — list, read,
+     initiate, suspend, reactivate, disconnect, audit.
+
+     <p>Thin HTTP adapter: all repository access lives in {@link ConnectionAdminService ConnectionAdminService};
+     the state machine + audit invariants live in {@link ConnectionService ConnectionService}; per-kind
+     vendor flows live in {@link ConnectionStrategy ConnectionStrategy} implementations. The controller's
+     only jobs are HTTP wire mapping (DTO ↔ entity), strategy resolution, and exception
+     translation.
+
+     <p>The <code>workspaceId</code> path variable + class-level
+     {@link RequireAtLeastWorkspaceAdmin RequireAtLeastWorkspaceAdmin} satisfy the
+     <code>MultiTenancyArchitectureTest.dataEndpointsReceiveWorkspaceContext</code> rule — the
+     annotation simple name contains <code>Workspace</code>, which the rule recognises as a
+     workspace-context guard.
+
+     <p>TODO(#1198 follow-up): credential persistence — see <code>ConnectionAdminService</code>
+     for the AES-GCM converter integration plan.
+
+     <p>TODO(#1198 follow-up): the OAuth callback controller that calls
+     {@link ConnectionStrategy#finalizeConnect ConnectionStrategy#finalizeConnect} lives in a separate slice — its endpoint
+     is per-kind and must accept unauthenticated browser redirects from the vendor.
+  name: connection-controller
 - description: Authentication discovery (public)
   name: Auth
 - description: Manage practice definitions
@@ -48,6 +101,19 @@ tags:
   name: Team Settings
 - description: Team management within workspace
   name: Teams
+- description: |-
+    Admin endpoint for binding a pre-observed GitHub App installation to a workspace.
+
+     <p>The workspace id appears in the URL path so the arch-test
+     <code>MultiTenancyArchitectureTest.ControllerWorkspaceContextTests</code> sees a workspace
+     scope on every method.
+
+     <p>TODO(#1198 follow-up): {@link RequireWorkspaceAdminForBinding RequireWorkspaceAdminForBinding} is permissive
+     (<code>isAuthenticated()</code>). Tightening it to <code>@workspaceSecure.isAdminOfWorkspace(#workspaceId)</code>
+     needs a parameterised SpEL on <code>WorkspaceSecurityExpressions</code> that resolves the
+     workspace by id directly (without <code>WorkspaceContextHolder</code>, which is only populated
+     on <code>/workspaces/{slug</code>/...} paths). See the annotation's Javadoc for the gap details.
+  name: github-installation-controller
 - description: Contributor feedback on AI-generated practice findings
   name: Finding Feedback
 - description: User profile and activity data
@@ -55,6 +121,211 @@ tags:
 - description: Contributor rankings and league statistics
   name: Leaderboard
 paths:
+  /api/v1/admin/workspaces/{workspaceId}/integrations/github/bind:
+    post:
+      operationId: bind
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BindRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BindResponse"
+          description: OK
+      tags:
+      - github-installation
+  /api/v1/workspaces/{workspaceId}/connections:
+    get:
+      operationId: list
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConnectionSummary"
+          description: OK
+      tags:
+      - connection
+    post:
+      operationId: initiate
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitiateConnectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: "#/components/schemas/Linked"
+                - $ref: "#/components/schemas/Redirect"
+          description: OK
+      tags:
+      - connection
+  /api/v1/workspaces/{workspaceId}/connections/{id}:
+    get:
+      operationId: read
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionDetail"
+          description: OK
+      tags:
+      - connection
+  /api/v1/workspaces/{workspaceId}/connections/{id}/audit:
+    get:
+      operationId: audit
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConnectionAuditEntry"
+          description: OK
+      tags:
+      - connection
+  /api/v1/workspaces/{workspaceId}/connections/{id}/disconnect:
+    post:
+      operationId: disconnect
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+      tags:
+      - connection
+  /api/v1/workspaces/{workspaceId}/connections/{id}/reactivate:
+    post:
+      operationId: reactivate
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonRequest"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionSummary"
+          description: OK
+      tags:
+      - connection
+  /api/v1/workspaces/{workspaceId}/connections/{id}/suspend:
+    post:
+      operationId: suspend
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonRequest"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionSummary"
+          description: OK
+      tags:
+      - connection
   /auth/identity-providers:
     get:
       description: Returns all enabled identity providers that can be used for login.
@@ -89,6 +360,102 @@ paths:
       summary: List global contributors
       tags:
       - Contributors
+  /oauth/callback/{kind}:
+    get:
+      description: |-
+        GET callback (Slack, Outline, GitHub App install). The <code>error</code> param is
+         checked before state so vendor cancellations (<code>error=access_denied</code> with
+         no <code>code</code>) surface as 400 rather than blowing up on missing state.
+      operationId: callbackGet
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: code
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: state
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: error
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: error_description
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: allParams
+        required: true
+        schema:
+          type: object
+          additionalProperties:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      summary: "GET callback (Slack, Outline, GitHub App install)."
+      tags:
+      - o-auth-callback
+    post:
+      description: POST variant for vendors that send form-encoded callbacks.
+      operationId: callbackPost
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: code
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: state
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: error
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: error_description
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: allParams
+        required: true
+        schema:
+          type: object
+          additionalProperties:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      summary: POST variant for vendors that send form-encoded callbacks.
+      tags:
+      - o-auth-callback
   /user:
     delete:
       description: Permanently delete the current user's account and all associated
@@ -205,6 +572,24 @@ paths:
       summary: Update user settings
       tags:
       - Account
+  /webhooks/{kind}:
+    post:
+      operationId: ingest
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - webhook
   /workspaces:
     get:
       operationId: listWorkspaces
@@ -3023,15 +3408,16 @@ components:
           example: My Workspace
           maxLength: 120
           minLength: 0
-        gitProviderMode:
+        kind:
           type: string
-          description: Git provider authentication mode. Defaults to PAT_ORG (GitHub
-            PAT) if not specified.
+          description: "Integration kind to provision. Must be GITHUB or GITLAB; SLACK/OUTLINE\
+            \ flow through OAuth, not this endpoint."
           enum:
-          - PAT_ORG
-          - GITHUB_APP_INSTALLATION
-          - GITLAB_PAT
-          example: GITLAB_PAT
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+          example: GITLAB
         ownerUserId:
           type: integer
           format: int64
@@ -3040,9 +3426,9 @@ components:
             \ always becomes the owner."
         personalAccessToken:
           type: string
-          description: Personal Access Token for GitLab API access. Required when
-            gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
-          example: your-gitlab-token
+          description: Personal Access Token. Required for both kinds (GitLab API
+            or GitHub PAT). Stored encrypted at rest.
+          example: glpat-...
           maxLength: 512
           minLength: 0
         serverUrl:
@@ -3060,6 +3446,7 @@ components:
       - accountLogin
       - accountType
       - displayName
+      - kind
       - workspaceSlug
     FeatureFlags:
       type: object
@@ -4506,9 +4893,6 @@ components:
         displayName:
           type: string
           description: Human-readable name of the workspace
-        gitProviderMode:
-          type: string
-          description: "Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)"
         gitlabWebhookRegistered:
           type: boolean
           description: Whether a GitLab webhook has been auto-registered for this
@@ -4518,7 +4902,7 @@ components:
           description: Whether a Personal Access Token is configured
         hasSlackSigningSecret:
           type: boolean
-          description: Whether Slack signing secret is configured
+          description: Whether Slack signing secret is configured (always false post-#1198)
         hasSlackToken:
           type: boolean
           description: Whether Slack token is configured
@@ -4537,6 +4921,9 @@ components:
         isPubliclyViewable:
           type: boolean
           description: Whether the workspace is publicly viewable without authentication
+        kind:
+          type: string
+          description: Integration kind backing this workspace (GITHUB or GITLAB)
         leaderboardEnabled:
           type: boolean
           description: Whether the leaderboard is enabled
@@ -4580,8 +4967,8 @@ components:
           description: Whether the league/progression system is enabled
         providerType:
           type: string
-          description: High-level git provider type derived from the authentication
-            mode
+          description: High-level git provider type for the workspace's SCM connection
+            (null if none bound)
           enum:
           - GITHUB
           - GITLAB
@@ -4619,7 +5006,6 @@ components:
       - practiceReviewManualTriggerEnabled
       - practicesEnabled
       - progressionEnabled
-      - providerType
       - status
       - updatedAt
       - workspaceSlug
@@ -4661,7 +5047,8 @@ components:
           description: Whether the league/progression system is enabled
         providerType:
           type: string
-          description: High-level git provider type (GITHUB or GITLAB)
+          description: "High-level git provider type (GITHUB or GITLAB), or null if\
+            \ no SCM connection bound"
           enum:
           - GITHUB
           - GITLAB
@@ -4684,7 +5071,6 @@ components:
       - mentorEnabled
       - practicesEnabled
       - progressionEnabled
-      - providerType
       - status
       - workspaceSlug
     WorkspaceMembership:

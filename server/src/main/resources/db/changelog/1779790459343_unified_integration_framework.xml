@@ -44,13 +44,30 @@
         Connection rows from sibling worktrees do NOT need to be preserved because
         the branch boots against a fresh DB per the user's clean-migration directive.
 
-        Preconditions strategy — every changeset still uses
-        onFail="MARK_RAN" so re-applying against a partially-migrated environment
-        (e.g. someone manually applied a subset of the old 12 files locally) stays
-        forward-only safe. The DROP COLUMN changesets carry preconditions in the
-        same belt-and-braces style; they no-op on a fresh DB where the column was
-        never created, and apply on an existing DB where the column is still
-        carrying legacy data.
+        Preconditions strategy — every changeset uses onFail="MARK_RAN" so
+        re-applying against a partially-migrated environment (e.g. someone manually
+        applied a subset of the old 12 files locally) stays forward-only safe. The
+        DROP COLUMN changesets carry preconditions in the same belt-and-braces
+        style; they no-op on a fresh DB where the column was never created, and
+        apply on an existing DB where the column is still present.
+
+        OPERATOR WARNING — DATA-LOSS GUARD INTENTIONALLY OMITTED on the DROP COLUMN
+        block (section 12 below):
+          * ON FRESH DB: legacy Workspace columns are empty by construction; the
+            drops are no-ops on column-content. Safe.
+          * ON IN-FLIGHT DB carrying real student-facing data: the eleven dropped
+            columns (installation_id, personal_access_token, git_provider_mode,
+            slack_token, slack_signing_secret, gitlab_group_id, gitlab_webhook_id,
+            server_url, leaderboard_notification_team,
+            leaderboard_notification_channel_id, installation_linked_at) WILL be
+            destroyed without warning. Their successor — rows in the {@code
+            connection} table — must be backfilled OUT-OF-BAND BEFORE this
+            migration runs. The {@code WorkspaceConnectionBackfillChange}
+            customChange that previously performed the backfill in-Liquibase was
+            deleted in pass 16/stage 2 as part of the clean-migration directive.
+            Operators upgrading a live environment must replicate that logic
+            externally (script or admin task) and verify the {@code connection}
+            table is populated before applying this changelog.
     -->
 
     <!-- ───────────────────────────────────────────────────────────────────────

@@ -52,7 +52,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 ### Structure
 
-- Feature packages live under `gitprovider/`, `leaderboard/`, `mentor/`, `notification/`, `syncing/`, and `workspace/`. Shared wiring sits in `config/` and `core/`.
+- Feature packages live under `integration/scm/`, `leaderboard/`, `mentor/`, `notification/`, `syncing/`, and `workspace/`. Shared wiring sits in `config/` and `core/`. Cross-cutting integration traits (webhook ingress, oauth ingress, SPI, registry) live under `integration/` directly.
 - Controllers return DTOs located near the controller. `LeaderboardEntryDTO` is the reference example.
 - Repositories return `Optional<T>` instead of `null`.
 - Services use field injection with `@Autowired`, as in `LeaderboardService`. If a service depends on many collaborators, split the responsibility.
@@ -74,7 +74,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Run the modular test suites with `./mvnw verify`. The build uses ArchUnit checks to enforce package boundaries.
 - Prefer integration tests that extend `AbstractSpringIntegrationTest` when you touch persistence logic.
 
-## Webhook receiver (`server/.../gitprovider/webhook/`)
+## Webhook receiver (`server/.../integration/webhook/`)
 
 - Pure verifier/builder classes (`HmacVerifier`, `GitLabTokenVerifier`, `GitLabSubjectBuilder`,
   `GitHubSubjectBuilder`, `DedupIdResolver`) — Spring-free; exercised by JUnit unit tests plus
@@ -86,7 +86,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
   `RuntimeRole.WEBHOOK_PROPERTY`. Production runs them in the dedicated `webhook-server`
   container (`SPRING_PROFILES_ACTIVE=prod,webhook`) for restart independence — see ADR 0008.
 - Configuration is shared with auto-registration: `core.webhook.WebhookProperties` bound to
-  `hephaestus.webhook.*`. JaCoCo package coverage gate ≥ 0.95 branch on `gitprovider.webhook`.
+  `hephaestus.webhook.*`. JaCoCo package coverage gate ≥ 0.95 branch on `integration.webhook`.
 
 ## Docs site (`/docs`)
 

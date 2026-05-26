@@ -87,7 +87,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
     private Map<Long, ConnectionConfig.GitLabConfig> gitLabConfigs;
     private Map<Long, BearerToken> gitLabBearerTokens;
 
-    private static final String EXTERNAL_URL = "https://app.example.com/webhooks";
+    private static final String EXTERNAL_URL = "https://app.example.com";
     private static final String SECRET = "a]RkF9P2s#Lm7$xQ4wN!vB3yJ6tH0dCe";
 
     @BeforeEach
@@ -204,7 +204,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(webhookClient.lookupGroup(1L, "my-org")).thenReturn(new GroupInfo(42L, "My Org", "my-org"));
             when(webhookClient.listGroupWebhooks(1L, 42L)).thenReturn(List.of());
             when(webhookClient.registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class))).thenReturn(
-                new WebhookInfo(99L, EXTERNAL_URL + "/gitlab")
+                new WebhookInfo(99L, EXTERNAL_URL + "/webhooks/gitlab")
             );
 
             WebhookSetupResult result = webhookService.registerWebhook(workspace);
@@ -222,7 +222,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
             when(webhookClient.lookupGroup(1L, "my-org")).thenReturn(new GroupInfo(42L, "My Org", "my-org"));
             when(webhookClient.listGroupWebhooks(1L, 42L)).thenReturn(
-                List.of(new WebhookInfo(77L, EXTERNAL_URL + "/gitlab"), new WebhookInfo(78L, "https://other.com/hooks"))
+                List.of(new WebhookInfo(77L, EXTERNAL_URL + "/webhooks/gitlab"), new WebhookInfo(78L, "https://other.com/hooks"))
             );
 
             WebhookSetupResult result = webhookService.registerWebhook(workspace);
@@ -241,7 +241,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
 
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
             when(webhookClient.getGroupWebhook(1L, 42L, 99L)).thenReturn(
-                Optional.of(new WebhookInfo(99L, EXTERNAL_URL + "/gitlab"))
+                Optional.of(new WebhookInfo(99L, EXTERNAL_URL + "/webhooks/gitlab"))
             );
 
             WebhookSetupResult result = webhookService.registerWebhook(workspace);
@@ -262,7 +262,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(webhookClient.getGroupWebhook(1L, 42L, 99L)).thenReturn(Optional.empty()); // Deleted externally
             when(webhookClient.listGroupWebhooks(1L, 42L)).thenReturn(List.of());
             when(webhookClient.registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class))).thenReturn(
-                new WebhookInfo(100L, EXTERNAL_URL + "/gitlab")
+                new WebhookInfo(100L, EXTERNAL_URL + "/webhooks/gitlab")
             );
 
             WebhookSetupResult result = webhookService.registerWebhook(workspace);

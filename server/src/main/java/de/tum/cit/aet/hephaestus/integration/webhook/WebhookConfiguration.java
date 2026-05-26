@@ -89,7 +89,7 @@ public class WebhookConfiguration {
         FilterRegistrationBean<WebhookPayloadSizeFilter> registration = new FilterRegistrationBean<>(
             new WebhookPayloadSizeFilter(properties, meterRegistry)
         );
-        registration.addUrlPatterns("/gitlab", "/github");
+        registration.addUrlPatterns("/webhooks/*");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;
     }

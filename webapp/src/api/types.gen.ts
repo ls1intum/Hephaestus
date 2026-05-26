@@ -157,9 +157,9 @@ export type WorkspaceListItem = {
      */
     progressionEnabled: boolean;
     /**
-     * High-level git provider type (GITHUB or GITLAB)
+     * High-level git provider type (GITHUB or GITLAB), or null if no SCM connection bound
      */
-    providerType: 'GITHUB' | 'GITLAB';
+    providerType?: 'GITHUB' | 'GITLAB';
     /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */
@@ -191,10 +191,6 @@ export type Workspace = {
      */
     displayName: string;
     /**
-     * Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)
-     */
-    gitProviderMode?: string;
-    /**
      * Whether a GitLab webhook has been auto-registered for this workspace
      */
     gitlabWebhookRegistered: boolean;
@@ -203,7 +199,7 @@ export type Workspace = {
      */
     hasPersonalAccessToken: boolean;
     /**
-     * Whether Slack signing secret is configured
+     * Whether Slack signing secret is configured (always false post-#1198)
      */
     hasSlackSigningSecret: boolean;
     /**
@@ -226,6 +222,10 @@ export type Workspace = {
      * Whether the workspace is publicly viewable without authentication
      */
     isPubliclyViewable: boolean;
+    /**
+     * Integration kind backing this workspace (GITHUB or GITLAB)
+     */
+    kind?: string;
     /**
      * Whether the leaderboard is enabled
      */
@@ -275,9 +275,9 @@ export type Workspace = {
      */
     progressionEnabled: boolean;
     /**
-     * High-level git provider type derived from the authentication mode
+     * High-level git provider type for the workspace's SCM connection (null if none bound)
      */
-    providerType: 'GITHUB' | 'GITLAB';
+    providerType?: 'GITHUB' | 'GITLAB';
     /**
      * Custom server URL for self-hosted instances (null for cloud defaults)
      */
@@ -1605,9 +1605,9 @@ export type CreateWorkspaceRequest = {
      */
     displayName: string;
     /**
-     * Git provider authentication mode. Defaults to PAT_ORG (GitHub PAT) if not specified.
+     * Integration kind to provision. Must be GITHUB or GITLAB; SLACK/OUTLINE flow through OAuth, not this endpoint.
      */
-    gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
+    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     /**
      * Deprecated: ignored by the server. The authenticated user always becomes the owner.
      *
@@ -1615,7 +1615,7 @@ export type CreateWorkspaceRequest = {
      */
     ownerUserId?: number;
     /**
-     * Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
+     * Personal Access Token. Required for both kinds (GitLab API or GitHub PAT). Stored encrypted at rest.
      */
     personalAccessToken?: string;
     /**
@@ -1989,6 +1989,62 @@ export type ListGlobalContributorsResponses = {
 
 export type ListGlobalContributorsResponse = ListGlobalContributorsResponses[keyof ListGlobalContributorsResponses];
 
+export type CallbackGetData = {
+    body?: never;
+    path: {
+        kind: string;
+    };
+    query: {
+        code?: string;
+        state?: string;
+        error?: string;
+        error_description?: string;
+        allParams: {
+            [key: string]: string;
+        };
+    };
+    url: '/oauth/callback/{kind}';
+};
+
+export type CallbackGetResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type CallbackGetResponse = CallbackGetResponses[keyof CallbackGetResponses];
+
+export type CallbackPostData = {
+    body?: never;
+    path: {
+        kind: string;
+    };
+    query: {
+        code?: string;
+        state?: string;
+        error?: string;
+        error_description?: string;
+        allParams: {
+            [key: string]: string;
+        };
+    };
+    url: '/oauth/callback/{kind}';
+};
+
+export type CallbackPostResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type CallbackPostResponse = CallbackPostResponses[keyof CallbackPostResponses];
+
 export type DeleteUserData = {
     body?: never;
     path?: never;
@@ -2098,6 +2154,26 @@ export type UpdateUserSettingsResponses = {
 };
 
 export type UpdateUserSettingsResponse = UpdateUserSettingsResponses[keyof UpdateUserSettingsResponses];
+
+export type IngestData = {
+    body?: never;
+    path: {
+        kind: string;
+    };
+    query?: never;
+    url: '/webhooks/{kind}';
+};
+
+export type IngestResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type IngestResponse = IngestResponses[keyof IngestResponses];
 
 export type ListWorkspacesData = {
     body?: never;

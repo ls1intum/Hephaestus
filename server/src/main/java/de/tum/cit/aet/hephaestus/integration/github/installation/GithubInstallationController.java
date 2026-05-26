@@ -121,9 +121,11 @@ public class GithubInstallationController {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 
+    @io.swagger.v3.oas.annotations.media.Schema(name = "BindRequest")
     public record BindRequest(@NotNull Long installationId) {
     }
 
+    @io.swagger.v3.oas.annotations.media.Schema(name = "BindResponse")
     public record BindResponse(
         Long id,
         Long workspaceId,

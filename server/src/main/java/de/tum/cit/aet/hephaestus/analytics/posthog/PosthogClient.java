@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.integrations.posthog;
+package de.tum.cit.aet.hephaestus.analytics.posthog;
 
 import java.net.URI;
 import java.util.HashSet;
