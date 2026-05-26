@@ -15,6 +15,10 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
@@ -92,6 +96,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     @Mock
     private GitLabWebhookService gitLabWebhookService;
 
+    @Mock
+    private ConnectionService connectionService;
+
     private GitLabWorkspaceInitializationService initService;
     private Workspace workspace;
 
@@ -121,14 +128,24 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             gitLabSyncServiceHolderProvider,
             gitLabWebhookServiceProvider,
             rateLimitTrackerProvider,
+            connectionService,
             monitoringExecutor
         );
 
         workspace = new Workspace();
-        workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
         workspace.setAccountLogin("my-group/subgroup");
-        workspace.setPersonalAccessToken("glpat-test-token");
         ReflectionTestUtils.setField(workspace, "id", 1L);
+
+        // Stage-1 (#1198) migration: GitLab integration metadata lives on a Connection
+        // row now, not on Workspace. Each test that triggers initialize() needs to see
+        // an active GitLab Connection + bearer token; default-configure that here so the
+        // existing test bodies don't have to know about the Connection registry.
+        lenient().when(connectionService.findActiveGitLabConfig(anyLong()))
+            .thenReturn(Optional.of(new ConnectionConfig.GitLabConfig(
+                "https://gitlab.com", null, null,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of())));
+        lenient().when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB)))
+            .thenReturn(Optional.of(new BearerToken("glpat-test-token", null)));
     }
 
     /** Creates a service instance with NATS disabled for testing skip behavior. */
@@ -147,6 +164,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             gitLabSyncServiceHolderProvider,
             gitLabWebhookServiceProvider,
             rateLimitTrackerProvider,
+            connectionService,
             monitoringExecutor
         );
     }
@@ -183,7 +201,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSkipNonGitLab() {
-            workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
+            // Drop the default GitLab Connection mock — this workspace has no GitLab
+            // binding so initialize() must short-circuit before touching any sync service.
+            when(connectionService.findActiveGitLabConfig(anyLong())).thenReturn(Optional.empty());
 
             initService.initialize(workspace);
 
@@ -193,7 +213,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSkipGitHubApp() {
-            workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
+            // GitHub App workspace = no GitLab Connection at all.
+            when(connectionService.findActiveGitLabConfig(anyLong())).thenReturn(Optional.empty());
 
             initService.initialize(workspace);
 
@@ -202,7 +223,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSkipNullToken() {
-            workspace.setPersonalAccessToken(null);
+            when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB)))
+                .thenReturn(Optional.empty());
 
             initService.initialize(workspace);
 
@@ -211,7 +233,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSkipBlankToken() {
-            workspace.setPersonalAccessToken("   ");
+            when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB)))
+                .thenReturn(Optional.of(new BearerToken("   ", null)));
 
             initService.initialize(workspace);
 

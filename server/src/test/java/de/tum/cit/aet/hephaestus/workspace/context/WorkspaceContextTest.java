@@ -23,12 +23,12 @@ class WorkspaceContextTest {
         workspace.setWorkspaceSlug("test-workspace");
         workspace.setDisplayName("Test Workspace");
         workspace.setAccountType(AccountType.ORG);
-        workspace.setInstallationId(123L);
 
         Set<WorkspaceRole> roles = Set.of(WorkspaceRole.OWNER, WorkspaceRole.ADMIN);
 
-        // Act
-        WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, roles);
+        // Act — installationId is now passed in by the caller (resolved from the active
+        // GitHub App Connection); the record no longer pulls it from Workspace.
+        WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, roles, 123L);
 
         // Assert
         assertEquals(42L, context.id());
@@ -52,7 +52,7 @@ class WorkspaceContextTest {
         workspace.setAccountType(AccountType.USER);
 
         // Act
-        WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, null);
+        WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, null, /* installationId */ null);
 
         // Assert
         assertNotNull(context.roles());
@@ -121,10 +121,9 @@ class WorkspaceContextTest {
         workspace.setWorkspaceSlug("test");
         workspace.setDisplayName("Test");
         workspace.setAccountType(AccountType.USER);
-        workspace.setInstallationId(null);
 
-        // Act
-        WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, Set.of());
+        // Act — null installationId is the legitimate "no App connection" path.
+        WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, Set.of(), null);
 
         // Assert
         assertNull(context.installationId());

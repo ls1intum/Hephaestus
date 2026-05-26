@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.installation.GitHubInstallationRepositoryEnumerationService;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -43,6 +44,9 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private GitProviderRepository gitProviderRepository;
+
+    @Autowired
+    private ConnectionRepository connectionRepository;
 
     @BeforeEach
     void setup() {
@@ -101,12 +105,15 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     }
 
     private Workspace persistWorkspace(RepositorySelection selection) {
-        return workspaceRepository.save(
-            WorkspaceTestFixtures.installationWorkspace(INSTALLATION_ID, "HephaestusTest")
-                .withRepositorySelection(selection)
-                .withSlug("ws-install-" + INSTALLATION_ID + "-" + selection.name().toLowerCase(Locale.ENGLISH))
-                .build()
-        );
+        var builder = WorkspaceTestFixtures.installationWorkspace(INSTALLATION_ID, "HephaestusTest")
+            .withRepositorySelection(selection)
+            .withSlug("ws-install-" + INSTALLATION_ID + "-" + selection.name().toLowerCase(Locale.ENGLISH));
+        // Stage-1 (#1198): the provider classification used by
+        // WorkspaceRepositoryMonitorService.isGitHubAppWorkspace pulls from the
+        // Connection registry, so the fixture must persist the GitHub App connection
+        // alongside the Workspace.
+        return WorkspaceTestFixtures.persistInstallationWorkspace(
+            workspaceRepository, connectionRepository, builder, INSTALLATION_ID);
     }
 
     private RepositoryToMonitor buildMonitor(Workspace workspace, String nameWithOwner) {

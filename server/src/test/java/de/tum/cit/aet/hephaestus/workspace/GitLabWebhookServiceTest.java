@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Publish;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Shutdown;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Stream;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.TokenRotation;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenRotationClient;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenRotationClient.RotatedToken;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenRotationClient.TokenInfo;
@@ -23,22 +22,37 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookClient;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookClient.GroupInfo;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookClient.WebhookConfig;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookClient.WebhookInfo;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
  * Unit tests for {@link GitLabWebhookService}.
+ *
+ * <p>Stage-1 (#1198) migration: legacy {@code Workspace.gitlab*} setters are gone; the
+ * service now reads/writes the {@code GitLabConfig} on the active GitLab Connection
+ * via {@link ConnectionService}. Tests mirror the new flow via a small in-memory map
+ * stand-in for the registry so we don't need an integration test container here.
  */
 @Tag("unit")
 @DisplayName("GitLabWebhookService")
@@ -65,8 +79,13 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
+    @Mock
+    private ConnectionService connectionService;
+
     private GitLabWebhookService webhookService;
     private Workspace workspace;
+    private Map<Long, ConnectionConfig.GitLabConfig> gitLabConfigs;
+    private Map<Long, BearerToken> gitLabBearerTokens;
 
     private static final String EXTERNAL_URL = "https://app.example.com/webhooks";
     private static final String SECRET = "a]RkF9P2s#Lm7$xQ4wN!vB3yJ6tH0dCe";
@@ -88,15 +107,68 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             rotationClientProvider,
             tokenServiceProvider,
             properties,
-            workspaceRepository
+            workspaceRepository,
+            connectionService
         );
 
         workspace = new Workspace();
-        workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
         workspace.setAccountLogin("my-org");
-        workspace.setPersonalAccessToken("glpat-test-token");
-
         ReflectionTestUtils.setField(workspace, "id", 1L);
+
+        gitLabConfigs = new HashMap<>();
+        gitLabBearerTokens = new HashMap<>();
+
+        // Default: workspace is a GitLab workspace with a token. Tests that need
+        // to flip this out (non-GitLab, missing token) override per-test.
+        bindGitLabConfig(1L, new ConnectionConfig.GitLabConfig(
+            "https://gitlab.com", null, null, ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of()));
+        gitLabBearerTokens.put(1L, new BearerToken("glpat-test-token", null));
+
+        // lenient() — each Nested test exercises a different code path, so a given
+        // stub may go unused per test. Mockito's strict-stub mode would otherwise reject
+        // the shared setUp.
+        Mockito.lenient().when(connectionService.findActiveProviderKind(anyLong())).thenAnswer(inv -> {
+            long id = inv.getArgument(0);
+            return gitLabConfigs.containsKey(id) ? Optional.of(IntegrationKind.GITLAB) : Optional.empty();
+        });
+        Mockito.lenient().when(connectionService.findActiveGitLabConfig(anyLong())).thenAnswer(inv -> {
+            long id = inv.getArgument(0);
+            return Optional.ofNullable(gitLabConfigs.get(id));
+        });
+        Mockito.lenient().when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB)))
+            .thenAnswer(inv -> {
+                long id = inv.getArgument(0);
+                return Optional.ofNullable(gitLabBearerTokens.get(id));
+            });
+        Mockito.lenient().when(connectionService.updateConfig(anyLong(), eq(IntegrationKind.GITLAB), any()))
+            .thenAnswer(this::applyUpdateConfig);
+        Mockito.lenient().when(
+                connectionService.rotateBearerToken(anyLong(), eq(IntegrationKind.GITLAB), any(BearerToken.class)))
+            .thenAnswer(inv -> {
+                long id = inv.getArgument(0);
+                BearerToken token = inv.getArgument(2);
+                gitLabBearerTokens.put(id, token);
+                return Optional.empty();
+            });
+    }
+
+    private void bindGitLabConfig(long workspaceId, ConnectionConfig.GitLabConfig cfg) {
+        gitLabConfigs.put(workspaceId, cfg);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<Object> applyUpdateConfig(InvocationOnMock inv) {
+        long id = inv.getArgument(0);
+        UnaryOperator<ConnectionConfig> mutator = inv.getArgument(2);
+        ConnectionConfig.GitLabConfig current = gitLabConfigs.get(id);
+        if (current == null) return Optional.empty();
+        ConnectionConfig.GitLabConfig next = (ConnectionConfig.GitLabConfig) mutator.apply(current);
+        gitLabConfigs.put(id, next);
+        return Optional.empty();
+    }
+
+    private ConnectionConfig.GitLabConfig currentConfig(long workspaceId) {
+        return gitLabConfigs.get(workspaceId);
     }
 
     @Nested
@@ -106,7 +178,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("should skip for non-GitLab workspace")
         void shouldSkipForNonGitLab() {
-            workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
+            gitLabConfigs.remove(1L);
 
             WebhookSetupResult result = webhookService.registerWebhook(workspace);
 
@@ -134,15 +206,14 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(webhookClient.registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class))).thenReturn(
                 new WebhookInfo(99L, EXTERNAL_URL + "/gitlab")
             );
-            when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 
             WebhookSetupResult result = webhookService.registerWebhook(workspace);
 
             assertThat(result.registered()).isTrue();
             assertThat(result.webhookId()).isEqualTo(99L);
             assertThat(result.groupId()).isEqualTo(42L);
-            assertThat(workspace.getGitlabGroupId()).isEqualTo(42L);
-            assertThat(workspace.getGitlabWebhookId()).isEqualTo(99L);
+            assertThat(currentConfig(1L).gitlabGroupId()).isEqualTo(42L);
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(99L);
         }
 
         @Test
@@ -153,7 +224,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(webhookClient.listGroupWebhooks(1L, 42L)).thenReturn(
                 List.of(new WebhookInfo(77L, EXTERNAL_URL + "/gitlab"), new WebhookInfo(78L, "https://other.com/hooks"))
             );
-            when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 
             WebhookSetupResult result = webhookService.registerWebhook(workspace);
 
@@ -165,8 +235,9 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("should return success when webhook already registered and exists")
         void shouldReturnSuccessForExistingWebhook() {
-            workspace.setGitlabGroupId(42L);
-            workspace.setGitlabWebhookId(99L);
+            bindGitLabConfig(1L, new ConnectionConfig.GitLabConfig(
+                "https://gitlab.com", 42L, 99L,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of()));
 
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
             when(webhookClient.getGroupWebhook(1L, 42L, 99L)).thenReturn(
@@ -183,8 +254,9 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("should re-register when stored webhook was deleted externally")
         void shouldReRegisterDeletedWebhook() {
-            workspace.setGitlabGroupId(42L);
-            workspace.setGitlabWebhookId(99L);
+            bindGitLabConfig(1L, new ConnectionConfig.GitLabConfig(
+                "https://gitlab.com", 42L, 99L,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of()));
 
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
             when(webhookClient.getGroupWebhook(1L, 42L, 99L)).thenReturn(Optional.empty()); // Deleted externally
@@ -192,7 +264,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(webhookClient.registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class))).thenReturn(
                 new WebhookInfo(100L, EXTERNAL_URL + "/gitlab")
             );
-            when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 
             WebhookSetupResult result = webhookService.registerWebhook(workspace);
 
@@ -209,7 +280,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(webhookClient.registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class))).thenThrow(
                 WebClientResponseException.create(403, "Forbidden", null, null, null)
             );
-            when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 
             WebhookSetupResult result = webhookService.registerWebhook(workspace);
 
@@ -234,7 +304,8 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
                 rotationClientProvider,
                 tokenServiceProvider,
                 unconfigured,
-                workspaceRepository
+                workspaceRepository,
+                connectionService
             );
 
             WebhookSetupResult result = service.registerWebhook(workspace);
@@ -251,7 +322,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("should skip for non-GitLab workspace")
         void shouldSkipForNonGitLab() {
-            workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
+            gitLabConfigs.remove(1L);
 
             webhookService.rotateTokenIfNeeded(workspace);
 
@@ -298,12 +369,11 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(rotationClient.rotateToken(eq(1L), any(LocalDate.class))).thenReturn(
                 new RotatedToken("glpat-new-token", LocalDate.now().plusDays(90))
             );
-            when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 
             webhookService.rotateTokenIfNeeded(workspace);
 
-            assertThat(workspace.getPersonalAccessToken()).isEqualTo("glpat-new-token");
-            verify(workspaceRepository).save(workspace);
+            assertThat(gitLabBearerTokens.get(1L).token()).isEqualTo("glpat-new-token");
+            verify(connectionService).rotateBearerToken(eq(1L), eq(IntegrationKind.GITLAB), any(BearerToken.class));
             verify(tokenService).invalidateCache(1L);
         }
 
@@ -333,27 +403,27 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("should deregister and clear fields")
         void shouldDeregisterAndClearFields() {
-            workspace.setGitlabGroupId(42L);
-            workspace.setGitlabWebhookId(99L);
+            bindGitLabConfig(1L, new ConnectionConfig.GitLabConfig(
+                "https://gitlab.com", 42L, 99L,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of()));
 
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
-            when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 
             webhookService.deregisterWebhook(workspace);
 
             verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
-            assertThat(workspace.getGitlabWebhookId()).isNull();
-            assertThat(workspace.getGitlabGroupId()).isNull();
+            assertThat(currentConfig(1L).gitlabWebhookId()).isNull();
+            assertThat(currentConfig(1L).gitlabGroupId()).isNull();
         }
 
         @Test
         @DisplayName("should clear fields even on deregistration error")
         void shouldClearFieldsOnError() {
-            workspace.setGitlabGroupId(42L);
-            workspace.setGitlabWebhookId(99L);
+            bindGitLabConfig(1L, new ConnectionConfig.GitLabConfig(
+                "https://gitlab.com", 42L, 99L,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of()));
 
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
-            when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // Simulate API error
             org.mockito.Mockito.doThrow(new RuntimeException("API error"))
@@ -363,23 +433,23 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             webhookService.deregisterWebhook(workspace);
 
             // Fields should still be cleared (best-effort)
-            assertThat(workspace.getGitlabWebhookId()).isNull();
-            assertThat(workspace.getGitlabGroupId()).isNull();
+            assertThat(currentConfig(1L).gitlabWebhookId()).isNull();
+            assertThat(currentConfig(1L).gitlabGroupId()).isNull();
         }
 
         @Test
         @DisplayName("should clear fields when client unavailable")
         void shouldClearFieldsWhenClientUnavailable() {
-            workspace.setGitlabGroupId(42L);
-            workspace.setGitlabWebhookId(99L);
+            bindGitLabConfig(1L, new ConnectionConfig.GitLabConfig(
+                "https://gitlab.com", 42L, 99L,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of()));
 
             when(webhookClientProvider.getIfAvailable()).thenReturn(null);
-            when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 
             webhookService.deregisterWebhook(workspace);
 
-            assertThat(workspace.getGitlabWebhookId()).isNull();
-            assertThat(workspace.getGitlabGroupId()).isNull();
+            assertThat(currentConfig(1L).gitlabWebhookId()).isNull();
+            assertThat(currentConfig(1L).gitlabGroupId()).isNull();
         }
     }
 
@@ -390,18 +460,18 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("should deregister webhook for existing workspace")
         void shouldDeregisterForExistingWorkspace() {
-            workspace.setGitlabGroupId(42L);
-            workspace.setGitlabWebhookId(99L);
+            bindGitLabConfig(1L, new ConnectionConfig.GitLabConfig(
+                "https://gitlab.com", 42L, 99L,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of()));
 
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
-            when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 
             webhookService.deregisterWebhookByWorkspaceId(1L);
 
             verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
-            assertThat(workspace.getGitlabWebhookId()).isNull();
-            assertThat(workspace.getGitlabGroupId()).isNull();
+            assertThat(currentConfig(1L).gitlabWebhookId()).isNull();
+            assertThat(currentConfig(1L).gitlabGroupId()).isNull();
         }
 
         @Test

@@ -1,6 +1,10 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -31,6 +35,7 @@ public class WorkspaceSettingsService {
     private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CGD][A-Z0-9]{8,}$");
 
     private final WorkspaceRepository workspaceRepository;
+    private final ConnectionService connectionService;
 
     /**
      * Update the leaderboard schedule for a workspace.
@@ -63,9 +68,16 @@ public class WorkspaceSettingsService {
     /**
      * Update notification settings for a workspace.
      *
+     * <p>{@code enabled} stays on {@link Workspace#leaderboardNotificationEnabled} (a UI
+     * toggle, not a Slack-side configuration). {@code team} and {@code channelId} are now
+     * persisted on the Slack {@link ConnectionConfig.SlackConfig} via
+     * {@link ConnectionService#updateConfig} — caller must have already provisioned a
+     * Slack Connection (typically via the Slack OAuth callback). PATCH semantics: null
+     * fields are not touched.
+     *
      * @param workspaceId the workspace ID
      * @param enabled whether notifications are enabled
-     * @param team the team to notify
+     * @param team the team identifier to notify (treated as the human-readable team label)
      * @param channelId the Slack channel ID
      * @return the updated workspace
      */
@@ -75,51 +87,86 @@ public class WorkspaceSettingsService {
 
         if (enabled != null) {
             workspace.setLeaderboardNotificationEnabled(enabled);
-        }
-
-        if (team != null) {
-            workspace.setLeaderboardNotificationTeam(team);
+            workspace = workspaceRepository.save(workspace);
         }
 
         if (channelId != null) {
             validateSlackChannelId(channelId);
-            workspace.setLeaderboardNotificationChannelId(channelId);
+        }
+
+        if (team != null || channelId != null) {
+            connectionService.updateConfig(workspaceId, IntegrationKind.SLACK, cfg -> {
+                if (!(cfg instanceof ConnectionConfig.SlackConfig slack)) {
+                    throw new IllegalStateException(
+                        "Expected SlackConfig on workspace=" + workspaceId
+                            + " but got " + cfg.getClass().getSimpleName()
+                    );
+                }
+                return new ConnectionConfig.SlackConfig(
+                    slack.teamId(),
+                    slack.teamName(),
+                    channelId != null ? channelId : slack.notificationChannelId(),
+                    team != null ? team : slack.teamLabel(),
+                    slack.enabledStreams()
+                );
+            });
         }
 
         log.info("Updated workspace notifications: workspaceId={}, enabled={}", workspaceId, enabled);
-        return workspaceRepository.save(workspace);
+        return workspace;
     }
 
     /**
-     * Update the personal access token for a workspace.
-     *
-     * @param workspaceId the workspace ID
-     * @param token the new token
-     * @return the updated workspace
+     * Update the personal access token for a workspace. Rotates the bearer credential on
+     * whichever SCM Connection (GitHub PAT or GitLab) is currently active — the caller
+     * controls which workspace this hits via {@code workspaceId}, the kind is resolved
+     * from the active Connection.
      */
     @Transactional
     public Workspace updateToken(Long workspaceId, String token) {
         Workspace workspace = requireWorkspace(workspaceId);
-        workspace.setPersonalAccessToken(token);
-        log.info("Updated workspace PAT: workspaceId={}", workspaceId);
-        return workspaceRepository.save(workspace);
+        IntegrationKind kind = connectionService
+            .findActiveProviderKind(workspaceId)
+            .filter(k -> k == IntegrationKind.GITHUB || k == IntegrationKind.GITLAB)
+            .orElseThrow(() -> new IllegalStateException(
+                "Cannot rotate PAT for workspace " + workspaceId
+                    + ": no active GitHub or GitLab Connection. Bind a provider first."
+            ));
+        connectionService.rotateBearerToken(workspaceId, kind, new BearerToken(token, null));
+        log.info("Updated workspace PAT: workspaceId={}, kind={}", workspaceId, kind);
+        return workspace;
     }
 
     /**
      * Update Slack credentials for a workspace.
      *
-     * @param workspaceId the workspace ID
-     * @param slackToken the Slack bot token
-     * @param slackSigningSecret the Slack signing secret
-     * @return the updated workspace
+     * <p>{@code slackToken} rotates the Slack Connection's bearer credential. {@code
+     * slackSigningSecret} is dead at runtime — the Slack manifest's app-global signing
+     * secret in {@code hephaestus.slack.signing-secret} is what verifies incoming webhook
+     * signatures — so this parameter is accepted for API back-compat but ignored.
+     *
+     * <p>Requires a pre-existing Slack Connection (typically created by the Slack OAuth
+     * install flow). Returns the workspace; throws if no active Slack Connection exists.
      */
     @Transactional
     public Workspace updateSlackCredentials(Long workspaceId, String slackToken, String slackSigningSecret) {
         Workspace workspace = requireWorkspace(workspaceId);
-        workspace.setSlackToken(slackToken);
-        workspace.setSlackSigningSecret(slackSigningSecret);
+        if (slackToken != null) {
+            connectionService
+                .rotateBearerToken(workspaceId, IntegrationKind.SLACK, new BearerToken(slackToken, null))
+                .orElseThrow(() -> new IllegalStateException(
+                    "Cannot rotate Slack credentials for workspace " + workspaceId
+                        + ": no active Slack Connection. Complete the Slack OAuth install first."
+                ));
+        }
+        if (slackSigningSecret != null) {
+            log.debug(
+                "Ignored per-workspace Slack signing secret update: workspaceId={} (runtime uses app-global hephaestus.slack.signing-secret)",
+                workspaceId
+            );
+        }
         log.info("Updated workspace Slack credentials: workspaceId={}", workspaceId);
-        return workspaceRepository.save(workspace);
+        return workspace;
     }
 
     /**

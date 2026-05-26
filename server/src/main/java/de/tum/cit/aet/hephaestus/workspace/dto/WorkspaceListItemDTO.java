@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -17,7 +19,8 @@ public record WorkspaceListItemDTO(
     @Schema(description = "Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)")
     String status,
     @NonNull @Schema(description = "Git provider account login associated with this workspace") String accountLogin,
-    @NonNull @Schema(description = "High-level git provider type (GITHUB or GITLAB)") GitProviderType providerType,
+    @Schema(description = "High-level git provider type (GITHUB or GITLAB), or null if no SCM connection bound")
+    GitProviderType providerType,
     @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt,
     @NonNull @Schema(description = "Whether the practice review feature is enabled") Boolean practicesEnabled,
     @NonNull @Schema(description = "Whether the Pi mentor chat feature is enabled") Boolean mentorEnabled,
@@ -26,14 +29,18 @@ public record WorkspaceListItemDTO(
     @NonNull @Schema(description = "Whether the league/progression system is enabled") Boolean progressionEnabled,
     @NonNull @Schema(description = "Whether league tiers and rankings are enabled") Boolean leaguesEnabled
 ) {
-    public static WorkspaceListItemDTO from(Workspace workspace) {
+    public static WorkspaceListItemDTO from(Workspace workspace, ConnectionService connectionService) {
+        GitProviderType providerType = connectionService
+            .findActiveProviderKind(workspace.getId())
+            .map(IntegrationKind::toGitProviderType)
+            .orElse(null);
         return new WorkspaceListItemDTO(
             workspace.getId(),
             workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
             workspace.getStatus() != null ? workspace.getStatus().name() : null,
             workspace.getAccountLogin(),
-            workspace.getProviderType(),
+            providerType,
             workspace.getCreatedAt(),
             workspace.getFeatures().getPracticesEnabled(),
             workspace.getFeatures().getMentorEnabled(),

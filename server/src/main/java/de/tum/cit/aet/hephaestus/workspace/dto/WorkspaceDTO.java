@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -21,9 +24,8 @@ public record WorkspaceDTO(
     String status,
     @NonNull @Schema(description = "Git provider account login associated with this workspace") String accountLogin,
     @Schema(description = "GitHub App installation ID, if linked") Long installationId,
-    @Schema(description = "Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)") String gitProviderMode,
-    @NonNull
-    @Schema(description = "High-level git provider type derived from the authentication mode")
+    @Schema(description = "Integration kind backing this workspace (GITHUB or GITLAB)") String kind,
+    @Schema(description = "High-level git provider type for the workspace's SCM connection (null if none bound)")
     GitProviderType providerType,
     @Schema(description = "Custom server URL for self-hosted instances (null for cloud defaults)") String serverUrl,
     @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt,
@@ -38,7 +40,8 @@ public record WorkspaceDTO(
     @Schema(description = "Slack channel ID for leaderboard notifications") String leaderboardNotificationChannelId,
     @NonNull @Schema(description = "Whether a Personal Access Token is configured") Boolean hasPersonalAccessToken,
     @NonNull @Schema(description = "Whether Slack token is configured") Boolean hasSlackToken,
-    @NonNull @Schema(description = "Whether Slack signing secret is configured") Boolean hasSlackSigningSecret,
+    @NonNull @Schema(description = "Whether Slack signing secret is configured (always false post-#1198)")
+    Boolean hasSlackSigningSecret,
     @NonNull
     @Schema(description = "Whether a GitLab webhook has been auto-registered for this workspace")
     Boolean gitlabWebhookRegistered,
@@ -55,30 +58,91 @@ public record WorkspaceDTO(
     @Schema(description = "Whether manual practice reviews triggered via bot command are enabled")
     Boolean practiceReviewManualTriggerEnabled
 ) {
-    public static WorkspaceDTO from(Workspace workspace) {
+    /**
+     * Builds a {@link WorkspaceDTO} pulling integration-mode metadata from the
+     * {@code Connection} registry rather than from the (now retired) legacy
+     * {@code Workspace} columns. Pass the request-scoped {@code ConnectionService}
+     * so the lookups can run inside the caller's transaction.
+     *
+     * <p>{@code installation_linked_at} is derived from the active GitHub App
+     * connection's {@code createdAt} — the migration backfilled it from the legacy
+     * column for existing rows, and freshly-bound installations stamp it via the
+     * standard {@code @CreationTimestamp} on {@link de.tum.cit.aet.hephaestus.integration.registry.Connection}.
+     *
+     * <p>{@code hasSlackSigningSecret} is always {@code false}: per-workspace signing
+     * secrets are dead at runtime (Slack signing-secret comes from the app-global
+     * {@code hephaestus.slack.signing-secret}). The DTO field is kept for openapi /
+     * webapp compatibility.
+     */
+    public static WorkspaceDTO from(Workspace workspace, ConnectionService connectionService) {
+        long workspaceId = workspace.getId();
+
+        var providerKind = connectionService.findActiveProviderKind(workspaceId);
+        var gitHubApp = connectionService.findActiveGitHubAppConfig(workspaceId);
+        var gitHubPat = connectionService.findActiveGitHubPatConfig(workspaceId);
+        var gitLab = connectionService.findActiveGitLabConfig(workspaceId);
+        var slackCfg = connectionService.findSlackNotificationConfig(workspaceId);
+
+        String serverUrl = gitLab.map(ConnectionConfig.GitLabConfig::serverUrl)
+            .or(() -> gitHubApp.map(ConnectionConfig.GitHubAppConfig::serverUrl))
+            .or(() -> gitHubPat.map(ConnectionConfig.GitHubPatConfig::serverUrl))
+            .orElse(null);
+
+        Long installationId = gitHubApp.map(ConnectionConfig.GitHubAppConfig::installationId).orElse(null);
+
+        // installation_linked_at: createdAt on the App connection mirrors what the
+        // legacy column tracked. Empty for non-App workspaces.
+        Instant installationLinkedAt = connectionService
+            .findActive(workspaceId, IntegrationKind.GITHUB)
+            .filter(c -> c.getConfig() instanceof ConnectionConfig.GitHubAppConfig)
+            .map(c -> c.getCreatedAt())
+            .orElse(null);
+
+        boolean hasPat = connectionService
+            .findActiveBearerToken(workspaceId, IntegrationKind.GITHUB)
+            .map(b -> b.token() != null && !b.token().isEmpty())
+            .orElseGet(() -> connectionService
+                .findActiveBearerToken(workspaceId, IntegrationKind.GITLAB)
+                .map(b -> b.token() != null && !b.token().isEmpty())
+                .orElse(false));
+
+        boolean hasSlackToken = connectionService
+            .findActiveBearerToken(workspaceId, IntegrationKind.SLACK)
+            .map(b -> b.token() != null && !b.token().isEmpty())
+            .orElse(false);
+
+        String leaderboardTeam = slackCfg
+            .map(s -> s.teamLabel() != null ? s.teamLabel() : s.teamName())
+            .orElse(null);
+        String leaderboardChannelId = slackCfg.map(ConnectionConfig.SlackConfig::notificationChannelId).orElse(null);
+
+        boolean gitlabWebhookRegistered = gitLab
+            .map(c -> c.gitlabWebhookId() != null)
+            .orElse(false);
+
         return new WorkspaceDTO(
-            workspace.getId(),
+            workspaceId,
             workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
             workspace.getIsPubliclyViewable(),
             workspace.getStatus() != null ? workspace.getStatus().name() : null,
             workspace.getAccountLogin(),
-            workspace.getInstallationId(),
-            workspace.getGitProviderMode() != null ? workspace.getGitProviderMode().name() : null,
-            workspace.getProviderType(),
-            workspace.getServerUrl(),
+            installationId,
+            providerKind.map(Enum::name).orElse(null),
+            providerKind.map(IntegrationKind::toGitProviderType).orElse(null),
+            serverUrl,
             workspace.getCreatedAt(),
             workspace.getUpdatedAt(),
-            workspace.getInstallationLinkedAt(),
+            installationLinkedAt,
             workspace.getLeaderboardScheduleDay(),
             workspace.getLeaderboardScheduleTime(),
             workspace.getLeaderboardNotificationEnabled(),
-            workspace.getLeaderboardNotificationTeam(),
-            workspace.getLeaderboardNotificationChannelId(),
-            workspace.getPersonalAccessToken() != null && !workspace.getPersonalAccessToken().isEmpty(),
-            workspace.getSlackToken() != null && !workspace.getSlackToken().isEmpty(),
-            workspace.getSlackSigningSecret() != null && !workspace.getSlackSigningSecret().isEmpty(),
-            workspace.getGitlabWebhookId() != null,
+            leaderboardTeam,
+            leaderboardChannelId,
+            hasPat,
+            hasSlackToken,
+            false,
+            gitlabWebhookRegistered,
             workspace.getFeatures().getPracticesEnabled(),
             workspace.getFeatures().getMentorEnabled(),
             workspace.getFeatures().getAchievementsEnabled(),

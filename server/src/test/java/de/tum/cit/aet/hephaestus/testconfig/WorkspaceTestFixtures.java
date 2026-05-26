@@ -1,9 +1,17 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
+import de.tum.cit.aet.hephaestus.integration.registry.Connection;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.util.Set;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Shared test fixtures for workspace-related integration tests.
@@ -20,6 +28,49 @@ public final class WorkspaceTestFixtures {
      */
     public static WorkspaceBuilder installationWorkspace(long installationId, String login) {
         return new WorkspaceBuilder(installationId, login);
+    }
+
+    /**
+     * Persist a GitHub App installation workspace AND its backing {@code Connection} row.
+     * The legacy {@code Workspace.installation_id} column is still populated for
+     * compatibility with code paths that haven't migrated yet; the runtime sources
+     * provider classification + installation id from the Connection.
+     *
+     * <p>Returns the saved Workspace; use the repositories the caller passed in to
+     * find the Connection if needed.
+     */
+    public static Workspace persistInstallationWorkspace(WorkspaceRepository workspaceRepository,
+                                                         ConnectionRepository connectionRepository,
+                                                         WorkspaceBuilder builder,
+                                                         long installationId) {
+        Workspace saved = workspaceRepository.save(builder.build());
+        ConnectionConfig.GitHubAppConfig cfg = new ConnectionConfig.GitHubAppConfig(
+            installationId, saved.getAccountLogin(), /* serverUrl */ null, Set.of());
+        Connection connection = new Connection(saved, IntegrationKind.GITHUB, Long.toString(installationId), cfg);
+        connection.setDisplayName(saved.getAccountLogin());
+        ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
+        connectionRepository.save(connection);
+        return saved;
+    }
+
+    /**
+     * Persist a GitLab PAT workspace AND its backing {@code Connection} row. PAT
+     * itself is NOT persisted on the Connection (skipped in unit-test fixtures); use
+     * {@code ConnectionService.rotateBearerToken} in tests that need a real token blob.
+     */
+    public static Workspace persistGitLabWorkspace(WorkspaceRepository workspaceRepository,
+                                                   ConnectionRepository connectionRepository,
+                                                   GitLabWorkspaceBuilder builder,
+                                                   String serverUrl) {
+        Workspace saved = workspaceRepository.save(builder.build());
+        ConnectionConfig.GitLabConfig cfg = new ConnectionConfig.GitLabConfig(
+            serverUrl, null, null,
+            ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of());
+        Connection connection = new Connection(saved, IntegrationKind.GITLAB, serverUrl, cfg);
+        connection.setDisplayName(saved.getAccountLogin());
+        ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
+        connectionRepository.save(connection);
+        return saved;
     }
 
     /**

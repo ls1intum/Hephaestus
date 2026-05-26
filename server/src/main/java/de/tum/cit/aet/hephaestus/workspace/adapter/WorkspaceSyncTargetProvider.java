@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectRepository;
@@ -44,17 +46,20 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final ProjectRepository projectRepository;
     private final WorkspaceScopeFilter workspaceScopeFilter;
+    private final ConnectionService connectionService;
 
     public WorkspaceSyncTargetProvider(
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         ProjectRepository projectRepository,
-        WorkspaceScopeFilter workspaceScopeFilter
+        WorkspaceScopeFilter workspaceScopeFilter,
+        ConnectionService connectionService
     ) {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.projectRepository = projectRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
+        this.connectionService = connectionService;
     }
 
     @Override
@@ -64,16 +69,22 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .findAll()
             .stream()
             .filter(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-            .filter(ws -> ws.getProviderType() == GitProviderType.GITHUB)
+            .filter(ws -> hasActiveProvider(ws, IntegrationKind.GITHUB))
             .flatMap(ws ->
                 ws
                     .getRepositoriesToMonitor()
                     .stream()
                     // Apply repository filter to respect monitoring configuration (e.g., dev environment limits)
                     .filter(workspaceScopeFilter::isRepositoryAllowed)
-                    .map(rtm -> SyncTargetFactory.create(ws, rtm))
+                    .map(rtm -> SyncTargetFactory.create(ws, rtm, connectionService))
             )
             .toList();
+    }
+
+    private boolean hasActiveProvider(Workspace workspace, IntegrationKind kind) {
+        return connectionService.findActiveProviderKind(workspace.getId())
+            .map(k -> k == kind)
+            .orElse(false);
     }
 
     @Override
@@ -87,7 +98,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     .stream()
                     // Apply repository filter to respect monitoring configuration (e.g., dev environment limits)
                     .filter(workspaceScopeFilter::isRepositoryAllowed)
-                    .map(rtm -> SyncTargetFactory.create(ws, rtm))
+                    .map(rtm -> SyncTargetFactory.create(ws, rtm, connectionService))
                     .toList()
             )
             .orElse(List.of());
@@ -243,7 +254,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .findById(syncTargetId)
             .map(rtm -> {
                 var workspace = rtm.getWorkspace();
-                return SyncTargetFactory.create(workspace, rtm);
+                return SyncTargetFactory.create(workspace, rtm, connectionService);
             });
     }
 
@@ -386,7 +397,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         return allWorkspaces
             .stream()
             .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
-            .filter(ws -> ws.getProviderType() == GitProviderType.GITHUB)
+            .filter(ws -> hasActiveProvider(ws, IntegrationKind.GITHUB))
             .filter(workspaceScopeFilter::isWorkspaceAllowed)
             .map(this::toSyncSession)
             .toList();
@@ -400,7 +411,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         return allWorkspaces
             .stream()
             .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
-            .filter(ws -> ws.getProviderType() == GitProviderType.GITLAB)
+            .filter(ws -> hasActiveProvider(ws, IntegrationKind.GITLAB))
             .filter(workspaceScopeFilter::isWorkspaceAllowed)
             .map(this::toSyncSession)
             .toList();
@@ -420,7 +431,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         List<Workspace> activeGitHubWorkspaces = allWorkspaces
             .stream()
             .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
-            .filter(ws -> ws.getProviderType() == GitProviderType.GITHUB)
+            .filter(ws -> hasActiveProvider(ws, IntegrationKind.GITHUB))
             .toList();
 
         int skippedByFilter = (int) activeGitHubWorkspaces
@@ -445,23 +456,37 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .getRepositoriesToMonitor()
             .stream()
             .filter(workspaceScopeFilter::isRepositoryAllowed)
-            .map(rtm -> SyncTargetFactory.create(workspace, rtm))
+            .map(rtm -> SyncTargetFactory.create(workspace, rtm, connectionService))
             .toList();
 
+        long workspaceId = workspace.getId();
+        Long installationId = connectionService
+            .findActiveGitHubAppConfig(workspaceId)
+            .map(ConnectionConfig.GitHubAppConfig::installationId)
+            .orElse(null);
+        String serverUrl = connectionService
+            .findActiveGitLabConfig(workspaceId)
+            .map(ConnectionConfig.GitLabConfig::serverUrl)
+            .or(() -> connectionService.findActiveGitHubAppConfig(workspaceId)
+                .map(ConnectionConfig.GitHubAppConfig::serverUrl))
+            .or(() -> connectionService.findActiveGitHubPatConfig(workspaceId)
+                .map(ConnectionConfig.GitHubPatConfig::serverUrl))
+            .orElse(null);
+
         SyncContextProvider.SyncContext syncContext = new SyncContextProvider.SyncContext(
-            workspace.getId(),
+            workspaceId,
             workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
-            workspace.getInstallationId()
+            installationId
         );
 
         return new SyncSession(
-            workspace.getId(),
+            workspaceId,
             workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
             workspace.getAccountLogin(),
-            workspace.getInstallationId(),
-            workspace.getServerUrl(),
+            installationId,
+            serverUrl,
             syncTargets,
             syncContext
         );

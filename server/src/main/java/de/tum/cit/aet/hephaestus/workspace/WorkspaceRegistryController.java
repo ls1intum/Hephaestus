@@ -89,7 +89,7 @@ public class WorkspaceRegistryController {
             .buildAndExpand(workspace.getWorkspaceSlug())
             .toUri();
 
-        return ResponseEntity.created(location).body(WorkspaceDTO.from(workspace));
+        return ResponseEntity.created(location).body(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @GetMapping
@@ -100,12 +100,7 @@ public class WorkspaceRegistryController {
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = WorkspaceListItemDTO.class)))
     )
     public ResponseEntity<List<WorkspaceListItemDTO>> listWorkspaces() {
-        List<WorkspaceListItemDTO> workspaces = workspaceQueryService
-            .findAccessibleWorkspaces()
-            .stream()
-            .map(WorkspaceListItemDTO::from)
-            .toList();
-        return ResponseEntity.ok(workspaces);
+        return ResponseEntity.ok(workspaceQueryService.findAccessibleWorkspaceListItems());
     }
 
     @PostMapping("/gitlab/preflight")

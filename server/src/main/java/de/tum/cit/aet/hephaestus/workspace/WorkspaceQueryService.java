@@ -4,10 +4,13 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.gitprovider.github.GitHubProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
+import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceListItemDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceProvidersDTO;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -45,6 +48,7 @@ public class WorkspaceQueryService {
     private final GitHubProperties gitHubProperties;
     private final GitLabProperties gitLabProperties;
     private final FeatureFlagService featureFlagService;
+    private final ConnectionService connectionService;
 
     public WorkspaceQueryService(
         WorkspaceRepository workspaceRepository,
@@ -53,7 +57,8 @@ public class WorkspaceQueryService {
         UserRepository userRepository,
         GitHubProperties gitHubProperties,
         GitLabProperties gitLabProperties,
-        FeatureFlagService featureFlagService
+        FeatureFlagService featureFlagService,
+        ConnectionService connectionService
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
@@ -62,6 +67,27 @@ public class WorkspaceQueryService {
         this.gitHubProperties = gitHubProperties;
         this.gitLabProperties = gitLabProperties;
         this.featureFlagService = featureFlagService;
+        this.connectionService = connectionService;
+    }
+
+    /**
+     * Maps a {@link Workspace} entity to a {@link WorkspaceDTO}, hydrating the
+     * integration-mode metadata from the active Connection(s). Exposed here so
+     * controllers don't have to inject {@link ConnectionService} just to call the
+     * DTO factory (keeps controllers under the 5-constructor-param arch rule).
+     */
+    public WorkspaceDTO toWorkspaceDTO(Workspace workspace) {
+        return WorkspaceDTO.from(workspace, connectionService);
+    }
+
+    /**
+     * Builds {@link WorkspaceListItemDTO}s for every workspace accessible to the
+     * current authenticated user.
+     */
+    public List<WorkspaceListItemDTO> findAccessibleWorkspaceListItems() {
+        return findAccessibleWorkspaces().stream()
+            .map(w -> WorkspaceListItemDTO.from(w, connectionService))
+            .toList();
     }
 
     /**

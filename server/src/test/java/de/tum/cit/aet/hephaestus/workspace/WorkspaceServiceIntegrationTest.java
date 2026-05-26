@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,9 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private WorkspaceMembershipRepository workspaceMembershipRepository;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     @Test
     @DisplayName("createWorkspace normalizes slug and assigns owner membership")
@@ -50,12 +56,21 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
             owner
         );
 
+        // Stage-1 (#1198): team + channelId live on the Slack Connection's config now,
+        // so updateNotifications requires an ACTIVE Slack Connection to exist.
+        // Seed one ourselves — the OAuth callback path normally provisions it; here we
+        // shortcut for the test.
+        persistSlackConnection(workspace);
+
         workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, "core-team", "C12345678");
 
         Workspace updated = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(updated.getLeaderboardNotificationEnabled()).isTrue();
-        assertThat(updated.getLeaderboardNotificationTeam()).isEqualTo("core-team");
-        assertThat(updated.getLeaderboardNotificationChannelId()).isEqualTo("C12345678");
+
+        // team + channel are read back from the Slack Connection config.
+        var slack = connectionService.findSlackNotificationConfig(workspace.getId()).orElseThrow();
+        assertThat(slack.teamLabel()).isEqualTo("core-team");
+        assertThat(slack.notificationChannelId()).isEqualTo("C12345678");
 
         assertThatThrownBy(() ->
             workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, null, "invalid")
@@ -63,6 +78,20 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("Slack channel ID");
     }
+
+    private void persistSlackConnection(Workspace workspace) {
+        de.tum.cit.aet.hephaestus.integration.registry.Connection conn =
+            new de.tum.cit.aet.hephaestus.integration.registry.Connection(
+                workspace, IntegrationKind.SLACK, "test-team-id",
+                new ConnectionConfig.SlackConfig(
+                    "test-team-id", "Test Team", null, null, java.util.Set.of()));
+        org.springframework.test.util.ReflectionTestUtils.setField(
+            conn, "state", de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.ACTIVE);
+        connectionRepository.save(conn);
+    }
+
+    @Autowired
+    private de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository connectionRepository;
 
     @Test
     @DisplayName("Workspace lifecycle enforces suspend/resume/purge transitions")
@@ -97,10 +126,9 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         User owner = persistUser("ls1intum-owner");
         Workspace workspace = createWorkspace("ls1intum", "ls1intum", "ls1intum", AccountType.ORG, owner);
 
-        // Explicitly ensure PAT mode without token to mirror legacy bootstrap behaviour
-        workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
-        workspace.setPersonalAccessToken(null);
-        workspaceRepository.save(workspace);
+        // No PAT Connection on the workspace — this mirrors the legacy
+        // "PAT_ORG without token" shape the migration replaces. The lifecycle listener
+        // should promote it cleanly to a GitHub App Connection.
 
         Workspace promoted = githubLifecycleListener.createOrUpdateFromInstallation(
             95711017L,
@@ -108,14 +136,14 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
             RepositorySelection.ALL
         );
 
-        Workspace persisted = workspaceRepository.findById(promoted.getId()).orElseThrow();
-
-        assertThat(promoted.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
-        assertThat(promoted.getInstallationId()).isEqualTo(95711017L);
-        assertThat(promoted.getPersonalAccessToken()).isNull();
-        assertThat(promoted.getInstallationLinkedAt()).isNotNull();
-
-        assertThat(persisted.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
-        assertThat(persisted.getInstallationId()).isEqualTo(95711017L);
+        // Stage-1 (#1198): provider mode + installation id live on the Connection
+        // registry now, not on Workspace.
+        assertThat(connectionService.findActiveProviderKind(promoted.getId()))
+            .hasValue(IntegrationKind.GITHUB);
+        assertThat(connectionService.findActiveGitHubAppConfig(promoted.getId()))
+            .hasValueSatisfying(cfg -> assertThat(cfg.installationId()).isEqualTo(95711017L));
+        assertThat(connectionService.findActiveBearerToken(promoted.getId(), IntegrationKind.GITHUB))
+            .as("App-mode Connections do not store a bearer credential blob")
+            .isEmpty();
     }
 }

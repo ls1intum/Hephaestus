@@ -65,6 +65,12 @@ hephaestus:
     # ensures tenancy bugs surface in CI rather than being masked.
     tenancy:
         enforcement: throw
+    security:
+        # 32-char (256-bit) AES key for CredentialBundleConverter under test.
+        # Encrypted credential blobs only persist when a key is configured; without
+        # this, integration tests that go through ConnectionService.rotateBearerToken
+        # fail at the boot stage where the converter requires a key.
+        encryption-key: test-encryption-key-32-bytes-aes
     workspace:
         init-default: false # Disable PAT workspace bootstrap
     # OAuth state HMAC secret + webhook secret — required by HmacOAuthStateService

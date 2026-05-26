@@ -39,6 +39,7 @@ public class WorkspaceController {
     private final WorkspaceLifecycleService workspaceLifecycleService;
     private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
     private final WorkspaceTeamLabelService workspaceTeamLabelService;
+    private final WorkspaceQueryService workspaceQueryService;
 
     @GetMapping
     @Operation(summary = "Fetch a workspace by slug")
@@ -52,7 +53,7 @@ public class WorkspaceController {
         Workspace workspace = workspaceService
             .getWorkspaceBySlug(workspaceContext.slug())
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/status")
@@ -68,7 +69,7 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspaceStatusRequestDTO request
     ) {
         Workspace workspace = workspaceLifecycleService.updateStatus(workspaceContext, request.status());
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @DeleteMapping
@@ -93,7 +94,7 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspaceScheduleRequestDTO request
     ) {
         Workspace workspace = workspaceService.updateSchedule(workspaceContext, request.day(), request.time());
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/notifications")
@@ -114,7 +115,7 @@ public class WorkspaceController {
             request.team(),
             request.channelId()
         );
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/token")
@@ -130,7 +131,7 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspaceTokenRequestDTO request
     ) {
         Workspace workspace = workspaceService.updateToken(workspaceContext, request.personalAccessToken());
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/slack-credentials")
@@ -150,7 +151,7 @@ public class WorkspaceController {
             request.slackToken(),
             request.slackSigningSecret()
         );
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/public-visibility")
@@ -166,7 +167,7 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspacePublicVisibilityRequestDTO request
     ) {
         Workspace workspace = workspaceService.updatePublicVisibility(workspaceContext, request.isPubliclyViewable());
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/features")
@@ -182,7 +183,7 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspaceFeaturesRequestDTO request
     ) {
         Workspace workspace = workspaceService.updateFeatures(workspaceContext, request);
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/slug")
@@ -198,7 +199,7 @@ public class WorkspaceController {
         @Valid @RequestBody RenameWorkspaceSlugRequestDTO request
     ) {
         Workspace workspace = workspaceService.renameSlug(workspaceContext, request.newSlug());
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @GetMapping("/repositories")

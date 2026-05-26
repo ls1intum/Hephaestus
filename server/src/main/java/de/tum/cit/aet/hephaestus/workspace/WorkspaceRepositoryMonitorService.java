@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
@@ -68,6 +70,9 @@ public class WorkspaceRepositoryMonitorService {
     // Lazy-loaded dependencies (to break circular references)
     private final ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider;
 
+    // Authoritative source for provider mode and credentials
+    private final ConnectionService connectionService;
+
     public WorkspaceRepositoryMonitorService(
         NatsConnectionProperties natsProperties,
         WorkspaceRepository workspaceRepository,
@@ -80,7 +85,8 @@ public class WorkspaceRepositoryMonitorService {
         GitHubAppTokenService gitHubAppTokenService,
         ProjectIntegrityService projectIntegrityService,
         GitRepositoryManager gitRepositoryManager,
-        ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider
+        ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider,
+        ConnectionService connectionService
     ) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
@@ -94,6 +100,7 @@ public class WorkspaceRepositoryMonitorService {
         this.projectIntegrityService = projectIntegrityService;
         this.gitRepositoryManager = gitRepositoryManager;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
+        this.connectionService = connectionService;
     }
 
     /** Lazy accessor for GithubDataSyncService to break circular dependency. */
@@ -129,7 +136,7 @@ public class WorkspaceRepositoryMonitorService {
         Workspace workspace = requireWorkspace(slug);
 
         // Block repository management for GitHub App Installation workspaces
-        if (Workspace.GitProviderMode.GITHUB_APP_INSTALLATION.equals(workspace.getGitProviderMode())) {
+        if (isGitHubAppWorkspace(workspace)) {
             throw new RepositoryManagementNotAllowedException(slug);
         }
 
@@ -149,7 +156,7 @@ public class WorkspaceRepositoryMonitorService {
 
         // For GitLab PAT workspaces, the repo may not be synced yet — allow adding by name.
         // For other modes, validate that the repository exists in the database.
-        if (!Workspace.GitProviderMode.GITLAB_PAT.equals(workspace.getGitProviderMode())) {
+        if (!isGitLabWorkspace(workspace)) {
             var repository = findRepository(nameWithOwner);
             if (repository.isEmpty()) {
                 log.debug(
@@ -203,7 +210,7 @@ public class WorkspaceRepositoryMonitorService {
         Workspace workspace = requireWorkspace(slug);
 
         // Block repository management for GitHub App Installation workspaces
-        if (Workspace.GitProviderMode.GITHUB_APP_INSTALLATION.equals(workspace.getGitProviderMode())) {
+        if (isGitHubAppWorkspace(workspace)) {
             throw new RepositoryManagementNotAllowedException(slug);
         }
 
@@ -430,7 +437,7 @@ public class WorkspaceRepositoryMonitorService {
         }
 
         Workspace workspace = workspaceOpt.get();
-        if (workspace.getGitProviderMode() != Workspace.GitProviderMode.GITHUB_APP_INSTALLATION) {
+        if (!isGitHubAppWorkspace(workspace)) {
             return;
         }
 
@@ -600,7 +607,7 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
         if (repositoryAllowed) {
-            getGitHubDataSyncService().syncSyncTargetAsync(SyncTargetFactory.create(workspace, monitor));
+            getGitHubDataSyncService().syncSyncTargetAsync(SyncTargetFactory.create(workspace, monitor, connectionService));
         } else {
             log.debug(
                 "Persisted repository without sync: reason=filteredByScope, repoName={}",
@@ -728,5 +735,20 @@ public class WorkspaceRepositoryMonitorService {
             throw new IllegalArgumentException("Workspace context slug must not be blank.");
         }
         return slug;
+    }
+
+    /** Workspace is bound to a GitHub App installation (vs GitHub PAT or GitLab PAT). */
+    private boolean isGitHubAppWorkspace(Workspace workspace) {
+        return connectionService.findActiveProviderKind(workspace.getId())
+            .map(k -> k == IntegrationKind.GITHUB)
+            .orElse(false)
+            && connectionService.findActiveGitHubAppConfig(workspace.getId()).isPresent();
+    }
+
+    /** Workspace is bound to a GitLab PAT (vs GitHub of either flavour). */
+    private boolean isGitLabWorkspace(Workspace workspace) {
+        return connectionService.findActiveProviderKind(workspace.getId())
+            .map(k -> k == IntegrationKind.GITLAB)
+            .orElse(false);
     }
 }

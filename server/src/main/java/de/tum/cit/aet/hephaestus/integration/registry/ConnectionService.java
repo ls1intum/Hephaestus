@@ -5,8 +5,10 @@ import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.Credentia
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +65,29 @@ public class ConnectionService {
         if (ref.instanceKey() == null) return Optional.empty();
         return connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(
             ref.workspaceId(), ref.kind(), ref.instanceKey());
+    }
+
+    /**
+     * Reverse lookup: workspace id from a GitHub App {@code installationId}.
+     *
+     * <p>Replaces the legacy {@code WorkspaceRepository.findByInstallationId} after
+     * the {@code installation_id} column is dropped — the durable identity lives in
+     * the GitHub Connection's {@code instance_key} now. Returns the FIRST matching
+     * binding; cross-workspace collision is rejected at
+     * {@code GithubInstallationBindingService}, so at most one row exists.
+     *
+     * <p>{@link Optional#empty()} when no GitHub Connection carries this installation
+     * id (uninstalled, never bound, or backfill incomplete). Callers MUST treat empty
+     * the same way they treated the old {@code Optional<Workspace>} — no implicit
+     * create.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Long> findWorkspaceIdByGitHubInstallationId(long installationId) {
+        return connectionRepository
+            .findByKindAndInstanceKey(IntegrationKind.GITHUB, Long.toString(installationId))
+            .stream()
+            .findFirst()
+            .map(c -> c.getWorkspace().getId());
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -187,6 +212,102 @@ public class ConnectionService {
             c.setCredentials(bundle, credentialConverter);
             return connectionRepository.save(c);
         });
+    }
+
+    /**
+     * Upsert the workspace's GitHub App binding so it reflects {@code installationId}.
+     *
+     * <p>Two-step rebind:
+     * <ol>
+     *   <li>If a non-UNINSTALLED GitHub Connection exists for this workspace with a
+     *       different {@code instance_key} (PAT row, or a stale App row pointing at a
+     *       different installation), transition it to UNINSTALLED — that path clears
+     *       its credential blob inside the same transaction (per
+     *       {@link IntegrationState#UNINSTALLED} contract).</li>
+     *   <li>Either re-use an existing {@code (workspace, GITHUB, installationId)} row
+     *       (re-bind) or create a new one. The transition to {@code ACTIVE} is wrapped
+     *       in {@link #transition} so the audit row + idempotency contract are honoured.</li>
+     * </ol>
+     *
+     * <p>Used by {@code GithubLifecycleListener.createOrUpdateFromInstallation} on the
+     * PAT→App promotion path. {@code GithubInstallationBindingService.bind} owns the
+     * higher-trust "OAuth-driven bind" entry — it adds the installer-identity check
+     * and the cross-workspace collision guard. This helper is the lifecycle-driven
+     * counterpart: webhook says "install on org X" and we have to make the binding
+     * truthful regardless of what the PAT-mode workspace looked like before.
+     *
+     * @param workspace      the target workspace
+     * @param installationId the GitHub App installation id (becomes the {@code instance_key})
+     * @param accountLogin   GitHub org/user login stored in {@link ConnectionConfig.GitHubAppConfig}
+     * @param correlationId  audit correlation key; webhook redelivery with the same id is silenced
+     * @return the ACTIVE GitHub App connection
+     */
+    @Transactional
+    public Connection upsertGitHubAppConnection(Workspace workspace,
+                                                long installationId,
+                                                @Nullable String accountLogin,
+                                                String correlationId) {
+        String instanceKey = Long.toString(installationId);
+
+        // Step 1: retire any non-matching SCM-side row on this workspace. The legacy
+        // PAT workspace carries instance_key='pat'; a previously-bound App installation
+        // could carry a different number. Either way, retire it before introducing the
+        // new instance_key to keep the invariant "one ACTIVE GitHub Connection per
+        // workspace" intact.
+        for (Connection existing : connectionRepository.findByWorkspaceIdAndState(
+            workspace.getId(), IntegrationState.ACTIVE)) {
+            if (existing.getKind() != IntegrationKind.GITHUB) {
+                continue;
+            }
+            if (instanceKey.equals(existing.getInstanceKey())) {
+                continue;
+            }
+            transition(existing, new TransitionRequest(
+                IntegrationState.UNINSTALLED,
+                "REPLACED_BY_INSTALL",
+                "SYSTEM",
+                "github-install-" + installationId,
+                correlationId + "-retire-" + existing.getId(),
+                "Replaced by GitHub App installation " + installationId
+            ));
+        }
+
+        // Step 2: upsert the (workspace, GITHUB, installationId) row.
+        Connection connection = connectionRepository
+            .findByWorkspaceIdAndKindAndInstanceKey(workspace.getId(), IntegrationKind.GITHUB, instanceKey)
+            .orElseGet(() -> {
+                ConnectionConfig.GitHubAppConfig config = new ConnectionConfig.GitHubAppConfig(
+                    installationId, accountLogin, /* serverUrl */ null, Set.of()
+                );
+                Connection fresh = new Connection(workspace, IntegrationKind.GITHUB, instanceKey, config);
+                fresh.setDisplayName(accountLogin);
+                return connectionRepository.save(fresh);
+            });
+
+        // Refresh stored accountLogin/orgLogin if the webhook carries a non-blank one
+        // (handles the rare-but-real case where the org renamed since first bind).
+        if (accountLogin != null && !accountLogin.isBlank()
+            && connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig current
+            && !accountLogin.equals(current.orgLogin())) {
+            connection.setConfig(new ConnectionConfig.GitHubAppConfig(
+                installationId, accountLogin, current.serverUrl(), current.enabledStreams()
+            ));
+            connection.setDisplayName(accountLogin);
+            connection = connectionRepository.save(connection);
+        }
+
+        if (connection.getState() != IntegrationState.ACTIVE) {
+            connection = transition(connection, new TransitionRequest(
+                IntegrationState.ACTIVE,
+                "INSTALL_BIND",
+                "GITHUB_WEBHOOK",
+                "github-install-" + installationId,
+                correlationId,
+                "Linked workspace to GitHub App installation " + installationId
+            ));
+        }
+
+        return connection;
     }
 
     /**

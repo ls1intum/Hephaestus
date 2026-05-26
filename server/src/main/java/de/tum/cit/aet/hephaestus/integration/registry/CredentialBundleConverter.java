@@ -84,6 +84,7 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
         log.debug("Instantiated CredentialBundleConverter: enabled=false, reason=no_spring_context");
     }
 
+    @Autowired
     public CredentialBundleConverter(
         @Value("${hephaestus.security.encryption-key:}") String encryptionKey,
         @Value("${spring.profiles.active:}") String activeProfiles

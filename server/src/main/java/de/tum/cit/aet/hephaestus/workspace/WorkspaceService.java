@@ -5,6 +5,8 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
@@ -13,6 +15,7 @@ import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -68,6 +71,7 @@ public class WorkspaceService {
     private final LeaguePointsRecalculator leaguePointsRecalculator;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService;
+    private final ScmConnectionProvisioner scmConnectionProvisioner;
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
@@ -76,7 +80,8 @@ public class WorkspaceService {
         WorkspaceSettingsService workspaceSettingsService,
         LeaguePointsRecalculator leaguePointsRecalculator,
         WorkspaceMembershipService workspaceMembershipService,
-        GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService
+        GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService,
+        ScmConnectionProvisioner scmConnectionProvisioner
     ) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
@@ -85,6 +90,7 @@ public class WorkspaceService {
         this.leaguePointsRecalculator = leaguePointsRecalculator;
         this.workspaceMembershipService = workspaceMembershipService;
         this.gitLabWorkspaceInitializationService = gitLabWorkspaceInitializationService;
+        this.scmConnectionProvisioner = scmConnectionProvisioner;
     }
 
     // ========================================================================
@@ -179,26 +185,52 @@ public class WorkspaceService {
             ownerUserId
         );
 
-        if (request.gitProviderMode() != null) {
-            workspace.setGitProviderMode(request.gitProviderMode());
-        }
-        if (request.personalAccessToken() != null && !request.personalAccessToken().isBlank()) {
-            workspace.setPersonalAccessToken(request.personalAccessToken());
-        }
-        if (request.serverUrl() != null && !request.serverUrl().isBlank()) {
-            workspace.setServerUrl(request.serverUrl().trim());
-        }
+        boolean isGitLab = request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT;
+        boolean isGitHubPat = request.gitProviderMode() == Workspace.GitProviderMode.PAT_ORG;
 
-        // GitLab PAT workspaces monitor all repositories in the group by default
-        if (request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+        if (isGitLab) {
+            // GitLab PAT workspaces monitor all repositories in the group by default.
             workspace.setRepositorySelection(RepositorySelection.ALL);
+            workspaceRepository.save(workspace);
+
+            String serverUrl = (request.serverUrl() != null && !request.serverUrl().isBlank())
+                ? request.serverUrl().trim()
+                : null;
+            scmConnectionProvisioner.provisionPatConnection(
+                workspace,
+                IntegrationKind.GITLAB,
+                serverUrl,
+                new ConnectionConfig.GitLabConfig(
+                    serverUrl,
+                    /* gitlabGroupId */ null,
+                    /* gitlabWebhookId */ null,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                ),
+                request.personalAccessToken(),
+                "create-workspace-" + workspace.getId()
+            );
+        } else if (isGitHubPat) {
+            workspaceRepository.save(workspace);
+            String serverUrl = (request.serverUrl() != null && !request.serverUrl().isBlank())
+                ? request.serverUrl().trim()
+                : null;
+            scmConnectionProvisioner.provisionPatConnection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "pat",
+                new ConnectionConfig.GitHubPatConfig(request.accountLogin(), serverUrl, Set.of()),
+                request.personalAccessToken(),
+                "create-workspace-" + workspace.getId()
+            );
+        } else {
+            // GITHUB_APP_INSTALLATION via this DTO path is not supported — App workspaces
+            // come in through GithubLifecycleListener.createOrUpdateFromInstallation. Fall
+            // through to a plain save so the workspace row is persisted.
+            workspaceRepository.save(workspace);
         }
 
-        // Explicit save required: when called via createWorkspaceWithInitialization(),
-        // self-invocation bypasses @Transactional proxy, so dirty-checking flush won't
-        // happen automatically. The inner createWorkspace(5-args) saved the base entity,
-        // but these additional fields (gitProviderMode, PAT, serverUrl) need a second save.
-        return workspaceRepository.save(workspace);
+        return workspace;
     }
 
     /**
@@ -217,7 +249,7 @@ public class WorkspaceService {
         // Trigger async repository discovery for GitLab PAT workspaces.
         // The @Transactional createWorkspace() has already committed at this point,
         // so the async thread will find the workspace in the database.
-        if (workspace.getGitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+        if (request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
             gitLabWorkspaceInitializationService.initializeAsync(workspace.getId());
         }
 

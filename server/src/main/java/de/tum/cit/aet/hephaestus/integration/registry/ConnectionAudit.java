@@ -14,6 +14,8 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.lang.Nullable;
 
 /**
@@ -66,6 +68,7 @@ public class ConnectionAudit {
     @Nullable
     private String correlationId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "detail", columnDefinition = "jsonb")
     @Nullable
     private String detail;

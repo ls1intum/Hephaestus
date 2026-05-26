@@ -1,55 +1,48 @@
 package de.tum.cit.aet.hephaestus.integration.registry;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.NoSuchElementException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
  * Resolves the {@link IntegrationKind} for a piece of work given its current
- * vendor binding plus a workspace fallback. New work (post-#1198) carries the kind
- * directly; legacy paths fall back to mapping {@code workspace.git_provider_mode}
- * into {@link IntegrationKind}.
+ * vendor binding plus a workspace fallback.
  *
- * <p>Lives under {@code integration/registry/} (not {@code agent/}) so the legacy
- * {@link GitProviderType} branch stays out of the agent module — per #1198 AC#8
- * which forbids agent-side switching on the legacy enum. The fallback is purely
- * an integration-framework concern and disappears once the connection-cutover
- * changeset drops the legacy column.
+ * <p>The agent-side rows now always carry the kind directly. The legacy fallback
+ * that derived the kind from {@code workspace.git_provider_mode} is gone — Stage 1
+ * of the #1198 cutover drops that column and the Connection registry is the
+ * authoritative source. The fallback that used to consult {@code ConnectionService}
+ * for un-stamped rows is omitted on purpose: when {@code directKind} is null the
+ * agent row is malformed (created by code that pre-dates the registry) and should
+ * surface as an error, not silently resolve.
  *
- * <p>Accepts primitive {@code workspaceId} (not the AgentJob entity) to avoid a
- * Modulith violation ({@code integration → agent}).
+ * <p>Kept as a thin {@code @Component} so the existing call sites (which pass
+ * {@code directKind} from the work row) don't need to change.
  */
 @Component
 public class JobIntegrationKindResolver {
 
-    private final WorkspaceRepository workspaceRepository;
-
-    public JobIntegrationKindResolver(WorkspaceRepository workspaceRepository) {
-        this.workspaceRepository = workspaceRepository;
+    public JobIntegrationKindResolver() {
+        // No collaborators — pure delegation now.
     }
 
     /**
-     * @param directKind the kind already recorded on the work row, or {@code null}
-     *     to force the workspace fallback (used by legacy rows pre-backfill).
-     * @param workspaceId workspace id to consult when {@code directKind} is null.
+     * @param directKind the kind recorded on the work row. Must be non-null after
+     *     the #1198 cutover; agent jobs created without this column are not
+     *     expected to exist in production.
+     * @param workspaceId workspace id, kept in the signature for caller-site clarity
+     *     (logs, future audit trails). Currently unused.
      * @return the {@link IntegrationKind} for this work item.
-     * @throws NoSuchElementException if the workspace doesn't exist
+     * @throws NoSuchElementException if {@code directKind} is null
      */
     public IntegrationKind resolve(@Nullable IntegrationKind directKind, long workspaceId) {
         if (directKind != null) {
             return directKind;
         }
-        Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new NoSuchElementException("Workspace not found: id=" + workspaceId));
-        GitProviderType providerType = workspace.getProviderType();
-        return switch (providerType) {
-            case GITHUB -> IntegrationKind.GITHUB;
-            case GITLAB -> IntegrationKind.GITLAB;
-        };
+        throw new NoSuchElementException(
+            "Cannot resolve IntegrationKind: directKind is null for workspaceId=" + workspaceId
+                + ". Post-#1198 every agent/work row must carry its integration kind explicitly."
+        );
     }
 }

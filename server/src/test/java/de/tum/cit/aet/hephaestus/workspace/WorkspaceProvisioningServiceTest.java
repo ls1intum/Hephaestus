@@ -63,6 +63,9 @@ class WorkspaceProvisioningServiceTest {
     @Mock
     private AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
 
+    @Mock
+    private ScmConnectionProvisioner scmConnectionProvisioner;
+
     private WorkspaceProvisioningService provisioningService;
 
     private WorkspaceProperties workspaceProperties;
@@ -98,7 +101,8 @@ class WorkspaceProvisioningServiceTest {
             workspaceMembershipService,
             workspaceScopeFilter,
             gitLabProperties,
-            authenticatedGitProviderUserService
+            authenticatedGitProviderUserService,
+            scmConnectionProvisioner
         );
     }
 

@@ -75,12 +75,11 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             )
         );
 
-        // Set GitLab webhook fields (simulates a registered webhook)
-        workspace.setGitlabGroupId(42L);
-        workspace.setGitlabWebhookId(99L);
-        workspace.setSlackToken("xoxb-test-slack-token");
-        workspace.setSlackSigningSecret("test-signing-secret");
-        workspace = workspaceRepository.save(workspace);
+        // GitLab webhook ids + Slack credentials live on Connection rows now (the
+        // Connection registry); the legacy Workspace columns are scheduled for removal.
+        // The PAT was already encrypted onto the GitLab Connection by the workspace
+        // creation request above, which is what the credential-clearing assertion below
+        // exercises.
 
         // Add a monitored repository (saved directly — purge reloads workspace with EAGER fetch)
         RepositoryToMonitor monitor = new RepositoryToMonitor();
@@ -268,27 +267,42 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @DisplayName("Sensitive field clearing")
     class SensitiveFieldClearing {
 
+        @Autowired
+        private de.tum.cit.aet.hephaestus.integration.registry.ConnectionRepository connectionRepository;
+
+        /**
+         * Per-workspace credentials now live on the {@code Connection} aggregate (PAT,
+         * Slack token, GitLab webhook ids). On workspace purge,
+         * {@code ConnectionPurgeContributor} transitions every still-ACTIVE Connection to
+         * {@code UNINSTALLED}, which clears the encrypted credential blob inside the
+         * same transaction. We assert the post-purge state of those rows directly here
+         * — the legacy {@code Workspace.personal_access_token / slack_token / …} columns
+         * no longer carry runtime state.
+         */
         @Test
-        @DisplayName("purge clears PAT, Slack tokens, and GitLab webhook fields")
-        void purgeClearsSensitiveFields() {
+        @DisplayName("purge moves Connections to UNINSTALLED with cleared credential blobs")
+        void purgeClearsCredentialBlobsOnConnections() {
             Workspace workspace = createGitLabWorkspaceWithData("sensitive");
             Long workspaceId = workspace.getId();
 
-            // Verify fields set before purge
-            assertThat(workspace.getPersonalAccessToken()).isNotNull();
-            assertThat(workspace.getSlackToken()).isNotNull();
-            assertThat(workspace.getSlackSigningSecret()).isNotNull();
-            assertThat(workspace.getGitlabGroupId()).isNotNull();
-            assertThat(workspace.getGitlabWebhookId()).isNotNull();
+            // Pre-purge: the GitLab Connection from createGitLabWorkspaceWithData carries an
+            // encrypted PAT blob and is ACTIVE.
+            var connections = connectionRepository.findByWorkspaceId(workspaceId);
+            assertThat(connections).isNotEmpty();
+            assertThat(connections).anyMatch(c ->
+                c.getKind() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB
+                    && c.getState() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.ACTIVE
+                    && c.getCredentialsEncrypted() != null
+            );
 
             workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
 
-            Workspace purged = workspaceRepository.findById(workspaceId).orElseThrow();
-            assertThat(purged.getPersonalAccessToken()).isNull();
-            assertThat(purged.getSlackToken()).isNull();
-            assertThat(purged.getSlackSigningSecret()).isNull();
-            assertThat(purged.getGitlabGroupId()).isNull();
-            assertThat(purged.getGitlabWebhookId()).isNull();
+            // Post-purge: every Connection is UNINSTALLED and its credential blob is null.
+            var postPurge = connectionRepository.findByWorkspaceId(workspaceId);
+            assertThat(postPurge)
+                .allMatch(c -> c.getState() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.UNINSTALLED);
+            assertThat(postPurge).allMatch(c -> c.getCredentialsEncrypted() == null);
+            assertThat(postPurge).allMatch(c -> c.getCredentialsAlg() == null);
         }
     }
 

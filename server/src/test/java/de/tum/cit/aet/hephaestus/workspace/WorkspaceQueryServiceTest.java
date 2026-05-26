@@ -5,6 +5,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.gitprovider.github.GitHubProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
@@ -37,6 +38,9 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
     @Mock
     private FeatureFlagService featureFlagService;
 
+    @Mock
+    private ConnectionService connectionService;
+
     @Test
     void findAccessibleWorkspacesSortsByDisplayNameAndDeduplicatesMemberships() {
         Workspace alphaWorkspace = workspace(1L, "alpha-space", "Alpha Workspace", true);
@@ -56,7 +60,8 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
             userRepository,
             gitHubProperties,
             gitLabProperties,
-            featureFlagService
+            featureFlagService,
+            connectionService
         );
 
         when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(
@@ -84,7 +89,8 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
             userRepository,
             gitHubProperties,
             gitLabProperties,
-            featureFlagService
+            featureFlagService,
+            connectionService
         );
 
         when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(

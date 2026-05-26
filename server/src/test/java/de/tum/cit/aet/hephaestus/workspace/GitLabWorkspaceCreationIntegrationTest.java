@@ -69,18 +69,20 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
 
         WorkspaceDTO workspace = Objects.requireNonNull(created);
         assertThat(workspace.workspaceSlug()).isEqualTo("gitlab-space");
-        assertThat(workspace.gitProviderMode()).isEqualTo("GITLAB_PAT");
+        // Stage-1 (#1198): provider classification is derived from the active Connection
+        // and surfaced via `kind` (the renamed field). The legacy gitProviderMode field
+        // is gone.
+        assertThat(workspace.kind()).isEqualTo("GITLAB");
         assertThat(workspace.providerType()).isEqualTo(GitProviderType.GITLAB);
         assertThat(workspace.serverUrl()).isEqualTo("https://gitlab.example.com");
         assertThat(workspace.status()).isEqualTo("ACTIVE");
         assertThat(workspace.hasPersonalAccessToken()).isTrue();
 
-        // Verify persisted entity
+        // Verify persisted entity exists; provider mode / PAT / server URL now live on
+        // the workspace's GitLab Connection row rather than legacy Workspace columns,
+        // which the WorkspaceDTO assertions above already cover end-to-end.
         Workspace persisted = workspaceRepository.findById(workspace.id()).orElseThrow();
-        assertThat(persisted.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITLAB_PAT);
-        assertThat(persisted.getServerUrl()).isEqualTo("https://gitlab.example.com");
-        assertThat(persisted.getPersonalAccessToken()).isNotNull();
-        assertThat(persisted.getPersonalAccessToken()).isNotBlank();
+        assertThat(persisted.getAccountLogin()).isEqualTo("my-group/my-project");
     }
 
     @Test
@@ -312,9 +314,14 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             .getResponseBody();
 
         assertThat(workspaces).isNotNull();
+        // Stage-1 (#1198): providerType is now derived from the active Connection. The
+        // GitHub workspace created via the 5-arg path has no Connection (App
+        // installations come in via GithubLifecycleListener), so its providerType is
+        // null. The GitLab workspace created via the REST API path provisions a GitLab
+        // Connection inline and surfaces as GITLAB.
         assertThat(workspaces)
             .extracting(WorkspaceListItemDTO::providerType)
-            .contains(GitProviderType.GITHUB, GitProviderType.GITLAB);
+            .contains(GitProviderType.GITLAB);
     }
 
     @Test
@@ -335,16 +342,13 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         );
         ensureOwnerMembership(workspace);
 
-        // Verify it's ACTIVE and GITLAB
-        assertThat(workspace.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITLAB_PAT);
+        // Verify it's ACTIVE
         assertThat(workspace.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
 
         // Suspend
         workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
         Workspace suspended = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(suspended.getStatus()).isEqualTo(Workspace.WorkspaceStatus.SUSPENDED);
-        // GitLab mode preserved after suspend
-        assertThat(suspended.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITLAB_PAT);
 
         // Resume
         workspaceLifecycleService.resumeWorkspace(workspace.getWorkspaceSlug());

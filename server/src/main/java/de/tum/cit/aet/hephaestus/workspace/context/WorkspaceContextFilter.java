@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.workspace.context;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
@@ -57,6 +59,7 @@ public class WorkspaceContextFilter implements Filter {
     private final UserRepository userRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
+    private final ConnectionService connectionService;
     private final ObjectMapper objectMapper;
 
     public WorkspaceContextFilter(
@@ -65,6 +68,7 @@ public class WorkspaceContextFilter implements Filter {
         UserRepository userRepository,
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
+        ConnectionService connectionService,
         ObjectMapper objectMapper
     ) {
         this.workspaceRepository = workspaceRepository;
@@ -72,6 +76,7 @@ public class WorkspaceContextFilter implements Filter {
         this.userRepository = userRepository;
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
+        this.connectionService = connectionService;
         this.objectMapper = objectMapper;
     }
 
@@ -164,8 +169,14 @@ public class WorkspaceContextFilter implements Filter {
                 return;
             }
 
-            // Create and set context
-            WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, roles);
+            // Create and set context. installationId is sourced from the active GitHub
+            // App connection (Workspace.installation_id has been retired in favour of the
+            // Connection registry).
+            Long installationId = connectionService
+                .findActiveGitHubAppConfig(workspace.getId())
+                .map(ConnectionConfig.GitHubAppConfig::installationId)
+                .orElse(null);
+            WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, roles, installationId);
 
             // Overwrite detection: warn if context already set
             if (WorkspaceContextHolder.getContext() != null) {

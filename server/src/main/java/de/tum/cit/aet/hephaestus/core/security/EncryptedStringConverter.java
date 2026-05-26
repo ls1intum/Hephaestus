@@ -61,6 +61,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
         log.debug("Instantiated EncryptedStringConverter: enabled=false, reason=no_spring_context");
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
     public EncryptedStringConverter(
         @Value("${hephaestus.security.encryption-key:}") String encryptionKey,
         @Value("${spring.profiles.active:}") String activeProfiles

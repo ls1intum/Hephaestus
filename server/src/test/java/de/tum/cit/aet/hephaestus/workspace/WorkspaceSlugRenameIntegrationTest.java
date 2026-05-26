@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
@@ -29,6 +30,9 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Autowired
     private WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     @Test
     @WithAdminUser
@@ -185,7 +189,10 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(created).as("workspace should be created with fallback slug").isNotNull();
         assertThat(created.getWorkspaceSlug()).isNotEqualTo("install-alpha");
         assertThat(created.getWorkspaceSlug()).startsWith("install-alpha".substring(0, 3));
-        assertThat(created.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
+        // Stage-1 (#1198): provider mode lives on the Connection registry now, not on Workspace.
+        assertThat(connectionService.findActiveGitHubAppConfig(created.getId()))
+            .as("GitHub App Connection should be active after createOrUpdateFromInstallation")
+            .isPresent();
     }
 
     @Test

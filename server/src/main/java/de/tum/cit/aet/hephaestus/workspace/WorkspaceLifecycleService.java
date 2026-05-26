@@ -217,19 +217,11 @@ public class WorkspaceLifecycleService {
         // Step 7: Unlink organization (don't delete - Organization is a shared entity)
         workspace.setOrganization(null);
 
-        // Step 7b: Clear sensitive credentials (defense in depth — purged workspaces
-        // are retained for audit but should not hold decryptable secrets)
-        workspace.setPersonalAccessToken(null);
-        workspace.setSlackToken(null);
-        workspace.setSlackSigningSecret(null);
-
-        // Step 7c: Clear GitLab webhook references on the managed entity.
-        // The GitLabWebhookPurgeAdapter already deregistered the webhook via a suspended
-        // transaction (NOT_SUPPORTED), but that operates on a separate entity instance.
-        // We must clear these on the managed instance to prevent step 9's save from
-        // re-persisting stale values.
-        workspace.setGitlabGroupId(null);
-        workspace.setGitlabWebhookId(null);
+        // Step 7b: Per-workspace credentials and integration metadata (PAT / Slack tokens,
+        // GitLab webhook ids) live on Connection rows now. The ConnectionPurgeContributor
+        // (order=-100, runs as part of step 4 above) already transitions every active
+        // Connection to UNINSTALLED, which clears credential blobs atomically inside the
+        // transition. No explicit clearing needed here.
 
         // Step 8: Clear sync timestamps for clean slate on potential reactivation
         // This ensures that if the workspace is ever reactivated, sync will fetch fresh data

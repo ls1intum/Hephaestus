@@ -4,6 +4,9 @@ import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncServiceHolder;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncType;
 import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -85,6 +88,9 @@ public class GitLabWorkspaceInitializationService {
     private final ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider;
     private final ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider;
 
+    // Authoritative source for per-workspace integration config (server URL, PAT presence).
+    private final ConnectionService connectionService;
+
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
 
@@ -100,6 +106,7 @@ public class GitLabWorkspaceInitializationService {
         ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
         ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider,
         ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
+        ConnectionService connectionService,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.workspaceRepository = workspaceRepository;
@@ -113,6 +120,7 @@ public class GitLabWorkspaceInitializationService {
         this.gitLabSyncServiceHolderProvider = gitLabSyncServiceHolderProvider;
         this.gitLabWebhookServiceProvider = gitLabWebhookServiceProvider;
         this.rateLimitTrackerProvider = rateLimitTrackerProvider;
+        this.connectionService = connectionService;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -139,7 +147,8 @@ public class GitLabWorkspaceInitializationService {
 
                 // Set workspace context for entire lifecycle (init + sync + NATS).
                 // initialize() checks contextOwner and won't double-set/clear.
-                WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, Set.of());
+                // GitLab workspaces never have a GitHub App installation id.
+                WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, Set.of(), /* installationId */ null);
                 WorkspaceContextHolder.setContext(context);
                 try {
                     initialize(workspace);
@@ -172,11 +181,16 @@ public class GitLabWorkspaceInitializationService {
      * @param workspace the GITLAB_PAT workspace to initialize
      */
     public void initialize(Workspace workspace) {
-        if (workspace.getGitProviderMode() != Workspace.GitProviderMode.GITLAB_PAT) {
+        var gitLabConfigOpt = connectionService.findActiveGitLabConfig(workspace.getId());
+        if (gitLabConfigOpt.isEmpty()) {
             return;
         }
 
-        if (isBlank(workspace.getPersonalAccessToken())) {
+        boolean hasToken = connectionService
+            .findActiveBearerToken(workspace.getId(), IntegrationKind.GITLAB)
+            .map(b -> b.token() != null && !b.token().isBlank())
+            .orElse(false);
+        if (!hasToken) {
             log.warn("Skipped GitLab initialization: reason=missingToken, workspaceId={}", workspace.getId());
             return;
         }
@@ -186,10 +200,11 @@ public class GitLabWorkspaceInitializationService {
             return;
         }
 
-        // Only set context if not already set (avoids clearing caller's context)
+        // Only set context if not already set (avoids clearing caller's context).
+        // GitLab workspaces never have a GitHub App installation id.
         boolean contextOwner = WorkspaceContextHolder.getContext() == null;
         if (contextOwner) {
-            WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, Set.of());
+            WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, Set.of(), /* installationId */ null);
             WorkspaceContextHolder.setContext(context);
         }
         try {
@@ -284,8 +299,13 @@ public class GitLabWorkspaceInitializationService {
             // Pass workspace.serverUrl so per-instance repos get stamped with the matching
             // git_provider row instead of falling back to the global default (which silently
             // fuses cross-instance identities under gitlab.com). Live-run finding 2026-05-25.
+            // The server URL now lives on the GitLab Connection's config, not on Workspace.
+            String serverUrl = connectionService
+                .findActiveGitLabConfig(workspace.getId())
+                .map(ConnectionConfig.GitLabConfig::serverUrl)
+                .orElse(null);
             GitLabSyncResult result = syncService.syncGroupProjects(
-                workspace.getId(), workspace.getAccountLogin(), workspace.getServerUrl());
+                workspace.getId(), workspace.getAccountLogin(), serverUrl);
             log.info(
                 "GitLab project discovery: workspaceId={}, status={}, synced={}, failed={}, pages={}",
                 workspace.getId(),

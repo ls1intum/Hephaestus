@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
@@ -23,7 +24,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceSlugService;
-import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -90,6 +90,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final GitHubAppTokenService gitHubAppTokenService;
     private final OrganizationService organizationService;
+    private final ConnectionService connectionService;
 
     public GithubLifecycleListener(
         NatsConnectionProperties natsProperties,
@@ -102,7 +103,8 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         WorkspaceMembershipService workspaceMembershipService,
         ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         GitHubAppTokenService gitHubAppTokenService,
-        OrganizationService organizationService
+        OrganizationService organizationService,
+        ConnectionService connectionService
     ) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
@@ -115,6 +117,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         this.natsConsumerService = natsConsumerService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.organizationService = organizationService;
+        this.connectionService = connectionService;
     }
 
     @Override
@@ -274,8 +277,13 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             Workspace existingByLogin = workspaceRepository.findByAccountLoginIgnoreCase(accountLogin).orElse(null);
 
             if (existingByLogin != null) {
-                boolean isPatWorkspace = existingByLogin.getGitProviderMode() == Workspace.GitProviderMode.PAT_ORG;
-                boolean hasPatToken = !isBlank(existingByLogin.getPersonalAccessToken());
+                boolean isPatWorkspace = connectionService
+                    .findActiveGitHubPatConfig(existingByLogin.getId())
+                    .isPresent();
+                boolean hasPatToken = connectionService
+                    .findActiveBearerToken(existingByLogin.getId(), IntegrationKind.GITHUB)
+                    .map(b -> b.token() != null && !b.token().isBlank())
+                    .orElse(false);
 
                 if (isPatWorkspace && hasPatToken) {
                     log.info(
@@ -355,20 +363,12 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             );
         }
 
-        workspace.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
-        workspace.setInstallationId(installationId);
-        workspace.setPersonalAccessToken(null);
-
         if (!isBlank(accountLogin)) {
             workspace.setAccountLogin(accountLogin);
         }
 
         if (repositorySelection != null) {
             workspace.setRepositorySelection(repositorySelection);
-        }
-
-        if (workspace.getInstallationLinkedAt() == null) {
-            workspace.setInstallationLinkedAt(Instant.now());
         }
 
         // Reactivate workspace if it was previously purged or suspended
@@ -400,7 +400,18 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             );
         }
 
-        return workspaceRepository.save(workspace);
+        Workspace saved = workspaceRepository.save(workspace);
+
+        // Bind the GitHub App installation to this workspace via the Connection registry.
+        // upsertGitHubAppConnection retires any non-matching GITHUB connection on this
+        // workspace (PAT or stale App) and either re-uses or creates the new App row.
+        // Correlation id is stable per installation so webhook redelivery is idempotent.
+        connectionService.upsertGitHubAppConnection(
+            saved, installationId, accountLogin,
+            "install-bind-" + installationId
+        );
+
+        return saved;
     }
 
     /**

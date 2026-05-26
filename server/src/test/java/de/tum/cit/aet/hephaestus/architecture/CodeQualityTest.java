@@ -61,7 +61,13 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "HistoricalBackfillService", // Coordinates multiple sync services for historical data backfill
                 "GitHubPullRequestSyncService", // Coordinates review, review comment, and project item sub-sync services
                 "WorkspaceProvisioningService", // Orchestrates provisioning across GitHub and GitLab providers
-                "MentorChatService" // Coordinates persistence, SSE, runner, lock, metrics, executor, llm config, context build
+                "MentorChatService", // Coordinates persistence, SSE, runner, lock, metrics, executor, llm config, context build
+                // #1198 Stage 1: ConnectionService dependency added to read per-Connection state
+                // (GitHub installation id, GitLab server url, PAT) instead of legacy Workspace columns.
+                // Both services are full provider-lifecycle orchestrators — splitting them further
+                // would scatter related logic without reducing coupling.
+                "GitLabWorkspaceInitializationService",
+                "WorkspaceRepositoryMonitorService"
             );
 
             ArchRule rule = classes()

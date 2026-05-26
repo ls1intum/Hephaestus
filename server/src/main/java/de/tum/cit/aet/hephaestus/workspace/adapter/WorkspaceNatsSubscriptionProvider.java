@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.spi.NatsSubscriptionProvider;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -16,13 +17,16 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
 
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceScopeFilter workspaceScopeFilter;
+    private final ConnectionService connectionService;
 
     public WorkspaceNatsSubscriptionProvider(
         WorkspaceRepository workspaceRepository,
-        WorkspaceScopeFilter workspaceScopeFilter
+        WorkspaceScopeFilter workspaceScopeFilter,
+        ConnectionService connectionService
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
+        this.connectionService = connectionService;
     }
 
     @Override
@@ -39,10 +43,16 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
             .filter(workspaceScopeFilter::isRepositoryAllowed)
             .collect(Collectors.toSet());
 
-        String streamName = switch (workspace.getProviderType()) {
-            case GITHUB -> "github";
-            case GITLAB -> "gitlab";
-        };
+        // No active SCM connection → default to "github" stream for the same back-compat
+        // shape the old getProviderType() fallback produced.
+        String streamName = connectionService
+            .findActiveProviderKind(workspace.getId())
+            .map(kind -> switch (kind) {
+                case GITHUB -> "github";
+                case GITLAB -> "gitlab";
+                case SLACK, OUTLINE -> "github";
+            })
+            .orElse("github");
 
         return new NatsSubscriptionInfo(workspace.getId(), repositoryNames, workspace.getAccountLogin(), streamName);
     }

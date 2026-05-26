@@ -4,13 +4,14 @@ import static de.tum.cit.aet.hephaestus.integration.github.common.GitHubSyncCons
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.registry.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
@@ -20,6 +21,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -52,6 +54,7 @@ public class WorkspaceProvisioningService {
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitLabProperties gitLabProperties;
     private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
+    private final ScmConnectionProvisioner scmConnectionProvisioner;
     private final WebClient webClient;
 
     public WorkspaceProvisioningService(
@@ -68,7 +71,8 @@ public class WorkspaceProvisioningService {
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceScopeFilter workspaceScopeFilter,
         GitLabProperties gitLabProperties,
-        AuthenticatedGitProviderUserService authenticatedGitProviderUserService
+        AuthenticatedGitProviderUserService authenticatedGitProviderUserService,
+        ScmConnectionProvisioner scmConnectionProvisioner
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
@@ -84,6 +88,7 @@ public class WorkspaceProvisioningService {
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitLabProperties = gitLabProperties;
         this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
+        this.scmConnectionProvisioner = scmConnectionProvisioner;
         this.webClient = WebClient.builder()
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
@@ -136,11 +141,21 @@ public class WorkspaceProvisioningService {
             ownerUserId
         );
 
-        workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
-        workspace.setPersonalAccessToken(config.token());
         workspace.setRepositorySelection(RepositorySelection.SELECTED);
-
         Workspace savedWorkspace = workspaceRepository.save(workspace);
+
+        // Provision the GitHub PAT Connection row. instance_key="pat" matches the
+        // backfill convention for legacy PAT workspaces — single PAT row per workspace,
+        // ACTIVE state, bearer credential stored encrypted via the per-row AAD.
+        scmConnectionProvisioner.provisionPatConnection(
+            savedWorkspace,
+            IntegrationKind.GITHUB,
+            "pat",
+            new ConnectionConfig.GitHubPatConfig(accountLogin, /* serverUrl */ null, Set.of()),
+            config.token(),
+            "bootstrap-pat-workspace-" + savedWorkspace.getId()
+        );
+
         log.info(
             "Created default PAT workspace: accountLogin={}, workspaceId={}",
             savedWorkspace.getAccountLogin(),
@@ -215,14 +230,28 @@ public class WorkspaceProvisioningService {
             ownerUserId
         );
 
-        workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
-        workspace.setPersonalAccessToken(config.token());
         workspace.setRepositorySelection(RepositorySelection.ALL);
-        if (!isBlank(config.serverUrl())) {
-            workspace.setServerUrl(config.serverUrl().trim());
-        }
-
         Workspace savedWorkspace = workspaceRepository.save(workspace);
+
+        // instance_key derived from "<serverUrl>:<groupId>" lets multiple GitLab orgs
+        // co-exist if needed; the group id isn't known yet at bootstrap so we use the
+        // server URL alone — webhook registration will fill in the group id later.
+        String instanceKey = serverUrl;
+        scmConnectionProvisioner.provisionPatConnection(
+            savedWorkspace,
+            IntegrationKind.GITLAB,
+            instanceKey,
+            new ConnectionConfig.GitLabConfig(
+                serverUrl,
+                /* gitlabGroupId */ null,
+                /* gitlabWebhookId */ null,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                Set.of()
+            ),
+            config.token(),
+            "bootstrap-gitlab-pat-workspace-" + savedWorkspace.getId()
+        );
+
         log.info(
             "Created default GitLab PAT workspace: groupPath={}, workspaceId={}",
             savedWorkspace.getAccountLogin(),
