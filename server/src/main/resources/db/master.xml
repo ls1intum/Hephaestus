@@ -76,7 +76,5 @@
     <include file="./changelog/1779173113243_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779520390544_worker_runtime_substrate.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779790459343_unified_integration_framework.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779826075422_one_active_scm_per_workspace.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779862439263_user_keycloak_subject.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1779862439264_pe_audit_schema_polish.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

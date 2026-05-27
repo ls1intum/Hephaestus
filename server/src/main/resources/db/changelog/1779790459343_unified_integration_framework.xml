@@ -16,8 +16,10 @@
 
         Logical contents:
 
-          1.  Connection aggregate + audit + partial-unique for NULL instance_key.
-          2.  integration_webhook_subscription per-subscription signing-secret sidecar.
+          1.  Connection aggregate + audit + partial-unique for NULL instance_key
+              + partial-unique enforcing "one ACTIVE SCM Connection per workspace".
+          2.  integration_webhook_subscription per-subscription signing-secret sidecar
+              (with updated_at audit column).
           3.  feedback_post cross-vendor edit-in-place tracking.
           4.  agent_job classification columns (integration_kind, subject_class)
               + (kind, subject, created_at) index.
@@ -126,7 +128,13 @@
             ALTER TABLE connection ADD CONSTRAINT ck_connection_state
                 CHECK (state IN ('PENDING','ACTIVE','SUSPENDED','UNINSTALLED'));
         </sql>
-        <createIndex tableName="connection" indexName="ix_connection_active">
+        <!--
+            ix_connection_workspace_kind: unfiltered (workspace_id, kind) lookup
+            index for the by-(workspace, kind) read path. Name reflects what the
+            index actually covers — an earlier draft mis-named it ix_connection_active
+            even though it has no state predicate.
+        -->
+        <createIndex tableName="connection" indexName="ix_connection_workspace_kind">
             <column name="workspace_id"/>
             <column name="kind"/>
         </createIndex>
@@ -152,6 +160,28 @@
         </sql>
         <rollback>
             <sql>DROP INDEX IF EXISTS uq_connection_pending;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-2b">
+        <preConditions onFail="MARK_RAN" onFailMessage="uq_connection_one_active_scm_per_workspace already present">
+            <not><indexExists indexName="uq_connection_one_active_scm_per_workspace"/></not>
+        </preConditions>
+        <comment>
+            Partial unique over (workspace_id) WHERE state = 'ACTIVE' AND kind IN
+            ('GITHUB','GITLAB') — DB-level enforcement of the "one ACTIVE SCM
+            provider per workspace" invariant. Belt to the @PrePersist suspenders
+            on ConnectionService.findActiveProviderKind: history rows in SUSPENDED
+            / UNINSTALLED state are unaffected, only one live SCM row may exist
+            per workspace at a time.
+        </comment>
+        <sql>
+            CREATE UNIQUE INDEX uq_connection_one_active_scm_per_workspace
+                ON connection (workspace_id)
+                WHERE state = 'ACTIVE' AND kind IN ('GITHUB','GITLAB');
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS uq_connection_one_active_scm_per_workspace;</sql>
         </rollback>
     </changeSet>
 
@@ -183,14 +213,26 @@
                 <constraints nullable="false"/>
             </column>
         </createTable>
-        <addUniqueConstraint tableName="connection_audit"
-                             columnNames="connection_id, event_type, correlation_id"
-                             constraintName="uq_connection_audit_idempotency"/>
+        <!--
+            uq_connection_audit_idempotency: webhook-replay idempotency contract.
+            NULLS NOT DISTINCT (Postgres 15+) closes the replay-with-NULL gap left
+            by the standard UNIQUE contract (server-side admin actions and install
+            events arrive without a correlation_id, and the default treats every
+            NULL as distinct). Implemented as a raw CREATE UNIQUE INDEX rather than
+            addUniqueConstraint because Liquibase has no first-class attribute for
+            NULLS NOT DISTINCT on a UNIQUE constraint.
+        -->
+        <sql>
+            CREATE UNIQUE INDEX uq_connection_audit_idempotency
+                ON connection_audit (connection_id, event_type, correlation_id)
+                NULLS NOT DISTINCT;
+        </sql>
         <createIndex tableName="connection_audit" indexName="ix_connection_audit_lookup">
             <column name="connection_id"/>
             <column name="occurred_at" descending="true"/>
         </createIndex>
         <rollback>
+            <sql>DROP INDEX IF EXISTS uq_connection_audit_idempotency;</sql>
             <dropTable tableName="connection_audit"/>
         </rollback>
     </changeSet>
@@ -225,6 +267,14 @@
                 <constraints nullable="false"/>
             </column>
             <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <!--
+                updated_at: subscription rotations (signing-secret roll, events_subscribed
+                change) need an audit timestamp. NOW() default covers the create path so
+                the column is never NULL.
+            -->
+            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
                 <constraints nullable="false"/>
             </column>
             <column name="last_delivery_at" type="timestamp with time zone"/>
