@@ -1,0 +1,112 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        #1198 — PE-DB schema polish (three small, independent fixes).
+
+        1. connection_audit idempotency hole. Postgres treats NULL as DISTINCT
+           in the standard UNIQUE contract, so the existing
+           `uq_connection_audit_idempotency` over (connection_id, event_type,
+           correlation_id) silently lets webhook replays with no correlation
+           id (e.g. install events, manual admin actions) duplicate.
+           Postgres 15+ supports NULLS NOT DISTINCT — switch the constraint
+           over to it. Dropping and recreating is the only way; ALTER
+           CONSTRAINT cannot change NULLS NOT DISTINCT.
+
+        2. ix_connection_active is misleadingly named. It's an unfiltered
+           (workspace_id, kind) lookup index, NOT a filter on state='ACTIVE'.
+           Rename to ix_connection_workspace_kind.
+
+        3. integration_webhook_subscription has no updated_at column.
+           Subscriptions get rotated (signing-secret rolls, events_subscribed
+           changes), and the audit story for those is currently mute. Add the
+           column with NOW() default.
+
+        Each changeset is independent — onFail="MARK_RAN" preconditions match
+        the rest of the #1198 branch style so re-running against a partially-
+        applied database is forward-only safe.
+    -->
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         1. connection_audit idempotency: NULL-distinct → NULLS NOT DISTINCT.
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779862439264-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="connection_audit not yet present">
+            <tableExists tableName="connection_audit"/>
+        </preConditions>
+        <comment>
+            Recreate uq_connection_audit_idempotency with NULLS NOT DISTINCT so
+            duplicate webhook replays with NULL correlation_id are rejected.
+            DROP IF EXISTS covers both the original constraint form and an
+            already-migrated index form.
+        </comment>
+        <sql>
+            ALTER TABLE connection_audit DROP CONSTRAINT IF EXISTS uq_connection_audit_idempotency;
+            DROP INDEX IF EXISTS uq_connection_audit_idempotency;
+            CREATE UNIQUE INDEX uq_connection_audit_idempotency
+                ON connection_audit (connection_id, event_type, correlation_id)
+                NULLS NOT DISTINCT;
+        </sql>
+        <rollback>
+            <sql>
+                DROP INDEX IF EXISTS uq_connection_audit_idempotency;
+                ALTER TABLE connection_audit
+                    ADD CONSTRAINT uq_connection_audit_idempotency
+                    UNIQUE (connection_id, event_type, correlation_id);
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         2. ix_connection_active → ix_connection_workspace_kind (rename).
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779862439264-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_connection_active not present (already renamed or never created)">
+            <indexExists indexName="ix_connection_active"/>
+        </preConditions>
+        <comment>
+            Rename the misleadingly-named ix_connection_active to
+            ix_connection_workspace_kind. The index is a generic lookup, not
+            state-filtered — the name was a leftover from an earlier design.
+        </comment>
+        <sql>
+            ALTER INDEX ix_connection_active RENAME TO ix_connection_workspace_kind;
+        </sql>
+        <rollback>
+            <sql>ALTER INDEX ix_connection_workspace_kind RENAME TO ix_connection_active;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         3. integration_webhook_subscription.updated_at — audit story.
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779862439264-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="integration_webhook_subscription.updated_at already present">
+            <and>
+                <tableExists tableName="integration_webhook_subscription"/>
+                <not><columnExists tableName="integration_webhook_subscription" columnName="updated_at"/></not>
+            </and>
+        </preConditions>
+        <comment>
+            Add updated_at to integration_webhook_subscription so subscription
+            rotations (secret rolls, event-set changes) leave a timestamp.
+            Default NOW() backfills the existing row baseline.
+        </comment>
+        <addColumn tableName="integration_webhook_subscription">
+            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="integration_webhook_subscription" columnName="updated_at"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

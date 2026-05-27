@@ -153,13 +153,13 @@ erDiagram
 
     ConnectionAudit {
         BIGINT id PK
-        BIGINT connection_id FK,UK "NOT NULL"
-        VARCHAR(48) event_type UK "NOT NULL"
+        BIGINT connection_id FK "NOT NULL"
+        VARCHAR(48) event_type "NOT NULL"
         VARCHAR(32) from_state
         VARCHAR(32) to_state
         VARCHAR(32) actor_kind "NOT NULL"
         VARCHAR(256) actor_ref
-        VARCHAR(64) correlation_id UK
+        VARCHAR(64) correlation_id
         JSONB detail
         TIMESTAMPTZ occurred_at "NOT NULL"
     }
@@ -283,29 +283,6 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
-    HephaestusUser {
-        BIGINT id PK
-        VARCHAR(128) keycloak_subject UK "NOT NULL"
-        VARCHAR(320) email
-        VARCHAR(256) display_name
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at "NOT NULL"
-    }
-
-    IntegrationIdentity {
-        BIGINT id PK
-        BIGINT hephaestus_user_id FK
-        VARCHAR(48) kind UK "NOT NULL"
-        BIGINT integration_instance_id UK "NOT NULL"
-        VARCHAR(256) external_id UK "NOT NULL"
-        VARCHAR(256) external_login
-        VARCHAR(320) external_email
-        VARCHAR(256) display_name
-        JSONB raw_attributes "NOT NULL"
-        TIMESTAMPTZ first_seen_at "NOT NULL"
-        TIMESTAMPTZ linked_at
-    }
-
     IntegrationWebhookSubscription {
         BIGINT id PK
         BIGINT connection_id FK,UK "NOT NULL"
@@ -315,6 +292,7 @@ erDiagram
         JSONB events_subscribed "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ last_delivery_at
+        TIMESTAMPTZ updated_at "NOT NULL"
     }
 
     Issue {
@@ -804,6 +782,7 @@ erDiagram
         VARCHAR(255) type
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+        VARCHAR(128) keycloak_subject
     }
 
     UserAchievement {
@@ -903,7 +882,6 @@ erDiagram
     ChatMessage ||--|| ChatMessageVote : has
     GitCommit ||--|| CommitContributor : has
     Workspace ||--|| Connection : has
-    Connection ||--|| ConnectionAudit : has
     DiscussionComment ||--|| Discussion : references
     GitProvider ||--|| Discussion : references
     Repository ||--|| Discussion : has
@@ -956,6 +934,7 @@ erDiagram
     Workspace ||--o{ ChatThread : has
     User ||--o{ CommitContributor : has
     GitCommit ||--o{ CommitFileChange : has
+    Connection ||--o{ ConnectionAudit : has
     User ||--o{ Discussion : references
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has
@@ -966,7 +945,6 @@ erDiagram
     PracticeFinding ||--o{ FindingFeedback : has
     User ||--o{ GitCommit : authored_by
     User ||--o{ GitCommit : references
-    HephaestusUser ||--o{ IntegrationIdentity : has
     User ||--o{ Issue : authored_by
     IssueType ||--o{ Issue : has
     User ||--o{ Issue : merged_by

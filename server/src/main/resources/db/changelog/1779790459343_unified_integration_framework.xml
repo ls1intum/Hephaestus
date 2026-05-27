@@ -19,20 +19,27 @@
           1.  Connection aggregate + audit + partial-unique for NULL instance_key.
           2.  integration_webhook_subscription per-subscription signing-secret sidecar.
           3.  feedback_post cross-vendor edit-in-place tracking.
-          4.  hephaestus_user + integration_identity cross-integration identity split.
-          5.  agent_job classification columns (integration_kind, subject_class)
+          4.  agent_job classification columns (integration_kind, subject_class)
               + (kind, subject, created_at) index.
-          6.  practice capability gating (required_capabilities, required_aspects,
+          5.  practice capability gating (required_capabilities, required_aspects,
               required_family).
-          7.  slack_channel + slack_message persistence (ToS-compliant, see
+          6.  slack_channel + slack_message persistence (ToS-compliant, see
               SlackMessage javadoc).
-          8.  outline_collection + outline_document persistence.
-          9.  shedlock distributed-lock table (JdbcTemplateLockProvider schema).
-         10.  oauth_state_nonce (with code_verifier PKCE column declared from the
+          7.  outline_collection + outline_document persistence.
+          8.  shedlock distributed-lock table (JdbcTemplateLockProvider schema).
+          9.  oauth_state_nonce (with code_verifier PKCE column declared from the
               start) — single-use nonce + RFC 7636 S256 verifier storage.
-         11.  Unconditional drop of the eleven legacy Workspace columns superseded
+         10.  Unconditional drop of the eleven legacy Workspace columns superseded
               by the Connection registry. account_login is intentionally KEPT —
               40+ join sites depend on it as a denormalised org/group lookup column.
+
+         Note: the hephaestus_user + integration_identity tables that appeared in
+         earlier revisions of this changelog were removed before merge — the
+         Java entities, repositories, and JpaUserDirectory wiring were never
+         consumed in production. See ADR 0011 (now historical) + the
+         "unified-identity-keycloak-as-truth" ADR (0016) for the model we
+         actually ship: SCM User is authoritative, keycloak_subject is the
+         persisted stable join key.
 
         Decision — no data backfill: the branch ships as a clean migration. The
         interim WorkspaceConnectionBackfillChange customChange that moved data
@@ -281,85 +288,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         4. hephaestus_user + integration_identity (cross-integration identity).
-         ─────────────────────────────────────────────────────────────────────── -->
-
-    <changeSet author="hephaestus-1198" id="1779790459343-7">
-        <preConditions onFail="MARK_RAN" onFailMessage="hephaestus_user already present">
-            <not><tableExists tableName="hephaestus_user"/></not>
-        </preConditions>
-        <comment>Cross-integration identity Layer 2 — created on first Keycloak login. Aggregates a real person's vendor identities.</comment>
-        <createTable tableName="hephaestus_user">
-            <column name="id" type="bigserial">
-                <constraints primaryKey="true" primaryKeyName="pk_hephaestus_user" nullable="false"/>
-            </column>
-            <column name="keycloak_subject" type="varchar(128)">
-                <constraints nullable="false" unique="true" uniqueConstraintName="uq_hephaestus_user_kc_subject"/>
-            </column>
-            <column name="email" type="varchar(320)"/>
-            <column name="display_name" type="varchar(256)"/>
-            <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
-                <constraints nullable="false"/>
-            </column>
-            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-        <rollback>
-            <dropTable tableName="hephaestus_user"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-1198" id="1779790459343-8">
-        <preConditions onFail="MARK_RAN" onFailMessage="integration_identity already present">
-            <not><tableExists tableName="integration_identity"/></not>
-        </preConditions>
-        <comment>
-            Cross-integration identity Layer 3 — per-(integration-instance, kind, external_id).
-            For GITHUB/GITLAB the integration_instance is the shared git_provider id (cross-workspace identities);
-            for SLACK/OUTLINE it's the connection_id (per-workspace identity universes).
-        </comment>
-        <createTable tableName="integration_identity">
-            <column name="id" type="bigserial">
-                <constraints primaryKey="true" primaryKeyName="pk_integration_identity" nullable="false"/>
-            </column>
-            <column name="hephaestus_user_id" type="bigint">
-                <constraints referencedTableName="hephaestus_user" referencedColumnNames="id"
-                             foreignKeyName="fk_integration_identity_user"/>
-            </column>
-            <column name="kind" type="varchar(48)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="integration_instance_id" type="bigint">
-                <constraints nullable="false"/>
-            </column>
-            <column name="external_id" type="varchar(256)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="external_login" type="varchar(256)"/>
-            <column name="external_email" type="varchar(320)"/>
-            <column name="display_name" type="varchar(256)"/>
-            <column name="raw_attributes" type="jsonb" defaultValueComputed="'{}'::jsonb">
-                <constraints nullable="false"/>
-            </column>
-            <column name="first_seen_at" type="timestamp with time zone" defaultValueComputed="NOW()">
-                <constraints nullable="false"/>
-            </column>
-            <column name="linked_at" type="timestamp with time zone"/>
-        </createTable>
-        <addUniqueConstraint tableName="integration_identity"
-                             columnNames="kind, integration_instance_id, external_id"
-                             constraintName="uq_integration_identity"/>
-        <createIndex tableName="integration_identity" indexName="ix_integration_identity_user">
-            <column name="hephaestus_user_id"/>
-        </createIndex>
-        <rollback>
-            <dropTable tableName="integration_identity"/>
-        </rollback>
-    </changeSet>
-
-    <!-- ───────────────────────────────────────────────────────────────────────
-         5. agent_job classification columns + index.
+         4. agent_job classification columns + index.
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-9">
@@ -407,7 +336,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         6. practice capability gating (UI surface filter).
+         5. practice capability gating (UI surface filter).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-12">
@@ -475,7 +404,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         7. Slack persistence (channels + messages).
+         6. Slack persistence (channels + messages).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-16">
@@ -579,7 +508,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         8. Outline persistence (collections + documents).
+         7. Outline persistence (collections + documents).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-18">
@@ -671,7 +600,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         9. ShedLock distributed-lock table.
+         8. ShedLock distributed-lock table.
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-20">
@@ -702,7 +631,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         10. OAuth state nonce store (with PKCE code_verifier from the start).
+         9. OAuth state nonce store (with PKCE code_verifier from the start).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-21">
@@ -741,7 +670,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         11. Unconditional drop of legacy Workspace columns superseded by the
+         10. Unconditional drop of legacy Workspace columns superseded by the
              Connection registry. account_login is intentionally KEPT.
 
              Preconditions guard against re-applying against an environment where

@@ -103,10 +103,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "IssueType", // GitHub issue types are workspace-scoped through issue
         "GitProvider", // Global provider instances (e.g., github.com, gitlab.com)
         "ModelPricing", // Vendor list prices per LLM model — not tenant-scoped
-        "WorkerTokenDenylist", // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
-        // Unified integration framework — three-layer identity model
-        "HephaestusUser", // Layer 2 — cross-workspace per real person
-        "IntegrationIdentity" // Layer 3 — scoped by (kind, integration_instance_id, external_id); cross-workspace for SCM
+        "WorkerTokenDenylist" // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
     );
 
     // ========================================================================

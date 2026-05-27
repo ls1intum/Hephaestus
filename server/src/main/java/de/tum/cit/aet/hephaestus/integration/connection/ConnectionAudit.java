@@ -11,7 +11,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -25,15 +24,20 @@ import org.springframework.lang.Nullable;
  * idempotency: a redelivered SUSPEND with the same {@code X-GitHub-Delivery} does
  * NOT cause a state flap — the conflicting INSERT is caught by the unique index
  * and the caller short-circuits.
+ *
+ * <p><b>Uniqueness contract:</b> {@code uq_connection_audit_idempotency} over
+ * (connection_id, event_type, correlation_id) is declared in Liquibase as a
+ * partial unique index with {@code NULLS NOT DISTINCT} (Postgres 15+). The
+ * NULLS-NOT-DISTINCT semantics close a real bug: webhook replays without a
+ * correlation id (manual admin events, some install lifecycle events) would
+ * otherwise duplicate under the default NULLS-DISTINCT contract. A JPA
+ * {@code @UniqueConstraint} cannot express NULLS NOT DISTINCT, so the
+ * contract lives in the migration ({@code 1779862439264_pe_audit_schema_polish.xml})
+ * and is intentionally NOT mirrored as a {@code @Table.uniqueConstraints}
+ * annotation here — see ADR 0016 plus the PE-DB pass on #1198.
  */
 @Entity
-@Table(
-    name = "connection_audit",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uq_connection_audit_idempotency",
-        columnNames = { "connection_id", "event_type", "correlation_id" }
-    )
-)
+@Table(name = "connection_audit")
 public class ConnectionAudit {
 
     @Id

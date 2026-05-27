@@ -1,8 +1,10 @@
 # ADR 0011: `integration_identity` is OAuth-fed, not sync-fed (today)
 
-**Status:** Accepted (with follow-up commitment)
+**Status:** Superseded by [ADR 0016](0016-unified-identity-keycloak-as-truth.md) (2026-05-27)
 **Date:** 2026-05-25
 **Authors:** Live-run audit (#1198 pass 13)
+
+> **2026-05-27 supersede — three-layer identity model deleted.** The principal-engineer cleanup pass on #1198 (PE-DB + PE-IDM) confirmed the audit conclusion this ADR carries forward (`hephaestus_user`/`integration_identity` empty in every environment, zero callers, Stage B never landed) and acted on it: the entire `integration.identity` package — `HephaestusUser`, `IntegrationIdentity`, `JpaUserDirectory`, the two repositories, the `UserDirectory` SPI — was deleted, and the Liquibase create steps were removed from the unmerged `1779790459343_unified_integration_framework.xml` changelog. The auth model we actually ship is documented in [ADR 0016](0016-unified-identity-keycloak-as-truth.md): SCM `User` is the authoritative person row, Keycloak `sub` is persisted on `User.keycloak_subject` as the stable join key. This ADR remains in the tree as the historical record of the "we tried, we deferred, then we deleted" arc.
 
 > **2026-05-26 amendment — AC#6 dropped from #1198.** The pre-workspace bind
 > surface (`github_installation_unbound` table + `GithubInstallationBindingService`

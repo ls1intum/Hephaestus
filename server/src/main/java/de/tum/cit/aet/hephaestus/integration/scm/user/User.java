@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewcomment.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.repository.collaborator.RepositoryCollaborator;
 import de.tum.cit.aet.hephaestus.integration.scm.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.team.membership.TeamMembership;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -73,6 +74,25 @@ public class User extends BaseGitServiceEntity {
     private String name;
 
     private String email;
+
+    /**
+     * Keycloak {@code sub} claim — the stable IdP-side identifier for the real person.
+     *
+     * <p>Populated on first authenticated upsert (see
+     * {@link AuthenticatedGitProviderUserService}); nullable for synced rows that
+     * never authenticate (bots, organizations, and contributors observed only via
+     * webhooks). The unique constraint is a partial index defined in Liquibase —
+     * it covers only non-null rows so the many never-authenticated users keep
+     * coexisting with no collision.
+     *
+     * <p>Lookup of the authenticated user today still goes via {@code login}
+     * (see {@code WorkspaceContextFilter} / {@code SecurityUtils}); this field
+     * exists so a follow-up PR can flip the lookup to {@code keycloak_subject}
+     * without a backfill window. ADR 0016 captures the rationale.
+     */
+    @Nullable
+    @Column(name = "keycloak_subject", length = 128)
+    private String keycloakSubject;
 
     @NonNull
     private String htmlUrl;
