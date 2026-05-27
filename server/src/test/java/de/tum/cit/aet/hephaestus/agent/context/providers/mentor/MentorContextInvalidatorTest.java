@@ -21,7 +21,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -36,7 +35,6 @@ import org.springframework.cache.CacheManager;
  * annotation is metadata for the runtime — invoking the method directly tests the
  * business logic).
  */
-@DisplayName("MentorContextInvalidator")
 @MockitoSettings(strictness = Strictness.LENIENT)
 class MentorContextInvalidatorTest extends BaseUnitTest {
 
@@ -66,7 +64,6 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PR update evicts per-user caches for author")
     void prUpdateEvictsAuthor() {
         when(workspaceRepository.findWorkspaceIdByRepositoryId(eq(42L))).thenReturn(Optional.of(7L));
 
@@ -78,7 +75,6 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PR update with mergedBy evicts BOTH author and merger when distinct")
     void prUpdateEvictsMerger() {
         when(workspaceRepository.findWorkspaceIdByRepositoryId(eq(42L))).thenReturn(Optional.of(7L));
 
@@ -89,7 +85,6 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PR update is a no-op when workspace can't be resolved")
     void prUpdateUnknownWorkspace() {
         when(workspaceRepository.findWorkspaceIdByRepositoryId(eq(42L))).thenReturn(Optional.empty());
 
@@ -99,7 +94,6 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Issue update evicts per-user caches for author")
     void issueUpdateEvictsAuthor() {
         when(workspaceRepository.findWorkspaceIdByRepositoryId(eq(42L))).thenReturn(Optional.of(7L));
 

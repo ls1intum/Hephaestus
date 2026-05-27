@@ -26,7 +26,6 @@ import org.mockito.ArgumentCaptor;
  * we can verify NAK delay math, poison ACK threshold, and counter increments without a
  * live JetStream connection.
  */
-@DisplayName("IntegrationPoisonHandler NAK / poison policy")
 class IntegrationPoisonHandlerTest extends BaseUnitTest {
 
     private MeterRegistry meterRegistry;
@@ -46,11 +45,9 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("nakWithBackoff")
     class NakWithBackoff {
 
         @Test
-        @DisplayName("invokes msg.nakWithDelay with exponential backoff on first failure")
         void firstFailureNAKsWithBaseDelay() {
             Message msg = githubMessage(1L, "github.acme.foo.issues");
 
@@ -82,7 +79,6 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("increments NAK counter tagged with the message kind")
         void nakIncrementsKindTaggedCounter() {
             Message gh = githubMessage(1L, "github.acme.foo.issues");
             Message gl = githubMessage(1L, "gitlab.group.proj.push");
@@ -99,7 +95,6 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("falls back to immediate nak() when nakWithDelay throws")
         void fallsBackToImmediateNakWhenDelayThrows() {
             Message msg = githubMessage(1L, "github.acme.foo.issues");
             doThrow(new IllegalStateException("connection closed")).when(msg).nakWithDelay(any());
@@ -111,7 +106,6 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("ignores null message")
         void nullMessageIsTolerated() {
             // No exception, no counter increment — keeps the consumer's error path
             // null-safe so an upstream NPE doesn't get rethrown out of the NAK handler.
@@ -133,7 +127,6 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("nakWithBackoff at threshold ACKs the message rather than NAKing")
         void thresholdHitAcksAsPoison() {
             Message msg = githubMessage(10L, "github.acme.foo.issues");
 
@@ -148,7 +141,6 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("explicit ackPoison logs and increments counter even from caller")
         void explicitAckPoisonIncrementsCounter() {
             Message msg = githubMessage(7L, "github.acme.foo.issues");
 
@@ -161,7 +153,6 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("unknown subject prefix tags counter as 'unknown'")
         void unknownPrefixGetsUnknownTag() {
             Message msg = githubMessage(10L, "bitbucket.foo.bar.event");
 

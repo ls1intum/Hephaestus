@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 /** Per-kind capability declaration for Slack. */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackManifest implements IntegrationManifest {
 
     @Override

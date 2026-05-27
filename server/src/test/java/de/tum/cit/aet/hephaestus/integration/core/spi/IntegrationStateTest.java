@@ -3,10 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("IntegrationState transition guard")
 class IntegrationStateTest extends BaseUnitTest {
 
     @Test

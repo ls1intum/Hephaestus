@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -33,7 +32,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Issue Comment Message Handler")
 class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -129,15 +127,12 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("repository.issue_comment");
     }
 
     @Test
-    @DisplayName("Should create comment on created event")
     void shouldCreateCommentOnCreatedEvent() throws Exception {
-        // Given
         GitHubIssueCommentEventDTO event = loadPayload("issue_comment.created");
 
         // Create the issue that the comment belongs to
@@ -146,10 +141,8 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         // Verify comment doesn't exist initially
         assertThat(commentRepository.findByNativeIdAndProviderId(event.comment().id(), gitProvider.getId())).isEmpty();
 
-        // When
         handler.handleEvent(event);
 
-        // Then
         assertThat(commentRepository.findByNativeIdAndProviderId(event.comment().id(), gitProvider.getId()))
             .isPresent()
             .get()
@@ -161,7 +154,6 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should update comment on edited event")
     void shouldUpdateCommentOnEditedEvent() throws Exception {
         // Given - first create the comment
         GitHubIssueCommentEventDTO createEvent = loadPayload("issue_comment.created");
@@ -171,10 +163,8 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         // Load edited event
         GitHubIssueCommentEventDTO editEvent = loadPayload("issue_comment.edited");
 
-        // When
         handler.handleEvent(editEvent);
 
-        // Then
         assertThat(commentRepository.findByNativeIdAndProviderId(editEvent.comment().id(), gitProvider.getId()))
             .isPresent()
             .get()
@@ -184,7 +174,6 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should delete comment on deleted event")
     void shouldDeleteCommentOnDeletedEvent() throws Exception {
         // Given - first create the comment
         GitHubIssueCommentEventDTO createEvent = loadPayload("issue_comment.created");
@@ -199,10 +188,8 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         // Load deleted event
         GitHubIssueCommentEventDTO deleteEvent = loadPayload("issue_comment.deleted");
 
-        // When
         handler.handleEvent(deleteEvent);
 
-        // Then
         assertThat(
             commentRepository.findByNativeIdAndProviderId(deleteEvent.comment().id(), gitProvider.getId())
         ).isEmpty();

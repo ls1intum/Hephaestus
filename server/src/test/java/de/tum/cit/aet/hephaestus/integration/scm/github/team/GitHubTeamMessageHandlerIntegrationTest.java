@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -31,7 +30,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Team Message Handler")
 class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -109,24 +107,19 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("organization.team");
     }
 
     @Test
-    @DisplayName("Should create team on created event")
     void shouldCreateTeamOnCreatedEvent() throws Exception {
-        // Given
         GitHubTeamEventDTO event = loadPayload("team.org.created");
 
         // Verify team doesn't exist initially
         assertThat(teamRepository.findByNativeIdAndProviderId(event.team().id(), gitProvider.getId())).isEmpty();
 
-        // When
         handler.handleEvent(event);
 
-        // Then
         assertThat(teamRepository.findByNativeIdAndProviderId(event.team().id(), gitProvider.getId()))
             .isPresent()
             .get()
@@ -138,7 +131,6 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should update team on edited event")
     void shouldUpdateTeamOnEditedEvent() throws Exception {
         // Given - first create the team
         GitHubTeamEventDTO createEvent = loadPayload("team.org.created");
@@ -147,10 +139,8 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Load edited event
         GitHubTeamEventDTO editEvent = loadPayload("team.org.edited");
 
-        // When
         handler.handleEvent(editEvent);
 
-        // Then
         assertThat(teamRepository.findByNativeIdAndProviderId(editEvent.team().id(), gitProvider.getId()))
             .isPresent()
             .get()
@@ -161,7 +151,6 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should delete team on deleted event")
     void shouldDeleteTeamOnDeletedEvent() throws Exception {
         // Given - first create the team
         GitHubTeamEventDTO createEvent = loadPayload("team.org.created");
@@ -175,10 +164,8 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Load deleted event
         GitHubTeamEventDTO deleteEvent = loadPayload("team.org.deleted");
 
-        // When
         handler.handleEvent(deleteEvent);
 
-        // Then
         assertThat(teamRepository.findByNativeIdAndProviderId(deleteEvent.team().id(), gitProvider.getId())).isEmpty();
     }
 

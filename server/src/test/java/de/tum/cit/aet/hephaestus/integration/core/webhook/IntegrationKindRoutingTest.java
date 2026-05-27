@@ -4,10 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("IntegrationKindRouting allow-list")
 class IntegrationKindRoutingTest extends BaseUnitTest {
 
     private final IntegrationKindRouting routing = new IntegrationKindRouting();

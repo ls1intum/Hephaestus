@@ -9,13 +9,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
 @Tag("unit")
-@DisplayName("WorkspaceContextHolder Unit Tests")
 class WorkspaceContextHolderTest {
 
     @AfterEach
@@ -25,9 +23,7 @@ class WorkspaceContextHolderTest {
     }
 
     @Test
-    @DisplayName("Should store and retrieve context from ThreadLocal")
     void shouldStoreAndRetrieveContext() {
-        // Arrange
         WorkspaceContext context = new WorkspaceContext(
             1L,
             "test-workspace",
@@ -39,11 +35,9 @@ class WorkspaceContextHolderTest {
             Set.of(WorkspaceRole.OWNER)
         );
 
-        // Act
         WorkspaceContextHolder.setContext(context);
         WorkspaceContext retrieved = WorkspaceContextHolder.getContext();
 
-        // Assert
         assertNotNull(retrieved);
         assertEquals(1L, retrieved.id());
         assertEquals("test-workspace", retrieved.slug());
@@ -54,9 +48,7 @@ class WorkspaceContextHolderTest {
     }
 
     @Test
-    @DisplayName("Should enrich MDC with workspace metadata")
     void shouldEnrichMDC() {
-        // Arrange
         WorkspaceContext context = new WorkspaceContext(
             42L,
             "test-slug",
@@ -68,19 +60,15 @@ class WorkspaceContextHolderTest {
             Set.of()
         );
 
-        // Act
         WorkspaceContextHolder.setContext(context);
 
-        // Assert
         assertEquals("42", MDC.get("workspace_id"));
         assertEquals("test-slug", MDC.get("workspace_slug"));
         assertEquals("999", MDC.get("installation_id"));
     }
 
     @Test
-    @DisplayName("Should clear context and MDC")
     void shouldClearContextAndMDC() {
-        // Arrange
         WorkspaceContext context = new WorkspaceContext(
             1L,
             "test",
@@ -93,10 +81,8 @@ class WorkspaceContextHolderTest {
         );
         WorkspaceContextHolder.setContext(context);
 
-        // Act
         WorkspaceContextHolder.clearContext();
 
-        // Assert
         assertNull(WorkspaceContextHolder.getContext());
         assertNull(MDC.get("workspace_id"));
         assertNull(MDC.get("workspace_slug"));
@@ -104,9 +90,7 @@ class WorkspaceContextHolderTest {
     }
 
     @Test
-    @DisplayName("Should handle null installation ID in MDC")
     void shouldHandleNullInstallationId() {
-        // Arrange
         WorkspaceContext context = new WorkspaceContext(
             1L,
             "test",
@@ -118,19 +102,15 @@ class WorkspaceContextHolderTest {
             Set.of()
         );
 
-        // Act
         WorkspaceContextHolder.setContext(context);
 
-        // Assert
         assertEquals("1", MDC.get("workspace_id"));
         assertEquals("test", MDC.get("workspace_slug"));
         assertNull(MDC.get("installation_id"));
     }
 
     @Test
-    @DisplayName("Should isolate context between threads")
     void shouldIsolateContextBetweenThreads() throws InterruptedException {
-        // Arrange
         WorkspaceContext mainContext = new WorkspaceContext(
             1L,
             "main-workspace",
@@ -179,19 +159,14 @@ class WorkspaceContextHolderTest {
     }
 
     @Test
-    @DisplayName("Should return null when no context is set")
     void shouldReturnNullWhenNoContextSet() {
-        // Act
         WorkspaceContext context = WorkspaceContextHolder.getContext();
 
-        // Assert
         assertNull(context);
     }
 
     @Test
-    @DisplayName("Should handle setting null context")
     void shouldHandleSettingNullContext() {
-        // Arrange
         WorkspaceContext context = new WorkspaceContext(
             1L,
             "test",
@@ -204,10 +179,8 @@ class WorkspaceContextHolderTest {
         );
         WorkspaceContextHolder.setContext(context);
 
-        // Act
         WorkspaceContextHolder.setContext(null);
 
-        // Assert
         assertNull(WorkspaceContextHolder.getContext());
         assertNull(MDC.get("workspace_id"));
         assertNull(MDC.get("workspace_slug"));

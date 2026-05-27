@@ -29,7 +29,6 @@ import org.junit.jupiter.api.Test;
  *
  * @see ArchitectureTestConstants
  */
-@DisplayName("Activity Module Boundaries")
 class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
 
     // ========================================================================
@@ -37,7 +36,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Activity Module Isolation")
     class ActivityModuleIsolationTests {
 
         /**
@@ -48,7 +46,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
          * on leaderboard's service layer.
          */
         @Test
-        @DisplayName("Activity does not depend on leaderboard services")
         void activityDoesNotDependOnLeaderboardServices() {
             ArchRule rule = noClasses()
                 .that()
@@ -72,7 +69,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
          * These are orthogonal concerns.
          */
         @Test
-        @DisplayName("Activity does not depend on mentor module")
         void activityDoesNotDependOnMentor() {
             ArchRule rule = noClasses()
                 .that()
@@ -91,7 +87,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
          * not through direct dependencies.
          */
         @Test
-        @DisplayName("Activity does not depend on notification module")
         void activityDoesNotDependOnNotification() {
             ArchRule rule = noClasses()
                 .that()
@@ -110,7 +105,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
          * not the other way around.
          */
         @Test
-        @DisplayName("Activity does not depend on profile module")
         void activityDoesNotDependOnProfile() {
             ArchRule rule = noClasses()
                 .that()
@@ -126,7 +120,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
          * Activity module should not depend on contributors module.
          */
         @Test
-        @DisplayName("Activity does not depend on contributors module")
         void activityDoesNotDependOnContributors() {
             ArchRule rule = noClasses()
                 .that()
@@ -144,7 +137,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Practices Module Isolation")
     class PracticesModuleTests {
 
         /**
@@ -155,7 +147,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
          * Model/persistence layer should not depend on detection logic.
          */
         @Test
-        @DisplayName("practices.model does not depend on practices.review")
         void practicesModelDoesNotDependOnReview() {
             ArchRule rule = noClasses()
                 .that()
@@ -183,7 +174,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
          * direct dependencies on external services or controllers.
          */
         @Test
-        @DisplayName("Scoring does not depend on controllers")
         void scoringDoesNotDependOnControllers() {
             ArchRule rule = noClasses()
                 .that()
@@ -199,7 +189,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
          * Scoring should not depend on external feature modules.
          */
         @Test
-        @DisplayName("Scoring has minimal external dependencies")
         void scoringHasMinimalExternalDependencies() {
             ArchRule rule = noClasses()
                 .that()
@@ -217,7 +206,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Practices Controller Isolation")
     class PracticesControllerTests {
 
         /**
@@ -226,7 +214,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
          * in the practices module.
          */
         @Test
-        @DisplayName("Practices has dedicated controllers")
         void practicesHasDedicatedController() {
             ArchRule rule = classes()
                 .that()

@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  * to a wrong handler.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackSubjectParser implements SubjectParser {
 
     private static final String PREFIX = "slack.";

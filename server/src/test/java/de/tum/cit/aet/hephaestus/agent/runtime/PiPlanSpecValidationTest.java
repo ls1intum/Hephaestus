@@ -8,12 +8,10 @@ import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeRunnerProfile;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Map;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-@DisplayName("PiPlanSpec validation contract")
 class PiPlanSpecValidationTest extends BaseUnitTest {
 
     private static final PiRunnerProfile PROFILE = new PracticeRunnerProfile();
@@ -43,13 +41,11 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
             ".sessions/abc-123.jsonl", // SESSIONS_DIR_PREFIX
         }
     )
-    @DisplayName("Allowlisted workspace paths are accepted")
     void allowlistedPathsAccepted(String path) {
         assertThatNoException().isThrownBy(() -> specWith(Map.of(path, BYTES)));
     }
 
     @Test
-    @DisplayName("Undeclared workspace paths are rejected with a message naming the path")
     void undeclaredPathRejected() {
         assertThatThrownBy(() -> specWith(Map.of("evil/../etc/passwd", BYTES)))
             .isInstanceOf(IllegalArgumentException.class)
@@ -58,7 +54,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PROXY mode requires jobToken")
     void proxyRequiresToken() {
         assertThatThrownBy(() ->
             new PiPlanSpec(
@@ -80,7 +75,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("API_KEY mode requires credential")
     void apiKeyRequiresCredential() {
         assertThatThrownBy(() ->
             new PiPlanSpec(
@@ -102,7 +96,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("timeoutSeconds must exceed TIMEOUT_BUFFER_SECONDS")
     void timeoutMustExceedBuffer() {
         assertThatThrownBy(() ->
             new PiPlanSpec(

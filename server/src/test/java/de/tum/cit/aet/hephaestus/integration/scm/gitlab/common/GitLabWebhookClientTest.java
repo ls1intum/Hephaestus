@@ -40,7 +40,6 @@ import reactor.core.publisher.Mono;
  * Unit tests for {@link GitLabWebhookClient}.
  */
 @Tag("unit")
-@DisplayName("GitLabWebhookClient")
 class GitLabWebhookClientTest extends BaseUnitTest {
 
     @Mock
@@ -74,11 +73,9 @@ class GitLabWebhookClientTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("lookupGroup")
     class LookupGroup {
 
         @Test
-        @DisplayName("should return group info with numeric ID from GraphQL")
         @SuppressWarnings("unchecked")
         void shouldReturnGroupInfo() {
             HttpGraphQlClient mockGraphQlClient = mock(HttpGraphQlClient.class);
@@ -110,7 +107,6 @@ class GitLabWebhookClientTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw when group not found")
         @SuppressWarnings("unchecked")
         void shouldThrowWhenGroupNotFound() {
             HttpGraphQlClient mockGraphQlClient = mock(HttpGraphQlClient.class);
@@ -130,11 +126,9 @@ class GitLabWebhookClientTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("registerGroupWebhook")
     class RegisterGroupWebhook {
 
         @Test
-        @DisplayName("should register webhook and return info")
         @SuppressWarnings("unchecked")
         void shouldRegisterWebhook() {
             stubTokenService();
@@ -177,11 +171,9 @@ class GitLabWebhookClientTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getGroupWebhook")
     class GetGroupWebhook {
 
         @Test
-        @DisplayName("should return webhook when found")
         @SuppressWarnings("unchecked")
         void shouldReturnWebhookWhenFound() {
             stubTokenService();
@@ -225,11 +217,9 @@ class GitLabWebhookClientTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("listGroupWebhooks")
     class ListGroupWebhooks {
 
         @Test
-        @DisplayName("should return list of webhooks")
         @SuppressWarnings("unchecked")
         void shouldReturnListOfWebhooks() {
             stubTokenService();
@@ -258,7 +248,6 @@ class GitLabWebhookClientTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty list when no webhooks")
         @SuppressWarnings("unchecked")
         void shouldReturnEmptyList() {
             stubTokenService();
@@ -279,11 +268,9 @@ class GitLabWebhookClientTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("deregisterGroupWebhook")
     class DeregisterGroupWebhook {
 
         @Test
-        @DisplayName("should deregister webhook successfully")
         @SuppressWarnings("unchecked")
         void shouldDeregisterWebhook() {
             stubTokenService();
@@ -302,7 +289,6 @@ class GitLabWebhookClientTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should treat 404 as success (already deleted)")
         @SuppressWarnings("unchecked")
         void shouldTreat404AsSuccess() {
             stubTokenService();
@@ -321,7 +307,6 @@ class GitLabWebhookClientTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should rethrow non-404 errors")
         @SuppressWarnings("unchecked")
         void shouldRethrowNon404Errors() {
             stubTokenService();
@@ -342,29 +327,24 @@ class GitLabWebhookClientTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("isPermissionOrNotFoundError")
     class IsPermissionOrNotFoundError {
 
         @Test
-        @DisplayName("should return true for 401")
         void shouldReturnTrueFor401() {
             assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.UNAUTHORIZED)).isTrue();
         }
 
         @Test
-        @DisplayName("should return true for 403")
         void shouldReturnTrueFor403() {
             assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.FORBIDDEN)).isTrue();
         }
 
         @Test
-        @DisplayName("should return true for 404")
         void shouldReturnTrueFor404() {
             assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.NOT_FOUND)).isTrue();
         }
 
         @Test
-        @DisplayName("should return false for 500")
         void shouldReturnFalseFor500() {
             assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.INTERNAL_SERVER_ERROR)).isFalse();
         }

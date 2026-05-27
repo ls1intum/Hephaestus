@@ -24,7 +24,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -46,7 +45,6 @@ import tools.jackson.databind.ObjectMapper;
  * chain calls GitHubUserProcessor.findOrCreate() which uses REQUIRES_NEW propagation.
  * Having @Transactional here would cause connection pool deadlocks.
  */
-@DisplayName("GitHub Discussion Comment Message Handler")
 @Import(GitHubDiscussionCommentMessageHandlerIntegrationTest.TestEventListener.class)
 class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -153,21 +151,17 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
     }
 
     @Test
-    @DisplayName("Should return correct event type")
     void shouldReturnCorrectEventType() {
         assertThat(handler.key().eventType()).isEqualTo("repository.discussion_comment");
     }
 
     @Test
-    @DisplayName("Should create comment on created event")
     void shouldCreateCommentOnCreatedEvent() throws Exception {
-        // Given
         GitHubDiscussionCommentEventDTO event = loadPayload("discussion_comment.created");
 
         // Verify comment doesn't exist initially
         assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId())).isEmpty();
 
-        // When
         handler.handleEvent(event);
 
         // Then - comment should be persisted with correct fields
@@ -195,7 +189,6 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
     }
 
     @Test
-    @DisplayName("Should update comment on edited event")
     void shouldUpdateCommentOnEditedEvent() throws Exception {
         // Given - first create the comment
         GitHubDiscussionCommentEventDTO createEvent = loadPayload("discussion_comment.created");
@@ -205,10 +198,8 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         // Load edited event
         GitHubDiscussionCommentEventDTO editEvent = loadPayload("discussion_comment.edited");
 
-        // When
         handler.handleEvent(editEvent);
 
-        // Then
         assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId()))
             .isPresent()
             .get()
@@ -218,7 +209,6 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
     }
 
     @Test
-    @DisplayName("Should delete comment on deleted event")
     void shouldDeleteCommentOnDeletedEvent() throws Exception {
         // Given - first create the comment
         GitHubDiscussionCommentEventDTO createEvent = loadPayload("discussion_comment.created");
@@ -231,10 +221,8 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         // Load deleted event
         GitHubDiscussionCommentEventDTO deleteEvent = loadPayload("discussion_comment.deleted");
 
-        // When
         handler.handleEvent(deleteEvent);
 
-        // Then
         assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId())).isEmpty();
 
         // Domain event published

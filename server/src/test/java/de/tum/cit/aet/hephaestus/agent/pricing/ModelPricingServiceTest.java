@@ -14,7 +14,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-@DisplayName("ModelPricingService")
 class ModelPricingServiceTest extends BaseUnitTest {
 
     @Mock
@@ -28,14 +27,12 @@ class ModelPricingServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Unknown model → Optional.empty()")
     void unknownModelReturnsEmpty() {
         when(repository.findActive(eq("nope"), any(Instant.class))).thenReturn(Optional.empty());
         assertThat(service.computeCost("nope", 100, 100, 0, 0)).isEmpty();
     }
 
     @Test
-    @DisplayName("Null / blank model → Optional.empty()")
     void blankModelReturnsEmpty() {
         assertThat(service.computeCost(null, 0, 0, 0, 0)).isEmpty();
         assertThat(service.computeCost("", 0, 0, 0, 0)).isEmpty();
@@ -43,7 +40,6 @@ class ModelPricingServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Known model with input + output tokens computes (tokens/1k) × rate")
     void knownModelComputesCost() {
         when(repository.findActive(eq("gpt-4o-mini"), any(Instant.class))).thenReturn(Optional.of(fixture()));
         // 1500 input → 1.5 × 0.000150 = 0.000225
@@ -64,7 +60,6 @@ class ModelPricingServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Cache tokens contribute to the total")
     void cacheTokensAreSummed() {
         when(repository.findActive(eq("claude-3-5-sonnet"), any(Instant.class))).thenReturn(
             Optional.of(claudeFixture())

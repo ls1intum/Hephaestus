@@ -16,11 +16,9 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-@DisplayName("GitDiffOperations JGit operations")
 class GitDiffOperationsJGitTest extends BaseUnitTest {
 
     private final GitDiffOperations ops = new GitDiffOperations();
@@ -59,7 +57,6 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("diff() emits unified diff with hunk headers and added/removed lines")
     void diffProducesUnifiedDiff() {
         String diff = ops.diff(repoDir, baseSha, headSha);
         assertThat(diff).isNotNull().contains("diff --git", "--- a/a.txt", "+++ b/a.txt", "@@ ");
@@ -67,7 +64,6 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("diffStat() emits one ' path | N' line per changed file")
     void diffStatEmitsPerFileLines() {
         String stat = ops.diffStat(repoDir, baseSha, headSha);
         assertThat(stat).isNotNull();
@@ -76,7 +72,6 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("diffStat() encodes renames as 'old => new' so the existing parser extracts the new path")
     void diffStatEncodesRenames() throws GitAPIException, IOException {
         // Start a third commit that introduces a renameable file, then commit a pure rename.
         write("renamed-from.txt", "stable\n");
@@ -100,7 +95,6 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("diffNameOnly() returns one path per line")
     void diffNameOnlyReturnsPaths() {
         String names = ops.diffNameOnly(repoDir, baseSha, headSha);
         assertThat(names).isNotNull();
@@ -108,7 +102,6 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("diffNameOnly() returns only the new path for renames (matches `git diff --name-only`)")
     void diffNameOnlyReturnsNewPathForRenames() throws GitAPIException, IOException {
         write("renamed-from.txt", "stable\n");
         String addSha = commit("add file");
@@ -131,7 +124,6 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("shortLog() emits abbreviated SHA + subject for each commit in range, newest first")
     void shortLogEmitsAbbreviatedShaAndSubject() throws GitAPIException, IOException {
         write("c.txt", "c\n");
         String laterSha = commit("add c");
@@ -146,14 +138,12 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("resolveDiffRange() Strategy 1: origin/source matching headSha returns [origin/target, origin/source]")
     void resolveDiffRangeStrategyOne() {
         String[] range = ops.resolveDiffRange(repoDir, "main", "feature", headSha);
         assertThat(range).isNotNull().containsExactly(baseSha, headSha);
     }
 
     @Test
-    @DisplayName("resolveDiffRange() Strategy 2: merge commit with head as second parent returns [firstParent, head]")
     void resolveDiffRangeStrategyTwoMergeCommit() throws GitAPIException, IOException {
         // Diverge main with a commit, then merge feature into main (no-ff) so a real merge commit
         // exists. Use an unresolvable source-branch name in the call so Strategy 1 is skipped and
@@ -180,7 +170,6 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("resolveDiffRange() Strategy 3: merge-base when branches diverge with no merge commit")
     void resolveDiffRangeStrategyThreeMergeBase() throws GitAPIException, IOException {
         // Diverge main without merging — only the merge-base remains as a candidate.
         git.checkout().setName("main").call();
@@ -194,7 +183,6 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("diff() returns null when a ref does not resolve")
     void diffNullForUnknownRef() {
         ObjectId zero = ObjectId.fromString("0000000000000000000000000000000000000000");
         assertThat(ops.diff(repoDir, zero.getName(), headSha)).isNull();
@@ -202,7 +190,6 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("resolveDiffRange() returns null when headSha is blank")
     void resolveDiffRangeNullForBlankHead() {
         assertThat(ops.resolveDiffRange(repoDir, "main", "feature", "")).isNull();
         assertThat(ops.resolveDiffRange(repoDir, "main", "feature", null)).isNull();

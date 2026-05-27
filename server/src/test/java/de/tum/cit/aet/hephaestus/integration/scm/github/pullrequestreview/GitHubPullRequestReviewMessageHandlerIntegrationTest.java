@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -34,7 +33,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Pull Request Review Message Handler")
 class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -129,15 +127,12 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("repository.pull_request_review");
     }
 
     @Test
-    @DisplayName("Should create review on submitted event")
     void shouldCreateReviewOnSubmittedEvent() throws Exception {
-        // Given
         GitHubPullRequestReviewEventDTO event = loadPayload("pull_request_review.submitted");
 
         // Create the PR that the review belongs to
@@ -146,7 +141,6 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         // Verify review doesn't exist initially (lookup by native ID + provider)
         assertThat(reviewRepository.findByNativeIdAndProviderId(event.review().id(), gitProvider.getId())).isEmpty();
 
-        // When
         handler.handleEvent(event);
 
         // Then (lookup by native ID + provider, since JPA PK is auto-generated)
@@ -161,7 +155,6 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     }
 
     @Test
-    @DisplayName("Should update review on edited event")
     void shouldUpdateReviewOnEditedEvent() throws Exception {
         // Given - first create the review
         GitHubPullRequestReviewEventDTO submitEvent = loadPayload("pull_request_review.submitted");
@@ -171,10 +164,8 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         // Load edited event
         GitHubPullRequestReviewEventDTO editEvent = loadPayload("pull_request_review.edited");
 
-        // When
         handler.handleEvent(editEvent);
 
-        // Then
         assertThat(reviewRepository.findByNativeIdAndProviderId(editEvent.review().id(), gitProvider.getId()))
             .isPresent()
             .get()
@@ -184,7 +175,6 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     }
 
     @Test
-    @DisplayName("Should handle dismissed event")
     void shouldHandleDismissedEvent() throws Exception {
         // Given - load dismissed event first to get the correct review ID
         GitHubPullRequestReviewEventDTO dismissEvent = loadPayload("pull_request_review.dismissed");
@@ -200,7 +190,6 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         existingReview.setDismissed(false);
         reviewRepository.save(existingReview);
 
-        // When
         handler.handleEvent(dismissEvent);
 
         // Then - review should be marked as dismissed

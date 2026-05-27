@@ -31,7 +31,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("PracticeFindingRepository Integration")
 class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -88,11 +87,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("insertIfAbsent")
     class InsertIfAbsentTests {
 
         @Test
-        @DisplayName("inserts new finding and returns 1")
         void insertsNewFinding() {
             UUID id = UUID.randomUUID();
             int result = practiceFindingRepository.insertIfAbsent(
@@ -175,7 +172,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("inserts finding with JSONB evidence")
         void insertsWithEvidence() {
             UUID id = UUID.randomUUID();
             String evidence = "{\"files\":[\"src/Main.java\"],\"diff_lines\":42}";
@@ -208,7 +204,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Workspace purge")
     class WorkspacePurgeTests {
 
         @Test
@@ -241,11 +236,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Workspace isolation")
     class WorkspaceIsolationTests {
 
         @Test
-        @DisplayName("purging workspace A does not affect workspace B findings")
         void purgeDoesNotAffectOtherWorkspace() {
             // Create workspace B with its own practice and finding
             Workspace workspaceB = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("ws-b"));
@@ -313,11 +306,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("CASCADE delete")
     class CascadeDeleteTests {
 
         @Test
-        @DisplayName("deleting a practice cascades only to its own findings")
         void cascadesFromPracticeSelectively() {
             // Create a second practice with its own finding
             Practice otherPractice = new Practice();
@@ -378,11 +369,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("findContributorPracticeSummary")
     class FindContributorPracticeSummaryTests {
 
         @Test
-        @DisplayName("returns empty list for contributor with no findings")
         void returnsEmptyForNoFindings() {
             List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
                 contributor.getId(),
@@ -393,7 +382,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("aggregates verdict counts for a single practice")
         void aggregatesSinglePractice() {
             // Insert 3 NEGATIVE and 1 POSITIVE for the same practice
             insertFinding("sum-1", practice, "NEGATIVE", Instant.parse("2026-03-18T10:00:00Z"));
@@ -426,7 +414,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("groups by practice slug across multiple practices")
         void groupsByPracticeSlug() {
             Practice secondPractice = new Practice();
             secondPractice.setWorkspace(workspace);
@@ -452,7 +439,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("workspace isolation: excludes findings from other workspaces")
         void workspaceIsolation() {
             Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("other-ws"));
             Practice otherPractice = new Practice();
@@ -502,7 +488,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("returns correct MAX(detectedAt) as lastDetectedAt")
         void correctLastDetectedAt() {
             Instant earliest = Instant.parse("2026-03-15T08:00:00Z");
             Instant latest = Instant.parse("2026-03-20T14:30:00Z");
@@ -522,7 +507,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("contributor isolation: excludes findings from other contributors")
         void contributorIsolation() {
             GitProvider provider = gitProviderRepository
                 .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
@@ -583,7 +567,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("target_type enum mapping")
     class TargetTypeTests {
 
         @Test

@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -47,7 +46,6 @@ import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
 @Tag("unit")
-@DisplayName("GitLabCommitMergeRequestLinker")
 class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
 
     private static final Long SCOPE_ID = 7L;
@@ -107,7 +105,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("single-page response links commits to their MRs")
     void singlePage_linksCommitsToMergeRequests() {
         ClientGraphQlResponse page = mockMrsPage(
             List.of(mrNode(101, List.of("sha-a1", "sha-a2"), false, null), mrNode(102, List.of("sha-b1"), false, null)),
@@ -131,7 +128,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("MR with no commits is skipped without calling the repository")
     void mrWithNoCommits_isSkipped() {
         ClientGraphQlResponse page = mockMrsPage(
             List.of(mrNode(55, List.of(), false, null)),
@@ -148,7 +144,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("multi-page outer pagination visits all pages before completing")
     void multiPagePagination_visitsAllPages() {
         ClientGraphQlResponse page1 = mockMrsPage(
             List.of(mrNode(1, List.of("sha-1"), false, null)),
@@ -172,7 +167,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ABORT from response handler records failure and aborts with error")
     void abortAction_recordsFailureAndAbortsWithError() {
         ClientGraphQlResponse invalid = mock(ClientGraphQlResponse.class);
         HttpGraphQlClient client = mockClient();
@@ -190,7 +184,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("RETRY from response handler repeats the request on the same cursor")
     void retryAction_repeatsRequestOnSameCursor() {
         ClientGraphQlResponse transientFailure = mock(ClientGraphQlResponse.class);
         ClientGraphQlResponse good = mockMrsPage(
@@ -216,7 +209,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("pagination loop (same cursor twice) aborts with error")
     void paginationLoop_abortsWithError() {
         ClientGraphQlResponse page1 = mockMrsPage(
             List.of(mrNode(1, List.of("sha-1"), false, null)),
@@ -244,7 +236,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("follow-up pagination fetches remaining commits for MRs with >100 commits")
     void mrWithMoreCommits_followUpPaginationMerges() {
         ClientGraphQlResponse outerPage = mockMrsPage(
             List.of(mrNode(9, List.of("head-1", "head-2"), true, "nested-cursor-1")),
@@ -270,7 +261,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("follow-up pagination ABORT skips the MR (no partial links)")
     void nestedPaginationAbort_skipsMrWithoutPartialLinks() {
         ClientGraphQlResponse outerPage = mockMrsPage(
             List.of(mrNode(11, List.of("head-1"), true, "nested-cursor-1")),
@@ -294,7 +284,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("unexpected exception during execute records failure and aborts with error")
     void unexpectedException_recordsFailureAndAbortsWithError() {
         HttpGraphQlClient client = mockClient();
         HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -310,7 +299,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("harvested (email→login) pairs backfill commit_contributor.user_id after the sweep")
     void harvestedAuthorPairs_backfillCommitContributorUserId() {
         Map<String, Object> commit1 = commitNode("sha-1", "go35kin@mytum.de", "00000000014C41E0");
         Map<String, Object> commit2 = commitNode("sha-2", "go35kin@tum.de", null);
@@ -335,7 +323,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("merged MR with empty primary commits triggers fallback via MergeRequest.commits")
     void shouldFallBackToMergeRequestCommitsWhenLinkRowsEmpty() {
         Map<String, Object> mergedMr = mrNode(500, List.of(), false, null);
         mergedMr.put("state", "merged");
@@ -363,7 +350,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("fallback logs debug and continues when SHAs are not yet in git_commit")
     void shouldSkipMissingCommitShasWhenNotInGitCommit() {
         Map<String, Object> closedMr = mrNode(501, List.of(), false, null);
         closedMr.put("state", "closed");
@@ -386,7 +372,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("open MR with empty primary commits does NOT trigger fallback")
     void shouldNotInvokeFallbackWhenMrIsOpen() {
         Map<String, Object> openMr = mrNode(502, List.of(), false, null);
         openMr.put("state", "opened");
@@ -402,7 +387,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("publishes CommitAuthorsReconciled with GitLab RepositoryRef when commit_author rows are updated")
     void shouldPublishReconciledEventWhenCommitAuthorsUpdated() {
         Map<String, Object> commit = commitNode("sha-1", "dev@example.com", "devlogin");
         Map<String, Object> mr = mrNodeWithCommits(42, List.of(commit));
@@ -437,7 +421,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("does not publish CommitAuthorsReconciled when no commit_author rows are updated")
     void shouldNotPublishWhenNoCommitAuthorsUpdated() {
         Map<String, Object> commit = commitNode("sha-1", "dev@example.com", "devlogin");
         Map<String, Object> mr = mrNodeWithCommits(42, List.of(commit));
@@ -462,7 +445,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("full sweep (null updatedAfter) passes null variable to GraphQL")
     void nullUpdatedAfter_passesNullVariable() {
         ClientGraphQlResponse page = mockMrsPage(List.of(), new GitLabPageInfo(false, null));
         HttpGraphQlClient client = mockClient();

@@ -6,12 +6,10 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("GithubSubjectKeyDeriver four-segment subject + dedup key derivation")
 class GithubSubjectKeyDeriverTest extends BaseUnitTest {
 
     private final GithubSubjectKeyDeriver deriver = new GithubSubjectKeyDeriver();

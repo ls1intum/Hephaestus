@@ -14,7 +14,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Test;
  * mirrors {@code integration.webhook.github.HmacVerifier} bit-for-bit; these tests
  * guard that the SPI-side adapter doesn't drift from it.
  */
-@DisplayName("GithubWebhookSignatureVerifier HMAC + verdict mapping")
 class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
 
     private static final String SECRET = "github-app-shared-secret-32-bytes-long-XYZ";

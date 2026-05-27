@@ -7,7 +7,6 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -16,11 +15,9 @@ import org.junit.jupiter.api.Test;
  * {@link Task}. ArchUnit can't introspect Java 21 sealed-switch bytecode, so this is reflection-based.
  */
 @Tag("architecture")
-@DisplayName("Task sealed hierarchy")
 class TaskSealedHierarchyTest {
 
     @Test
-    @DisplayName("Task permits, @JsonSubTypes and per-permit @JsonTypeName all agree")
     void permitsJsonSubtypesAndJsonTypeNameAgree() {
         assertThat(Task.class.isSealed()).as("Task must remain sealed").isTrue();
 

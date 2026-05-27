@@ -26,7 +26,6 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>If you change a Pi event mapping, change the fixture too. Stub-only shapes (the synthetic
  * {@code pi_error} / {@code turn_watchdog_fired} the runner itself emits) are exercised inline.
  */
-@DisplayName("PiEventToUiChunkTranslator (real Pi shapes)")
 class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
     private static final String FIXTURE_DIR = "agent/mentor/pi-events/";
@@ -52,7 +51,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     // ─── message_start ───────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("message_start with assistant message → Start + StartStep and captures model")
     void messageStart_assistant_emitsStartAndCapturesModel() throws Exception {
         JsonNode event = fixture("message_start_assistant.json");
 
@@ -69,7 +67,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("message_start with non-assistant role → no chunks")
     void messageStart_userMessage_dropped() throws Exception {
         ObjectNode event = mapper.createObjectNode();
         event.put("type", "message_start");
@@ -79,7 +76,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("message_start when orchestrator already markStarted: emits StartStep only (no duplicate Start)")
     void messageStart_afterOrchestratorMarkedStarted_emitsStartStepOnly() throws Exception {
         // Orchestrator pre-emits Start at turn open, then markStarted() to suppress duplicate.
         state.markStarted();
@@ -111,7 +107,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     // ─── message_update (Pi's authoritative shape) ───────────────────────────────────────
 
     @Test
-    @DisplayName("text_delta translates to TextStart + TextDelta and observes usage")
     void delta_type_translatesTo_textDelta_chunk() throws Exception {
         JsonNode event = fixture("message_update_text_delta.json");
 
@@ -130,7 +125,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Subsequent text_delta with same contentIndex reuses the open block id")
     void delta_type_reusesBlockIdAcrossDeltas() throws Exception {
         JsonNode first = fixture("message_update_text_delta.json");
         translator.translate(first, state);
@@ -165,7 +159,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     // ─── message_end (captures final usage but emits no UI chunks) ───────────────────────
 
     @Test
-    @DisplayName("message_end captures the final usage snapshot but emits no chunks")
     void messageEnd_capturesUsage_emitsNothing() throws Exception {
         JsonNode event = fixture("message_end_assistant.json");
 
@@ -182,7 +175,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     // ─── tool_execution_start / end with real camelCase shapes ───────────────────────────
 
     @Test
-    @DisplayName("tool_execution_start (real Pi camelCase) emits ToolInputStart + ToolInputAvailable")
     void tool_call_start_emits_inputAvailable() throws Exception {
         JsonNode event = fixture("tool_execution_start.json");
 
@@ -199,7 +191,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("tool_execution_end with isError:false emits ToolOutputAvailable")
     void tool_call_success_emits_outputAvailable() throws Exception {
         translator.translate(fixture("tool_execution_start.json"), state);
         JsonNode event = fixture("tool_execution_end_success.json");
@@ -212,7 +203,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("tool_execution_end with isError:true emits ToolOutputError carrying the result.content text")
     void tool_call_failure_emits_outputError_withResultText() throws Exception {
         // Start a different call id so name lookup hits.
         ObjectNode start = mapper.createObjectNode();
@@ -232,7 +222,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("tool_execution_end with neither isError nor error → treated as success")
     void tool_call_end_unknownStatus_treatedAsSuccess() throws Exception {
         ObjectNode event = mapper.createObjectNode();
         event.put("type", "tool_execution_end");
@@ -246,7 +235,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     // ─── agent_end (no usage on event itself — harvest from messages[]) ──────────────────
 
     @Test
-    @DisplayName("agent_end has no usage on the event — harvests from messages[].assistant.usage")
     void agentEnd_noEventUsage_harvestsFromMessages() throws Exception {
         JsonNode event = fixture("agent_end_no_usage.json");
 
@@ -261,7 +249,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("agent_end after message_end uses message_end's authoritative usage (not messages[])")
     void agentEnd_prefersMessageEndUsage() throws Exception {
         translator.translate(fixture("message_end_assistant.json"), state);
         // Override the agent_end messages with a wildly different usage to prove we don't trust it.
@@ -283,7 +270,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("agent_end with empty messages[] → Finish with no metadata (cost stays null downstream)")
     void agentEnd_emptyMessages_noMetadata() throws Exception {
         ObjectNode event = mapper.createObjectNode();
         event.put("type", "agent_end");
@@ -295,7 +281,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("agent_end maps Pi stopReason to AI SDK enum (toolUse → TOOL_CALLS, aborted → ERROR)")
     void agentEnd_mapsStopReasonToAiSdkEnum() {
         // Pi StopReason union: stop | length | toolUse | error | aborted (pi-ai/src/types.ts:269)
         // AI SDK union: stop | length | content-filter | tool-calls | error | other (ui-message-chunks.ts)
@@ -316,7 +301,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("agent_end extracts stopReason from the last assistant message in messages[]")
     void agentEnd_extractsStopReasonFromLastAssistant() {
         ObjectNode event = mapper.createObjectNode();
         event.put("type", "agent_end");
@@ -334,7 +318,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     // ─── turn_end + open block closure ───────────────────────────────────────────────────
 
     @Test
-    @DisplayName("turn_end closes both text and reasoning blocks then emits FinishStep")
     void turnEnd_closesAllOpenBlocks() throws Exception {
         translator.translate(fixture("message_update_text_delta.json"), state);
         translator.translate(fixture("message_update_thinking_delta.json"), state);
@@ -347,7 +330,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("tool_execution_start closes any open text block before opening the tool")
     void toolStart_closesOpenText() throws Exception {
         translator.translate(fixture("message_update_text_delta.json"), state);
         List<UIMessageChunk> out = translator.translate(fixture("tool_execution_start.json"), state);
@@ -359,7 +341,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     // ─── link_finding (runner-emitted, camelCase canonical) ──────────────────────────────
 
     @Test
-    @DisplayName("link_finding (camelCase findingId) emits DataFinding")
     void linkFinding_camelCase_emitsDataFinding() throws Exception {
         JsonNode event = fixture("runner_link_finding.json");
 
@@ -372,7 +353,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("link_finding with invalid UUID is dropped")
     void linkFinding_invalidUuid_dropped() throws Exception {
         assertThat(
             translator.translate(mapper.readTree("{\"type\":\"link_finding\",\"findingId\":\"nope\"}"), state)
@@ -382,7 +362,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     // ─── synthetic runner events (snake-case, runner-owned) ──────────────────────────────
 
     @Test
-    @DisplayName("pi_error (synthetic from runner) → Error chunk")
     void piError_emitsError() throws Exception {
         JsonNode event = mapper.readTree("{\"type\":\"pi_error\",\"error\":\"upstream timeout\"}");
         List<UIMessageChunk> out = translator.translate(event, state);
@@ -390,26 +369,22 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("turn_watchdog_fired → Error chunk")
     void watchdogFired_emitsError() throws Exception {
         JsonNode event = mapper.readTree("{\"type\":\"turn_watchdog_fired\",\"threadId\":\"t\"}");
         assertThat(translator.translate(event, state)).hasSize(1).first().isInstanceOf(UIMessageChunk.Error.class);
     }
 
     @Test
-    @DisplayName("runner_ready is dropped (controller observes it separately)")
     void runnerReady_dropped() throws Exception {
         assertThat(translator.translate(mapper.readTree("{\"type\":\"runner_ready\"}"), state)).isEmpty();
     }
 
     @Test
-    @DisplayName("Unknown event type returns empty (forward-compat)")
     void unknownEvent_dropped() throws Exception {
         assertThat(translator.translate(mapper.readTree("{\"type\":\"future_event_we_dont_know\"}"), state)).isEmpty();
     }
 
     @Test
-    @DisplayName("Pi session-level events are explicit no-ops (not silent default-drops)")
     void piSessionLevelEvents_explicitlyDropped() throws Exception {
         // These types are emitted by Pi but produce no UI chunks. Listing them as explicit
         // `case` arms lets the `default` arm WARN on TRULY unknown types — otherwise a new
@@ -436,7 +411,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("pi_error mid-stream closes the open text block before emitting Error (vercel/ai #11700)")
     void piError_closesOpenStreamingBlock() throws Exception {
         // Drive a text-start + delta so an open block exists, then fire pi_error. The AI SDK
         // client reducer crashes on an `error` chunk that follows an unmatched `*-start` — we
@@ -453,7 +427,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("turn_watchdog_fired mid-stream closes the open text block before emitting Error")
     void watchdogFired_closesOpenStreamingBlock() throws Exception {
         JsonNode start = fixture("message_start_assistant.json");
         translator.translate(start, state);
@@ -467,7 +440,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("turn_watchdog_fired surfaces a user-friendly Error string (not the bare type symbol)")
     void turnWatchdogFired_userFriendlyText() throws Exception {
         JsonNode event = mapper.readTree("{\"type\":\"turn_watchdog_fired\",\"threadId\":\"t\"}");
         List<UIMessageChunk> out = translator.translate(event, state);
@@ -478,7 +450,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("decrementStep does not corrupt the step depth below zero (regression)")
     void decrementStep_clampsField() {
         // Pi can emit more turn_end than start-step (e.g. agent_end without a paired turn_end).
         // The field itself must clamp at 0; if it goes negative, the next incrementStep would
@@ -490,7 +461,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("message_end captures stopReason; agent_end uses it as fallback when messages[] omits it")
     void messageEndStopReason_consumedByAgentEnd() throws Exception {
         // message_end carries the authoritative stopReason for the assistant message.
         ObjectNode messageEnd = mapper.createObjectNode();
@@ -511,7 +481,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("text_end / thinking_end close their open blocks so multi-block messages preserve reasoning text")
     void textEndThinkingEnd_closeBlocksFlushesBuffers() throws Exception {
         // Open reasoning block first, append, then end it (multi-block scenario).
         ObjectNode reasoningDelta = mapper.createObjectNode();
@@ -539,7 +508,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Malformed event with no type returns empty list")
     void malformedEvent_dropped() {
         assertThat(translator.translate(mapper.createObjectNode().put("noType", true), state)).isEmpty();
     }
@@ -547,7 +515,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     // ─── parts accumulation ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("State accumulates step-start + one text part with concatenated deltas")
     void stateAccumulatesPartsAcrossDeltas() throws Exception {
         translator.translate(fixture("message_start_assistant.json"), state);
         translator.translate(fixture("message_update_text_delta.json"), state);
@@ -603,7 +570,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Tool start then error mutates the same part; `output` is removed and errorText set")
     void toolPart_errorMutationCleansOutput() throws Exception {
         ObjectNode start = mapper.createObjectNode();
         start.put("type", "tool_execution_start");

@@ -76,11 +76,9 @@ class AchievementServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("checkAndUnlock")
     class CheckAndUnlockTests {
 
         @Test
-        @DisplayName("skips when user is empty")
         void skipsWhenUserIsEmpty() {
             ActivitySavedEvent event = new ActivitySavedEvent(
                 Optional.empty(),
@@ -111,7 +109,6 @@ class AchievementServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("creates new UserAchievement and increments progress")
         void createsNewProgressRecord() {
             AchievementDefinition def = new AchievementDefinition(
                 "commit.common.1",
@@ -151,7 +148,6 @@ class AchievementServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips already unlocked achievements")
         void skipsAlreadyUnlocked() {
             AchievementDefinition def = new AchievementDefinition(
                 "pr.merged.common.1",
@@ -185,7 +181,6 @@ class AchievementServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("increments existing progress without unlocking")
         void incrementsExistingProgress() {
             AchievementDefinition def = new AchievementDefinition(
                 "pr.merged.rare",
@@ -220,7 +215,6 @@ class AchievementServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("sets unlockedAt to event's occurredAt timestamp")
         void setsUnlockedAtToEventTimestamp() {
             Instant historicalTimestamp = Instant.parse("2024-07-15T14:30:00Z");
             AchievementDefinition def = new AchievementDefinition(
@@ -268,7 +262,6 @@ class AchievementServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Concurrent insert race")
     class ConcurrentInsertTests {
 
         private AchievementDefinition newAchievement() {
@@ -285,7 +278,6 @@ class AchievementServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not throw when concurrent inserts collide on unique constraint")
         void shouldNotThrowWhenConcurrentInsertsCollideOnUniqueConstraint() {
             AchievementDefinition def = newAchievement();
             when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED)).thenReturn(List.of(def));
@@ -320,7 +312,6 @@ class AchievementServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reapply evaluator on winning row when insert loses race")
         void shouldReapplyEvaluatorOnWinningRowWhenInsertLosesRace() {
             AchievementDefinition def = newAchievement();
             when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED)).thenReturn(List.of(def));
@@ -355,7 +346,6 @@ class AchievementServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip reapply when winning row is already unlocked")
         void shouldSkipReapplyWhenWinningRowIsAlreadyUnlocked() {
             AchievementDefinition def = newAchievement();
             when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED)).thenReturn(List.of(def));
@@ -388,11 +378,9 @@ class AchievementServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Dirty-Check Optimization")
     class DirtyCheckTests {
 
         @Test
-        @DisplayName("saves when progress changes even without unlock")
         void savesWhenProgressChanges() {
             AchievementDefinition def = new AchievementDefinition(
                 "pr.merged.rare",

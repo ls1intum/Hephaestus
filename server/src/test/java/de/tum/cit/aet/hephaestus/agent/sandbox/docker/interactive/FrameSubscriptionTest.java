@@ -16,11 +16,9 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.IntNode;
 
-@DisplayName("FrameSubscription")
 class FrameSubscriptionTest extends BaseUnitTest {
 
     @Test
-    @DisplayName("delivers offered frames in order")
     void deliversInOrder() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         Counter dropped = reg.counter("test.drop");
@@ -48,7 +46,6 @@ class FrameSubscriptionTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("slow listener drops oldest beyond bounded queue, counter increments")
     void slowListenerDropsOldest() throws Exception {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         Counter dropped = reg.counter("test.drop");
@@ -121,7 +118,6 @@ class FrameSubscriptionTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("dispose() is idempotent and runs onDispose exactly once")
     void disposeIdempotent() throws Exception {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         AtomicInteger onDisposeFires = new AtomicInteger();
@@ -146,7 +142,6 @@ class FrameSubscriptionTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("offer after dispose is a no-op")
     void offerAfterDisposeNoOp() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         List<Integer> received = new CopyOnWriteArrayList<>();

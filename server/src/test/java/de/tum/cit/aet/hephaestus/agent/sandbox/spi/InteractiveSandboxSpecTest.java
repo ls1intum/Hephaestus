@@ -11,11 +11,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-@DisplayName("InteractiveSandboxSpec")
 class InteractiveSandboxSpecTest extends BaseUnitTest {
 
     private static InteractiveSandboxSpec spec(Map<String, String> env) {
@@ -51,7 +49,6 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
     }
 
     @org.junit.jupiter.api.Test
-    @DisplayName("rejects NUL in env value")
     void rejectsNulInValue() {
         assertThatThrownBy(() -> spec(Map.of("FOO", "a\0b")))
             .isInstanceOf(IllegalArgumentException.class)
@@ -67,7 +64,6 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
     }
 
     @org.junit.jupiter.api.Test
-    @DisplayName("environment map is defensively copied — post-construction mutation does not affect the spec")
     void environmentIsCopied() {
         Map<String, String> env = new HashMap<>();
         env.put("OK_KEY", "good");
@@ -79,7 +75,6 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
     }
 
     @org.junit.jupiter.api.Test
-    @DisplayName("command list is defensively copied — post-construction mutation does not affect the spec")
     void commandIsCopied() {
         List<String> cmd = new ArrayList<>(List.of("node", "/run.mjs"));
         InteractiveSandboxSpec s = new InteractiveSandboxSpec(

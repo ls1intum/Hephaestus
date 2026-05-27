@@ -13,9 +13,9 @@ import org.springframework.stereotype.Component;
  * byte-compares this value, the {@code whsec_*} path interprets a {@code whsec_<b64>}
  * prefix as a Standard Webhooks signing secret and treats anything else as opaque bytes.
  *
- * <p>TODO: per-workspace {@code whsec_*} secrets in {@code GitLabConfig} blobs — requires
- * the per-Connection credential converter and {@code Scope.WORKSPACE} wiring. Until then,
- * multi-tenant Standard Webhooks setups share one cluster-wide signing secret.
+ * <p>Per-workspace {@code whsec_*} secrets would require {@code Scope.WORKSPACE} wiring
+ * plus per-Connection credential storage; for now multi-tenant Standard Webhooks setups
+ * share one cluster-wide signing secret.
  */
 @Component
 public class GitlabWebhookSecretSource implements WebhookSecretSource {

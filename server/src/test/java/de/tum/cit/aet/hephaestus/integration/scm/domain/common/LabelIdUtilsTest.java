@@ -6,18 +6,15 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("LabelIdUtils")
 class LabelIdUtilsTest extends BaseUnitTest {
 
     @Test
-    @DisplayName("generates negative IDs to avoid collision with real provider IDs")
     void shouldGenerateNegativeIds() {
         long id = LabelIdUtils.generateDeterministicId(100L, "bug");
         assertThat(id).isNegative();
     }
 
     @Test
-    @DisplayName("generates consistent IDs for the same input")
     void shouldGenerateConsistentIds() {
         long id1 = LabelIdUtils.generateDeterministicId(42L, "enhancement");
         long id2 = LabelIdUtils.generateDeterministicId(42L, "enhancement");
@@ -25,7 +22,6 @@ class LabelIdUtilsTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("generates different IDs for different label names")
     void shouldGenerateDifferentIdsForDifferentNames() {
         long id1 = LabelIdUtils.generateDeterministicId(42L, "bug");
         long id2 = LabelIdUtils.generateDeterministicId(42L, "enhancement");
@@ -33,7 +29,6 @@ class LabelIdUtilsTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("generates different IDs for different repositories")
     void shouldGenerateDifferentIdsForDifferentRepos() {
         long id1 = LabelIdUtils.generateDeterministicId(1L, "bug");
         long id2 = LabelIdUtils.generateDeterministicId(2L, "bug");

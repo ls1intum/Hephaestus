@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClie
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -26,7 +25,6 @@ import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-@DisplayName("GithubApprovalChannel")
 class GithubApprovalChannelTest extends BaseUnitTest {
 
     @Mock
@@ -43,7 +41,6 @@ class GithubApprovalChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("approve invokes ApprovePullRequest mutation against resolved PR node id")
     void approveInvokesMutation() {
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
@@ -74,7 +71,6 @@ class GithubApprovalChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("approve throws when GitHub rate limit critical")
     void approveThrowsOnRateLimit() {
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
@@ -89,7 +85,6 @@ class GithubApprovalChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("approve throws when mutation returns errors")
     void approveThrowsOnMutationErrors() {
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),

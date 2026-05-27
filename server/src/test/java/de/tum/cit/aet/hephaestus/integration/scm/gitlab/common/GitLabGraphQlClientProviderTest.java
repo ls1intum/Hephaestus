@@ -16,7 +16,6 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -28,7 +27,6 @@ import org.springframework.http.HttpHeaders;
  * Unit tests for {@link GitLabGraphQlClientProvider}.
  */
 @Tag("unit")
-@DisplayName("GitLabGraphQlClientProvider")
 class GitLabGraphQlClientProviderTest extends BaseUnitTest {
 
     @Mock
@@ -51,11 +49,9 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("forScope")
     class ForScope {
 
         @Test
-        @DisplayName("should build client with correct URL and auth header")
         @SuppressWarnings("unchecked")
         void shouldBuildClientWithCorrectUrlAndAuth() {
             when(tokenService.getAccessToken(1L)).thenReturn("glpat-test-token");
@@ -80,7 +76,6 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw when token service fails")
         void shouldThrowWhenTokenServiceFails() {
             when(tokenService.getAccessToken(1L)).thenThrow(new IllegalStateException("Scope 1 is not active"));
 
@@ -89,11 +84,9 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("withToken")
     class WithToken {
 
         @Test
-        @DisplayName("should build client with provided token and URL")
         @SuppressWarnings("unchecked")
         void shouldBuildClientWithProvidedTokenAndUrl() {
             HttpGraphQlClient.Builder<?> mutateBuilder = mock(HttpGraphQlClient.Builder.class);
@@ -111,25 +104,21 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Circuit breaker")
     class CircuitBreakerTests {
 
         @Test
-        @DisplayName("isCircuitClosed returns true when state is CLOSED")
         void isCircuitClosedWhenClosed() {
             when(circuitBreaker.getState()).thenReturn(CircuitBreaker.State.CLOSED);
             assertThat(provider.isCircuitClosed()).isTrue();
         }
 
         @Test
-        @DisplayName("isCircuitClosed returns false when state is OPEN")
         void isCircuitClosedReturnsFalseWhenOpen() {
             when(circuitBreaker.getState()).thenReturn(CircuitBreaker.State.OPEN);
             assertThat(provider.isCircuitClosed()).isFalse();
         }
 
         @Test
-        @DisplayName("acquirePermission throws CircuitBreakerOpenException when open")
         void acquirePermissionThrowsWhenOpen() {
             CallNotPermittedException exception = mock(CallNotPermittedException.class);
 
@@ -140,7 +129,6 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("getCircuitState returns current state")
         void getCircuitStateReturnsCurrent() {
             when(circuitBreaker.getState()).thenReturn(CircuitBreaker.State.HALF_OPEN);
             assertThat(provider.getCircuitState()).isEqualTo(CircuitBreaker.State.HALF_OPEN);
@@ -148,11 +136,9 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Rate limit delegation")
     class RateLimitDelegation {
 
         @Test
-        @DisplayName("updateRateLimit delegates to tracker")
         void updateRateLimitDelegates() {
             HttpHeaders headers = new HttpHeaders();
             provider.updateRateLimit(42L, headers);
@@ -160,7 +146,6 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("isRateLimitCritical delegates to tracker")
         void isRateLimitCriticalDelegates() {
             when(rateLimitTracker.isCritical(42L)).thenReturn(true);
             assertThat(provider.isRateLimitCritical(42L)).isTrue();
@@ -168,7 +153,6 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("waitIfRateLimitLow delegates to tracker")
         void waitIfRateLimitLowDelegates() throws InterruptedException {
             when(rateLimitTracker.waitIfNeeded(42L)).thenReturn(true);
             assertThat(provider.waitIfRateLimitLow(42L)).isTrue();
@@ -176,7 +160,6 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("getRateLimitRemaining delegates to tracker")
         void getRateLimitRemainingDelegates() {
             when(rateLimitTracker.getRemaining(42L)).thenReturn(50);
             assertThat(provider.getRateLimitRemaining(42L)).isEqualTo(50);
@@ -184,7 +167,6 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("getRateLimitResetAt delegates to tracker")
         void getRateLimitResetAtDelegates() {
             Instant resetAt = Instant.parse("2026-02-15T10:30:00Z");
             when(rateLimitTracker.getResetAt(42L)).thenReturn(resetAt);
@@ -193,7 +175,6 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("getRateLimitTracker returns tracker instance")
         void getRateLimitTrackerReturnsInstance() {
             assertThat(provider.getRateLimitTracker()).isSameAs(rateLimitTracker);
         }

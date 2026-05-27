@@ -14,7 +14,6 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -29,7 +28,6 @@ import reactor.core.publisher.Mono;
  * Unit tests for {@link GitLabTokenService}.
  */
 @Tag("unit")
-@DisplayName("GitLabTokenService")
 class GitLabTokenServiceTest extends BaseUnitTest {
 
     @Mock
@@ -58,11 +56,9 @@ class GitLabTokenServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getAccessToken")
     class GetAccessToken {
 
         @Test
-        @DisplayName("should return token for active scope")
         void shouldReturnTokenForActiveScope() {
             when(tokenProvider.isScopeActive(1L)).thenReturn(true);
             when(tokenProvider.getPersonalAccessToken(1L)).thenReturn(Optional.of("glpat-test-token"));
@@ -73,7 +69,6 @@ class GitLabTokenServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw for inactive scope")
         void shouldThrowForInactiveScope() {
             when(tokenProvider.isScopeActive(1L)).thenReturn(false);
 
@@ -83,7 +78,6 @@ class GitLabTokenServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw when no token stored")
         void shouldThrowWhenNoTokenStored() {
             when(tokenProvider.isScopeActive(1L)).thenReturn(true);
             when(tokenProvider.getPersonalAccessToken(1L)).thenReturn(Optional.empty());
@@ -94,7 +88,6 @@ class GitLabTokenServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw when token is blank")
         void shouldThrowWhenTokenIsBlank() {
             when(tokenProvider.isScopeActive(1L)).thenReturn(true);
             when(tokenProvider.getPersonalAccessToken(1L)).thenReturn(Optional.of("  "));
@@ -106,11 +99,9 @@ class GitLabTokenServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("resolveServerUrl")
     class ResolveServerUrl {
 
         @Test
-        @DisplayName("should return custom URL when workspace has one")
         void shouldReturnCustomUrl() {
             when(tokenProvider.getServerUrl(1L)).thenReturn(Optional.of("https://gitlab.example.com"));
 
@@ -118,7 +109,6 @@ class GitLabTokenServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should strip trailing slash from custom URL")
         void shouldStripTrailingSlash() {
             when(tokenProvider.getServerUrl(1L)).thenReturn(Optional.of("https://gitlab.example.com/"));
 
@@ -126,7 +116,6 @@ class GitLabTokenServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return default URL when workspace has no custom URL")
         void shouldReturnDefaultUrl() {
             when(tokenProvider.getServerUrl(1L)).thenReturn(Optional.empty());
 
@@ -134,7 +123,6 @@ class GitLabTokenServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return default URL when workspace URL is blank")
         void shouldReturnDefaultWhenBlank() {
             when(tokenProvider.getServerUrl(1L)).thenReturn(Optional.of("  "));
 
@@ -143,11 +131,9 @@ class GitLabTokenServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("validateToken")
     class ValidateToken {
 
         @Test
-        @DisplayName("should return null when token retrieval fails")
         void shouldReturnNullWhenTokenRetrievalFails() {
             when(tokenProvider.isScopeActive(1L)).thenReturn(false);
 
@@ -155,7 +141,6 @@ class GitLabTokenServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use cache for repeated validation")
         @SuppressWarnings("unchecked")
         void shouldUseCacheForRepeatedValidation() {
             when(tokenProvider.isScopeActive(1L)).thenReturn(true);
@@ -188,11 +173,9 @@ class GitLabTokenServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("isTokenValid")
     class IsTokenValid {
 
         @Test
-        @DisplayName("should return false when scope is inactive")
         void shouldReturnFalseWhenInactive() {
             when(tokenProvider.isScopeActive(1L)).thenReturn(false);
 
@@ -201,11 +184,9 @@ class GitLabTokenServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("invalidateCache")
     class InvalidateCache {
 
         @Test
-        @DisplayName("should invalidate cached validation")
         void shouldInvalidateCachedValidation() {
             // Just verify no exception — cache invalidation is fire-and-forget
             tokenService.invalidateCache(1L);

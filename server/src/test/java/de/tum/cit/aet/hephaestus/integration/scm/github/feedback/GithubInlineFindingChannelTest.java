@@ -17,14 +17,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClie
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-@DisplayName("GithubInlineFindingChannel")
 class GithubInlineFindingChannelTest extends BaseUnitTest {
 
     @Mock
@@ -41,14 +39,12 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("empty findings returns (0, 0)")
     void emptyFindingsReturnsZero() {
         FeedbackTarget target = githubTarget();
         assertThat(channel.postInlineFindings(target, List.of())).isEqualTo(new InlineResult(0, 0));
     }
 
     @Test
-    @DisplayName("posts DiffAnchor findings as single review with correct count")
     void postsDiffAnchorsAsBatch() {
         FeedbackTarget target = githubTarget();
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
@@ -77,7 +73,6 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("rate-limit critical short-circuits and counts all as failed")
     void rateLimitCriticalShortCircuits() {
         FeedbackTarget target = githubTarget();
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(true);

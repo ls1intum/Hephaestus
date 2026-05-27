@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -74,11 +73,9 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("recalculateUserInternal")
     class RecalculateTests {
 
         @Test
-        @DisplayName("wipes progress and replays events")
         void wipesAndReplays() {
             ActivityEvent event1 = createActivityEvent(ActivityEventType.PULL_REQUEST_MERGED);
             ActivityEvent event2 = createActivityEvent(ActivityEventType.COMMIT_CREATED);
@@ -116,7 +113,6 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles empty activity history")
         void handlesEmptyHistory() {
             doAnswer(invocation -> {
                 @SuppressWarnings("unchecked")

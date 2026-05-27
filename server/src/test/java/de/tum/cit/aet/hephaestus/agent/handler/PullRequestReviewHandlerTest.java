@@ -38,7 +38,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -47,7 +46,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("PullRequestReviewHandler")
 class PullRequestReviewHandlerTest extends BaseUnitTest {
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
@@ -168,22 +166,18 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("jobType")
     class JobType {
 
         @Test
-        @DisplayName("returns PULL_REQUEST_REVIEW")
         void returnsPullRequestReview() {
             assertThat(handler.jobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
         }
     }
 
     @Nested
-    @DisplayName("createSubmission")
     class CreateSubmission {
 
         @Test
-        @DisplayName("extracts metadata + idempotency key")
         void extractsMetadata() {
             JobSubmission submission = handler.createSubmission(sampleRequest());
             JsonNode metadata = submission.metadata();
@@ -196,7 +190,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("rejects wrong request type")
         void rejectsWrongRequestType() {
             JobSubmissionRequest wrongType = new JobSubmissionRequest() {};
             assertThatThrownBy(() -> handler.createSubmission(wrongType))
@@ -206,11 +199,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("prepareInputFiles")
     class PrepareInputFiles {
 
         @Test
-        @DisplayName("delegates to WorkspaceContextBuilder with a PracticeReviewRequest")
         void delegatesToWorkspaceContextBuilder() {
             stubDefaults();
             AgentJob job = jobWithMetadata(sampleJobMetadata());
@@ -224,7 +215,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("merges context/target/* files from the builder into the result map")
         void mergesProviderFiles() {
             byte[] metadataBytes = "{\"pr_number\":42}".getBytes(StandardCharsets.UTF_8);
             when(workspaceContextBuilder.build(any(ContextRequest.PracticeReviewRequest.class))).thenReturn(
@@ -238,7 +228,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("writes a valid task.json envelope at the workspace root")
         void writesTaskJsonEnvelope() throws Exception {
             stubDefaults();
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
@@ -255,7 +244,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("injects the practice catalog (.practices/index.json + .practices/all-criteria.md)")
         void injectsPracticeCatalog() {
             stubDefaults();
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
@@ -268,7 +256,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does NOT write a legacy .prompt file (replaced by task.json)")
         void doesNotWriteLegacyPromptFile() {
             stubDefaults();
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
@@ -276,7 +263,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("rejects practices whose slug fails the workspace-ABI pattern (defense-in-depth)")
         void rejectsMalformedSlug() {
             when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(
@@ -289,7 +275,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws JobPreparationException when no active practices for the workspace")
         void throwsWhenNoActivePractices() {
             when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of());
@@ -300,7 +285,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws JobPreparationException when metadata is missing")
         void throwsWhenMetadataMissing() {
             var job = new AgentJob();
             job.setMetadata(null);
@@ -310,7 +294,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("preserves provider-file order (LinkedHashMap)")
         void preservesProviderOrder() {
             var providerFiles = new LinkedHashMap<String, byte[]>();
             providerFiles.put("context/target/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
@@ -330,11 +313,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("filterByDiffScope")
     class FilterByDiffScope {
 
         @Test
-        @DisplayName("keeps finding whose evidence path is in diff")
         void keepsFindingInDiff() {
             var finding = finding("fatal-error-crash", Verdict.NEGATIVE, "Sources/View.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
@@ -342,7 +323,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("keeps finding backed by internal context/target/metadata.json (whitelisted)")
         void keepsFindingBackedByMetadata() {
             var finding = finding("mr-description-quality", Verdict.NEGATIVE, "context/target/metadata.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
@@ -350,7 +330,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("filters finding backed only by non-whitelisted internal context")
         void filtersFindingBackedByNonWhitelistedInternal() {
             var finding = finding("review-noise", Verdict.NEGATIVE, "context/target/comments.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
@@ -358,7 +337,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("filters finding pointing only outside the diff")
         void filtersFindingOutsideDiff() {
             var finding = finding("view-logic-separation", Verdict.NEGATIVE, "Sources/Other.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
@@ -386,11 +364,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("parseDiffNameOnlyPaths")
     class ParseDiffNameOnlyPaths {
 
         @Test
-        @DisplayName("extracts simple file paths")
         void simplePaths() {
             String output = "src/Main.swift\nViews/ContentView.swift\nREADME.md\n";
             assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths(output)).containsExactlyInAnyOrder(
@@ -401,7 +377,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty for blank input")
         void blankInput() {
             assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths("")).isEmpty();
             assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths("  \n  ")).isEmpty();
@@ -409,7 +384,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("deliver")
     class Deliver {
 
         private AgentJob jobWithOutput(String rawOutputJson) {
@@ -422,7 +396,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("delegates to delivery service with parsed findings")
         @SuppressWarnings("unchecked")
         void delegatesToDeliveryService() {
             String rawOutput = """
@@ -446,7 +419,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws when output has no valid findings")
         void throwsWhenNoValidFindings() {
             AgentJob job = jobWithOutput("{\"findings\":[]}");
             assertThatThrownBy(() -> handler.deliver(job))

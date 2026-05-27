@@ -16,7 +16,6 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
  * @see SlackProperties
  */
 @Tag("unit")
-@DisplayName("SlackProperties Configuration Binding")
 class SlackPropertiesTest {
 
     @EnableConfigurationProperties(SlackProperties.class)
@@ -30,7 +29,6 @@ class SlackPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Valid Configuration")
     class ValidConfiguration {
 
         @Test
@@ -52,7 +50,6 @@ class SlackPropertiesTest {
         }
 
         @Test
-        @DisplayName("should report not configured when token is missing")
         void missingToken_notConfigured() {
             contextRunner()
                 .withPropertyValues("hephaestus.slack.signing-secret=signing123")
@@ -63,7 +60,6 @@ class SlackPropertiesTest {
         }
 
         @Test
-        @DisplayName("should report not configured when signing secret is missing")
         void missingSigningSecret_notConfigured() {
             contextRunner()
                 .withPropertyValues("hephaestus.slack.token=xoxb-test-token")
@@ -74,7 +70,6 @@ class SlackPropertiesTest {
         }
 
         @Test
-        @DisplayName("should report not configured when token is blank")
         void blankToken_notConfigured() {
             contextRunner()
                 .withPropertyValues("hephaestus.slack.token=   ", "hephaestus.slack.signing-secret=signing123")
@@ -85,7 +80,6 @@ class SlackPropertiesTest {
         }
 
         @Test
-        @DisplayName("should allow empty config for disabled Slack integration")
         void emptyConfig_allowed() {
             contextRunner().run(context -> {
                 assertThat(context).hasNotFailed();

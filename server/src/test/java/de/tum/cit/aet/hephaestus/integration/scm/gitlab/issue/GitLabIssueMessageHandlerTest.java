@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Tag("unit")
-@DisplayName("GitLabIssueMessageHandler")
 class GitLabIssueMessageHandlerTest extends BaseUnitTest {
 
     private static final String PROJECT_PATH = "hephaestustest/demo-repository";
@@ -73,7 +71,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("registers under the unified key gitlab:issue")
     void key_returnsIssue() {
         assertThat(handler.key().eventType()).isEqualTo("issue");
     }
@@ -83,11 +80,9 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Action routing")
     class ActionRouting {
 
         @Test
-        @DisplayName("open action routes to process()")
         void openAction_routesToProcess() throws IOException {
             GitLabIssueEventDTO event = createEvent("open", "opened", false);
             setupRepository();
@@ -101,7 +96,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("update action routes to process()")
         void updateAction_routesToProcess() throws IOException {
             GitLabIssueEventDTO event = createEvent("update", "closed", false);
             setupRepository();
@@ -113,7 +107,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("close action routes to processClosed()")
         void closeAction_routesToProcessClosed() throws IOException {
             GitLabIssueEventDTO event = createEvent("close", "closed", false);
             setupRepository();
@@ -126,7 +119,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("reopen action routes to processReopened()")
         void reopenAction_routesToProcessReopened() throws IOException {
             GitLabIssueEventDTO event = createEvent("reopen", "opened", false);
             setupRepository();
@@ -139,7 +131,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("unknown action skips processing")
         void unknownAction_skipsProcessing() throws IOException {
             GitLabIssueEventDTO event = createEvent("unknown_action", "opened", false);
             setupRepository();
@@ -158,11 +149,9 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Confidential issues")
     class ConfidentialIssues {
 
         @Test
-        @DisplayName("confidential issue event is skipped")
         void confidentialIssue_skipsProcessing() throws IOException {
             GitLabIssueEventDTO event = createEvent("open", "opened", true);
 
@@ -174,7 +163,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("confidential_issue event_type is skipped")
         void confidentialIssueEventType_skipsProcessing() throws IOException {
             var attrs = new GitLabIssueEventDTO.ObjectAttributes(
                 422297L,
@@ -214,11 +202,9 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Payload validation")
     class PayloadValidation {
 
         @Test
-        @DisplayName("missing object_attributes skips processing")
         void missingObjectAttributes_skipsProcessing() throws IOException {
             GitLabIssueEventDTO event = new GitLabIssueEventDTO(
                 "issue",
@@ -237,7 +223,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("missing project skips processing")
         void missingProject_skipsProcessing() throws IOException {
             var attrs = new GitLabIssueEventDTO.ObjectAttributes(
                 422296L,
@@ -272,7 +257,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("non-issue subject is rejected by base class")
         void nonIssueSubject_rejected() throws IOException {
             Message msg = mock(Message.class);
             when(msg.getSubject()).thenReturn("gitlab.org.proj.merge_request");
@@ -289,11 +273,9 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Context resolution")
     class ContextResolution {
 
         @Test
-        @DisplayName("skips when context resolver returns null (filtered or not found)")
         void contextResolverReturnsNull_skipsProcessing() throws IOException {
             when(contextResolver.resolve(eq(PROJECT_PATH), any(), any())).thenReturn(null);
             GitLabIssueEventDTO event = createEvent("open", "opened", false);

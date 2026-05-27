@@ -27,7 +27,7 @@ import tools.jackson.databind.JsonNode;
  * messages.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
 
     private static final String HEADER_REQUEST_ID = "X-Slack-Request-Id";

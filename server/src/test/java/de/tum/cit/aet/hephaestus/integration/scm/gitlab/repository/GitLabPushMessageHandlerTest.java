@@ -46,7 +46,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Tag("unit")
-@DisplayName("GitLabPushMessageHandler")
 class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
     private static final Long PROVIDER_ID = 2L;
@@ -147,13 +146,11 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("registers under the unified key gitlab:push")
     void key_returnsPush() {
         assertThat(handler.key().eventType()).isEqualTo("push");
     }
 
     @Test
-    @DisplayName("valid push event upserts project")
     void validPushEvent_upsertsProject() throws IOException {
         var projectInfo = new GitLabPushEventDTO.ProjectInfo(
             246765L,
@@ -198,7 +195,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("branch deletion skips processing")
     void branchDeletion_skipsProcessing() throws IOException {
         var projectInfo = new GitLabPushEventDTO.ProjectInfo(
             1L,
@@ -229,7 +225,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("push event with null project skips processing")
     void nullProject_skipsProcessing() throws IOException {
         var pushEvent = new GitLabPushEventDTO(
             "push",
@@ -250,7 +245,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("processor returning null logs warning")
     void processorReturnsNull_logsWarning() throws IOException {
         var projectInfo = new GitLabPushEventDTO.ProjectInfo(
             1L,
@@ -285,7 +279,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("batched commit→MR linker runs once per push when scope resolves")
     void batchedLinker_runsOncePerPush() throws IOException {
         var projectInfo = createProjectInfo(42L, "org/proj");
         Repository repo = new Repository();
@@ -314,7 +307,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("non-push subject is rejected by base class")
     void nonPushSubject_rejected() throws IOException {
         Message msg = mock(Message.class);
         when(msg.getSubject()).thenReturn("gitlab.org.proj.merge_request");
@@ -330,11 +322,9 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Organization linking")
     class OrganizationLinking {
 
         @Test
-        @DisplayName("skips linking when org already set")
         void skipsWhenOrgAlreadySet() throws IOException {
             Organization existingOrg = new Organization();
             existingOrg.setId(1L);
@@ -354,7 +344,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("links org from DB lookup")
         void linksOrgFromDbLookup() throws IOException {
             Repository repo = new Repository();
             repo.setId(1L);
@@ -376,7 +365,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips linking when org not yet in DB (deferred to full sync)")
         void skipsLinkingWhenOrgNotInDb() throws IOException {
             Repository repo = new Repository();
             repo.setId(1L);
@@ -396,7 +384,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles nested group paths correctly")
         void handlesNestedGroupPaths() throws IOException {
             Repository repo = new Repository();
             repo.setId(1L);
@@ -419,7 +406,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips org linking for user-owned project (no group)")
         void skipsForUserOwnedProject() throws IOException {
             Repository repo = new Repository();
             repo.setId(1L);
@@ -440,11 +426,9 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("extractGroupPath")
     class ExtractGroupPath {
 
         @Test
-        @DisplayName("simple org/project")
         void simpleOrgProject() {
             assertThat(GitLabPushMessageHandler.extractGroupPath("org/project")).isEqualTo("org");
         }
@@ -456,31 +440,26 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("deeply nested")
         void deeplyNested() {
             assertThat(GitLabPushMessageHandler.extractGroupPath("a/b/c/d/project")).isEqualTo("a/b/c/d");
         }
 
         @Test
-        @DisplayName("no slash returns null")
         void noSlash() {
             assertThat(GitLabPushMessageHandler.extractGroupPath("project")).isNull();
         }
 
         @Test
-        @DisplayName("null returns null")
         void nullInput() {
             assertThat(GitLabPushMessageHandler.extractGroupPath(null)).isNull();
         }
 
         @Test
-        @DisplayName("blank returns null")
         void blankInput() {
             assertThat(GitLabPushMessageHandler.extractGroupPath("  ")).isNull();
         }
 
         @Test
-        @DisplayName("leading slash returns null")
         void leadingSlash() {
             assertThat(GitLabPushMessageHandler.extractGroupPath("/project")).isNull();
         }

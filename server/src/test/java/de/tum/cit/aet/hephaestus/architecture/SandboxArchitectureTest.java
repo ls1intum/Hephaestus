@@ -11,20 +11,16 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /** Architecture tests for the sandbox module boundaries. */
-@DisplayName("Sandbox Architecture")
 class SandboxArchitectureTest extends HephaestusArchitectureTest {
 
     @Nested
-    @DisplayName("SPI isolation")
     class SpiIsolation {
 
         @Test
-        @DisplayName("SPI package should not depend on docker-java")
         void spiShouldNotDependOnDockerJava() {
             noClasses()
                 .that()
@@ -37,7 +33,6 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("SPI package should not depend on Spring")
         void spiShouldNotDependOnSpring() {
             noClasses()
                 .that()
@@ -50,7 +45,6 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("SPI package should not depend on Docker implementation")
         void spiShouldNotDependOnDockerImpl() {
             noClasses()
                 .that()
@@ -64,11 +58,9 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Nested
-    @DisplayName("Docker implementation isolation")
     class DockerIsolation {
 
         @Test
-        @DisplayName("Docker implementation should not be imported outside sandbox package")
         void dockerImplNotImportedOutside() {
             noClasses()
                 .that()
@@ -81,7 +73,6 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("DockerClient should only be used in docker subpackage")
         void dockerClientOnlyInDockerPackage() {
             noClasses()
                 .that()
@@ -99,11 +90,9 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
      * actually catch violations.
      */
     @Nested
-    @DisplayName("Interactive sandbox isolation")
     class InteractiveIsolation {
 
         @Test
-        @DisplayName("agent.mentor.** must not invoke SandboxManager.execute (use InteractiveSandboxService instead)")
         void mentorMustNotInvokeSandboxManagerExecute() {
             noClasses()
                 .that()
@@ -118,7 +107,6 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("agent.practice.** must not invoke InteractiveSandboxService.attach (use SandboxManager instead)")
         void practiceMustNotInvokeInteractiveAttach() {
             noClasses()
                 .that()
@@ -131,7 +119,6 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
 
         /** Guards against ArchUnit #324: callMethod silently passes when the parameter signature mismatches. */
         @Test
-        @DisplayName("[positive fixture] mentor-must-not-call-execute rule actually catches violators")
         void mentorPositiveFixtureCatchesViolation() {
             JavaClasses fixtureClasses = importTestFixture("de.tum.cit.aet.hephaestus.agent.mentor");
 
@@ -147,7 +134,6 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("[positive fixture] practice-must-not-call-attach rule actually catches violators")
         void practicePositiveFixtureCatchesViolation() {
             JavaClasses fixtureClasses = importTestFixture("de.tum.cit.aet.hephaestus.agent.practice");
 

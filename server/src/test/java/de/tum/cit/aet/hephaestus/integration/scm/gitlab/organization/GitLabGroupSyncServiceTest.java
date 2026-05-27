@@ -30,7 +30,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -41,7 +40,6 @@ import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
 @Tag("unit")
-@DisplayName("GitLabGroupSyncService")
 class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
     private static final Long TEST_PROVIDER_ID = 100L;
@@ -95,11 +93,9 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("syncGroup")
     class SyncGroup {
 
         @Test
-        @DisplayName("null group path returns empty")
         void nullGroupPath_returnsEmpty() {
             Optional<Organization> result = service.syncGroup(1L, null, null);
             assertThat(result).isEmpty();
@@ -107,7 +103,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("blank group path returns empty")
         void blankGroupPath_returnsEmpty() {
             Optional<Organization> result = service.syncGroup(1L, "   ", null);
             assertThat(result).isEmpty();
@@ -115,7 +110,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("successful sync returns organization")
         void successfulSync_returnsOrganization() {
             Organization org = new Organization();
             org.setId(42L);
@@ -144,7 +138,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("group not found returns empty")
         void groupNotFound_returnsEmpty() {
             mockGraphQlGroupResponse(null);
 
@@ -154,7 +147,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("invalid GraphQL response returns empty and records failure")
         void invalidResponse_returnsEmptyAndRecordsFailure() {
             HttpGraphQlClient client = mockClient();
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
@@ -175,7 +167,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("exception returns empty and records failure")
         void exception_returnsEmptyAndRecordsFailure() {
             when(graphQlClientProvider.forScope(1L)).thenThrow(new RuntimeException("connection error"));
 
@@ -187,7 +178,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("syncGroupProjects")
     class SyncGroupProjects {
 
         private Organization org;
@@ -199,7 +189,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null group path returns aborted result")
         void nullGroupPath_returnsAborted() {
             GitLabSyncResult result = service.syncGroupProjects(1L, null, null);
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
@@ -208,7 +197,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("blank group path returns aborted result")
         void blankGroupPath_returnsAborted() {
             GitLabSyncResult result = service.syncGroupProjects(1L, "   ", null);
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
@@ -217,7 +205,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null group on first page aborts sync")
         void nullGroupOnFirstPage_abortsSyncWithEmptyList() {
             ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
             when(resp.isValid()).thenReturn(true);
@@ -243,7 +230,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("empty group returns completed with empty list")
         void emptyGroup_returnsCompleted() {
             ClientGraphQlResponse projectsResp = mockProjectsPageWithGroup(List.of(), null);
 
@@ -259,7 +245,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("single page with projects returns all repositories")
         void singlePage_returnsAllProjects() {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
             var proj2 = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
@@ -287,7 +272,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("multi-page pagination fetches all pages")
         void multiPage_fetchesAllPages() {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
             var proj2 = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
@@ -316,7 +300,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null processor result is counted as skipped")
         void nullProcessorResult_countedAsSkipped() {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
             var proj2 = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
@@ -340,7 +323,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processor exception counts as skipped, does not abort sync")
         void processorException_countedAsSkipped() {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
             var proj2 = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
@@ -367,7 +349,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null nodes from GitLab timeouts produce COMPLETED_WITH_ERRORS")
         void nullNodes_countedAsRedacted_producesErrors() {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
 
@@ -397,7 +378,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("subgroup project uses its own group, not top-level")
         void subgroupProject_usesOwnGroup() {
             var subGroupResponse = new GitLabGroupResponse(
                 "gid://gitlab/Group/99",
@@ -451,7 +431,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("invalid first page response returns empty synced list")
         void invalidFirstPage_returnsEmptyList() {
             HttpGraphQlClient client = mockClient();
             ClientGraphQlResponse invalidResp = mock(ClientGraphQlResponse.class);
@@ -479,7 +458,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         // -- Reconciliation Tests (GitLab #33419 workaround) --
 
         @Test
-        @DisplayName("reconciliation recovers direct projects dropped by includeSubgroups bug")
         void reconciliation_recoversDroppedDirectProjects() {
             // Subgroup query returns only proj-a (simulates bug dropping proj-b)
             var projA = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
@@ -509,7 +487,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("no reconciliation needed when all projects present in subgroup query")
         void noReconciliationNeeded_whenAllProjectsPresent() {
             var projA = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
             var projB = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
@@ -537,7 +514,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("subgroup query succeeds but reconciliation fails gracefully")
         void subgroupSucceeds_reconciliationFails_preservesSubgroupResults() {
             var projA = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
 
@@ -570,7 +546,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("reconciliation waits for rate limit reset then proceeds")
         void reconciliationWaitsForRateLimit_thenProceeds() throws InterruptedException {
             var projA = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
             var projB = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
@@ -604,7 +579,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("extreme bug: all projects only in direct query")
         void allProjectsOnlyInDirect_extremeBugManifestation() {
             var projA = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
             var projB = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
@@ -632,7 +606,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("reconciliation skipped when primary sync had API failure")
         void reconciliationSkipped_whenPrimarySyncHadApiFailure() {
             HttpGraphQlClient client = mockClient();
             ClientGraphQlResponse invalidResp = mock(ClientGraphQlResponse.class);

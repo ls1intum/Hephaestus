@@ -54,7 +54,6 @@ import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
 
 @Tag("unit")
-@DisplayName("GitLabMergeRequestProcessor")
 class GitLabMergeRequestProcessorTest extends BaseUnitTest {
 
     private static final long REPO_ID = 1L;
@@ -185,11 +184,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("State mapping")
     class StateMapping {
 
         @Test
-        @DisplayName("opened state maps to OPEN")
         void mapState_opened() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -237,7 +234,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("closed state maps to CLOSED")
         void mapState_closed() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -285,7 +281,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("merged state maps to MERGED")
         void mapState_merged() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -333,7 +328,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null state defaults to OPEN")
         void mapState_null() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -381,7 +375,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("unknown state defaults to OPEN")
         void mapState_unknown() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -429,7 +422,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("locked state maps to CLOSED")
         void mapState_locked() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -482,11 +474,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Webhook event processing")
     class WebhookProcessing {
 
         @Test
-        @DisplayName("process() creates new PR and publishes PullRequestCreated")
         void processCreatesNewPR() {
             PullRequest pr = createPullRequestEntity();
             // 1st: stale check + isNew (process) -> empty (new PR)
@@ -511,7 +501,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("process() updates existing PR and publishes no PullRequestCreated")
         void processUpdatesExistingPR() {
             PullRequest pr = createPullRequestEntity();
             // 2 calls: stale check + isNew (process), post-upsert fetch (upsertMergeRequest)
@@ -532,7 +521,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("process() updates existing PR and publishes PullRequestUpdated")
         void processUpdatesExistingPRPublishesPullRequestUpdated() {
             PullRequest pr = createPullRequestEntity();
             // 2 calls: stale check + isNew (process), post-upsert fetch (upsertMergeRequest)
@@ -559,7 +547,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processClosed() sets state to CLOSED and publishes PullRequestClosed(wasMerged=false)")
         void processClosedPublishesEvent() {
             PullRequest pr = createPullRequestEntity();
             // 2 calls: stale+isNew check (process), post-upsert fetch (upsertMergeRequest)
@@ -587,7 +574,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processReopened() sets state to OPEN and publishes PullRequestReopened")
         void processReopenedPublishesEvent() {
             PullRequest pr = createPullRequestEntity();
             pr.setState(Issue.State.CLOSED);
@@ -652,7 +638,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processApproved() creates PullRequestReview with state APPROVED and publishes ReviewSubmitted")
         void processApprovedCreatesReview() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -699,7 +684,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processUnapproved() dismisses review and publishes ReviewDismissed")
         void processUnapprovedDismissesReview() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -753,7 +737,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processApproved() is idempotent — skips save if review already exists")
         void processApprovedIdempotent() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -788,7 +771,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processUnapproved() with no existing review does nothing")
         void processUnapprovedNoExistingReview() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -828,7 +810,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processMerged() resolves mergeUser when mergeUserId matches event user")
         void processMergedResolvesMergeUser() {
             PullRequest pr = createPullRequestEntity();
             // 2 calls: stale+isNew check (process), post-upsert fetch (upsertMergeRequest)
@@ -914,7 +895,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processApproved() with null user skips approval creation")
         void processApprovedNullUserSkips() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -968,7 +948,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processUnapproved() is idempotent when review is already DISMISSED")
         void processUnapproved_alreadyDismissed_isIdempotent() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -1011,7 +990,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processApproved() re-approval from CHANGES_REQUESTED updates to APPROVED")
         void processApproved_reApproval_fromChangesRequested_updatesToApproved() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -1063,7 +1041,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processRequestedChangesFromNote() updates existing APPROVED review to CHANGES_REQUESTED")
         void processRequestedChangesFromNote_updatesExistingApproval() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -1089,7 +1066,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processRequestedChangesFromNote() is idempotent when already CHANGES_REQUESTED")
         void processRequestedChangesFromNote_idempotent() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -1111,7 +1087,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processRequestedChangesFromNote() skips when no existing review (prevents false positives)")
         void processRequestedChangesFromNote_noExistingReview_skips() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -1131,7 +1106,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processRequestedChangesFromNote() skips when reviewer nativeId is null")
         void processRequestedChangesFromNote_nullNativeId_skips() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -1145,7 +1119,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("process() with missing id and iid skips processing")
         void processMissingIdSkips() {
             var attrs = new GitLabMergeRequestEventDTO.ObjectAttributes(
                 null,
@@ -1185,7 +1158,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("process() returns existing entity for stale webhook (allows lifecycle events)")
         void processSkipsStaleWebhookUpdate() {
             // The staleness check returns the existing entity without calling upsertCore.
             // This allows callers (processClosed, processMerged, etc.) to still publish
@@ -1248,11 +1220,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("GraphQL sync processing")
     class SyncProcessing {
 
         @Test
-        @DisplayName("processFromSync() creates PR from GraphQL sync data")
         void processFromSyncCreatesPR() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -1306,7 +1276,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() publishes PullRequestCreated for new PR")
         void processFromSyncPublishesCreatedEvent() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -1323,7 +1292,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() publishes PullRequestUpdated for existing PR")
         void processFromSyncPublishesUpdatedForExisting() {
             PullRequest pr = createPullRequestEntity();
             // PR already exists
@@ -1351,7 +1319,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() links milestone when milestoneIid is provided")
         void processFromSyncLinksMilestone() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -1451,7 +1418,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() passes null milestoneId when milestone not found")
         void processFromSyncMilestoneNotFound() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -1548,7 +1514,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() skips milestone lookup when milestoneIid is null")
         void processFromSyncNullMilestoneIid() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -1562,7 +1527,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() with invalid globalId skips processing")
         void processFromSyncInvalidGlobalId() {
             var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
                 "invalid-id",
@@ -1615,7 +1579,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() with invalid iid skips processing")
         void processFromSyncInvalidIid() {
             var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
                 "gid://gitlab/MergeRequest/999555",
@@ -1668,7 +1631,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() reconciles approvals: adds missing and removes stale")
         void processFromSyncReconcileApprovals() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -1793,11 +1755,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Confidential filtering")
     class ConfidentialFiltering {
 
         @Test
-        @DisplayName("process() skips confidential merge request")
         void processSkipsConfidential() {
             GitLabMergeRequestEventDTO event = createConfidentialEvent("open", "opened");
             ProcessingContext ctx = createContext();
@@ -1848,53 +1808,44 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Detailed merge status mapping")
     class DetailedMergeStatusMapping {
 
         @Test
-        @DisplayName("mergeable maps to CLEAN")
         void mergeableMapsToClean() {
             assertMergeStatusMapping("mergeable", "CLEAN");
         }
 
         @Test
-        @DisplayName("conflict maps to DIRTY")
         void conflictMapsToDirty() {
             assertMergeStatusMapping("conflict", "DIRTY");
         }
 
         @Test
-        @DisplayName("need_rebase maps to DIRTY")
         void needRebaseMapsToDirty() {
             assertMergeStatusMapping("need_rebase", "DIRTY");
         }
 
         @Test
-        @DisplayName("ci_must_pass maps to UNSTABLE")
         void ciMustPassMapsToUnstable() {
             assertMergeStatusMapping("ci_must_pass", "UNSTABLE");
         }
 
         @Test
-        @DisplayName("not_approved maps to BLOCKED")
         void notApprovedMapsToBlocked() {
             assertMergeStatusMapping("not_approved", "BLOCKED");
         }
 
         @Test
-        @DisplayName("checking maps to UNKNOWN")
         void checkingMapsToUnknown() {
             assertMergeStatusMapping("checking", "UNKNOWN");
         }
 
         @Test
-        @DisplayName("unknown status defaults to UNKNOWN")
         void unknownDefaultsToUnknown() {
             assertMergeStatusMapping("some_future_status", "UNKNOWN");
         }
 
         @Test
-        @DisplayName("null status maps to null")
         void nullMapsToNull() {
             assertMergeStatusMapping(null, null);
         }
@@ -1998,11 +1949,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Approval review ID generation")
     class ApprovalReviewIdGeneration {
 
         @Test
-        @DisplayName("generates unique IDs for different (mr, user) pairs")
         void uniqueIdsForDifferentPairs() {
             long id1 = GitLabMergeRequestProcessor.generateApprovalNativeId(100, 200);
             long id2 = GitLabMergeRequestProcessor.generateApprovalNativeId(100, 201);
@@ -2016,7 +1965,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("deterministic: same inputs produce same output")
         void deterministicOutput() {
             long id1 = GitLabMergeRequestProcessor.generateApprovalNativeId(999555, 12345);
             long id2 = GitLabMergeRequestProcessor.generateApprovalNativeId(999555, 12345);
@@ -2024,7 +1972,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("result is always positive even for max 32-bit MR ID (sign bit cleared)")
         void alwaysPositiveForMax32BitMrId() {
             long maxSafe = (1L << 32) - 1; // 4294967295
             long id = GitLabMergeRequestProcessor.generateApprovalNativeId(maxSafe, 1);
@@ -2033,7 +1980,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("result is positive for max 32-bit user ID with small MR ID")
         void positiveForMax32BitUserId() {
             long maxUser = (1L << 32) - 1; // 4294967295
             long id = GitLabMergeRequestProcessor.generateApprovalNativeId(1, maxUser);

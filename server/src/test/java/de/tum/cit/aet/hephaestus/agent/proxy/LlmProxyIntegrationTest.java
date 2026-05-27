@@ -24,7 +24,6 @@ import mockwebserver3.RecordedRequest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +32,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("LLM proxy integration")
 class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static MockWebServer mockUpstream;
@@ -110,11 +108,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Security isolation")
     class SecurityIsolation {
 
         @Test
-        @DisplayName("should reject request without any auth")
         void shouldRejectNoAuth() {
             webTestClient
                 .post()
@@ -126,7 +122,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should reject JWT token on internal endpoints")
         @WithAdminUser
         void shouldRejectJwtOnInternalEndpoints() {
             webTestClient
@@ -140,7 +135,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should reject expired/non-RUNNING job token")
         void shouldRejectNonRunningJobToken() {
             AgentConfig config = new AgentConfig();
             config.setWorkspace(workspace);
@@ -167,7 +161,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should reject QUEUED job token (not yet RUNNING)")
         void shouldRejectQueuedJobToken() {
             AgentConfig config = new AgentConfig();
             config.setWorkspace(workspace);
@@ -194,7 +187,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should reject FAILED job token")
         void shouldRejectFailedJobToken() {
             AgentConfig config = new AgentConfig();
             config.setWorkspace(workspace);
@@ -221,7 +213,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should reject fabricated token not in database")
         void shouldRejectFabricatedToken() {
             String fakeToken = "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY";
 
@@ -236,7 +227,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should reject empty x-api-key header")
         void shouldRejectEmptyApiKeyHeader() {
             webTestClient
                 .post()
@@ -249,7 +239,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should reject malformed token (non-Base64-URL characters)")
         void shouldRejectMalformedToken() {
             webTestClient
                 .post()
@@ -263,7 +252,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Proxy forwarding with mock upstream")
     class ProxyForwarding {
 
         @BeforeEach
@@ -272,7 +260,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should forward Anthropic request with real API key and correct path")
         void shouldForwardAnthropicWithRealApiKey() throws Exception {
             mockUpstream.enqueue(
                 new MockResponse.Builder()
@@ -309,7 +296,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should forward OpenAI request with Bearer auth and correct path")
         void shouldForwardOpenAIWithBearerAuth() throws Exception {
             mockUpstream.enqueue(
                 new MockResponse.Builder()
@@ -345,7 +331,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should authenticate via api-key header (Azure-style) for OpenAI endpoint")
         void shouldAuthenticateViaApiKeyForAzure() throws Exception {
             mockUpstream.enqueue(
                 new MockResponse.Builder()
@@ -375,7 +360,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should support GET method (for model listing)")
         void shouldSupportGetMethod() throws Exception {
             mockUpstream.enqueue(
                 new MockResponse.Builder()
@@ -405,7 +389,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should return 404 for unknown provider")
         void shouldReturn404ForUnknownProvider() {
             AgentJob job = createRunningJobWithApiKey("sk-test-key");
 
@@ -420,7 +403,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should stream SSE responses end-to-end")
         void shouldStreamSseResponse() throws Exception {
             String ssePayload = "data: {\"id\":\"msg_stream\"}\n\ndata: [DONE]\n\n";
             mockUpstream.enqueue(
@@ -455,7 +437,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should forward query parameters to upstream")
         void shouldForwardQueryParameters() throws Exception {
             mockUpstream.enqueue(
                 new MockResponse.Builder()
@@ -482,7 +463,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should forward upstream error status codes transparently")
         void shouldForwardUpstreamErrors() throws Exception {
             mockUpstream.enqueue(new MockResponse.Builder().code(429).body("{\"error\":\"rate_limited\"}").build());
 
@@ -503,7 +483,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Input validation")
     class InputValidation {
 
         @BeforeEach
@@ -512,7 +491,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should reject path traversal attempts without forwarding upstream")
         void shouldRejectPathTraversal() {
             int requestsBefore = mockUpstream.getRequestCount();
 
@@ -541,11 +519,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Job token hash integrity")
     class TokenHashIntegrity {
 
         @Test
-        @DisplayName("should generate and persist job_token_hash on save")
         void shouldPersistTokenHash() {
             AgentJob job = createRunningJobWithApiKey("sk-test");
 
@@ -556,7 +532,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should look up job by token hash")
         void shouldLookUpByTokenHash() {
             AgentJob job = createRunningJobWithApiKey("sk-test");
 
@@ -567,7 +542,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("should not find job with wrong status via hash lookup")
         void shouldNotFindJobWithWrongStatus() {
             AgentJob job = createRunningJobWithApiKey("sk-test");
 
@@ -577,7 +551,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("job token should be unique across jobs")
         void jobTokenShouldBeUnique() {
             AgentJob job1 = createRunningJobWithApiKey("sk-test-1");
             AgentJob job2 = createRunningJobWithApiKey("sk-test-2");
@@ -587,7 +560,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("job token should be 43 chars (256-bit Base64-URL no padding)")
         void jobTokenShouldBe43Chars() {
             AgentJob job = createRunningJobWithApiKey("sk-test");
 
@@ -596,7 +568,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("computeTokenHash should be deterministic")
         void computeTokenHashShouldBeDeterministic() {
             String token = "test-token-abc";
             String hash1 = AgentJob.computeTokenHash(token);
@@ -609,11 +580,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Cross-chain security — LLM proxy endpoints vs main API")
     class CrossChainSecurity {
 
         @Test
-        @DisplayName("job token should not grant access to main API endpoints")
         @WithAdminUser
         void jobTokenShouldNotAccessMainApi() {
             AgentJob job = createRunningJobWithApiKey("sk-test");

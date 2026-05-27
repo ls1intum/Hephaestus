@@ -135,7 +135,6 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Event Type ====================
 
     @Test
-    @DisplayName("returns NOTE as event type")
     void returnsCorrectEventType() {
         assertThat(handler.key().eventType()).isEqualTo("note");
     }
@@ -143,11 +142,9 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Issue Notes ====================
 
     @Nested
-    @DisplayName("Issue Notes")
     class IssueNotes {
 
         @Test
-        @DisplayName("creates comment from issue note create event")
         void shouldCreateCommentFromIssueNote() throws Exception {
             handler.handleEvent(loadPayload("note.issue.create"));
 
@@ -169,7 +166,6 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("updates comment body on issue note update event")
         void shouldUpdateCommentOnIssueNoteUpdate() throws Exception {
             handler.handleEvent(loadPayload("note.issue.create"));
             eventListener.clear();
@@ -192,11 +188,9 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== MR Notes ====================
 
     @Nested
-    @DisplayName("Merge Request Notes")
     class MergeRequestNotes {
 
         @Test
-        @DisplayName("creates comment from MR general note")
         void shouldCreateCommentFromMrNote() throws Exception {
             handler.handleEvent(loadPayload("note.mergerequest.create"));
 
@@ -214,7 +208,6 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("updates comment body on MR note update event")
         void shouldUpdateCommentFromMrNoteUpdate() throws Exception {
             handler.handleEvent(loadPayload("note.mergerequest.create"));
             eventListener.clear();
@@ -237,11 +230,9 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== System Notes ====================
 
     @Nested
-    @DisplayName("System Notes")
     class SystemNotes {
 
         @Test
-        @DisplayName("skips system-generated note")
         void shouldSkipSystemNote() throws Exception {
             handler.handleEvent(loadPayload("note.system"));
 
@@ -253,11 +244,9 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Confidential Notes ====================
 
     @Nested
-    @DisplayName("Confidential Notes")
     class ConfidentialNotes {
 
         @Test
-        @DisplayName("skips confidential/internal note")
         void shouldSkipConfidentialNote() throws Exception {
             handler.handleEvent(loadPayload("note.confidential.issue.create"));
 
@@ -269,11 +258,9 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Edge Cases ====================
 
     @Nested
-    @DisplayName("Edge Cases")
     class EdgeCases {
 
         @Test
-        @DisplayName("handles missing repository gracefully")
         void shouldHandleMissingRepositoryGracefully() throws Exception {
             repositoryRepository.deleteAll();
 
@@ -294,7 +281,6 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("creates stub issue when parent missing")
         void shouldCreateStubIssueWhenParentMissing() throws Exception {
             // Delete the pre-created issue
             commentRepository.deleteAll();
@@ -316,7 +302,6 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("commit note is skipped")
         void shouldSkipCommitNote() throws Exception {
             handler.handleEvent(loadPayload("note.commit.create"));
 

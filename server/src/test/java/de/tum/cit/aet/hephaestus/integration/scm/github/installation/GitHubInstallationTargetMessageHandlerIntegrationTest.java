@@ -18,7 +18,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -29,7 +28,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Installation Target Message Handler")
 class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -94,19 +92,16 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("installation.installation_target");
     }
 
     @Test
-    @DisplayName("Should handle renamed event")
     void shouldHandleRenamedEvent() throws Exception {
         // Given - use installation_target.json which has action: "renamed"
         GitHubInstallationTargetEventDTO event = loadPayload("installation_target");
         setupTestWorkspace(event.installation().id(), "OldName");
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error
@@ -114,13 +109,11 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     }
 
     @Test
-    @DisplayName("Should handle renamed event for user account")
     void shouldHandleRenamedEventForUser() throws Exception {
         // Given - use installation_target_user.json for user account rename
         GitHubInstallationTargetEventDTO event = loadPayload("installation_target_user");
         setupTestWorkspace(event.installation().id(), "SoloMaintainer");
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error
@@ -129,7 +122,6 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     }
 
     @Test
-    @DisplayName("Should handle null account gracefully")
     void shouldHandleNullAccountGracefully() {
         // Given - event with null account
         GitHubInstallationTargetEventDTO event = new GitHubInstallationTargetEventDTO(
@@ -147,7 +139,6 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     }
 
     @Test
-    @DisplayName("Should handle unknown action gracefully")
     void shouldHandleUnknownActionGracefully() throws Exception {
         // Given - load a valid event and create with unknown action
         GitHubInstallationTargetEventDTO baseEvent = loadPayload("installation_target");

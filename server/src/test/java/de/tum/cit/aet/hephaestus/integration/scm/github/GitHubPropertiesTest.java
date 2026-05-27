@@ -18,7 +18,6 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
  * @see GitHubProperties
  */
 @Tag("unit")
-@DisplayName("GitHubProperties Configuration Binding")
 class GitHubPropertiesTest {
 
     @EnableConfigurationProperties(GitHubProperties.class)
@@ -32,7 +31,6 @@ class GitHubPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Valid Configuration")
     class ValidConfiguration {
 
         @Test
@@ -79,7 +77,6 @@ class GitHubPropertiesTest {
         }
 
         @Test
-        @DisplayName("should allow null private key for PAT mode")
         void nullPrivateKey_allowed() {
             contextRunner()
                 .withPropertyValues("hephaestus.github.app.id=0")
@@ -93,12 +90,10 @@ class GitHubPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Validation")
     class Validation {
 
         @ParameterizedTest
         @ValueSource(longs = { 0, 1, 12345, 999999999 })
-        @DisplayName("should accept non-negative app ID values")
         void validAppId_passes(long appId) {
             contextRunner()
                 .withPropertyValues("hephaestus.github.app.id=" + appId)
@@ -107,7 +102,6 @@ class GitHubPropertiesTest {
 
         @ParameterizedTest
         @ValueSource(longs = { -1, -100, -999999 })
-        @DisplayName("should fail when app ID is negative")
         void negativeAppId_validationFails(long appId) {
             contextRunner()
                 .withPropertyValues("hephaestus.github.app.id=" + appId)
@@ -116,11 +110,9 @@ class GitHubPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Nested Record Defaults")
     class NestedRecordDefaults {
 
         @Test
-        @DisplayName("should provide non-null nested app record when not configured")
         void nestedApp_neverNull() {
             contextRunner().run(context -> {
                 GitHubProperties props = context.getBean(GitHubProperties.class);
@@ -129,7 +121,6 @@ class GitHubPropertiesTest {
         }
 
         @Test
-        @DisplayName("should provide non-null nested meta record when not configured")
         void nestedMeta_neverNull() {
             contextRunner().run(context -> {
                 GitHubProperties props = context.getBean(GitHubProperties.class);

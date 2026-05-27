@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Tag("unit")
-@DisplayName("GitLabMergeRequestMessageHandler")
 class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
 
     private static final String PROJECT_PATH = "gitlab-org/gitlab";
@@ -78,7 +76,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("registers under the unified key gitlab:merge_request")
     void key_returnsMergeRequest() {
         assertThat(handler.key().eventType()).isEqualTo("merge_request");
     }
@@ -88,11 +85,9 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Action routing")
     class ActionRouting {
 
         @Test
-        @DisplayName("open action routes to process()")
         void openAction_routesToProcess() throws IOException {
             GitLabMergeRequestEventDTO event = createEvent("open", "opened", false);
             setupRepository();
@@ -109,7 +104,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("update action routes to process()")
         void updateAction_routesToProcess() throws IOException {
             GitLabMergeRequestEventDTO event = createEvent("update", "opened", false);
             setupRepository();
@@ -121,7 +115,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("close action routes to processClosed()")
         void closeAction_routesToProcessClosed() throws IOException {
             GitLabMergeRequestEventDTO event = createEvent("close", "closed", false);
             setupRepository();
@@ -134,7 +127,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("reopen action routes to processReopened()")
         void reopenAction_routesToProcessReopened() throws IOException {
             GitLabMergeRequestEventDTO event = createEvent("reopen", "opened", false);
             setupRepository();
@@ -147,7 +139,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("merge action routes to processMerged()")
         void mergeAction_routesToProcessMerged() throws IOException {
             GitLabMergeRequestEventDTO event = createEvent("merge", "merged", false);
             setupRepository();
@@ -160,7 +151,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("approved action routes to processApproved()")
         void approvedAction_routesToProcessApproved() throws IOException {
             GitLabMergeRequestEventDTO event = createEvent("approved", "opened", false);
             setupRepository();
@@ -173,7 +163,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("unapproved action routes to processUnapproved()")
         void unapprovedAction_routesToProcessUnapproved() throws IOException {
             GitLabMergeRequestEventDTO event = createEvent("unapproved", "opened", false);
             setupRepository();
@@ -186,7 +175,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("group-level approval action is logged and skipped")
         void approvalAction_skipsProcessing() throws IOException {
             GitLabMergeRequestEventDTO event = createEvent("approval", "opened", false);
             setupRepository();
@@ -203,7 +191,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("group-level unapproval action is logged and skipped")
         void unapprovalAction_skipsProcessing() throws IOException {
             GitLabMergeRequestEventDTO event = createEvent("unapproval", "opened", false);
             setupRepository();
@@ -220,7 +207,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("unknown action skips processing")
         void unknownAction_skipsProcessing() throws IOException {
             GitLabMergeRequestEventDTO event = createEvent("unknown_action", "opened", false);
             setupRepository();
@@ -242,11 +228,9 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Confidential merge requests")
     class ConfidentialMergeRequests {
 
         @Test
-        @DisplayName("confidential_merge_request event_type is skipped")
         void confidentialMergeRequest_skipsProcessing() throws IOException {
             var attrs = new GitLabMergeRequestEventDTO.ObjectAttributes(
                 999555L,
@@ -297,11 +281,9 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Payload validation")
     class PayloadValidation {
 
         @Test
-        @DisplayName("missing object_attributes skips processing")
         void missingObjectAttributes_skipsProcessing() throws IOException {
             GitLabMergeRequestEventDTO event = new GitLabMergeRequestEventDTO(
                 "merge_request",
@@ -321,7 +303,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("missing project skips processing")
         void missingProject_skipsProcessing() throws IOException {
             var attrs = new GitLabMergeRequestEventDTO.ObjectAttributes(
                 999555L,
@@ -362,7 +343,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("non-merge_request subject is rejected by base class")
         void nonMergeRequestSubject_rejected() throws IOException {
             Message msg = mock(Message.class);
             when(msg.getSubject()).thenReturn("gitlab.org.proj.issue");
@@ -379,11 +359,9 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Context resolution")
     class ContextResolution {
 
         @Test
-        @DisplayName("skips when context resolver returns null (filtered or not found)")
         void contextResolverReturnsNull_skipsProcessing() throws IOException {
             when(contextResolver.resolve(eq(PROJECT_PATH), any(), any())).thenReturn(null);
             GitLabMergeRequestEventDTO event = createEvent("open", "opened", false);

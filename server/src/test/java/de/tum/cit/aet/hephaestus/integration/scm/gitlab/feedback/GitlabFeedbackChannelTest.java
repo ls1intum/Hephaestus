@@ -20,7 +20,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolve
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -29,7 +28,6 @@ import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-@DisplayName("GitlabFeedbackChannel")
 class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Mock
@@ -46,7 +44,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("postSummary returns SummaryHandle with note id from mutation")
     void postSummaryReturnsNoteId() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
@@ -70,7 +67,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("postSummary escapes /approve slash command before posting")
     void postSummaryEscapesSlashCommands() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
@@ -95,7 +91,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("postSummary throws when GitLab rate limit critical")
     void throwsOnRateLimit() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
@@ -105,7 +100,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("postSummary throws on createNote mutation errors")
     void throwsOnMutationErrors() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);

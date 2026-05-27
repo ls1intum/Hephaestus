@@ -968,14 +968,11 @@
                     </referenceUrl>
                     <!--
                         Exclude Liquibase-managed sidecar tables that have no JPA entity
-                        and never will (managed by external libraries / forward-looking).
+                        and never will (managed by external libraries).
                           - shedlock: ShedLock distributed lock table (managed by the
                             ShedLock library via JdbcTemplateLockProvider, not JPA).
-                          - integration_webhook_subscription: per-webhook signing-secret
-                            sidecar created by #1198 for future Outline/Notion/MS Graph/
-                            Asana/Linear connectors; no JPA entity yet by design.
                     -->
-                    <diffExcludeObjects>table:shedlock,table:integration_webhook_subscription</diffExcludeObjects>
+                    <diffExcludeObjects>table:shedlock</diffExcludeObjects>
                     <verbose>true</verbose>
                 </configuration>
                 <dependencies>

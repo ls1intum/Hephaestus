@@ -4,11 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("ProviderProxyConfig")
 class ProviderProxyConfigTest extends BaseUnitTest {
 
     private static final LlmProxyProperties DEFAULT_PROPS = new LlmProxyProperties(
@@ -22,7 +20,6 @@ class ProviderProxyConfigTest extends BaseUnitTest {
     );
 
     @Nested
-    @DisplayName("Anthropic provider")
     class AnthropicProvider {
 
         private final ProviderProxyConfig config = ProviderProxyConfig.forProvider(
@@ -31,67 +28,56 @@ class ProviderProxyConfigTest extends BaseUnitTest {
         );
 
         @Test
-        @DisplayName("should use x-api-key header")
         void shouldUseXApiKeyHeader() {
             assertThat(config.authHeaderName()).isEqualTo("x-api-key");
         }
 
         @Test
-        @DisplayName("should not use Bearer prefix")
         void shouldNotUseBearerPrefix() {
             assertThat(config.useBearerPrefix()).isFalse();
         }
 
         @Test
-        @DisplayName("should format auth value as plain key")
         void shouldFormatAuthValueAsPlainKey() {
             assertThat(config.formatAuthValue("sk-ant-123")).isEqualTo("sk-ant-123");
         }
 
         @Test
-        @DisplayName("should use correct upstream URL")
         void shouldUseCorrectUpstreamUrl() {
             assertThat(config.upstreamBaseUrl()).isEqualTo("https://api.anthropic.com");
         }
     }
 
     @Nested
-    @DisplayName("OpenAI provider")
     class OpenAIProvider {
 
         private final ProviderProxyConfig config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
 
         @Test
-        @DisplayName("should use Authorization header")
         void shouldUseAuthorizationHeader() {
             assertThat(config.authHeaderName()).isEqualTo("Authorization");
         }
 
         @Test
-        @DisplayName("should use Bearer prefix")
         void shouldUseBearerPrefix() {
             assertThat(config.useBearerPrefix()).isTrue();
         }
 
         @Test
-        @DisplayName("should format auth value with Bearer prefix")
         void shouldFormatAuthValueWithBearer() {
             assertThat(config.formatAuthValue("sk-123")).isEqualTo("Bearer sk-123");
         }
 
         @Test
-        @DisplayName("should use correct upstream URL")
         void shouldUseCorrectUpstreamUrl() {
             assertThat(config.upstreamBaseUrl()).isEqualTo("https://api.openai.com");
         }
     }
 
     @Nested
-    @DisplayName("Custom upstream URLs")
     class CustomUpstreamUrls {
 
         @Test
-        @DisplayName("should use custom upstream URLs from properties")
         void shouldUseCustomUrls() {
             var props = new LlmProxyProperties(
                 "https://custom-anthropic.example.com",
@@ -111,7 +97,6 @@ class ProviderProxyConfigTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Azure OpenAI configuration")
     class AzureOpenAI {
 
         private final ProviderProxyConfig config = ProviderProxyConfig.forProvider(
@@ -128,30 +113,25 @@ class ProviderProxyConfigTest extends BaseUnitTest {
         );
 
         @Test
-        @DisplayName("should use api-key header for Azure")
         void shouldUseApiKeyHeader() {
             assertThat(config.authHeaderName()).isEqualTo("api-key");
         }
 
         @Test
-        @DisplayName("should not use Bearer prefix for Azure")
         void shouldNotUseBearerPrefix() {
             assertThat(config.useBearerPrefix()).isFalse();
         }
 
         @Test
-        @DisplayName("should format auth value as plain key for Azure")
         void shouldFormatAsPlainKey() {
             assertThat(config.formatAuthValue("mykey123")).isEqualTo("mykey123");
         }
     }
 
     @Nested
-    @DisplayName("buildUpstreamUrl")
     class BuildUpstreamUrl {
 
         @Test
-        @DisplayName("simple base URL without query params")
         void simpleBaseUrl() {
             assertThat(
                 LlmProxyController.buildUpstreamUrl("https://api.openai.com", "/v1/chat/completions", null)
@@ -159,7 +139,6 @@ class ProviderProxyConfigTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("base URL with embedded query params (Azure)")
         void baseUrlWithQueryParams() {
             assertThat(
                 LlmProxyController.buildUpstreamUrl(
@@ -173,7 +152,6 @@ class ProviderProxyConfigTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("base URL query params merged with incoming query")
         void mergedQueryParams() {
             assertThat(
                 LlmProxyController.buildUpstreamUrl(
@@ -185,7 +163,6 @@ class ProviderProxyConfigTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("incoming query only (no base query)")
         void incomingQueryOnly() {
             assertThat(
                 LlmProxyController.buildUpstreamUrl("https://api.openai.com", "/v1/chat/completions", "user=test")
@@ -193,7 +170,6 @@ class ProviderProxyConfigTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("empty subpath")
         void emptySubpath() {
             assertThat(LlmProxyController.buildUpstreamUrl("https://api.anthropic.com", "", null)).isEqualTo(
                 "https://api.anthropic.com"

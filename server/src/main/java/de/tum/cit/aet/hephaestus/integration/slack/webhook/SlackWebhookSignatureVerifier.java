@@ -41,7 +41,7 @@ import tools.jackson.databind.ObjectMapper;
  * rather than silently accepting unauthenticated traffic.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackWebhookSignatureVerifier implements WebhookSignatureVerifier {
 
     private static final Logger log = LoggerFactory.getLogger(SlackWebhookSignatureVerifier.class);

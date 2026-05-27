@@ -57,7 +57,6 @@ import tools.jackson.databind.node.ObjectNode;
  * masks the bug.
  */
 @LiveLlmTest
-@DisplayName("Mentor runner — live LLM round-trip")
 class MentorLiveLlmTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -144,7 +143,6 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("hero: single turn streams text + Finish carries authoritative usage")
     void hero_singleTurnStreamsTextAndFinishesWithUsage() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();
@@ -244,7 +242,6 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("multi-turn (warm runner): turn 2 recalls a fact from turn 1")
     void multiTurn_secondTurnRecallsFirst() throws Exception {
         // Pin Pi SDK's session-bound agent._state.messages threading: a single long-lived
         // runner must keep both turns' messages in its in-memory state across message_end
@@ -345,7 +342,6 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("cold-restart preserves session JSONL: runner-B recalls a fact planted on runner-A")
     void coldRestart_preservesHistoryViaSessionJsonl() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();
@@ -369,7 +365,6 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("tool use: agent uses read/bash to explore a staged git repo")
     void toolUse_agentExploresRepoWithReadOrBash() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();
@@ -440,7 +435,6 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("session JSONL is byte-identical across cold restarts (prompt-cache prefix preserved)")
     void coldRestart_sessionJsonlIsByteIdentical() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();

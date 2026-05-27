@@ -16,15 +16,12 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
  * (used by every collaborator that builds the bean directly in tests) and the Spring
  * binding path (used at runtime via {@code @ConfigurationPropertiesScan}).
  */
-@DisplayName("NatsConsumerProperties defaults & binding")
 class NatsConsumerPropertiesTest extends BaseUnitTest {
 
     @Nested
-    @DisplayName("constructor defaults")
     class ConstructorDefaults {
 
         @Test
-        @DisplayName("null poison block is replaced by the canonical defaults")
         void nullPoisonBlockUsesDefaults() {
             NatsConsumerProperties props = new NatsConsumerProperties(
                 Duration.ofMinutes(5),
@@ -40,7 +37,6 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("explicit poison block is preserved verbatim")
         void explicitPoisonBlockKept() {
             NatsConsumerProperties.PoisonProperties custom = new NatsConsumerProperties.PoisonProperties(
                 3,
@@ -59,7 +55,6 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Spring binding")
     class SpringBinding {
 
         @EnableConfigurationProperties(NatsConsumerProperties.class)
@@ -90,7 +85,6 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("explicit overrides are bound correctly")
         void explicitOverridesBound() {
             runner()
                 .withPropertyValues(

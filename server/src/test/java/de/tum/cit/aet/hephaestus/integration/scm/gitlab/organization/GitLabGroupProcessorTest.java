@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 @Tag("unit")
-@DisplayName("GitLabGroupProcessor")
 class GitLabGroupProcessorTest extends BaseUnitTest {
 
     private static final Long PROVIDER_ID = 1L;
@@ -50,11 +49,9 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("process")
     class Process {
 
         @Test
-        @DisplayName("valid group creates new organization with correct field mapping")
         void validGroup_createsOrganization() {
             var group = new GitLabGroupResponse(
                 "gid://gitlab/Group/42",
@@ -83,7 +80,6 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("existing org updates mutable fields and preserves createdAt")
         void existingOrg_updatesFieldsPreservesCreatedAt() {
             var group = new GitLabGroupResponse(
                 "gid://gitlab/Group/42",
@@ -118,7 +114,6 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null name falls back to fullPath as name")
         void nullName_fallsBackToFullPath() {
             var group = new GitLabGroupResponse(
                 "gid://gitlab/Group/99",
@@ -140,7 +135,6 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("deeply nested group path is preserved")
         void deeplyNestedPath_preserved() {
             var group = new GitLabGroupResponse(
                 "gid://gitlab/Group/7",
@@ -200,14 +194,12 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null response returns null")
         void nullResponse_returnsNull() {
             assertThat(processor.process(null, PROVIDER_ID)).isNull();
             verify(organizationRepository, never()).save(any());
         }
 
         @Test
-        @DisplayName("null id returns null")
         void nullId_returnsNull() {
             var group = new GitLabGroupResponse(
                 null,
@@ -224,7 +216,6 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null fullPath returns null")
         void nullFullPath_returnsNull() {
             var group = new GitLabGroupResponse(
                 "gid://gitlab/Group/42",
@@ -241,7 +232,6 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null webUrl returns null")
         void nullWebUrl_returnsNull() {
             var group = new GitLabGroupResponse(
                 "gid://gitlab/Group/42",
@@ -258,7 +248,6 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("invalid GID format returns null")
         void invalidGid_returnsNull() {
             var group = new GitLabGroupResponse(
                 "invalid-id-format",

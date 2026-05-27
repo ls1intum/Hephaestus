@@ -11,14 +11,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-@DisplayName("Feature flag controller integration")
 class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
 
     @Nested
-    @DisplayName("GET /user/features")
     class GetUserFeatures {
 
         @Test
@@ -35,7 +33,6 @@ class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
 
         @Test
         @WithAdminUser
-        @DisplayName("admin user has admin and inherited role flags enabled")
         void adminUserHasAdminFlags() {
             webTestClient
                 .get()
@@ -55,7 +52,6 @@ class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
 
         @Test
         @WithMentorUser
-        @DisplayName("mentor user has mentor_access flag enabled")
         void mentorUserHasMentorFlags() {
             webTestClient
                 .get()
@@ -75,7 +71,6 @@ class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
 
         @Test
         @WithUser
-        @DisplayName("regular user has no role flags enabled")
         void regularUserHasNoRoleFlags() {
             webTestClient
                 .get()
@@ -97,7 +92,6 @@ class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
 
         @Test
         @WithUser
-        @DisplayName("response contains all expected flag fields")
         void responseContainsAllFlags() {
             webTestClient
                 .get()

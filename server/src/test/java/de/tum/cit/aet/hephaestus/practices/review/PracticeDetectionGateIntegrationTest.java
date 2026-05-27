@@ -32,7 +32,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +49,6 @@ import tools.jackson.databind.ObjectMapper;
  * Label/draft/assignee checks operate on the in-memory PR object passed to the gate
  * (matching production behavior where the PR is loaded once by the caller).
  */
-@DisplayName("PracticeReviewDetectionGate integration")
 class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -190,11 +188,9 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Practice matching")
     class PracticeMatching {
 
         @Test
-        @DisplayName("matches practices by trigger event")
         void matchesByTriggerEvent() {
             createPractice("pr-quality", "PR Quality", List.of("PullRequestCreated"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
@@ -208,7 +204,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("excludes inactive practices")
         void excludesInactive() {
             createPractice("active-one", "Active", List.of("PullRequestCreated"), true);
             createPractice("inactive-one", "Inactive", List.of("PullRequestCreated"), false);
@@ -223,7 +218,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("excludes mismatched trigger events")
         void excludesMismatchedEvents() {
             createPractice("review-only", "Review Only", List.of("ReviewSubmitted"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
@@ -234,7 +228,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("matches multiple practices")
         void matchesMultiple() {
             createPractice("practice-a", "Practice A", List.of("PullRequestCreated"), true);
             createPractice("practice-b", "Practice B", List.of("PullRequestCreated", "ReviewSubmitted"), true);
@@ -253,11 +246,9 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Gate skips")
     class GateSkips {
 
         @Test
-        @DisplayName("skips when no agent config exists")
         void skipsNoConfig() {
             agentConfigRepository.deleteAll();
             createPractice("no-config", "No Config", List.of("PullRequestCreated"), true);
@@ -270,7 +261,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("skips when no practices match trigger event")
         void skipsNoMatchingPractices() {
             createPractice("wrong-event", "Wrong Event", List.of("ReviewSubmitted"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
@@ -282,7 +272,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("skips draft PR when skipDrafts is configured")
         void skipsDraft() {
             createPractice("draft-skip", "Draft Skip", List.of("PullRequestCreated"), true);
             PullRequest pr = createPullRequest(true, Set.of(), Set.of(assignee));
@@ -295,11 +284,9 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Workspace resolution")
     class WorkspaceResolution {
 
         @Test
-        @DisplayName("resolves workspace from repository owner (heuristic)")
         void resolvesFromRepoOwner() {
             createPractice("resolved", "Resolved", List.of("PullRequestCreated"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
@@ -312,7 +299,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("skips when workspace cannot be resolved")
         void skipsUnresolvableWorkspace() {
             createPractice("orphan", "Orphan", List.of("PullRequestCreated"), true);
 

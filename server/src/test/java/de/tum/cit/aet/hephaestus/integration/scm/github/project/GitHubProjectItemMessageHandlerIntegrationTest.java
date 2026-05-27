@@ -24,7 +24,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -40,7 +39,6 @@ import tools.jackson.databind.ObjectMapper;
  * (create, edit, archive, restore, convert, reorder, delete) using JSON fixtures
  * parsed directly into DTOs for complete isolation.
  */
-@DisplayName("GitHub Project Item Message Handler")
 @Import(GitHubProjectItemMessageHandlerIntegrationTest.TestProjectItemEventListener.class)
 class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -161,15 +159,12 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("Should return correct event type")
     void shouldReturnCorrectEventType() {
         assertThat(handler.key().eventType()).isEqualTo("organization.projects_v2_item");
     }
 
     @Test
-    @DisplayName("Should handle item deleted event")
     void shouldHandleItemDeletedEvent() throws Exception {
-        // Given
         ProjectItem item = createAndSaveTestItem(
             FIXTURE_ITEM2_ID,
             FIXTURE_ITEM2_NODE_ID,
@@ -181,10 +176,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         GitHubProjectItemEventDTO deletedEvent = loadPayload("projects_v2_item.deleted");
 
-        // When
         handler.handleEvent(deletedEvent);
 
-        // Then
         assertThat(projectItemRepository.findById(item.getId())).isEmpty();
 
         // Verify ProjectItemDeleted domain event
@@ -193,15 +186,12 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     @Test
-    @DisplayName("Should process project item archived event")
     void shouldHandleItemArchivedEvent() throws Exception {
-        // Given
         createAndSaveTestItem(FIXTURE_ITEM2_ID, FIXTURE_ITEM2_NODE_ID, ProjectItem.ContentType.DRAFT_ISSUE, false);
         eventListener.clear();
 
         GitHubProjectItemEventDTO archivedEvent = loadPayload("projects_v2_item.archived");
 
-        // When
         handler.handleEvent(archivedEvent);
 
         // Then — processArchived() forces archived=true on the DTO before upserting,
@@ -229,7 +219,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("Should skip event when organization is not found")
     void shouldSkipEventWhenOrganizationNotFound() throws Exception {
         // Given - clean database so no org exists
         databaseTestUtils.cleanDatabase();
@@ -237,7 +226,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.created");
 
-        // When
         handler.handleEvent(event);
 
         // Then - no item should be created and no events published
@@ -246,7 +234,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     @Test
-    @DisplayName("Should skip event when project is not found")
     void shouldSkipEventWhenProjectNotFound() throws Exception {
         // Given — org/workspace exist but project does not
         projectItemRepository.deleteAll();
@@ -255,7 +242,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.created");
 
-        // When
         handler.handleEvent(event);
 
         // Then — no item should be created and no events published
@@ -268,15 +254,11 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("Should create project item from created event and publish ProjectItemCreated event")
     void shouldHandleItemCreatedEvent() throws Exception {
-        // Given
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.created");
 
-        // When
         handler.handleEvent(event);
 
-        // Then
         var item = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), FIXTURE_ITEM_NODE_ID);
         assertThat(item)
             .isPresent()
@@ -297,9 +279,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle duplicate created events idempotently")
     void shouldHandleDuplicateCreatedEventsIdempotently() throws Exception {
-        // Given
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.created");
 
         // When — process the same event twice
@@ -315,7 +295,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     @Test
-    @DisplayName("Should update project item from edited event and publish ProjectItemUpdated event")
     void shouldHandleItemEditedEvent() throws Exception {
         // Given — pre-create the item
         createAndSaveTestItem(FIXTURE_ITEM_ID, FIXTURE_ITEM_NODE_ID, ProjectItem.ContentType.DRAFT_ISSUE, false);
@@ -323,7 +302,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.edited");
 
-        // When
         handler.handleEvent(event);
 
         // Then — updated_at should reflect the edited fixture timestamp;
@@ -348,7 +326,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     @Test
-    @DisplayName("Should process project item restored event and publish ProjectItemRestored event")
     void shouldHandleItemRestoredEvent() throws Exception {
         // Given — pre-create item as archived
         createAndSaveTestItem(FIXTURE_ITEM2_ID, FIXTURE_ITEM2_NODE_ID, ProjectItem.ContentType.DRAFT_ISSUE, true);
@@ -356,10 +333,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.restored");
 
-        // When
         handler.handleEvent(event);
 
-        // Then
         var result = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), FIXTURE_ITEM2_NODE_ID);
         assertThat(result)
             .isPresent()
@@ -379,7 +354,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     @Test
-    @DisplayName("Should update content type when item is converted and publish ProjectItemConverted event")
     void shouldHandleItemConvertedEvent() throws Exception {
         // Given — pre-create item as DRAFT_ISSUE
         createAndSaveTestItem(FIXTURE_ITEM_ID, FIXTURE_ITEM_NODE_ID, ProjectItem.ContentType.DRAFT_ISSUE, false);
@@ -387,7 +361,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.converted");
 
-        // When
         handler.handleEvent(event);
 
         // Then — content type should be updated to ISSUE
@@ -410,7 +383,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     @Test
-    @DisplayName("Should process project item reordered event and publish ProjectItemReordered event")
     void shouldHandleItemReorderedEvent() throws Exception {
         // Given — pre-create the item
         createAndSaveTestItem(FIXTURE_ITEM2_ID, FIXTURE_ITEM2_NODE_ID, ProjectItem.ContentType.DRAFT_ISSUE, false);
@@ -418,10 +390,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.reordered");
 
-        // When
         handler.handleEvent(event);
 
-        // Then
         var result = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), FIXTURE_ITEM2_NODE_ID);
         assertThat(result)
             .isPresent()

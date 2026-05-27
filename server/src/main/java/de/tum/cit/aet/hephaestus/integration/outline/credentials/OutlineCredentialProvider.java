@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
  * either shape comes back faithfully.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineCredentialProvider implements ApiCredentialProvider {
 
     private static final Logger log = LoggerFactory.getLogger(OutlineCredentialProvider.class);

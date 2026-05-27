@@ -28,7 +28,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,7 +39,6 @@ import tools.jackson.databind.ObjectMapper;
  * Integration test for {@link AgentJobService#submit} exercising real PostgreSQL
  * idempotency (partial unique index), config snapshot capture, and event publication.
  */
-@DisplayName("AgentJobService submission integration")
 @RecordApplicationEvents
 class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
@@ -175,11 +173,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Happy path")
     class HappyPath {
 
         @Test
-        @DisplayName("submits job with correct metadata, status, and config snapshot")
         void submitsJobWithCorrectState() {
             var request = createRequest("abc123");
 
@@ -207,7 +203,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("publishes AgentJobCreatedEvent with correct fields")
         void publishesAgentJobCreatedEvent() {
             var request = createRequest("event123");
 
@@ -226,11 +221,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Idempotency")
     class Idempotency {
 
         @Test
-        @DisplayName("deduplicates submissions with same commit SHA")
         void deduplicatesSameCommitSha() {
             var request = createRequest("dedup123");
 
@@ -254,7 +247,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("allows different commit SHAs as separate jobs")
         void allowsDifferentCommitSha() {
             var request1 = createRequest("sha_v1");
             var request2 = createRequest("sha_v2");
@@ -278,7 +270,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("deduplicates against pre-existing job with same idempotency key")
         void deduplicatesAgainstPreExistingJob() {
             // Pre-insert a QUEUED job with the same idempotency key via raw repository,
             // simulating a job created by a concurrent request before this one.
@@ -307,11 +298,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("No config")
     class NoConfig {
 
         @Test
-        @DisplayName("returns empty when no agent config exists")
         void returnsEmptyWhenNoConfig() {
             agentConfigRepository.deleteAll();
 
@@ -326,7 +315,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("returns empty when config is disabled")
         void returnsEmptyWhenDisabled() {
             agentConfig.setEnabled(false);
             agentConfigRepository.save(agentConfig);
@@ -343,11 +331,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Config snapshot")
     class ConfigSnapshot {
 
         @Test
-        @DisplayName("captures config snapshot at submit time, immune to later changes")
         void capturesSnapshotAtSubmitTime() {
             var request = createRequest("snapshot123");
 

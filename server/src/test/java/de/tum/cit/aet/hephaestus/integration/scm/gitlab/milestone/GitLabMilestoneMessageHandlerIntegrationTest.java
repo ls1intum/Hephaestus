@@ -115,11 +115,9 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Event Type ====================
 
     @Nested
-    @DisplayName("Event Type")
     class EventTypeTest {
 
         @Test
-        @DisplayName("returns MILESTONE as event type")
         void returnsCorrectEventType() {
             assertThat(handler.key().eventType()).isEqualTo("milestone");
         }
@@ -128,11 +126,9 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Basic Lifecycle ====================
 
     @Nested
-    @DisplayName("Basic Lifecycle Events")
     class BasicLifecycleEvents {
 
         @Test
-        @DisplayName("persists milestone with all fields on 'create' event")
         void shouldPersistMilestoneOnCreateEvent() throws Exception {
             GitLabMilestoneEventDTO event = loadPayload("milestone.create");
 
@@ -155,7 +151,6 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("closes milestone on 'close' event")
         void shouldCloseMilestoneOnCloseEvent() throws Exception {
             // Create first
             handler.handleEvent(loadPayload("milestone.create"));
@@ -175,7 +170,6 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("reopens milestone on 'reopen' event")
         void shouldReopenMilestoneOnReopenEvent() throws Exception {
             // Create and close
             handler.handleEvent(loadPayload("milestone.create"));
@@ -199,11 +193,9 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Edge Cases ====================
 
     @Nested
-    @DisplayName("Edge Cases")
     class EdgeCases {
 
         @Test
-        @DisplayName("handles missing repository gracefully")
         void shouldHandleMissingRepositoryGracefully() throws Exception {
             repositoryRepository.deleteAll();
 
@@ -227,7 +219,6 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("full lifecycle: create → close → reopen")
         void shouldHandleFullLifecycle() throws Exception {
             handler.handleEvent(loadPayload("milestone.create"));
             assertThat(

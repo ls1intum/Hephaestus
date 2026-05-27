@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolve
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -26,7 +25,6 @@ import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-@DisplayName("GitlabInlineFindingChannel")
 class GitlabInlineFindingChannelTest extends BaseUnitTest {
 
     @Mock
@@ -43,13 +41,11 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("empty findings returns (0, 0)")
     void emptyFindings() {
         assertThat(channel.postInlineFindings(gitlabTarget(), List.of())).isEqualTo(new InlineResult(0, 0));
     }
 
     @Test
-    @DisplayName("rate-limit critical short-circuits and counts all as failed")
     void rateLimitCriticalShortCircuits() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
         InlineResult result = channel.postInlineFindings(
@@ -61,7 +57,6 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("missing diffRefs results in zero posted, all counted failed")
     void missingDiffRefsSkips() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         // diffRefs absent → headSha/startSha null
@@ -78,7 +73,6 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("posts DiffAnchor findings successfully")
     void postsDiffNotesSuccessfully() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(

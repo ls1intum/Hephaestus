@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -30,7 +29,6 @@ import org.mockito.MockitoAnnotations;
  * own contract tests; we only re-verify the happy-path decode here to keep the suite
  * compact.
  */
-@DisplayName("GitlabCredentialProvider — unit")
 class GitlabCredentialProviderTest extends BaseUnitTest {
 
     @Mock
@@ -47,7 +45,6 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ACTIVE Connection with encrypted PAT decrypts back to a BearerToken")
     void activeConnection_decryptsPat() {
         long workspaceId = 17L;
         Connection connection = newGitlabConnection(workspaceId);
@@ -63,7 +60,6 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ACTIVE Connection with no credential blob returns empty (does not crash)")
     void activeConnection_noBlob_returnsEmpty() {
         long workspaceId = 17L;
         Connection connection = newGitlabConnection(workspaceId);
@@ -74,7 +70,6 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Wrong-kind ref short-circuits without touching the repo")
     void wrongKindRef_returnsEmpty() {
         assertThat(provider.resolve(new IntegrationRef(IntegrationKind.GITHUB, 17L, "100"))).isEmpty();
         Mockito.verifyNoInteractions(connectionService);

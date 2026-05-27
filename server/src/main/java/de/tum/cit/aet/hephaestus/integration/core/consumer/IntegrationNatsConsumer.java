@@ -44,58 +44,23 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 
 /**
- * Unified JetStream consumer fleet for every integration kind.
- *
- * <p>Sole consumer-side entry point for the integration framework: per-scope consumers,
- * the GitHub installation-wide consumer, lifecycle, reconnect, and the per-message
- * dispatch path. Replaces the pre-unification monolithic consumer service
- * verbatim in behaviour; the collaborator decomposition is the structural improvement.
+ * Unified JetStream consumer fleet for every integration kind. Sole consumer-side entry
+ * point: per-scope consumers, the installation-wide consumer, lifecycle, reconnect, and
+ * the per-message dispatch path.
  *
  * <h2>Collaborators</h2>
  * <ul>
- *   <li>{@link IntegrationMessageDispatcher} — vendor-agnostic subject → handler routing
- *       via the unified {@code IntegrationMessageHandlerRegistry}. Sole resolver: every
- *       production handler extends
- *       {@link de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler}
- *       and the per-kind {@code SubjectParser} re-encodes the subject into an
- *       {@code EventTypeKey} the registry looks up.</li>
- *   <li>{@link IntegrationPoisonHandler} — NAK-with-backoff + ACK-after-N for messages
- *       that exhaust their redelivery budget.</li>
+ *   <li>{@link IntegrationMessageDispatcher} — vendor-agnostic subject → handler routing.</li>
+ *   <li>{@link IntegrationPoisonHandler} — NAK-with-backoff + ACK-after-N on redelivery exhaustion.</li>
  *   <li>{@link IntegrationConsumerStats} — read-side surface for the actuator probe.</li>
- *   <li>{@link ConsumerSubjectMath} — pure subject-arithmetic (wildcard filters,
- *       consumer-name conventions).</li>
+ *   <li>{@link ConsumerSubjectMath} — pure subject-arithmetic (wildcard filters, consumer-name conventions).</li>
  *   <li>{@link ScopeConsumer} — per-scope queue + virtual-thread dispatch.</li>
  * </ul>
  *
- * <h2>Routing</h2>
- * Single resolution step: {@link IntegrationMessageDispatcher#dispatch(String)} returns
- * the unified handler (or empty if the subject is one we deliberately don't process —
- * e.g. {@code check_run}). Empty resolutions ACK as no-op rather than NACKing; unknown
- * event types are not errors.
- *
- * <h2>Lifecycle</h2>
- * <ol>
- *   <li>{@link #onApplicationReady()} — establish the NATS connection with reconnect.</li>
- *   <li>{@link #onWorkspacesInitialized(WorkspacesInitializedEvent)} — start the
- *       installation-wide consumer once workspace entities exist (the GitHub
- *       installation handler depends on workspace lookup).</li>
- *   <li>{@link #startConsumingScope(Long)} / {@link #stopConsumingScope(Long)} /
- *       {@link #updateScopeConsumer(Long)} — externally-driven scope lifecycle from
- *       the workspace lifecycle services. Idempotent and concurrency-safe.</li>
- *   <li>{@link #shutdown()} — drain all scope consumers, stop the installation
- *       consumer, close the connection.</li>
- * </ol>
- *
  * <h2>Concurrency</h2>
- * Per-scope lifecycle is gated by a {@link Set} of in-flight scope IDs ({@code pendingScopeSetup})
- * so two concurrent callers can't race to create the same JetStream consumer.
- * Connection creation is double-checked-locked. The virtual-thread executor scales linearly
- * with the number of scopes.
- *
- * <h2>Role gating</h2>
- * {@link RuntimeRole#SERVER_PROPERTY} ({@code matchIfMissing=true}). The webhook-only and
- * worker-only deploys disable the server role and this bean does not start, leaving the
- * publisher half of the pipeline running unencumbered.
+ * Per-scope lifecycle is gated by an in-flight {@link Set} ({@code pendingScopeSetup}) so
+ * two callers can't race to create the same JetStream consumer. Connection creation is
+ * double-checked-locked. The virtual-thread executor scales linearly with the scope count.
  */
 @Order(1)
 @Service

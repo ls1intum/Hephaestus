@@ -4,7 +4,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.lang.ArchRule;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.Test;
 class AgentDoesNotBranchOnGitProviderTypeTest extends HephaestusArchitectureTest {
 
     @Test
-    @DisplayName("agent/** must not depend on GitProviderType")
     void agentDoesNotImportGitProviderType() {
         ArchRule rule = noClasses()
             .that()

@@ -75,7 +75,6 @@ import tools.jackson.databind.ObjectMapper;
  * holds a connection while REQUIRES_NEW needs an additional one.
  * We use TransactionTemplate for lazy-loading assertions.
  */
-@DisplayName("GitHub Pull Request Message Handler")
 class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -170,11 +169,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Event Key Tests ====================
 
     @Nested
-    @DisplayName("Event Type")
     class EventType {
 
         @Test
-        @DisplayName("Should return PULL_REQUEST as event type")
         void shouldReturnCorrectEventType() {
             assertThat(handler.key().eventType()).isEqualTo("repository.pull_request");
         }
@@ -183,16 +180,12 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Basic Lifecycle Events ====================
 
     @Nested
-    @DisplayName("Basic Lifecycle Events")
     class BasicLifecycleEvents {
 
         @Test
-        @DisplayName("Should persist pull request with all schema fields on 'opened' event")
         void shouldPersistPullRequestOnOpenedEvent() throws Exception {
-            // Given
             GitHubPullRequestEventDTO event = loadPayload("pull_request.opened");
 
-            // When
             handler.handleEvent(event);
 
             // Then - verify ALL persisted fields against hardcoded fixture values
@@ -261,7 +254,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should close pull request on 'closed' event (not merged)")
         void shouldHandleClosedEvent() throws Exception {
             // Given - create PR first
             handler.handleEvent(loadPayload("pull_request.opened"));
@@ -269,10 +261,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             GitHubPullRequestEventDTO closedEvent = loadPayload("pull_request.closed");
 
-            // When
             handler.handleEvent(closedEvent);
 
-            // Then
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
@@ -285,7 +275,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should reopen pull request on 'reopened' event")
         void shouldHandleReopenedEvent() throws Exception {
             // Given - create and close PR
             handler.handleEvent(loadPayload("pull_request.opened"));
@@ -294,10 +283,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             GitHubPullRequestEventDTO reopenedEvent = loadPayload("pull_request.reopened");
 
-            // When
             handler.handleEvent(reopenedEvent);
 
-            // Then
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
@@ -309,11 +296,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Draft State Events ====================
 
     @Nested
-    @DisplayName("Draft State Events")
     class DraftStateEvents {
 
         @Test
-        @DisplayName("Should handle 'ready_for_review' event and publish PullRequestReady")
         void shouldHandleReadyForReviewEvent() throws Exception {
             // Given - create draft PR first
             handler.handleEvent(loadPayload("pull_request.converted_to_draft"));
@@ -321,10 +306,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             GitHubPullRequestEventDTO readyEvent = loadPayload("pull_request.ready_for_review");
 
-            // When
             handler.handleEvent(readyEvent);
 
-            // Then
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
@@ -336,15 +319,11 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should handle 'converted_to_draft' event and publish PullRequestDrafted")
         void shouldHandleConvertedToDraftEvent() throws Exception {
-            // Given
             GitHubPullRequestEventDTO draftEvent = loadPayload("pull_request.converted_to_draft");
 
-            // When
             handler.handleEvent(draftEvent);
 
-            // Then
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
@@ -359,11 +338,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Synchronize Event ====================
 
     @Nested
-    @DisplayName("Synchronize Event")
     class SynchronizeEvent {
 
         @Test
-        @DisplayName("Should handle 'synchronize' event and publish PullRequestSynchronized")
         void shouldHandleSynchronizeEvent() throws Exception {
             // Given - create PR first
             handler.handleEvent(loadPayload("pull_request.opened"));
@@ -371,10 +348,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             GitHubPullRequestEventDTO syncEvent = loadPayload("pull_request.synchronize");
 
-            // When
             handler.handleEvent(syncEvent);
 
-            // Then
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
@@ -388,11 +363,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Label Events ====================
 
     @Nested
-    @DisplayName("Label Events")
     class LabelEvents {
 
         @Test
-        @DisplayName("Should handle 'labeled' event and persist label")
         void shouldHandleLabeledEvent() throws Exception {
             // Given - create PR first
             handler.handleEvent(loadPayload("pull_request.opened"));
@@ -400,7 +373,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             GitHubPullRequestEventDTO labeledEvent = loadPayload("pull_request.labeled");
 
-            // When
             handler.handleEvent(labeledEvent);
 
             // Then - use TransactionTemplate for lazy-loading assertions
@@ -420,7 +392,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should handle 'unlabeled' event")
         void shouldHandleUnlabeledEvent() throws Exception {
             // Given - create PR with label
             handler.handleEvent(loadPayload("pull_request.opened"));
@@ -429,7 +400,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             GitHubPullRequestEventDTO unlabeledEvent = loadPayload("pull_request.unlabeled");
 
-            // When
             handler.handleEvent(unlabeledEvent);
 
             // Then - Unlabeled event should be published
@@ -440,16 +410,12 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Assignment Events ====================
 
     @Nested
-    @DisplayName("Assignment Events")
     class AssignmentEvents {
 
         @Test
-        @DisplayName("Should handle 'assigned' event - process routes to processor with assignees")
         void shouldHandleAssignedEvent() throws Exception {
-            // Given
             GitHubPullRequestEventDTO assignedEvent = loadPayload("pull_request.assigned");
 
-            // When
             handler.handleEvent(assignedEvent);
 
             // Then - PR should be created with assignees from the DTO
@@ -465,14 +431,12 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should handle 'unassigned' event")
         void shouldHandleUnassignedEvent() throws Exception {
             // Given - create PR with assignee
             handler.handleEvent(loadPayload("pull_request.assigned"));
 
             GitHubPullRequestEventDTO unassignedEvent = loadPayload("pull_request.unassigned");
 
-            // When
             handler.handleEvent(unassignedEvent);
 
             // Then - PR still exists and was processed
@@ -486,16 +450,12 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Milestone Events ====================
 
     @Nested
-    @DisplayName("Milestone Events")
     class MilestoneEvents {
 
         @Test
-        @DisplayName("Should handle 'milestoned' event and create milestone")
         void shouldHandleMilestonedEvent() throws Exception {
-            // Given
             GitHubPullRequestEventDTO milestonedEvent = loadPayload("pull_request.milestoned");
 
-            // When
             handler.handleEvent(milestonedEvent);
 
             // Then - use TransactionTemplate for lazy-loading assertions
@@ -516,14 +476,12 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should handle 'demilestoned' event - processes without error")
         void shouldHandleDemilestonedEvent() throws Exception {
             // Given - this uses a fresh demilestoned event
             // Note: The processor currently only clears milestone during create,
             // not during update. This test verifies the handler routing works.
             GitHubPullRequestEventDTO demilestonedEvent = loadPayload("pull_request.demilestoned");
 
-            // When
             handler.handleEvent(demilestonedEvent);
 
             // Then - PR should be created and processed
@@ -542,19 +500,14 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Review Request Events ====================
 
     @Nested
-    @DisplayName("Review Request Events")
     class ReviewRequestEvents {
 
         @Test
-        @DisplayName("Should handle 'review_requested' event")
         void shouldHandleReviewRequestedEvent() throws Exception {
-            // Given
             GitHubPullRequestEventDTO reviewRequestedEvent = loadPayload("pull_request.review_requested");
 
-            // When
             handler.handleEvent(reviewRequestedEvent);
 
-            // Then
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
@@ -564,17 +517,14 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should handle 'review_request_removed' event")
         void shouldHandleReviewRequestRemovedEvent() throws Exception {
             // Given - create PR with review request
             handler.handleEvent(loadPayload("pull_request.review_requested"));
 
             GitHubPullRequestEventDTO reviewRequestRemovedEvent = loadPayload("pull_request.review_request_removed");
 
-            // When
             handler.handleEvent(reviewRequestRemovedEvent);
 
-            // Then
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
@@ -585,18 +535,15 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Lock Events ====================
 
     @Nested
-    @DisplayName("Lock Events")
     class LockEvents {
 
         @Test
-        @DisplayName("Should handle 'locked' event")
         void shouldHandleLockedEvent() throws Exception {
             // Given - create PR first
             handler.handleEvent(loadPayload("pull_request.opened"));
 
             GitHubPullRequestEventDTO lockedEvent = loadPayload("pull_request.locked");
 
-            // When
             handler.handleEvent(lockedEvent);
 
             // Then - PR processed successfully
@@ -607,7 +554,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should handle 'unlocked' event")
         void shouldHandleUnlockedEvent() throws Exception {
             // Given - create PR first
             handler.handleEvent(loadPayload("pull_request.opened"));
@@ -615,10 +561,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             GitHubPullRequestEventDTO unlockedEvent = loadPayload("pull_request.unlocked");
 
-            // When
             handler.handleEvent(unlockedEvent);
 
-            // Then
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
@@ -629,13 +573,10 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Edge Cases ====================
 
     @Nested
-    @DisplayName("Edge Cases")
     class EdgeCases {
 
         @Test
-        @DisplayName("Should handle unknown action gracefully (falls back to process)")
         void shouldHandleUnknownActionGracefully() throws Exception {
-            // Given
             GitHubPullRequestEventDTO event = loadPayload("pull_request.opened");
 
             // When/Then - should not throw
@@ -643,7 +584,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should handle missing repository context gracefully")
         void shouldHandleMissingRepositoryContextGracefully() throws Exception {
             // Given - remove the repository so context creation fails
             repositoryRepository.deleteAll();
@@ -660,7 +600,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         @Test
         @DisplayName("Should be idempotent - processing same event twice")
         void shouldBeIdempotent() throws Exception {
-            // Given
             GitHubPullRequestEventDTO event = loadPayload("pull_request.opened");
 
             // When - handle same event twice
@@ -674,7 +613,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should verify getDatabaseId() fallback works (id is used when databaseId is null)")
         void shouldVerifyGetDatabaseIdFallback() throws Exception {
             // Given - webhook payloads have 'id' not 'database_id'
             GitHubPullRequestEventDTO event = loadPayload("pull_request.opened");
@@ -683,7 +621,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // In webhook payloads, databaseId will be null and id will have the value
             assertThat(event.pullRequest().getDatabaseId()).isEqualTo(PR_26_ID);
 
-            // When
             handler.handleEvent(event);
 
             // Then - PR should be persisted with the correct native ID
@@ -693,12 +630,10 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should create author entity with correct field values from opened event")
         void shouldCreateAllRelatedEntitiesFromOpenedEvent() throws Exception {
             // Given - no users exist
             assertThat(userRepository.count()).isZero();
 
-            // When
             handler.handleEvent(loadPayload("pull_request.opened"));
 
             // Then - author created with exact fixture values
@@ -712,7 +647,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should handle null pull request DTO gracefully")
         void shouldHandleNullPullRequestDTOGracefully() throws Exception {
             // Given - a manually created event with null PR
             GitHubPullRequestEventDTO event = new GitHubPullRequestEventDTO(
@@ -737,11 +671,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Full Workflow Tests ====================
 
     @Nested
-    @DisplayName("Full Workflow")
     class FullWorkflow {
 
         @Test
-        @DisplayName("Should handle complete PR lifecycle: open → label → sync → close")
         void shouldHandleCompletePullRequestLifecycle() throws Exception {
             // 1. Open PR
             handler.handleEvent(loadPayload("pull_request.opened"));
@@ -778,7 +710,6 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should handle ready_for_review event after opened")
         void shouldHandleReadyForReviewAfterOpened() throws Exception {
             // 1. Open PR (which is not draft in opened.json)
             handler.handleEvent(loadPayload("pull_request.opened"));
@@ -801,13 +732,10 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== DTO Parsing Tests ====================
 
     @Nested
-    @DisplayName("DTO Parsing")
     class DTOParsing {
 
         @Test
-        @DisplayName("Should parse all opened event fields with exact fixture values")
         void shouldParseAllOpenedEventFieldsCorrectly() throws Exception {
-            // Given
             String payload = loadPayloadRaw("pull_request.opened");
             GitHubPullRequestEventDTO event = objectMapper.readValue(payload, GitHubPullRequestEventDTO.class);
 
@@ -857,13 +785,10 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should parse labeled event with label data")
         void shouldParseLabeledEventWithLabelData() throws Exception {
-            // Given
             String payload = loadPayloadRaw("pull_request.labeled");
             GitHubPullRequestEventDTO event = objectMapper.readValue(payload, GitHubPullRequestEventDTO.class);
 
-            // Then
             assertThat(event.action()).isEqualTo("labeled");
             assertThat(event.label()).isNotNull();
             assertThat(event.label().id()).isEqualTo(FIXTURE_LABEL_ID);
@@ -871,13 +796,10 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should parse milestoned event with milestone data")
         void shouldParseMilestonedEventWithMilestoneData() throws Exception {
-            // Given
             String payload = loadPayloadRaw("pull_request.milestoned");
             GitHubPullRequestEventDTO event = objectMapper.readValue(payload, GitHubPullRequestEventDTO.class);
 
-            // Then
             assertThat(event.action()).isEqualTo("milestoned");
             assertThat(event.pullRequest().milestone()).isNotNull();
             assertThat(event.pullRequest().milestone().id()).isEqualTo(FIXTURE_MILESTONE_ID);

@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -61,7 +60,6 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ensureAllInstallationRepositoriesCovered adds missing monitors and prunes stale ones")
     void shouldReconcileMonitorsForInstallation() {
         Workspace workspace = persistWorkspace(RepositorySelection.ALL);
         repositoryToMonitorRepository.save(buildMonitor(workspace, "HephaestusTest/Orphaned"));
@@ -87,7 +85,6 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ensureAllInstallationRepositoriesCovered runs for SELECTED installations")
     void shouldRespectSelectedInstallations() {
         Workspace workspace = persistWorkspace(RepositorySelection.SELECTED);
 

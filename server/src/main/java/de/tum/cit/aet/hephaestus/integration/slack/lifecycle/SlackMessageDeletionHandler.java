@@ -40,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
  * </ol>
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackMessageDeletionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(SlackMessageDeletionHandler.class);

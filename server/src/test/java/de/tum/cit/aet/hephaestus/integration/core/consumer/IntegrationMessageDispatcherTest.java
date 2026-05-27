@@ -19,10 +19,8 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("IntegrationMessageDispatcher subject routing")
 class IntegrationMessageDispatcherTest extends BaseUnitTest {
 
     private static final List<SubjectParser> ALL_PARSERS = List.of(

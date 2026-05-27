@@ -18,12 +18,10 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 
-@DisplayName("SlackMessageDeletionHandler — unit")
 class SlackMessageDeletionHandlerTest extends BaseUnitTest {
 
     private static final Instant FIXED = Instant.parse("2026-05-24T12:00:00Z");
@@ -43,7 +41,6 @@ class SlackMessageDeletionHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Unknown team_id returns empty Optional, no repo write")
     void unknownTeam() {
         when(
             connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(1L, IntegrationKind.SLACK, "T-gone")
@@ -56,7 +53,6 @@ class SlackMessageDeletionHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("First delivery → 1 row tombstoned, workspace + clock-fixed timestamp")
     void firstDeliveryTombstonesOneRow() {
         Connection conn = Mockito.mock(Connection.class);
         when(conn.getId()).thenReturn(77L);
@@ -72,7 +68,6 @@ class SlackMessageDeletionHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Replayed delivery → 0 rows (already tombstoned), still returns 0 not error")
     void replayedDeliveryIsNoop() {
         Connection conn = Mockito.mock(Connection.class);
         when(conn.getId()).thenReturn(77L);

@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -33,58 +32,48 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Initial State")
     class InitialState {
 
         @Test
-        @DisplayName("should return default limit for unknown scope")
         void shouldReturnDefaultLimitForUnknownScope() {
             assertThat(tracker.getRemaining(999L)).isEqualTo(5000);
         }
 
         @Test
-        @DisplayName("should return default limit for null scope")
         void shouldReturnDefaultLimitForNullScope() {
             assertThat(tracker.getRemaining(null)).isEqualTo(5000);
         }
 
         @Test
-        @DisplayName("should return default limit from getLimit for unknown scope")
         void shouldReturnDefaultFromGetLimitForUnknownScope() {
             assertThat(tracker.getLimit(999L)).isEqualTo(5000);
         }
 
         @Test
-        @DisplayName("should return default limit from getLimit for null scope")
         void shouldReturnDefaultFromGetLimitForNullScope() {
             assertThat(tracker.getLimit(null)).isEqualTo(5000);
         }
 
         @Test
-        @DisplayName("should return null reset time for unknown scope")
         void shouldReturnNullResetTimeForUnknownScope() {
             assertThat(tracker.getResetAt(999L)).isNull();
         }
 
         @Test
-        @DisplayName("should return null reset time for null scope")
         void shouldReturnNullResetTimeForNullScope() {
             assertThat(tracker.getResetAt(null)).isNull();
         }
 
         @Test
-        @DisplayName("should have zero tracked scopes initially")
         void shouldHaveZeroTrackedScopes() {
             assertThat(tracker.getTrackedScopeCount()).isZero();
         }
     }
 
     @Nested
-    @DisplayName("updateFromResponse")
     class UpdateFromResponse {
 
         @Test
-        @DisplayName("should update state from valid response")
         void shouldUpdateStateFromValidResponse() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -100,7 +89,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for null scope ID")
         void shouldReturnNullForNullScopeId() {
             // Use a plain mock — updateFromResponse returns null before touching the response
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
@@ -111,7 +99,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for null response")
         void shouldReturnNullForNullResponse() {
             GHRateLimit result = tracker.updateFromResponse(1L, null);
 
@@ -119,7 +106,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for invalid response")
         void shouldReturnNullForInvalidResponse() {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.isValid()).thenReturn(false);
@@ -130,7 +116,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should track multiple scopes independently")
         void shouldTrackMultipleScopesIndependently() {
             Long scope1 = 1L;
             Long scope2 = 2L;
@@ -145,7 +130,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should update existing scope state")
         void shouldUpdateExistingScopeState() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -160,11 +144,9 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("isCritical")
     class IsCritical {
 
         @Test
-        @DisplayName("should return true when remaining below critical threshold")
         void shouldReturnTrueWhenBelowCriticalThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -174,7 +156,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false when remaining at critical threshold")
         void shouldReturnFalseWhenAtCriticalThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -184,7 +165,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false when remaining above critical threshold")
         void shouldReturnFalseWhenAboveCriticalThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -194,18 +174,15 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false for unknown scope (defaults to 5000)")
         void shouldReturnFalseForUnknownScope() {
             assertThat(tracker.isCritical(999L)).isFalse();
         }
     }
 
     @Nested
-    @DisplayName("isLow")
     class IsLow {
 
         @Test
-        @DisplayName("should return true when remaining below low threshold")
         void shouldReturnTrueWhenBelowLowThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -215,7 +192,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false when remaining at low threshold")
         void shouldReturnFalseWhenAtLowThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -225,7 +201,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false when remaining above low threshold")
         void shouldReturnFalseWhenAboveLowThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -235,18 +210,15 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false for unknown scope (defaults to 5000)")
         void shouldReturnFalseForUnknownScope() {
             assertThat(tracker.isLow(999L)).isFalse();
         }
     }
 
     @Nested
-    @DisplayName("waitIfNeeded")
     class WaitIfNeeded {
 
         @Test
-        @DisplayName("should not wait when remaining is above low threshold")
         void shouldNotWaitWhenAboveLowThreshold() throws InterruptedException {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -258,7 +230,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not wait when remaining is between critical and low thresholds")
         void shouldNotWaitWhenBetweenCriticalAndLow() throws InterruptedException {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -270,7 +241,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not wait when reset time has already passed")
         void shouldNotWaitWhenResetTimeHasPassed() throws InterruptedException {
             Long scopeId = 1L;
             OffsetDateTime pastResetTime = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(5);
@@ -283,11 +253,9 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getRecommendedDelay")
     class GetRecommendedDelay {
 
         @Test
-        @DisplayName("should return zero when remaining is above low threshold")
         void shouldReturnZeroWhenAboveLowThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -299,7 +267,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return zero when reset time is in the past")
         void shouldReturnZeroWhenResetTimeInPast() {
             Long scopeId = 1L;
             OffsetDateTime pastResetTime = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(5);
@@ -311,7 +278,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return positive delay when remaining is low")
         void shouldReturnPositiveDelayWhenLow() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(30);
@@ -323,7 +289,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return zero for unknown scope")
         void shouldReturnZeroForUnknownScope() {
             Duration delay = tracker.getRecommendedDelay(999L);
 
@@ -332,11 +297,9 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Metrics")
     class Metrics {
 
         @Test
-        @DisplayName("should register metrics gauge on first update")
         void shouldRegisterMetricsGaugeOnFirstUpdate() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
@@ -360,7 +323,6 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reflect updated values in gauges")
         void shouldReflectUpdatedValuesInGauges() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);

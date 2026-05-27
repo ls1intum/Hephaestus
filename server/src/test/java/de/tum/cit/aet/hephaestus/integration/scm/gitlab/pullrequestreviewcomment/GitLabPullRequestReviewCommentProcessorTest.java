@@ -20,7 +20,6 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -29,7 +28,6 @@ import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
 
 @Tag("unit")
-@DisplayName("GitLabPullRequestReviewCommentProcessor")
 class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
 
     private static final long PROVIDER_ID = 2L;
@@ -72,32 +70,27 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("resolvePath")
     class ResolvePath {
 
         @Test
-        @DisplayName("should prefer newPath when available")
         void shouldPreferNewPathWhenAvailable() {
             var data = buildDiffNoteData("new/path.ts", "old/path.ts", "ignored.ts", 10, null, null, null, null);
             assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data)).isEqualTo("new/path.ts");
         }
 
         @Test
-        @DisplayName("should fall back to oldPath when newPath is blank")
         void shouldFallBackToOldPathWhenNewPathIsBlank() {
             var data = buildDiffNoteData(null, "old/path.ts", "ignored.ts", null, 5, null, null, null);
             assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data)).isEqualTo("old/path.ts");
         }
 
         @Test
-        @DisplayName("should fall back to filePath when both newPath and oldPath are null")
         void shouldFallBackToFilePathWhenNewAndOldPathAreNull() {
             var data = buildDiffNoteData(null, null, "resolved/path.ts", 10, null, null, null, null);
             assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data)).isEqualTo("resolved/path.ts");
         }
 
         @Test
-        @DisplayName("should return empty string when no path is available")
         void shouldReturnEmptyStringWhenNoPathIsAvailable() {
             var data = buildDiffNoteData(null, null, null, 10, null, null, null, null);
             assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data)).isEmpty();
@@ -109,11 +102,9 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("deriveSide")
     class DeriveSide {
 
         @Test
-        @DisplayName("should return RIGHT when newLine is present")
         void shouldReturnRightWhenNewLineIsPresent() {
             assertThat(GitLabPullRequestReviewCommentProcessor.deriveSide(42, null)).isEqualTo(
                 PullRequestReviewComment.Side.RIGHT
@@ -121,7 +112,6 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return LEFT when only oldLine is present")
         void shouldReturnLeftWhenOnlyOldLineIsPresent() {
             assertThat(GitLabPullRequestReviewCommentProcessor.deriveSide(null, 7)).isEqualTo(
                 PullRequestReviewComment.Side.LEFT
@@ -129,7 +119,6 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should default to RIGHT when neither line is present")
         void shouldDefaultToRightWhenNeitherLineIsPresent() {
             assertThat(GitLabPullRequestReviewCommentProcessor.deriveSide(null, null)).isEqualTo(
                 PullRequestReviewComment.Side.RIGHT
@@ -142,11 +131,9 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("buildDiffHunkStub")
     class BuildDiffHunkStub {
 
         @Test
-        @DisplayName("should build single-line stub when newLine is present")
         void shouldBuildSingleLineStubWhenNewLineIsPresent() {
             assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(null, 42)).isEqualTo(
                 "@@ -0,1 +42,1 @@"
@@ -154,19 +141,16 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should build single-line stub when oldLine is present")
         void shouldBuildSingleLineStubWhenOldLineIsPresent() {
             assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(7, null)).isEqualTo("@@ -7,1 +0,1 @@");
         }
 
         @Test
-        @DisplayName("should return null when both lines are null")
         void shouldReturnNullWhenBothLinesAreNull() {
             assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(null, null)).isNull();
         }
 
         @Test
-        @DisplayName("should return null when both lines are zero")
         void shouldReturnNullWhenBothLinesAreZero() {
             assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(0, 0)).isNull();
         }
@@ -177,11 +161,9 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("findOrCreateComment — creation")
     class CreateComment {
 
         @Test
-        @DisplayName("should populate path, side, commitId, originalCommitId, and diffHunk when creating a comment")
         void shouldPopulateAllPositionMetadataWhenCreatingComment() {
             when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID)).thenReturn(
                 Optional.empty()
@@ -224,7 +206,6 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should fall back to startSha for originalCommitId when baseSha is null")
         void shouldFallBackToStartShaWhenBaseShaIsNull() {
             when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID)).thenReturn(
                 Optional.empty()
@@ -251,7 +232,6 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should attach inReplyTo when reply context is provided")
         void shouldAttachInReplyToWhenReplyContextIsProvided() {
             when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID)).thenReturn(
                 Optional.empty()
@@ -281,7 +261,6 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should link review via addComment when review context is provided")
         void shouldLinkReviewWhenReviewContextIsProvided() {
             when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID)).thenReturn(
                 Optional.empty()
@@ -313,7 +292,6 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should publish ReviewCommentCreated event when a new comment is persisted")
         void shouldPublishReviewCommentCreatedEventWhenNewCommentIsPersisted() {
             when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID)).thenReturn(
                 Optional.empty()
@@ -340,7 +318,6 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip and return null when noteGlobalId cannot be parsed")
         void shouldSkipWhenNoteGlobalIdCannotBeParsed() {
             var data = new GitLabPullRequestReviewCommentProcessor.DiffNoteData(
                 "not-a-gid",
@@ -380,11 +357,9 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("DiffNoteData backward-compat")
     class DiffNoteDataBackwardCompat {
 
         @Test
-        @DisplayName("should default startSha to null for 12-arg callers")
         void shouldDefaultStartShaToNullFor12ArgCallers() {
             var data = new GitLabPullRequestReviewCommentProcessor.DiffNoteData(
                 "gid://gitlab/DiffNote/1",

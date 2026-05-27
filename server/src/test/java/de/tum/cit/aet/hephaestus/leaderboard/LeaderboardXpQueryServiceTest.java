@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,6 @@ import org.mockito.quality.Strictness;
  * Verifies correct data hydration and breakdown stat accumulation.
  */
 @Tag("unit")
-@DisplayName("LeaderboardXpQueryService")
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class LeaderboardXpQueryServiceTest {
@@ -119,29 +117,22 @@ class LeaderboardXpQueryServiceTest {
     }
 
     @Nested
-    @DisplayName("getLeaderboardData")
     class GetLeaderboardDataTests {
 
         @Test
-        @DisplayName("returns empty map when no activity events exist")
         void returnsEmptyMapWhenNoEvents() {
-            // Arrange
             when(
                 activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(WORKSPACE_ID, SINCE, UNTIL)
             ).thenReturn(List.of());
 
-            // Act
             Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
 
-            // Assert
             assertThat(result).isEmpty();
             verify(activityEventRepository, never()).findActivityBreakdown(any(), any(), any(), any());
         }
 
         @Test
-        @DisplayName("aggregates XP totals from activity events")
         void aggregatesXpTotals() {
-            // Arrange
             User user1 = createUser(100L, "alice");
             User user2 = createUser(200L, "bob");
 
@@ -158,10 +149,8 @@ class LeaderboardXpQueryServiceTest {
             ).thenReturn(List.of());
             when(userRepository.findAllById(Set.of(100L, 200L))).thenReturn(List.of(user1, user2));
 
-            // Act
             Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
 
-            // Assert
             assertThat(result).hasSize(2);
             assertThat(result.get(100L).totalScore()).isEqualTo(150);
             assertThat(result.get(100L).eventCount()).isEqualTo(10);
@@ -170,9 +159,7 @@ class LeaderboardXpQueryServiceTest {
         }
 
         @Test
-        @DisplayName("enriches data with activity breakdown by event type")
         void enrichesWithBreakdown() {
-            // Arrange
             User user = createUser(100L, "alice");
 
             List<ActivityXpProjection> xpData = List.of(createXpProjection(100L, 100.0, 8L));
@@ -200,10 +187,8 @@ class LeaderboardXpQueryServiceTest {
             ).thenReturn(Map.of(100L, 1L));
             when(userRepository.findAllById(Set.of(100L))).thenReturn(List.of(user));
 
-            // Act
             Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
 
-            // Assert
             LeaderboardUserXp data = result.get(100L);
             assertThat(data).isNotNull();
             assertThat(data.approvals()).isEqualTo(3);
@@ -214,9 +199,7 @@ class LeaderboardXpQueryServiceTest {
         }
 
         @Test
-        @DisplayName("skips actors without matching user entity")
         void skipsUnknownActors() {
-            // Arrange
             User knownUser = createUser(100L, "alice");
 
             List<ActivityXpProjection> xpData = List.of(
@@ -232,19 +215,15 @@ class LeaderboardXpQueryServiceTest {
             ).thenReturn(List.of());
             when(userRepository.findAllById(Set.of(100L, 999L))).thenReturn(List.of(knownUser));
 
-            // Act
             Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
 
-            // Assert
             assertThat(result).hasSize(1);
             assertThat(result.containsKey(100L)).isTrue();
             assertThat(result.containsKey(999L)).isFalse();
         }
 
         @Test
-        @DisplayName("filters by team IDs when provided")
         void filtersByTeamIds() {
-            // Arrange
             User user = createUser(100L, "alice");
             Set<Long> teamIds = Set.of(10L, 20L);
 
@@ -296,10 +275,8 @@ class LeaderboardXpQueryServiceTest {
             ).thenReturn(Map.of(100L, 3L));
             when(userRepository.findAllById(Set.of(100L))).thenReturn(List.of(user));
 
-            // Act
             Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL, teamIds);
 
-            // Assert
             assertThat(result).hasSize(1);
             verify(activityEventRepository).findExperiencePointsByWorkspaceAndTeamsAndTimeframe(
                 WORKSPACE_ID,
@@ -314,9 +291,7 @@ class LeaderboardXpQueryServiceTest {
         }
 
         @Test
-        @DisplayName("handles null XP and event count gracefully")
         void handlesNullValues() {
-            // Arrange
             User user = createUser(100L, "alice");
             ActivityXpProjection xpWithNulls = createXpProjection(100L, null, null);
 
@@ -328,10 +303,8 @@ class LeaderboardXpQueryServiceTest {
             ).thenReturn(List.of());
             when(userRepository.findAllById(Set.of(100L))).thenReturn(List.of(user));
 
-            // Act
             Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
 
-            // Assert
             LeaderboardUserXp data = result.get(100L);
             assertThat(data.totalScore()).isZero();
             assertThat(data.eventCount()).isZero();

@@ -31,7 +31,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * — survive future regressions.
  */
 @TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
-@DisplayName("MentorChatController auth integration")
 class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -87,7 +86,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
 
     @Test
     @WithMentorUser
-    @DisplayName("authenticated non-member → 403 (filter rejects with FORBIDDEN_MEMBERSHIP)")
     void authenticatedButNotMember_returnsForbidden() {
         persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-test");
@@ -107,7 +105,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
 
     @Test
     @WithMentorUser
-    @DisplayName("authenticated member → 200 SSE with AI-SDK header and service is dispatched")
     void authenticatedMember_returnsOkSseStreamAndDispatchesService() throws Exception {
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-happy");
@@ -148,7 +145,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
 
     @Test
     @WithMentorUser
-    @DisplayName("authenticated member of workspace with mentorEnabled=false → 404 (per-workspace gate)")
     void authenticatedMember_mentorDisabled_returnsNotFound() {
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-disabled");

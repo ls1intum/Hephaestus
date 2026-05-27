@@ -53,7 +53,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Mono;
 
-@DisplayName("GitLabGroupMemberSyncService")
 class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
     private static final Long TEST_PROVIDER_ID = 100L;
@@ -139,11 +138,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("syncGroupMemberships — argument validation")
     class ArgumentValidation {
 
         @Test
-        @DisplayName("null organization returns -1")
         void nullOrganization_returnsNegative() {
             int result = service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, null);
             assertThat(result).isEqualTo(-1);
@@ -151,7 +148,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null group path returns -1")
         void nullGroupPath_returnsNegative() {
             int result = service.syncGroupMemberships(SCOPE_ID, null, testOrg);
             assertThat(result).isEqualTo(-1);
@@ -159,7 +155,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("blank group path returns -1")
         void blankGroupPath_returnsNegative() {
             int result = service.syncGroupMemberships(SCOPE_ID, "   ", testOrg);
             assertThat(result).isEqualTo(-1);
@@ -168,11 +163,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("syncGroupMemberships — provider resolution")
     class ProviderResolution {
 
         @Test
-        @DisplayName("throws IllegalStateException when provider not found")
         void providerNotFound_throwsIllegalState() {
             when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com")).thenReturn(
                 Optional.empty()
@@ -185,11 +178,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("syncGroupMemberships — single page")
     class SinglePage {
 
         @Test
-        @DisplayName("syncs all members, fires event, returns unique count")
         void syncsAllMembers() throws InterruptedException {
             var member1 = createMember("gid://gitlab/User/10", "alice", "Alice", 30); // DEVELOPER → MEMBER
             var member2 = createMember("gid://gitlab/User/20", "bob", "Bob", 50); // OWNER → ADMIN
@@ -247,7 +238,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("duplicate member on same page counted only once")
         void duplicateMember_countedOnce() {
             var member1 = createMember("gid://gitlab/User/10", "alice", "Alice", 30);
             var member2 = createMember("gid://gitlab/User/10", "alice", "Alice", 30); // duplicate
@@ -268,11 +258,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("syncGroupMemberships — multi-page pagination")
     class MultiPage {
 
         @Test
-        @DisplayName("fetches all pages and deduplicates across pages")
         void fetchesAllPages() throws InterruptedException {
             var member1 = createMember("gid://gitlab/User/10", "alice", "Alice", 30);
             var member2 = createMember("gid://gitlab/User/20", "bob", "Bob", 40);
@@ -298,7 +286,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null cursor despite hasNextPage=true stops pagination")
         void nullCursor_stopsPagination() {
             var member = createMember("gid://gitlab/User/10", "alice", "Alice", 30);
             // hasNextPage=true but endCursor=null
@@ -320,11 +307,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("syncGroupMemberships — stale member removal")
     class StaleMemberRemoval {
 
         @Test
-        @DisplayName("removes stale members after complete sync")
         void removesStaleMembers() {
             var member = createMember("gid://gitlab/User/10", "alice", "Alice", 30);
 
@@ -351,7 +336,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("stale removal skipped when sync incomplete, returns count")
         void staleRemovalSkipped_whenIncomplete() {
             HttpGraphQlClient client = mockClient();
             ClientGraphQlResponse invalidResp = mock(ClientGraphQlResponse.class);
@@ -381,11 +365,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("syncGroupMemberships — error handling")
     class ErrorHandling {
 
         @Test
-        @DisplayName("null member user is skipped")
         void nullMemberUser_skipped() {
             var nullUserMember = new GitLabGroupMemberResponse(null, new GitLabAccessLevel("DEVELOPER", 30));
             var validMember = createMember("gid://gitlab/User/10", "alice", "Alice", 30);
@@ -404,7 +386,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("invalid GID is skipped gracefully")
         void invalidGid_skippedGracefully() {
             var badMember = createMember("invalid-gid", "baduser", "Bad User", 30);
             var goodMember = createMember("gid://gitlab/User/10", "alice", "Alice", 30);
@@ -436,7 +417,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("InterruptedException during Thread.sleep returns -1")
         void interruptedDuringSleep_returnsNegative() {
             var member = createMember("gid://gitlab/User/10", "alice", "Alice", 30);
 
@@ -463,7 +443,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("InterruptedException during rate limit wait breaks loop cleanly")
         void interruptedDuringRateLimitWait_breaksLoop() throws InterruptedException {
             doThrow(new InterruptedException("rate limit wait interrupted"))
                 .when(graphQlClientProvider)
@@ -479,7 +458,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("exception during GraphQL execution returns -1")
         void graphQlException_returnsNegative() {
             HttpGraphQlClient client = mockClient();
             HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -495,7 +473,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("empty member list on complete sync does not delete all memberships")
         void emptyMemberList_doesNotDeleteAll() {
             ClientGraphQlResponse response = mockMembersPage(List.of(), null);
             HttpGraphQlClient client = mockClient();
@@ -526,7 +503,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     class ListenerTests {
 
         @Test
-        @DisplayName("no listener configured does not throw")
         void noListener_doesNotThrow() {
             PlatformTransactionManager mockTxManager = mock(PlatformTransactionManager.class);
             lenient().when(mockTxManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
@@ -559,11 +535,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("upsertUser")
     class UpsertUser {
 
         @Test
-        @DisplayName("upserts via native SQL with advisory lock and login conflict resolution")
         void upsertsViaNativeSql() {
             stubUserLookup(42L, 1042L);
 
@@ -602,7 +576,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("proceeds without freeLoginConflicts when lock not acquired")
         void lockNotAcquired_proceedsWithoutFreeConflicts() {
             when(userRepository.tryAcquireLoginLock("alice", TEST_PROVIDER_ID)).thenReturn(false);
             stubUserLookup(42L, 1042L);
@@ -634,7 +607,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null avatar URL defaults to empty string")
         void nullAvatarUrl_defaultsToEmpty() {
             stubUserLookup(42L, 1042L);
 
@@ -664,7 +636,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("invalid GID returns null")
         void invalidGid_returnsNull() {
             var memberUser = new GitLabMemberUser(
                 "not-a-valid-gid",
@@ -692,7 +663,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("user not found after upsert returns null")
         void userNotFoundAfterUpsert_returnsNull() {
             when(userRepository.findByNativeIdAndProviderId(42L, TEST_PROVIDER_ID)).thenReturn(Optional.empty());
 
@@ -724,11 +694,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("mapAccessLevel")
     class MapAccessLevel {
 
         @Test
-        @DisplayName("OWNER (50) maps to ADMIN")
         void owner_mapsToAdmin() {
             assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("OWNER", 50))).isEqualTo(
                 OrganizationMemberRole.ADMIN
@@ -736,7 +704,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("MAINTAINER (40) maps to ADMIN")
         void maintainer_mapsToAdmin() {
             assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("MAINTAINER", 40))).isEqualTo(
                 OrganizationMemberRole.ADMIN
@@ -744,7 +711,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("DEVELOPER (30) maps to MEMBER")
         void developer_mapsToMember() {
             assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("DEVELOPER", 30))).isEqualTo(
                 OrganizationMemberRole.MEMBER
@@ -752,7 +718,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("REPORTER (20) maps to MEMBER")
         void reporter_mapsToMember() {
             assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("REPORTER", 20))).isEqualTo(
                 OrganizationMemberRole.MEMBER
@@ -760,7 +725,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("PLANNER (15) maps to MEMBER")
         void planner_mapsToMember() {
             assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("PLANNER", 15))).isEqualTo(
                 OrganizationMemberRole.MEMBER
@@ -768,7 +732,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("GUEST (10) maps to MEMBER")
         void guest_mapsToMember() {
             assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("GUEST", 10))).isEqualTo(
                 OrganizationMemberRole.MEMBER
@@ -776,7 +739,6 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("MINIMAL_ACCESS (5) maps to MEMBER")
         void minimalAccess_mapsToMember() {
             assertThat(
                 GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("MINIMAL_ACCESS", 5))
@@ -784,13 +746,11 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null access level maps to MEMBER")
         void nullAccessLevel_mapsToMember() {
             assertThat(GitLabGroupMemberSyncService.mapAccessLevel(null)).isEqualTo(OrganizationMemberRole.MEMBER);
         }
 
         @Test
-        @DisplayName("null integer value maps to MEMBER")
         void nullIntegerValue_mapsToMember() {
             assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("UNKNOWN", null))).isEqualTo(
                 OrganizationMemberRole.MEMBER

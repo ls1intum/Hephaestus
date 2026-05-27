@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -33,7 +32,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Pull Request Review Comment Message Handler")
 class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -128,15 +126,12 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("repository.pull_request_review_comment");
     }
 
     @Test
-    @DisplayName("Should create review comment on created event")
     void shouldCreateReviewCommentOnCreatedEvent() throws Exception {
-        // Given
         GitHubPullRequestReviewCommentEventDTO event = loadPayload("pull_request_review_comment.created");
 
         // Create the PR that the comment belongs to
@@ -145,7 +140,6 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         // Verify comment doesn't exist initially
         assertThat(commentRepository.findByNativeIdAndProviderId(event.comment().id(), gitProvider.getId())).isEmpty();
 
-        // When
         handler.handleEvent(event);
 
         // Then - verify comment is created with required fields
@@ -165,7 +159,6 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     }
 
     @Test
-    @DisplayName("Should update review comment on edited event")
     void shouldUpdateReviewCommentOnEditedEvent() throws Exception {
         // Given - first create the comment
         GitHubPullRequestReviewCommentEventDTO createEvent = loadPayload("pull_request_review_comment.created");
@@ -175,10 +168,8 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         // Load edited event
         GitHubPullRequestReviewCommentEventDTO editEvent = loadPayload("pull_request_review_comment.edited");
 
-        // When
         handler.handleEvent(editEvent);
 
-        // Then
         assertThat(commentRepository.findByNativeIdAndProviderId(editEvent.comment().id(), gitProvider.getId()))
             .isPresent()
             .get()
@@ -188,7 +179,6 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     }
 
     @Test
-    @DisplayName("Should delete review comment on deleted event")
     void shouldDeleteReviewCommentOnDeletedEvent() throws Exception {
         // Given - first create the comment
         GitHubPullRequestReviewCommentEventDTO createEvent = loadPayload("pull_request_review_comment.created");
@@ -203,10 +193,8 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         // Load deleted event
         GitHubPullRequestReviewCommentEventDTO deleteEvent = loadPayload("pull_request_review_comment.deleted");
 
-        // When
         handler.handleEvent(deleteEvent);
 
-        // Then
         assertThat(
             commentRepository.findByNativeIdAndProviderId(deleteEvent.comment().id(), gitProvider.getId())
         ).isEmpty();

@@ -8,14 +8,12 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-@DisplayName("FeatureFlagService")
 class FeatureFlagServiceTest extends BaseUnitTest {
 
     @Mock
@@ -30,11 +28,9 @@ class FeatureFlagServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("isEnabled — ROLE flags")
     class RoleFlags {
 
         @Test
-        @DisplayName("returns true when user has the matching authority")
         void returnsTrueWhenUserHasRole() {
             setSecurityContext("testuser", FeatureFlag.MENTOR_ACCESS.key());
 
@@ -42,7 +38,6 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns false when user lacks the authority")
         void returnsFalseWhenUserLacksRole() {
             setSecurityContext("testuser", FeatureFlag.MENTOR_ACCESS.key());
 
@@ -50,13 +45,11 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns false when no security context is present")
         void returnsFalseWithNoSecurityContext() {
             assertThat(featureFlagService.isEnabled(FeatureFlag.MENTOR_ACCESS)).isFalse();
         }
 
         @Test
-        @DisplayName("returns true for admin user with admin authority")
         void returnsTrueForAdminUser() {
             setSecurityContext("admin", FeatureFlag.ADMIN.key());
 
@@ -64,7 +57,6 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns correct flags when user has multiple authorities")
         void returnsCorrectFlagsWithMultipleAuthorities() {
             setSecurityContext(
                 "poweruser",
@@ -81,11 +73,9 @@ class FeatureFlagServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("isEnabled — CONFIG flags")
     class ConfigFlags {
 
         @Test
-        @DisplayName("returns true when config flag is enabled")
         void returnsTrueWhenConfigEnabled() {
             when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(true);
 
@@ -93,7 +83,6 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns false when config flag is disabled")
         void returnsFalseWhenConfigDisabled() {
             when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(false);
 
@@ -101,7 +90,6 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("CONFIG flags do not depend on security context")
         void configFlagsIgnoreSecurityContext() {
             when(featureProperties.isEnabled(FeatureFlag.PRACTICE_REVIEW_FOR_ALL.key())).thenReturn(true);
 
@@ -111,11 +99,9 @@ class FeatureFlagServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("allEnabled — AND composition")
     class AllEnabled {
 
         @Test
-        @DisplayName("returns true when all flags are enabled")
         void returnsTrueWhenAllEnabled() {
             setSecurityContext("admin", FeatureFlag.ADMIN.key());
             when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(true);
@@ -126,7 +112,6 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns false when one flag is disabled")
         void returnsFalseWhenOneDisabled() {
             setSecurityContext("admin", FeatureFlag.ADMIN.key());
             when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(false);
@@ -137,18 +122,15 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns true for empty varargs")
         void returnsTrueForEmpty() {
             assertThat(featureFlagService.allEnabled()).isTrue();
         }
     }
 
     @Nested
-    @DisplayName("anyEnabled — OR composition")
     class AnyEnabled {
 
         @Test
-        @DisplayName("returns true when at least one flag is enabled")
         void returnsTrueWhenOneEnabled() {
             // ADMIN role flag is checked first and returns true (short-circuits)
             setSecurityContext("admin", FeatureFlag.ADMIN.key());
@@ -159,7 +141,6 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns false when no flags are enabled")
         void returnsFalseWhenNoneEnabled() {
             // No security context → ROLE flags return false
             // CONFIG flags also return false (Mockito defaults unstubbed boolean to false)
@@ -169,18 +150,15 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns false for empty varargs")
         void returnsFalseForEmpty() {
             assertThat(featureFlagService.anyEnabled()).isFalse();
         }
     }
 
     @Nested
-    @DisplayName("evaluateAll")
     class EvaluateAll {
 
         @Test
-        @DisplayName("returns a map with all flags evaluated")
         void returnsAllFlags() {
             setSecurityContext("testuser", FeatureFlag.MENTOR_ACCESS.key());
             when(featureProperties.isEnabled(FeatureFlag.PRACTICE_REVIEW_FOR_ALL.key())).thenReturn(true);
@@ -195,11 +173,9 @@ class FeatureFlagServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("null safety")
     class NullSafety {
 
         @Test
-        @DisplayName("isEnabled throws NullPointerException for null flag")
         void throwsForNullFlag() {
             assertThatThrownBy(() -> featureFlagService.isEnabled(null))
                 .isInstanceOf(NullPointerException.class)

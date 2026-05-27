@@ -11,7 +11,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -33,46 +32,38 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Initial State")
     class InitialState {
 
         @Test
-        @DisplayName("should return default limit (100) for unknown scope")
         void shouldReturnDefaultLimitForUnknownScope() {
             assertThat(tracker.getRemaining(999L)).isEqualTo(100);
         }
 
         @Test
-        @DisplayName("should return default limit for null scope")
         void shouldReturnDefaultLimitForNullScope() {
             assertThat(tracker.getRemaining(null)).isEqualTo(100);
         }
 
         @Test
-        @DisplayName("should return default from getLimit for unknown scope")
         void shouldReturnDefaultFromGetLimitForUnknownScope() {
             assertThat(tracker.getLimit(999L)).isEqualTo(100);
         }
 
         @Test
-        @DisplayName("should return null reset time for unknown scope")
         void shouldReturnNullResetTimeForUnknownScope() {
             assertThat(tracker.getResetAt(999L)).isNull();
         }
 
         @Test
-        @DisplayName("should have zero tracked scopes initially")
         void shouldHaveZeroTrackedScopes() {
             assertThat(tracker.getTrackedScopeCount()).isZero();
         }
     }
 
     @Nested
-    @DisplayName("updateFromHeaders")
     class UpdateFromHeaders {
 
         @Test
-        @DisplayName("should update state from valid headers")
         void shouldUpdateStateFromValidHeaders() {
             Long scopeId = 1L;
             Instant resetTime = Instant.now().plusSeconds(60);
@@ -87,7 +78,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null scope ID")
         void shouldHandleNullScopeId() {
             HttpHeaders headers = createHeaders(80, 100, Instant.now().plusSeconds(60), 5);
             tracker.updateFromHeaders(null, headers);
@@ -95,21 +85,18 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null headers")
         void shouldHandleNullHeaders() {
             tracker.updateFromHeaders(1L, null);
             assertThat(tracker.getTrackedScopeCount()).isZero();
         }
 
         @Test
-        @DisplayName("should handle headers without rate limit info")
         void shouldHandleEmptyHeaders() {
             tracker.updateFromHeaders(1L, new HttpHeaders());
             assertThat(tracker.getTrackedScopeCount()).isZero();
         }
 
         @Test
-        @DisplayName("should track multiple scopes independently")
         void shouldTrackMultipleScopesIndependently() {
             Long scope1 = 1L;
             Long scope2 = 2L;
@@ -124,7 +111,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should update existing scope state")
         void shouldUpdateExistingScopeState() {
             Long scopeId = 1L;
             Instant resetTime = Instant.now().plusSeconds(60);
@@ -139,11 +125,9 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("isCritical")
     class IsCritical {
 
         @Test
-        @DisplayName("should return true when remaining below critical threshold (5)")
         void shouldReturnTrueWhenBelowCriticalThreshold() {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(3, 100, Instant.now().plusSeconds(60), 10));
@@ -151,7 +135,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false when remaining at critical threshold")
         void shouldReturnFalseWhenAtCriticalThreshold() {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(5, 100, Instant.now().plusSeconds(60), 10));
@@ -159,7 +142,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false when remaining above critical threshold")
         void shouldReturnFalseWhenAboveCriticalThreshold() {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
@@ -167,18 +149,15 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false for unknown scope (defaults to 100)")
         void shouldReturnFalseForUnknownScope() {
             assertThat(tracker.isCritical(999L)).isFalse();
         }
     }
 
     @Nested
-    @DisplayName("isLow")
     class IsLow {
 
         @Test
-        @DisplayName("should return true when remaining below low threshold (15)")
         void shouldReturnTrueWhenBelowLowThreshold() {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(10, 100, Instant.now().plusSeconds(60), 5));
@@ -186,7 +165,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false when remaining at low threshold")
         void shouldReturnFalseWhenAtLowThreshold() {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(15, 100, Instant.now().plusSeconds(60), 5));
@@ -194,18 +172,15 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false for unknown scope (defaults to 100)")
         void shouldReturnFalseForUnknownScope() {
             assertThat(tracker.isLow(999L)).isFalse();
         }
     }
 
     @Nested
-    @DisplayName("waitIfNeeded")
     class WaitIfNeeded {
 
         @Test
-        @DisplayName("should not wait when remaining is above low threshold")
         void shouldNotWaitWhenAboveLowThreshold() throws InterruptedException {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
@@ -213,7 +188,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not wait when between critical and low thresholds")
         void shouldNotWaitWhenBetweenCriticalAndLow() throws InterruptedException {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(10, 100, Instant.now().plusSeconds(60), 5));
@@ -221,7 +195,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not wait when reset time has already passed")
         void shouldNotWaitWhenResetTimeHasPassed() throws InterruptedException {
             Long scopeId = 1L;
             Instant pastResetTime = Instant.now().minusSeconds(30);
@@ -231,11 +204,9 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getRecommendedDelay")
     class GetRecommendedDelay {
 
         @Test
-        @DisplayName("should return zero when remaining is above low threshold")
         void shouldReturnZeroWhenAboveLowThreshold() {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
@@ -243,7 +214,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return zero when reset time is in the past")
         void shouldReturnZeroWhenResetTimeInPast() {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(10, 100, Instant.now().minusSeconds(30), 5));
@@ -251,7 +221,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return positive delay when remaining is low")
         void shouldReturnPositiveDelayWhenLow() {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(10, 100, Instant.now().plusSeconds(30), 5));
@@ -259,18 +228,15 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return zero for unknown scope")
         void shouldReturnZeroForUnknownScope() {
             assertThat(tracker.getRecommendedDelay(999L)).isEqualTo(Duration.ZERO);
         }
     }
 
     @Nested
-    @DisplayName("Metrics")
     class Metrics {
 
         @Test
-        @DisplayName("should register metrics on first update")
         void shouldRegisterMetricsOnFirstUpdate() {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
@@ -293,7 +259,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reflect updated values in gauges")
         void shouldReflectUpdatedValuesInGauges() {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
@@ -311,11 +276,9 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Eviction")
     class Eviction {
 
         @Test
-        @DisplayName("should not evict recently updated entries")
         void shouldNotEvictRecentEntries() {
             tracker.updateFromHeaders(1L, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
             tracker.evictStaleEntries();

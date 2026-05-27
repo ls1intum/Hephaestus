@@ -91,11 +91,9 @@ class AccountServiceTest extends BaseUnitTest {
     // ── getUserSettings ─────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("getUserSettings")
     class GetUserSettings {
 
         @Test
-        @DisplayName("returns DTO with all fields including aiReviewEnabled")
         void returnsAllFields() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -110,7 +108,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns defaults when no preferences exist")
         void returnsDefaults() {
             User user = createUser();
             when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
@@ -126,11 +123,9 @@ class AccountServiceTest extends BaseUnitTest {
     // ── updateUserSettings ──────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("updateUserSettings")
     class UpdateUserSettings {
 
         @Test
-        @DisplayName("persists aiReviewEnabled=true")
         void persistsAiReviewEnabledTrue() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -147,7 +142,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("persists aiReviewEnabled=false")
         void persistsAiReviewEnabledFalse() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -164,7 +158,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws when aiReviewEnabled is null")
         void throwsWhenAiReviewEnabledNull() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -178,7 +171,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does not touch PostHog when only aiReviewEnabled changes")
         void noPosthogWhenOnlyAiReviewChanges() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -196,11 +188,9 @@ class AccountServiceTest extends BaseUnitTest {
     // ── isAiReviewEnabled ───────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("isAiReviewEnabled")
     class IsAiReviewEnabled {
 
         @Test
-        @DisplayName("returns true when preference exists and is enabled")
         void returnsTrueWhenEnabled() {
             UserPreferences prefs = new UserPreferences();
             prefs.setAiReviewEnabled(true);
@@ -210,7 +200,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns false when preference exists and is disabled")
         void returnsFalseWhenDisabled() {
             UserPreferences prefs = new UserPreferences();
             prefs.setAiReviewEnabled(false);
@@ -228,7 +217,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws IllegalArgumentException when userLogin is null")
         void throwsWhenUserLoginNull() {
             assertThatThrownBy(() -> accountService.isAiReviewEnabled(null))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -236,7 +224,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws IllegalArgumentException when userLogin is blank")
         void throwsWhenUserLoginBlank() {
             assertThatThrownBy(() -> accountService.isAiReviewEnabled("   "))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -244,7 +231,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws IllegalArgumentException when userLogin is empty string")
         void throwsWhenUserLoginEmpty() {
             assertThatThrownBy(() -> accountService.isAiReviewEnabled(""))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -255,11 +241,9 @@ class AccountServiceTest extends BaseUnitTest {
     // ── updateUserSettings + PostHog combination ─────────────────────────────
 
     @Nested
-    @DisplayName("updateUserSettings – PostHog interaction")
     class UpdateSettingsPosthogInteraction {
 
         @Test
-        @DisplayName("disabling aiReview while opting out of research triggers PostHog deletion")
         void aiReviewChangeWithResearchOptOutTriggersPosthog() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -277,7 +261,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips PostHog deletion when the client bean is absent")
         void skipsPosthogDeletionWhenBeanAbsent() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -293,7 +276,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("round-trip: update then get returns consistent values")
         void roundTripConsistency() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
@@ -314,7 +296,6 @@ class AccountServiceTest extends BaseUnitTest {
     // ── getLinkedAccounts ───────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("getLinkedAccounts")
     class GetLinkedAccounts {
 
         @Mock
@@ -358,7 +339,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns connected and unconnected providers")
         void returnsConnectedAndUnconnectedProviders() {
             setupKeycloakMocks();
             when(identityProvidersResource.findAll()).thenReturn(
@@ -387,7 +367,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("filters out link-only and disabled providers")
         void filtersLinkOnlyAndDisabledProviders() {
             setupKeycloakMocks();
             when(identityProvidersResource.findAll()).thenReturn(
@@ -406,7 +385,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("falls back to alias when displayName is null")
         void fallsBackToAliasWhenDisplayNameNull() {
             setupKeycloakMocks();
             when(identityProvidersResource.findAll()).thenReturn(List.of(idp("github", null, true, false)));
@@ -419,7 +397,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("wraps Keycloak exception in BAD_GATEWAY")
         void wrapsKeycloakExceptionInBadGateway() {
             when(keycloak.realm("hephaestus")).thenThrow(new NotFoundException("realm not found"));
 
@@ -435,7 +412,6 @@ class AccountServiceTest extends BaseUnitTest {
     // ── unlinkAccount ───────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("unlinkAccount")
     class UnlinkAccount {
 
         @Mock
@@ -461,7 +437,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("successfully unlinks when multiple providers exist")
         void successfullyUnlinksWithMultipleProviders() {
             setupKeycloakMocks();
             when(userResource.getFederatedIdentity()).thenReturn(List.of(fedIdentity("github"), fedIdentity("gitlab")));
@@ -472,7 +447,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws CONFLICT when unlinking last provider")
         void throwsConflictWhenUnlinkingLastProvider() {
             setupKeycloakMocks();
             when(userResource.getFederatedIdentity()).thenReturn(List.of(fedIdentity("github")));
@@ -486,7 +460,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws NOT_FOUND when provider alias not linked")
         void throwsNotFoundWhenProviderNotLinked() {
             setupKeycloakMocks();
             when(userResource.getFederatedIdentity()).thenReturn(List.of(fedIdentity("github"), fedIdentity("gitlab")));
@@ -500,7 +473,6 @@ class AccountServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("wraps Keycloak exception in BAD_GATEWAY")
         void wrapsKeycloakExceptionInBadGateway() {
             when(keycloak.realm("hephaestus")).thenThrow(new NotFoundException("realm not found"));
 

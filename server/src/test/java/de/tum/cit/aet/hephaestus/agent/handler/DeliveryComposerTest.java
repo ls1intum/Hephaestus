@@ -10,14 +10,12 @@ import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("DeliveryComposer")
 class DeliveryComposerTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -165,7 +163,6 @@ class DeliveryComposerTest extends BaseUnitTest {
     // =========================================================================
 
     @Test
-    @DisplayName("compose with mixed findings produces expected MR note")
     void compose_withMixedFindings_producesExpectedMrNote() {
         List<ValidatedFinding> findings = mixedFindings();
 
@@ -226,7 +223,6 @@ class DeliveryComposerTest extends BaseUnitTest {
     // =========================================================================
 
     @Test
-    @DisplayName("compose with all positive findings produces approval note")
     void compose_withAllPositive_producesApprovalNote() {
         List<ValidatedFinding> findings = List.of(
             positiveFinding("error-state-handling"),
@@ -248,7 +244,6 @@ class DeliveryComposerTest extends BaseUnitTest {
     // =========================================================================
 
     @Test
-    @DisplayName("compose with many negatives shows all in compact list")
     void compose_withManyNegatives_allInCompactList() {
         List<ValidatedFinding> findings = new ArrayList<>();
 
@@ -357,7 +352,6 @@ class DeliveryComposerTest extends BaseUnitTest {
     // =========================================================================
 
     @Test
-    @DisplayName("compose creates diff notes for all negatives")
     void compose_diffNotes_allNegativesGetInlineComments() {
         List<ValidatedFinding> findings = mixedFindings();
 
@@ -411,19 +405,16 @@ class DeliveryComposerTest extends BaseUnitTest {
     // =========================================================================
 
     @Test
-    @DisplayName("compose with null input returns null")
     void compose_withNull_returnsNull() {
         assertThat(DeliveryComposer.compose(null)).isNull();
     }
 
     @Test
-    @DisplayName("compose with empty list returns null")
     void compose_withEmptyList_returnsNull() {
         assertThat(DeliveryComposer.compose(List.of())).isNull();
     }
 
     @Test
-    @DisplayName("compose renders non-inlinable findings in full in MR summary")
     void compose_nonInlinableFindings_renderedInFullInMrNote() {
         List<ValidatedFinding> findings = List.of(
             negativeFinding(
@@ -469,7 +460,6 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("compose puts guidance for inlinable MINOR findings in diff notes")
     void compose_minorFindings_guidanceInDiffNote() {
         List<ValidatedFinding> findings = List.of(
             negativeFinding(
@@ -499,7 +489,6 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("compose with only minor negatives uses improvement language")
     void compose_withOnlyMinorNegatives_usesImprovementLanguage() {
         List<ValidatedFinding> findings = List.of(
             negativeFinding(

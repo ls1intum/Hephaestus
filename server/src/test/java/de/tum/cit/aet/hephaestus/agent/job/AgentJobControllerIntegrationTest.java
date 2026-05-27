@@ -14,13 +14,11 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("Agent job controller integration")
 class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired

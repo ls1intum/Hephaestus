@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.lang.ArchRule;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -27,7 +26,6 @@ import org.junit.jupiter.api.Test;
 class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
 
     @Test
-    @DisplayName("integration/core/spi does NOT depend on any vendor SDK (org.kohsuke / com.slack / org.gitlab4j)")
     void spiHasNoVendorSdkDependencies() {
         ArchRule rule = noClasses()
             .that()
@@ -43,7 +41,6 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    @DisplayName("integration/<kind>/ modules do not import each other")
     void kindModulesDoNotImportEachOther() {
         check(
             noClasses()
@@ -88,7 +85,6 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    @DisplayName("agent/** does not import IntegrationKind for switch/instanceof dispatch")
     void agentDoesNotBranchOnIntegrationKind() {
         // We can't easily pattern-match `switch (kind)` in ArchUnit, but we can require
         // that any agent/ code that does mention IntegrationKind goes through a port

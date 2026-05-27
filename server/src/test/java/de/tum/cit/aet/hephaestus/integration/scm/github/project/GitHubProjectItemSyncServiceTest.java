@@ -39,7 +39,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -58,7 +57,6 @@ import reactor.core.publisher.Mono;
  * with issue/PR queries, including field value delegation to
  * {@link GitHubProjectItemFieldValueSyncService}.
  */
-@DisplayName("GitHubProjectItemSyncService")
 class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
     @Mock
@@ -184,46 +182,36 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("processEmbeddedItems")
     class ProcessEmbeddedItems {
 
         @Test
-        @DisplayName("should return 0 when embeddedItems is null")
         void shouldReturnZeroWhenEmbeddedItemsIsNull() {
-            // Act
             int result = service.processEmbeddedItems(
                 null,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(projectItemProcessor, never()).process(any(), any(), any());
         }
 
         @Test
-        @DisplayName("should return 0 when items list is empty")
         void shouldReturnZeroWhenItemsListIsEmpty() {
-            // Arrange
             EmbeddedProjectItemsDTO emptyItems = EmbeddedProjectItemsDTO.empty();
 
-            // Act
             int result = service.processEmbeddedItems(
                 emptyItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(projectItemProcessor, never()).process(any(), any(), any());
         }
 
         @Test
-        @DisplayName("should process items and delegate field values to fieldValueSyncService")
         void shouldProcessItemsAndDelegateFieldValues() {
-            // Arrange
             Project project = createProject();
             when(projectRepository.findByNodeId(PROJECT_NODE_ID)).thenReturn(Optional.of(project));
 
@@ -239,22 +227,18 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 processedItem
             );
 
-            // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isEqualTo(1);
             verify(fieldValueSyncService).processFieldValues(eq(77L), any(), eq(false), eq(null));
         }
 
         @Test
-        @DisplayName("should pass truncation info to fieldValueSyncService")
         void shouldPassTruncationInfoToFieldValueSyncService() {
-            // Arrange
             Project project = createProject();
             when(projectRepository.findByNodeId(PROJECT_NODE_ID)).thenReturn(Optional.of(project));
 
@@ -288,7 +272,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 processedItem
             );
 
-            // Act
             service.processEmbeddedItems(
                 embeddedItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
@@ -300,7 +283,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip items when project is not synced yet")
         void shouldSkipItemsWhenProjectNotSynced() {
             // Arrange — project not found in repository
             when(projectRepository.findByNodeId(PROJECT_NODE_ID)).thenReturn(Optional.empty());
@@ -309,23 +291,19 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             EmbeddedProjectItem embeddedItem = new EmbeddedProjectItem(itemDto, createProjectRef());
             EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(List.of(embeddedItem), 1, false, null);
 
-            // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(projectItemProcessor, never()).process(any(), any(), any());
             verify(fieldValueSyncService, never()).processFieldValues(any(), any(), any(boolean.class), any());
         }
 
         @Test
-        @DisplayName("should continue processing remaining items when one fails")
         void shouldContinueProcessingWhenOneFails() {
-            // Arrange
             Project project = createProject();
             when(projectRepository.findByNodeId(PROJECT_NODE_ID)).thenReturn(Optional.of(project));
 
@@ -346,7 +324,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 .thenThrow(new RuntimeException("DB error"))
                 .thenReturn(createProjectItem(99L));
 
-            // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
@@ -359,9 +336,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not call fieldValueSyncService when processor returns null")
         void shouldNotCallFieldValueSyncServiceWhenProcessorReturnsNull() {
-            // Arrange
             Project project = createProject();
             when(projectRepository.findByNodeId(PROJECT_NODE_ID)).thenReturn(Optional.of(project));
 
@@ -371,22 +346,18 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
             when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any())).thenReturn(null);
 
-            // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(fieldValueSyncService, never()).processFieldValues(any(), any(), any(boolean.class), any());
         }
 
         @Test
-        @DisplayName("should propagate parentIssueId via withIssueId to processor")
         void shouldPropagateParentIssueIdViaWithIssueId() {
-            // Arrange
             Project project = createProject();
             when(projectRepository.findByNodeId(PROJECT_NODE_ID)).thenReturn(Optional.of(project));
 
@@ -400,7 +371,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 processedItem
             );
 
-            // Act
             service.processEmbeddedItems(
                 embeddedItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
@@ -414,9 +384,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should count item as failed when fieldValueSyncService throws")
         void shouldCountItemAsFailedWhenFieldValueSyncServiceThrows() {
-            // Arrange
             Project project = createProject();
             when(projectRepository.findByNodeId(PROJECT_NODE_ID)).thenReturn(Optional.of(project));
 
@@ -444,7 +412,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 new RuntimeException("Field value error")
             );
 
-            // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
@@ -457,48 +424,38 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip embedded item when item DTO is null")
         void shouldSkipEmbeddedItemWhenItemDtoIsNull() {
-            // Arrange
             EmbeddedProjectItem embeddedItem = new EmbeddedProjectItem(null, createProjectRef());
             EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(List.of(embeddedItem), 1, false, null);
 
-            // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(projectRepository, never()).findByNodeId(any());
         }
 
         @Test
-        @DisplayName("should skip embedded item when project reference is null")
         void shouldSkipEmbeddedItemWhenProjectReferenceIsNull() {
-            // Arrange
             GitHubProjectItemDTO itemDto = createItemDTO("PVTI_no_proj", List.of());
             EmbeddedProjectItem embeddedItem = new EmbeddedProjectItem(itemDto, null);
             EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(List.of(embeddedItem), 1, false, null);
 
-            // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(projectItemProcessor, never()).process(any(), any(), any());
         }
 
         @Test
-        @DisplayName("should process multiple items from different projects")
         void shouldProcessMultipleItemsFromDifferentProjects() {
-            // Arrange
             Project project1 = createProject();
             Project project2 = new Project();
             project2.setId(20L);
@@ -554,14 +511,12 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 .thenReturn(createProjectItem(71L))
                 .thenReturn(createProjectItem(72L));
 
-            // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
                 ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isEqualTo(2);
             verify(projectItemProcessor).process(any(GitHubProjectItemDTO.class), eq(project1), any());
             verify(projectItemProcessor).process(any(GitHubProjectItemDTO.class), eq(project2), any());
@@ -574,7 +529,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("syncRemainingProjectItems")
     class SyncRemainingProjectItems {
 
         @Mock
@@ -584,9 +538,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         private RequestSpec requestSpec;
 
         @Test
-        @DisplayName("should return 0 when issueNodeId is null")
         void shouldReturnZeroWhenIssueNodeIdIsNull() {
-            // Act
             int result = service.syncRemainingProjectItems(
                 SCOPE_ID,
                 null,
@@ -596,15 +548,12 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(graphQlClientProvider, never()).forScope(any());
         }
 
         @Test
-        @DisplayName("should return 0 when issueNodeId is blank")
         void shouldReturnZeroWhenIssueNodeIdIsBlank() {
-            // Act
             int result = service.syncRemainingProjectItems(
                 SCOPE_ID,
                 "  ",
@@ -614,15 +563,12 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(graphQlClientProvider, never()).forScope(any());
         }
 
         @Test
-        @DisplayName("should paginate through remaining items for issue")
         void shouldPaginateThroughRemainingItemsForIssue() {
-            // Arrange
             Repository repository = mock(Repository.class);
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
@@ -666,7 +612,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 createProjectItem(150L)
             );
 
-            // Act
             int result = service.syncRemainingProjectItems(
                 SCOPE_ID,
                 "I_nodeId123",
@@ -676,7 +621,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isEqualTo(1);
             // Verify issue-specific query was used
             verify(graphQlClient).documentName("GetIssueProjectItems");
@@ -684,9 +628,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use PR-specific query for pull requests")
         void shouldUsePrSpecificQueryForPullRequests() {
-            // Arrange
             Repository repository = mock(Repository.class);
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
@@ -705,7 +647,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             when(responseField.toEntity(GHProjectV2ItemConnection.class)).thenReturn(connection);
             when(requestSpec.execute()).thenReturn(Mono.just(response));
 
-            // Act
             int result = service.syncRemainingProjectItems(
                 SCOPE_ID,
                 "PR_nodeId456",
@@ -715,16 +656,13 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(graphQlClient).documentName("GetPullRequestProjectItems");
             verify(requestSpec).variable("pullRequestId", "PR_nodeId456");
         }
 
         @Test
-        @DisplayName("should stop on rate limit critical")
         void shouldStopOnRateLimitCritical() throws InterruptedException {
-            // Arrange
             Repository repository = mock(Repository.class);
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
@@ -739,7 +677,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(true);
             when(graphQlClientProvider.waitIfRateLimitLow(SCOPE_ID)).thenThrow(new InterruptedException("rate limit"));
 
-            // Act
             int result = service.syncRemainingProjectItems(
                 SCOPE_ID,
                 "I_nodeId",
@@ -749,15 +686,12 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(graphQlClientProvider).trackRateLimit(eq(SCOPE_ID), eq(response));
         }
 
         @Test
-        @DisplayName("should handle empty response when all items in embedded list")
         void shouldHandleEmptyResponseWhenAllItemsInEmbeddedList() {
-            // Arrange
             Repository repository = mock(Repository.class);
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
@@ -772,7 +706,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             when(responseField.toEntity(GHProjectV2ItemConnection.class)).thenReturn(null);
             when(requestSpec.execute()).thenReturn(Mono.just(response));
 
-            // Act
             int result = service.syncRemainingProjectItems(
                 SCOPE_ID,
                 "I_nodeId",
@@ -782,15 +715,12 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
             verify(transactionTemplate, never()).execute(any());
         }
 
         @Test
-        @DisplayName("should handle invalid GraphQL response and break")
         void shouldHandleInvalidGraphQlResponseAndBreak() {
-            // Arrange
             Repository repository = mock(Repository.class);
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
@@ -801,7 +731,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             when(response.isValid()).thenReturn(false);
             when(requestSpec.execute()).thenReturn(Mono.just(response));
 
-            // Act
             int result = service.syncRemainingProjectItems(
                 SCOPE_ID,
                 "I_nodeId",
@@ -811,14 +740,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
         }
 
         @Test
-        @DisplayName("should handle exception during pagination and break gracefully")
         void shouldHandleExceptionDuringPaginationAndBreak() {
-            // Arrange
             Repository repository = mock(Repository.class);
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
@@ -831,7 +757,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 ClassificationResult.of(GitHubExceptionClassifier.Category.RETRYABLE, "Network error")
             );
 
-            // Act
             int result = service.syncRemainingProjectItems(
                 SCOPE_ID,
                 "I_nodeId",
@@ -841,14 +766,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isZero();
         }
 
         @Test
-        @DisplayName("should paginate through multiple pages")
         void shouldPaginateThroughMultiplePages() {
-            // Arrange
             Repository repository = mock(Repository.class);
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
@@ -908,7 +830,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 .thenReturn(createProjectItem(160L))
                 .thenReturn(createProjectItem(161L));
 
-            // Act
             int result = service.syncRemainingProjectItems(
                 SCOPE_ID,
                 "I_nodeId",
@@ -918,7 +839,6 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 PARENT_ISSUE_ID
             );
 
-            // Assert
             assertThat(result).isEqualTo(2);
             verify(graphQlClientProvider, times(2)).trackRateLimit(eq(SCOPE_ID), any());
         }

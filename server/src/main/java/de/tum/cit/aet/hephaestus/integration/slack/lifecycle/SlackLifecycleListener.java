@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
  * the {@link IntegrationLifecycleListener} sense.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackLifecycleListener implements IntegrationLifecycleListener {
 
     private static final Logger log = LoggerFactory.getLogger(SlackLifecycleListener.class);

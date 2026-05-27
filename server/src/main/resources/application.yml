@@ -579,6 +579,22 @@ hephaestus:
         token: ${SLACK_BOT_TOKEN:${SLACK_TOKEN:}}
         signing-secret: ${SLACK_SIGNING_SECRET:}
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # INTEGRATION FEATURE FLAGS
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Slack and Outline integrations are opt-in. Every bean under
+    # integration/slack/** and integration/outline/** carries
+    # @ConditionalOnProperty(...enabled, matchIfMissing=false), so leaving these
+    # unset keeps the OAuth flows, webhook verifiers, and lifecycle listeners
+    # inert. Flip to `true` once the follow-up wires the actual OAuth code
+    # exchange + signature verification.
+    #
+    # integration:
+    #     slack:
+    #         enabled: false
+    #     outline:
+    #         enabled: false
+
     sentry:
         dsn: ${SENTRY_DSN:}
 

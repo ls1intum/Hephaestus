@@ -138,11 +138,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Event Type ====================
 
     @Nested
-    @DisplayName("Event Type")
     class EventType {
 
         @Test
-        @DisplayName("returns ISSUE as event type")
         void returnsCorrectEventType() {
             assertThat(handler.key().eventType()).isEqualTo("issue");
         }
@@ -151,11 +149,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Basic Lifecycle ====================
 
     @Nested
-    @DisplayName("Basic Lifecycle Events")
     class BasicLifecycleEvents {
 
         @Test
-        @DisplayName("persists issue with all fields on 'open' event")
         void shouldPersistIssueOnOpenEvent() throws Exception {
             GitLabIssueEventDTO event = loadPayload("issue.open");
 
@@ -198,7 +194,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("closes issue on 'close' event")
         void shouldCloseIssueOnCloseEvent() throws Exception {
             // Create first
             handler.handleEvent(loadPayload("issue.open"));
@@ -215,7 +210,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("reopens issue on 'reopen' event")
         void shouldReopenIssueOnReopenEvent() throws Exception {
             // Create and close
             handler.handleEvent(loadPayload("issue.open"));
@@ -233,7 +227,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("updates issue on 'update' event")
         void shouldUpdateIssueOnUpdateEvent() throws Exception {
             // Create first
             handler.handleEvent(loadPayload("issue.open"));
@@ -252,11 +245,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Confidential Issues ====================
 
     @Nested
-    @DisplayName("Confidential Issues")
     class ConfidentialIssues {
 
         @Test
-        @DisplayName("skips confidential issue on open")
         void shouldSkipConfidentialOpen() throws Exception {
             handler.handleEvent(loadPayload("issue.confidential.open"));
 
@@ -265,7 +256,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("skips confidential issue on update")
         void shouldSkipConfidentialUpdate() throws Exception {
             handler.handleEvent(loadPayload("issue.confidential.update"));
 
@@ -273,7 +263,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("skips confidential issue on close")
         void shouldSkipConfidentialClose() throws Exception {
             handler.handleEvent(loadPayload("issue.confidential.close"));
 
@@ -285,7 +274,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Author and Label Resolution ====================
 
     @Nested
-    @DisplayName("Entity Resolution")
     class EntityResolution {
 
         @Test
@@ -307,7 +295,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("creates label with correct fields")
         void shouldCreateLabelWithCorrectFields() throws Exception {
             handler.handleEvent(loadPayload("issue.open"));
 
@@ -324,11 +311,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Edge Cases ====================
 
     @Nested
-    @DisplayName("Edge Cases")
     class EdgeCases {
 
         @Test
-        @DisplayName("handles missing repository gracefully")
         void shouldHandleMissingRepositoryGracefully() throws Exception {
             repositoryRepository.deleteAll();
 
@@ -352,7 +337,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("full lifecycle: open → close → reopen → update")
         void shouldHandleFullLifecycle() throws Exception {
             handler.handleEvent(loadPayload("issue.open"));
             assertThat(

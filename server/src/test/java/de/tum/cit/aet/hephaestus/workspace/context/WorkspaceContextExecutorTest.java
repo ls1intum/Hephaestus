@@ -8,13 +8,11 @@ import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
 @Tag("unit")
-@DisplayName("WorkspaceContextExecutor Unit Tests")
 class WorkspaceContextExecutorTest {
 
     @AfterEach
@@ -24,9 +22,7 @@ class WorkspaceContextExecutorTest {
     }
 
     @Test
-    @DisplayName("Should propagate context to wrapped Runnable")
     void shouldPropagateContextToRunnable() throws Exception {
-        // Arrange
         WorkspaceContext context = new WorkspaceContext(
             1L,
             "test-workspace",
@@ -41,7 +37,6 @@ class WorkspaceContextExecutorTest {
 
         AtomicReference<WorkspaceContext> capturedContext = new AtomicReference<>();
 
-        // Act
         Runnable wrapped = WorkspaceContextExecutor.wrap(() ->
             capturedContext.set(WorkspaceContextHolder.getContext())
         );
@@ -55,7 +50,6 @@ class WorkspaceContextExecutorTest {
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 
-        // Assert
         WorkspaceContext captured = capturedContext.get();
         assertNotNull(captured);
         assertEquals("test-workspace", captured.slug());
@@ -63,9 +57,7 @@ class WorkspaceContextExecutorTest {
     }
 
     @Test
-    @DisplayName("Should propagate context to wrapped Callable")
     void shouldPropagateContextToCallable() throws Exception {
-        // Arrange
         WorkspaceContext workspaceContext = new WorkspaceContext(
             42L,
             "callable-test",
@@ -78,7 +70,6 @@ class WorkspaceContextExecutorTest {
         );
         WorkspaceContextHolder.setContext(workspaceContext);
 
-        // Act
         Callable<String> wrapped = WorkspaceContextExecutor.wrap(() -> {
             WorkspaceContext wrappedWorkspaceContext = WorkspaceContextHolder.getContext();
             return wrappedWorkspaceContext != null ? wrappedWorkspaceContext.slug() : "null";
@@ -94,14 +85,11 @@ class WorkspaceContextExecutorTest {
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 
-        // Assert
         assertEquals("callable-test", result);
     }
 
     @Test
-    @DisplayName("Should propagate MDC to wrapped Runnable")
     void shouldPropagateMDCToRunnable() throws Exception {
-        // Arrange
         WorkspaceContext context = new WorkspaceContext(
             99L,
             "mdc-test",
@@ -117,7 +105,6 @@ class WorkspaceContextExecutorTest {
         AtomicReference<String> capturedWorkspaceId = new AtomicReference<>();
         AtomicReference<String> capturedSlug = new AtomicReference<>();
 
-        // Act
         Runnable wrapped = WorkspaceContextExecutor.wrap(() -> {
             capturedWorkspaceId.set(MDC.get("workspace_id"));
             capturedSlug.set(MDC.get("workspace_slug"));
@@ -130,15 +117,12 @@ class WorkspaceContextExecutorTest {
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 
-        // Assert
         assertEquals("99", capturedWorkspaceId.get());
         assertEquals("mdc-test", capturedSlug.get());
     }
 
     @Test
-    @DisplayName("Should clean up context after Runnable execution")
     void shouldCleanupContextAfterRunnableExecution() throws Exception {
-        // Arrange
         WorkspaceContext context = new WorkspaceContext(
             1L,
             "cleanup-test",
@@ -154,7 +138,6 @@ class WorkspaceContextExecutorTest {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<WorkspaceContext> contextAfterExecution = new AtomicReference<>();
 
-        // Act
         Runnable wrapped = WorkspaceContextExecutor.wrap(() -> {
             // Do some work
             assertNotNull(WorkspaceContextHolder.getContext());
@@ -176,12 +159,10 @@ class WorkspaceContextExecutorTest {
     }
 
     @Test
-    @DisplayName("Should handle null context gracefully")
     void shouldHandleNullContextGracefully() throws Exception {
         // Arrange - No context set
         AtomicReference<WorkspaceContext> capturedContext = new AtomicReference<>();
 
-        // Act
         Runnable wrapped = WorkspaceContextExecutor.wrap(() -> {
             capturedContext.set(WorkspaceContextHolder.getContext());
         });
@@ -191,12 +172,10 @@ class WorkspaceContextExecutorTest {
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 
-        // Assert
         assertNull(capturedContext.get());
     }
 
     @Test
-    @DisplayName("Should throw exception when wrapping null Runnable")
     void shouldThrowExceptionForNullRunnable() {
         // Act & Assert
         assertThrows(IllegalArgumentException.class, () -> {
@@ -205,7 +184,6 @@ class WorkspaceContextExecutorTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when wrapping null Callable")
     void shouldThrowExceptionForNullCallable() {
         // Act & Assert
         assertThrows(IllegalArgumentException.class, () -> {
@@ -214,9 +192,7 @@ class WorkspaceContextExecutorTest {
     }
 
     @Test
-    @DisplayName("Should not leak context between multiple wrapped executions")
     void shouldNotLeakContextBetweenExecutions() throws Exception {
-        // Arrange
         WorkspaceContext context1 = new WorkspaceContext(
             1L,
             "ws1",
@@ -267,7 +243,6 @@ class WorkspaceContextExecutorTest {
     }
 
     @Test
-    @DisplayName("Should restore previous context and MDC state after execution")
     void shouldRestorePreviousContextAndMdcAfterExecution() throws Exception {
         WorkspaceContext previousContext = new WorkspaceContext(
             10L,

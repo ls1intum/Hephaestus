@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +49,6 @@ import tools.jackson.databind.ObjectMapper;
  * uses REQUIRES_NEW propagation. Having @Transactional here would cause deadlocks
  * as the test transaction would hold locks needed by the processor's new transaction.
  */
-@DisplayName("GitHub Label Message Handler")
 class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -148,19 +146,15 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should return correct event type")
     void shouldReturnCorrectEventType() {
         assertThat(handler.key().eventType()).isEqualTo("repository.label");
     }
 
     @Test
-    @DisplayName("Should process created label events with exact fixture values")
     void shouldProcessCreatedLabelEvents() throws Exception {
-        // Given
         GitHubLabelEventDTO event = loadPayload("label.created");
         assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProvider.getId())).isEmpty();
 
-        // When
         handler.handleEvent(event);
 
         // Then - verify ALL persisted fields against hardcoded fixture values
@@ -181,7 +175,6 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should update all label fields on 'edited' event")
     void shouldProcessEditedLabelEvents() throws Exception {
         // Given - create existing label with stale data
         GitHubLabelEventDTO event = loadPayload("label.edited");
@@ -196,7 +189,6 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         existingLabel.setRepository(testRepository);
         labelRepository.save(existingLabel);
 
-        // When
         handler.handleEvent(event);
 
         // Then - verify all mutable fields are updated from DTO
@@ -210,9 +202,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should process deleted label events")
     void shouldProcessDeletedLabelEvents() throws Exception {
-        // Given
         GitHubLabelEventDTO event = loadPayload("label.deleted");
 
         // Create existing label
@@ -227,10 +217,8 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Verify it exists
         assertThat(labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId())).isPresent();
 
-        // When
         handler.handleEvent(event);
 
-        // Then
         assertThat(labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId())).isEmpty();
     }
 
@@ -258,11 +246,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Edge Case Tests ====================
 
     @Nested
-    @DisplayName("Edge Cases")
     class EdgeCases {
 
         @Test
-        @DisplayName("Should handle null label in event gracefully")
         void shouldHandleNullLabelGracefully() {
             // Given - event with null label
             GitHubLabelEventDTO event = new GitHubLabelEventDTO("created", null, createTestRepoRef(), null);
@@ -275,7 +261,6 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle event with missing repository context")
         void shouldHandleMissingRepositoryContext() {
             // Given - event without repository
             GitHubLabelDTO labelDto = new GitHubLabelDTO(
@@ -294,7 +279,6 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle label with null description")
         void shouldHandleLabelWithNullDescription() throws Exception {
             // Given - create label DTO with null description
             Long labelId = 123456789L;
@@ -309,10 +293,8 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             );
             GitHubLabelEventDTO event = new GitHubLabelEventDTO("created", labelDto, createTestRepoRef(), null);
 
-            // When
             handler.handleEvent(event);
 
-            // Then
             assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProvider.getId()))
                 .isPresent()
                 .get()
@@ -323,7 +305,6 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should update description from value to null")
         void shouldUpdateDescriptionToNull() throws Exception {
             // Given - existing label with description
             Long labelId = 987654321L;
@@ -358,9 +339,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle idempotent label creation")
         void shouldHandleIdempotentCreation() throws Exception {
-            // Given
             GitHubLabelEventDTO event = loadPayload("label.created");
 
             // When - handle same event twice
@@ -375,7 +354,6 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle deletion of non-existent label gracefully")
         void shouldHandleDeletionOfNonExistentLabel() throws Exception {
             // Given - label doesn't exist
             GitHubLabelEventDTO event = loadPayload("label.deleted");
@@ -386,7 +364,6 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle unknown action gracefully")
         void shouldHandleUnknownAction() {
             // Given - event with unknown action
             GitHubLabelDTO labelDto = new GitHubLabelDTO(
@@ -413,16 +390,12 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Repository Association Tests ====================
 
     @Nested
-    @DisplayName("Repository Association")
     class RepositoryAssociation {
 
         @Test
-        @DisplayName("Should associate created label with correct repository")
         void shouldAssociateLabelWithRepository() throws Exception {
-            // Given
             GitHubLabelEventDTO event = loadPayload("label.created");
 
-            // When
             handler.handleEvent(event);
 
             // Then — use TransactionTemplate for lazy-loaded repository access
@@ -439,16 +412,12 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should find label by repository and name")
         void shouldFindLabelByRepositoryAndName() throws Exception {
-            // Given
             GitHubLabelEventDTO event = loadPayload("label.created");
             handler.handleEvent(event);
 
-            // When
             var foundLabel = labelRepository.findByRepositoryIdAndName(testRepository.getId(), event.label().name());
 
-            // Then
             assertThat(foundLabel)
                 .isPresent()
                 .get()
@@ -468,11 +437,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
      * We use TransactionTemplate for lazy loading assertions to avoid connection leaks.
      */
     @Nested
-    @DisplayName("Label-Issue Relationship")
     class LabelIssueRelationship {
 
         @Test
-        @DisplayName("Should preserve label-issue relationships after label edit")
         void shouldPreserveLabelIssueRelationshipsAfterEdit() throws Exception {
             // Given - create label and issue with that label
             GitHubLabelEventDTO createEvent = loadPayload("label.created");

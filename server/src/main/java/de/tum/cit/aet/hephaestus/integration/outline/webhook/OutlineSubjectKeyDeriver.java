@@ -25,7 +25,7 @@ import tools.jackson.databind.JsonNode;
  * falling back to a body hash for shapes without an id field.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineSubjectKeyDeriver implements SubjectKeyDeriver {
 
     private static final String UNKNOWN = "?";

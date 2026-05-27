@@ -6,13 +6,11 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
-@DisplayName("Account controller integration")
 class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -26,7 +24,6 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Transactional
-    @DisplayName("GET /user/settings provisions a GitLab user from JWT claims when no user row exists yet")
     void getUserSettingsProvisionsGitLabUserWhenMissing() {
         assertThat(userRepository.findByLogin("gitlabuser")).isEmpty();
 

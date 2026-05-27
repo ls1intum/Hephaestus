@@ -30,7 +30,6 @@ import org.springframework.data.domain.Pageable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("FindingsHistoryAspectProvider")
 class FindingsHistoryAspectProviderTest extends BaseUnitTest {
 
     @Mock
@@ -52,7 +51,6 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
     FindingsHistoryAspectProvider provider;
 
     @Test
-    @DisplayName("contribute writes findings_history.json with empty defaults when no data")
     void emptyDefaults() throws Exception {
         User user = new User();
         user.setLogin("octo");

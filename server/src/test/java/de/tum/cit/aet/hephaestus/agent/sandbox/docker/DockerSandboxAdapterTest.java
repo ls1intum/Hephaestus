@@ -37,7 +37,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
-@DisplayName("DockerSandboxAdapter")
 class DockerSandboxAdapterTest extends BaseUnitTest {
 
     @Mock
@@ -148,11 +147,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Happy path")
     class HappyPath {
 
         @Test
-        @DisplayName("should execute 4-phase lifecycle and return result")
         void shouldExecuteFullLifecycle() {
             setupHappyPath();
 
@@ -181,7 +178,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should inject LLM proxy URL from app-server IP when no explicit URL set")
         void shouldInjectDefaultLlmProxyUrl() {
             setupHappyPath();
 
@@ -211,7 +207,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use active server port when llm proxy override is unset")
         void shouldUseActiveServerPortWhenProxyPortUnset() {
             SandboxProperties properties = new SandboxProperties(
                 true,
@@ -266,7 +261,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should resolve proxy URL template placeholder")
         void shouldResolveProxyUrlPlaceholder() {
             setupHappyPath();
 
@@ -294,7 +288,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use explicit proxy URL as-is when no placeholder")
         void shouldUseExplicitProxyUrl() {
             setupHappyPath();
 
@@ -325,7 +318,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should merge user-provided environment variables")
         void shouldMergeUserEnvironment() {
             setupHappyPath();
 
@@ -341,7 +333,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should filter out blocked environment variables (exact and prefix)")
         void shouldFilterBlockedEnvVars() {
             setupHappyPath();
 
@@ -388,7 +379,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should create internet-enabled network when allowed")
         void shouldCreateInternetNetwork() {
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(true))).thenReturn(NETWORK_ID);
             when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
@@ -407,7 +397,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip file injection when no input files")
         void shouldSkipInjectionWhenNoFiles() {
             setupHappyPath();
 
@@ -430,7 +419,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null networkPolicy gracefully")
         void shouldHandleNullNetworkPolicy() {
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
             when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
@@ -471,7 +459,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("collectOutput is called with the spec.outputPath verbatim")
         void usesSpecOutputPath() {
             setupHappyPath();
 
@@ -495,7 +482,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Timeout handling")
     class TimeoutHandling {
 
         private void setupTimeoutPath() {
@@ -513,7 +499,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return timedOut=true when container exceeds timeout")
         void shouldReturnTimedOutOnTimeout() {
             setupTimeoutPath();
             when(workspaceManager.collectOutput(eq(CONTAINER_ID), anyString())).thenReturn(Map.of());
@@ -525,7 +510,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should still collect output on timeout")
         void shouldCollectOutputOnTimeout() {
             setupTimeoutPath();
             when(workspaceManager.collectOutput(eq(CONTAINER_ID), anyString())).thenReturn(
@@ -540,11 +524,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Failure handling")
     class FailureHandling {
 
         @Test
-        @DisplayName("should throw SandboxException on network creation failure")
         void shouldThrowOnNetworkFailure() {
             when(networkManager.createJobNetwork(any(), eq(false))).thenThrow(
                 new SandboxException("Network creation failed")
@@ -556,7 +538,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should cleanup on container creation failure")
         void shouldCleanupOnContainerFailure() {
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
             when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
@@ -572,7 +553,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should tolerate partial cleanup failure")
         void shouldToleratePartialCleanupFailure() {
             setupHappyPath();
             doThrow(new SandboxException("Container stuck")).when(containerManager).forceRemove(CONTAINER_ID);
@@ -587,7 +567,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should capture container logs on error path before cleanup")
         void shouldCaptureLogsOnError() {
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
             when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
@@ -608,7 +587,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use SecurityProfile.DEFAULT when spec has null securityProfile")
         void shouldUseDefaultSecurityProfileWhenNull() {
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
             when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
@@ -649,11 +627,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Cancellation")
     class Cancellation {
 
         @Test
-        @DisplayName("should throw SandboxCancelledException on cancellation between phases")
         void shouldThrowOnCancellation() {
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenAnswer(invocation -> {
                 // Simulate cancellation during network creation
@@ -668,7 +644,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("cancel should stop running container and cause SandboxCancelledException")
         void shouldStopRunningContainer() throws Exception {
             CountDownLatch containerStarted = new CountDownLatch(1);
             CountDownLatch cancelDone = new CountDownLatch(1);
@@ -710,7 +685,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("cancel should be no-op for unknown job")
         void shouldNoOpForUnknownJob() {
             // Should not throw
             sandboxAdapter.cancel(UUID.randomUUID());
@@ -718,18 +692,15 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Health check")
     class HealthCheck {
 
         @Test
-        @DisplayName("should return true when Docker is reachable")
         void shouldReturnTrueWhenHealthy() {
             when(containerManager.ping()).thenReturn(true);
             assertThat(sandboxAdapter.isHealthy()).isTrue();
         }
 
         @Test
-        @DisplayName("should return false when Docker is unreachable")
         void shouldReturnFalseWhenUnhealthy() {
             when(containerManager.ping()).thenReturn(false);
             assertThat(sandboxAdapter.isHealthy()).isFalse();
@@ -737,11 +708,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Metrics")
     class Metrics {
 
         @Test
-        @DisplayName("should increment success counter on successful execution")
         void shouldIncrementSuccessCounter() {
             setupHappyPath();
 
@@ -752,7 +721,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should increment timeout counter on timeout")
         void shouldIncrementTimeoutCounter() {
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
             when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
@@ -772,7 +740,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should increment failure counter on error")
         void shouldIncrementFailureCounter() {
             when(networkManager.createJobNetwork(any(), eq(false))).thenThrow(new SandboxException("boom"));
 
@@ -784,7 +751,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should increment cancelled counter on cancellation")
         void shouldIncrementCancelledCounter() {
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenAnswer(invocation -> {
                 sandboxAdapter.cancel(JOB_ID);
@@ -801,7 +767,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should record execution duration for all outcomes")
         void shouldRecordDurationAlways() {
             when(networkManager.createJobNetwork(any(), eq(false))).thenThrow(new SandboxException("fail"));
 
@@ -813,7 +778,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should increment cleanup failure counter with step tag when cleanup fails")
         void shouldIncrementCleanupFailureCounterWithStep() {
             setupHappyPath();
             doThrow(new SandboxException("stuck")).when(containerManager).forceRemove(CONTAINER_ID);
@@ -826,7 +790,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should track active containers gauge during execution")
         void shouldTrackActiveContainersGauge() throws Exception {
             CountDownLatch inExecution = new CountDownLatch(1);
             CountDownLatch release = new CountDownLatch(1);
@@ -866,11 +829,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Duplicate job guard")
     class DuplicateJobGuard {
 
         @Test
-        @DisplayName("should reject duplicate jobId")
         void shouldRejectDuplicateJobId() throws Exception {
             CountDownLatch enteredExecute = new CountDownLatch(1);
             CountDownLatch releaseBlock = new CountDownLatch(1);
@@ -934,20 +895,17 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
         @ParameterizedTest(name = "should block exact var: {0}")
         @MethodSource("exactBlockedVars")
-        @DisplayName("should block exact env vars")
         void shouldBlockExactVars(String varName) {
             assertThat(SandboxEnvBlocklist.isBlocked(varName)).isTrue();
         }
 
         @ParameterizedTest(name = "should block prefix var: {0}")
         @MethodSource("prefixBlockedVars")
-        @DisplayName("should block prefix-matched env vars")
         void shouldBlockPrefixVars(String varName) {
             assertThat(SandboxEnvBlocklist.isBlocked(varName)).isTrue();
         }
 
         @Test
-        @DisplayName("should allow safe env vars")
         void shouldAllowSafeVars() {
             assertThat(SandboxEnvBlocklist.isBlocked("MY_APP_KEY")).isFalse();
             assertThat(SandboxEnvBlocklist.isBlocked("FOO")).isFalse();
@@ -955,7 +913,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should block case variants of prefix-matched vars")
         void shouldBlockCaseVariants() {
             // Some tools/shells inject lowercase variants
             assertThat(SandboxEnvBlocklist.isBlocked("aws_access_key_id")).isTrue();
@@ -966,11 +923,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Git security config")
     class GitSecurityConfig {
 
         @Test
-        @DisplayName("should contain all expected security config keys")
         void shouldContainAllExpectedKeys() {
             assertThat(DockerSandboxAdapter.GIT_SECURITY_CONFIGS)
                 .extracting(Map.Entry::getKey)
@@ -990,7 +945,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should inject all security configs even without volume mounts")
         void shouldInjectSecurityConfigsWithoutVolumeMounts() {
             setupHappyPath();
 
@@ -1017,7 +971,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should inject safe.directory per volume mount plus all security configs")
         void shouldInjectSafeDirectoryPerVolumeMount() {
             setupHappyPath();
 
@@ -1072,7 +1025,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should block caller-supplied GIT_CONFIG_* via prefix blocklist")
         void shouldBlockCallerGitConfigVars() {
             // Verify at the unit level that GIT_CONFIG_* vars are prefix-blocked
             assertThat(SandboxEnvBlocklist.isBlocked("GIT_CONFIG_COUNT")).isTrue();
@@ -1081,7 +1033,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should overwrite security env vars even if caller bypasses blocklist")
         void shouldOverwriteSecurityEnvVarsViaOrdering() {
             setupHappyPath();
 

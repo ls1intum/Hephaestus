@@ -52,7 +52,6 @@ import org.springframework.stereotype.Component;
  * - Issue type handling
  * - Edge cases in DTO processing including the critical getDatabaseId() fallback
  */
-@DisplayName("GitHub Issue Processor")
 class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -199,11 +198,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Critical: getDatabaseId() Fallback Tests ====================
 
     @Nested
-    @DisplayName("getDatabaseId() Fallback Logic")
     class GetDatabaseIdFallback {
 
         @Test
-        @DisplayName("Should use databaseId when present (GraphQL style)")
         void shouldUseDatabaseIdWhenPresent() {
             // Given - GraphQL style DTO with databaseId
             Long databaseId = 123456789L;
@@ -231,7 +228,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
             // Then - should use databaseId
@@ -241,7 +237,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should fallback to id when databaseId is null (Webhook style)")
         void shouldFallbackToIdWhenDatabaseIdNull() {
             // Given - Webhook style DTO with only id
             Long webhookId = FIXTURE_ISSUE_ID;
@@ -272,7 +267,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Verify the fallback works
             assertThat(dto.getDatabaseId()).isEqualTo(webhookId);
 
-            // When
             Issue result = processor.process(dto, createContext());
 
             // Then - should use id as fallback
@@ -282,7 +276,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should return null when both id and databaseId are null")
         void shouldReturnNullWhenBothIdsNull() {
             // Given - malformed DTO with no IDs
             GitHubIssueDTO dto = new GitHubIssueDTO(
@@ -312,10 +305,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Verify fallback returns null
             assertThat(dto.getDatabaseId()).isNull();
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result).isNull();
             assertThat(eventListener.getCreatedEvents()).isEmpty();
         }
@@ -324,17 +315,13 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Process (Create/Update) Tests ====================
 
     @Nested
-    @DisplayName("Process Method - Create")
     class ProcessMethodCreate {
 
         @Test
-        @DisplayName("Should create new issue and publish Created event")
         void shouldCreateNewIssueAndPublishEvent() {
-            // Given
             Long issueId = FIXTURE_ISSUE_ID;
             GitHubIssueDTO dto = createBasicIssueDto(issueId, 20);
 
-            // When
             Issue result = processor.process(dto, createContext());
 
             // Then - verify issue created
@@ -359,7 +346,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should create author user if not exists")
         void shouldCreateAuthorIfNotExists() {
             // Given - no user exists
             assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())).isEmpty();
@@ -367,10 +353,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Long issueId = 111222333L;
             GitHubIssueDTO dto = createBasicIssueDto(issueId, 1);
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getAuthor()).isNotNull();
             assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
@@ -380,7 +364,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should reuse existing author user")
         void shouldReuseExistingAuthor() {
             // Given - create user first
             User existingUser = new User();
@@ -395,7 +378,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Long issueId = 222333444L;
             GitHubIssueDTO dto = createBasicIssueDto(issueId, 2);
 
-            // When
             Issue result = processor.process(dto, createContext());
 
             // Then - should reuse existing user, not create new
@@ -404,9 +386,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle issue with null body")
         void shouldHandleNullBody() {
-            // Given
             Long issueId = 333444555L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -432,17 +412,13 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getBody()).isNull();
         }
 
         @Test
-        @DisplayName("Should handle issue with null author")
         void shouldHandleNullAuthor() {
-            // Given
             Long issueId = 444555666L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -468,18 +444,14 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result).isNotNull();
             assertThat(result.getAuthor()).isNull();
         }
 
         @Test
-        @DisplayName("Should create labels when included in issue")
         void shouldCreateLabelsWhenIncluded() {
-            // Given
             Long issueId = 555666777L;
             Long labelId = 9567656085L;
             GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "bug", "Bug label", "ff0000", null, null);
@@ -507,19 +479,15 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getLabels()).hasSize(1);
             assertThat(result.getLabels().iterator().next().getName()).isEqualTo("bug");
             assertThat(labelRepository.findByNativeIdAndProviderId(labelId, githubProvider.getId())).isPresent();
         }
 
         @Test
-        @DisplayName("Should create assignees when included in issue")
         void shouldCreateAssigneesWhenIncluded() {
-            // Given
             Long issueId = 666777888L;
             Long assigneeId = 888999111L;
             GitHubUserDTO assigneeDto = new GitHubUserDTO(
@@ -555,19 +523,15 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getAssignees()).hasSize(1);
             assertThat(result.getAssignees().iterator().next().getLogin()).isEqualTo("assignee1");
             assertThat(userRepository.findByNativeIdAndProviderId(assigneeId, githubProvider.getId())).isPresent();
         }
 
         @Test
-        @DisplayName("Should create milestone when included in issue")
         void shouldCreateMilestoneWhenIncluded() {
-            // Given
             Long issueId = 777888999L;
             Long milestoneId = 14028563L;
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
@@ -608,10 +572,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getMilestone()).isNotNull();
             assertThat(result.getMilestone().getTitle()).isEqualTo("Webhook Fixtures");
             assertThat(
@@ -623,11 +585,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Process (Update) Tests ====================
 
     @Nested
-    @DisplayName("Process Method - Update")
     class ProcessMethodUpdate {
 
         @Test
-        @DisplayName("Should update existing issue and publish Updated event")
         void shouldUpdateExistingIssueAndPublishEvent() {
             // Given - create existing issue
             Long issueId = FIXTURE_ISSUE_ID;
@@ -668,7 +628,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
             // Then - verify issue updated
@@ -730,7 +689,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             processor.process(dto, createContext());
 
             // Then - no Updated event (empty changedFields)
@@ -744,7 +702,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should be idempotent - processing same DTO twice")
         void shouldBeIdempotent() {
-            // Given
             Long issueId = 111222333L;
             GitHubIssueDTO dto = createBasicIssueDto(issueId, 10);
 
@@ -760,7 +717,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should update milestone when changed")
         void shouldUpdateMilestoneWhenChanged() {
             // Given - create issue without milestone
             Long issueId = 888999000L;
@@ -817,10 +773,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getMilestone()).isNotNull();
             assertThat(eventListener.getUpdatedEvents())
                 .first()
@@ -828,7 +782,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should remove milestone when demilestoned")
         void shouldRemoveMilestoneWhenDemilestoned() {
             // Given - create milestone and issue with milestone
             Long milestoneId = 14028563L;
@@ -881,10 +834,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getMilestone()).isNull();
             assertThat(eventListener.getUpdatedEvents())
                 .first()
@@ -895,13 +846,10 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== State Transition Tests ====================
 
     @Nested
-    @DisplayName("State Transitions")
     class StateTransitions {
 
         @Test
-        @DisplayName("processClosed should update state and publish Closed event")
         void processClosedShouldPublishClosedEvent() {
-            // Given
             Long issueId = FIXTURE_ISSUE_ID;
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -927,10 +875,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.processClosed(dto, createContext());
 
-            // Then
             assertThat(result.getState()).isEqualTo(Issue.State.CLOSED);
             assertThat(result.getStateReason()).isEqualTo(Issue.StateReason.COMPLETED);
 
@@ -944,7 +890,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("processReopened should update state and publish Updated event with state in changedFields")
         void processReopenedShouldPublishUpdatedEvent() {
             // Given - create closed issue first
             Long issueId = 222333444L;
@@ -985,10 +930,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.processReopened(dto, createContext());
 
-            // Then
             assertThat(result.getState()).isEqualTo(Issue.State.OPEN);
 
             // Verify Updated event with "state" in changedFields
@@ -998,9 +941,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle NOT_PLANNED state reason")
         void shouldHandleNotPlannedStateReason() {
-            // Given
             Long issueId = 333444555L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -1026,10 +967,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.processClosed(dto, createContext());
 
-            // Then
             assertThat(result.getStateReason()).isEqualTo(Issue.StateReason.NOT_PLANNED);
         }
     }
@@ -1037,11 +976,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Label Event Tests ====================
 
     @Nested
-    @DisplayName("Label Events")
     class LabelEvents {
 
         @Test
-        @DisplayName("processLabeled should publish Labeled event")
         void processLabeledShouldPublishEvent() {
             // Given - create issue first
             Long issueId = FIXTURE_ISSUE_ID;
@@ -1061,10 +998,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null
             );
 
-            // When
             processor.processLabeled(issueDto, labelDto, createContext());
 
-            // Then
             assertThat(eventListener.getLabeledEvents())
                 .hasSize(1)
                 .first()
@@ -1074,7 +1009,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("processUnlabeled should publish Unlabeled event")
         void processUnlabeledShouldPublishEvent() {
             // Given - create issue with label
             Long issueId = FIXTURE_ISSUE_ID;
@@ -1107,10 +1041,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             eventListener.clear();
 
-            // When
             processor.processUnlabeled(issueDto, labelDto, createContext());
 
-            // Then
             assertThat(eventListener.getUnlabeledEvents())
                 .hasSize(1)
                 .first()
@@ -1123,11 +1055,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Issue Type Tests ====================
 
     @Nested
-    @DisplayName("Issue Type Events")
     class IssueTypeEvents {
 
         @Test
-        @DisplayName("processTyped should set issue type and publish Typed event")
         void processTypedShouldPublishEvent() {
             // Given - create issue first
             Long issueId = FIXTURE_ISSUE_ID;
@@ -1142,10 +1072,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 true
             );
 
-            // When
             Issue result = processor.processTyped(issueDto, typeDto, FIXTURE_ORG_LOGIN, createContext());
 
-            // Then
             assertThat(result.getIssueType()).isNotNull();
             assertThat(result.getIssueType().getName()).isEqualTo("Task");
 
@@ -1159,7 +1087,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("processUntyped should remove issue type and publish Untyped event")
         void processUntypedShouldPublishEvent() {
             // Given - create issue type
             IssueType issueType = new IssueType();
@@ -1188,10 +1115,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             GitHubIssueDTO issueDto = createBasicIssueDto(issueId, 20);
 
-            // When
             Issue result = processor.processUntyped(issueDto, createContext());
 
-            // Then
             assertThat(result.getIssueType()).isNull();
 
             assertThat(eventListener.getUntypedEvents())
@@ -1207,11 +1132,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Delete Tests ====================
 
     @Nested
-    @DisplayName("Delete Method")
     class DeleteMethod {
 
         @Test
-        @DisplayName("processDeleted should delete issue")
         void processDeletedShouldDeleteIssue() {
             // Given - create issue via process() to match real workflow
             Long issueId = FIXTURE_ISSUE_ID;
@@ -1227,12 +1150,10 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubIssueDTO deleteDto = createBasicIssueDto(issueId, 20);
             processor.processDeleted(deleteDto, createContext());
 
-            // Then
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isEmpty();
         }
 
         @Test
-        @DisplayName("processDeleted should handle non-existent issue gracefully")
         void processDeletedShouldHandleNonExistent() {
             // Given - issue doesn't exist
             Long nonExistentId = 999999999L;
@@ -1245,9 +1166,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("processDeleted should handle null ID gracefully")
         void processDeletedShouldHandleNullId() {
-            // Given
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 null,
                 null,
@@ -1277,7 +1196,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("processDeleted should sync bidirectional ManyToMany relationships")
         void processDeletedShouldSyncBidirectionalRelationships() {
             // Given - create issue with labels (ManyToMany relationship)
             Long issueId = FIXTURE_ISSUE_ID;
@@ -1322,11 +1240,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Edge Cases ====================
 
     @Nested
-    @DisplayName("Edge Cases")
     class EdgeCases {
 
         @Test
-        @DisplayName("Should handle null DTO IDs gracefully")
         void shouldHandleNullDtoIds() {
             // When - DTO with null IDs (getDatabaseId() will return null)
             GitHubIssueDTO nullIdDto = new GitHubIssueDTO(
@@ -1355,14 +1271,11 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             Issue result = processor.process(nullIdDto, createContext());
 
-            // Then
             assertThat(result).isNull();
         }
 
         @Test
-        @DisplayName("Should default to OPEN state for null state string")
         void shouldDefaultToOpenStateForNullState() {
-            // Given
             Long issueId = 111222333L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -1388,17 +1301,13 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getState()).isEqualTo(Issue.State.OPEN);
         }
 
         @Test
-        @DisplayName("Should default to OPEN state for unknown state string")
         void shouldDefaultToOpenStateForUnknownState() {
-            // Given
             Long issueId = 222333444L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -1424,17 +1333,13 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getState()).isEqualTo(Issue.State.OPEN);
         }
 
         @Test
-        @DisplayName("Should handle unknown stateReason as UNKNOWN")
         void shouldHandleUnknownStateReason() {
-            // Given
             Long issueId = 333444555L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -1460,17 +1365,13 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getStateReason()).isEqualTo(Issue.StateReason.UNKNOWN);
         }
 
         @Test
-        @DisplayName("Should handle empty assignees list")
         void shouldHandleEmptyAssigneesList() {
-            // Given
             Long issueId = 444555666L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -1496,17 +1397,13 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getAssignees()).isEmpty();
         }
 
         @Test
-        @DisplayName("Should handle empty labels list")
         void shouldHandleEmptyLabelsList() {
-            // Given
             Long issueId = 555666777L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -1532,10 +1429,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null // pullRequest
             );
 
-            // When
             Issue result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getLabels()).isEmpty();
         }
     }

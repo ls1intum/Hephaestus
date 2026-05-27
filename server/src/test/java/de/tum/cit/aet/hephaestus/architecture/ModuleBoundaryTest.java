@@ -39,7 +39,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("SPI Pattern Enforcement")
     class SpiPatternTests {
 
         /**
@@ -49,7 +48,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * workspace context, authentication, and sync targets to the core.
          */
         @Test
-        @DisplayName("SPI classes are interfaces")
         void spiClassesAreInterfaces() {
             ArchRule rule = classes()
                 .that()
@@ -75,7 +73,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * to the integration.scm sync engine via adapter implementations.
          */
         @Test
-        @DisplayName("Workspace adapters implement integration.spi SPIs")
         void workspaceAdaptersImplementSpis() {
             ArchRule rule = classes()
                 .that()
@@ -142,7 +139,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * is to bridge workspace-aware concerns into the neutral domain.
          */
         @Test
-        @DisplayName("Vendor-neutral SCM domain does not depend on workspace internals")
         void scmDoesNotDependOnWorkspace() {
             ArchRule rule = noClasses()
                 .that()
@@ -173,7 +169,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * <p>CRITICAL: Keep this list in sync with the actual feature modules.
          */
         @Test
-        @DisplayName("Vendor-neutral SCM domain does not depend on feature modules")
         void scmDoesNotDependOnFeatureModules() {
             ArchRule rule = noClasses()
                 .that()
@@ -203,7 +198,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * The sync/ package is allowed to contain orchestrators that dispatch to providers.
          */
         @Test
-        @DisplayName("GitHub-specific classes are in github packages")
         void githubSpecificClassesAreInGithubPackages() {
             ArchRule rule = classes()
                 .that()
@@ -224,7 +218,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Domain Event Patterns")
     class DomainEventPatternTests {
 
         /**
@@ -235,7 +228,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * ending in 'Event' are excluded.
          */
         @Test
-        @DisplayName("Domain events are in events packages")
         void domainEventsAreInEventsPackages() {
             ArchRule rule = classes()
                 .that()
@@ -260,7 +252,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Utility Class Patterns")
     class UtilityClassPatternTests {
 
         /**
@@ -270,7 +261,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * or extended.
          */
         @Test
-        @DisplayName("Utility classes are final or have private constructors")
         void utilityClassesAreFinalOrPrivateConstructor() {
             ArchRule rule = classes()
                 .that()
@@ -328,7 +318,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * Domain entities named "Repository" are excluded from this check.
          */
         @Test
-        @DisplayName("Spring Data repositories are interfaces")
         void springDataRepositoriesAreInterfaces() {
             ArchRule rule = classes()
                 .that()
@@ -361,7 +350,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * prevents exception declaration pollution in method signatures.
          */
         @Test
-        @DisplayName("Custom exceptions extend RuntimeException")
         void customExceptionsExtendRuntimeException() {
             ArchRule rule = classes()
                 .that()
@@ -380,7 +368,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("SPI Bypass Detection")
     class SpiBypassDetectionTests {
 
         /**
@@ -412,7 +399,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * scm.{entity}/ for vendor-neutral access.
          */
         @Test
-        @DisplayName("Feature modules do not bypass integration.core.spi SPIs")
         void featureModulesDoNotBypassScmSpis() {
             // Internal packages that should NOT be accessed directly by feature modules.
             // We list ETL-internal subpackages explicitly instead of blanketing on
@@ -457,7 +443,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * not create ad-hoc coupling.
          */
         @Test
-        @DisplayName("Feature modules do not depend on integration.scm GitHub service implementations")
         void featureModulesDoNotDependOnGitHubServiceImplementations() {
             // Entity data sub-packages (e.g. scm.github.project) stay readable; only
             // adapter/service implementations are off-limits. See
@@ -491,7 +476,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Feature Module Boundaries")
     class FeatureModuleBoundaryTests {
 
         /**
@@ -500,7 +484,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * <p>Feature modules should depend on public APIs, not internal details.
          */
         @Test
-        @DisplayName("Leaderboard does not depend on workspace internals")
         void leaderboardDoesNotDependOnWorkspaceInternals() {
             ArchRule rule = noClasses()
                 .that()
@@ -519,7 +502,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * have direct dependencies on each other's internal implementation.
          */
         @Test
-        @DisplayName("Activity does not depend on leaderboard internals")
         void activityDoesNotDependOnLeaderboardInternals() {
             ArchRule rule = noClasses()
                 .that()
@@ -537,7 +519,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * <p>Mentor is a standalone feature that consumes pull request data.
          */
         @Test
-        @DisplayName("Mentor has limited dependencies on feature modules")
         void mentorHasLimitedDependencies() {
             ArchRule rule = noClasses()
                 .that()
@@ -556,7 +537,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * or depend on the sync engine internals.
          */
         @Test
-        @DisplayName("Profile does not depend on integration.scm sync internals")
         void profileDoesNotDependOnSyncInternals() {
             ArchRule rule = noClasses()
                 .that()
@@ -575,7 +555,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * not by depending on feature module implementations.
          */
         @Test
-        @DisplayName("Notification uses events, not direct dependencies")
         void notificationUsesEventsNotDirectDependencies() {
             ArchRule rule = noClasses()
                 .that()

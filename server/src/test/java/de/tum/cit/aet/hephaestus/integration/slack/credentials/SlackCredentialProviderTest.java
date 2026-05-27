@@ -17,13 +17,11 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
-@DisplayName("SlackCredentialProvider — unit")
 class SlackCredentialProviderTest extends BaseUnitTest {
 
     @Mock
@@ -40,7 +38,6 @@ class SlackCredentialProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ACTIVE Slack Connection with encrypted xoxb token decrypts back to BearerToken")
     void activeConnection_decryptsBotToken() {
         long workspaceId = 17L;
         Workspace ws = Mockito.mock(Workspace.class);

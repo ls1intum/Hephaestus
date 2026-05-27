@@ -99,11 +99,9 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("process()")
     class ProcessMethod {
 
         @Test
-        @DisplayName("creates a new milestone with all fields")
         void shouldCreateNewMilestone() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
                 18066L,
@@ -143,7 +141,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("maps 'active' state to OPEN")
         void shouldMapActiveStateToOpen() {
             GitLabMilestoneDTO dto = createDto(1, "active");
 
@@ -154,7 +151,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("maps 'closed' state to CLOSED and approximates closedAt")
         void shouldMapClosedStateToClosed() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
                 18066L,
@@ -224,7 +220,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("updates existing milestone by iid")
         void shouldUpdateExistingMilestone() {
             // Create
             GitLabMilestoneDTO createDto = createDto(2, "active");
@@ -272,7 +267,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("uses deterministic negative nativeId for group milestones")
         void shouldUseDeterministicIdForGroupMilestone() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
                 99999L,
@@ -298,7 +292,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("constructs htmlUrl from webPath (GraphQL)")
         void shouldConstructHtmlUrlFromWebPath() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
                 18066L,
@@ -325,7 +318,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("constructs htmlUrl from projectWebUrl (webhook)")
         void shouldConstructHtmlUrlFromProjectWebUrl() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
                 18066L,
@@ -352,7 +344,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("parses due date from date-only string")
         void shouldParseDueDate() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
                 18066L,
@@ -377,7 +368,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("handles null description")
         void shouldHandleNullDescription() {
             GitLabMilestoneDTO dto = createDto(2, "active");
 
@@ -388,7 +378,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("handles null dueDate")
         void shouldHandleNullDueDate() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
                 18066L,
@@ -413,7 +402,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("returns null for null DTO")
         void shouldReturnNullForNullDto() {
             Milestone result = milestoneProcessor.process(null, testRepository, testContext());
 
@@ -422,7 +410,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("returns null for invalid iid (zero)")
         void shouldReturnNullForInvalidIid() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
                 18066L,
@@ -446,7 +433,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("defaults to OPEN state for null state")
         void shouldDefaultToOpenForNullState() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
                 18066L,
@@ -472,11 +458,9 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("group-milestone fan-out (Gap 4)")
     class GroupMilestoneFanOut {
 
         @Test
-        @DisplayName("shouldFanOutGroupMilestoneToEveryRepoWhenProcessingOncePerRepo")
         void shouldFanOutGroupMilestoneToEveryRepoWhenProcessingOncePerRepo() {
             Repository secondRepo = createRepository(
                 246766L,
@@ -515,7 +499,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("shouldUseDistinctNegativeNativeIdsWhenFanningOutSameGroupMilestone")
         void shouldUseDistinctNegativeNativeIdsWhenFanningOutSameGroupMilestone() {
             Repository secondRepo = createRepository(
                 246767L,
@@ -556,7 +539,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("shouldPersistDescriptionAndDueOnWhenGroupMilestoneIsFannedOut")
         void shouldPersistDescriptionAndDueOnWhenGroupMilestoneIsFannedOut() {
             // Gap 4 notes that description, due_on, and closed_at were NULL on most rows.
             // Verify all three survive the fan-out path.
@@ -608,7 +590,6 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("delete()")
     class DeleteMethod {
 
         @Test
@@ -625,13 +606,11 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("handles null milestoneId gracefully")
         void shouldHandleNullId() {
             assertThatCode(() -> milestoneProcessor.delete(null, testContext())).doesNotThrowAnyException();
         }
 
         @Test
-        @DisplayName("handles non-existent milestone gracefully")
         void shouldHandleNonExistentMilestone() {
             milestoneProcessor.delete(-999L, testContext());
             assertThat(eventListener.getDeletedEvents()).isEmpty();

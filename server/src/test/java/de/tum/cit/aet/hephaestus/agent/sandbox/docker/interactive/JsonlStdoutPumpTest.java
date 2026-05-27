@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("JsonlStdoutPump")
 class JsonlStdoutPumpTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -62,7 +61,6 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("parses well-formed JSONL frames in order")
     void parsesFrames() {
         Captured c = runPump("{\"t\":\"a\"}\n{\"t\":\"b\"}\n{\"t\":\"c\"}\n");
         assertThat(c.frames()).hasSize(3);
@@ -95,7 +93,6 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("malformed line increments parse counter and pump continues")
     void malformedLineSurvived() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         Counter parseErrors = reg.counter("test.parse.error");
@@ -107,7 +104,6 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("blank lines are silently skipped (not counted as errors)")
     void blankLinesSkipped() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         Counter parseErrors = reg.counter("test.parse.error");
@@ -117,7 +113,6 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("oversized line is dropped (parse error counter), pump terminates")
     void oversizedLineRejected() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         Counter parseErrors = reg.counter("test.parse.error");
@@ -128,7 +123,6 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("raw \\r bytes between would-be frames do NOT split: only \\n is a terminator")
     void rawCarriageReturnBetweenFramesIsNotASplitter() {
         // BufferedReader.readLine splits on CR; our \n-only pump must not. (Jackson is lenient with trailing
         // content after the first complete value — up to one frame may parse, but never two.)

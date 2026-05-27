@@ -37,7 +37,6 @@ import org.mockito.ArgumentCaptor;
  * delivery order use a {@link CountDownLatch} to wait for that loop without busy-spinning.
  */
 @Tag("unit")
-@DisplayName("ScopeConsumer")
 class ScopeConsumerTest {
 
     private static final String STREAM = "github";
@@ -46,7 +45,6 @@ class ScopeConsumerTest {
     private static final String[] SUBJECTS = new String[] { "github.acme.repo.>" };
 
     @Nested
-    @DisplayName("constructor argument validation")
     class ConstructorArgs {
 
         @Test
@@ -100,11 +98,9 @@ class ScopeConsumerTest {
     }
 
     @Nested
-    @DisplayName("lifecycle invariants")
     class Lifecycle {
 
         @Test
-        @DisplayName("start is idempotent — second call is a no-op")
         void doubleStartIsNoOp() throws Exception {
             ConsumerContext ctx = mock(ConsumerContext.class);
             MessageConsumer subscription = mock(MessageConsumer.class);
@@ -130,7 +126,6 @@ class ScopeConsumerTest {
         }
 
         @Test
-        @DisplayName("stop is idempotent — second call is a no-op")
         void doubleStopIsNoOp() throws Exception {
             ConsumerContext ctx = mock(ConsumerContext.class);
             MessageConsumer subscription = mock(MessageConsumer.class);
@@ -154,7 +149,6 @@ class ScopeConsumerTest {
     }
 
     @Nested
-    @DisplayName("dispatch")
     class Dispatch {
 
         @Test
@@ -199,7 +193,6 @@ class ScopeConsumerTest {
         }
 
         @Test
-        @DisplayName("handler exception does not kill the dispatch loop")
         void handlerExceptionDoesNotKillLoop() throws Exception {
             ConsumerContext ctx = mock(ConsumerContext.class);
             ArgumentCaptor<MessageHandler> handlerCaptor = ArgumentCaptor.forClass(MessageHandler.class);
@@ -235,7 +228,6 @@ class ScopeConsumerTest {
         }
 
         @Test
-        @DisplayName("messages enqueued after stop are NAKed")
         void messageAfterStopIsNakd() throws Exception {
             ConsumerContext ctx = mock(ConsumerContext.class);
             ArgumentCaptor<MessageHandler> handlerCaptor = ArgumentCaptor.forClass(MessageHandler.class);
@@ -264,11 +256,9 @@ class ScopeConsumerTest {
     }
 
     @Nested
-    @DisplayName("updateSubjects")
     class UpdateSubjects {
 
         @Test
-        @DisplayName("identical subject array is a no-op (no server-side rebuild)")
         void identicalSubjectsAreNoOp() throws Exception {
             ConsumerContext ctx = mock(ConsumerContext.class);
             StreamContext streamCtx = mock(StreamContext.class);
@@ -292,7 +282,6 @@ class ScopeConsumerTest {
         }
 
         @Test
-        @DisplayName("different subject array triggers consumer reconfigure + resubscribe")
         void differentSubjectsReconfigure() throws Exception {
             ConsumerContext ctx = mock(ConsumerContext.class);
             ConsumerInfo info = mock(ConsumerInfo.class);

@@ -35,7 +35,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -55,7 +54,6 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * stand-in for the registry so we don't need an integration test container here.
  */
 @Tag("unit")
-@DisplayName("GitLabWebhookService")
 class GitLabWebhookServiceTest extends BaseUnitTest {
 
     @Mock
@@ -186,11 +184,9 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("registerWebhook")
     class RegisterWebhook {
 
         @Test
-        @DisplayName("should skip for non-GitLab workspace")
         void shouldSkipForNonGitLab() {
             gitLabConfigs.remove(1L);
 
@@ -201,7 +197,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when webhook client unavailable")
         void shouldSkipWhenClientUnavailable() {
             when(webhookClientProvider.getIfAvailable()).thenReturn(null);
 
@@ -212,7 +207,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should register new webhook successfully")
         void shouldRegisterNewWebhook() {
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
             when(webhookClient.lookupGroup(1L, "my-org")).thenReturn(new GroupInfo(42L, "My Org", "my-org"));
@@ -231,7 +225,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should adopt existing webhook with matching URL")
         void shouldAdoptExistingWebhook() {
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
             when(webhookClient.lookupGroup(1L, "my-org")).thenReturn(new GroupInfo(42L, "My Org", "my-org"));
@@ -250,7 +243,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return success when webhook already registered and exists")
         void shouldReturnSuccessForExistingWebhook() {
             bindGitLabConfig(
                 1L,
@@ -276,7 +268,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should re-register when stored webhook was deleted externally")
         void shouldReRegisterDeletedWebhook() {
             bindGitLabConfig(
                 1L,
@@ -303,7 +294,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return failed on 403 (insufficient permissions)")
         void shouldReturnFailedOn403() {
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
             when(webhookClient.lookupGroup(1L, "my-org")).thenReturn(new GroupInfo(42L, "My Org", "my-org"));
@@ -319,7 +309,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when properties not configured")
         void shouldSkipWhenNotConfigured() {
             WebhookProperties unconfigured = new WebhookProperties(
                 "",
@@ -347,11 +336,9 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("rotateTokenIfNeeded")
     class RotateTokenIfNeeded {
 
         @Test
-        @DisplayName("should skip for non-GitLab workspace")
         void shouldSkipForNonGitLab() {
             gitLabConfigs.remove(1L);
 
@@ -361,7 +348,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when rotation client unavailable")
         void shouldSkipWhenUnavailable() {
             when(rotationClientProvider.getIfAvailable()).thenReturn(null);
 
@@ -370,7 +356,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when token has no expiry")
         void shouldSkipNoExpiry() {
             when(rotationClientProvider.getIfAvailable()).thenReturn(rotationClient);
             when(rotationClient.getTokenInfo(1L)).thenReturn(new TokenInfo(1L, "test", null));
@@ -381,7 +366,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when token not expiring soon")
         void shouldSkipNotExpiringSoon() {
             when(rotationClientProvider.getIfAvailable()).thenReturn(rotationClient);
             when(rotationClient.getTokenInfo(1L)).thenReturn(new TokenInfo(1L, "test", LocalDate.now().plusDays(30)));
@@ -392,7 +376,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should rotate when token expiring within threshold")
         void shouldRotateWhenExpiringSoon() {
             when(rotationClientProvider.getIfAvailable()).thenReturn(rotationClient);
             when(tokenServiceProvider.getIfAvailable()).thenReturn(tokenService);
@@ -409,7 +392,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should continue on rotation error")
         void shouldContinueOnError() {
             when(rotationClientProvider.getIfAvailable()).thenReturn(rotationClient);
             when(rotationClient.getTokenInfo(1L)).thenThrow(new IllegalStateException("Connection refused"));
@@ -420,11 +402,9 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("deregisterWebhook")
     class DeregisterWebhook {
 
         @Test
-        @DisplayName("should skip when no webhook registered")
         void shouldSkipWhenNoWebhook() {
             webhookService.deregisterWebhook(workspace);
 
@@ -432,7 +412,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should deregister and clear fields")
         void shouldDeregisterAndClearFields() {
             bindGitLabConfig(
                 1L,
@@ -455,7 +434,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should clear fields even on deregistration error")
         void shouldClearFieldsOnError() {
             bindGitLabConfig(
                 1L,
@@ -483,7 +461,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should clear fields when client unavailable")
         void shouldClearFieldsWhenClientUnavailable() {
             bindGitLabConfig(
                 1L,
@@ -506,11 +483,9 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("deregisterWebhookByWorkspaceId")
     class DeregisterWebhookByWorkspaceId {
 
         @Test
-        @DisplayName("should deregister webhook for existing workspace")
         void shouldDeregisterForExistingWorkspace() {
             bindGitLabConfig(
                 1L,
@@ -534,7 +509,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should do nothing when workspace not found")
         void shouldDoNothingWhenWorkspaceNotFound() {
             when(workspaceRepository.findById(999L)).thenReturn(Optional.empty());
 

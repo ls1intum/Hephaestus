@@ -19,7 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolve
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -27,7 +26,6 @@ import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-@DisplayName("GitlabApprovalChannel")
 class GitlabApprovalChannelTest extends BaseUnitTest {
 
     @Mock
@@ -47,7 +45,6 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("approve invokes ApproveMergeRequest mutation against resolved MR global gid")
     void approveInvokesMutation() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
@@ -75,7 +72,6 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("approve throws on rate limit critical")
     void approveThrowsOnRateLimit() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
@@ -85,7 +81,6 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("approve throws on mergeRequestApprove errors")
     void approveThrowsOnMutationErrors() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);

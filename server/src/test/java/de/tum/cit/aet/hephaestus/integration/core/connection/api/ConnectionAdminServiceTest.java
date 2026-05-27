@@ -27,7 +27,6 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -39,7 +38,6 @@ import org.mockito.MockitoAnnotations;
  * inline-connection creation. The companion {@link ConnectionControllerTest} mocks
  * this service away to test the HTTP adapter shell in isolation.
  */
-@DisplayName("ConnectionAdminService — unit")
 class ConnectionAdminServiceTest extends BaseUnitTest {
 
     @Mock
@@ -76,7 +74,6 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("listForWorkspace delegates to the repo's workspace-scoped query")
     void listForWorkspace_delegatesToRepo() {
         long workspaceId = 7L;
         when(connectionRepository.findByWorkspaceId(workspaceId)).thenReturn(List.of());
@@ -84,7 +81,6 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("findInWorkspaceOrThrow returns the row when workspace matches")
     void findInWorkspaceOrThrow_matchingWorkspace_returns() {
         long workspaceId = 7L;
         Workspace ws = Mockito.mock(Workspace.class);
@@ -101,14 +97,12 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("findInWorkspaceOrThrow 404s on missing id")
     void findInWorkspaceOrThrow_missingId_throws() {
         when(connectionRepository.findById(99L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.findInWorkspaceOrThrow(7L, 99L)).isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
-    @DisplayName("findInWorkspaceOrThrow 404s on cross-workspace read — does NOT distinguish from missing")
     void findInWorkspaceOrThrow_wrongWorkspace_throws() {
         Workspace ws = Mockito.mock(Workspace.class);
         when(ws.getId()).thenReturn(1L);
@@ -125,7 +119,6 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("auditForConnection applies the page cap")
     void auditForConnection_appliesLimit() {
         Workspace ws = Mockito.mock(Workspace.class);
         Connection c = new Connection(
@@ -146,7 +139,6 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("createInlineConnection persists the row, encrypts credentials, transitions to ACTIVE")
     void createInlineConnection_happyPath() {
         long workspaceId = 17L;
         Workspace workspace = Mockito.mock(Workspace.class);
@@ -193,7 +185,6 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("createInlineConnection EntityNotFoundException on missing workspace")
     void createInlineConnection_missingWorkspace_throws() {
         when(workspaceRepository.findById(99L)).thenReturn(Optional.empty());
         assertThatThrownBy(() ->

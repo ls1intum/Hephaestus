@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-@DisplayName("TaskEnvelopeWriter")
 class TaskEnvelopeWriterTest extends BaseUnitTest {
 
     private TaskEnvelopeWriter writer;
@@ -33,7 +32,6 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("writes envelope with kind discriminator and schemaVersion 1")
     void writesKindAndSchemaVersion() throws Exception {
         JsonNode root = reader.readTree(writer.write(sampleEnvelope()));
 
@@ -47,14 +45,12 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("schemaVersion is on the envelope, not on the task record")
     void schemaVersionOnEnvelopeOnly() throws Exception {
         JsonNode root = reader.readTree(writer.write(sampleEnvelope()));
         assertThat(root.get("task").has("schemaVersion")).isFalse();
     }
 
     @Test
-    @DisplayName("output is deterministic across invocations (sorted map keys)")
     void deterministicOutput() {
         TaskEnvelope env = sampleEnvelope();
         assertThat(writer.write(env)).isEqualTo(writer.write(env));
@@ -75,14 +71,12 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PracticeReview rejects non-positive pullRequestNumber")
     void rejectsNonPositivePrNumber() {
         assertThatThrownBy(() -> new Task.PracticeReview("p", 0, "o/r")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new Task.PracticeReview("p", -1, "o/r")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    @DisplayName("PracticeReview rejects blank prompt")
     void rejectsBlankPrompt() {
         assertThatThrownBy(() -> new Task.PracticeReview("", 42, "owner/repo")).isInstanceOf(
             IllegalArgumentException.class
@@ -90,7 +84,6 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("TaskEnvelope rejects non-positive schemaVersion and workspaceId")
     void rejectsNonPositiveFields() {
         Task.PracticeReview task = new Task.PracticeReview("p", 1, "o/r");
         UUID jobId = UUID.randomUUID();
@@ -103,7 +96,6 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("TaskEnvelope.of stamps the current SCHEMA_VERSION constant")
     void ofUsesCurrentSchemaVersion() {
         TaskEnvelope env = TaskEnvelope.of(UUID.randomUUID(), 1L, new Task.PracticeReview("p", 1, "o/r"));
         assertThat(env.schemaVersion()).isEqualTo(TaskEnvelope.SCHEMA_VERSION);

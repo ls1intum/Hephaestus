@@ -18,13 +18,11 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
-@DisplayName("OutlineCredentialProvider — unit")
 class OutlineCredentialProviderTest extends BaseUnitTest {
 
     @Mock
@@ -41,7 +39,6 @@ class OutlineCredentialProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ACTIVE Outline Connection with encrypted OAuth session decrypts back faithfully")
     void activeConnection_decryptsOAuthSession() {
         long workspaceId = 17L;
         Workspace ws = Mockito.mock(Workspace.class);

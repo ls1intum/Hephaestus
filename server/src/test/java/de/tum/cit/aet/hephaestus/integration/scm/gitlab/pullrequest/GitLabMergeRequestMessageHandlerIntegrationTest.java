@@ -149,11 +149,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     // ==================== Event Type ====================
 
     @Nested
-    @DisplayName("Event Type")
     class EventType {
 
         @Test
-        @DisplayName("returns MERGE_REQUEST as event type")
         void returnsCorrectEventType() {
             assertThat(handler.key().eventType()).isEqualTo("merge_request");
         }
@@ -162,11 +160,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     // ==================== Basic Lifecycle ====================
 
     @Nested
-    @DisplayName("Basic Lifecycle Events")
     class BasicLifecycleEvents {
 
         @Test
-        @DisplayName("persists pull request with all fields on 'open' event")
         void openMergeRequest_createsPullRequest() throws Exception {
             GitLabMergeRequestEventDTO event = loadPayload("merge_request.open");
 
@@ -214,7 +210,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("closes merge request on 'close' event")
         void closeMergeRequest_setsStateToClosed() throws Exception {
             // Create MR !3 first
             handler.handleEvent(loadPayload("merge_request.open"));
@@ -237,7 +232,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("merges merge request on 'merge' event")
         void mergeMergeRequest_setsStateToMerged() throws Exception {
             // Create MR !2 via update event first
             handler.handleEvent(loadPayload("merge_request.update"));
@@ -262,7 +256,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("reopens merge request on 'reopen' event")
         void reopenMergeRequest_setsStateToOpen() throws Exception {
             // Create MR !3 and close it
             handler.handleEvent(loadPayload("merge_request.open"));
@@ -286,11 +279,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     // ==================== Approval Events ====================
 
     @Nested
-    @DisplayName("Approval Events")
     class ApprovalEvents {
 
         @Test
-        @DisplayName("creates review on 'approved' event")
         void approveMergeRequest_createsReview() throws Exception {
             // Approved event creates MR !4 via internal process() call
             handler.handleEvent(loadPayload("merge_request.approved"));
@@ -345,11 +336,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     // ==================== Edge Cases ====================
 
     @Nested
-    @DisplayName("Edge Cases")
     class EdgeCases {
 
         @Test
-        @DisplayName("handles missing repository gracefully")
         void shouldHandleMissingRepositoryGracefully() throws Exception {
             repositoryRepository.deleteAll();
 
@@ -360,7 +349,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("is idempotent — processing same event twice")
         void idempotency_processSameEventTwice() throws Exception {
             GitLabMergeRequestEventDTO event = loadPayload("merge_request.open");
 
@@ -373,7 +361,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("full lifecycle: open -> close -> reopen (MR !3)")
         void fullLifecycle_openCloseReopen() throws Exception {
             // Open MR !3
             handler.handleEvent(loadPayload("merge_request.open"));
@@ -411,7 +398,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("full lifecycle: approve -> unapprove (MR !4)")
         void fullLifecycle_approveUnapprove() throws Exception {
             // Approve MR !4 (also creates it)
             handler.handleEvent(loadPayload("merge_request.approved"));
@@ -435,7 +421,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("full lifecycle: update -> merge (MR !2)")
         void fullLifecycle_updateMerge() throws Exception {
             // Create MR !2 via update
             handler.handleEvent(loadPayload("merge_request.update"));
@@ -456,7 +441,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("IID namespace isolation — Issue #3 and MR !3 coexist in same repository")
         void iidNamespaceIsolation_issueAndMrCoexist() throws Exception {
             // Create an Issue with number=3 in the same repository
             transactionTemplate.executeWithoutResult(status -> {
@@ -511,11 +495,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     // ==================== Domain Events ====================
 
     @Nested
-    @DisplayName("Domain Events")
     class DomainEvents {
 
         @Test
-        @DisplayName("publishes correct domain events for MR !3 lifecycle")
         void domainEvents_mr3Lifecycle() throws Exception {
             // Open -> PullRequestCreated
             handler.handleEvent(loadPayload("merge_request.open"));
@@ -534,7 +516,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("publishes correct domain events for MR !2 merge")
         void domainEvents_mr2Merge() throws Exception {
             // Create via update
             handler.handleEvent(loadPayload("merge_request.update"));
@@ -548,7 +529,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("publishes correct domain events for MR !4 approval")
         void domainEvents_mr4Approval() throws Exception {
             // Approve -> ReviewSubmitted
             handler.handleEvent(loadPayload("merge_request.approved"));
@@ -565,7 +545,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     // ==================== Author Resolution ====================
 
     @Nested
-    @DisplayName("Entity Resolution")
     class EntityResolution {
 
         @Test

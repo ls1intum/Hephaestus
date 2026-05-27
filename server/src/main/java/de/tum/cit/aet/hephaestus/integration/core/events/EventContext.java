@@ -33,8 +33,10 @@ public record EventContext(
      * may hold a detached JPA proxy that is inaccessible outside the original session.
      */
     public static EventContext from(ProcessingContext ctx) {
-        // TODO: Resolve providerType eagerly in ProcessingContext construction instead
-        //  of catching LazyInitializationException here. See ProcessingContext Javadoc.
+        // ProcessingContext.provider() may hold a detached JPA proxy when the
+        // surrounding transaction has already committed. Best-effort eager-resolve;
+        // fall back to a null provider type rather than propagating the proxy
+        // (which would explode again the next time a downstream listener touched it).
         GitProviderType resolvedType = null;
         if (ctx.provider() != null) {
             try {

@@ -38,7 +38,6 @@ import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@DisplayName("GitHubPushMessageHandler")
 class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
     @Mock
@@ -181,7 +180,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("key")
     class HandlerKey {
 
         @Test
@@ -193,11 +191,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("skip conditions")
     class SkipConditions {
 
         @Test
-        @DisplayName("should skip branch deletion events")
         void shouldSkipBranchDeletionEvents() throws Exception {
             var event = createBasicPushEvent("refs/heads/feature", true, List.of());
 
@@ -224,7 +220,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip events with null commits")
         void shouldSkipEventsWithNullCommits() throws Exception {
             var event = new GitHubPushEventDTO(
                 "refs/heads/main",
@@ -248,7 +243,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip events with empty commits list")
         void shouldSkipEventsWithEmptyCommitsList() throws Exception {
             var event = createBasicPushEvent("refs/heads/main", false, List.of());
 
@@ -258,7 +252,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when repository not found in database")
         void shouldSkipWhenRepositoryNotFoundInDatabase() throws Exception {
             var commit = createPushCommit("sha1", "message", List.of("file.txt"), List.of(), List.of());
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
@@ -287,7 +280,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when repository ref has null id")
         void shouldSkipWhenRepositoryRefHasNullId() throws Exception {
             var commit = createPushCommit("sha1", "message", List.of("file.txt"), List.of(), List.of());
             var event = new GitHubPushEventDTO(
@@ -312,7 +304,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when push is not to default branch")
         void shouldSkipWhenPushIsNotToDefaultBranch() throws Exception {
             var commit = createPushCommit("sha1", "message", List.of("file.txt"), List.of(), List.of());
             var event = createBasicPushEvent("refs/heads/feature-branch", false, List.of(commit));
@@ -343,11 +334,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("webhook processing")
     class WebhookProcessing {
 
         @Test
-        @DisplayName("should process commits via webhook when git is disabled")
         void shouldProcessCommitsViaWebhookWhenGitIsDisabled() throws Exception {
             var commit = createPushCommit(
                 "abc123def456789012345678901234567890abcd",
@@ -384,7 +373,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should process multiple commits")
         void shouldProcessMultipleCommits() throws Exception {
             var commit1 = createPushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -428,7 +416,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should resolve author by username")
         void shouldResolveAuthorByUsername() throws Exception {
             var commit = createPushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -468,7 +455,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle commits with null author username")
         void shouldHandleCommitsWithNullAuthorUsername() throws Exception {
             var commit = new GitHubPushEventDTO.PushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -512,7 +498,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should count changed files correctly")
         void shouldCountChangedFilesCorrectly() throws Exception {
             var commit = createPushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -549,7 +534,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should extract message headline and body correctly")
         void shouldExtractMessageHeadlineAndBodyCorrectly() throws Exception {
             var commit = createPushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -587,11 +571,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("local git processing")
     class LocalGitProcessing {
 
         @Test
-        @DisplayName("should use local git when enabled")
         void shouldUseLocalGitWhenEnabled() throws Exception {
             var commit = createPushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -621,7 +603,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should fall back to webhook on git failure")
         void shouldFallBackToWebhookOnGitFailure() throws Exception {
             var commit = createPushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -664,7 +645,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should process commit info from local git with file changes")
         void shouldProcessCommitInfoFromLocalGitWithFileChanges() throws Exception {
             var commit = createPushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -754,7 +734,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip existing commits in local git mode")
         void shouldSkipExistingCommitsInLocalGitMode() throws Exception {
             var commit = createPushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -815,7 +794,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should fall back to webhook when scope is not active")
         void shouldFallBackToWebhookWhenScopeNotActive() throws Exception {
             var commit = createPushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -861,11 +839,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("branch handling")
     class BranchHandling {
 
         @Test
-        @DisplayName("should process pushes to default branch")
         void shouldProcessPushesToDefaultBranch() throws Exception {
             var commit = createPushCommit(
                 "sha1aabbccdd112233445566778899aabbccddeeff",
@@ -902,7 +878,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle refs without refs/heads/ prefix")
         void shouldHandleRefsWithoutPrefix() throws Exception {
             // Edge case: ref doesn't start with "refs/heads/"
             var commit = createPushCommit(
@@ -941,18 +916,15 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("DTO contract")
     class DtoContract {
 
         @Test
-        @DisplayName("action should return pushed")
         void actionShouldReturnPushed() {
             var event = createBasicPushEvent("refs/heads/main", false, List.of());
             assertThat(event.action()).isEqualTo("pushed");
         }
 
         @Test
-        @DisplayName("actionType should return PUSHED")
         void actionTypeShouldReturnPushed() {
             var event = createBasicPushEvent("refs/heads/main", false, List.of());
             assertThat(event.actionType()).isEqualTo(
@@ -962,11 +934,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("event publishing")
     class EventPublishing {
 
         @Test
-        @DisplayName("should publish CommitCreated event after webhook processing")
         void shouldPublishCommitCreatedEventAfterWebhookProcessing() throws Exception {
             var commit = createPushCommit(
                 "abc123def456789012345678901234567890abcd",
@@ -1008,7 +978,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not publish event when commit not found after upsert")
         void shouldNotPublishEventWhenCommitNotFoundAfterUpsert() throws Exception {
             var commit = createPushCommit(
                 "abc123def456789012345678901234567890abcd",

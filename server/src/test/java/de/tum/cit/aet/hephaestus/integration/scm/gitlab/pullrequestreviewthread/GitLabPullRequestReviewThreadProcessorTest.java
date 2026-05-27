@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -26,7 +25,6 @@ import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
 
 @Tag("unit")
-@DisplayName("GitLabPullRequestReviewThreadProcessor")
 class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
 
     private static final long PROVIDER_ID = 2L;
@@ -63,11 +61,9 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("deterministicNativeId")
     class DeterministicNativeId {
 
         @Test
-        @DisplayName("should be deterministic for identical input")
         void shouldBeDeterministicForIdenticalInput() {
             long a = GitLabPullRequestReviewThreadProcessor.deterministicNativeId(DISCUSSION_GID);
             long b = GitLabPullRequestReviewThreadProcessor.deterministicNativeId(DISCUSSION_GID);
@@ -75,7 +71,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should always return a positive value")
         void shouldAlwaysReturnPositiveValue() {
             for (int i = 0; i < 50; i++) {
                 String gid = "gid://gitlab/Discussion/" + Integer.toHexString(i * 997 + 13);
@@ -84,7 +79,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should produce distinct values for distinct discussion IDs")
         void shouldProduceDistinctValuesForDistinctDiscussionIds() {
             long a = GitLabPullRequestReviewThreadProcessor.deterministicNativeId("gid://gitlab/Discussion/aaaaaa");
             long b = GitLabPullRequestReviewThreadProcessor.deterministicNativeId("gid://gitlab/Discussion/bbbbbb");
@@ -97,11 +91,9 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("findOrCreateThread — creation")
     class CreateThread {
 
         @Test
-        @DisplayName("should populate path, line, side, commitSha, and originalCommitSha when creating a thread")
         void shouldPopulateAllPositionMetadataWhenCreatingThread() {
             when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
             when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
@@ -135,7 +127,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should mark thread RESOLVED and set resolvedBy when discussion is resolved")
         void shouldMarkThreadResolvedWhenDiscussionIsResolved() {
             when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
             when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
@@ -166,7 +157,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should leave position metadata null when data has no position info (backward-compat 6-arg ctor)")
         void shouldLeavePositionNullWhenDataHasNoPositionInfo() {
             when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
             when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
@@ -194,7 +184,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should mark thread outdated=true on create when discussion position has dropped its hunk")
         void shouldMarkThreadOutdatedWhenPositionHasNullLines() {
             when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
             when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
@@ -222,7 +211,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should mark thread outdated=false on create when discussion position is still active")
         void shouldMarkThreadOutdatedFalseWhenPositionIsActive() {
             when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
             when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
@@ -255,11 +243,9 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("findOrCreateThread — update backfill")
     class UpdateThreadBackfill {
 
         @Test
-        @DisplayName("should backfill path, line, side, and commit shas when existing thread has null values")
         void shouldBackfillAllPositionFieldsWhenExistingHasNull() {
             PullRequestReviewThread existing = new PullRequestReviewThread();
             existing.setId(500L);
@@ -300,7 +286,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not clobber existing values when backfilling")
         void shouldNotClobberExistingValuesWhenBackfilling() {
             PullRequestReviewThread existing = new PullRequestReviewThread();
             existing.setId(500L);
@@ -345,7 +330,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should backfill outdated flag when existing thread has null value")
         void shouldBackfillOutdatedWhenExistingHasNull() {
             PullRequestReviewThread existing = new PullRequestReviewThread();
             existing.setId(500L);
@@ -384,7 +368,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not overwrite outdated flag when existing thread already has a value")
         void shouldNotOverwriteOutdatedWhenExistingHasValue() {
             PullRequestReviewThread existing = new PullRequestReviewThread();
             existing.setId(500L);
@@ -426,7 +409,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should transition state from UNRESOLVED to RESOLVED and publish ReviewThreadResolved")
         void shouldTransitionStateAndPublishResolvedEventWhenDiscussionResolvesExistingThread() {
             PullRequestReviewThread existing = new PullRequestReviewThread();
             existing.setId(500L);
@@ -474,11 +456,9 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("ThreadData backward-compat")
     class ThreadDataBackwardCompat {
 
         @Test
-        @DisplayName("should default side and commit shas to null for 6-arg callers")
         void shouldDefaultOptionalFieldsToNullFor6ArgCallers() {
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
                 DISCUSSION_GID,
@@ -499,7 +479,6 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should default outdated to null for 10-arg callers")
         void shouldDefaultOutdatedToNullFor10ArgCallers() {
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
                 DISCUSSION_GID,

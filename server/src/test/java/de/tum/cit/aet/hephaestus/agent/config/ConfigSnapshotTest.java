@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.DeserializationFeature;
@@ -15,7 +14,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-@DisplayName("ConfigSnapshot")
 class ConfigSnapshotTest extends BaseUnitTest {
 
     // Mirrors spring.jackson.deserialization.fail-on-null-for-primitives=false from application.yml.
@@ -42,11 +40,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("from(AgentConfig)")
     class FromConfig {
 
         @Test
-        @DisplayName("should capture all included fields")
         void shouldCaptureAllIncludedFields() {
             AgentConfig config = createConfig();
             ConfigSnapshot snapshot = ConfigSnapshot.from(config);
@@ -62,7 +58,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null modelName")
         void shouldHandleNullModelName() {
             AgentConfig config = createConfig();
             config.setModelName(null);
@@ -72,18 +67,15 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null config")
         void shouldRejectNullConfig() {
             assertThatThrownBy(() -> ConfigSnapshot.from(null)).isInstanceOf(NullPointerException.class);
         }
     }
 
     @Nested
-    @DisplayName("JSON round-trip")
     class JsonRoundTrip {
 
         @Test
-        @DisplayName("should serialize and deserialize correctly")
         void shouldSerializeAndDeserializeCorrectly() {
             AgentConfig config = createConfig();
             ConfigSnapshot original = ConfigSnapshot.from(config);
@@ -99,7 +91,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not contain llmApiKey in JSON")
         void shouldNotContainLlmApiKeyInJson() {
             AgentConfig config = createConfig();
             config.setLlmApiKey("sk-super-secret");
@@ -114,7 +105,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not contain maxConcurrentJobs in JSON")
         void shouldNotContainMaxConcurrentJobsInJson() {
             AgentConfig config = createConfig();
             config.setMaxConcurrentJobs(10);
@@ -128,7 +118,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should include schemaVersion in JSON")
         void shouldIncludeSchemaVersionInJson() {
             ConfigSnapshot snapshot = ConfigSnapshot.from(createConfig());
             JsonNode json = snapshot.toJson(OBJECT_MAPPER);
@@ -138,7 +127,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should include configId and configName in JSON")
         void shouldIncludeConfigIdAndName() {
             ConfigSnapshot snapshot = ConfigSnapshot.from(createConfig());
             JsonNode json = snapshot.toJson(OBJECT_MAPPER);
@@ -150,7 +138,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject snapshot with newer schemaVersion")
         void shouldRejectNewerSchemaVersion() {
             ConfigSnapshot original = ConfigSnapshot.from(createConfig());
             JsonNode json = original.toJson(OBJECT_MAPPER);
@@ -164,7 +151,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should tolerate unknown fields in JSON (forward compatibility)")
         void shouldTolerateUnknownFields() {
             ConfigSnapshot original = ConfigSnapshot.from(createConfig());
             JsonNode json = original.toJson(OBJECT_MAPPER);
@@ -177,7 +163,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null modelName in JSON round-trip")
         void shouldHandleNullModelNameInJson() {
             AgentConfig config = createConfig();
             config.setModelName(null);
@@ -190,7 +175,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should deserialise legacy v2 snapshot containing dropped agentType field")
         void shouldDeserializeLegacyV2WithAgentType() throws Exception {
             // Pre-consolidation snapshot shape: schemaVersion=2 + agentType=CLAUDE_CODE.
             // After the Pi-only consolidation the agentType field is gone from the record;
@@ -212,7 +196,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should deserialise v1 snapshot lacking schemaVersion field")
         void shouldDeserializeV1WithoutSchemaVersion() throws Exception {
             // Earliest snapshot shape predates the schemaVersion guard. fromJson reads
             // missing schemaVersion as 0 (≤ current), so v1 rows are accepted.
@@ -231,11 +214,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Validation")
     class Validation {
 
         @Test
-        @DisplayName("should reject null llmProvider")
         void shouldRejectNullLlmProvider() {
             assertThatThrownBy(() ->
                 new ConfigSnapshot(1, 1L, "name", null, CredentialMode.PROXY, null, null, null, 600, false)
@@ -243,7 +224,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null credentialMode")
         void shouldRejectNullCredentialMode() {
             assertThatThrownBy(() ->
                 new ConfigSnapshot(1, 1L, "name", LlmProvider.ANTHROPIC, null, null, null, null, 600, false)
@@ -251,7 +231,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject zero timeout")
         void shouldRejectZeroTimeout() {
             assertThatThrownBy(() ->
                 new ConfigSnapshot(
@@ -270,7 +249,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject negative timeout")
         void shouldRejectNegativeTimeout() {
             assertThatThrownBy(() ->
                 new ConfigSnapshot(

@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -44,62 +43,47 @@ class ProcessingContextFactoryTest {
     }
 
     @Nested
-    @DisplayName("forWebhookEvent")
     class ForWebhookEvent {
 
         @Test
-        @DisplayName("returns empty when repository data is missing from event")
         void returnsEmpty_whenRepositoryDataMissing() {
-            // Arrange
             GitHubWebhookEvent event = mock(GitHubWebhookEvent.class);
             when(event.repository()).thenReturn(null);
 
-            // Act
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
 
-            // Assert
             assertThat(result).isEmpty();
             verifyNoInteractions(repositoryScopeFilter);
             verifyNoInteractions(repositoryRepository);
         }
 
         @Test
-        @DisplayName("returns empty when repository is filtered out by scope filter")
         void returnsEmpty_whenRepositoryFiltered() {
-            // Arrange
             String repoFullName = "ls1intum/artemis-ansible-collection";
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(false);
 
-            // Act
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
 
-            // Assert
             assertThat(result).isEmpty();
             verify(repositoryScopeFilter).isRepositoryAllowed(repoFullName);
             verifyNoInteractions(repositoryRepository); // Should NOT query DB for filtered repos
         }
 
         @Test
-        @DisplayName("returns empty when repository is allowed but not found in database")
         void returnsEmpty_whenRepositoryNotInDatabase() {
-            // Arrange
             String repoFullName = "ls1intum/Hephaestus";
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
             when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(Optional.empty());
 
-            // Act
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
 
-            // Assert
             assertThat(result).isEmpty();
         }
 
         @Test
-        @DisplayName("returns context when repository is allowed and exists in database")
         void returnsContext_whenRepositoryAllowedAndExists() {
-            // Arrange
             String repoFullName = "ls1intum/Hephaestus";
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
             Repository repository = mock(Repository.class);
@@ -112,24 +96,19 @@ class ProcessingContextFactoryTest {
             );
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(42L));
 
-            // Act
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
 
-            // Assert
             assertThat(result).isPresent();
             assertThat(result.get().repository()).isEqualTo(repository);
             assertThat(result.get().scopeId()).isEqualTo(42L);
         }
 
         @Test
-        @DisplayName("checks filter before database query for performance optimization")
         void checksFilterBeforeDatabase() {
-            // Arrange
             String repoFullName = "ls1intum/some-repo";
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(false);
 
-            // Act
             factory.forWebhookEvent(event);
 
             // Assert - filter should be checked, but repository should NOT be queried
@@ -155,13 +134,10 @@ class ProcessingContextFactoryTest {
     }
 
     @Nested
-    @DisplayName("scopeId resolution")
     class ScopeIdResolution {
 
         @Test
-        @DisplayName("resolves scopeId by organization login for org-owned repositories")
         void resolvesScopeId_byOrgLogin_forOrgOwnedRepos() {
-            // Arrange
             String repoFullName = "ls1intum/Hephaestus";
             String orgLogin = "ls1intum";
             Long expectedScopeId = 100L;
@@ -179,10 +155,8 @@ class ProcessingContextFactoryTest {
             );
             when(scopeIdResolver.findScopeIdByOrgLogin(orgLogin)).thenReturn(Optional.of(expectedScopeId));
 
-            // Act
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
 
-            // Assert
             assertThat(result).isPresent();
             assertThat(result.get().scopeId()).isEqualTo(expectedScopeId);
             verify(scopeIdResolver).findScopeIdByOrgLogin(orgLogin);
@@ -190,9 +164,7 @@ class ProcessingContextFactoryTest {
         }
 
         @Test
-        @DisplayName("resolves scopeId by repository name for personal repositories (no organization)")
         void resolvesScopeId_byRepoName_forPersonalRepos() {
-            // Arrange
             String repoFullName = "octocat/hello-world";
             Long expectedScopeId = 200L;
 
@@ -207,10 +179,8 @@ class ProcessingContextFactoryTest {
             );
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(expectedScopeId));
 
-            // Act
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
 
-            // Assert
             assertThat(result).isPresent();
             assertThat(result.get().scopeId()).isEqualTo(expectedScopeId);
             // Should NOT try org lookup for personal repos
@@ -220,9 +190,7 @@ class ProcessingContextFactoryTest {
         }
 
         @Test
-        @DisplayName("falls back to repository lookup when org lookup fails")
         void fallsBackToRepoLookup_whenOrgLookupFails() {
-            // Arrange
             String repoFullName = "some-org/some-repo";
             String orgLogin = "some-org";
             Long expectedScopeId = 300L;
@@ -243,10 +211,8 @@ class ProcessingContextFactoryTest {
             // Fallback to repo lookup succeeds
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(expectedScopeId));
 
-            // Act
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
 
-            // Assert
             assertThat(result).isPresent();
             assertThat(result.get().scopeId()).isEqualTo(expectedScopeId);
             // Should try org lookup first
@@ -256,9 +222,7 @@ class ProcessingContextFactoryTest {
         }
 
         @Test
-        @DisplayName("returns null scopeId when no resolution strategy succeeds")
         void returnsNullScopeId_whenNoResolutionSucceeds() {
-            // Arrange
             String repoFullName = "unknown/unknown-repo";
 
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
@@ -272,10 +236,8 @@ class ProcessingContextFactoryTest {
             );
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.empty());
 
-            // Act
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
 
-            // Assert
             assertThat(result).isPresent();
             assertThat(result.get().scopeId()).isNull();
         }

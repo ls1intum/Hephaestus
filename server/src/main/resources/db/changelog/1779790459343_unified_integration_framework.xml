@@ -18,20 +18,18 @@
 
           1.  Connection aggregate + audit + partial-unique for NULL instance_key
               + partial-unique enforcing "one ACTIVE SCM Connection per workspace".
-          2.  integration_webhook_subscription per-subscription signing-secret sidecar
-              (with updated_at audit column).
-          3.  feedback_post cross-vendor edit-in-place tracking.
-          4.  agent_job classification columns (integration_kind, subject_class)
+          2.  feedback_post cross-vendor edit-in-place tracking.
+          3.  agent_job classification columns (integration_kind, subject_class)
               + (kind, subject, created_at) index.
-          5.  practice capability gating (required_capabilities, required_aspects,
+          4.  practice capability gating (required_capabilities, required_aspects,
               required_family).
-          6.  slack_channel + slack_message persistence (ToS-compliant, see
+          5.  slack_channel + slack_message persistence (ToS-compliant, see
               SlackMessage javadoc).
-          7.  outline_collection + outline_document persistence.
-          8.  shedlock distributed-lock table (JdbcTemplateLockProvider schema).
-          9.  oauth_state_nonce (with code_verifier PKCE column declared from the
+          6.  outline_collection + outline_document persistence.
+          7.  shedlock distributed-lock table (JdbcTemplateLockProvider schema).
+          8.  oauth_state_nonce (with code_verifier PKCE column declared from the
               start) — single-use nonce + RFC 7636 S256 verifier storage.
-         10.  Unconditional drop of the eleven legacy Workspace columns superseded
+          9.  Unconditional drop of the eleven legacy Workspace columns superseded
               by the Connection registry. account_login is intentionally KEPT —
               40+ join sites depend on it as a denormalised org/group lookup column.
 
@@ -56,7 +54,7 @@
         apply on an existing DB where the column is still present.
 
         OPERATOR WARNING — DATA-LOSS GUARD INTENTIONALLY OMITTED on the DROP COLUMN
-        block (section 11 below):
+        block (section 9 below):
           * ON FRESH DB: legacy Workspace columns are empty by construction; the
             drops are no-ops on column-content. Safe.
           * ON IN-FLIGHT DB carrying real student-facing data: the eleven dropped
@@ -238,57 +236,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         2. integration_webhook_subscription per-subscription secret sidecar.
-         ─────────────────────────────────────────────────────────────────────── -->
-
-    <changeSet author="hephaestus-1198" id="1779790459343-5">
-        <preConditions onFail="MARK_RAN" onFailMessage="integration_webhook_subscription already present">
-            <not><tableExists tableName="integration_webhook_subscription"/></not>
-        </preConditions>
-        <comment>Per-subscription signing-secret sidecar (Outline, Notion, MS Graph, Asana, Linear).</comment>
-        <createTable tableName="integration_webhook_subscription">
-            <column name="id" type="bigserial">
-                <constraints primaryKey="true" primaryKeyName="pk_integration_webhook_subscription" nullable="false"/>
-            </column>
-            <column name="connection_id" type="bigint">
-                <constraints nullable="false" referencedTableName="connection" referencedColumnNames="id"
-                             foreignKeyName="fk_iws_connection"/>
-            </column>
-            <column name="subscription_id" type="varchar(128)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="signing_secret_encrypted" type="bytea">
-                <constraints nullable="false"/>
-            </column>
-            <column name="credentials_alg" type="varchar(64)" defaultValue="aesgcm-v1">
-                <constraints nullable="false"/>
-            </column>
-            <column name="events_subscribed" type="jsonb" defaultValueComputed="'[]'::jsonb">
-                <constraints nullable="false"/>
-            </column>
-            <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
-                <constraints nullable="false"/>
-            </column>
-            <!--
-                updated_at: subscription rotations (signing-secret roll, events_subscribed
-                change) need an audit timestamp. NOW() default covers the create path so
-                the column is never NULL.
-            -->
-            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
-                <constraints nullable="false"/>
-            </column>
-            <column name="last_delivery_at" type="timestamp with time zone"/>
-        </createTable>
-        <addUniqueConstraint tableName="integration_webhook_subscription"
-                             columnNames="connection_id, subscription_id"
-                             constraintName="uq_integration_webhook_subscription"/>
-        <rollback>
-            <dropTable tableName="integration_webhook_subscription"/>
-        </rollback>
-    </changeSet>
-
-    <!-- ───────────────────────────────────────────────────────────────────────
-         3. feedback_post cross-vendor edit-in-place tracking.
+         2. feedback_post cross-vendor edit-in-place tracking.
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-6">
@@ -337,7 +285,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         4. agent_job classification columns + index.
+         3. agent_job classification columns + index.
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-9">
@@ -385,7 +333,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         5. practice capability gating (UI surface filter).
+         4. practice capability gating (UI surface filter).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-12">
@@ -453,7 +401,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         6. Slack persistence (channels + messages).
+         5. Slack persistence (channels + messages).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-16">
@@ -557,7 +505,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         7. Outline persistence (collections + documents).
+         6. Outline persistence (collections + documents).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-18">
@@ -649,7 +597,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         8. ShedLock distributed-lock table.
+         7. ShedLock distributed-lock table.
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-20">
@@ -680,7 +628,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         9. OAuth state nonce store (with PKCE code_verifier from the start).
+         8. OAuth state nonce store (with PKCE code_verifier from the start).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-21">
@@ -719,7 +667,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         10. Unconditional drop of legacy Workspace columns superseded by the
+         9. Unconditional drop of legacy Workspace columns superseded by the
              Connection registry. account_login is intentionally KEPT.
 
              Preconditions guard against re-applying against an environment where

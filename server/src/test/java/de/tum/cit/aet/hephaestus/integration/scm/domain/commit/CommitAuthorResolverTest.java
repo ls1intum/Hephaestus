@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-@DisplayName("CommitAuthorResolver")
 class CommitAuthorResolverTest extends BaseUnitTest {
 
     @Mock
@@ -43,25 +42,21 @@ class CommitAuthorResolverTest extends BaseUnitTest {
     // ========== extractLoginFromNoreply (static, no mocks needed) ==========
 
     @Nested
-    @DisplayName("extractLoginFromNoreply")
     class ExtractLoginFromNoreply {
 
         @Test
-        @DisplayName("should extract login from simple noreply email")
         void shouldExtractLoginFromSimpleNoreply() {
             String login = CommitAuthorResolver.extractLoginFromNoreply("username@users.noreply.github.com");
             assertThat(login).isEqualTo("username");
         }
 
         @Test
-        @DisplayName("should extract login from ID-prefixed noreply email")
         void shouldExtractLoginFromIdPrefixedNoreply() {
             String login = CommitAuthorResolver.extractLoginFromNoreply("12345+username@users.noreply.github.com");
             assertThat(login).isEqualTo("username");
         }
 
         @Test
-        @DisplayName("should handle large numeric ID prefix")
         void shouldHandleLargeNumericIdPrefix() {
             String login = CommitAuthorResolver.extractLoginFromNoreply(
                 "123456789+FelixTJDietrich@users.noreply.github.com"
@@ -70,28 +65,24 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for regular email")
         void shouldReturnNullForRegularEmail() {
             String login = CommitAuthorResolver.extractLoginFromNoreply("user@example.com");
             assertThat(login).isNull();
         }
 
         @Test
-        @DisplayName("should return null for personal email")
         void shouldReturnNullForPersonalEmail() {
             String login = CommitAuthorResolver.extractLoginFromNoreply("felix_dietrich@gmx.de");
             assertThat(login).isNull();
         }
 
         @Test
-        @DisplayName("should be case insensitive for domain")
         void shouldBeCaseInsensitiveForDomain() {
             String login = CommitAuthorResolver.extractLoginFromNoreply("user@Users.Noreply.GitHub.com");
             assertThat(login).isEqualTo("user");
         }
 
         @Test
-        @DisplayName("should return null for partial noreply match")
         void shouldReturnNullForPartialNoreplyMatch() {
             String login = CommitAuthorResolver.extractLoginFromNoreply("user@noreply.github.com");
             assertThat(login).isNull();
@@ -101,11 +92,9 @@ class CommitAuthorResolverTest extends BaseUnitTest {
     // ========== resolveByEmail ==========
 
     @Nested
-    @DisplayName("resolveByEmail")
     class ResolveByEmail {
 
         @Test
-        @DisplayName("should return null for null email")
         void shouldReturnNullForNullEmail() {
             Long result = resolver.resolveByEmail(null, null);
             assertThat(result).isNull();
@@ -113,7 +102,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for blank email")
         void shouldReturnNullForBlankEmail() {
             Long result = resolver.resolveByEmail("   ", null);
             assertThat(result).isNull();
@@ -121,7 +109,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return user ID on direct email match")
         void shouldReturnUserIdOnDirectEmailMatch() {
             User user = createUser(42L);
             when(userRepository.findByEmail("author@example.com")).thenReturn(Optional.of(user));
@@ -134,7 +121,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should fall back to noreply login match when email not found")
         void shouldFallBackToNoreplyLoginMatch() {
             when(userRepository.findByEmail("username@users.noreply.github.com")).thenReturn(Optional.empty());
 
@@ -149,7 +135,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should fall back to noreply login match for ID-prefixed email")
         void shouldFallBackToNoreplyLoginMatchForIdPrefixed() {
             when(userRepository.findByEmail("12345+dev@users.noreply.github.com")).thenReturn(Optional.empty());
 
@@ -162,7 +147,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null when neither email nor noreply login match")
         void shouldReturnNullWhenNeitherMatch() {
             when(userRepository.findByEmail("unknown@users.noreply.github.com")).thenReturn(Optional.empty());
             when(userRepository.findByLogin("unknown")).thenReturn(Optional.empty());
@@ -173,7 +157,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for dotted local-part email when not found")
         void shouldReturnNullForDottedLocalPartEmailWhenNotFound() {
             when(userRepository.findByEmail("first.last@gmail.com")).thenReturn(Optional.empty());
 
@@ -185,7 +168,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should fall back to email local-part login for TUM-style address")
         void shouldFallBackToEmailLocalPartLoginForTumStyleAddress() {
             when(userRepository.findByEmail("ge27coy@mytum.de")).thenReturn(Optional.empty());
 
@@ -200,7 +182,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not try login match for GitLab bot noreply email")
         void shouldNotTryLoginMatchForGitLabBotNoreplyEmail() {
             when(userRepository.findByEmail("group_319719_bot_abc123@noreply.gitlab.lrz.de")).thenReturn(
                 Optional.empty()
@@ -213,7 +194,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should prefer direct email match over noreply parsing")
         void shouldPreferDirectEmailMatchOverNoreplyParsing() {
             // Edge case: noreply email is stored directly in user's email field
             User user = createUser(55L);
@@ -230,11 +210,9 @@ class CommitAuthorResolverTest extends BaseUnitTest {
     // ========== resolveByLogin ==========
 
     @Nested
-    @DisplayName("resolveByLogin")
     class ResolveByLogin {
 
         @Test
-        @DisplayName("should return null for null login")
         void shouldReturnNullForNullLogin() {
             Long result = resolver.resolveByLogin(null, null);
             assertThat(result).isNull();
@@ -242,7 +220,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for blank login")
         void shouldReturnNullForBlankLogin() {
             Long result = resolver.resolveByLogin("  ", null);
             assertThat(result).isNull();
@@ -250,7 +227,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return user ID when login found")
         void shouldReturnUserIdWhenLoginFound() {
             User user = createUser(33L);
             when(userRepository.findByLogin("testuser")).thenReturn(Optional.of(user));
@@ -261,7 +237,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null when login not found")
         void shouldReturnNullWhenLoginNotFound() {
             when(userRepository.findByLogin("unknown")).thenReturn(Optional.empty());
 
@@ -274,11 +249,9 @@ class CommitAuthorResolverTest extends BaseUnitTest {
     // ========== Strategy 4: display-name match ==========
 
     @Nested
-    @DisplayName("resolveByEmail — strategy 4 (display-name match)")
     class ResolveByEmailDisplayName {
 
         @Test
-        @DisplayName("should match firstname.lastname@tum.de against User.name when exactly one candidate")
         void shouldMatchFirstnameLastnameAgainstUserName() {
             when(userRepository.findByEmailAndProviderId("erik.kiessig@tum.de", 3L)).thenReturn(Optional.empty());
 
@@ -292,7 +265,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should fall back to cross-provider name match when providerId is null")
         void shouldFallBackToCrossProviderNameMatchWhenProviderIdIsNull() {
             when(userRepository.findByEmail("john.doe@example.com")).thenReturn(Optional.empty());
 
@@ -305,7 +277,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip display-name match when multiple candidates are ambiguous")
         void shouldSkipDisplayNameMatchWhenAmbiguous() {
             when(userRepository.findByEmailAndProviderId("john.smith@tum.de", 3L)).thenReturn(Optional.empty());
             when(userRepository.findAllByNameAndProviderId("John Smith", 3L)).thenReturn(
@@ -318,7 +289,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle three-token dotted local-parts")
         void shouldHandleThreeTokenDottedLocalParts() {
             when(userRepository.findByEmailAndProviderId("anna.marie.huber@in.tum.de", 3L)).thenReturn(
                 Optional.empty()
@@ -333,7 +303,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should prefer login match over display-name match when login resolves")
         void shouldPreferLoginMatchOverDisplayName() {
             // Login-style local-parts skip strategy 4 entirely.
             when(userRepository.findByEmailAndProviderId("go98tod@mytum.de", 3L)).thenReturn(Optional.empty());
@@ -348,7 +317,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for numeric-prefixed local-part")
         void shouldReturnNullForNumericPrefixedLocalPart() {
             when(userRepository.findByEmailAndProviderId("42.spam@domain.com", 3L)).thenReturn(Optional.empty());
 
@@ -362,11 +330,9 @@ class CommitAuthorResolverTest extends BaseUnitTest {
     // ========== resolveAndBackfillByEmail ==========
 
     @Nested
-    @DisplayName("resolveAndBackfillByEmail")
     class ResolveAndBackfillByEmail {
 
         @Test
-        @DisplayName("should backfill user email when strategy 3 resolves login-style address")
         void shouldBackfillEmailWhenStrategy3Resolves() {
             when(userRepository.findByEmailAndProviderId("go98tod@mytum.de", 3L)).thenReturn(Optional.empty());
 
@@ -380,7 +346,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should backfill user email when strategy 4 resolves firstname.lastname address")
         void shouldBackfillEmailWhenStrategy4Resolves() {
             when(userRepository.findByEmailAndProviderId("erik.kiessig@tum.de", 3L)).thenReturn(Optional.empty());
 
@@ -394,7 +359,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should lowercase email before backfilling")
         void shouldLowercaseEmailBeforeBackfilling() {
             when(userRepository.findByEmailAndProviderId("Erik.Kiessig@TUM.de", 3L)).thenReturn(Optional.empty());
 
@@ -421,7 +385,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should NOT backfill for GitHub noreply address")
         void shouldNotBackfillForGitHubNoreply() {
             when(userRepository.findByEmail("dev@users.noreply.github.com")).thenReturn(Optional.empty());
 
@@ -435,7 +398,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should NOT backfill for GitLab bot noreply address")
         void shouldNotBackfillForGitLabBotNoreply() {
             // Resolver returns null for bot noreply (no strategy can match), so we
             // cover the eligibility filter via isBackfillEligible directly below.
@@ -448,7 +410,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not throw when backfill repository call fails")
         void shouldNotThrowWhenBackfillFails() {
             when(userRepository.findByEmailAndProviderId("go98tod@mytum.de", 3L)).thenReturn(Optional.empty());
 
@@ -466,35 +427,29 @@ class CommitAuthorResolverTest extends BaseUnitTest {
     // ========== isBackfillEligible (static helper) ==========
 
     @Nested
-    @DisplayName("isBackfillEligible")
     class IsBackfillEligible {
 
         @Test
-        @DisplayName("should accept login-style institutional address")
         void shouldAcceptLoginStyleAddress() {
             assertThat(CommitAuthorResolver.isBackfillEligible("ge27coy@mytum.de")).isTrue();
         }
 
         @Test
-        @DisplayName("should accept firstname.lastname institutional address")
         void shouldAcceptFirstnameLastnameAddress() {
             assertThat(CommitAuthorResolver.isBackfillEligible("erik.kiessig@tum.de")).isTrue();
         }
 
         @Test
-        @DisplayName("should reject GitHub noreply address")
         void shouldRejectGitHubNoreply() {
             assertThat(CommitAuthorResolver.isBackfillEligible("1234+dev@users.noreply.github.com")).isFalse();
         }
 
         @Test
-        @DisplayName("should reject GitLab bot noreply address")
         void shouldRejectGitLabBotNoreply() {
             assertThat(CommitAuthorResolver.isBackfillEligible("group_123_bot_abc@noreply.gitlab.lrz.de")).isFalse();
         }
 
         @Test
-        @DisplayName("should reject null and blank")
         void shouldRejectNullAndBlank() {
             assertThat(CommitAuthorResolver.isBackfillEligible(null)).isFalse();
             assertThat(CommitAuthorResolver.isBackfillEligible("")).isFalse();
@@ -502,7 +457,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject malformed address")
         void shouldRejectMalformedAddress() {
             assertThat(CommitAuthorResolver.isBackfillEligible("no-at-sign")).isFalse();
             assertThat(CommitAuthorResolver.isBackfillEligible("@nolocalpart.com")).isFalse();
@@ -513,23 +467,19 @@ class CommitAuthorResolverTest extends BaseUnitTest {
     // ========== dottedLocalPartToDisplayName (static helper) ==========
 
     @Nested
-    @DisplayName("dottedLocalPartToDisplayName")
     class DottedLocalPartToDisplayName {
 
         @Test
-        @DisplayName("should capitalise single-dot local-part")
         void shouldCapitaliseSingleDot() {
             assertThat(CommitAuthorResolver.dottedLocalPartToDisplayName("erik.kiessig")).isEqualTo("Erik Kiessig");
         }
 
         @Test
-        @DisplayName("should lowercase remaining characters")
         void shouldLowercaseRemainingCharacters() {
             assertThat(CommitAuthorResolver.dottedLocalPartToDisplayName("ERIK.KIESSIG")).isEqualTo("Erik Kiessig");
         }
 
         @Test
-        @DisplayName("should handle three tokens")
         void shouldHandleThreeTokens() {
             assertThat(CommitAuthorResolver.dottedLocalPartToDisplayName("anna.marie.huber")).isEqualTo(
                 "Anna Marie Huber"
@@ -537,7 +487,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for empty token")
         void shouldReturnNullForEmptyToken() {
             assertThat(CommitAuthorResolver.dottedLocalPartToDisplayName("erik..kiessig")).isNull();
             assertThat(CommitAuthorResolver.dottedLocalPartToDisplayName(".kiessig")).isNull();
@@ -545,13 +494,11 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for input without dot")
         void shouldReturnNullForInputWithoutDot() {
             assertThat(CommitAuthorResolver.dottedLocalPartToDisplayName("ge27coy")).isNull();
         }
 
         @Test
-        @DisplayName("should return null for null or blank input")
         void shouldReturnNullForNullOrBlank() {
             assertThat(CommitAuthorResolver.dottedLocalPartToDisplayName(null)).isNull();
             assertThat(CommitAuthorResolver.dottedLocalPartToDisplayName("")).isNull();
@@ -559,7 +506,6 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should preserve single-character tokens")
         void shouldPreserveSingleCharacterTokens() {
             assertThat(CommitAuthorResolver.dottedLocalPartToDisplayName("a.b")).isEqualTo("A B");
         }

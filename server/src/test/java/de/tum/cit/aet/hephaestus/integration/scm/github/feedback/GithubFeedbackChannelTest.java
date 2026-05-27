@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClie
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -25,7 +24,6 @@ import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-@DisplayName("GithubFeedbackChannel")
 class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Mock
@@ -42,7 +40,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("postSummary returns SummaryHandle with comment node id from mutation")
     void postSummaryReturnsCommentNodeId() {
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
@@ -69,7 +66,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("postSummary throws when GitHub rate limit critical")
     void postSummaryThrowsOnRateLimit() {
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
@@ -84,7 +80,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("postSummary throws on malformed subjectExternalId")
     void postSummaryThrowsOnMalformedSubjectId() {
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
@@ -99,7 +94,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("postSummary throws when mutation returns errors")
     void postSummaryThrowsOnMutationErrors() {
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),

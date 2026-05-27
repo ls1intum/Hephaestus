@@ -11,29 +11,24 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("DiffHunkValidator")
 class DiffHunkValidatorTest extends BaseUnitTest {
 
     // ── parseValidLines ─────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("parseValidLines")
     class ParseValidLines {
 
         @Test
-        @DisplayName("returns empty map for null diff")
         void nullDiff() {
             assertThat(DiffHunkValidator.parseValidLines(null)).isEmpty();
         }
 
         @Test
-        @DisplayName("returns empty map for blank diff")
         void blankDiff() {
             assertThat(DiffHunkValidator.parseValidLines("   ")).isEmpty();
         }
 
         @Test
-        @DisplayName("parses single-file diff with added and context lines")
         void singleFileDiff() {
             String diff = """
                 diff --git a/src/Main.swift b/src/Main.swift
@@ -54,7 +49,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("parses multi-file diff")
         void multiFileDiff() {
             String diff = """
                 diff --git a/FileA.swift b/FileA.swift
@@ -79,7 +73,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles deleted lines (no increment to new line counter)")
         void deletedLines() {
             String diff = """
                 diff --git a/File.swift b/File.swift
@@ -99,7 +92,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles multiple hunks in same file")
         void multipleHunks() {
             String diff = """
                 diff --git a/File.swift b/File.swift
@@ -121,7 +113,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles annotated diff with [L<n>] prefixes")
         void annotatedDiff() {
             String diff = """
                 diff --git a/File.swift b/File.swift
@@ -139,7 +130,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles rename diff (b/ path extraction)")
         void renameDiff() {
             String diff = """
                 diff --git a/old/File.swift b/new/File.swift
@@ -156,7 +146,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles new file (--- /dev/null)")
         void newFile() {
             String diff = """
                 diff --git a/NewFile.swift b/NewFile.swift
@@ -174,7 +163,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles binary file diff (no hunks)")
         void binaryFile() {
             String diff = """
                 diff --git a/image.png b/image.png
@@ -206,11 +194,9 @@ class DiffHunkValidatorTest extends BaseUnitTest {
     // ── validateAndCorrect ──────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("validateAndCorrect")
     class ValidateAndCorrect {
 
         @Test
-        @DisplayName("returns notes unchanged when validLines is empty")
         void emptyValidLines() {
             List<DiffNote> notes = List.of(new DiffNote("File.swift", 10, null, "comment"));
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(notes, Map.of(), "job-1");
@@ -218,7 +204,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns notes unchanged when notes list is empty")
         void emptyNotes() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
@@ -230,7 +215,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("keeps valid notes as-is")
         void validNotesUnchanged() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 15, 20));
             DiffNote note = new DiffNote("File.swift", 10, null, "good line");
@@ -244,7 +228,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("snaps invalid line to nearest valid line (floor)")
         void snapsToFloor() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 20));
             DiffNote note = new DiffNote("File.swift", 12, null, "off by 2");
@@ -258,7 +241,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("snaps invalid line to nearest valid line (ceiling)")
         void snapsToCeiling() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 20));
             DiffNote note = new DiffNote("File.swift", 17, null, "closer to 20");
@@ -287,7 +269,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("corrects endLine preserving original span width")
         void correctsEndLinePreservesSpan() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 11, 12, 15, 20, 25));
             // Note with range 12-14 (span=2), closest valid start is 12 (exact match)
@@ -307,7 +288,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("endLine does not balloon to distant valid line")
         void endLineDoesNotBalloon() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 100));
             // Note at 12-14 (span=2), snaps to 10, endLine should NOT jump to 100
@@ -340,7 +320,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("prefers floor on equal distance tie")
         void tieBreaksToFloor() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 15));
             DiffNote note = new DiffNote("File.swift", 10, null, "equidistant");
@@ -354,7 +333,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("drops note when nearest valid line is beyond MAX_SNAP_DELTA")
         void dropsNoteBeyondSnapDelta() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
             DiffNote note = new DiffNote("File.swift", 1000, null, "way beyond");
@@ -367,7 +345,6 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("snaps note within MAX_SNAP_DELTA to nearest valid line")
         void snapsWithinSnapDelta() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
             DiffNote note = new DiffNote("File.swift", 5, null, "close enough"); // delta=2 (to 3)

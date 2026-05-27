@@ -78,7 +78,6 @@ class ReviewCountEvaluatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Non-Self Review")
     class NonSelfReviewTests {
 
         @Test
@@ -115,11 +114,9 @@ class ReviewCountEvaluatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Self Review Filtering")
     class SelfReviewTests {
 
         @Test
-        @DisplayName("does not increment for self-review")
         void doesNotIncrementForSelfReview() {
             Long reviewId = 100L;
             when(reviewRepository.findByIdWithPullRequestAuthor(reviewId)).thenReturn(
@@ -135,7 +132,6 @@ class ReviewCountEvaluatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does not increment when review not found")
         void doesNotIncrementWhenReviewNotFound() {
             Long reviewId = 999L;
             when(reviewRepository.findByIdWithPullRequestAuthor(reviewId)).thenReturn(Optional.empty());

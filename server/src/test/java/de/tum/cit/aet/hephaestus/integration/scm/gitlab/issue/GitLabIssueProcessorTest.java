@@ -41,7 +41,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -50,7 +49,6 @@ import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
 
 @Tag("unit")
-@DisplayName("GitLabIssueProcessor")
 class GitLabIssueProcessorTest extends BaseUnitTest {
 
     private static final long REPO_ID = 1L;
@@ -167,11 +165,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Confidential filtering")
     class ConfidentialFiltering {
 
         @Test
-        @DisplayName("process() skips confidential issue")
         void processSkipsConfidential() {
             GitLabIssueEventDTO event = createEvent("open", "opened", true);
             ProcessingContext ctx = createContext();
@@ -206,7 +202,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() skips confidential issue")
         void processFromSyncSkipsConfidential() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
@@ -266,11 +261,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("State mapping")
     class StateMapping {
 
         @Test
-        @DisplayName("opened state maps to OPEN")
         void openedMapsToOpen() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -307,7 +300,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("closed state maps to CLOSED")
         void closedMapsToClosed() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -344,7 +336,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null state defaults to OPEN")
         void nullStateDefaultsToOpen() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -386,11 +377,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Webhook event processing")
     class WebhookProcessing {
 
         @Test
-        @DisplayName("process() creates new issue and publishes IssueCreated")
         void processCreatesNewIssue() {
             Issue issue = createIssueEntity();
             // First call: check if exists → empty (new issue)
@@ -415,7 +404,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("process() with missing id and iid skips processing")
         void processMissingIdSkips() {
             var attrs = new GitLabIssueEventDTO.ObjectAttributes(
                 null,
@@ -449,7 +437,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processClosed() publishes IssueClosed event")
         void processClosedPublishesEvent() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -471,7 +458,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processReopened() publishes IssueReopened event")
         void processReopenedPublishesEvent() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -497,11 +483,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("GraphQL sync processing")
     class SyncProcessing {
 
         @Test
-        @DisplayName("processFromSync() creates issue from GraphQL sync data")
         void processFromSyncCreatesIssue() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -566,7 +550,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() with invalid globalId skips processing")
         void processFromSyncInvalidGlobalId() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "invalid-id",
@@ -597,7 +580,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() with invalid iid skips processing")
         void processFromSyncInvalidIid() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
@@ -628,7 +610,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() publishes IssueCreated for new issue")
         void processFromSyncPublishesCreatedEvent() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -667,7 +648,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() links milestone when milestoneIid is provided")
         void processFromSyncLinksMilestone() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -731,7 +711,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() passes null milestoneId when milestone not found")
         void processFromSyncMilestoneNotFound() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -792,7 +771,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() skips milestone lookup when milestoneIid is null")
         void processFromSyncNullMilestoneIid() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -828,7 +806,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() does not publish event for existing issue")
         void processFromSyncNoEventForExisting() {
             Issue issue = createIssueEntity();
             // Issue already exists
@@ -865,7 +842,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() maps COMPLETED state reason when closed with no duplicate marker")
         void shouldMapCompletedStateReasonWhenClosedWithNoOtherSignal() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
@@ -920,7 +896,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() maps DUPLICATE state reason when closedAsDuplicateOf is present")
         void shouldMapDuplicateStateReasonWhenClosedAsDuplicateOfPresent() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
@@ -975,7 +950,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processFromSync() resolves issueTypeId when humanised type name matches")
         void shouldResolveIssueTypeIdWhenTypeNameMatches() {
             de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization organization =
                 new de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization();

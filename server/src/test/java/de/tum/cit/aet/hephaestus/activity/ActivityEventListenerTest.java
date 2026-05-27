@@ -130,11 +130,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Created Event")
     class PullRequestCreatedTests {
 
         @Test
-        @DisplayName("records pull request opened with fixed XP using event data directly")
         void recordsPullRequestOpened() {
             PullRequest pullRequest = createPullRequest(1L);
 
@@ -158,7 +156,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does nothing when authorId is missing from event data")
         void noOpWhenAuthorIdMissing() {
             PullRequest pullRequest = createPullRequest(1L);
             pullRequest.setAuthor(null); // No author
@@ -172,11 +169,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Merged Event")
     class PullRequestMergedTests {
 
         @Test
-        @DisplayName("records pull request merged with fixed XP using event data")
         void recordsPullRequestMerged() {
             PullRequest pullRequest = createPullRequest(2L);
             pullRequest.setMergedAt(Instant.now());
@@ -200,11 +195,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Closed Event")
     class PullRequestClosedTests {
 
         @Test
-        @DisplayName("records pull request closed with zero XP when not merged")
         void recordsPullRequestClosedWithZeroXp() {
             PullRequest pullRequest = createPullRequest(3L);
             pullRequest.setClosedAt(Instant.now());
@@ -241,11 +234,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Reopened Event")
     class PullRequestReopenedTests {
 
         @Test
-        @DisplayName("records pull request reopened with zero XP (lifecycle tracking only)")
         void recordsPullRequestReopenedWithZeroXp() {
             PullRequest pullRequest = createPullRequest(5L);
 
@@ -267,11 +258,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Ready Event")
     class PullRequestReadyTests {
 
         @Test
-        @DisplayName("records pull request ready for review with XP")
         void recordsPullRequestReady() {
             PullRequest pullRequest = createPullRequest(6L);
 
@@ -293,7 +282,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Review Submitted Event")
     class ReviewSubmittedTests {
 
         @Test
@@ -324,7 +312,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles missing author gracefully")
         void handlesMissingAuthor() {
             PullRequest pullRequest = createPullRequest(1L);
             PullRequestReview review = createReview(6L, pullRequest);
@@ -339,11 +326,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Issue Created Event")
     class IssueCreatedTests {
 
         @Test
-        @DisplayName("records issue created with XP for regular issues")
         void recordsIssueCreatedWithXp() {
             Issue issue = createIssue(10L);
 
@@ -364,7 +349,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips pull requests (they have PULL_REQUEST_OPENED event)")
         void skipsPullRequests() {
             PullRequest pullRequest = createPullRequest(11L);
 
@@ -376,7 +360,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("records issue with null author and zero XP (deleted user or bot)")
         void recordsIssueWithNullAuthorAndZeroXp() {
             // Create issue WITHOUT author - simulates deleted GitHub user or bot
             Issue issue = createIssue(14L);
@@ -401,11 +384,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Issue Closed Event")
     class IssueClosedTests {
 
         @Test
-        @DisplayName("records issue closed with zero XP (lifecycle tracking only)")
         void recordsIssueClosedWithZeroXp() {
             Issue issue = createIssue(12L);
             issue.setClosedAt(Instant.now());
@@ -427,7 +408,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips pull requests (they have their own close event)")
         void skipsPullRequests() {
             PullRequest pullRequest = createPullRequest(13L);
 
@@ -439,7 +419,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("records issue closed with null author (deleted user or bot)")
         void recordsIssueClosedWithNullAuthor() {
             // Create issue WITHOUT author - simulates deleted GitHub user or bot
             Issue issue = createIssue(15L);
@@ -465,11 +444,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Commit Created Event")
     class CommitCreatedTests {
 
         @Test
-        @DisplayName("records commit created with XP for known author")
         void recordsCommitCreatedWithXp() {
             Commit commit = createCommit(20L);
 
@@ -490,7 +467,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("records commit with null author and zero XP (deleted user or bot)")
         void recordsCommitWithNullAuthorAndZeroXp() {
             Commit commit = createCommit(21L);
             commit.setAuthor(null);
@@ -513,7 +489,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips commit when scopeId is null")
         void skipsCommitWhenScopeIdIsNull() {
             Commit commit = createCommit(22L);
 
@@ -537,11 +512,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Created Event")
     class DiscussionCreatedTests {
 
         @Test
-        @DisplayName("records discussion created with XP for known author")
         void recordsDiscussionCreatedWithXp() {
             Discussion discussion = createDiscussion(30L);
 
@@ -562,7 +535,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("records discussion with null author and zero XP")
         void recordsDiscussionWithNullAuthorAndZeroXp() {
             Discussion discussion = createDiscussion(31L);
             discussion.setAuthor(null);
@@ -585,11 +557,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Closed Event")
     class DiscussionClosedTests {
 
         @Test
-        @DisplayName("records discussion closed with zero XP (lifecycle tracking)")
         void recordsDiscussionClosedWithZeroXp() {
             Discussion discussion = createDiscussion(32L);
             discussion.setClosedAt(Instant.now());
@@ -612,11 +582,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Reopened Event")
     class DiscussionReopenedTests {
 
         @Test
-        @DisplayName("records discussion reopened with zero XP (lifecycle tracking)")
         void recordsDiscussionReopenedWithZeroXp() {
             Discussion discussion = createDiscussion(33L);
 
@@ -638,11 +606,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Answered Event")
     class DiscussionAnsweredTests {
 
         @Test
-        @DisplayName("records discussion answered with XP for author")
         void recordsDiscussionAnsweredWithXp() {
             Discussion discussion = createDiscussion(34L);
             discussion.setAnswerChosenAt(Instant.now());
@@ -664,7 +630,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("records discussion answered with null author and zero XP")
         void recordsDiscussionAnsweredWithNullAuthorAndZeroXp() {
             Discussion discussion = createDiscussion(35L);
             discussion.setAuthor(null);
@@ -688,11 +653,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Deleted Event")
     class DiscussionDeletedTests {
 
         @Test
-        @DisplayName("records discussion deleted audit trail")
         void recordsDiscussionDeleted() {
             var event = new DomainEvent.DiscussionDeleted(36L, createContext());
 
@@ -709,11 +672,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Review Comment Created Event")
     class ReviewCommentCreatedTests {
 
         @Test
-        @DisplayName("standalone comment (reviewId=null) awards XP from calculator")
         void onReviewCommentCreated_standaloneComment_awardsXp() {
             PullRequest pullRequest = createPullRequest(50L);
             // Different author so it's not a self-review
@@ -756,7 +717,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("comment linked to review (reviewId!=null) awards zero XP")
         void onReviewCommentCreated_linkedToReview_awardsZeroXp() {
             var commentData = new EventPayload.ReviewCommentData(
                 78L, // id
@@ -789,7 +749,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips recording when scopeId is null")
         void onReviewCommentCreated_nullScopeId_skips() {
             var commentData = new EventPayload.ReviewCommentData(
                 79L,
@@ -822,7 +781,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips recording when authorId is null")
         void onReviewCommentCreated_nullAuthorId_skips() {
             var commentData = new EventPayload.ReviewCommentData(
                 80L,
@@ -844,7 +802,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("standalone comment with PR not found records zero XP")
         void onReviewCommentCreated_prNotFound_recordsZeroXp() {
             when(pullRequestRepository.findById(999L)).thenReturn(Optional.empty());
 
@@ -878,7 +835,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("standalone comment with null body passes 0 as body length")
         void onReviewCommentCreated_nullBody_passesZeroLength() {
             PullRequest pullRequest = createPullRequest(50L);
             User prAuthor = new User();
@@ -911,11 +867,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Comment Created Event")
     class DiscussionCommentCreatedTests {
 
         @Test
-        @DisplayName("records discussion comment created with XP")
         void recordsDiscussionCommentCreatedWithXp() {
             DiscussionComment comment = createDiscussionComment(37L);
 
@@ -940,7 +894,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips comment when author is null")
         void skipsCommentWhenAuthorIsNull() {
             DiscussionComment comment = createDiscussionComment(38L);
             comment.setAuthor(null);
@@ -958,11 +911,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Commit Authors Reconciled Event")
     class CommitAuthorsReconciledTests {
 
         @Test
-        @DisplayName("backfills commit actors using configured xp-per-commit when event has repository id")
         void backfillsCommitActorsOnReconciliation() {
             when(activityEventRepository.backfillCommitActors(eq(200L), eq(0.5))).thenReturn(3);
 
@@ -974,7 +925,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does nothing when repository id is missing from event")
         void noOpWhenRepositoryIdMissing() {
             var event = new DomainEvent.CommitAuthorsReconciled(null, createContext());
 
@@ -984,7 +934,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("swallows backfill exceptions so the event pipeline does not break")
         void swallowsBackfillExceptions() {
             when(activityEventRepository.backfillCommitActors(eq(200L), anyDouble())).thenThrow(
                 new RuntimeException("db outage")

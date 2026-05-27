@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldValue;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,6 @@ import tools.jackson.databind.json.JsonMapper;
  * Tests for Jackson mixin-based polymorphic deserialization of GitHub ProjectV2 item field values.
  */
 @Tag("unit")
-@DisplayName("GitHubProjectV2ItemFieldValueMixin")
 class GitHubProjectV2ItemFieldValueMixinTest {
 
     private ObjectMapper objectMapper;
@@ -48,7 +46,6 @@ class GitHubProjectV2ItemFieldValueMixinTest {
     }
 
     @Nested
-    @DisplayName("Polymorphic deserialization by __typename")
     class PolymorphicDeserialization {
 
         @ParameterizedTest(name = "__typename={0} -> {1}")
@@ -67,7 +64,6 @@ class GitHubProjectV2ItemFieldValueMixinTest {
                 "ProjectV2ItemFieldUserValue, GHProjectV2ItemFieldUserValue",
             }
         )
-        @DisplayName("should deserialize __typename to correct GH class")
         void shouldDeserializeToCorrectType(String typename, String expectedClassName) throws Exception {
             String json = "{\"__typename\": \"" + typename + "\"}";
 
@@ -79,11 +75,9 @@ class GitHubProjectV2ItemFieldValueMixinTest {
     }
 
     @Nested
-    @DisplayName("Fallback behavior")
     class FallbackBehavior {
 
         @Test
-        @DisplayName("should fall back to GHProjectV2ItemFieldTextValue for unknown __typename")
         void shouldFallbackForUnknownTypename() throws Exception {
             String json = "{\"__typename\": \"ProjectV2ItemFieldUnknownFutureType\"}";
 
@@ -93,7 +87,6 @@ class GitHubProjectV2ItemFieldValueMixinTest {
         }
 
         @Test
-        @DisplayName("should fall back to GHProjectV2ItemFieldTextValue when __typename is missing")
         void shouldFallbackWhenTypenameIsMissing() throws Exception {
             String json = "{\"someField\": \"someValue\"}";
 
@@ -104,11 +97,9 @@ class GitHubProjectV2ItemFieldValueMixinTest {
     }
 
     @Nested
-    @DisplayName("Array deserialization")
     class ArrayDeserialization {
 
         @Test
-        @DisplayName("should deserialize mixed types in an array")
         void shouldDeserializeMixedTypesInArray() throws Exception {
             String json = """
                 [
@@ -133,11 +124,9 @@ class GitHubProjectV2ItemFieldValueMixinTest {
     }
 
     @Nested
-    @DisplayName("Specific type deserialization")
     class SpecificTypeDeserialization {
 
         @Test
-        @DisplayName("should preserve text value fields")
         void shouldPreserveTextValueFields() throws Exception {
             String json = """
                 {"__typename": "ProjectV2ItemFieldTextValue", "text": "Hello World"}
@@ -151,7 +140,6 @@ class GitHubProjectV2ItemFieldValueMixinTest {
         }
 
         @Test
-        @DisplayName("should preserve number value fields")
         void shouldPreserveNumberValueFields() throws Exception {
             String json = """
                 {"__typename": "ProjectV2ItemFieldNumberValue", "number": 42.5}
@@ -165,7 +153,6 @@ class GitHubProjectV2ItemFieldValueMixinTest {
         }
 
         @Test
-        @DisplayName("should ignore unknown properties")
         void shouldIgnoreUnknownProperties() throws Exception {
             String json = """
                 {"__typename": "ProjectV2ItemFieldTextValue", "text": "value", "unknownField": "ignored"}

@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import org.assertj.core.api.InstanceOfAssertFactories;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -35,7 +34,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-@DisplayName("Workspace controller integration")
 class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired

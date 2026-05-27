@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-@DisplayName("SandboxNetworkManager")
 class SandboxNetworkManagerTest extends BaseUnitTest {
 
     @Mock
@@ -50,11 +49,9 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("createJobNetwork")
     class CreateJobNetwork {
 
         @Test
-        @DisplayName("should create internal network when internet disabled")
         void shouldCreateInternalNetwork() {
             when(networkOps.createNetwork(anyString(), eq(true))).thenReturn(NETWORK_ID);
 
@@ -65,7 +62,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should create bridge network when internet enabled")
         void shouldCreateBridgeNetwork() {
             when(networkOps.createNetwork(anyString(), eq(false))).thenReturn(NETWORK_ID);
 
@@ -77,11 +73,9 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("connectAppServer")
     class ConnectAppServer {
 
         @Test
-        @DisplayName("should connect app-server and return IP")
         void shouldConnectAndReturnIp() {
             when(networkOps.connectToNetwork(NETWORK_ID, "app-server-id")).thenReturn("172.18.0.2");
 
@@ -91,7 +85,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should fall back to HOSTNAME when config has no container ID")
         void shouldFallBackToHostname() {
             SandboxProperties propsNoId = new SandboxProperties(
                 true,
@@ -119,7 +112,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null when container ID cannot be resolved")
         void shouldReturnNullWhenNoContainerId() {
             SandboxProperties propsNoId = new SandboxProperties(
                 true,
@@ -144,7 +136,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null when hostname is blank")
         void shouldReturnNullWhenHostnameBlank() {
             SandboxProperties propsNoId = new SandboxProperties(
                 true,
@@ -169,7 +160,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should cache resolved container ID across calls (DCL)")
         void shouldCacheContainerId() {
             var callCount = new java.util.concurrent.atomic.AtomicInteger(0);
             SandboxProperties propsNoId = new SandboxProperties(
@@ -202,7 +192,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("disconnectAppServer")
     class DisconnectAppServer {
 
         @Test
@@ -214,7 +203,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should no-op when container ID cannot be resolved")
         void shouldNoOpWhenNoContainerId() {
             SandboxProperties propsNoId = new SandboxProperties(
                 true,
@@ -241,11 +229,9 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("removeNetwork")
     class RemoveNetwork {
 
         @Test
-        @DisplayName("should remove network by ID")
         void shouldRemoveNetwork() {
             manager.removeNetwork(NETWORK_ID);
 
@@ -254,11 +240,9 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("listOrphanedNetworks")
     class ListOrphanedNetworks {
 
         @Test
-        @DisplayName("should list networks with agent-net- prefix")
         void shouldListByPrefix() {
             when(networkOps.listNetworksByName("agent-net-")).thenReturn(
                 List.of(new DockerOperations.NetworkInfo("n1", "agent-net-" + JOB_ID))

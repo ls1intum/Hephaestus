@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService.StateBinding;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.ConnectFinalization;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.ConnectInitiation;
@@ -48,7 +47,6 @@ import org.springframework.http.ResponseEntity;
  * + the SecurityConfig {@code securityMatcher} that pins {@code /oauth/callback/**}
  * to the permit-all worker chain.
  */
-@DisplayName("OAuthCallbackController — unit")
 class OAuthCallbackControllerTest extends BaseUnitTest {
 
     private static final OAuthCallbackProperties PROPS = new OAuthCallbackProperties("/integrations?status=success");
@@ -130,7 +128,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Null actorRef in state binding is passed through verbatim — fallback lives in OAuthCallbackService")
     void happyPath_nullActorRef_passedThrough() {
         String state = "signed-state-token";
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), null);
@@ -178,7 +175,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── State validation ────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("Missing state → 400")
     void missingState_returns400() {
         ResponseEntity<?> response = controller.callbackGet("slack", "code", null, null, null, Map.of("code", "code"));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -188,7 +184,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Bad state (HMAC mismatch / expired) → 400 with reason from OAuthStateService")
     void badState_returns400() {
         when(oauthStateService.consume("tampered")).thenThrow(
             new IllegalArgumentException("OAuth state signature mismatch")
@@ -214,7 +209,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("State kind ≠ path kind (cross-kind replay) → 400 with explanation")
     void stateKindMismatch_returns400() {
         // State issued for SLACK; replayed against /oauth/callback/outline.
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
@@ -242,7 +236,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── Strategy failure ────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("Strategy.finalizeConnect returns Failed → 400 with reason")
     void finalizeFailed_returns400() {
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("s")).thenReturn(binding);
@@ -270,7 +263,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Strategy.finalizeConnect throws → 400 strategy_error")
     void finalizeThrows_returns400() {
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("s")).thenReturn(binding);
@@ -296,7 +288,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── Transition guard rejection ──────────────────────────────────────────
 
     @Test
-    @DisplayName("completeConnection throws IllegalStateException → 409 transition_conflict")
     void completeConnection_transitionGuardRejects_returns409() {
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("s")).thenReturn(binding);
@@ -325,7 +316,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── Unknown kind ────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("Unknown kind path segment → 404")
     void unknownKind_returns404() {
         ResponseEntity<?> response = controller.callbackGet(
             "bitbucket",
@@ -368,7 +358,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── POST callback ───────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("POST /oauth/callback/slack delegates through the same shared handler")
     void postCallback_sharesGetHandler() {
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("s")).thenReturn(binding);
@@ -480,11 +469,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
                 throw new IllegalStateException("test forgot to set nextFinalization");
             }
             return nextFinalization;
-        }
-
-        @Override
-        public ValidationResult validate(IntegrationRef ref, CredentialBundle credentials) {
-            return new ValidationResult.Ok(null, null);
         }
 
         @Override

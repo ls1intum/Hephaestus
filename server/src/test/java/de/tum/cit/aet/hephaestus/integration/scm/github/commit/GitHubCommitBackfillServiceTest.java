@@ -35,7 +35,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@DisplayName("GitHubCommitBackfillService")
 class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
     @Mock
@@ -166,7 +165,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     // ========== Tests ==========
 
     @Nested
-    @DisplayName("skip conditions")
     class SkipConditions {
 
         @Test
@@ -183,7 +181,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return -1 when default branch is null")
         void shouldReturnNegativeOneWhenDefaultBranchNull() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             Repository repo = createMockRepository(1L, "owner/repo", null);
@@ -196,7 +193,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return -1 when default branch is blank")
         void shouldReturnNegativeOneWhenDefaultBranchBlank() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             Repository repo = createMockRepository(1L, "owner/repo", "  ");
@@ -240,11 +236,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("full backfill (no previous commits)")
     class FullBackfill {
 
         @Test
-        @DisplayName("should walk all commits when no previous commits exist")
         void shouldWalkAllCommitsWhenNoPreviousCommits() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn("head123");
@@ -288,7 +282,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should publish CommitCreated event for new commits")
         void shouldPublishCommitCreatedEvent() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn("head123");
@@ -317,11 +310,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("incremental backfill")
     class IncrementalBackfill {
 
         @Test
-        @DisplayName("should walk from latest known SHA when previous commits exist")
         void shouldWalkFromLatestKnownSha() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn("head456");
@@ -348,11 +339,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("duplicate handling")
     class DuplicateHandling {
 
         @Test
-        @DisplayName("should skip commits that already exist")
         void shouldSkipExistingCommits() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn("head123");
@@ -396,7 +385,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return 0 when walk returns empty list")
         void shouldReturnZeroWhenWalkReturnsEmpty() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn("head123");
@@ -430,11 +418,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("authentication")
     class Authentication {
 
         @Test
-        @DisplayName("should use installation token for GitHub App auth")
         void shouldUseInstallationTokenForGitHubApp() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(true);
@@ -452,7 +438,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use PAT for personal access token auth")
         void shouldUsePATForPersonalAccessTokenAuth() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn("head123");
@@ -469,11 +454,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("error handling")
     class ErrorHandling {
 
         @Test
-        @DisplayName("should return -1 on GitOperationException")
         void shouldReturnNegativeOneOnGitOperationException() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.ensureRepository(anyLong(), anyString(), any())).thenThrow(
@@ -489,7 +472,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return -1 on unexpected exception")
         void shouldReturnNegativeOneOnUnexpectedException() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.ensureRepository(anyLong(), anyString(), any())).thenThrow(
@@ -505,7 +487,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return -1 when token service fails")
         void shouldReturnNegativeOneWhenTokenServiceFails() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(true);
@@ -527,11 +508,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("user resolution")
     class UserResolution {
 
         @Test
-        @DisplayName("should resolve author and committer IDs by email")
         void shouldResolveUserIdsByEmail() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn("head123");
@@ -572,7 +551,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should pass null IDs when users not found")
         void shouldPassNullIdsWhenUsersNotFound() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn("head123");
@@ -614,11 +592,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("file changes")
     class FileChanges {
 
         @Test
-        @DisplayName("should attach file changes to persisted commit")
         void shouldAttachFileChangesToPersistedCommit() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn("head123");

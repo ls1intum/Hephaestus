@@ -23,7 +23,6 @@ import org.springframework.core.io.Resource;
  *
  * @see FragmentMergingDocumentSource
  */
-@DisplayName("FragmentMergingDocumentSource")
 class FragmentMergingDocumentSourceTest extends BaseUnitTest {
 
     private static Resource byteResource(String content, String description) {
@@ -36,11 +35,9 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getDocument - selective fragment appending")
     class GetDocumentTests {
 
         @Test
-        @DisplayName("should append only fragments referenced by the operation")
         void shouldAppendOnlyReferencedFragments() {
             // Arrange — two fragments, only one is referenced by GetOrganizationProjects
             String fragments = """
@@ -56,7 +53,6 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
             // Act — GetOrganizationProjects uses ...ActorFields but not ...UnusedFragment
             String document = source.getDocument("GetOrganizationProjects").block();
 
-            // Assert
             assertThat(document).isNotNull();
             assertThat(document).contains("query GetOrganizationProjects");
             assertThat(document).contains("fragment ActorFields on Actor");
@@ -64,7 +60,6 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not append any fragments when none are referenced")
         void shouldNotAppendFragmentsWhenNoneReferenced() {
             // Arrange — fragments that are NOT used by GetRepository
             String fragments = """
@@ -88,7 +83,6 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should resolve transitive fragment dependencies")
         void shouldResolveTransitiveFragmentDependencies() {
             // Arrange — FragA references ...FragB, so loading a doc that uses ...FragA
             // should pull in both FragA and FragB
@@ -120,9 +114,7 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw when document is not found")
         void shouldThrowWhenDocumentNotFound() {
-            // Arrange
             FragmentMergingDocumentSource source = new FragmentMergingDocumentSource(
                 List.of(new ClassPathResource("graphql/github/operations/")),
                 List.of(".graphql"),
@@ -138,7 +130,6 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
         @Test
         @DisplayName("should work with actual ProjectFragments.graphql and include correct subset")
         void shouldWorkWithActualFragmentFileSelectively() {
-            // Arrange
             FragmentMergingDocumentSource source = new FragmentMergingDocumentSource(
                 List.of(new ClassPathResource("graphql/github/operations/")),
                 List.of(".graphql"),
@@ -192,9 +183,7 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should resolve FieldValueFieldsCostOptimized for embedded query files")
         void shouldResolveFieldValueFieldsCostOptimizedForEmbeddedQueries() {
-            // Arrange
             FragmentMergingDocumentSource source = new FragmentMergingDocumentSource(
                 List.of(new ClassPathResource("graphql/github/operations/")),
                 List.of(".graphql"),
@@ -221,9 +210,7 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not contaminate non-project queries with any fragments")
         void shouldNotContaminateNonProjectQueries() {
-            // Arrange
             FragmentMergingDocumentSource source = new FragmentMergingDocumentSource(
                 List.of(new ClassPathResource("graphql/github/operations/")),
                 List.of(".graphql"),
@@ -246,23 +233,18 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("parseFragments - fragment parsing")
     class ParseFragmentsTests {
 
         @Test
-        @DisplayName("should parse multiple fragment definitions from raw content")
         void shouldParseMultipleFragments() {
-            // Arrange
             String raw = """
                 fragment Frag1 on Type1 { field1 }
                 fragment Frag2 on Type2 { field2 }
                 fragment Frag3 on Type3 { field3 nested { subfield } }
                 """;
 
-            // Act
             Map<String, String> fragments = FragmentMergingDocumentSource.parseFragments(raw);
 
-            // Assert
             assertThat(fragments).hasSize(3);
             assertThat(fragments).containsKeys("Frag1", "Frag2", "Frag3");
             assertThat(fragments.get("Frag1")).startsWith("fragment Frag1 on Type1");
@@ -270,7 +252,6 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty map for blank content")
         void shouldReturnEmptyForBlankContent() {
             assertThat(FragmentMergingDocumentSource.parseFragments("")).isEmpty();
             assertThat(FragmentMergingDocumentSource.parseFragments("   ")).isEmpty();
@@ -278,7 +259,6 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle fragments with nested braces and spreads")
         void shouldHandleComplexFragments() {
             // Arrange — fragment that references another fragment
             String raw = """
@@ -293,10 +273,8 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
                 }
                 """;
 
-            // Act
             Map<String, String> fragments = FragmentMergingDocumentSource.parseFragments(raw);
 
-            // Assert
             assertThat(fragments).hasSize(2);
             assertThat(fragments.get("Outer")).contains("...Inner");
             assertThat(fragments.get("Inner")).contains("field2");
@@ -304,13 +282,10 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("constructor - fragment loading")
     class ConstructorTests {
 
         @Test
-        @DisplayName("should throw IllegalStateException when fragment resource does not exist")
         void shouldThrowWhenFragmentResourceMissing() {
-            // Arrange
             Resource missingResource = new ClassPathResource("nonexistent/fragment.graphql");
 
             // Act & Assert
@@ -326,7 +301,6 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept empty fragment list without error")
         void shouldAcceptEmptyFragmentList() {
             // Arrange & Act
             FragmentMergingDocumentSource source = new FragmentMergingDocumentSource(

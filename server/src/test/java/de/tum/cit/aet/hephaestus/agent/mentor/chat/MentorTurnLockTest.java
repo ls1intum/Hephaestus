@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
  * Concurrency invariants for the per-thread turn mutex. The lock map MUST stay bounded as
  * threads come and go (otherwise multi-tenant servers leak memory).
  */
-@DisplayName("MentorTurnLock")
 class MentorTurnLockTest extends BaseUnitTest {
 
     @Test
@@ -73,7 +72,6 @@ class MentorTurnLockTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Independent keys do not serialise — TWO REAL THREADS overlap in their holding window")
     void independentKeysRunInParallel() throws Exception {
         // Sequential calls cannot prove non-serialisation: a broken global lock would also pass
         // sequentially. Fork two threads on independent keys, hold them simultaneously, and
@@ -124,7 +122,6 @@ class MentorTurnLockTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Exception in action releases the lock (no permanent leak)")
     void exceptionStillReleasesLock() {
         MentorTurnLock lock = new MentorTurnLock();
         MentorTurnLock.ThreadKey key = new MentorTurnLock.ThreadKey(1L, UUID.randomUUID());
@@ -145,7 +142,6 @@ class MentorTurnLockTest extends BaseUnitTest {
     // ─── Sandbox-level FIFO lock (multi-session) ─────────────────────────────────────────
 
     @Test
-    @DisplayName("Sandbox lock: same key blocks; different keys run concurrently")
     void sandboxLock_sameKeySerialises_differentKeysParallel() throws Exception {
         MentorTurnLock lock = new MentorTurnLock();
         MentorTurnLock.SandboxKey shared = new MentorTurnLock.SandboxKey(1L, 100L);

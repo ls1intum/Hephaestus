@@ -16,12 +16,10 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-@DisplayName("GitRepositoryManager")
 class GitRepositoryManagerTest extends BaseUnitTest {
 
     @TempDir
@@ -79,18 +77,15 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("isEnabled")
     class IsEnabled {
 
         @Test
-        @DisplayName("should return true when enabled")
         void shouldReturnTrueWhenEnabled() {
             manager = createManager(true);
             assertThat(manager.isEnabled()).isTrue();
         }
 
         @Test
-        @DisplayName("should return false when disabled")
         void shouldReturnFalseWhenDisabled() {
             manager = createManager(false);
             assertThat(manager.isEnabled()).isFalse();
@@ -98,11 +93,9 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getRepositoryPath")
     class GetRepositoryPath {
 
         @Test
-        @DisplayName("should return path with repository id")
         void shouldReturnPathWithRepositoryId() {
             manager = createManager(false);
             Path path = manager.getRepositoryPath(42L);
@@ -112,18 +105,15 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("isRepositoryCloned")
     class IsRepositoryCloned {
 
         @Test
-        @DisplayName("should return false for non-existent repository")
         void shouldReturnFalseForNonExistentRepository() {
             manager = createManager(false);
             assertThat(manager.isRepositoryCloned(999L)).isFalse();
         }
 
         @Test
-        @DisplayName("should return true for cloned repository")
         void shouldReturnTrueForClonedRepository() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -134,11 +124,9 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("ensureRepository")
     class EnsureRepository {
 
         @Test
-        @DisplayName("should throw when not enabled")
         void shouldThrowWhenNotEnabled() {
             manager = createManager(false);
 
@@ -148,7 +136,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should clone repository on first call")
         void shouldCloneRepositoryOnFirstCall() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -160,7 +147,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should fetch on subsequent calls")
         void shouldFetchOnSubsequentCalls() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -191,11 +177,9 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("walkCommits")
     class WalkCommits {
 
         @Test
-        @DisplayName("should return empty list when not enabled")
         void shouldReturnEmptyListWhenNotEnabled() {
             manager = createManager(false);
 
@@ -205,7 +189,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should walk all commits when fromSha is null")
         void shouldWalkAllCommitsWhenFromShaIsNull() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -220,7 +203,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should walk commits between fromSha and toSha")
         void shouldWalkCommitsBetweenShas() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -260,7 +242,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw GitOperationException for unresolvable toSha")
         void shouldThrowForUnresolvableToSha() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -273,7 +254,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should extract file changes for commits")
         void shouldExtractFileChangesForCommits() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -295,7 +275,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should extract author and committer info")
         void shouldExtractAuthorAndCommitterInfo() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -315,7 +294,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should detect file modifications")
         void shouldDetectFileModifications() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -344,7 +322,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should detect file deletions")
         void shouldDetectFileDeletions() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -372,7 +349,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should compute additions and deletions correctly")
         void shouldComputeAdditionsAndDeletionsCorrectly() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -391,11 +367,9 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("resolveDefaultBranchHead")
     class ResolveDefaultBranchHead {
 
         @Test
-        @DisplayName("should return null when not enabled")
         void shouldReturnNullWhenNotEnabled() {
             manager = createManager(false);
 
@@ -405,7 +379,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should resolve HEAD SHA for default branch")
         void shouldResolveHeadShaForDefaultBranch() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -419,7 +392,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should resolve HEAD after fetch updates")
         void shouldResolveHeadAfterFetchUpdates() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -446,7 +418,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for non-existent branch")
         void shouldReturnNullForNonExistentBranch() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -461,7 +432,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null for non-existent repository")
         void shouldReturnNullForNonExistentRepository() {
             manager = createManager(true);
 
@@ -473,11 +443,9 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("readFilesAtCommit")
     class ReadFilesAtCommit {
 
         @Test
-        @DisplayName("should return empty map when not enabled")
         void shouldReturnEmptyMapWhenNotEnabled() {
             manager = createManager(false);
 
@@ -487,7 +455,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should read all files at a given commit")
         void shouldReadAllFilesAtCommit() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -502,7 +469,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should read files from a specific commit, not working tree")
         void shouldReadFromSpecificCommit() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -529,7 +495,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should respect maxTotalBytes limit")
         void shouldRespectMaxTotalBytesLimit() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -559,7 +524,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw GitOperationException for unresolvable commit")
         void shouldThrowForUnresolvableCommit() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -575,11 +539,9 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("generateUnifiedDiff")
     class GenerateUnifiedDiff {
 
         @Test
-        @DisplayName("should return empty string when not enabled")
         void shouldReturnEmptyStringWhenNotEnabled() {
             manager = createManager(false);
 
@@ -589,7 +551,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should generate unified diff between two branches")
         void shouldGenerateUnifiedDiff() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -621,7 +582,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty string for unresolvable base ref")
         void shouldReturnEmptyForUnresolvableBaseRef() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -635,7 +595,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty string for unresolvable head ref")
         void shouldReturnEmptyForUnresolvableHeadRef() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
@@ -649,7 +608,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty diff when both refs are the same")
         void shouldReturnEmptyDiffWhenSameRef() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {

@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.connect;
 
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -26,7 +25,7 @@ import org.springframework.stereotype.Component;
  * {@link ConnectFinalization.Failed} so callers don't claim success on a stub.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackConnectionStrategy implements ConnectionStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(SlackConnectionStrategy.class);
@@ -76,9 +75,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public ConnectFinalization finalizeConnect(IntegrationRef ref, Map<String, String> callbackParams) {
-        // TODO: wire a SlackOAuthClient that POSTs to
-        // https://slack.com/api/oauth.v2.access with client_id + client_secret + code,
-        // then returns ConnectFinalization.Completed(team_id, BearerToken(bot_token), team_name).
+        // Stub: real implementation ships with the Slack OAuth client (#1204).
         log.warn(
             "Slack finalizeConnect called but OAuth code exchange not yet wired (workspace={}, params keys={})",
             ref.workspaceId(),
@@ -88,14 +85,8 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     }
 
     @Override
-    public ValidationResult validate(IntegrationRef ref, CredentialBundle credentials) {
-        // Honest: auth.test probe ships with the Slack OAuth client (#1204).
-        return new ValidationResult.Failed("Slack auth.test probe not wired");
-    }
-
-    @Override
     public void revoke(IntegrationRef ref) {
-        // TODO: call https://slack.com/api/auth.revoke best-effort.
+        // Slack auth.revoke is best-effort and ships with the Slack OAuth client (#1204).
         log.debug("Slack revoke stub for workspace={}", ref.workspaceId());
     }
 

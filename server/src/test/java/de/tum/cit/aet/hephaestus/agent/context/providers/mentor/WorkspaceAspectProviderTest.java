@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -28,7 +27,6 @@ import org.springframework.cache.CacheManager;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("WorkspaceAspectProvider")
 class WorkspaceAspectProviderTest extends BaseUnitTest {
 
     @Mock
@@ -50,7 +48,6 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
     WorkspaceAspectProvider provider;
 
     @Test
-    @DisplayName("contribute writes workspace.json with all aspect sections")
     void writesWorkspaceJson() throws Exception {
         User user = new User();
         user.setLogin("octo");
@@ -81,7 +78,6 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("focusSuggestions surfaces stale review requests")
     void staleReviewRequests() {
         PullRequest pr = new PullRequest();
         // 5 days in the past — beyond the 3-day urgency threshold.
@@ -91,7 +87,6 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("focusSuggestions skips fresh review requests")
     void freshReviewRequests() {
         PullRequest pr = new PullRequest();
         pr.setCreatedAt(Instant.now().minus(Duration.ofHours(2)));

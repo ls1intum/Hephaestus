@@ -40,7 +40,6 @@ import tools.jackson.databind.node.ObjectNode;
  * reaper sweep.
  */
 @TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
-@DisplayName("MentorTurnPersistence integration")
 class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
@@ -122,7 +121,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ensureThread creates a thread when absent")
     void ensureThread_createsWhenAbsent() {
         UUID threadId = UUID.randomUUID();
         ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user, "Hello mentor");
@@ -134,7 +132,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ensureThread returns the existing row when one already exists")
     void ensureThread_returnsExisting() {
         UUID threadId = UUID.randomUUID();
         ChatThread first = persistence.ensureThread(workspace.getId(), threadId, user, "first prompt");
@@ -146,7 +143,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ensureThread hides foreign-owner reads as 404 (no thread enumeration)")
     void ensureThread_foreignOwnerThrows() {
         UUID threadId = UUID.randomUUID();
         persistence.ensureThread(workspace.getId(), threadId, user, "hello");
@@ -170,7 +166,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("persistInFlight writes user+assistant rows, returns assistant id, status=in_flight")
     void persistInFlight_happyPath() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
@@ -192,7 +187,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("persistInFlight honours the client-supplied user message id")
     void persistInFlight_honorsClientUserMessageId() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID clientUserId = UUID.randomUUID();
@@ -208,7 +202,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("persistInFlight throws TurnAlreadyInFlightException on the DB unique partial index")
     void persistInFlight_secondCallThrows() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         persistence.persistInFlight(thread, "first", UUID.randomUUID(), null);
@@ -218,7 +211,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("persistInFlight: TWO REAL THREADS race the same thread row — exactly one wins, exactly one 409s")
     void persistInFlight_concurrentRace_exactlyOneWins() throws Exception {
         // Sequential calls only prove the SQL `WHERE in_flight` semantics fire. The dual-lock
         // defence (Java MentorTurnLock + DB partial unique index) is supposed to handle the
@@ -270,7 +262,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("finalise flips status to completed and writes parts + usage")
     void finalise_writesCompletedRow() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
@@ -401,7 +392,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("interrupt flips status to interrupted and stores the error message")
     void interrupt_writesInterruptedRow() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
@@ -420,7 +410,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("@Version: reaper bumps version, then a stale-snapshot save throws OptimisticLockingFailureException")
     void optimisticLocking_staleSnapshotSaveFails() {
         // Root-cause protection against the reaper-vs-late-finalise data corruption: a
         // writer that loaded the entity at version=N can no longer overwrite a row the
@@ -458,7 +447,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("reapStaleInFlight flips in-flight rows older than the cutoff")
     void reaper_flipsStaleInFlightRows() throws Exception {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "stuck");
         UUID assistantId = UUID.randomUUID();

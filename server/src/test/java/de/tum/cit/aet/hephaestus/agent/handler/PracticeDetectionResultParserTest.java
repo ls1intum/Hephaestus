@@ -20,7 +20,6 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("PracticeDetectionResultParser")
 class PracticeDetectionResultParserTest extends BaseUnitTest {
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
@@ -60,11 +59,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Structural validation")
     class StructuralValidation {
 
         @Test
-        @DisplayName("returns empty result when jobOutput is null")
         void nullJobOutput() {
             ParseResult result = parser.parse(null);
 
@@ -74,7 +71,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty result when rawOutput field is missing")
         void missingRawOutput() {
             ObjectNode jobOutput = objectMapper.createObjectNode();
             jobOutput.put("somethingElse", "value");
@@ -86,7 +82,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty result when rawOutput is blank")
         void blankRawOutput() {
             ParseResult result = parser.parse(wrapRawOutput("  "));
 
@@ -95,7 +90,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty result when rawOutput is invalid JSON")
         void invalidJson() {
             ParseResult result = parser.parse(wrapRawOutput("not json {{{"));
 
@@ -104,7 +98,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty result when findings field is missing")
         void missingFindings() {
             ParseResult result = parser.parse(wrapRawOutput("{\"summary\":\"hello\"}"));
 
@@ -113,7 +106,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty result when findings array is empty")
         void emptyFindings() {
             ParseResult result = parser.parse(wrapRawOutput("{\"findings\":[]}"));
 
@@ -122,7 +114,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("keeps all findings when count is high")
         void keepsAllFindings() {
             ObjectNode root = objectMapper.createObjectNode();
             ArrayNode arr = root.putArray("findings");
@@ -156,11 +147,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Field validation")
     class FieldValidation {
 
         @Test
-        @DisplayName("valid finding is parsed correctly")
         void validFinding() {
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(validFindingNode())));
 
@@ -176,7 +165,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("discards entry with missing practiceSlug")
         void missingPracticeSlug() {
             ObjectNode finding = validFindingNode();
             finding.remove("practiceSlug");
@@ -189,7 +177,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("discards entry with blank title")
         void blankTitle() {
             ObjectNode finding = validFindingNode();
             finding.put("title", "  ");
@@ -201,7 +188,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("accepts NOT_APPLICABLE verdict")
         void notApplicableVerdict() {
             ObjectNode finding = validFindingNode();
             finding.put("verdict", "NOT_APPLICABLE");
@@ -213,7 +199,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("normalizes lowercase verdict to uppercase")
         void lowercaseVerdict() {
             ObjectNode finding = validFindingNode();
             finding.put("verdict", "positive");
@@ -225,7 +210,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("discards entry with invalid verdict")
         void invalidVerdict() {
             ObjectNode finding = validFindingNode();
             finding.put("verdict", "UNKNOWN_VERDICT");
@@ -237,7 +221,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("normalizes lowercase severity to uppercase")
         void lowercaseSeverity() {
             ObjectNode finding = validFindingNode();
             finding.put("severity", "major");
@@ -249,7 +232,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("discards entry with invalid severity")
         void invalidSeverity() {
             ObjectNode finding = validFindingNode();
             finding.put("severity", "EXTREME");
@@ -260,7 +242,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("discards entry with confidence below 0")
         void confidenceBelowZero() {
             ObjectNode finding = validFindingNode();
             finding.put("confidence", -0.5);
@@ -272,7 +253,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("normalizes percentage confidence (85 → 0.85)")
         void percentageConfidence() {
             ObjectNode finding = validFindingNode();
             finding.put("confidence", 85);
@@ -284,7 +264,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("discards entry with confidence above 100")
         void confidenceAbove100() {
             ObjectNode finding = validFindingNode();
             finding.put("confidence", 150);
@@ -296,7 +275,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("truncates oversized title to 255 chars")
         void oversizedTitle() {
             ObjectNode finding = validFindingNode();
             finding.put("title", "x".repeat(300));
@@ -322,7 +300,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("parses optional fields when present")
         void optionalFieldsPresent() {
             ObjectNode finding = validFindingNode();
             finding.put("reasoning", "Some reasoning");
@@ -341,7 +318,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null optional fields are parsed as null")
         void nullOptionalFields() {
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(validFindingNode())));
 
@@ -352,7 +328,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("accepts confidence of exactly 0.0")
         void confidenceExactlyZero() {
             ObjectNode finding = validFindingNode();
             finding.put("confidence", 0.0);
@@ -364,7 +339,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("accepts confidence of exactly 1.0")
         void confidenceExactlyOne() {
             ObjectNode finding = validFindingNode();
             finding.put("confidence", 1.0);
@@ -376,7 +350,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("drops oversized evidence without discarding finding")
         void oversizedEvidenceDropped() {
             ObjectNode finding = validFindingNode();
             ObjectNode evidence = objectMapper.createObjectNode();
@@ -417,11 +390,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Mixed findings")
     class MixedFindings {
 
         @Test
-        @DisplayName("valid and invalid entries produce correct split")
         void mixedValidAndInvalid() {
             ObjectNode valid = validFindingNode();
             ObjectNode invalid = validFindingNode();
@@ -435,7 +406,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("all invalid entries produce empty validFindings")
         void allInvalid() {
             ObjectNode bad1 = validFindingNode();
             bad1.remove("practiceSlug");
@@ -450,7 +420,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Per-finding suggestedDiffNotes parsing")
     class PerFindingSuggestedDiffNotes {
 
         private ObjectNode findingWithSuggestedNotes(
@@ -481,7 +450,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("attaches suggestedDiffNotes to the validated finding")
         void attachesNotesToFinding() {
             ObjectNode finding = findingWithSuggestedNotes(
                 "error-handling",
@@ -502,7 +470,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("absent suggestedDiffNotes yields an empty list")
         void absentNotesYieldsEmptyList() {
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(validFindingNode())));
 
@@ -511,7 +478,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips invalid suggestedDiffNotes entries")
         void skipsInvalidEntries() {
             ObjectNode finding = objectMapper.createObjectNode();
             finding.put("practiceSlug", "error-handling");
@@ -541,7 +507,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("rejects suggestedDiffNotes pointing at internal workspace paths")
         void rejectsInternalPaths() {
             ObjectNode finding = findingWithSuggestedNotes(
                 "error-handling",
@@ -559,7 +524,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("preserves endLine when supplied")
         void preservesEndLine() {
             ObjectNode note = suggestedNote("src/Range.java", 10, "Multi-line issue");
             note.put("endLine", 20);
@@ -576,11 +540,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Deduplication")
     class Deduplication {
 
         @Test
-        @DisplayName("keeps all findings including multiple per practice")
         void keepsAllFindingsPerPractice() {
             ObjectNode f1 = validFindingNode();
             f1.put("practiceSlug", "error-handling");
@@ -617,11 +579,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("JSON extraction from mixed text")
     class JsonExtractionFromMixedText {
 
         @Test
-        @DisplayName("extracts JSON from text with phase markers")
         void extractsJsonFromPhaseMarkers() {
             String mixed = """
                 [PHASE0] Context loaded: 1 files changed
@@ -636,7 +596,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty when no valid JSON found in text")
         void returnsEmptyWhenNoJsonInText() {
             String text = "[PHASE0] no json here at all {notjson";
 
@@ -647,11 +606,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("JSON escape sanitization")
     class JsonEscapeSanitization {
 
         @Test
-        @DisplayName("fixes Swift string interpolation \\(variable) in JSON")
         void fixesSwiftInterpolation() {
             // Simulate agent output with Swift \(error) in code snippets
             // Jackson would fail on \( because it's not a valid JSON escape
@@ -667,7 +624,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("sanitizeJsonEscapes fixes invalid \\( escape")
         void fixesInvalidParenEscape() {
             String input = "print(\\\"\\(error)\\\")";
             String result = PracticeDetectionResultParser.sanitizeJsonEscapes(input);
@@ -675,7 +631,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("sanitizeJsonEscapes handles already-escaped \\\\( correctly")
         void handlesAlreadyEscaped() {
             // \\( in the input means the text literally has \( which is valid JSON (\\)
             String input = "print(\\\\(error))";
@@ -685,11 +640,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Contract test")
     class ContractTest {
 
         @Test
-        @DisplayName("parses sample agent output fixture")
         void parseSampleFixture() throws Exception {
             InputStream is = getClass().getResourceAsStream("/practices/finding/sample-agent-output.json");
             assertThat(is).as("sample fixture must exist").isNotNull();

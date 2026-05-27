@@ -8,11 +8,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-@DisplayName("Workspace service integration")
 class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -28,7 +26,6 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private ConnectionService connectionService;
 
     @Test
-    @DisplayName("createWorkspace normalizes slug and assigns owner membership")
     void createWorkspaceAssignsOwnerMembership() {
         User owner = persistUser("OwnerLogin");
 
@@ -45,7 +42,6 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    @DisplayName("updateNotifications persists Slack configuration and enforces channel validation")
     void updateNotificationsPersistsStateAndValidatesChannel() {
         User owner = persistUser("notification-owner");
         Workspace workspace = createWorkspace(
@@ -99,7 +95,6 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository connectionRepository;
 
     @Test
-    @DisplayName("Workspace lifecycle enforces suspend/resume/purge transitions")
     void workspaceLifecycleTransitions() {
         User owner = persistUser("lifecycle-owner");
         Workspace workspace = createWorkspace("Lifecycle", "Lifecycle", "lifecycle", AccountType.ORG, owner);
@@ -126,7 +121,6 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    @DisplayName("PAT workspace without token is promoted to GitHub App installation during provisioning")
     void patWorkspaceWithoutTokenIsPromoted() {
         User owner = persistUser("ls1intum-owner");
         Workspace workspace = createWorkspace("ls1intum", "ls1intum", "ls1intum", AccountType.ORG, owner);

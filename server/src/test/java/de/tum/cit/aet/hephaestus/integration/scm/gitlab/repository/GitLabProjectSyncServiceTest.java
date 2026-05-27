@@ -28,7 +28,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -39,7 +38,6 @@ import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
 @Tag("unit")
-@DisplayName("GitLabProjectSyncService")
 class GitLabProjectSyncServiceTest extends BaseUnitTest {
 
     private static final Long TEST_PROVIDER_ID = 100L;
@@ -93,11 +91,9 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("syncProject")
     class SyncProject {
 
         @Test
-        @DisplayName("null project path returns empty")
         void nullProjectPath_returnsEmpty() {
             Optional<Repository> result = service.syncProject(1L, null);
             assertThat(result).isEmpty();
@@ -105,7 +101,6 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("blank project path returns empty")
         void blankProjectPath_returnsEmpty() {
             Optional<Repository> result = service.syncProject(1L, "  ");
             assertThat(result).isEmpty();
@@ -113,7 +108,6 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("successful sync returns repository with parent group")
         void successfulSync_returnsRepositoryWithGroup() {
             var groupData = new GitLabGroupResponse(
                 "gid://gitlab/Group/42",
@@ -161,7 +155,6 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("project without group syncs with null organization")
         void projectWithoutGroup_syncsWithNullOrg() {
             var projectData = new GitLabProjectResponse(
                 "gid://gitlab/Project/456",
@@ -191,7 +184,6 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("project not found returns empty")
         void projectNotFound_returnsEmpty() {
             mockGraphQlProjectResponse(null);
 
@@ -202,7 +194,6 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("invalid GraphQL response returns empty and records failure")
         void invalidResponse_returnsEmptyAndRecordsFailure() {
             HttpGraphQlClient client = mock(HttpGraphQlClient.class);
             when(graphQlClientProvider.forScope(any())).thenReturn(client);
@@ -228,7 +219,6 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("group processor returning null aborts project sync")
         void groupProcessorReturnsNull_abortsSync() {
             var groupData = new GitLabGroupResponse(
                 "gid://gitlab/Group/42",
@@ -264,7 +254,6 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("exception returns empty and records failure")
         void exception_returnsEmptyAndRecordsFailure() {
             when(graphQlClientProvider.forScope(any())).thenThrow(new RuntimeException("connection refused"));
 

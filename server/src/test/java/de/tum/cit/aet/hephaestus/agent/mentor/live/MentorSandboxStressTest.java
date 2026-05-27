@@ -52,7 +52,6 @@ import tools.jackson.databind.node.ObjectNode;
  * Defaults to N=5 to stay polite on shared infra.
  */
 @LiveLlmTest
-@DisplayName("Mentor sandbox stress — multi-user runner footprint")
 class MentorSandboxStressTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -113,7 +112,6 @@ class MentorSandboxStressTest {
      * <p>Run: {@code N=3 K=5 ./mvnw -Plive-tests test -Dtest=MentorSandboxStressTest#multiSessionPerRunner}.
      */
     @Test
-    @DisplayName("N runners × K sessions each: per-user multi-thread footprint")
     void multiSessionPerRunner() throws Exception {
         int n = Integer.parseInt(System.getenv().getOrDefault("N", "3"));
         int k = Integer.parseInt(System.getenv().getOrDefault("K", "5"));

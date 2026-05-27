@@ -224,11 +224,9 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Normal Operation (Circuit Closed)")
     class NormalOperationTests {
 
         @Test
-        @DisplayName("Should return true when user has role")
         void userHasRole() {
             setupUserWithRole(true);
 
@@ -240,7 +238,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should return false when user does not have role")
         void userMissingRole() {
             setupUserWithRole(false);
 
@@ -251,7 +248,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should return false when user not found in Keycloak")
         void userNotFound() {
             when(usersResource.searchByUsername(TEST_USERNAME, true)).thenReturn(Collections.emptyList());
 
@@ -263,11 +259,9 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Circuit Breaker Behavior")
     class CircuitBreakerTests {
 
         @Test
-        @DisplayName("Should NOT open circuit after auth failures (401 is config error, not transient)")
         void authFailuresDoNotOpenCircuit() {
             setupAuthFailure();
 
@@ -285,7 +279,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should return false but continue working on auth failures")
         void authFailuresReturnFalseButDontBreakCircuit() {
             setupAuthFailure();
 
@@ -297,7 +290,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should open circuit after three consecutive connection failures (60% of 5)")
         void connectionFailuresOpenCircuit() {
             setupConnectionFailure();
 
@@ -310,7 +302,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should skip requests when circuit is open")
         void circuitOpenSkipsRequests() {
             setupConnectionFailure();
 
@@ -330,7 +321,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("ProcessingException (connection failure) should open circuit")
         void connectionFailureCountsAsFailure() {
             setupConnectionFailure();
 
@@ -360,7 +350,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("ProcessingException wrapping IOException SHOULD open circuit")
         void wrappedIOFailuresOpenCircuit() {
             // ProcessingException wrapping IOException is a real infrastructure failure
             // The cause-chain checking should NOT prevent this from tripping the circuit
@@ -377,11 +366,9 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Half-Open State and Recovery")
     class HalfOpenRecoveryTests {
 
         @Test
-        @DisplayName("Should transition to half-open when manually triggered")
         void transitionsToHalfOpen() {
             setupConnectionFailure();
 
@@ -420,7 +407,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should return to open state if test request fails")
         void returnsToOpenOnTestFailure() {
             setupConnectionFailure();
 
@@ -444,7 +430,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
     class EdgeCaseTests {
 
         @Test
-        @DisplayName("Should allow multiple recovery cycles")
         void multipleRecoveryCycles() {
             // First circuit break (use connection failures, not auth failures)
             setupConnectionFailure();
@@ -474,7 +459,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should report healthy when circuit is closed")
         void healthyWhenClosed() {
             // Make a successful call first to use the stubs from setUp
             setupUserWithRole(false);
@@ -485,7 +469,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should report unhealthy when circuit is open")
         void unhealthyWhenOpen() {
             // Use connection failure to open the circuit (auth failures don't open it)
             setupConnectionFailure();
@@ -498,7 +481,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should remain healthy even with repeated auth failures")
         void healthyDespiteAuthFailures() {
             // Auth failures should not affect circuit health
             setupAuthFailure();
@@ -516,7 +498,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should NOT open circuit after forbidden failures (403 is config error, not transient)")
         void forbiddenFailuresDoNotOpenCircuit() {
             setupForbiddenFailure();
 
@@ -534,7 +515,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should throw NullPointerException for null username")
         void throwsOnNullUsername() {
             org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class, () ->
                 checker.hasRole(null, TEST_ROLE)
@@ -542,7 +522,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should throw NullPointerException for null roleName")
         void throwsOnNullRoleName() {
             org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class, () ->
                 checker.hasRole(TEST_USERNAME, null)
@@ -550,7 +529,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should throw IllegalArgumentException for blank roleName")
         void throwsOnBlankRoleName() {
             org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () ->
                 checker.hasRole(TEST_USERNAME, "   ")
@@ -558,7 +536,6 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should report healthy in HALF_OPEN state to allow recovery traffic")
         void healthyWhenHalfOpen() {
             // Open the circuit with connection failures
             setupConnectionFailure();

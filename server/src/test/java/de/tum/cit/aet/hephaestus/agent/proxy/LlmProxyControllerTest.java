@@ -28,7 +28,6 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("LlmProxyController")
 class LlmProxyControllerTest extends BaseUnitTest {
 
     private static final LlmProxyProperties DEFAULT_PROPS = new LlmProxyProperties(
@@ -70,11 +69,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Header stripping — credential isolation")
     class HeaderStripping {
 
         @Test
-        @DisplayName("should strip x-api-key (Anthropic job token) from upstream headers")
         void shouldStripXApiKey() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
             HttpHeaders incoming = new HttpHeaders();
@@ -89,7 +86,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should strip Authorization header (OpenAI job token) from upstream headers")
         void shouldStripAuthorization() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
             HttpHeaders incoming = new HttpHeaders();
@@ -103,7 +99,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should strip api-key header (Azure job token) from upstream headers")
         void shouldStripAzureApiKey() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
             HttpHeaders incoming = new HttpHeaders();
@@ -115,7 +110,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should strip ALL auth headers even when multiple are present")
         void shouldStripAllAuthHeaders() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
             HttpHeaders incoming = new HttpHeaders();
@@ -131,7 +125,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should remove Host and set Accept-Encoding to identity")
         void shouldRemoveHostAndSetAcceptEncodingIdentity() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
             HttpHeaders incoming = new HttpHeaders();
@@ -145,7 +138,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should strip hop-by-hop headers")
         void shouldStripHopByHopHeaders() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
             HttpHeaders incoming = new HttpHeaders();
@@ -163,7 +155,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should preserve non-auth custom headers")
         void shouldPreserveCustomHeaders() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
             HttpHeaders incoming = new HttpHeaders();
@@ -180,7 +171,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Path traversal rejection")
     class PathTraversal {
 
         @Test
@@ -200,7 +190,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject double-dot even when URL-encoded in path")
         void shouldRejectDoubleDotInDecodedPath() {
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -216,7 +205,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject percent-encoded path traversal (%2e)")
         void shouldRejectPercentEncodedDots() {
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -232,7 +220,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject double-encoded path traversal (%252e)")
         void shouldRejectDoubleEncodedDots() {
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -248,7 +235,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject backslash in path")
         void shouldRejectBackslash() {
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -265,11 +251,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Null/blank API key handling")
     class NullApiKey {
 
         @Test
-        @DisplayName("should return 502 when job has null API key")
         void shouldReturn502ForNullApiKey() {
             AgentJob job = createJobWithApiKey(null);
             setUpAuthentication(job);
@@ -284,7 +268,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return 502 when job has blank API key")
         void shouldReturn502ForBlankApiKey() {
             AgentJob job = createJobWithApiKey("   ");
             setUpAuthentication(job);
@@ -299,7 +282,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should increment error counter with provider tag for null API key")
         void shouldIncrementErrorCounterForNullApiKey() {
             AgentJob job = createJobWithApiKey(null);
             setUpAuthentication(job);
@@ -317,11 +299,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("SSRF host validation")
     class SsrfProtection {
 
         @Test
-        @DisplayName("buildUpstreamUrl should construct correct URL")
         void shouldBuildCorrectUrl() {
             String url = LlmProxyController.buildUpstreamUrl(
                 "https://api.anthropic.com",
@@ -332,7 +312,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("buildUpstreamUrl preserves host and scheme from base URL")
         void shouldPreserveHostAndSchemeFromBaseUrl() {
             String url = LlmProxyController.buildUpstreamUrl("https://api.anthropic.com", "/v1/messages", null);
             var uri = java.net.URI.create(url);
@@ -341,7 +320,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("buildUpstreamUrl with no query params")
         void shouldBuildUrlWithNoQuery() {
             String url = LlmProxyController.buildUpstreamUrl("https://api.openai.com", "/v1/chat/completions", null);
             assertThat(url).isEqualTo("https://api.openai.com/v1/chat/completions");
@@ -349,14 +327,12 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("buildUpstreamUrl with empty subpath")
         void shouldBuildUrlWithEmptySubpath() {
             String url = LlmProxyController.buildUpstreamUrl("https://api.anthropic.com", "", null);
             assertThat(url).isEqualTo("https://api.anthropic.com");
         }
 
         @Test
-        @DisplayName("@ in path should not be misinterpreted as userinfo")
         void shouldNotMisinterpretAtInPathAsUserinfo() {
             // An @ in the URL path (after the authority) is a harmless literal character,
             // not a userinfo separator. Verify the constructed URI parses correctly.
@@ -383,7 +359,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject SSRF when subpath hijacks URI authority via @ injection")
         void shouldRejectSsrfHostMismatchViaAtInjection() {
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -403,7 +378,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle malformed URI gracefully (return 400 not 500)")
         void shouldHandleMalformedUri() {
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -422,11 +396,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Metrics and observability")
     class Metrics {
 
         @Test
-        @DisplayName("should record timer with provider tag")
         void shouldRecordTimerWithProviderTag() {
             AgentJob job = createJobWithApiKey(null);
             setUpAuthentication(job);
@@ -443,7 +415,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should record timer even when proxy fails early")
         void shouldRecordTimerOnEarlyReturn() {
             AgentJob job = createJobWithApiKey("   ");
             setUpAuthentication(job);
@@ -461,7 +432,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should increment error counter with provider tag on consecutive failures")
         void shouldIncrementErrorCounterMultipleTimes() {
             AgentJob job = createJobWithApiKey(null);
             setUpAuthentication(job);
@@ -480,7 +450,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should track errors per provider independently")
         void shouldTrackErrorsPerProvider() {
             AgentJob job = createJobWithApiKey(null);
             setUpAuthentication(job);
@@ -505,11 +474,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Request body size validation")
     class BodySizeValidation {
 
         @Test
-        @DisplayName("should reject request body exceeding 4MB limit")
         void shouldRejectOversizedBody() {
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -525,7 +492,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept request body at exactly 4MB limit")
         void shouldAcceptBodyAtLimit() {
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -542,7 +508,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept null body (GET request)")
         void shouldAcceptNullBody() {
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -559,11 +524,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Upstream error handling")
     class UpstreamErrors {
 
         @Test
-        @DisplayName("should return 502 and increment errors on WebClientRequestException")
         void shouldReturn502OnWebClientRequestException() {
             // Mock WebClient to throw WebClientRequestException (upstream unreachable)
             @SuppressWarnings("unchecked")
@@ -609,7 +572,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return 502 and increment errors on generic upstream exception")
         void shouldReturn502OnGenericException() {
             @SuppressWarnings("unchecked")
             WebClient.RequestBodyUriSpec bodyUriSpec = mock(WebClient.RequestBodyUriSpec.class);
@@ -648,7 +610,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Azure body sanitization")
     class AzureBodySanitization {
 
         private static final LlmProxyProperties AZURE_PROPS = new LlmProxyProperties(
@@ -662,7 +623,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         );
 
         @Test
-        @DisplayName("should strip reasoningSummary when upstream is Azure OpenAI")
         void shouldStripReasoningSummaryForAzure() throws Exception {
             var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
@@ -679,7 +639,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should NOT strip reasoningSummary when upstream is standard OpenAI")
         void shouldNotStripForStandardOpenAI() throws Exception {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
 
@@ -693,14 +652,12 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should pass through null body unchanged")
         void shouldPassThroughNullBody() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
             assertThat(controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, null)).isNull();
         }
 
         @Test
-        @DisplayName("should pass through empty body unchanged")
         void shouldPassThroughEmptyBody() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
             byte[] empty = new byte[0];
@@ -708,7 +665,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should pass through non-JSON body unchanged for Azure")
         void shouldPassThroughNonJsonBody() {
             var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
@@ -720,7 +676,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should rename max_tokens to max_completion_tokens for Azure")
         void shouldRenameMaxTokensForAzure() throws Exception {
             var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
@@ -735,7 +690,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should NOT rename max_tokens for standard OpenAI")
         void shouldNotRenameMaxTokensForStandardOpenAI() throws Exception {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
 
@@ -746,7 +700,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not modify body when no unsupported params present")
         void shouldNotModifyCleanBody() throws Exception {
             var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
@@ -760,11 +713,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Provider routing")
     class ProviderRouting {
 
         @Test
-        @DisplayName("should use Anthropic upstream URL for anthropic provider")
         void shouldUseAnthropicUpstream() {
             // Verify buildUpstreamUrl produces correct Anthropic URL
             String url = LlmProxyController.buildUpstreamUrl("https://api.anthropic.com", "/v1/messages", null);
@@ -772,7 +723,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use OpenAI upstream URL for openai provider")
         void shouldUseOpenAIUpstream() {
             String url = LlmProxyController.buildUpstreamUrl("https://api.openai.com", "/v1/chat/completions", null);
             assertThat(java.net.URI.create(url).getHost()).isEqualTo("api.openai.com");

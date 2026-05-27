@@ -28,7 +28,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("Practice catalog controller integration")
 class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -76,12 +75,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("GET /practices")
     class ListPractices {
 
         @Test
         @WithAdminUser
-        @DisplayName("returns empty list when no practices exist")
         void shouldReturnEmptyList() {
             ensureAdminMembership(workspace);
 
@@ -99,7 +96,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns all practices for workspace")
         void shouldReturnAllPractices() {
             ensureAdminMembership(workspace);
             persistPractice("alpha", "Alpha", "cat-a", true);
@@ -119,7 +115,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns practices ordered by name ascending")
         void shouldReturnOrderedByName() {
             ensureAdminMembership(workspace);
             persistPractice("z-slug", "Zebra", "cat", true);
@@ -146,7 +141,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("filters by category")
         void shouldFilterByCategory() {
             ensureAdminMembership(workspace);
             persistPractice("alpha", "Alpha", "cat-a", true);
@@ -168,7 +162,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("filters by active state")
         void shouldFilterByActive() {
             ensureAdminMembership(workspace);
             persistPractice("active-one", "Active", "cat", true);
@@ -190,7 +183,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("filters by both category and active")
         void shouldFilterByCategoryAndActive() {
             ensureAdminMembership(workspace);
             persistPractice("a-active", "A Active", "cat-a", true);
@@ -213,7 +205,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        @DisplayName("member (non-admin) can list practices")
         void shouldAllowMemberToList() {
             User member = persistUser("mentor");
             ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -243,7 +234,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("GET /practices/{practiceSlug}")
     class GetPractice {
 
         @Test
@@ -277,7 +267,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        @DisplayName("member (non-admin) can get practice by slug")
         void shouldAllowMemberToGet() {
             User member = persistUser("mentor");
             ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -381,7 +370,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("creates practice with only required fields (null optionals)")
         void shouldCreatePracticeWithMinimalFields() {
             ensureAdminMembership(workspace);
 
@@ -416,7 +404,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("accepts minimum length slug (3 chars)")
         void shouldAcceptMinLengthSlug() {
             ensureAdminMembership(workspace);
 
@@ -436,7 +423,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("accepts maximum length slug (64 chars)")
         void shouldAcceptMaxLengthSlug() {
             ensureAdminMembership(workspace);
             String slug64 = "a".repeat(64);
@@ -457,7 +443,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 409 for duplicate slug")
         void shouldReturn409ForDuplicateSlug() {
             ensureAdminMembership(workspace);
             persistPractice("taken-slug", "Existing", "cat", true);
@@ -482,7 +467,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for invalid slug format (uppercase)")
         void shouldReturn400ForUppercaseSlug() {
             ensureAdminMembership(workspace);
 
@@ -517,7 +501,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for slug with trailing hyphen")
         void shouldReturn400ForTrailingHyphen() {
             ensureAdminMembership(workspace);
 
@@ -543,7 +526,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for slug with consecutive hyphens")
         void shouldReturn400ForConsecutiveHyphens() {
             ensureAdminMembership(workspace);
 
@@ -569,7 +551,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for slug with leading hyphen")
         void shouldReturn400ForLeadingHyphen() {
             ensureAdminMembership(workspace);
 
@@ -595,7 +576,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for invalid trigger events")
         void shouldReturn400ForInvalidTriggerEvents() {
             ensureAdminMembership(workspace);
 
@@ -630,7 +610,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for duplicate trigger events")
         void shouldReturn400ForDuplicateTriggerEvents() {
             ensureAdminMembership(workspace);
 
@@ -656,7 +635,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for blank required fields")
         void shouldReturn400ForBlankFields() {
             ensureAdminMembership(workspace);
 
@@ -684,7 +662,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for slug too short")
         void shouldReturn400ForSlugTooShort() {
             ensureAdminMembership(workspace);
 
@@ -703,7 +680,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for slug too long (65 chars)")
         void shouldReturn400ForSlugTooLong() {
             ensureAdminMembership(workspace);
 
@@ -729,7 +705,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for name too short")
         void shouldReturn400ForNameTooShort() {
             ensureAdminMembership(workspace);
 
@@ -755,7 +730,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for empty trigger events list")
         void shouldReturn400ForEmptyTriggerEvents() {
             ensureAdminMembership(workspace);
 
@@ -774,7 +748,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        @DisplayName("returns 403 for non-admin user")
         void shouldReturn403ForNonAdmin() {
             User memberUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -909,7 +882,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for name too short")
         void shouldReturn400ForNameTooShort() {
             ensureAdminMembership(workspace);
             persistPractice("bad-update", "Name", "cat", true);
@@ -938,7 +910,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for whitespace-only name")
         void shouldReturn400ForWhitespaceOnlyName() {
             ensureAdminMembership(workspace);
             persistPractice("ws-name", "Name", "cat", true);
@@ -967,7 +938,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for whitespace-only criteria")
         void shouldReturn400ForWhitespaceOnlyCriteria() {
             ensureAdminMembership(workspace);
             persistPractice("ws-criteria", "Name", "cat", true);
@@ -996,7 +966,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for invalid trigger events in update")
         void shouldReturn400ForInvalidTriggerEventsInUpdate() {
             ensureAdminMembership(workspace);
             persistPractice("update-events", "Name", "cat", true);
@@ -1016,7 +985,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        @DisplayName("returns 403 for non-admin user")
         void shouldReturn403ForNonAdmin() {
             User memberUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -1061,7 +1029,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("sets active to false")
         void shouldSetActiveToFalse() {
             ensureAdminMembership(workspace);
             persistPractice("deactivate-me", "Name", "cat", true);
@@ -1093,7 +1060,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("sets active to true")
         void shouldSetActiveToTrue() {
             ensureAdminMembership(workspace);
             persistPractice("activate-me", "Name", "cat", false);
@@ -1158,7 +1124,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        @DisplayName("returns 403 for non-admin user")
         void shouldReturn403ForNonAdmin() {
             User memberUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -1177,7 +1142,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for null active value")
         void shouldReturn400ForNullActive() {
             ensureAdminMembership(workspace);
             persistPractice("null-active", "Name", "cat", true);
@@ -1213,7 +1177,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("DELETE /practices/{practiceSlug}")
     class DeletePractice {
 
         @Test
@@ -1253,7 +1216,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        @DisplayName("returns 403 for non-admin user")
         void shouldReturn403ForNonAdmin() {
             User memberUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -1285,7 +1247,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("Workspace isolation")
     class WorkspaceIsolation {
 
         @Test
@@ -1360,7 +1321,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("same slug in different workspace is allowed")
         void shouldAllowSameSlugInDifferentWorkspace() {
             User ownerA = persistUser("create-owner-a");
             User ownerB = persistUser("create-owner-b");

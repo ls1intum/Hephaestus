@@ -29,7 +29,6 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-@DisplayName("GitLabPreflightService")
 class GitLabPreflightServiceTest extends BaseUnitTest {
 
     private WebClient mockWebClient;
@@ -82,11 +81,9 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("validateToken")
     class ValidateToken {
 
         @Test
-        @DisplayName("returns success for valid personal token")
         void returnsValidForPersonalToken() {
             mockGetRequest(new GitLabPreflightService.GitLabUserResponse(42L, "testuser", "Test User", null, null));
 
@@ -112,7 +109,6 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns failure for connection error")
         void returnsFailureForConnectionError() {
             mockGetRequestThrows(new RuntimeException("Connection refused"));
 
@@ -123,7 +119,6 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("validates against custom server URL when provided")
         void validatesWithCustomServerUrl() {
             // Uses custom server URL — the mock intercepts regardless
             mockGetRequest(new GitLabPreflightService.GitLabUserResponse(99L, "custom-user", "Custom", null, null));
@@ -140,7 +135,6 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("rejects unsafe server URL")
         void rejectsUnsafeServerUrl() {
             assertThatThrownBy(() -> preflightService.validateToken("glpat-test", "http://evil.com", null))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -149,11 +143,9 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("listAccessibleGroups")
     class ListAccessibleGroups {
 
         @Test
-        @DisplayName("returns empty list when no groups accessible")
         @SuppressWarnings("unchecked")
         void returnsEmptyListWhenNoGroups() {
             RequestHeadersUriSpec<?> uriSpec = mock(RequestHeadersUriSpec.class);
@@ -174,7 +166,6 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("maps groups correctly")
         @SuppressWarnings("unchecked")
         void mapsGroupsCorrectly() {
             RequestHeadersUriSpec<?> uriSpec = mock(RequestHeadersUriSpec.class);
@@ -217,7 +208,6 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("rejects unsafe server URL")
         void rejectsUnsafeServerUrl() {
             assertThatThrownBy(() -> preflightService.listAccessibleGroups("glpat-test", "http://evil.com"))
                 .isInstanceOf(IllegalArgumentException.class)

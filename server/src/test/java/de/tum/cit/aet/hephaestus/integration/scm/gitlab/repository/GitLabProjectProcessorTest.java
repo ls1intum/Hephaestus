@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -26,7 +25,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 @Tag("unit")
-@DisplayName("GitLabProjectProcessor")
 class GitLabProjectProcessorTest extends BaseUnitTest {
 
     private static final Long PROVIDER_ID = 2L;
@@ -48,7 +46,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("processGraphQlResponse")
     class ProcessGraphQlResponse {
 
         @BeforeEach
@@ -60,7 +57,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("valid project maps all fields correctly")
         void validProject_mapsAllFields() {
             var repoInfo = new GitLabProjectResponse.RepositoryInfo("develop");
             var project = new GitLabProjectResponse(
@@ -106,7 +102,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("private visibility sets isPrivate true")
         void privateVisibility_setsIsPrivateTrue() {
             var project = createMinimalProject("private");
             when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID)).thenReturn(Optional.empty());
@@ -118,7 +113,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("internal visibility maps correctly")
         void internalVisibility_mapsCorrectly() {
             var project = createMinimalProject("internal");
             when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID)).thenReturn(Optional.empty());
@@ -130,7 +124,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null repository rootRef falls back to main")
         void nullRootRef_fallsBackToMain() {
             var project = new GitLabProjectResponse(
                 "gid://gitlab/Project/123",
@@ -153,7 +146,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("archived project sets isArchived true")
         void archivedProject_setsFlag() {
             var project = new GitLabProjectResponse(
                 "gid://gitlab/Project/123",
@@ -176,7 +168,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("existing entity is updated, not duplicated")
         void existingEntity_isUpdated() {
             var project = createMinimalProject("public");
             Repository existing = new Repository();
@@ -194,14 +185,12 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null response returns null")
         void nullResponse_returnsNull() {
             assertThat(processor.processGraphQlResponse(null, null, gitLabProvider)).isNull();
             verify(repositoryRepository, never()).save(any());
         }
 
         @Test
-        @DisplayName("null webUrl returns null")
         void nullWebUrl_returnsNull() {
             var project = new GitLabProjectResponse(
                 "gid://gitlab/Project/123",
@@ -221,7 +210,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("malformed createdAt does not overwrite existing value")
         void malformedCreatedAt_doesNotOverwriteExisting() {
             var project = new GitLabProjectResponse(
                 "gid://gitlab/Project/123",
@@ -250,7 +238,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null fullPath returns null")
         void nullFullPath_returnsNull() {
             var project = new GitLabProjectResponse(
                 "gid://gitlab/Project/123",
@@ -270,7 +257,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("invalid GID returns null")
         void invalidGid_returnsNull() {
             var project = new GitLabProjectResponse(
                 "not-a-valid-gid",
@@ -307,7 +293,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("processPushEvent")
     class ProcessPushEvent {
 
         @BeforeEach
@@ -319,7 +304,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("valid push event project info creates repository")
         void validPushEvent_createsRepository() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(
                 246765L,
@@ -348,7 +332,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("public visibility level maps correctly")
         void publicVisibilityLevel_mapsCorrectly() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(
                 1L,
@@ -369,14 +352,12 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null project info returns null")
         void nullProjectInfo_returnsNull() {
             assertThat(processor.processPushEvent(null, gitLabProvider)).isNull();
             verify(repositoryRepository, never()).save(any());
         }
 
         @Test
-        @DisplayName("null webUrl in project info returns null")
         void nullWebUrl_returnsNull() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(1L, "proj", null, null, null, "org/proj", "main", 0);
             assertThat(processor.processPushEvent(projectInfo, gitLabProvider)).isNull();
@@ -384,7 +365,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null id in project info returns null")
         void nullId_returnsNull() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(
                 null,
@@ -401,7 +381,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null pathWithNamespace in project info returns null")
         void nullPathWithNamespace_returnsNull() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(
                 1L,
@@ -418,7 +397,6 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("existing repository is updated on push")
         void existingRepository_isUpdated() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(
                 1L,
@@ -445,11 +423,9 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("mapVisibility")
     class MapVisibility {
 
         @Test
-        @DisplayName("all visibility strings map correctly")
         void allVisibilityStrings() {
             assertThat(GitLabProjectProcessor.mapVisibility("public")).isEqualTo(Repository.Visibility.PUBLIC);
             assertThat(GitLabProjectProcessor.mapVisibility("private")).isEqualTo(Repository.Visibility.PRIVATE);
@@ -461,11 +437,9 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("mapVisibilityLevel")
     class MapVisibilityLevel {
 
         @Test
-        @DisplayName("all visibility levels map correctly")
         void allVisibilityLevels() {
             assertThat(GitLabProjectProcessor.mapVisibilityLevel(0)).isEqualTo(Repository.Visibility.PRIVATE);
             assertThat(GitLabProjectProcessor.mapVisibilityLevel(10)).isEqualTo(Repository.Visibility.INTERNAL);

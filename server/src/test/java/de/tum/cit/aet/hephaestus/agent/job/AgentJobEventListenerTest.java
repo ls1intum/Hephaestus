@@ -39,7 +39,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -47,7 +46,6 @@ import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 
-@DisplayName("AgentJobEventListener")
 class AgentJobEventListenerTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -160,11 +158,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     // ── Test Groups ─────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("Filtering")
     class FilteringTests {
 
         @Test
-        @DisplayName("should skip sync events")
         void shouldSkipSyncEvents() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, syncContext());
@@ -176,7 +172,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip closed PRs")
         void shouldSkipClosedPRs() {
             var prData = createPrData(Issue.State.CLOSED, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -188,7 +183,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip merged PRs")
         void shouldSkipMergedPRs() {
             var prData = createPrData(Issue.State.MERGED, false, true);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -200,7 +194,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip PRs with isMerged=true even when state is OPEN")
         void shouldSkipWhenIsMergedTrueButStateIsOpen() {
             // Race condition: merge flag set before state update in webhook
             var prData = createPrData(Issue.State.OPEN, false, true);
@@ -213,7 +206,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PR entity not found")
         void shouldSkipWhenPRNotFound() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -225,7 +217,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when headRefOid is null (GitLab)")
         void shouldSkipWhenHeadRefOidIsNull() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -240,7 +231,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when headRefName is null")
         void shouldSkipWhenHeadRefNameIsNull() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -255,7 +245,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when baseRefName is null")
         void shouldSkipWhenBaseRefNameIsNull() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -271,11 +260,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Gate Integration")
     class GateIntegrationTests {
 
         @Test
-        @DisplayName("should skip when gate returns Skip decision")
         void shouldSkipWhenGateReturnsSkip() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -292,7 +279,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should submit when gate returns Detect decision")
         void shouldSubmitWhenGateReturnsDetect() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(99L));
@@ -309,7 +295,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use workspace ID from gate decision, not from context scopeId")
         void shouldUseWorkspaceIdFromGateNotContext() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             // Context has scopeId=99, but gate resolves workspace with id=42
@@ -332,7 +317,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should build correct submission request with branch info from entity")
         void shouldBuildCorrectSubmissionRequest() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -359,7 +343,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should delegate draft filtering to gate (not filter in listener)")
         void shouldDelegateDraftFilteringToGate() {
             var prData = createPrData(Issue.State.OPEN, true, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -378,7 +361,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should pass PullRequestCreated trigger event name")
         void shouldPassPullRequestCreatedTriggerEventName() {
             PullRequest pr = setupHappyPath();
             var prData = createPrData(Issue.State.OPEN, false, false);
@@ -389,7 +371,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should pass PullRequestReady trigger event name")
         void shouldPassPullRequestReadyTriggerEventName() {
             PullRequest pr = setupHappyPath();
             var prData = createPrData(Issue.State.OPEN, false, false);
@@ -400,7 +381,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should pass PullRequestSynchronized trigger event name")
         void shouldPassPullRequestSynchronizedTriggerEventName() {
             PullRequest pr = setupHappyPath();
             var prData = createPrData(Issue.State.OPEN, false, false);
@@ -415,7 +395,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not propagate exceptions from submit")
         void shouldNotPropagateExceptionsFromSubmit() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -435,7 +414,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not propagate exceptions from gate evaluation")
         void shouldNotPropagateExceptionsFromGate() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -454,11 +432,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("PullRequestSynchronized")
     class PullRequestSynchronizedTests {
 
         @Test
-        @DisplayName("should submit job when gate passes")
         void shouldSubmitWhenGatePasses() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestSynchronized(prData, webhookContext(1L));
@@ -475,7 +451,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip sync events")
         void shouldSkipSyncEvents() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new DomainEvent.PullRequestSynchronized(prData, syncContext());
@@ -488,11 +463,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("ReviewSubmitted")
     class ReviewSubmittedTests {
 
         @Test
-        @DisplayName("should submit job when gate passes")
         void shouldSubmitWhenGatePasses() {
             var reviewData = createReviewData();
             var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
@@ -527,7 +500,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip sync events")
         void shouldSkipSyncEvents() {
             var reviewData = createReviewData();
             var event = new DomainEvent.ReviewSubmitted(reviewData, syncContext());
@@ -539,7 +511,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PR not found")
         void shouldSkipWhenPRNotFound() {
             var reviewData = createReviewData();
             var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
@@ -551,7 +522,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PR is closed")
         void shouldSkipWhenPRIsClosed() {
             var reviewData = createReviewData();
             var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
@@ -567,7 +537,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PR is merged")
         void shouldSkipWhenPRIsMerged() {
             var reviewData = createReviewData();
             var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
@@ -585,7 +554,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PR has isMerged=true even with OPEN state")
         void shouldSkipWhenIsMergedTrueButStateIsOpen() {
             var reviewData = createReviewData();
             var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
@@ -602,7 +570,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when missing branch info")
         void shouldSkipWhenMissingBranchInfo() {
             var reviewData = createReviewData();
             var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
@@ -617,7 +584,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when gate returns Skip")
         void shouldSkipWhenGateReturnsSkip() {
             var reviewData = createReviewData();
             var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
@@ -634,7 +600,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not propagate exceptions from submit")
         void shouldNotPropagateExceptionsFromSubmit() {
             var reviewData = createReviewData();
             var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
@@ -662,7 +627,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not propagate exceptions from gate evaluation")
         void shouldNotPropagateExceptionsFromGate() {
             var reviewData = createReviewData();
             var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
@@ -681,7 +645,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Collaboration (real gate)")
     class CollaborationTests {
 
         /**
@@ -744,7 +707,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should submit job when real gate returns Detect")
         void listenerWithRealGateSubmitsOnDetect() {
             var fixture = CollaborationFixture.create(agentJobService, pullRequestRepository);
 
@@ -779,7 +741,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("real gate should skip when no matching practices")
         void realGateSkipsWhenNoMatchingPractices() {
             var fixture = CollaborationFixture.create(agentJobService, pullRequestRepository);
 

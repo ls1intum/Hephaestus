@@ -19,7 +19,6 @@ import org.mockito.Mock;
 /**
  * Unit tests for ExperiencePointCalculator.
  */
-@DisplayName("ExperiencePointCalculator")
 class ExperiencePointCalculatorTest extends BaseUnitTest {
 
     @Mock
@@ -41,11 +40,9 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Self-Review Exclusion")
     class SelfReviewExclusion {
 
         @Test
-        @DisplayName("excludes reviews when pull request author is configured bot and reviewer is assignee")
         void excludesReviewWhenAuthorIsBotAndReviewerIsAssignee() {
             User copilot = createUser(1L, "Copilot");
             User reviewer = createUser(2L, "reviewer");
@@ -61,7 +58,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("excludes reviews with case-insensitive author login matching")
         void matchesAuthorLoginCaseInsensitively() {
             User copilot = createUser(1L, "COPILOT"); // Uppercase
             User reviewer = createUser(2L, "reviewer");
@@ -77,7 +73,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("counts reviews when pull request author is not in exclusion list")
         void countsReviewWhenAuthorNotExcluded() {
             User author = createUser(1L, "regular-author");
             User reviewer = createUser(2L, "reviewer");
@@ -92,7 +87,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("counts reviews when reviewer is not an assignee on bot-authored pull request")
         void countsReviewWhenReviewerNotAssignee() {
             User copilot = createUser(1L, "Copilot");
             User reviewer = createUser(2L, "reviewer");
@@ -110,11 +104,9 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Dismissed Review Handling")
     class DismissedReviewHandling {
 
         @Test
-        @DisplayName("includes dismissed reviews in XP calculation - effort is still valuable")
         void includesDismissedReviews() {
             User author = createUser(1L, "author");
             User reviewer = createUser(2L, "reviewer");
@@ -132,7 +124,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("dismissed and non-dismissed reviews both earn XP")
         void bothDismissedAndActiveEarnXp() {
             User author = createUser(1L, "author");
             User reviewer = createUser(2L, "reviewer");
@@ -155,7 +146,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("mixed dismissed and active reviews all count toward XP")
         void mixedDismissedAndActiveReviewsAllCount() {
             User author = createUser(1L, "author");
             User reviewer1 = createUser(2L, "reviewer1");
@@ -178,11 +168,9 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Complexity Scoring")
     class ComplexityScoring {
 
         @Test
-        @DisplayName("returns complexity score 1 for simple pull requests")
         void simpleComplexity() {
             PullRequest pullRequest = new PullRequest();
             pullRequest.setChangedFiles(1);
@@ -196,7 +184,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns complexity score 33 for overly complex pull requests")
         void overlyComplexComplexity() {
             PullRequest pullRequest = new PullRequest();
             pullRequest.setChangedFiles(100);
@@ -211,11 +198,9 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Standalone Review Comment XP")
     class StandaloneReviewCommentXp {
 
         @Test
-        @DisplayName("substantive comment (>50 chars) returns full XP_REVIEW_COMMENT")
         void calculateStandaloneReviewCommentXp_substantiveComment_returnsFullXp() {
             User prAuthor = createUser(10L, "pr-author");
             PullRequest pullRequest = createPullRequest(prAuthor);
@@ -226,7 +211,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("trivial comment (<=50 chars) returns half XP_REVIEW_COMMENT")
         void calculateStandaloneReviewCommentXp_trivialComment_returnsHalfXp() {
             User prAuthor = createUser(10L, "pr-author");
             PullRequest pullRequest = createPullRequest(prAuthor);
@@ -237,7 +221,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("self-review (comment author == PR author) returns zero XP")
         void calculateStandaloneReviewCommentXp_selfReview_returnsZero() {
             User prAuthor = createUser(10L, "pr-author");
             PullRequest pullRequest = createPullRequest(prAuthor);
@@ -249,7 +232,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null commentAuthorId does not match PR author — returns normal XP")
         void calculateStandaloneReviewCommentXp_nullAuthorId_returnsXp() {
             User prAuthor = createUser(10L, "pr-author");
             PullRequest pullRequest = createPullRequest(prAuthor);
@@ -276,7 +258,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("bot-authored PR still awards XP to human commenter (no blanket bot exclusion)")
         void calculateStandaloneReviewCommentXp_botAuthoredPr_humanGetsXp() {
             // PR authored by a configured bot login — human commenter should STILL get XP
             User botAuthor = createUser(50L, "copilot[bot]");
@@ -289,7 +270,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null PR author allows XP (defensive null safety)")
         void calculateStandaloneReviewCommentXp_nullPrAuthor_returnsXp() {
             PullRequest pullRequest = createPullRequest(null);
 
@@ -299,7 +279,6 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("issue comments on own pull request return zero XP")
         void calculateIssueCommentExperiencePoints_ownPullRequestComment_returnsZero() {
             User prAuthor = createUser(10L, "pr-author");
             PullRequest pullRequest = createPullRequest(prAuthor);
@@ -322,21 +301,18 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
     class ExperiencePointConstants {
 
         @Test
-        @DisplayName("XP_PULL_REQUEST_OPENED is disabled by default (0.0)")
         void pullRequestOpenedConstant() {
             // PR XP will be introduced in a future release
             assertThat(ExperiencePointCalculator.XP_PULL_REQUEST_OPENED).isEqualTo(0.0);
         }
 
         @Test
-        @DisplayName("XP_PULL_REQUEST_MERGED is disabled by default (0.0)")
         void pullRequestMergedConstant() {
             // PR XP will be introduced in a future release
             assertThat(ExperiencePointCalculator.XP_PULL_REQUEST_MERGED).isEqualTo(0.0);
         }
 
         @Test
-        @DisplayName("XP_REVIEW_COMMENT has expected value")
         void reviewCommentConstant() {
             assertThat(ExperiencePointCalculator.XP_REVIEW_COMMENT).isEqualTo(0.5);
         }

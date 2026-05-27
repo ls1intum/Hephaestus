@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -32,7 +31,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Sub Issues Message Handler")
 class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -123,21 +121,17 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("repository.sub_issues");
     }
 
     @Test
-    @DisplayName("Should handle sub issue added event")
     void shouldHandleSubIssueAddedEvent() throws Exception {
-        // Given
         GitHubSubIssuesEventDTO event = loadPayload("sub_issues.sub_issue_added");
 
         // Create parent issue
         createTestIssue(event.parentIssue().getDatabaseId(), event.parentIssue().number(), "Parent Issue");
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error
@@ -145,16 +139,13 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should handle sub issue removed event")
     void shouldHandleSubIssueRemovedEvent() throws Exception {
-        // Given
         GitHubSubIssuesEventDTO event = loadPayload("sub_issues.sub_issue_removed");
 
         // Create parent issue and sub issue
         createTestIssue(event.parentIssue().getDatabaseId(), event.parentIssue().number(), "Parent Issue");
         createTestIssue(event.subIssue().getDatabaseId(), event.subIssue().number(), "Sub Issue");
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error

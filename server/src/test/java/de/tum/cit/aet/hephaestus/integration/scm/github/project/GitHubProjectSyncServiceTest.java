@@ -56,7 +56,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -280,51 +279,38 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("syncProjectsForOrganization")
     class SyncProjectsForOrganization {
 
         @Test
-        @DisplayName("should return completed(0) when orgLogin is null")
         void shouldReturnCompletedZeroWhenOrgLoginIsNull() {
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, null);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isZero();
         }
 
         @Test
-        @DisplayName("should return completed(0) when orgLogin is blank")
         void shouldReturnCompletedZeroWhenOrgLoginIsBlank() {
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, "   ");
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isZero();
         }
 
         @Test
-        @DisplayName("should return completed(0) when organization is not found")
         void shouldReturnCompletedZeroWhenOrganizationNotFound() {
-            // Arrange
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
             ).thenReturn(Optional.empty());
 
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isZero();
         }
 
         @Test
-        @DisplayName("should sync a single page of projects successfully")
         void shouldSyncSinglePageOfProjectsSuccessfully() {
-            // Arrange
             Organization org = createOrganization();
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
@@ -349,10 +335,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             ).thenReturn(processedProject);
             when(projectRepository.save(any(Project.class))).thenReturn(processedProject);
 
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isEqualTo(1);
             verify(projectProcessor).process(
@@ -365,9 +349,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip projects within cooldown period")
         void shouldSkipProjectsWithinCooldownPeriod() {
-            // Arrange
             Organization org = createOrganization();
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
@@ -385,19 +367,15 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             existingProject.setLastSyncAt(Instant.now().minusSeconds(5 * 60));
             when(projectRepository.findById(100L)).thenReturn(Optional.of(existingProject));
 
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isZero(); // Skipped due to cooldown
             verify(projectProcessor, never()).process(any(), any(), any(), any());
         }
 
         @Test
-        @DisplayName("should abort with ABORTED_RATE_LIMIT when rate limit is critical")
         void shouldAbortWhenRateLimitCritical() throws InterruptedException {
-            // Arrange
             Organization org = createOrganization();
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
@@ -414,18 +392,14 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(true);
             when(graphQlClientProvider.waitIfRateLimitLow(SCOPE_ID)).thenThrow(new InterruptedException("rate limit"));
 
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.ABORTED_RATE_LIMIT);
             verify(graphQlClientProvider).trackRateLimit(eq(SCOPE_ID), any(ClientGraphQlResponse.class));
         }
 
         @Test
-        @DisplayName("should abort with ABORTED_ERROR when GraphQL response is invalid")
         void shouldAbortWhenGraphQlResponseInvalid() {
-            // Arrange
             Organization org = createOrganization();
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
@@ -436,18 +410,14 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             ClientGraphQlResponse invalidResponse = mockInvalidGraphQlResponse();
             when(requestSpec.execute()).thenReturn(Mono.just(invalidResponse));
 
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.ABORTED_ERROR);
             assertThat(result.count()).isZero();
         }
 
         @Test
-        @DisplayName("should rethrow InstallationNotFoundException")
         void shouldRethrowInstallationNotFoundException() {
-            // Arrange
             Organization org = createOrganization();
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
@@ -464,9 +434,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should remove stale projects when sync completes normally")
         void shouldRemoveStaleProjectsOnCompleteSync() {
-            // Arrange
             Organization org = createOrganization();
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
@@ -493,19 +461,15 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 List.of(processedProject, staleProject)
             );
 
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             verify(projectProcessor).delete(eq(999L), any(ProcessingContext.class));
             verify(projectProcessor, never()).delete(eq(100L), any(ProcessingContext.class));
         }
 
         @Test
-        @DisplayName("should not remove stale projects when sync was aborted")
         void shouldNotRemoveStaleProjectsOnAbortedSync() throws InterruptedException {
-            // Arrange
             Organization org = createOrganization();
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
@@ -521,18 +485,14 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(true);
             when(graphQlClientProvider.waitIfRateLimitLow(SCOPE_ID)).thenThrow(new InterruptedException("rate limit"));
 
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.ABORTED_RATE_LIMIT);
             verify(projectProcessor, never()).delete(anyLong(), any(ProcessingContext.class));
         }
 
         @Test
-        @DisplayName("should abort with ABORTED_RATE_LIMIT when exception is classified as RATE_LIMITED")
         void shouldAbortRateLimitOnRateLimitedException() {
-            // Arrange
             Organization org = createOrganization();
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
@@ -546,17 +506,13 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 ClassificationResult.of(Category.RATE_LIMITED, "Rate limited")
             );
 
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.ABORTED_RATE_LIMIT);
         }
 
         @Test
-        @DisplayName("should filter projects based on allowed-projects configuration")
         void shouldFilterProjectsBasedOnAllowedProjectsConfig() {
-            // Arrange
             syncSchedulerProperties = new SyncSchedulerProperties(
                 true,
                 7,
@@ -600,18 +556,14 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             );
             when(projectRepository.save(any(Project.class))).thenReturn(processedProject);
 
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isEqualTo(1); // Only 1 project synced, #2 filtered
         }
 
         @Test
-        @DisplayName("should rethrow exception when classified as AUTH_ERROR")
         void shouldRethrowWhenExceptionClassifiedAsAuthError() {
-            // Arrange
             Organization org = createOrganization();
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
@@ -630,9 +582,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should process multiple pages of projects")
         void shouldProcessMultiplePagesOfProjects() {
-            // Arrange
             Organization org = createOrganization();
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, GitProviderType.GITHUB)
@@ -661,10 +611,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 .thenReturn(p2);
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isEqualTo(2);
             verify(projectProcessor, times(2)).process(any(GitHubProjectDTO.class), any(), any(), any());
@@ -676,40 +624,30 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("syncProjectItems")
     class SyncProjectItems {
 
         @Test
-        @DisplayName("should return completed(0) when project is null")
         void shouldReturnCompletedZeroWhenProjectIsNull() {
-            // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, null);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isZero();
         }
 
         @Test
-        @DisplayName("should return completed(0) when project nodeId is null")
         void shouldReturnCompletedZeroWhenProjectNodeIdIsNull() {
-            // Arrange
             Project project = new Project();
             project.setId(1L);
             project.setNodeId(null);
 
-            // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isZero();
         }
 
         @Test
-        @DisplayName("should return completed when all phases encounter null data")
         void shouldCompleteWithAllPhasesWhenEmpty() {
-            // Arrange
             Project project = createProject(10L, "PVT_node10", 1);
             mockGraphQlClientForScope();
             mockGraphQlRequestChain();
@@ -729,10 +667,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             when(backfillStateProvider.getProjectItemSyncCursor(10L)).thenReturn(Optional.empty());
             when(backfillStateProvider.getProjectItemsSyncedAt(10L)).thenReturn(Optional.empty());
 
-            // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isZero();
             assertThat(result.fieldsSynced()).isTrue();
@@ -741,9 +677,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return COMPLETED_WITH_WARNINGS when field sync fails but items succeed")
         void shouldReturnCompletedWithWarningsWhenFieldSyncFails() {
-            // Arrange
             Project project = createProject(10L, "PVT_node10", 1);
             mockGraphQlClientForScope();
             mockGraphQlRequestChain();
@@ -763,10 +697,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             when(backfillStateProvider.getProjectItemSyncCursor(10L)).thenReturn(Optional.empty());
             when(backfillStateProvider.getProjectItemsSyncedAt(10L)).thenReturn(Optional.empty());
 
-            // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED_WITH_WARNINGS);
             assertThat(result.fieldsSynced()).isFalse();
             assertThat(result.statusUpdatesSynced()).isTrue();
@@ -866,9 +798,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should process Issue/PR items including field values via itemProcessor")
         void shouldProcessIssuePrItemsViaItemProcessor() {
-            // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
 
@@ -899,10 +829,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 List.of("PVTF_status")
             );
 
-            // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             // Verify itemProcessor.process was called for the Issue/PR item
             verify(itemProcessor).process(any(), eq(project), any(), isNull());
@@ -911,9 +839,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip items below incremental sync threshold")
         void shouldSkipItemsBelowIncrementalSyncThreshold() {
-            // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
 
@@ -949,10 +875,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
-            // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             // Field values should NOT be processed because the item was skipped
             verify(fieldValueSyncService, never()).processFieldValues(any(), any(), anyBoolean(), any());
@@ -960,9 +884,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should pass filterQuery variable during incremental sync")
         void shouldPassFilterQueryVariableDuringIncrementalSync() {
-            // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
 
@@ -1005,7 +927,6 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 List.of("PVTF_field1")
             );
 
-            // Act
             service.syncProjectItems(SCOPE_ID, project);
 
             // Assert - verify that filterQuery variable was passed (should start with "updated:>")
@@ -1019,9 +940,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip stale removal when server-side filtering is active")
         void shouldSkipStaleRemovalWhenServerSideFilteringIsActive() {
-            // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
 
@@ -1064,7 +983,6 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 List.of("PVTF_field1")
             );
 
-            // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
             // Assert - sync should complete but stale removal should NOT run
@@ -1074,9 +992,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not pass filterQuery on first sync when no previous sync timestamp exists")
         void shouldNotPassFilterQueryOnFirstSync() {
-            // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
 
@@ -1103,7 +1019,6 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 List.of("PVTF_field1")
             );
 
-            // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
             // Assert - filterQuery should be null (no previous sync), stale removal SHOULD run
@@ -1114,9 +1029,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should queue items with truncated field values for pagination")
         void shouldQueueItemsWithTruncatedFieldValuesForPagination() {
-            // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
 
@@ -1145,10 +1058,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 List.of("PVTF_field1")
             );
 
-            // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             // Verify itemProcessor.process was called
             verify(itemProcessor).process(any(), eq(project), any(), isNull());
@@ -1168,9 +1079,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should create Issue/PR items that don't exist locally via itemProcessor")
         void shouldCreateIssuePrItemsThatDontExistLocally() {
-            // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
 
@@ -1198,10 +1107,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 List.of("PVTF_field1")
             );
 
-            // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
-            // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             // Verify itemProcessor.process was called to create the item
             verify(itemProcessor).process(any(), eq(project), any(), isNull());
@@ -1215,13 +1122,10 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("getProjectsNeedingItemSync")
     class GetProjectsNeedingItemSync {
 
         @Test
-        @DisplayName("should delegate to repository with correct cooldown threshold")
         void shouldDelegateToRepositoryWithCorrectCooldownThreshold() {
-            // Arrange
             Long organizationId = 42L;
             Project project1 = createProject(1L, "PVT_1", 1);
             Project project2 = createProject(2L, "PVT_2", 2);
@@ -1233,10 +1137,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(List.of(project1, project2));
 
-            // Act
             List<Project> result = service.getProjectsNeedingItemSync(organizationId);
 
-            // Assert
             assertThat(result).hasSize(2);
             var instantCaptor = ArgumentCaptor.forClass(Instant.class);
             verify(projectRepository).findProjectsNeedingItemSync(
@@ -1253,9 +1155,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty list when no projects need sync")
         void shouldReturnEmptyListWhenNoProjectsNeedSync() {
-            // Arrange
             Long organizationId = 42L;
             when(
                 projectRepository.findProjectsNeedingItemSync(
@@ -1265,10 +1165,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(List.of());
 
-            // Act
             List<Project> result = service.getProjectsNeedingItemSync(organizationId);
 
-            // Assert
             assertThat(result).isEmpty();
         }
     }

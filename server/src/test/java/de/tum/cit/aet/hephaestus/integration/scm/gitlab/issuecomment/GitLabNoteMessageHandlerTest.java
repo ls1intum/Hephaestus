@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -39,7 +38,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Tag("unit")
-@DisplayName("GitLabNoteMessageHandler")
 class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
     private static final String PROJECT_PATH = "hephaestustest/demo-repository";
@@ -103,17 +101,14 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("registers under the unified key gitlab:note")
     void key_returnsNote() {
         assertThat(handler.key().eventType()).isEqualTo("note");
     }
 
     @Nested
-    @DisplayName("Note routing")
     class NoteRouting {
 
         @Test
-        @DisplayName("issue note routes to processIssueNote()")
         void issueNote_routesToProcessIssueNote() throws IOException {
             GitLabNoteEventDTO event = createIssueNoteEvent("create", false, false, false);
 
@@ -125,7 +120,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("MR general note (no position) routes to processMergeRequestNote()")
         void mrGeneralNote_routesToProcessMergeRequestNote() throws IOException {
             GitLabNoteEventDTO event = createMergeRequestNoteEvent("create", false, false, null);
 
@@ -137,7 +131,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("MR diff note (with position) is skipped")
         void mrDiffNote_isSkipped() throws IOException {
             // position is non-null => diff note => deferred
             GitLabNoteEventDTO event = createMergeRequestNoteEvent("create", false, false, new Object());
@@ -150,7 +143,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("commit note is skipped")
         void commitNote_isSkipped() throws IOException {
             GitLabNoteEventDTO event = createCommitNoteEvent();
 
@@ -163,11 +155,9 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Note filtering")
     class NoteFiltering {
 
         @Test
-        @DisplayName("system note is skipped")
         void systemNote_isSkipped() throws IOException {
             GitLabNoteEventDTO event = createIssueNoteEvent("create", true, false, false);
 
@@ -179,7 +169,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("internal/confidential note is skipped")
         void internalNote_isSkipped() throws IOException {
             GitLabNoteEventDTO event = createIssueNoteEvent("create", false, true, false);
 
@@ -191,7 +180,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("note on confidential issue is skipped")
         void noteOnConfidentialIssue_isSkipped() throws IOException {
             GitLabNoteEventDTO event = createIssueNoteEvent("create", false, false, true);
 
@@ -204,11 +192,9 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Payload validation")
     class PayloadValidation {
 
         @Test
-        @DisplayName("missing object_attributes skips processing")
         void missingObjectAttributes_skipsProcessing() throws IOException {
             GitLabNoteEventDTO event = new GitLabNoteEventDTO(
                 "note",
@@ -227,7 +213,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("missing project skips processing")
         void missingProject_skipsProcessing() throws IOException {
             NoteAttributes attrs = createNoteAttributes("Issue", "create", false, false, null);
             GitLabNoteEventDTO event = new GitLabNoteEventDTO(
@@ -247,7 +232,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("non-note subject is rejected by base class")
         void nonNoteSubject_rejected() throws IOException {
             Message msg = mock(Message.class);
             when(msg.getSubject()).thenReturn("gitlab.org.proj.issue");
@@ -260,11 +244,9 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Context resolution")
     class ContextResolution {
 
         @Test
-        @DisplayName("skips when context resolver returns null")
         void contextResolverReturnsNull_skipsProcessing() throws IOException {
             when(contextResolver.resolve(eq(PROJECT_PATH), any(), any())).thenReturn(null);
             GitLabNoteEventDTO event = createIssueNoteEvent("create", false, false, false);
@@ -277,11 +259,9 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Request changes detection")
     class RequestChangesDetection {
 
         @Test
-        @DisplayName("detects requested_changes and delegates to MR processor")
         void detectedRequestedChanges_delegatesToProcessor() throws IOException {
             var mr = createEmbeddedMergeRequestWithStatus("requested_changes");
             NoteAttributes attrs = createNoteAttributes("MergeRequest", "create", false, false, null);
@@ -309,7 +289,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips when detailedMergeStatus is not requested_changes")
         void mergeableStatus_skipsDetection() throws IOException {
             var mr = createEmbeddedMergeRequestWithStatus("mergeable");
             NoteAttributes attrs = createNoteAttributes("MergeRequest", "create", false, false, null);
@@ -322,7 +301,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips when detailedMergeStatus is null")
         void nullStatus_skipsDetection() throws IOException {
             var mr = createEmbeddedMergeRequestWithStatus(null);
             NoteAttributes attrs = createNoteAttributes("MergeRequest", "create", false, false, null);
@@ -335,7 +313,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips when note author is the MR author (self-review guard)")
         void selfReview_skipsDetection() throws IOException {
             var mr = createEmbeddedMergeRequestWithStatus("requested_changes");
             NoteAttributes attrs = createNoteAttributes("MergeRequest", "create", false, false, null);
@@ -359,7 +336,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips when PR not found in DB")
         void prNotFound_skipsDetection() throws IOException {
             var mr = createEmbeddedMergeRequestWithStatus("requested_changes");
             NoteAttributes attrs = createNoteAttributes("MergeRequest", "create", false, false, null);
@@ -374,7 +350,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips when reviewer user not found in DB")
         void reviewerNotFound_skipsDetection() throws IOException {
             var mr = createEmbeddedMergeRequestWithStatus("requested_changes");
             NoteAttributes attrs = createNoteAttributes("MergeRequest", "create", false, false, null);

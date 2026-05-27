@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * so the parser strictly validates structure rather than defensively sanitizing input.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineSubjectParser implements SubjectParser {
 
     private static final String PREFIX = "outline.";

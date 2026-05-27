@@ -57,7 +57,6 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Live integration tests — boots real Docker. Run with {@code -Pgroups=live} or {@code live-tests}. */
 @LiveDockerTest
-@DisplayName("Docker Interactive Sandbox Live")
 class DockerInteractiveSandboxLiveTest {
 
     private static final String NODE_IMAGE = "node:22-slim";
@@ -217,11 +216,9 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Handshake")
     class Handshake {
 
         @Test
-        @DisplayName("ping → pong via subscribe")
         void pingPong() {
             AttachedSandbox sb = adapter.attach(buildSpec("u1", "w1"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
@@ -238,7 +235,6 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Unicode safety")
     class UnicodeSafety {
 
         // Built at runtime: the U+2028/U+2029 escapes are pre-lexer line terminators in Java.
@@ -273,7 +269,6 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Ring buffer overflow")
     class RingBufferOverflow {
 
         @Test
@@ -324,11 +319,9 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Idle eviction")
     class IdleEviction {
 
         @Test
-        @DisplayName("session idle past TTL is reaped with reason=idle")
         void idleReaped() {
             double before = metrics.evictionsBy(EvictionReason.IDLE).count();
             AttachedSandbox sb = adapter.attach(buildSpec("u4", "w4"));
@@ -347,7 +340,6 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Concurrent attach")
     class ConcurrentAttach {
 
         @Test
@@ -411,7 +403,6 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Container labels")
     class ContainerLabels {
 
         @Test
@@ -432,7 +423,6 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Workspace mounts")
     class WorkspaceMounts {
 
         @Test
@@ -472,7 +462,6 @@ class DockerInteractiveSandboxLiveTest {
         }
 
         @Test
-        @DisplayName("agent-pi image: workspace setup succeeds with cap-drop=ALL (uid-1000-owned /workspace)")
         void agentPiWorkspaceSetupWithCapDropAll() {
             // node:22-slim lets root create /workspace itself, so it owns it and mkdir never fails.
             // agent-pi pre-creates /workspace owned by 1000:1000 in the Dockerfile; mkdir as root
@@ -505,11 +494,9 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Attach failure modes")
     class AttachFailureModes {
 
         @Test
-        @DisplayName("runner that crashes before emitting a frame → attach.failure{reason=first_frame_failed}")
         void runnerCrashesBeforeFirstFrame() {
             double timeoutBefore = metrics.attachFailureFirstFrameTimeout.count();
             double failedBefore = metrics.attachFailureFirstFrameFailed.count();
@@ -584,13 +571,11 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Mentor RPC protocol")
     class MentorRpcProtocol {
 
         private static final Duration RPC_TIMEOUT = Duration.ofSeconds(25);
 
         @Test
-        @DisplayName("production bootstrap: sh -c chain succeeds and runner emits runner_ready")
         void productionBootstrapSucceeds() {
             assumeTrue(
                 dockerOps.imageIsPresent(AGENT_PI_IMAGE),
@@ -659,7 +644,6 @@ class DockerInteractiveSandboxLiveTest {
         }
 
         @Test
-        @DisplayName("open_thread + prompt → agent_start + text_delta + agent_end (stub turn)")
         void stubTurn() {
             assumeTrue(dockerOps.imageIsPresent(AGENT_PI_IMAGE), "agent-pi image not in local daemon");
             AttachedSandbox sb = adapter.attach(buildMentorSpec("u_turn", "w_turn"));
@@ -762,11 +746,9 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Close lifecycle")
     class CloseLifecycle {
 
         @Test
-        @DisplayName("close transitions to CLOSED and removes container")
         void closeRemoves() {
             AttachedSandbox sb = adapter.attach(buildSpec("u8", "w8"));
             String containerId = ((DockerAttachedSandboxAdapter) sb).containerId();
@@ -782,7 +764,6 @@ class DockerInteractiveSandboxLiveTest {
         }
 
         @Test
-        @DisplayName("send after close throws InteractiveSandboxException")
         void sendAfterClose() {
             AttachedSandbox sb = adapter.attach(buildSpec("u9", "w9"));
             sb.close(Duration.ofSeconds(2));

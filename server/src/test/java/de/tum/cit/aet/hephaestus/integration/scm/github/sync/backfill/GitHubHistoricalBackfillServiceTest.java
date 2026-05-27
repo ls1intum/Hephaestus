@@ -296,12 +296,10 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("isEnabled")
     class IsEnabled {
 
         @Test
         void shouldReturnTrueWhenBackfillEnabled() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
 
             // Act & Assert
@@ -310,7 +308,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnFalseWhenBackfillDisabled() {
-            // Arrange
             service = createService(disabledSchedulerProperties);
 
             // Act & Assert
@@ -323,18 +320,14 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("runBackfillCycle")
     class RunBackfillCycle {
 
         @Test
         void shouldReturnNothingToDoWhenDisabled() {
-            // Arrange
             service = createService(disabledSchedulerProperties);
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isZero();
             assertThat(result.skipReason()).isNull();
@@ -342,14 +335,11 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnNothingToDoWhenNoSessions() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
             when(syncTargetProvider.getSyncSessions()).thenReturn(List.of());
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isZero();
             assertThat(result.skipReason()).isNull();
@@ -357,7 +347,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSkipScopeWhenRateLimitBelowThreshold() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
             SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
             SyncSession session = createSession(List.of(target));
@@ -366,17 +355,14 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(50);
             when(graphQlClientProvider.getRateLimitResetAt(SCOPE_ID)).thenReturn(Instant.now().plusSeconds(300));
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isEqualTo(1);
         }
 
         @Test
         void shouldSkipScopeWhenRateLimitBelowThresholdButNotCountCompleteRepos() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
             SyncTarget completeTarget = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
             SyncTarget incompleteTarget = createTargetWithIncrementalComplete(SYNC_TARGET_ID_B, "org/repo-b");
@@ -385,7 +371,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(50);
             when(graphQlClientProvider.getRateLimitResetAt(SCOPE_ID)).thenReturn(Instant.now().plusSeconds(300));
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
             // Assert - only the incomplete target should be counted as pending
@@ -395,14 +380,12 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSkipRepoWhenBackfillAlreadyComplete() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
             SyncTarget completeTarget = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
             SyncSession session = createSession(List.of(completeTarget));
             when(syncTargetProvider.getSyncSessions()).thenReturn(List.of(session));
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
             // Assert - no work, no pending (complete repos are silently skipped)
@@ -412,7 +395,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSkipRepoWhenIncrementalSyncPendingAndCountAsPending() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
             SyncTarget pendingTarget = createTargetPendingIncrementalSync(SYNC_TARGET_ID_A, "org/repo-a");
             SyncSession session = createSession(List.of(pendingTarget));
@@ -421,7 +403,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             // so we reach the per-repo incremental sync gate
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
             // Assert - repo is skipped per-repo because lastIssuesAndPullRequestsSyncedAt == null
@@ -430,9 +411,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Per-repo gate: repos with pending incremental sync are skipped individually")
         void shouldSkipEntireScopeWhenAnyRepoPendingIncrementalSync() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
 
             SyncTarget repoA = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
@@ -445,7 +424,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             // repoA passes incremental check, enters backfillRepository but not found in DB
             when(repositoryRepository.findByNameWithOwner("org/repo-a")).thenReturn(Optional.empty());
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
             // Assert - repoA: incremental done, attempted backfill but not in DB (not counted)
@@ -456,7 +434,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldBreakScopeLoopWhenRateLimitDropsBelowThresholdMidLoop() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
 
             SyncTarget repoA = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
@@ -475,7 +452,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             // (repo not in DB) before reaching the GraphQL client
             when(repositoryRepository.findByNameWithOwner("org/repo-a")).thenReturn(Optional.empty());
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
             // Assert - repo B should be counted as pending due to rate limit break
@@ -488,7 +464,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("backfillRepository")
     class BackfillRepository {
 
         @BeforeEach
@@ -498,7 +473,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnFalseWhenRepoNameIsInvalid() {
-            // Arrange
             SyncTarget target = new SyncTarget(
                 SYNC_TARGET_ID_A,
                 SCOPE_ID,
@@ -523,23 +497,18 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 null // discussionSyncCursor
             );
 
-            // Act
             boolean result = service.backfillRepository(target, 50);
 
-            // Assert
             assertThat(result).isFalse();
         }
 
         @Test
         void shouldReturnFalseWhenRepositoryNotInDatabase() {
-            // Arrange
             SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
             when(repositoryRepository.findByNameWithOwner("org/repo-a")).thenReturn(Optional.empty());
 
-            // Act
             boolean result = service.backfillRepository(target, 50);
 
-            // Assert
             assertThat(result).isFalse();
             verify(graphQlClientProvider, never()).forScope(anyLong());
         }
@@ -550,15 +519,12 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("BackfillCycleResult")
     class BackfillCycleResultTests {
 
         @Test
         void shouldCreateNothingToDoResult() {
-            // Act
             BackfillCycleResult result = BackfillCycleResult.nothingToDo();
 
-            // Assert
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isZero();
             assertThat(result.skipReason()).isNull();
@@ -566,10 +532,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldCreateResultWithValues() {
-            // Act
             BackfillCycleResult result = new BackfillCycleResult(5, 3, "rateLimitLow");
 
-            // Assert
             assertThat(result.repositoriesProcessed()).isEqualTo(5);
             assertThat(result.pendingRepositories()).isEqualTo(3);
             assertThat(result.skipReason()).isEqualTo("rateLimitLow");
@@ -581,18 +545,14 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("BackfillProgress")
     class BackfillProgressTests {
 
         @Test
         void shouldCreateFromSyncTargetNotStarted() {
-            // Arrange
             SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
 
-            // Act
             BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
 
-            // Assert
             assertThat(progress.repositoryName()).isEqualTo("org/repo-a");
             assertThat(progress.isInitialized()).isFalse();
             assertThat(progress.isComplete()).isFalse();
@@ -603,13 +563,10 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldCreateFromSyncTargetComplete() {
-            // Arrange
             SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
 
-            // Act
             BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
 
-            // Assert
             assertThat(progress.repositoryName()).isEqualTo("org/repo-a");
             assertThat(progress.isInitialized()).isTrue();
             assertThat(progress.isComplete()).isTrue();
@@ -618,13 +575,10 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldCreateFromSyncTargetInProgress() {
-            // Arrange
             SyncTarget target = createTargetWithBackfillInProgress(SYNC_TARGET_ID_A, "org/repo-a");
 
-            // Act
             BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
 
-            // Assert
             assertThat(progress.repositoryName()).isEqualTo("org/repo-a");
             assertThat(progress.isInitialized()).isTrue();
             assertThat(progress.isComplete()).isFalse();
@@ -635,40 +589,31 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnCompleteSummary() {
-            // Arrange
             SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
             BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
 
-            // Act
             String summary = progress.summary();
 
-            // Assert
             assertThat(summary).isEqualTo("Backfill complete for org/repo-a");
         }
 
         @Test
         void shouldReturnNotStartedSummary() {
-            // Arrange
             SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
             BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
 
-            // Act
             String summary = progress.summary();
 
-            // Assert
             assertThat(summary).isEqualTo("Backfill not started for org/repo-a");
         }
 
         @Test
         void shouldReturnInProgressSummary() {
-            // Arrange
             SyncTarget target = createTargetWithBackfillInProgress(SYNC_TARGET_ID_A, "org/repo-a");
             BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
 
-            // Act
             String summary = progress.summary();
 
-            // Assert
             assertThat(summary).startsWith("Backfill in progress for org/repo-a (last run: ");
         }
     }
@@ -678,15 +623,12 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("SyncTarget backfill state methods")
     class SyncTargetBackfillState {
 
         @Test
         void shouldReportBackfillNotInitializedWhenNoHighWaterMark() {
-            // Arrange
             SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
 
-            // Assert
             assertThat(target.isIssueBackfillInitialized()).isFalse();
             assertThat(target.isPullRequestBackfillInitialized()).isFalse();
             assertThat(target.isBackfillInitialized()).isFalse();
@@ -695,10 +637,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReportBackfillCompleteWhenCheckpointsAreZero() {
-            // Arrange
             SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
 
-            // Assert
             assertThat(target.isIssueBackfillInitialized()).isTrue();
             assertThat(target.isPullRequestBackfillInitialized()).isTrue();
             assertThat(target.isBackfillInitialized()).isTrue();
@@ -709,10 +649,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReportBackfillInProgressWhenCheckpointsNonZero() {
-            // Arrange
             SyncTarget target = createTargetWithBackfillInProgress(SYNC_TARGET_ID_A, "org/repo-a");
 
-            // Assert
             assertThat(target.isBackfillInitialized()).isTrue();
             assertThat(target.isBackfillComplete()).isFalse();
             assertThat(target.getIssueBackfillRemaining()).isEqualTo(42);
@@ -722,10 +660,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReportZeroRemainingWhenNotInitialized() {
-            // Arrange
             SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
 
-            // Assert
             assertThat(target.getIssueBackfillRemaining()).isZero();
             assertThat(target.getPullRequestBackfillRemaining()).isZero();
             assertThat(target.getBackfillRemaining()).isZero();
@@ -758,7 +694,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 null
             );
 
-            // Assert
             assertThat(target.isIssueBackfillComplete()).isTrue();
             assertThat(target.isPullRequestBackfillComplete()).isTrue();
             assertThat(target.isBackfillComplete()).isTrue();
@@ -805,20 +740,16 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("getProgress")
     class GetProgress {
 
         @Test
         void shouldReturnProgressWhenTargetExists() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
             SyncTarget target = createTargetWithBackfillInProgress(SYNC_TARGET_ID_A, "org/repo-a");
             when(syncTargetProvider.findSyncTargetById(SYNC_TARGET_ID_A)).thenReturn(Optional.of(target));
 
-            // Act
             Optional<BackfillProgress> progress = service.getProgress(SYNC_TARGET_ID_A);
 
-            // Assert
             assertThat(progress).isPresent();
             assertThat(progress.get().repositoryName()).isEqualTo("org/repo-a");
             assertThat(progress.get().isInitialized()).isTrue();
@@ -827,14 +758,11 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnEmptyWhenTargetNotFound() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
             when(syncTargetProvider.findSyncTargetById(999L)).thenReturn(Optional.empty());
 
-            // Act
             Optional<BackfillProgress> progress = service.getProgress(999L);
 
-            // Assert
             assertThat(progress).isEmpty();
         }
     }
@@ -844,12 +772,10 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("runBackfillCycle with multiple sessions")
     class MultipleSessions {
 
         @Test
         void shouldProcessMultipleSessionsIndependently() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
 
             Long scopeId2 = 200L;
@@ -897,7 +823,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
             when(graphQlClientProvider.getRateLimitRemaining(scopeId2)).thenReturn(5000);
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
             // Assert - both repos have pending incremental sync, so they are skipped per-repo
@@ -912,13 +837,11 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("runBackfillCycle with mixed target states")
     class MixedTargetStates {
 
         @Test
         @DisplayName("Should skip pending-incremental repos per-repo and process eligible ones")
         void shouldHandleMixedStatesCorrectly() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
 
             SyncTarget completeRepo = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-complete");
@@ -932,7 +855,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             // eligibleRepo passes incremental check, enters backfillRepository but not in DB
             when(repositoryRepository.findByNameWithOwner("org/repo-eligible")).thenReturn(Optional.empty());
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
             // Assert:
@@ -944,9 +866,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should process eligible repos and skip complete ones when all have completed incremental sync")
         void shouldProcessEligibleAndSkipCompleteWhenAllIncrementalDone() {
-            // Arrange
             service = createService(enabledSchedulerProperties);
 
             SyncTarget completeRepo = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-complete");
@@ -958,10 +878,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             // eligibleRepo enters the per-repo loop and calls backfillRepository
             when(repositoryRepository.findByNameWithOwner("org/repo-eligible")).thenReturn(Optional.empty());
 
-            // Act
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert
             // completeRepo: backfill complete → silently skipped (not pending, not processed)
             // eligibleRepo: attempted backfill but not in DB → backfillRepository returns false
             //   (not counted as processed, not counted as pending)

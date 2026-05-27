@@ -32,7 +32,6 @@ import org.junit.jupiter.api.Test;
  * @see ArchitectureTestConstants
  * @see <a href="https://www.archunit.org/userguide/html/000_Index.html">ArchUnit User Guide</a>
  */
-@DisplayName("Core Architecture")
 class ArchitectureTest extends HephaestusArchitectureTest {
 
     // ========================================================================
@@ -40,7 +39,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Structural Integrity")
     class StructuralIntegrity {
 
         /**
@@ -56,7 +54,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * {@code ModuleBoundaryTest} and {@code CrossCuttingModuleBoundaryTest}.
          */
         @Test
-        @DisplayName("No cycles between top-level modules")
         void noCyclesBetweenModules() {
             SliceAssignment platformAwareSlices = new SliceAssignment() {
                 @Override
@@ -96,7 +93,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * business logic or access data layer directly.
          */
         @Test
-        @DisplayName("Controllers delegate to services, not repositories")
         void controllersDoNotAccessRepositories() {
             ArchRule rule = noClasses()
                 .that()
@@ -114,7 +110,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Module Boundaries")
     class ModuleBoundaries {
 
         /**
@@ -124,7 +119,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * within their respective feature modules.
          */
         @Test
-        @DisplayName("SPI interfaces are not added under integration.scm.domain.common")
         void spiInterfacesAreInSpiPackage() {
             // Prevent Provider/Resolver/Listener SPI interfaces from creeping back
             // into integration.scm — they belong in integration.spi.
@@ -149,7 +143,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Spring Best Practices")
     class SpringBestPractices {
 
         /**
@@ -159,7 +152,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * responsibility of the service layer.
          */
         @Test
-        @DisplayName("@Transactional not on controllers")
         void transactionalNotOnControllers() {
             ArchRule rule = noClasses()
                 .that()
@@ -177,7 +169,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * suffix for discoverability.
          */
         @Test
-        @DisplayName("@Configuration classes have Config suffix")
         void configurationClassesHaveConfigSuffix() {
             ArchRule rule = classes()
                 .that()
@@ -197,7 +188,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * Spring Data abstractions for consistency.
          */
         @Test
-        @DisplayName("Repositories extend Spring Data")
         void repositoriesExtendSpringData() {
             ArchRule rule = classes()
                 .that()
@@ -216,14 +206,12 @@ class ArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Coding Standards (Core)")
     class CodingStandardsCore {
 
         /**
          * No console output - use SLF4J.
          */
         @Test
-        @DisplayName("No System.out/err")
         void noSystemOutOrErr() {
             ArchRule rule = NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS.because(
                 "Use SLF4J (LoggerFactory.getLogger) instead of System.out/err"
@@ -235,7 +223,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * No generic exceptions.
          */
         @Test
-        @DisplayName("No generic exceptions")
         void noGenericExceptions() {
             ArchRule rule = noClasses()
                 .should(THROW_GENERIC_EXCEPTIONS)
@@ -247,7 +234,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * No field injection.
          */
         @Test
-        @DisplayName("No field injection")
         void noFieldInjection() {
             ArchRule rule = NO_CLASSES_SHOULD_USE_FIELD_INJECTION.because(
                 "Constructor injection makes dependencies explicit and testable"
@@ -261,7 +247,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Coding Standards (Logging)")
     class CodingStandardsLogging {
 
         /**
@@ -270,7 +255,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * <p>Java 8+ has java.time API - Joda Time is deprecated.
          */
         @Test
-        @DisplayName("No Joda Time usage")
         void noJodaTime() {
             ArchRule rule = noClasses()
                 .should()
@@ -286,7 +270,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * <p>SLF4J provides consistent logging facade.
          */
         @Test
-        @DisplayName("No java.util.logging")
         void noJavaUtilLogging() {
             ArchRule rule = noClasses()
                 .should()
@@ -302,7 +285,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * <p>SLF4J provides consistent logging facade.
          */
         @Test
-        @DisplayName("No Apache Commons Logging")
         void noCommonsLogging() {
             ArchRule rule = noClasses()
                 .should()
@@ -318,11 +300,9 @@ class ArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Naming Conventions")
     class NamingConventions {
 
         @Test
-        @DisplayName("Controllers end with 'Controller'")
         void controllerNaming() {
             ArchRule rule = classes()
                 .that()
@@ -334,7 +314,6 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("Repositories end with 'Repository'")
         void repositoryNaming() {
             ArchRule rule = classes()
                 .that()

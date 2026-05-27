@@ -19,7 +19,6 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
  * @see SyncSchedulerProperties
  */
 @Tag("unit")
-@DisplayName("SyncSchedulerProperties Configuration Binding")
 class SyncSchedulerPropertiesTest {
 
     @EnableConfigurationProperties(SyncSchedulerProperties.class)
@@ -37,7 +36,6 @@ class SyncSchedulerPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Valid Configuration")
     class ValidConfiguration {
 
         @Test
@@ -56,7 +54,6 @@ class SyncSchedulerPropertiesTest {
         }
 
         @Test
-        @DisplayName("should apply default backfill values when not specified")
         void defaultBackfillValues_applied() {
             contextRunner().run(context -> {
                 SyncSchedulerProperties.BackfillProperties backfill = context
@@ -71,7 +68,6 @@ class SyncSchedulerPropertiesTest {
         }
 
         @Test
-        @DisplayName("should apply default filter values (empty sets)")
         void defaultFilterValues_applied() {
             contextRunner().run(context -> {
                 SyncSchedulerProperties.FilterProperties filters = context
@@ -103,11 +99,9 @@ class SyncSchedulerPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Validation Failures")
     class ValidationFailures {
 
         @Test
-        @DisplayName("should fail when cron is blank")
         void blankCron_validationFails() {
             contextRunner()
                 .withPropertyValues("hephaestus.sync.cron=   ")
@@ -118,7 +112,6 @@ class SyncSchedulerPropertiesTest {
 
         @ParameterizedTest
         @ValueSource(ints = { 0, -1 })
-        @DisplayName("should fail when timeframe-days is below minimum")
         void timeframeDaysBelowMin_validationFails(int days) {
             contextRunner()
                 .withPropertyValues("hephaestus.sync.timeframe-days=" + days)
@@ -136,7 +129,6 @@ class SyncSchedulerPropertiesTest {
 
         @ParameterizedTest
         @ValueSource(ints = { 1, 30, 365 })
-        @DisplayName("should pass when timeframe-days is in valid range")
         void validTimeframeDays_passes(int days) {
             contextRunner()
                 .withPropertyValues("hephaestus.sync.timeframe-days=" + days)
@@ -145,7 +137,6 @@ class SyncSchedulerPropertiesTest {
 
         @ParameterizedTest
         @ValueSource(ints = { 0, -1 })
-        @DisplayName("should fail when cooldown-minutes is below minimum")
         void cooldownMinutesBelowMin_validationFails(int minutes) {
             contextRunner()
                 .withPropertyValues("hephaestus.sync.cooldown-minutes=" + minutes)
@@ -163,7 +154,6 @@ class SyncSchedulerPropertiesTest {
 
         @ParameterizedTest
         @ValueSource(ints = { 0, -1 })
-        @DisplayName("should fail when backfill batch-size is below minimum")
         void backfillBatchSizeBelowMin_validationFails(int batchSize) {
             // Note: Nested validation in records requires @Valid on the parent field
             // and the nested class to have validation annotations.
@@ -182,7 +172,6 @@ class SyncSchedulerPropertiesTest {
 
         @ParameterizedTest
         @ValueSource(ints = { 1001, 5000 })
-        @DisplayName("should fail when backfill batch-size exceeds maximum")
         void backfillBatchSizeAboveMax_validationFails(int batchSize) {
             // Note: Nested validation in records requires @Valid on the parent field
             contextRunner()
@@ -196,11 +185,9 @@ class SyncSchedulerPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Filter Utility Methods")
     class FilterUtilityMethods {
 
         @Test
-        @DisplayName("should allow all organizations when filter is empty")
         void emptyOrgFilter_allowsAll() {
             var filters = new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of());
 
@@ -209,7 +196,6 @@ class SyncSchedulerPropertiesTest {
         }
 
         @Test
-        @DisplayName("should only allow listed organizations when filter is set")
         void orgFilter_onlyAllowsListed() {
             var filters = new SyncSchedulerProperties.FilterProperties(
                 Set.of("ls1intum", "HephaestusTest"),
@@ -223,7 +209,6 @@ class SyncSchedulerPropertiesTest {
         }
 
         @Test
-        @DisplayName("should allow all repositories when filter is empty")
         void emptyRepoFilter_allowsAll() {
             var filters = new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of());
 
@@ -231,7 +216,6 @@ class SyncSchedulerPropertiesTest {
         }
 
         @Test
-        @DisplayName("should only allow listed repositories when filter is set")
         void repoFilter_onlyAllowsListed() {
             var filters = new SyncSchedulerProperties.FilterProperties(
                 Set.of(),

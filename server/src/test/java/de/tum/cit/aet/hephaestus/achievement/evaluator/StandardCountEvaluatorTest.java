@@ -52,7 +52,6 @@ class StandardCountEvaluatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Progress Increment")
     class ProgressIncrementTests {
 
         @Test
@@ -78,7 +77,6 @@ class StandardCountEvaluatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does not increment past target")
         void doesNotIncrementPastTarget() {
             UserAchievement ua = createUserAchievement(5, 5);
             evaluator.updateProgress(ua, createEvent(ActivityEventType.COMMIT_CREATED));
@@ -89,11 +87,9 @@ class StandardCountEvaluatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Unlock Detection")
     class UnlockDetectionTests {
 
         @Test
-        @DisplayName("returns true when reaching target")
         void returnsTrueAtTarget() {
             UserAchievement ua = createUserAchievement(4, 5);
             boolean result = evaluator.updateProgress(ua, createEvent(ActivityEventType.PULL_REQUEST_MERGED));
@@ -104,7 +100,6 @@ class StandardCountEvaluatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns false when not yet at target")
         void returnsFalseBeforeTarget() {
             UserAchievement ua = createUserAchievement(2, 5);
             boolean result = evaluator.updateProgress(ua, createEvent(ActivityEventType.PULL_REQUEST_MERGED));
@@ -129,7 +124,6 @@ class StandardCountEvaluatorTest extends BaseUnitTest {
     class EdgeCaseTests {
 
         @Test
-        @DisplayName("returns false for wrong progress type")
         void returnsFalseForWrongProgressType() {
             UserAchievement ua = UserAchievement.builder()
                 .user(testUser)

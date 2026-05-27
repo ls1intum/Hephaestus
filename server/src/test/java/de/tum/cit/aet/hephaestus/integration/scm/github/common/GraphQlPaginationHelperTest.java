@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -85,13 +84,10 @@ class GraphQlPaginationHelperTest {
     }
 
     @Nested
-    @DisplayName("paginate()")
     class PaginateTests {
 
         @Test
-        @DisplayName("should process single page and complete normally")
         void shouldProcessSinglePageAndComplete() {
-            // Given
             GHPageInfo pageInfo = new GHPageInfo("cursor1", false, false, null);
             TestConnection connection = new TestConnection(List.of("item1", "item2"), pageInfo);
 
@@ -100,7 +96,6 @@ class GraphQlPaginationHelperTest {
 
             AtomicInteger processedCount = new AtomicInteger(0);
 
-            // When
             PaginationResult result = helper.paginate(
                 createRequest(conn -> {
                     processedCount.addAndGet(conn.getNodes().size());
@@ -108,7 +103,6 @@ class GraphQlPaginationHelperTest {
                 })
             );
 
-            // Then
             assertThat(result.pagesProcessed()).isEqualTo(1);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.COMPLETED);
             assertThat(result.isComplete()).isTrue();
@@ -117,9 +111,7 @@ class GraphQlPaginationHelperTest {
         }
 
         @Test
-        @DisplayName("should paginate through multiple pages")
         void shouldPaginateThroughMultiplePages() {
-            // Given
             GHPageInfo pageInfo1 = new GHPageInfo("cursor1", true, false, null);
             GHPageInfo pageInfo2 = new GHPageInfo("cursor2", true, false, null);
             GHPageInfo pageInfo3 = new GHPageInfo("cursor3", false, false, null);
@@ -136,7 +128,6 @@ class GraphQlPaginationHelperTest {
 
             List<String> allItems = new ArrayList<>();
 
-            // When
             PaginationResult result = helper.paginate(
                 createRequest(conn -> {
                     allItems.addAll(conn.getNodes());
@@ -144,16 +135,13 @@ class GraphQlPaginationHelperTest {
                 })
             );
 
-            // Then
             assertThat(result.pagesProcessed()).isEqualTo(3);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.COMPLETED);
             assertThat(allItems).containsExactly("item1", "item2", "item3");
         }
 
         @Test
-        @DisplayName("should stop when rate limit is critical")
         void shouldStopWhenRateLimitIsCritical() {
-            // Given
             GHPageInfo pageInfo = new GHPageInfo("cursor1", true, false, null);
             TestConnection connection = new TestConnection(List.of("item1"), pageInfo);
             ClientGraphQlResponse response = mockValidResponse(connection);
@@ -161,37 +149,29 @@ class GraphQlPaginationHelperTest {
 
             when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(true);
 
-            // When
             PaginationResult result = helper.paginate(createRequest(conn -> true));
 
-            // Then
             assertThat(result.pagesProcessed()).isEqualTo(1);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.RATE_LIMIT_CRITICAL);
             assertThat(result.isAborted()).isTrue();
         }
 
         @Test
-        @DisplayName("should stop when response is invalid")
         void shouldStopWhenResponseIsInvalid() {
-            // Given
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.isValid()).thenReturn(false);
             when(response.getErrors()).thenReturn(List.of());
             mockClientExecution(response);
 
-            // When
             PaginationResult result = helper.paginate(createRequest(conn -> true));
 
-            // Then
             assertThat(result.pagesProcessed()).isEqualTo(1);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.INVALID_RESPONSE);
             assertThat(result.isAborted()).isTrue();
         }
 
         @Test
-        @DisplayName("should stop when connection is null")
         void shouldStopWhenConnectionIsNull() {
-            // Given
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             ClientResponseField field = mock(ClientResponseField.class);
             when(response.isValid()).thenReturn(true);
@@ -199,36 +179,29 @@ class GraphQlPaginationHelperTest {
             when(field.toEntity(TestConnection.class)).thenReturn(null);
             mockClientExecution(response);
 
-            // When
             PaginationResult result = helper.paginate(createRequest(conn -> true));
 
-            // Then
             assertThat(result.pagesProcessed()).isEqualTo(1);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.NULL_CONNECTION);
         }
 
         @Test
-        @DisplayName("should stop when processor returns false")
         void shouldStopWhenProcessorReturnsFalse() {
-            // Given
             GHPageInfo pageInfo = new GHPageInfo("cursor1", true, false, null);
             TestConnection connection = new TestConnection(List.of("item1"), pageInfo);
             ClientGraphQlResponse response = mockValidResponse(connection);
             mockClientExecution(response);
 
-            // When
             PaginationResult result = helper.paginate(
                 createRequest(conn -> false) // Processor requests stop
             );
 
-            // Then
             assertThat(result.pagesProcessed()).isEqualTo(1);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.PROCESSOR_STOP);
             assertThat(result.isAborted()).isFalse(); // PROCESSOR_STOP is not considered aborted
         }
 
         @Test
-        @DisplayName("should respect max pages limit")
         void shouldRespectMaxPagesLimit() {
             // Given - always return hasNextPage=true
             GHPageInfo pageInfo = new GHPageInfo("cursor", true, false, null);
@@ -242,7 +215,6 @@ class GraphQlPaginationHelperTest {
 
             AtomicInteger pageCount = new AtomicInteger(0);
 
-            // When
             PaginationResult result = helper.paginate(
                 PaginationRequest.<TestConnection>builder()
                     .client(client)
@@ -262,7 +234,6 @@ class GraphQlPaginationHelperTest {
                     .build()
             );
 
-            // Then
             assertThat(result.pagesProcessed()).isEqualTo(3);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.MAX_PAGES_REACHED);
             assertThat(result.isAborted()).isTrue();
@@ -270,16 +241,13 @@ class GraphQlPaginationHelperTest {
         }
 
         @Test
-        @DisplayName("should use initial cursor when provided")
         void shouldUseInitialCursorWhenProvided() {
-            // Given
             String initialCursor = "resumeCursor123";
             GHPageInfo pageInfo = new GHPageInfo("cursor1", false, false, null);
             TestConnection connection = new TestConnection(List.of("item1"), pageInfo);
             ClientGraphQlResponse response = mockValidResponse(connection);
             mockClientExecution(response);
 
-            // When
             PaginationResult result = helper.paginate(
                 PaginationRequest.<TestConnection>builder()
                     .client(client)
@@ -296,16 +264,13 @@ class GraphQlPaginationHelperTest {
                     .build()
             );
 
-            // Then
             assertThat(result.isComplete()).isTrue();
             // Verify the initial cursor was used
             verify(requestSpec).variable("after", initialCursor);
         }
 
         @Test
-        @DisplayName("should track rate limit for each page")
         void shouldTrackRateLimitForEachPage() {
-            // Given
             GHPageInfo pageInfo1 = new GHPageInfo("cursor1", true, false, null);
             GHPageInfo pageInfo2 = new GHPageInfo("cursor2", false, false, null);
 
@@ -317,20 +282,16 @@ class GraphQlPaginationHelperTest {
 
             mockClientExecutionSequence(response1, response2);
 
-            // When
             helper.paginate(createRequest(conn -> true));
 
-            // Then
             verify(graphQlClientProvider, times(2)).trackRateLimit(eq(SCOPE_ID), any(ClientGraphQlResponse.class));
         }
     }
 
     @Nested
-    @DisplayName("PaginationRequest.Builder")
     class BuilderTests {
 
         @Test
-        @DisplayName("should throw when required fields are missing")
         void shouldThrowWhenRequiredFieldsAreMissing() {
             assertThatThrownBy(() -> PaginationRequest.<TestConnection>builder().build())
                 .isInstanceOf(IllegalStateException.class)
@@ -338,9 +299,7 @@ class GraphQlPaginationHelperTest {
         }
 
         @Test
-        @DisplayName("should use default max pages when not specified")
         void shouldUseDefaultMaxPagesWhenNotSpecified() {
-            // Given
             GHPageInfo pageInfo = new GHPageInfo(null, false, false, null);
             TestConnection connection = new TestConnection(List.of("item"), pageInfo);
             ClientGraphQlResponse response = mockValidResponse(connection);
@@ -354,11 +313,9 @@ class GraphQlPaginationHelperTest {
     }
 
     @Nested
-    @DisplayName("PaginationResult")
     class PaginationResultTests {
 
         @Test
-        @DisplayName("isComplete should return true only for COMPLETED reason")
         void isCompleteShouldReturnTrueOnlyForCompleted() {
             assertThat(new PaginationResult(1, TerminationReason.COMPLETED).isComplete()).isTrue();
             assertThat(new PaginationResult(1, TerminationReason.MAX_PAGES_REACHED).isComplete()).isFalse();
@@ -366,7 +323,6 @@ class GraphQlPaginationHelperTest {
         }
 
         @Test
-        @DisplayName("isAborted should return false for COMPLETED and PROCESSOR_STOP")
         void isAbortedShouldReturnFalseForCompletedAndProcessorStop() {
             assertThat(new PaginationResult(1, TerminationReason.COMPLETED).isAborted()).isFalse();
             assertThat(new PaginationResult(1, TerminationReason.PROCESSOR_STOP).isAborted()).isFalse();
@@ -376,26 +332,21 @@ class GraphQlPaginationHelperTest {
     }
 
     @Nested
-    @DisplayName("Error handling and edge cases")
     class ErrorHandlingTests {
 
         @Test
-        @DisplayName("should return INTERRUPTED when thread is interrupted")
         void shouldReturnInterruptedWhenThreadIsInterrupted() {
             // Given - set interrupt flag before paginate
             Thread.currentThread().interrupt();
 
-            // When
             PaginationResult result = helper.paginate(createRequest(conn -> true));
 
-            // Then
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.INTERRUPTED);
             assertThat(result.pagesProcessed()).isZero();
             assertThat(result.isAborted()).isTrue();
         }
 
         @Test
-        @DisplayName("should return TRANSIENT_ERROR when timeout error detected")
         void shouldReturnTransientErrorWhenTimeoutErrorDetected() {
             // Given - response with transient timeout error
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
@@ -406,33 +357,27 @@ class GraphQlPaginationHelperTest {
             // detectTransientError is called BEFORE isValid(), so isValid() is never reached
             mockClientExecution(response);
 
-            // When
             PaginationResult result = helper.paginate(createRequest(conn -> true));
 
-            // Then
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.TRANSIENT_ERROR);
             assertThat(result.pagesProcessed()).isEqualTo(1);
             assertThat(result.isAborted()).isTrue();
         }
 
         @Test
-        @DisplayName("should return INVALID_RESPONSE when response is null (Mono.empty())")
         void shouldReturnInvalidResponseWhenResponseIsNull() {
             // Given - execute() returns Mono.empty() which blocks to null
             when(client.documentName(DOCUMENT_NAME)).thenReturn(requestSpec);
             when(requestSpec.variable(any(), any())).thenReturn(requestSpec);
             when(requestSpec.execute()).thenReturn(Mono.empty());
 
-            // When
             PaginationResult result = helper.paginate(createRequest(conn -> true));
 
-            // Then
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.INVALID_RESPONSE);
             assertThat(result.pagesProcessed()).isEqualTo(1);
         }
 
         @Test
-        @DisplayName("should track rate limit even when processor stops")
         void shouldTrackRateLimitEvenWhenProcessorStops() {
             // Given - processor returns false (stop) on first page
             GHPageInfo pageInfo = new GHPageInfo("cursor1", true, false, null);
@@ -440,10 +385,8 @@ class GraphQlPaginationHelperTest {
             ClientGraphQlResponse response = mockValidResponse(connection);
             mockClientExecution(response);
 
-            // When
             PaginationResult result = helper.paginate(createRequest(conn -> false));
 
-            // Then
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.PROCESSOR_STOP);
             // Rate limit tracking should still have been called
             verify(graphQlClientProvider).trackRateLimit(eq(SCOPE_ID), any(ClientGraphQlResponse.class));

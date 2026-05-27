@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -17,15 +16,12 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Analogous to {@link SandboxArchitectureTest} for sandbox SPI isolation.
  */
-@DisplayName("Handler Architecture")
 class HandlerArchitectureTest extends HephaestusArchitectureTest {
 
     @Nested
-    @DisplayName("SPI isolation")
     class SpiIsolation {
 
         @Test
-        @DisplayName("SPI package should not depend on Spring")
         void spiShouldNotDependOnSpring() {
             noClasses()
                 .that()
@@ -38,7 +34,6 @@ class HandlerArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("SPI package should not depend on integration.scm")
         void spiShouldNotDependOnGitProvider() {
             noClasses()
                 .that()
@@ -51,7 +46,6 @@ class HandlerArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("SPI package should not depend on handler implementations")
         void spiShouldNotDependOnHandlerImpl() {
             noClasses()
                 .that()
@@ -65,11 +59,9 @@ class HandlerArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Nested
-    @DisplayName("Handler implementation isolation")
     class HandlerImplIsolation {
 
         @Test
-        @DisplayName("Handlers should not depend on sandbox Docker internals")
         void handlersShouldNotDependOnDockerInternals() {
             noClasses()
                 .that()
@@ -82,7 +74,6 @@ class HandlerArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("Handlers should not depend on the Pi practice agent module")
         void handlersShouldNotDependOnPracticeAgent() {
             noClasses()
                 .that()

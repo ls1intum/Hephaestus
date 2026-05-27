@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
  * pre-registered Counter (no per-call builder allocation), the duration timer brackets correctly,
  * and the cost summary swallows negative / non-finite inputs instead of polluting dashboards.
  */
-@DisplayName("MentorChatMetrics")
 class MentorChatMetricsTest extends BaseUnitTest {
 
     private MeterRegistry registry;
@@ -32,7 +31,6 @@ class MentorChatMetricsTest extends BaseUnitTest {
     // through MentorChatServiceTest.assertOutcomeRecorded — that's where the invariant matters.
 
     @Test
-    @DisplayName("every Outcome value lands on a distinct tagged counter (no per-call rebuild)")
     void everyOutcomeRoutesToPreRegisteredCounter() {
         for (MentorChatMetrics.Outcome o : MentorChatMetrics.Outcome.values()) {
             metrics.recordCompleted(o);

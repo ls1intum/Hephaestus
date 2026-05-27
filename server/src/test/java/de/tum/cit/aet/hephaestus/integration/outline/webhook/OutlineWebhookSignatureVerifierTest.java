@@ -13,10 +13,8 @@ import java.util.Map;
 import java.util.Optional;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("OutlineWebhookSignatureVerifier")
 class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
 
     private static final byte[] SECRET = "outline-subscription-secret-xyz".getBytes(StandardCharsets.UTF_8);

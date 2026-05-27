@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
  * empty until the subscription store lands in #1203, so verification fails closed.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineWebhookSignatureVerifier implements WebhookSignatureVerifier {
 
     private static final Logger log = LoggerFactory.getLogger(OutlineWebhookSignatureVerifier.class);

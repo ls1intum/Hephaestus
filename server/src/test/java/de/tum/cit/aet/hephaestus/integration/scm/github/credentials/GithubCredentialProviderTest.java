@@ -20,7 +20,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -32,7 +31,6 @@ import org.mockito.MockitoAnnotations;
  * covered transitively by the broader integration tests; we only add the new behaviour
  * here to keep the suite tight.
  */
-@DisplayName("GithubCredentialProvider — unit")
 class GithubCredentialProviderTest extends BaseUnitTest {
 
     @Mock
@@ -53,7 +51,6 @@ class GithubCredentialProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ACTIVE GitHubPatConfig Connection with encrypted PAT decrypts back to BearerToken")
     void patConnection_decryptsToken() {
         long workspaceId = 17L;
         Workspace ws = Mockito.mock(Workspace.class);
@@ -75,7 +72,6 @@ class GithubCredentialProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ACTIVE GitHubAppConfig Connection still surfaces installation identity (regression guard)")
     void appConnection_surfacesInstallationCredentialBundle() {
         long workspaceId = 17L;
         Workspace ws = Mockito.mock(Workspace.class);
@@ -100,7 +96,6 @@ class GithubCredentialProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PAT Connection with no credential blob returns empty rather than throwing")
     void patConnection_noBlob_returnsEmpty() {
         long workspaceId = 17L;
         Workspace ws = Mockito.mock(Workspace.class);

@@ -18,7 +18,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -29,7 +28,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Installation Repositories Message Handler")
 class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -94,19 +92,15 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("installation.installation_repositories");
     }
 
     @Test
-    @DisplayName("Should handle added repositories event")
     void shouldHandleAddedEvent() throws Exception {
-        // Given
         GitHubInstallationRepositoriesEventDTO event = loadPayload("installation_repositories.added");
         setupTestWorkspace(event.installation().id(), "HephaestusTest");
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error
@@ -114,13 +108,10 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     }
 
     @Test
-    @DisplayName("Should handle removed repositories event")
     void shouldHandleRemovedEvent() throws Exception {
-        // Given
         GitHubInstallationRepositoriesEventDTO event = loadPayload("installation_repositories.removed");
         setupTestWorkspace(event.installation().id(), "HephaestusTest");
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error
@@ -128,7 +119,6 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     }
 
     @Test
-    @DisplayName("Should handle null installation gracefully")
     void shouldHandleNullInstallationGracefully() {
         // Given - event with null installation
         GitHubInstallationRepositoriesEventDTO event = new GitHubInstallationRepositoriesEventDTO(
@@ -145,7 +135,6 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     }
 
     @Test
-    @DisplayName("Should handle null repository lists gracefully")
     void shouldHandleNullRepositoryListsGracefully() throws Exception {
         // Given - load a valid event and create with null lists
         GitHubInstallationRepositoriesEventDTO baseEvent = loadPayload("installation_repositories.added");

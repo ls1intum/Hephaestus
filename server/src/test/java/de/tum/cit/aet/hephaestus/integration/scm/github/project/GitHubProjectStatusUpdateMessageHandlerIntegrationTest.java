@@ -24,7 +24,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -39,7 +38,6 @@ import tools.jackson.databind.ObjectMapper;
  * Verifies persistence, field-level correctness, domain event publishing,
  * and edge case handling for status update webhook events.
  */
-@DisplayName("GitHub Project Status Update Message Handler")
 @Import(GitHubProjectStatusUpdateMessageHandlerIntegrationTest.TestStatusUpdateEventListener.class)
 class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -85,13 +83,11 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
     }
 
     @Test
-    @DisplayName("Should return correct event type")
     void shouldReturnCorrectEventType() {
         assertThat(handler.key().eventType()).isEqualTo("organization.projects_v2_status_update");
     }
 
     @Test
-    @DisplayName("Should handle status update created event with all fields and publish domain event")
     void shouldHandleStatusUpdateCreatedEvent() throws Exception {
         GitHubProjectStatusUpdateEventDTO createdEvent = loadPayload("projects_v2_status_update.created");
 
@@ -116,7 +112,6 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
     }
 
     @Test
-    @DisplayName("Should handle status update edited event and verify fields changed")
     void shouldHandleStatusUpdateEditedEvent() throws Exception {
         GitHubProjectStatusUpdateEventDTO createdEvent = loadPayload("projects_v2_status_update.created");
         handler.handleEvent(createdEvent);
@@ -141,7 +136,6 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
     }
 
     @Test
-    @DisplayName("Should handle status update deleted event and publish domain event")
     void shouldHandleStatusUpdateDeletedEvent() throws Exception {
         GitHubProjectStatusUpdateEventDTO createdEvent = loadPayload("projects_v2_status_update.created");
         handler.handleEvent(createdEvent);
@@ -159,7 +153,6 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
     }
 
     @Test
-    @DisplayName("Should skip event when organization is not found")
     void shouldSkipEventWhenOrganizationNotFound() throws Exception {
         // Given - clean database so no org exists
         databaseTestUtils.cleanDatabase();
@@ -167,7 +160,6 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
 
         GitHubProjectStatusUpdateEventDTO event = loadPayload("projects_v2_status_update.created");
 
-        // When
         handler.handleEvent(event);
 
         // Then — no status update should be created
@@ -176,7 +168,6 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
     }
 
     @Test
-    @DisplayName("Should skip event when project is not found")
     void shouldSkipEventWhenProjectNotFound() throws Exception {
         // Given — org/workspace exist but project does not
         statusUpdateRepository.deleteAll();
@@ -185,7 +176,6 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
 
         GitHubProjectStatusUpdateEventDTO event = loadPayload("projects_v2_status_update.created");
 
-        // When
         handler.handleEvent(event);
 
         // Then — no status update should be created
@@ -194,9 +184,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
     }
 
     @Test
-    @DisplayName("Should handle duplicate created events idempotently")
     void shouldHandleDuplicateCreatedEventsIdempotently() throws Exception {
-        // Given
         GitHubProjectStatusUpdateEventDTO event = loadPayload("projects_v2_status_update.created");
 
         // When — process the same event twice

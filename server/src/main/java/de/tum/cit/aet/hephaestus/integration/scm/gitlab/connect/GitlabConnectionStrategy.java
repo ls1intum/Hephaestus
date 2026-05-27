@@ -25,10 +25,6 @@ import org.springframework.stereotype.Component;
  * there is no vendor redirect. {@link #finalizeConnect} is therefore a no-op (the
  * UI never invokes it for GitLab).
  *
- * <p>{@link #validate} is a TODO stub. The full implementation pings
- * {@code GET /api/v4/user} with the PAT and checks the response is 200 with a
- * matching {@code is_admin} or group membership. Ships in the validation follow-up.
- *
  * <p>{@link #revoke} is best-effort and currently a no-op log: GitLab PATs can only
  * be revoked from the user's profile page — there is no admin-side revoke API for
  * tokens the user issued themselves. Local state transitions are handled by the
@@ -75,13 +71,6 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
         return new ConnectFinalization.Failed(
             "GitLab uses PAT-paste — finalizeConnect is not applicable; use initiate() output directly"
         );
-    }
-
-    @Override
-    public ValidationResult validate(IntegrationRef ref, CredentialBundle credentials) {
-        // PAT not probed against GET /api/v4/user yet — fail closed so callers do not
-        // auto-transition to ACTIVE without a live vendor check.
-        return new ValidationResult.Failed("GitLab PAT probe not wired");
     }
 
     @Override

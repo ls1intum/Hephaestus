@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  * happens only on full uninstall (Connection cascade).
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineLifecycleListener implements IntegrationLifecycleListener {
 
     private static final Logger log = LoggerFactory.getLogger(OutlineLifecycleListener.class);

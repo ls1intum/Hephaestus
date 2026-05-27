@@ -26,7 +26,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("UserAspectProvider")
 class UserAspectProviderTest extends BaseUnitTest {
 
     @Mock
@@ -45,7 +44,6 @@ class UserAspectProviderTest extends BaseUnitTest {
     UserAspectProvider provider;
 
     @Test
-    @DisplayName("contribute writes user.json under context/target/ with all expected keys")
     void writesUserJson() throws Exception {
         User user = new User();
         user.setLogin("octo");
@@ -82,7 +80,6 @@ class UserAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("insights: shipping velocity up surfaces increase message")
     void velocityUp() {
         ActivityInsights insights = UserAspectProvider.generateInsights(0, 5, 2, 3, 3, 0, 0);
         assertThat(insights.insights()).anyMatch(s -> s.contains("velocity increased"));
@@ -90,7 +87,6 @@ class UserAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("insights: shipping velocity down surfaces reflection topic")
     void velocityDown() {
         ActivityInsights insights = UserAspectProvider.generateInsights(0, 1, 5, 3, 3, 0, 0);
         assertThat(insights.insights()).anyMatch(s -> s.contains("Shipping slowed"));
@@ -98,7 +94,6 @@ class UserAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("insights: too many open PRs nudges focus")
     void manyOpenPrs() {
         ActivityInsights insights = UserAspectProvider.generateInsights(10, 0, 0, 0, 0, 0, 0);
         assertThat(insights.insights()).anyMatch(s -> s.contains("open PRs"));

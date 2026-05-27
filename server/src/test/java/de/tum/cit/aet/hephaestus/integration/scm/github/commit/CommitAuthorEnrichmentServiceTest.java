@@ -28,7 +28,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
 
-@DisplayName("CommitAuthorEnrichmentService")
 class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
 
     @Mock
@@ -70,11 +69,9 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     // ========== Tests ==========
 
     @Nested
-    @DisplayName("skip conditions")
     class SkipConditions {
 
         @Test
-        @DisplayName("should return 0 when no unresolved emails exist")
         void shouldReturnZeroWhenNoUnresolvedEmails() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L)).thenReturn(List.of());
             when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L)).thenReturn(List.of());
@@ -87,11 +84,9 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("email-based enrichment (Phase 1)")
     class EmailBasedEnrichment {
 
         @Test
-        @DisplayName("should enrich authors by email when resolver finds a match")
         void shouldEnrichAuthorsByEmail() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                 .thenReturn(List.of("author@example.com")) // first call
@@ -110,7 +105,6 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should enrich committers by email when resolver finds a match")
         void shouldEnrichCommittersByEmail() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                 .thenReturn(List.of())
@@ -129,7 +123,6 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip emails where resolver returns null")
         void shouldSkipUnresolvableEmails() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                 .thenReturn(List.of("unknown@personal.com"))
@@ -148,7 +141,6 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle multiple email clusters independently")
         void shouldHandleMultipleEmailClusters() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                 .thenReturn(List.of("alice@example.com", "bob@example.com"))
@@ -173,11 +165,9 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("API-based enrichment (Phase 2)")
     class ApiBasedEnrichment {
 
         @Test
-        @DisplayName("should skip API enrichment when scopeId is null")
         void shouldSkipApiEnrichmentWhenScopeIdNull() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                 .thenReturn(List.of("unknown@personal.com"))
@@ -195,11 +185,9 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("combined enrichment")
     class CombinedEnrichment {
 
         @Test
-        @DisplayName("should enrich both author and committer for same email")
         void shouldEnrichBothAuthorAndCommitter() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                 .thenReturn(List.of("author@example.com"))
@@ -221,7 +209,6 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should count email and API enrichments separately")
         void shouldCountEmailAndApiEnrichmentsSeparately() {
             // alice@example.com can be resolved by email, unknown@personal.com cannot
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
@@ -248,11 +235,9 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("edge cases")
     class EdgeCases {
 
         @Test
-        @DisplayName("should handle same email for author and committer")
         void shouldHandleSameEmailForAuthorAndCommitter() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                 .thenReturn(List.of("same@example.com"))
@@ -291,11 +276,9 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("unresolvable email filtering (R3)")
     class UnresolvableEmailFiltering {
 
         @Test
-        @DisplayName("should filter out noreply@github.com from author emails")
         void shouldFilterNoreplyFromAuthorEmails() {
             // noreply@github.com is the only unresolved email — should be filtered out
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L)).thenReturn(
@@ -311,7 +294,6 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should filter out noreply@github.com from committer emails")
         void shouldFilterNoreplyFromCommitterEmails() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L)).thenReturn(List.of());
             when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L)).thenReturn(
@@ -325,7 +307,6 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should filter noreply@github.com but process other emails")
         void shouldFilterNoreplyButProcessOtherEmails() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                 .thenReturn(List.of("noreply@github.com", "real@example.com"))
@@ -347,11 +328,9 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("domain event publishing")
     class DomainEventPublishing {
 
         @Test
-        @DisplayName("publishes CommitAuthorsReconciled with GitHub RepositoryRef when enrichment occurs")
         void shouldPublishReconciledEventWhenEnrichmentOccurs() {
             Repository repository = new Repository();
             repository.setId(1L);
@@ -385,7 +364,6 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does not publish CommitAuthorsReconciled when no commits were enriched")
         void shouldNotPublishWhenNothingEnriched() {
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L)).thenReturn(List.of());
             when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L)).thenReturn(List.of());

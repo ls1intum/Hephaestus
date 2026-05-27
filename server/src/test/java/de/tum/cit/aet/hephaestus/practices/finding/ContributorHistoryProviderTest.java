@@ -19,7 +19,6 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("ContributorHistoryProvider")
 class ContributorHistoryProviderTest extends BaseUnitTest {
 
     private static final Long CONTRIBUTOR_ID = 42L;
@@ -38,11 +37,9 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("buildHistoryJson")
     class BuildHistoryJson {
 
         @Test
-        @DisplayName("returns empty when no findings exist")
         void returnsEmptyForNoFindings() {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of()
@@ -54,7 +51,6 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("builds correct JSON structure for single practice")
         void buildsSinglePracticeJson() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
@@ -77,7 +73,6 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("aggregates multiple practices with mixed verdicts")
         void aggregatesMultiplePractices() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
@@ -106,7 +101,6 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("caps output at MAX_PRACTICES sorted by NEGATIVE count")
         void capsAtMaxPractices() throws Exception {
             List<ContributorPracticeSummary> summaries = new ArrayList<>();
             // Create 25 practices (exceeds MAX_PRACTICES=20)
@@ -132,7 +126,6 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("uses alphabetical order as tiebreaker when NEGATIVE counts are equal")
         void alphabeticalTiebreaker() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
@@ -149,7 +142,6 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("lastSeen reflects maximum across all verdicts for a practice")
         void lastSeenReflectsMaxAcrossVerdicts() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(

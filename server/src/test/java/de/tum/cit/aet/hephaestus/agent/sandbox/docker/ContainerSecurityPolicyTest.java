@@ -16,7 +16,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("ContainerSecurityPolicy")
 class ContainerSecurityPolicyTest extends BaseUnitTest {
 
     private ContainerSecurityPolicy securityPolicy;
@@ -42,11 +41,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Security flags")
     class SecurityFlags {
 
         @Test
-        @DisplayName("should apply all default security options")
         void shouldApplyDefaultSecurityOptions() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -63,7 +60,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should set memory and swap equal (no swap)")
         void shouldSetMemoryNoSwap() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -76,7 +72,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should set CPU limit in nanoCPUs")
         void shouldSetCpuLimit() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -88,7 +83,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should set PID limit")
         void shouldSetPidLimit() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -100,7 +94,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should set ulimit nofile")
         void shouldSetUlimitNofile() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -115,11 +108,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Network DNS")
     class NetworkDns {
 
         @Test
-        @DisplayName("should set dns=0.0.0.0 when internet is disabled")
         void shouldBlockDnsWhenNoInternet() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -131,7 +122,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not block DNS when internet is enabled")
         void shouldAllowDnsWithInternet() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -143,7 +133,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should block DNS when networkPolicy is null")
         void shouldBlockDnsWhenNetworkPolicyNull() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -156,11 +145,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Tmpfs mounts")
     class TmpfsMounts {
 
         @Test
-        @DisplayName("should configure default tmpfs mounts")
         void shouldConfigureDefaultTmpfs() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -176,11 +163,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Runtime configuration")
     class RuntimeConfiguration {
 
         @Test
-        @DisplayName("should use gVisor runtime when configured in security profile")
         void shouldUseGvisorFromProfile() {
             SecurityProfile gvisorProfile = new SecurityProfile("runsc", "none", List.of("ALL"), Map.of());
 
@@ -194,7 +179,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use global runtime when profile has none")
         void shouldUseGlobalRuntime() {
             SandboxProperties propsWithRuntime = new SandboxProperties(
                 true,
@@ -223,7 +207,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should have no runtime by default")
         void shouldHaveNoRuntimeByDefault() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -236,11 +219,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Labels")
     class Labels {
 
         @Test
-        @DisplayName("should build reconciliation labels")
         void shouldBuildLabels() {
             UUID jobId = UUID.randomUUID();
             Map<String, String> labels = securityPolicy.buildLabels(jobId);
@@ -251,11 +232,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Seccomp profile")
     class SeccompProfile {
 
         @Test
-        @DisplayName("should include seccomp profile in security options when provided")
         void shouldIncludeSeccompWhenProvided() {
             ContainerSecurityPolicy policyWithSeccomp = new ContainerSecurityPolicy(
                 new SandboxProperties(
@@ -288,7 +267,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not include seccomp when profile is null")
         void shouldNotIncludeSeccompWhenNull() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -301,11 +279,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Custom resource limits")
     class CustomResourceLimits {
 
         @Test
-        @DisplayName("should apply custom resource limits")
         void shouldApplyCustomLimits() {
             ResourceLimits custom = new ResourceLimits(
                 8L * 1024 * 1024 * 1024, // 8GB
@@ -327,11 +303,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Security enforcement floors")
     class EnforcementFloors {
 
         @Test
-        @DisplayName("should always enforce no-new-privileges")
         void shouldEnforceNoNewPrivileges() {
             SecurityProfile laxProfile = new SecurityProfile(null, "none", List.of(), Map.of());
 
@@ -345,7 +319,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should enforce cap-drop ALL even when profile drops nothing")
         void shouldEnforceCapDropAll() {
             SecurityProfile laxProfile = new SecurityProfile(null, "none", List.of(), Map.of());
 
@@ -359,7 +332,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should enforce cap-drop ALL when profile drops only specific capabilities")
         void shouldEnforceCapDropAllOverPartialList() {
             SecurityProfile partialCapProfile = new SecurityProfile(
                 null,
@@ -378,7 +350,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should always enforce private cgroup namespace")
         void shouldEnforcePrivateCgroupns() {
             SecurityProfile laxProfile = new SecurityProfile(null, "none", List.of("ALL"), Map.of());
 
@@ -392,7 +363,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject ipc mode 'host' and force 'none'")
         void shouldRejectHostIpcMode() {
             SecurityProfile hostIpcProfile = new SecurityProfile(null, "host", List.of("ALL"), Map.of());
 
@@ -406,7 +376,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject ipc mode 'shareable' and force 'none'")
         void shouldRejectShareableIpcMode() {
             SecurityProfile shareableIpcProfile = new SecurityProfile(null, "shareable", List.of("ALL"), Map.of());
 
@@ -420,7 +389,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should default ipc mode to none when profile sets null")
         void shouldDefaultIpcToNone() {
             SecurityProfile nullIpcProfile = new SecurityProfile(null, null, List.of("ALL"), Map.of());
 
@@ -434,7 +402,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should allow ipc mode 'private'")
         void shouldAllowPrivateIpcMode() {
             SecurityProfile privateIpcProfile = new SecurityProfile(null, "private", List.of("ALL"), Map.of());
 
@@ -448,7 +415,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should enforce mandatory tmpfs mounts over caller-supplied ones")
         void shouldEnforceMandatoryTmpfs() {
             SecurityProfile weakTmpfsProfile = new SecurityProfile(
                 null,
@@ -473,7 +439,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should apply mandatory tmpfs mounts when profile has null tmpfs")
         void shouldHandleNullTmpfsMounts() {
             SecurityProfile nullTmpfsProfile = new SecurityProfile(null, "none", List.of("ALL"), null);
 
@@ -490,7 +455,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should prevent runtime downgrade when global is configured")
         void shouldPreventRuntimeDowngrade() {
             SandboxProperties propsWithRuntime = new SandboxProperties(
                 true,
@@ -528,7 +492,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     class UlimitTests {
 
         @Test
-        @DisplayName("should set nproc ulimit matching pidsLimit")
         void shouldSetNprocUlimit() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,
@@ -542,7 +505,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should set core ulimit to zero (no core dumps)")
         void shouldDisableCoreDumps() {
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 SecurityProfile.DEFAULT,

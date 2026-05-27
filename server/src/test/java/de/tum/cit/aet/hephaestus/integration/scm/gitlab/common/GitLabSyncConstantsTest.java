@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -17,11 +16,9 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Unit tests for {@link GitLabSyncConstants}.
  */
 @Tag("unit")
-@DisplayName("GitLabSyncConstants")
 class GitLabSyncConstantsTest extends BaseUnitTest {
 
     @Nested
-    @DisplayName("extractNumericId")
     class ExtractNumericId {
 
         @ParameterizedTest(name = "should extract {1} from \"{0}\"")
@@ -68,11 +65,9 @@ class GitLabSyncConstantsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("adaptPageSize")
     class AdaptPageSize {
 
         @Test
-        @DisplayName("should return full page size when remaining >= low threshold")
         void shouldReturnFullPageSizeWhenHealthy() {
             assertThat(GitLabSyncConstants.adaptPageSize(100, 15)).isEqualTo(100);
             assertThat(GitLabSyncConstants.adaptPageSize(100, 50)).isEqualTo(100);
@@ -80,7 +75,6 @@ class GitLabSyncConstantsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should halve page size when between critical and low thresholds")
         void shouldHalvePageSizeWhenLow() {
             assertThat(GitLabSyncConstants.adaptPageSize(100, 14)).isEqualTo(50);
             assertThat(GitLabSyncConstants.adaptPageSize(100, 10)).isEqualTo(50);
@@ -88,7 +82,6 @@ class GitLabSyncConstantsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should quarter page size when below critical threshold")
         void shouldQuarterPageSizeWhenCritical() {
             assertThat(GitLabSyncConstants.adaptPageSize(100, 4)).isEqualTo(25);
             assertThat(GitLabSyncConstants.adaptPageSize(100, 1)).isEqualTo(25);
@@ -96,24 +89,20 @@ class GitLabSyncConstantsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should enforce minimum page size of 10 when low")
         void shouldEnforceMinimumWhenLow() {
             assertThat(GitLabSyncConstants.adaptPageSize(10, 10)).isEqualTo(10); // 10/2 = 5, clamped to 10
         }
 
         @Test
-        @DisplayName("should enforce minimum page size of 5 when critical")
         void shouldEnforceMinimumWhenCritical() {
             assertThat(GitLabSyncConstants.adaptPageSize(10, 2)).isEqualTo(5); // 10/4 = 2, clamped to 5
         }
     }
 
     @Nested
-    @DisplayName("Constants validation")
     class ConstantsValidation {
 
         @Test
-        @DisplayName("should have GitLab-appropriate rate limit values")
         void shouldHaveGitLabRateLimits() {
             // GitLab: 100 points/min (much lower than GitHub's 5000/hour)
             assertThat(GitLabSyncConstants.DEFAULT_RATE_LIMIT).isEqualTo(100);
@@ -128,7 +117,6 @@ class GitLabSyncConstantsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should have valid API paths")
         void shouldHaveValidApiPaths() {
             assertThat(GitLabSyncConstants.GITLAB_GRAPHQL_PATH).startsWith("/");
         }

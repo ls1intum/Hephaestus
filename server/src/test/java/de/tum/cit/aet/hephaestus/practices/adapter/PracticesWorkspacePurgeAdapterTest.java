@@ -11,7 +11,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-@DisplayName("PracticesWorkspacePurgeAdapter")
 class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
 
     @Mock
@@ -28,12 +27,9 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("deletes both findings and practices for workspace")
     void deleteWorkspaceData_deletesFindingsAndPractices() {
-        // Given
         Long workspaceId = 789L;
 
-        // When
         adapter.deleteWorkspaceData(workspaceId);
 
         // Then — both deletes called (explicit finding deletion is defense-in-depth; CASCADE also handles it)

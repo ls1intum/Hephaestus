@@ -10,7 +10,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
@@ -23,14 +22,12 @@ import org.mockito.Mock;
  *   <li>{@code @SchedulerLock} is present with the documented bounds.</li>
  * </ul>
  */
-@DisplayName("OAuthStateNonceCleanupJob — unit")
 class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
 
     @Mock
     private OAuthStateNonceRepository repository;
 
     @Test
-    @DisplayName("uses retention to compute cutoff and increments counter by row-count")
     void incrementsCounterByRowCount() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         OAuthStateNonceCleanupJob job = new OAuthStateNonceCleanupJob(repository, Duration.ofDays(7), registry);
@@ -43,7 +40,6 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("zero-row sweep does not increment counter")
     void zeroRowSweep() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         OAuthStateNonceCleanupJob job = new OAuthStateNonceCleanupJob(repository, Duration.ofDays(7), registry);
@@ -55,7 +51,6 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("@SchedulerLock present on cleanupExpired with bounded lockAtMostFor / lockAtLeastFor")
     void schedulerLockPresent() throws NoSuchMethodException {
         SchedulerLock lock = OAuthStateNonceCleanupJob.class.getMethod("cleanupExpired").getAnnotation(
             SchedulerLock.class
@@ -67,7 +62,6 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("null retention falls back to 7 days (defensive default)")
     void nullRetentionFallsBackToDefault() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         OAuthStateNonceCleanupJob job = new OAuthStateNonceCleanupJob(repository, null, registry);

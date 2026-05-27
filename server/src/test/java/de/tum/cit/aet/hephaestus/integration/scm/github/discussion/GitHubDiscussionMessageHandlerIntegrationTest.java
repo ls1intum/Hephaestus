@@ -74,7 +74,6 @@ import tools.jackson.databind.ObjectMapper;
  *   <li>Category: General (ID: "46489461")</li>
  * </ul>
  */
-@DisplayName("GitHub Discussion Message Handler")
 @Import(GitHubDiscussionMessageHandlerIntegrationTest.TestEventListener.class)
 class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -166,11 +165,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     // ==================== Event Key Tests ====================
 
     @Nested
-    @DisplayName("Event Type")
     class EventType {
 
         @Test
-        @DisplayName("Should return DISCUSSION as event type")
         void shouldReturnCorrectEventType() {
             assertThat(handler.key().eventType()).isEqualTo("repository.discussion");
         }
@@ -179,16 +176,12 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     // ==================== Basic Lifecycle Events ====================
 
     @Nested
-    @DisplayName("Basic Lifecycle Events")
     class BasicLifecycleEvents {
 
         @Test
-        @DisplayName("Should persist discussion with all schema fields on 'created' event")
         void shouldPersistDiscussionOnCreatedEvent() throws Exception {
-            // Given
             GitHubDiscussionEventDTO event = loadPayload("discussion.created");
 
-            // When
             handler.handleEvent(event);
 
             // Then - verify ALL persisted fields against hardcoded fixture values
@@ -252,7 +245,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
 
         @Test
-        @DisplayName("Should update discussion on 'edited' event")
         void shouldUpdateDiscussionOnEditedEvent() throws Exception {
             // Given - create discussion first
             handler.handleEvent(loadPayload("discussion.created"));
@@ -260,10 +252,8 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO editedEvent = loadPayload("discussion.edited");
 
-            // When
             handler.handleEvent(editedEvent);
 
-            // Then
             transactionTemplate.executeWithoutResult(status -> {
                 Discussion discussion = discussionRepository
                     .findByRepositoryIdAndNumber(testRepository.getId(), 27)
@@ -276,7 +266,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
 
         @Test
-        @DisplayName("Should close discussion on 'closed' event")
         void shouldHandleClosedEvent() throws Exception {
             // Given - create discussion first
             handler.handleEvent(loadPayload("discussion.created"));
@@ -284,10 +273,8 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO closedEvent = loadPayload("discussion.closed");
 
-            // When
             handler.handleEvent(closedEvent);
 
-            // Then
             Discussion discussion = discussionRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), 27)
                 .orElse(null);
@@ -300,7 +287,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
 
         @Test
-        @DisplayName("Should reopen discussion on 'reopened' event")
         void shouldHandleReopenedEvent() throws Exception {
             // Given - create and close discussion
             handler.handleEvent(loadPayload("discussion.created"));
@@ -309,10 +295,8 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO reopenedEvent = loadPayload("discussion.reopened");
 
-            // When
             handler.handleEvent(reopenedEvent);
 
-            // Then
             Discussion discussion = discussionRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), 27)
                 .orElse(null);
@@ -324,7 +308,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
 
         @Test
-        @DisplayName("Should delete discussion on 'deleted' event")
         void shouldDeleteDiscussionOnDeletedEvent() throws Exception {
             // Given - the deleted fixture uses discussion #28 (ID 9096674)
             // First, we create it by simulating it exists
@@ -342,10 +325,8 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO deletedEvent = loadPayload("discussion.deleted");
 
-            // When
             handler.handleEvent(deletedEvent);
 
-            // Then
             assertThat(discussionRepository.existsByRepositoryIdAndNumber(testRepository.getId(), 28)).isFalse();
 
             // Verify Deleted event was published
@@ -356,11 +337,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     // ==================== Answer Events ====================
 
     @Nested
-    @DisplayName("Answer Events")
     class AnswerEvents {
 
         @Test
-        @DisplayName("Should handle 'answered' event and publish DiscussionAnswered")
         void shouldHandleAnsweredEvent() throws Exception {
             // Given - create discussion first
             handler.handleEvent(loadPayload("discussion.created"));
@@ -368,10 +347,8 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO answeredEvent = loadPayload("discussion.answered");
 
-            // When
             handler.handleEvent(answeredEvent);
 
-            // Then
             transactionTemplate.executeWithoutResult(status -> {
                 Discussion discussion = discussionRepository
                     .findByRepositoryIdAndNumber(testRepository.getId(), 27)
@@ -386,7 +363,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
 
         @Test
-        @DisplayName("Should handle 'unanswered' event")
         void shouldHandleUnansweredEvent() throws Exception {
             // Given - create discussion and mark as answered
             handler.handleEvent(loadPayload("discussion.created"));
@@ -395,7 +371,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO unansweredEvent = loadPayload("discussion.unanswered");
 
-            // When
             handler.handleEvent(unansweredEvent);
 
             // Then - discussion should still exist and be processed
@@ -406,11 +381,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     // ==================== Label Events ====================
 
     @Nested
-    @DisplayName("Label Events")
     class LabelEvents {
 
         @Test
-        @DisplayName("Should handle 'labeled' event and persist label")
         void shouldHandleLabeledEvent() throws Exception {
             // Given - create discussion first
             handler.handleEvent(loadPayload("discussion.created"));
@@ -418,7 +391,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO labeledEvent = loadPayload("discussion.labeled");
 
-            // When
             handler.handleEvent(labeledEvent);
 
             // Then - use TransactionTemplate for lazy-loading assertions
@@ -435,7 +407,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
 
         @Test
-        @DisplayName("Should handle 'unlabeled' event")
         void shouldHandleUnlabeledEvent() throws Exception {
             // Given - create discussion with label
             handler.handleEvent(loadPayload("discussion.created"));
@@ -444,7 +415,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO unlabeledEvent = loadPayload("discussion.unlabeled");
 
-            // When
             handler.handleEvent(unlabeledEvent);
 
             // Then - discussion should still exist
@@ -455,11 +425,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     // ==================== Lock Events ====================
 
     @Nested
-    @DisplayName("Lock Events")
     class LockEvents {
 
         @Test
-        @DisplayName("Should handle 'locked' event and set lock reason")
         void shouldHandleLockedEvent() throws Exception {
             // Given - create discussion first
             handler.handleEvent(loadPayload("discussion.created"));
@@ -467,7 +435,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO lockedEvent = loadPayload("discussion.locked");
 
-            // When
             handler.handleEvent(lockedEvent);
 
             // Then - verify lock state
@@ -483,7 +450,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
 
         @Test
-        @DisplayName("Should handle 'unlocked' event")
         void shouldHandleUnlockedEvent() throws Exception {
             // Given - create and lock discussion
             handler.handleEvent(loadPayload("discussion.created"));
@@ -492,10 +458,8 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO unlockedEvent = loadPayload("discussion.unlocked");
 
-            // When
             handler.handleEvent(unlockedEvent);
 
-            // Then
             Discussion discussion = discussionRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), 27)
                 .orElse(null);
@@ -507,11 +471,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     // ==================== Pin Events ====================
 
     @Nested
-    @DisplayName("Pin Events")
     class PinEvents {
 
         @Test
-        @DisplayName("Should handle 'pinned' event")
         void shouldHandlePinnedEvent() throws Exception {
             // Given - create discussion first
             handler.handleEvent(loadPayload("discussion.created"));
@@ -519,7 +481,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO pinnedEvent = loadPayload("discussion.pinned");
 
-            // When
             handler.handleEvent(pinnedEvent);
 
             // Then - discussion should still exist
@@ -527,7 +488,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
 
         @Test
-        @DisplayName("Should handle 'unpinned' event")
         void shouldHandleUnpinnedEvent() throws Exception {
             // Given - create discussion first
             handler.handleEvent(loadPayload("discussion.created"));
@@ -536,10 +496,8 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO unpinnedEvent = loadPayload("discussion.unpinned");
 
-            // When
             handler.handleEvent(unpinnedEvent);
 
-            // Then
             assertThat(discussionRepository.existsByRepositoryIdAndNumber(testRepository.getId(), 27)).isTrue();
         }
     }
@@ -547,11 +505,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     // ==================== Category Changed Event ====================
 
     @Nested
-    @DisplayName("Category Changed Event")
     class CategoryChangedEvent {
 
         @Test
-        @DisplayName("Should handle 'category_changed' event and update category")
         void shouldHandleCategoryChangedEvent() throws Exception {
             // Given - create discussion first (starts in General category)
             handler.handleEvent(loadPayload("discussion.created"));
@@ -559,7 +515,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             GitHubDiscussionEventDTO categoryChangedEvent = loadPayload("discussion.category_changed");
 
-            // When
             handler.handleEvent(categoryChangedEvent);
 
             // Then - category should be updated to Q&A
@@ -577,13 +532,10 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     // ==================== Edge Cases ====================
 
     @Nested
-    @DisplayName("Edge Cases")
     class EdgeCases {
 
         @Test
-        @DisplayName("Should handle unknown action gracefully (falls back to process)")
         void shouldHandleUnknownActionGracefully() throws Exception {
-            // Given
             GitHubDiscussionEventDTO event = loadPayload("discussion.created");
 
             // When/Then - should not throw
@@ -591,7 +543,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
 
         @Test
-        @DisplayName("Should handle missing repository context gracefully")
         void shouldHandleMissingRepositoryContextGracefully() throws Exception {
             // Given - remove the repository so context creation fails
             repositoryRepository.deleteAll();
@@ -608,7 +559,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         @Test
         @DisplayName("Should be idempotent - processing same event twice")
         void shouldBeIdempotent() throws Exception {
-            // Given
             GitHubDiscussionEventDTO event = loadPayload("discussion.created");
 
             // When - handle same event twice
@@ -622,7 +572,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
 
         @Test
-        @DisplayName("Should verify getDatabaseId() fallback works (id is used when databaseId is null)")
         void shouldVerifyGetDatabaseIdFallback() throws Exception {
             // Given - webhook payloads have 'id' not 'database_id'
             GitHubDiscussionEventDTO event = loadPayload("discussion.created");
@@ -630,7 +579,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             // Verify the DTO is using the fallback correctly
             assertThat(event.discussion().getDatabaseId()).isEqualTo(DISCUSSION_27_ID);
 
-            // When
             handler.handleEvent(event);
 
             // Then - discussion should be persisted with the correct ID
@@ -643,7 +591,6 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             // Given - no users or categories exist
             assertThat(userRepository.count()).isZero();
 
-            // When
             handler.handleEvent(loadPayload("discussion.created"));
 
             // Then - author created with exact fixture values

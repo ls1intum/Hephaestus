@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
@@ -22,7 +21,6 @@ import tools.jackson.databind.ObjectMapper;
  * Service-layer unit tests. Pin the workspace + owner scoping the controllers rely on for
  * 404-vs-leak semantics.
  */
-@DisplayName("ChatThreadService")
 class ChatThreadServiceTest extends BaseUnitTest {
 
     @Mock
@@ -47,7 +45,6 @@ class ChatThreadServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("getOwnedThread → 404-style EntityNotFound when thread missing")
     void getOwnedThread_missingThreadThrows() {
         UUID threadId = UUID.randomUUID();
         when(userRepository.getCurrentUserElseThrow()).thenReturn(stubUser(OWNER_USER_ID));
@@ -57,7 +54,6 @@ class ChatThreadServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("getOwnedThread → 404-style EntityNotFound when thread owned by a different user")
     void getOwnedThread_foreignOwnerHidden() {
         UUID threadId = UUID.randomUUID();
         ChatThread thread = stubThread(threadId, stubUser(OTHER_USER_ID));
@@ -69,7 +65,6 @@ class ChatThreadServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("getOwnedThread returns the entity when ownership matches")
     void getOwnedThread_returnsForOwner() {
         UUID threadId = UUID.randomUUID();
         User owner = stubUser(OWNER_USER_ID);

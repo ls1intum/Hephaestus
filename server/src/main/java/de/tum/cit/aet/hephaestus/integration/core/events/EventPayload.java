@@ -26,6 +26,14 @@ import org.springframework.lang.Nullable;
 /**
  * Immutable event payload DTOs for domain events.
  * These records are safe for async handling - no lazy-loaded relationships.
+ *
+ * <p>Known structural debt: the static {@code .from(entity)} factories below pull
+ * in SCM domain entities (and three GitHub-vendor types — {@code Project},
+ * {@code ProjectItem}, {@code ProjectStatusUpdate}) into this {@code core.events}
+ * package. Moving those factories to a per-vendor converter layer would let the
+ * core package depend on value objects only. That refactor is a 30+ file change
+ * across the vendor processors — out of scope for the Phase 4 dead-stripping
+ * loop; tracked here so a future commit can quote the rationale.
  */
 public final class EventPayload {
 

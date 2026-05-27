@@ -4,7 +4,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.lang.ArchRule;
 import de.tum.cit.aet.hephaestus.architecture.HephaestusArchitectureTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -17,18 +16,15 @@ import org.junit.jupiter.api.Test;
  *   <li>{@code DockerClient} stays inside {@code docker/}
  * </ul>
  */
-@DisplayName("Sandbox Architecture")
 class SandboxArchitectureTest extends HephaestusArchitectureTest {
 
     private static final String SANDBOX_SPI = "..agent.sandbox.spi..";
     private static final String SANDBOX_DOCKER = "..agent.sandbox.docker..";
 
     @Nested
-    @DisplayName("SPI boundary")
     class SpiBoundary {
 
         @Test
-        @DisplayName("SPI types must not depend on Spring framework")
         void spiHasNoSpringDeps() {
             ArchRule rule = noClasses()
                 .that()
@@ -41,7 +37,6 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("SPI types must not depend on docker-java")
         void spiHasNoDockerDeps() {
             ArchRule rule = noClasses()
                 .that()
@@ -55,11 +50,9 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Nested
-    @DisplayName("Docker implementation boundary")
     class DockerBoundary {
 
         @Test
-        @DisplayName("Docker package must not be imported outside agent.sandbox")
         void dockerNotImportedOutsideSandbox() {
             ArchRule rule = noClasses()
                 .that()
@@ -72,7 +65,6 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         }
 
         @Test
-        @DisplayName("DockerClient must stay inside docker package")
         void dockerClientEncapsulated() {
             ArchRule rule = noClasses()
                 .that()

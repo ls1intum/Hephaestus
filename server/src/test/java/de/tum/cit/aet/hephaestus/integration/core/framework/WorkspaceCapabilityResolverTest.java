@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-@DisplayName("WorkspaceCapabilityResolver")
 class WorkspaceCapabilityResolverTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 7L;
@@ -67,11 +66,9 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
     // ── activeCapabilitiesFor ──────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("activeCapabilitiesFor")
     class ActiveCapabilitiesFor {
 
         @Test
-        @DisplayName("empty workspace -> empty set")
         void emptyWorkspaceReturnsEmpty() {
             when(
                 connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
@@ -81,7 +78,6 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("single GitHub ACTIVE -> manifest capabilities")
         void singleGithubConnectionReturnsManifestCapabilities() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.GITHUB));
             when(
@@ -98,7 +94,6 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("multiple ACTIVE -> union of manifests")
         void multipleConnectionsReturnUnion() {
             List<Connection> connections = List.of(
                 connectionOf(IntegrationKind.GITLAB),
@@ -117,7 +112,6 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("unknown kind contributes nothing")
         void unknownKindContributesNothing() {
             // OUTLINE has no stub manifest in this test setup → its capabilities are empty.
             List<Connection> connections = List.of(
@@ -141,7 +135,6 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
     // ── activeKindsFor ─────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("activeKindsFor")
     class ActiveKindsFor {
 
         @Test
@@ -173,11 +166,9 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
     // ── isAvailable ────────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("isAvailable")
     class IsAvailable {
 
         @Test
-        @DisplayName("empty workspace + non-empty requirement -> false")
         void emptyWorkspaceRejectsConstrainedRequirement() {
             when(
                 connectionRepository.findByWorkspaceIdAndState(eq(WORKSPACE_ID), eq(IntegrationState.ACTIVE))
@@ -196,13 +187,11 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null requirement set is treated as empty")
         void nullRequirementSetTreatedAsEmpty() {
             assertThat(resolver.isAvailable(WORKSPACE_ID, null, null)).isTrue();
         }
 
         @Test
-        @DisplayName("GitHub ACTIVE + required={WEBHOOK_INGEST} -> true")
         void githubSatisfiesWebhookIngest() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.GITHUB));
             when(
@@ -213,7 +202,6 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("GitLab ACTIVE + required={INLINE_FINDINGS} -> false (not declared)")
         void gitlabDoesNotSatisfyInlineFindings() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.GITLAB));
             when(
@@ -224,7 +212,6 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("GitLab + GitHub ACTIVE + required={INLINE_FINDINGS} -> true via union")
         void unionAcrossConnectionsSatisfiesInlineFindings() {
             List<Connection> connections = List.of(
                 connectionOf(IntegrationKind.GITLAB),
@@ -238,7 +225,6 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("requiredFamily=SCM + only Slack ACTIVE -> false")
         void scmFamilyRequiredButOnlyMessagingActive() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.SLACK));
             when(
@@ -251,7 +237,6 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("requiredFamily=MESSAGING + Slack ACTIVE + capability satisfied -> true")
         void messagingFamilySatisfied() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.SLACK));
             when(
@@ -268,7 +253,6 @@ class WorkspaceCapabilityResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("requiredFamily without capabilities -> family-only gate")
         void familyOnlyGate() {
             List<Connection> connections = List.of(connectionOf(IntegrationKind.GITHUB));
             when(

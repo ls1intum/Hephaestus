@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
  * in {@code NatsSubjectBuilderTest} and pins the consumer-side wildcard shapes that drive
  * JetStream filter creation.
  */
-@DisplayName("ConsumerSubjectMath subject-arithmetic")
 class ConsumerSubjectMathTest extends BaseUnitTest {
 
     @Nested
@@ -69,7 +68,6 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("kindFromSubjectPrefix")
     class PrefixToKind {
 
         @Test
@@ -108,7 +106,6 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("streamNameFor(IntegrationKind)")
     class StreamNameFor {
 
         @Test
@@ -129,7 +126,6 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("consumer-name builders")
     class ConsumerNames {
 
         @Test

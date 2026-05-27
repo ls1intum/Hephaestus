@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -24,7 +23,6 @@ import org.springframework.cache.CacheManager;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("PracticeCatalogAspectProvider")
 class PracticeCatalogAspectProviderTest extends BaseUnitTest {
 
     @Mock
@@ -43,7 +41,6 @@ class PracticeCatalogAspectProviderTest extends BaseUnitTest {
     PracticeCatalogAspectProvider provider;
 
     @Test
-    @DisplayName("contribute writes practice_catalog.json with slug + criteria")
     void writesCatalog() throws Exception {
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");

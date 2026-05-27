@@ -21,12 +21,10 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 
-@DisplayName("SlackLifecycleListener — unit")
 class SlackLifecycleListenerTest extends BaseUnitTest {
 
     @Mock
@@ -46,7 +44,6 @@ class SlackLifecycleListenerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("onScopeChanged with empty removedExternalIds is a no-op (no repo lookups)")
     void emptyDeltaIsNoOp() {
         listener.onScopeChanged(
             new IntegrationRef(IntegrationKind.SLACK, 1L, "T1"),
@@ -57,7 +54,6 @@ class SlackLifecycleListenerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("onScopeChanged with unknown connection logs + skips (no exception)")
     void unknownConnectionIsSilent() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.SLACK, 1L, "T-unknown");
         when(
@@ -71,7 +67,6 @@ class SlackLifecycleListenerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("onScopeChanged with removed channel deletes messages first, then channel row")
     void removalCascadesMessagesThenChannel() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.SLACK, 1L, "T1");
         Connection connection = Mockito.mock(Connection.class);

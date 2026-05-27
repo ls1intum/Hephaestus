@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -21,15 +20,12 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-@DisplayName("ProxyStreamingUtils")
 class ProxyStreamingUtilsTest extends BaseUnitTest {
 
     @Nested
-    @DisplayName("filterHopByHopHeaders")
     class FilterHopByHopHeaders {
 
         @Test
-        @DisplayName("should remove Connection header")
         void shouldRemoveConnection() {
             HttpHeaders headers = new HttpHeaders();
             headers.set(HttpHeaders.CONNECTION, "keep-alive");
@@ -42,7 +38,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should remove Transfer-Encoding header")
         void shouldRemoveTransferEncoding() {
             HttpHeaders headers = new HttpHeaders();
             headers.set(HttpHeaders.TRANSFER_ENCODING, "chunked");
@@ -53,7 +48,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should remove Keep-Alive header")
         void shouldRemoveKeepAlive() {
             HttpHeaders headers = new HttpHeaders();
             headers.set("Keep-Alive", "timeout=5");
@@ -64,7 +58,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should be case-insensitive")
         void shouldBeCaseInsensitive() {
             HttpHeaders headers = new HttpHeaders();
             headers.set("connection", "close");
@@ -79,7 +72,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should preserve non-hop-by-hop headers")
         void shouldPreserveNonHopByHopHeaders() {
             HttpHeaders headers = new HttpHeaders();
             headers.set("Content-Type", "application/json");
@@ -96,7 +88,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should strip headers named in Connection header value")
         void shouldStripDynamicConnectionHeaders() {
             HttpHeaders headers = new HttpHeaders();
             headers.set(HttpHeaders.CONNECTION, "keep-alive, X-Custom-Hop");
@@ -111,7 +102,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle empty headers")
         void shouldHandleEmptyHeaders() {
             HttpHeaders headers = new HttpHeaders();
 
@@ -121,7 +111,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should remove all RFC 7230 hop-by-hop headers")
         void shouldRemoveAllHopByHopHeaders() {
             HttpHeaders headers = new HttpHeaders();
             headers.set(HttpHeaders.CONNECTION, "keep-alive");
@@ -142,11 +131,9 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("consumeResponse")
     class ConsumeResponse {
 
         @Test
-        @DisplayName("should return buffered body for non-SSE response")
         void shouldBufferNonSseResponse() {
             byte[] expectedBody = "{\"id\":\"msg_123\"}".getBytes(StandardCharsets.UTF_8);
             HttpHeaders upstreamHeaders = new HttpHeaders();
@@ -169,7 +156,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return Flux body for SSE response")
         void shouldStreamSseResponse() {
             HttpHeaders upstreamHeaders = new HttpHeaders();
             upstreamHeaders.setContentType(MediaType.TEXT_EVENT_STREAM);
@@ -190,7 +176,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty byte array for empty non-SSE body")
         void shouldReturnEmptyBodyForEmptyResponse() {
             HttpHeaders upstreamHeaders = new HttpHeaders();
             upstreamHeaders.setContentType(MediaType.APPLICATION_JSON);
@@ -207,7 +192,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should filter hop-by-hop headers from upstream response")
         void shouldFilterHopByHopFromUpstream() {
             HttpHeaders upstreamHeaders = new HttpHeaders();
             upstreamHeaders.setContentType(MediaType.APPLICATION_JSON);
@@ -232,7 +216,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle upstream error status codes")
         void shouldForwardErrorStatus() {
             byte[] errorBody = "{\"error\":\"rate_limited\"}".getBytes(StandardCharsets.UTF_8);
             HttpHeaders upstreamHeaders = new HttpHeaders();
@@ -254,7 +237,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should detect SSE with charset parameter")
         void shouldDetectSseWithCharset() {
             HttpHeaders upstreamHeaders = new HttpHeaders();
             MediaType sseWithCharset = new MediaType("text", "event-stream", StandardCharsets.UTF_8);
@@ -275,7 +257,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should treat null content-type as non-SSE")
         void shouldTreatNullContentTypeAsNonSse() {
             HttpHeaders upstreamHeaders = new HttpHeaders();
 
@@ -329,13 +310,11 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("streamSseToResponse")
     class StreamSseToResponse {
 
         private final DefaultDataBufferFactory bufferFactory = new DefaultDataBufferFactory();
 
         @Test
-        @DisplayName("should write SSE data to response output stream")
         void shouldWriteSseDataToResponse() throws IOException {
             byte[] event1 = "data: hello\n\n".getBytes(StandardCharsets.UTF_8);
             byte[] event2 = "data: world\n\n".getBytes(StandardCharsets.UTF_8);
@@ -356,7 +335,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should set SSE-specific response headers")
         void shouldSetSseHeaders() {
             Flux<DataBuffer> dataFlux = Flux.empty();
             MockHttpServletResponse response = new MockHttpServletResponse();
@@ -372,7 +350,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should forward upstream status code")
         void shouldForwardUpstreamStatus() {
             Flux<DataBuffer> dataFlux = Flux.empty();
             MockHttpServletResponse response = new MockHttpServletResponse();
@@ -384,7 +361,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should copy upstream headers excluding managed ones")
         void shouldCopyUpstreamHeadersExcludingManaged() {
             Flux<DataBuffer> dataFlux = Flux.empty();
             MockHttpServletResponse response = new MockHttpServletResponse();
@@ -406,7 +382,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle empty flux gracefully")
         void shouldHandleEmptyFlux() {
             Flux<DataBuffer> dataFlux = Flux.empty();
             MockHttpServletResponse response = new MockHttpServletResponse();
@@ -419,7 +394,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle upstream error Flux without crashing")
         void shouldHandleErrorFlux() {
             Flux<DataBuffer> dataFlux = Flux.error(new RuntimeException("upstream died"));
             MockHttpServletResponse response = new MockHttpServletResponse();
@@ -432,7 +406,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should release DataBuffers from a Flux that emits then errors")
         void shouldReleaseBuffersOnPartialFluxError() {
             // Track buffer allocation via a custom factory
             var buf1 = bufferFactory.allocateBuffer(16);
@@ -456,7 +429,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should write multiple events in order")
         void shouldWriteEventsInOrder() throws IOException {
             Flux<DataBuffer> dataFlux = Flux.range(1, 5).map(i ->
                 bufferFactory.wrap(("data: event-" + i + "\n\n").getBytes(StandardCharsets.UTF_8))

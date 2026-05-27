@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  * deployment fails closed rather than letting unsigned requests through.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackWebhookSecretSource implements WebhookSecretSource {
 
     private final String configuredSecret;

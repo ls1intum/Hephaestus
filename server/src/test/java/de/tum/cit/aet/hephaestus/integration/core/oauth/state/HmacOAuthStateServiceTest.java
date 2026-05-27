@@ -7,10 +7,8 @@ import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService.
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("HmacOAuthStateService HMAC + TTL semantics")
 class HmacOAuthStateServiceTest extends BaseUnitTest {
 
     private static final String SECRET = "unit-test-secret-with-enough-entropy-32b";

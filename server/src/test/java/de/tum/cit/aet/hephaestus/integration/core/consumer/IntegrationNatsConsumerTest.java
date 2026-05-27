@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.core.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -28,11 +27,9 @@ import org.junit.jupiter.params.provider.CsvSource;
  * the JetStream client, which is out of scope here.
  */
 @Tag("unit")
-@DisplayName("IntegrationNatsConsumer helpers")
 class IntegrationNatsConsumerTest {
 
     @Nested
-    @DisplayName("reconnectBackoffMs (full-jitter exponential backoff)")
     class ReconnectBackoffMs {
 
         @ParameterizedTest(name = "attempt={0} → delay in [{1}, {2}] ms")
@@ -57,7 +54,6 @@ class IntegrationNatsConsumerTest {
         }
 
         @Test
-        @DisplayName("negative attempt is clamped to attempt 0 (defensive)")
         void negativeAttemptClampedToZero() {
             long delay = IntegrationNatsConsumer.reconnectBackoffMs(-5);
             // base=1000ms, jitter up to 1000ms → [1000, 2000]
@@ -65,7 +61,6 @@ class IntegrationNatsConsumerTest {
         }
 
         @Test
-        @DisplayName("delay never exceeds the hard cap (30 seconds)")
         void delayClampedToHardMax() {
             // Try the same call many times to stress the random-jitter path.
             for (int i = 0; i < 1000; i++) {

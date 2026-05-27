@@ -26,7 +26,6 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * Integration tests for workspace purge (deletion) covering data cleanup completeness,
  * idempotency, shared entity protection, credential clearing, and authorization.
  */
-@DisplayName("Workspace purge integration")
 class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -133,11 +132,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Data cleanup")
     class DataCleanup {
 
         @Test
-        @DisplayName("purge deletes all workspace-scoped data and marks workspace as PURGED")
         void purgeDeletesAllWorkspaceScopedData() {
             User owner = persistUser("cleanup-owner");
             Workspace workspace = workspaceService.createWorkspace(
@@ -202,7 +199,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Idempotency")
     class Idempotency {
 
         @Test
@@ -238,11 +234,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Shared entity protection")
     class SharedEntityProtection {
 
         @Test
-        @DisplayName("purge unlinks but preserves the Organization entity")
         void purgePreservesOrganization() {
             Workspace workspace = createGitLabWorkspaceWithData("org-protect");
             Long workspaceId = workspace.getId();
@@ -264,7 +258,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Sensitive field clearing")
     class SensitiveFieldClearing {
 
         @Autowired
@@ -280,7 +273,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
          * no longer carry runtime state.
          */
         @Test
-        @DisplayName("purge moves Connections to UNINSTALLED with cleared credential blobs")
         void purgeClearsCredentialBlobsOnConnections() {
             Workspace workspace = createGitLabWorkspaceWithData("sensitive");
             Long workspaceId = workspace.getId();
@@ -309,11 +301,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Chat thread cleanup")
     class ChatThreadCleanup {
 
         @Test
-        @DisplayName("purge deletes mentor chat threads via WorkspacePurgeContributor")
         void purgeDeletesChatThreads() {
             User owner = persistUser("chat-cleanup-owner");
             Workspace workspace = workspaceService.createWorkspace(
@@ -354,12 +344,10 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Authorization")
     class Authorization {
 
         @Test
         @WithAdminUser
-        @DisplayName("OWNER can purge workspace via DELETE endpoint")
         void ownerCanPurge() {
             Workspace workspace = createGitLabWorkspaceWithData("owner-purge");
             // ensureOwnerMembership already called in createGitLabWorkspaceWithData
@@ -378,7 +366,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         @WithMentorUser
-        @DisplayName("non-owner is denied access to DELETE endpoint")
         void nonOwnerIsDeniedAccess() {
             // Create workspace with a different owner — mentor user is NOT the owner
             User owner = persistUser("non-owner-test-owner");

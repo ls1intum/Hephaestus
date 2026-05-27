@@ -21,7 +21,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -40,7 +39,6 @@ import tools.jackson.databind.ObjectMapper;
  * real booted context — the JWT signing key is configured via {@code DynamicPropertySource}
  * and the bound port via {@code @LocalServerPort}.
  */
-@DisplayName("Worker control channel — handshake + capacity report end-to-end")
 class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
 
     @DynamicPropertySource
@@ -64,7 +62,6 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
     WorkerTokenDenylistService denylist;
 
     @Test
-    @DisplayName("raw WSS client completes handshake; hub registers session and receives CapacityReport")
     void handshakeAndCapacityRoundTrip() throws Exception {
         String workerId = "worker-it-" + java.util.UUID.randomUUID();
         WorkerJwtIssuer.IssuedWorkerJwt jwt = jwtIssuer.issue(workerId);
@@ -118,7 +115,6 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("revoked JWT cannot complete handshake — denylist hot path blocks upgrade")
     void revokedJwtIsRejected() throws Exception {
         assertThat(denylist).as("WorkerTokenDenylistService must be wired").isNotNull();
         String workerId = "worker-rev-" + java.util.UUID.randomUUID();

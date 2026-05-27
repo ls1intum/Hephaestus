@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -24,7 +23,6 @@ import org.springframework.graphql.client.HttpGraphQlClient;
 /**
  * Unit tests for {@link GitHubGraphQlClientProvider} rate limit delegation and circuit breaker.
  */
-@DisplayName("GitHubGraphQlClientProvider")
 class GitHubGraphQlClientProviderTest extends BaseUnitTest {
 
     @Mock
@@ -56,11 +54,9 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Rate limit delegation")
     class RateLimitDelegation {
 
         @Test
-        @DisplayName("trackRateLimit delegates to rateLimitTracker.updateFromResponse")
         void trackRateLimitDelegates() {
             ClientGraphQlResponse response = Mockito.mock(ClientGraphQlResponse.class);
             GHRateLimit rateLimit = new GHRateLimit();
@@ -73,7 +69,6 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("isRateLimitCritical delegates to rateLimitTracker.isCritical")
         void isRateLimitCriticalDelegates() {
             when(rateLimitTracker.isCritical(42L)).thenReturn(true);
 
@@ -82,7 +77,6 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("waitIfRateLimitLow delegates to rateLimitTracker.waitIfNeeded")
         void waitIfRateLimitLowDelegates() throws InterruptedException {
             when(rateLimitTracker.waitIfNeeded(42L)).thenReturn(true);
 
@@ -93,7 +87,6 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("getRateLimitRemaining delegates to rateLimitTracker.getRemaining")
         void getRateLimitRemainingDelegates() {
             when(rateLimitTracker.getRemaining(42L)).thenReturn(500);
 
@@ -102,7 +95,6 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("getRateLimitResetAt delegates to rateLimitTracker.getResetAt")
         void getRateLimitResetAtDelegates() {
             Instant resetAt = Instant.parse("2026-01-15T10:30:00Z");
             when(rateLimitTracker.getResetAt(42L)).thenReturn(resetAt);
@@ -112,18 +104,15 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("getRateLimitTracker returns the tracker instance")
         void getRateLimitTrackerReturnsInstance() {
             assertThat(provider.getRateLimitTracker()).isSameAs(rateLimitTracker);
         }
     }
 
     @Nested
-    @DisplayName("Circuit breaker")
     class CircuitBreakerTests {
 
         @Test
-        @DisplayName("isCircuitClosed returns true when state is CLOSED")
         void isCircuitClosedWhenClosed() {
             when(circuitBreaker.getState()).thenReturn(CircuitBreaker.State.CLOSED);
 

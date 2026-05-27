@@ -36,7 +36,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -49,7 +48,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("AgentJobService")
 class AgentJobServiceTest extends BaseUnitTest {
 
     @Mock
@@ -119,7 +117,6 @@ class AgentJobServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("submit()")
     class Submit {
 
         @BeforeEach
@@ -136,7 +133,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty when no enabled config exists")
         void shouldReturnEmptyWhenNoEnabledConfig() {
             AgentConfig disabledConfig = new AgentConfig();
             disabledConfig.setEnabled(false);
@@ -153,7 +149,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty when no configs exist")
         void shouldReturnEmptyWhenNoConfigs() {
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
@@ -167,7 +162,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return existing job on idempotency match")
         void shouldReturnExistingJobOnIdempotencyMatch() {
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -198,7 +192,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should create job and publish event on success")
         void shouldCreateJobAndPublishEvent() {
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -239,7 +232,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should copy llmApiKey for API_KEY credential mode")
         void shouldCopyLlmApiKeyForApiKeyMode() {
             enabledConfig.setCredentialMode(CredentialMode.API_KEY);
             enabledConfig.setLlmApiKey("sk-test-key");
@@ -272,7 +264,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should copy llmApiKey for PROXY credential mode (used by proxy for upstream auth)")
         void shouldCopyLlmApiKeyForProxyMode() {
             enabledConfig.setCredentialMode(CredentialMode.PROXY);
             enabledConfig.setLlmApiKey("sk-proxy-key");
@@ -304,7 +295,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty on DataIntegrityViolationException race condition")
         void shouldReturnEmptyOnDataIntegrityViolation() {
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -339,7 +329,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should pick first enabled config when multiple exist")
         void shouldPickFirstEnabledConfig() {
             AgentConfig disabled = new AgentConfig();
             disabled.setEnabled(false);
@@ -372,7 +361,6 @@ class AgentJobServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("cancel()")
     class Cancel {
 
         private AgentJob createJobWithStatus(AgentJobStatus status) {
@@ -385,7 +373,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should cancel QUEUED job")
         void shouldCancelQueuedJob() {
             AgentJob job = createJobWithStatus(AgentJobStatus.QUEUED);
             UUID jobId = job.getId();
@@ -406,7 +393,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should cancel RUNNING job and call sandbox cancel")
         void shouldCancelRunningJobAndCallSandbox() {
             AgentJob job = createJobWithStatus(AgentJobStatus.RUNNING);
             UUID jobId = job.getId();
@@ -427,7 +413,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should be idempotent for already-cancelled job")
         void shouldBeIdempotentForCancelledJob() {
             AgentJob job = createJobWithStatus(AgentJobStatus.CANCELLED);
             UUID jobId = job.getId();
@@ -441,7 +426,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw 409 for COMPLETED job")
         void shouldThrow409ForCompletedJob() {
             AgentJob job = createJobWithStatus(AgentJobStatus.COMPLETED);
             UUID jobId = job.getId();
@@ -454,7 +438,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw 409 for FAILED job")
         void shouldThrow409ForFailedJob() {
             AgentJob job = createJobWithStatus(AgentJobStatus.FAILED);
             UUID jobId = job.getId();
@@ -467,7 +450,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw 409 for TIMED_OUT job")
         void shouldThrow409ForTimedOutJob() {
             AgentJob job = createJobWithStatus(AgentJobStatus.TIMED_OUT);
             UUID jobId = job.getId();
@@ -478,7 +460,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw 404 for non-existent job")
         void shouldThrow404ForNonExistentJob() {
             UUID jobId = UUID.randomUUID();
             when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.empty());
@@ -487,7 +468,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw 409 when executor wins the race (updated==0)")
         void shouldThrow409WhenExecutorWinsRace() {
             AgentJob job = createJobWithStatus(AgentJobStatus.RUNNING);
             UUID jobId = job.getId();
@@ -510,7 +490,6 @@ class AgentJobServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("retryDelivery()")
     class RetryDelivery {
 
         private static final Long WORKSPACE_ID = 1L;
@@ -553,7 +532,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw 404 when job not found in workspace")
         void shouldThrow404WhenJobNotFound() {
             when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.empty());
 
@@ -563,7 +541,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw 409 without calling deliver when CAS transition returns zero")
         void shouldThrow409WhenCasTransitionReturnsZero() {
             when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
             when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
@@ -578,7 +555,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should deliver and update status to DELIVERED on success")
         void shouldDeliverAndUpdateStatusOnSuccess() {
             when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
             when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
@@ -598,7 +574,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should revert to FAILED and throw on delivery exception")
         void shouldRevertToFailedOnDeliveryException() {
             when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
             when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(

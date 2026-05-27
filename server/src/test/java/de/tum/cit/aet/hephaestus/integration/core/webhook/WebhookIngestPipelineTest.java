@@ -34,7 +34,6 @@ import tools.jackson.databind.ObjectMapper;
  * implementations — they validate the PIPELINE wiring, not the per-kind crypto.
  * The crypto adapters are covered in their own test classes.
  */
-@DisplayName("WebhookIngestPipeline — unit")
 class WebhookIngestPipelineTest extends BaseUnitTest {
 
     @Mock
@@ -72,7 +71,6 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("invalid signature → 401 with verifier-reported reason, no publish")
     void invalidSignatureBlocksPublish() {
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
             List.of(stubVerifier(IntegrationKind.GITHUB, new VerificationResult.Invalid("signature-mismatch"))),
@@ -92,7 +90,6 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("missing verifier → 501 without touching the publisher")
     void missingVerifier() {
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(List.of(), List.of(), publisher, objectMapper);
 
@@ -107,7 +104,6 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("missing deriver → 501 (kind verified but no subject-derivation wired)")
     void missingDeriver() {
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
             List.of(stubVerifier(IntegrationKind.GITHUB, new VerificationResult.Verified())),
@@ -127,7 +123,6 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("missing publisher → 503 so vendor retries")
     void missingPublisher() {
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
             List.of(stubVerifier(IntegrationKind.GITHUB, new VerificationResult.Verified())),
@@ -146,7 +141,6 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("publisher exception → 503 so vendor retries")
     void publisherExceptionMapsTo503() {
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
             List.of(stubVerifier(IntegrationKind.GITLAB, new VerificationResult.Verified())),
@@ -168,7 +162,6 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("invalid JSON body → 400, no publish")
     void invalidJsonBlocksPublish() {
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
             List.of(stubVerifier(IntegrationKind.GITHUB, new VerificationResult.Verified())),
@@ -210,7 +203,6 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("respond-immediately verdict → status + body served directly, no publish")
     void respondImmediatelyShortCircuits() {
         byte[] echoBody = "challenge-ack".getBytes(StandardCharsets.UTF_8);
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
@@ -237,7 +229,6 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("duplicate verifier registration is rejected at construction")
     void duplicateVerifierRejected() {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
             new WebhookIngestPipeline(
@@ -255,7 +246,6 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("duplicate deriver registration is rejected at construction")
     void duplicateDeriverRejected() {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
             new WebhookIngestPipeline(

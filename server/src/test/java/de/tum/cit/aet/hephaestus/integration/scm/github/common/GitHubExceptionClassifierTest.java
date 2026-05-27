@@ -47,11 +47,9 @@ class GitHubExceptionClassifierTest {
     }
 
     @Nested
-    @DisplayName("HTTP Status Code Classification")
     class HttpStatusCodeClassification {
 
         @Test
-        @DisplayName("classifies 400 Bad Request as CLIENT_ERROR")
         void badRequest() {
             var exception = createWebClientResponseException(400, "Bad Request");
 
@@ -75,7 +73,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies 403 with rate limit message as RATE_LIMITED")
         void forbiddenRateLimit() {
             var exception = createWebClientResponseExceptionWithBody(
                 403,
@@ -87,7 +84,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies 403 with zero remaining rate limit header as RATE_LIMITED")
         void forbiddenRateLimitHeader() {
             HttpHeaders headers = new HttpHeaders();
             headers.add("X-RateLimit-Remaining", "0");
@@ -101,7 +97,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies 404 Not Found as NOT_FOUND")
         void notFound() {
             var exception = createWebClientResponseException(404, "Not Found");
 
@@ -109,7 +104,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies 422 Unprocessable Entity as CLIENT_ERROR")
         void unprocessableEntity() {
             var exception = createWebClientResponseException(422, "Unprocessable Entity");
 
@@ -117,7 +111,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies 429 Too Many Requests as RATE_LIMITED")
         void tooManyRequests() {
             var exception = createWebClientResponseException(429, "Too Many Requests");
 
@@ -139,7 +132,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies 500 Internal Server Error as RETRYABLE")
         void internalServerError() {
             var exception = createWebClientResponseException(500, "Internal Server Error");
 
@@ -147,7 +139,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies 502 Bad Gateway as RETRYABLE")
         void badGateway() {
             var exception = createWebClientResponseException(502, "Bad Gateway");
 
@@ -155,7 +146,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies 503 Service Unavailable as RETRYABLE")
         void serviceUnavailable() {
             var exception = createWebClientResponseException(503, "Service Unavailable");
 
@@ -163,7 +153,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies 504 Gateway Timeout as RETRYABLE")
         void gatewayTimeout() {
             var exception = createWebClientResponseException(504, "Gateway Timeout");
 
@@ -172,11 +161,9 @@ class GitHubExceptionClassifierTest {
     }
 
     @Nested
-    @DisplayName("Network Exception Classification")
     class NetworkExceptionClassification {
 
         @Test
-        @DisplayName("classifies ConnectException as RETRYABLE")
         void connectException() {
             var exception = new ConnectException("Connection refused");
 
@@ -184,7 +171,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies SocketException as RETRYABLE")
         void socketException() {
             var exception = new SocketException("Connection reset");
 
@@ -192,7 +178,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies UnknownHostException as RETRYABLE")
         void unknownHostException() {
             var exception = new UnknownHostException("api.github.com");
 
@@ -208,7 +193,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies WebClientRequestException as RETRYABLE")
         void webClientRequestException() {
             var cause = new ConnectException("Connection refused");
             var exception = mock(WebClientRequestException.class);
@@ -219,11 +203,9 @@ class GitHubExceptionClassifierTest {
     }
 
     @Nested
-    @DisplayName("Timeout Exception Classification")
     class TimeoutExceptionClassification {
 
         @Test
-        @DisplayName("classifies TimeoutException as RETRYABLE")
         void timeoutException() {
             var exception = new TimeoutException("Request timed out");
 
@@ -231,7 +213,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies SocketTimeoutException as RETRYABLE")
         void socketTimeoutException() {
             var exception = new SocketTimeoutException("Read timed out");
 
@@ -240,11 +221,9 @@ class GitHubExceptionClassifierTest {
     }
 
     @Nested
-    @DisplayName("Wrapped Exception Classification")
     class WrappedExceptionClassification {
 
         @Test
-        @DisplayName("unwraps RuntimeException and classifies cause")
         void unwrapsRuntimeException() {
             var cause = createWebClientResponseException(503, "Service Unavailable");
             var exception = new RuntimeException("Wrapped", cause);
@@ -253,7 +232,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies unknown exception as UNKNOWN")
         void unknownException() {
             var exception = new IllegalStateException("Something unexpected");
 
@@ -261,14 +239,12 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("handles null exception")
         void nullException() {
             assertThat(classifier.classify(null)).isEqualTo(Category.UNKNOWN);
         }
     }
 
     @Nested
-    @DisplayName("GraphQL Response Classification")
     class GraphQlResponseClassification {
 
         @Test
@@ -281,13 +257,11 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("returns null for null response")
         void nullResponse() {
             assertThat(classifier.classifyGraphQlResponse(null)).isNull();
         }
 
         @Test
-        @DisplayName("classifies NOT_FOUND GraphQL error")
         void notFoundError() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -302,7 +276,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies FORBIDDEN GraphQL error as AUTH_ERROR")
         void forbiddenError() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "FORBIDDEN"));
@@ -317,7 +290,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies FORBIDDEN GraphQL error with rate limit message as RATE_LIMITED")
         void forbiddenRateLimitError() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "FORBIDDEN"));
@@ -332,7 +304,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies UNAUTHORIZED GraphQL error")
         void unauthorizedError() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "UNAUTHORIZED"));
@@ -347,7 +318,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("classifies error without extensions as UNKNOWN")
         void errorWithoutExtensions() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(null);
@@ -363,11 +333,9 @@ class GitHubExceptionClassifierTest {
     }
 
     @Nested
-    @DisplayName("isRetryable")
     class IsRetryable {
 
         @Test
-        @DisplayName("returns true for RETRYABLE category")
         void retryable() {
             var exception = createWebClientResponseException(503, "Service Unavailable");
 
@@ -375,7 +343,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("returns true for RATE_LIMITED category")
         void rateLimited() {
             var exception = createWebClientResponseException(429, "Too Many Requests");
 
@@ -383,7 +350,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("returns false for NOT_FOUND category")
         void notFound() {
             var exception = createWebClientResponseException(404, "Not Found");
 
@@ -391,7 +357,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("returns false for AUTH_ERROR category")
         void authError() {
             var exception = createWebClientResponseException(401, "Unauthorized");
 
@@ -399,7 +364,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("returns false for CLIENT_ERROR category")
         void clientError() {
             var exception = createWebClientResponseException(400, "Bad Request");
 
@@ -408,11 +372,9 @@ class GitHubExceptionClassifierTest {
     }
 
     @Nested
-    @DisplayName("Metrics")
     class Metrics {
 
         @Test
-        @DisplayName("increments retryable counter on classification")
         void incrementsRetryableCounter() {
             var exception = createWebClientResponseException(503, "Service Unavailable");
 
@@ -424,7 +386,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("increments rate_limited counter on classification")
         void incrementsRateLimitedCounter() {
             var exception = createWebClientResponseException(429, "Too Many Requests");
 
@@ -436,7 +397,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("increments not_found counter on classification")
         void incrementsNotFoundCounter() {
             var exception = createWebClientResponseException(404, "Not Found");
 
@@ -448,7 +408,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("increments auth_error counter on classification")
         void incrementsAuthErrorCounter() {
             var exception = createWebClientResponseException(401, "Unauthorized");
 
@@ -460,7 +419,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("increments client_error counter on classification")
         void incrementsClientErrorCounter() {
             var exception = createWebClientResponseException(400, "Bad Request");
 
@@ -472,7 +430,6 @@ class GitHubExceptionClassifierTest {
         }
 
         @Test
-        @DisplayName("increments unknown counter on classification")
         void incrementsUnknownCounter() {
             var exception = new IllegalStateException("Unknown error");
 

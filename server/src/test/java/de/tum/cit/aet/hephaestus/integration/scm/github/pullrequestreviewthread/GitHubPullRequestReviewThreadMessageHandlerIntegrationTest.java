@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -34,7 +33,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Pull Request Review Thread Message Handler")
 class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -129,15 +127,12 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("repository.pull_request_review_thread");
     }
 
     @Test
-    @DisplayName("Should handle thread resolved event")
     void shouldHandleResolvedEvent() throws Exception {
-        // Given
         GitHubPullRequestReviewThreadEventDTO event = loadPayload("pull_request_review_thread.resolved");
 
         // Create the PR that the thread belongs to
@@ -167,7 +162,6 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
             .get()
             .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
 
-        // When
         handler.handleEvent(event);
 
         // Then - thread should be resolved
@@ -178,9 +172,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     }
 
     @Test
-    @DisplayName("Should handle thread unresolved event")
     void shouldHandleUnresolvedEvent() throws Exception {
-        // Given
         GitHubPullRequestReviewThreadEventDTO event = loadPayload("pull_request_review_thread.unresolved");
 
         // Create the PR that the thread belongs to
@@ -209,7 +201,6 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
             .get()
             .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
 
-        // When
         handler.handleEvent(event);
 
         // Then - thread should be unresolved
@@ -220,7 +211,6 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     }
 
     @Test
-    @DisplayName("Should resolve thread when thread ID is known")
     void shouldResolveThreadWhenIdIsKnown() throws Exception {
         // Given - create a thread directly
         createTestPullRequest(12345L, 1);

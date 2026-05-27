@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.workspace.dto.RenameWorkspaceSlugRequestDTO;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -20,7 +19,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-@DisplayName("Workspace slug rename integration")
 class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired

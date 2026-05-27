@@ -4,7 +4,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.BASE_PACKAGE;
 
 import com.tngtech.archunit.lang.ArchRule;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -31,7 +30,6 @@ import org.junit.jupiter.api.Test;
  * @see <a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/lang/NonNull.html">
  *     Spring @NonNull</a>
  */
-@DisplayName("Null Annotation Consistency")
 class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
 
     /**
@@ -43,7 +41,6 @@ class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
      * and correct OpenAPI spec generation.
      */
     @Test
-    @DisplayName("No lombok.NonNull usage — use org.springframework.lang.NonNull")
     void noLombokNonNull() {
         ArchRule rule = noClasses()
             .that()
@@ -66,7 +63,6 @@ class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
      * instead.
      */
     @Test
-    @DisplayName("No jakarta.annotation.Nonnull usage — use org.springframework.lang.NonNull")
     void noJakartaAnnotationNonnull() {
         ArchRule rule = noClasses()
             .that()

@@ -32,7 +32,6 @@ import org.junit.jupiter.api.Test;
  *
  * @see ArchitectureTestConstants
  */
-@DisplayName("Code Quality")
 class CodeQualityTest extends HephaestusArchitectureTest {
 
     // ========================================================================
@@ -40,7 +39,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("God Class Prevention")
     class GodClassTests {
 
         /**
@@ -53,7 +51,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * These should be explicitly named here with justification.
          */
         @Test
-        @DisplayName("Services have max 12 constructor dependencies")
         void servicesHaveLimitedConstructorParams() {
             // Orchestrator services that coordinate many sub-services are allowed more dependencies
             Set<String> orchestratorExceptions = Set.of(
@@ -101,7 +98,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * Business methods exclude getters, setters, equals, hashCode, toString, and constructors.
          */
         @Test
-        @DisplayName("Services have limited business methods (max 25)")
         void servicesHaveLimitedBusinessMethods() {
             ArchRule rule = classes()
                 .that()
@@ -120,7 +116,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Method Complexity")
     class MethodComplexityTests {
 
         /** Maximum parameters per method - indicates complex method. */
@@ -140,7 +135,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * </ul>
          */
         @Test
-        @DisplayName("Methods have limited parameters (max 6)")
         void methodsHaveLimitedParameters() {
             // Methods that have command-object overloads but need many params for internal processing
             Set<String> allowedOverloads = Set.of(
@@ -242,7 +236,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * This is a proxy check since ArchUnit cannot directly measure cyclomatic complexity.
          */
         @Test
-        @DisplayName("Service methods avoid excessive boolean parameters")
         void serviceMethodsAvoidExcessiveBooleanParams() {
             ArchCondition<JavaClass> avoidManyBooleans = new ArchCondition<>(
                 "avoid methods with more than 2 boolean parameters"
@@ -307,7 +300,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * </ul>
          */
         @Test
-        @DisplayName("Token services in appropriate packages")
         void tokenServicesInSecurityPackages() {
             ArchCondition<JavaClass> beInTokenAppropriatePackage = new ArchCondition<>(
                 "be in security, auth, app, common, or github package"
@@ -353,7 +345,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Interface Segregation Principle")
     class InterfaceSegregationTests {
 
         /**
@@ -363,7 +354,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * don't need. Prefer small, focused interfaces.
          */
         @Test
-        @DisplayName("Interfaces have limited methods (max 8)")
         void interfacesHaveLimitedMethods() {
             ArchCondition<JavaClass> haveLimitedMethods = new ArchCondition<>(
                 "have at most " + MAX_INTERFACE_METHODS + " methods"
@@ -418,7 +408,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * they should be minimal.
          */
         @Test
-        @DisplayName("SPI interfaces are focused (max 8 methods)")
         void spiInterfacesAreFocused() {
             ArchCondition<JavaClass> beFocused = new ArchCondition<>("have at most " + MAX_SPI_METHODS + " methods") {
                 @Override
@@ -462,7 +451,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Dependency Inversion")
     class DependencyInversionTests {
 
         /**
@@ -472,7 +460,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * be used sparingly. Known usages are documented here.
          */
         @Test
-        @DisplayName("ObjectProvider usage is limited to known cases")
         void objectProviderUsageIsLimited() {
             Set<String> knownCycleBreakers = Set.of(
                 "WorkspaceActivationService",
@@ -523,7 +510,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Liskov Substitution Principle")
     class LiskovSubstitutionTests {
 
         /**
@@ -532,7 +518,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * <p>LSP principle: methods should declare specific exceptions.
          */
         @Test
-        @DisplayName("Service methods do not declare generic Exception")
         void serviceMethodsDoNotDeclareGenericException() {
             ArchCondition<JavaClass> notDeclareGenericException = new ArchCondition<>(
                 "not declare generic Exception in methods"
@@ -589,7 +574,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * and throws via utility methods.
          */
         @Test
-        @DisplayName("Service implementations do not throw UnsupportedOperationException")
         void serviceImplementationsDoNotThrowUnsupportedOperationException() {
             ArchCondition<JavaClass> notThrowUnsupportedOperationException = new ArchCondition<>(
                 "not throw UnsupportedOperationException"

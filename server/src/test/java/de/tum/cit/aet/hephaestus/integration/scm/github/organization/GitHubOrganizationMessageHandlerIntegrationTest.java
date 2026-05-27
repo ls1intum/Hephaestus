@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -30,7 +29,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Organization Message Handler")
 class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -91,18 +89,14 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("organization.organization");
     }
 
     @Test
-    @DisplayName("Should handle member added event")
     void shouldHandleMemberAddedEvent() throws Exception {
-        // Given
         GitHubOrganizationEventDTO event = loadPayload("organization.member_added");
 
-        // When
         handler.handleEvent(event);
 
         // Then - organization should still exist
@@ -116,7 +110,6 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should handle member removed event")
     void shouldHandleMemberRemovedEvent() throws Exception {
         // Given - first add a member
         GitHubOrganizationEventDTO addEvent = loadPayload("organization.member_added");
@@ -134,7 +127,6 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
         // Load remove event
         GitHubOrganizationEventDTO removeEvent = loadPayload("organization.member_removed");
 
-        // When
         handler.handleEvent(removeEvent);
 
         // Then - handler processes without error
@@ -142,12 +134,9 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should handle organization renamed event")
     void shouldHandleRenamedEvent() throws Exception {
-        // Given
         GitHubOrganizationEventDTO event = loadPayload("organization.renamed");
 
-        // When
         handler.handleEvent(event);
 
         // Then - organization should reflect new name

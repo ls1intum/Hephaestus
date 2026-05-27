@@ -27,7 +27,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +45,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * - Context handling and workspace association
  * - Reply threading via parent comment resolution
  */
-@DisplayName("GitHub Discussion Comment Processor")
 @Import(GitHubDiscussionCommentProcessorIntegrationTest.TestCommentEventListener.class)
 class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
@@ -188,11 +186,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Process Method - Create")
     class ProcessMethodCreate {
 
         @Test
-        @DisplayName("should create comment and publish DiscussionCommentCreated event")
         void shouldCreateCommentAndPublishCreatedEvent() {
             GitHubDiscussionCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "This is a test comment.");
             ProcessingContext context = createContext();
@@ -216,7 +212,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("should handle null DTO databaseId gracefully")
         void shouldHandleNullDtoGracefully() {
             GitHubDiscussionCommentDTO dto = new GitHubDiscussionCommentDTO(
                 null,
@@ -241,7 +236,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("should handle null author")
         void shouldHandleNullAuthor() {
             GitHubDiscussionCommentDTO dto = new GitHubDiscussionCommentDTO(
                 TEST_COMMENT_ID,
@@ -269,7 +263,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("should set discussion relationship")
         void shouldSetDiscussionRelationship() {
             GitHubDiscussionCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "Test body");
             ProcessingContext context = createContext();
@@ -283,7 +276,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("should set author association")
         void shouldSetAuthorAssociation() {
             GitHubDiscussionCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "Test body");
             ProcessingContext context = createContext();
@@ -296,11 +288,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Process Method - Update")
     class ProcessMethodUpdate {
 
         @Test
-        @DisplayName("should update comment and publish DiscussionCommentEdited event when body changes")
         void shouldUpdateCommentAndPublishEditedEventWhenBodyChanges() {
             // Create initial comment
             DiscussionComment existing = new DiscussionComment();
@@ -335,7 +325,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("should update answer status and publish DiscussionCommentEdited event")
         void shouldUpdateAnswerStatusAndPublishEditedEvent() {
             // Create initial comment that is not an answer
             DiscussionComment existing = new DiscussionComment();
@@ -392,7 +381,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("should not publish DiscussionCommentEdited event when nothing changes")
         void shouldNotPublishEditedEventWhenNothingChanges() {
             // Create initial comment with matching data
             GitHubDiscussionCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "Same body");
@@ -411,7 +399,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("should be idempotent")
         void shouldBeIdempotent() {
             GitHubDiscussionCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "Idempotent body");
             ProcessingContext context = createContext();
@@ -435,11 +422,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Delete Method")
     class DeleteMethod {
 
         @Test
-        @DisplayName("should delete comment and publish DiscussionCommentDeleted event")
         void shouldDeleteCommentAndPublishDeletedEvent() {
             // Create comment to delete
             GitHubDiscussionCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "To be deleted");
@@ -466,7 +451,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
         @Test
         @Transactional
-        @DisplayName("should sync bidirectional relationship when deleting")
         void shouldSyncBidirectionalRelationshipWhenDeleting() {
             // Create comment with bidirectional relationship set up
             DiscussionComment existing = new DiscussionComment();
@@ -497,7 +481,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("should handle null comment ID gracefully")
         void shouldHandleNullCommentIdGracefully() {
             GitHubDiscussionCommentDTO dto = new GitHubDiscussionCommentDTO(
                 null,
@@ -521,7 +504,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("should handle non-existent comment gracefully")
         void shouldHandleNonExistentCommentGracefully() {
             GitHubDiscussionCommentDTO dto = createCommentDTO(999999L, "Non-existent");
 
@@ -533,11 +515,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Reply Threading")
     class ReplyThreading {
 
         @Test
-        @DisplayName("should resolve parent comment")
         void shouldResolveParentComment() {
             // Create parent comment
             Long parentId = TEST_COMMENT_ID;

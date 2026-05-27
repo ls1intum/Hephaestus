@@ -10,7 +10,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -21,7 +20,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Installation Message Handler")
 class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -43,18 +41,14 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("installation.installation");
     }
 
     @Test
-    @DisplayName("Should handle created event")
     void shouldHandleCreatedEvent() throws Exception {
-        // Given
         GitHubInstallationEventDTO event = loadPayload("installation.created");
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error
@@ -63,12 +57,9 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should handle deleted event")
     void shouldHandleDeletedEvent() throws Exception {
-        // Given
         GitHubInstallationEventDTO event = loadPayload("installation.deleted");
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error
@@ -76,12 +67,9 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should handle suspended event")
     void shouldHandleSuspendedEvent() throws Exception {
-        // Given
         GitHubInstallationEventDTO event = loadPayload("installation.suspend");
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error
@@ -89,12 +77,9 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should handle unsuspended event")
     void shouldHandleUnsuspendedEvent() throws Exception {
-        // Given
         GitHubInstallationEventDTO event = loadPayload("installation.unsuspend");
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error
@@ -102,7 +87,6 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should handle null installation gracefully")
     void shouldHandleNullInstallationGracefully() {
         // Given - event with null installation
         GitHubInstallationEventDTO event = new GitHubInstallationEventDTO("created", null, null, null);
@@ -113,7 +97,6 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     @Test
-    @DisplayName("Should handle unknown action gracefully")
     void shouldHandleUnknownActionGracefully() throws Exception {
         // Given - load a valid event and parse to get structure, then create with unknown action
         GitHubInstallationEventDTO baseEvent = loadPayload("installation.created");

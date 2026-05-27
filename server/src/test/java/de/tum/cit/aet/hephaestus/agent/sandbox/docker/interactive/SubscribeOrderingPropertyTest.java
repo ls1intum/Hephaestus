@@ -9,17 +9,14 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.IntNode;
 
 /** Snapshot replay must strictly precede live frames for a subscriber that races the pump. */
-@DisplayName("Subscribe ordering: snapshot precedes live frames")
 class SubscribeOrderingPropertyTest extends BaseUnitTest {
 
     @Test
-    @DisplayName("a subscriber that races a producer sees snapshot frames before any live frames")
     void snapshotThenLive() throws Exception {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         FrameRingBuffer ring = new FrameRingBuffer(1024, reg.counter("test.dropped"));

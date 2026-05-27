@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  * "no auth available".
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackCredentialProvider implements ApiCredentialProvider {
 
     private static final Logger log = LoggerFactory.getLogger(SlackCredentialProvider.class);

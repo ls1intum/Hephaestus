@@ -20,10 +20,9 @@ import org.springframework.stereotype.Component;
  * {@link #finalizeConnect} reads {@code installation_id} from the callback and emits a
  * {@link InstallationCredential} for orchestrator persistence.
  *
- * <p>{@link #validate} fails closed ("probe not wired") until the GitHub installation
- * health probe lands. {@link #revoke} is a local no-op log: GitHub App uninstall happens
- * on GitHub's side; we observe {@code installation.deleted} via the lifecycle webhook
- * and transition our row to {@code UNINSTALLED} from there.
+ * <p>{@link #revoke} is a local no-op log: GitHub App uninstall happens on GitHub's
+ * side; we observe {@code installation.deleted} via the lifecycle webhook and
+ * transition our row to {@code UNINSTALLED} from there.
  */
 @Component
 public class GithubConnectionStrategy implements ConnectionStrategy {
@@ -88,17 +87,6 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
         // the DB for an unrelated property.
         InstallationCredential credentials = new InstallationCredential(installationId, appId);
         return new ConnectFinalization.Completed(Long.toString(installationId), credentials, null);
-    }
-
-    @Override
-    public ValidationResult validate(
-        IntegrationRef ref,
-        de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle credentials
-    ) {
-        // Fail closed: returning Ok would silently transition the Connection to ACTIVE on
-        // revoked installations. Follow-up wiring will call
-        // GitHubAppTokenService.isInstallationSuspended against GET /app/installations/{id}.
-        return new ValidationResult.Failed("probe not wired");
     }
 
     @Override

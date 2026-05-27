@@ -31,7 +31,6 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
-@DisplayName("OAuthCallbackService — unit")
 class OAuthCallbackServiceTest extends BaseUnitTest {
 
     @Mock
@@ -60,7 +59,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("findOrCreatePendingConnection reuses PENDING row if present")
     void findOrCreate_reusesPending() {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         when(
@@ -79,7 +77,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("findOrCreatePendingConnection reuses ACTIVE row (credential refresh on reconnect)")
     void findOrCreate_reusesActiveForReconnect() {
         Connection active = newConnection(7L, 42L, IntegrationKind.SLACK, "T1", IntegrationState.ACTIVE);
         when(
@@ -105,7 +102,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("findOrCreatePendingConnection creates a fresh row when no PENDING/ACTIVE exists")
     void findOrCreate_createsFreshWhenNoneExists() {
         when(
             connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
@@ -127,7 +123,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("findOrCreatePendingConnection throws if workspace doesn't exist")
     void findOrCreate_missingWorkspace_throws() {
         when(
             connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
@@ -180,7 +175,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("completeConnection falls back to 'oauth-callback' actor when actorRef is null")
     void complete_nullActorRef_usesSentinel() {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
@@ -201,7 +195,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("completeConnection rejects a vendor-returned instance_key that conflicts with the existing one")
     void complete_conflictingInstanceKey_throws() {
         Connection existing = newConnection(7L, 42L, IntegrationKind.SLACK, "T_ORIG", IntegrationState.ACTIVE);
         ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
@@ -217,7 +210,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("completeConnection propagates transition guard rejection (IllegalStateException)")
     void complete_transitionGuardRejects_throwsThrough() {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
@@ -236,7 +228,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("completeConnection with null CredentialBundle skips credentials persistence")
     void complete_nullCredentials_noBlobStamped() {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         ConnectFinalization.Completed completed = new ConnectFinalization.Completed("T1", null, null);

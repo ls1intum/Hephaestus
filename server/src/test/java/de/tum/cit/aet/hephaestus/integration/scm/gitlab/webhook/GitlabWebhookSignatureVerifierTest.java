@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.Optional;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -27,7 +26,6 @@ import org.junit.jupiter.api.Test;
  * dispatcher, so each path is exercised in isolation plus a final "both headers"
  * priority test that nails down the safer-mode-wins rule.
  */
-@DisplayName("GitlabWebhookSignatureVerifier dual-mode behaviour")
 class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
 
     private static final String PLAINTEXT_SECRET = "shared-gitlab-secret-32-bytes-long-XYZ";

@@ -26,7 +26,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -37,7 +36,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 
 @Tag("unit")
-@DisplayName("BaseGitLabProcessor")
 class BaseGitLabProcessorTest extends BaseUnitTest {
 
     @Mock
@@ -97,11 +95,9 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Timestamp parsing")
     class TimestampParsing {
 
         @Test
-        @DisplayName("parses ISO-8601 format (GraphQL)")
         void parsesIso8601() {
             Instant result = processor.callParseGitLabTimestamp("2026-01-31T18:03:35Z");
 
@@ -110,7 +106,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("parses ISO-8601 with offset")
         void parsesIso8601WithOffset() {
             Instant result = processor.callParseGitLabTimestamp("2026-01-31T19:03:35+01:00");
 
@@ -119,7 +114,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("parses webhook format (yyyy-MM-dd HH:mm:ss +ZZZZ)")
         void parsesWebhookFormat() {
             Instant result = processor.callParseGitLabTimestamp("2026-01-31 19:03:35 +0100");
 
@@ -128,7 +122,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("parses webhook format without timezone")
         void parsesWebhookFormatNoTimezone() {
             Instant result = processor.callParseGitLabTimestamp("2026-01-31 19:03:35");
 
@@ -140,14 +133,12 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         @ParameterizedTest
         @NullAndEmptySource
         @ValueSource(strings = { "  ", "\t" })
-        @DisplayName("returns null for null/blank timestamps")
         void returnsNullForNullOrBlank(String input) {
             Instant result = processor.callParseGitLabTimestamp(input);
             assertThat(result).isNull();
         }
 
         @Test
-        @DisplayName("returns null for unparseable timestamp")
         void returnsNullForUnparseable() {
             Instant result = processor.callParseGitLabTimestamp("not-a-timestamp");
             assertThat(result).isNull();
@@ -159,11 +150,9 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("User resolution (webhook)")
     class WebhookUserResolution {
 
         @Test
-        @DisplayName("finds or creates user from webhook data")
         void findsOrCreatesUserFromWebhook() {
             User user = new User();
             user.setId(-18024L);
@@ -187,14 +176,12 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns null for null webhook user")
         void returnsNullForNullUser() {
             User result = processor.callFindOrCreateUser((GitLabWebhookUser) null);
             assertThat(result).isNull();
         }
 
         @Test
-        @DisplayName("returns null for user with null id")
         void returnsNullForNullUserId() {
             GitLabWebhookUser dto = new GitLabWebhookUser(null, "ga84xah", "Felix", null, null);
             User result = processor.callFindOrCreateUser(dto);
@@ -202,7 +189,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns null for user with null username")
         void returnsNullForNullUsername() {
             GitLabWebhookUser dto = new GitLabWebhookUser(18024L, null, "Felix", null, null);
             User result = processor.callFindOrCreateUser(dto);
@@ -211,11 +197,9 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("User resolution (GraphQL)")
     class GraphQLUserResolution {
 
         @Test
-        @DisplayName("finds or creates user from GraphQL data")
         void findsOrCreatesUserFromGraphQL() {
             User user = new User();
             user.setId(-18024L);
@@ -242,14 +226,12 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns null for invalid globalId")
         void returnsNullForInvalidGlobalId() {
             User result = processor.callFindOrCreateUser("invalid", "ga84xah", "Felix", null, null);
             assertThat(result).isNull();
         }
 
         @Test
-        @DisplayName("returns null for null globalId")
         void returnsNullForNullGlobalId() {
             User result = processor.callFindOrCreateUser(null, "ga84xah", "Felix", null, null);
             assertThat(result).isNull();
@@ -261,11 +243,9 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Label resolution")
     class LabelResolution {
 
         @Test
-        @DisplayName("returns existing label by name")
         void returnsExistingLabel() {
             Label existing = new Label();
             existing.setId(-85907L);
@@ -283,7 +263,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("creates new label with native ID")
         void createsNewLabelWithNativeId() {
             Label created = new Label();
             created.setId(85907L);
@@ -302,14 +281,12 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns null for null label")
         void returnsNullForNullLabel() {
             Label result = processor.callFindOrCreateLabel((GitLabWebhookLabel) null, testRepo);
             assertThat(result).isNull();
         }
 
         @Test
-        @DisplayName("returns null for label with blank title")
         void returnsNullForBlankTitle() {
             GitLabWebhookLabel dto = new GitLabWebhookLabel(85907L, "  ", "#a2eeef");
             Label result = processor.callFindOrCreateLabel(dto, testRepo);
@@ -322,11 +299,9 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Context resolution")
     class ContextResolution {
 
         @Test
-        @DisplayName("returns null when repository is filtered")
         void returnsNullWhenFiltered() {
             when(repositoryScopeFilter.isRepositoryAllowed("org/repo")).thenReturn(false);
             var ctx = processor.callResolveContext("org/repo", "open");
@@ -334,7 +309,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns null when repository not found")
         void returnsNullWhenNotFound() {
             when(repositoryScopeFilter.isRepositoryAllowed("org/repo")).thenReturn(true);
             when(repositoryRepository.findByNameWithOwnerWithOrganization("org/repo")).thenReturn(Optional.empty());
@@ -345,7 +319,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         @ParameterizedTest
         @NullAndEmptySource
         @ValueSource(strings = { "  " })
-        @DisplayName("returns null for null/blank path")
         void returnsNullForNullOrBlankPath(String path) {
             var ctx = processor.callResolveContext(path, "open");
             assertThat(ctx).isNull();
@@ -357,12 +330,10 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("ID mapping")
     class IdMapping {
 
         @ParameterizedTest(name = "toEntityId({0}) = {1}")
         @CsvSource({ "1, 1", "42, 42", "18024, 18024", "422296, 422296" })
-        @DisplayName("returns raw GitLab IDs as entity IDs")
         void returnsRawIds(long rawId, long expectedEntityId) {
             assertThat(GitLabSyncConstants.toEntityId(rawId)).isEqualTo(expectedEntityId);
         }
@@ -376,7 +347,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
                 "gid://gitlab/Label/85907, 85907",
             }
         )
-        @DisplayName("extracts numeric IDs from global IDs")
         void extractsNumericIds(String globalId, long expectedEntityId) {
             assertThat(GitLabSyncConstants.extractEntityId(globalId)).isEqualTo(expectedEntityId);
         }

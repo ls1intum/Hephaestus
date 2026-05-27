@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("GitDiffOperations.annotateDiffWithLineNumbers")
 class GitDiffOperationsTest extends BaseUnitTest {
 
     @Test

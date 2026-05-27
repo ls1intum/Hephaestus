@@ -9,11 +9,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("GitRepositoryLockManager")
 class GitRepositoryLockManagerTest extends BaseUnitTest {
 
     private GitRepositoryLockManager lockManager;
@@ -24,11 +22,9 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getLock")
     class GetLock {
 
         @Test
-        @DisplayName("should return same lock instance for same repository ID")
         void shouldReturnSameLockForSameRepositoryId() {
             ReentrantReadWriteLock lock1 = lockManager.getLock(1L);
             ReentrantReadWriteLock lock2 = lockManager.getLock(1L);
@@ -37,7 +33,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return different lock instances for different repository IDs")
         void shouldReturnDifferentLocksForDifferentRepositoryIds() {
             ReentrantReadWriteLock lock1 = lockManager.getLock(1L);
             ReentrantReadWriteLock lock2 = lockManager.getLock(2L);
@@ -46,7 +41,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should create lock on first access")
         void shouldCreateLockOnFirstAccess() {
             assertThat(lockManager.getActiveLockCount()).isZero();
 
@@ -57,11 +51,9 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("withWriteLock (Supplier)")
     class WithWriteLockSupplier {
 
         @Test
-        @DisplayName("should execute operation and return result")
         void shouldExecuteOperationAndReturnResult() {
             String result = lockManager.withWriteLock(1L, () -> "hello");
 
@@ -69,7 +61,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should release lock after operation completes")
         void shouldReleaseLockAfterOperationCompletes() {
             lockManager.withWriteLock(1L, () -> "done");
 
@@ -78,7 +69,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should release lock even when operation throws")
         void shouldReleaseLockWhenOperationThrows() {
             try {
                 lockManager.withWriteLock(1L, () -> {
@@ -94,11 +84,9 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("withWriteLock (Runnable)")
     class WithWriteLockRunnable {
 
         @Test
-        @DisplayName("should execute runnable operation")
         void shouldExecuteRunnableOperation() {
             AtomicBoolean executed = new AtomicBoolean(false);
 
@@ -108,7 +96,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should release lock after runnable completes")
         void shouldReleaseLockAfterRunnableCompletes() {
             lockManager.withWriteLock(1L, () -> {});
 
@@ -118,11 +105,9 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("withReadLock")
     class WithReadLock {
 
         @Test
-        @DisplayName("should execute operation and return result")
         void shouldExecuteOperationAndReturnResult() {
             String result = lockManager.withReadLock(1L, () -> "read");
 
@@ -130,7 +115,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should release lock after operation completes")
         void shouldReleaseLockAfterOperationCompletes() {
             lockManager.withReadLock(1L, () -> "done");
 
@@ -139,7 +123,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should allow concurrent readers")
         void shouldAllowConcurrentReaders() throws InterruptedException {
             AtomicInteger concurrentReaders = new AtomicInteger(0);
             AtomicInteger maxConcurrentReaders = new AtomicInteger(0);
@@ -175,11 +158,9 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("removeLock")
     class RemoveLock {
 
         @Test
-        @DisplayName("should remove existing lock and return true")
         void shouldRemoveExistingLock() {
             lockManager.getLock(1L);
             assertThat(lockManager.getActiveLockCount()).isEqualTo(1);
@@ -191,7 +172,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return true when removing non-existent lock")
         void shouldReturnTrueWhenRemovingNonExistentLock() {
             boolean removed = lockManager.removeLock(999L);
 
@@ -200,7 +180,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not remove lock that is currently held and return false")
         void shouldNotRemoveHeldLock() {
             lockManager.getLock(1L).writeLock().lock();
             try {
@@ -215,11 +194,9 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("eviction")
     class Eviction {
 
         @Test
-        @DisplayName("should evict idle locks when exceeding max capacity")
         void shouldEvictIdleLocksWhenExceedingMaxCapacity() {
             // Fill up to MAX_LOCKS
             for (long i = 0; i < GitRepositoryLockManager.MAX_LOCKS; i++) {
@@ -236,7 +213,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not evict locks that are currently held")
         void shouldNotEvictLocksCurrentlyHeld() {
             // Fill up to MAX_LOCKS
             for (long i = 0; i < GitRepositoryLockManager.MAX_LOCKS; i++) {
@@ -259,17 +235,14 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getActiveLockCount")
     class GetActiveLockCount {
 
         @Test
-        @DisplayName("should return zero initially")
         void shouldReturnZeroInitially() {
             assertThat(lockManager.getActiveLockCount()).isZero();
         }
 
         @Test
-        @DisplayName("should track active locks")
         void shouldTrackActiveLocks() {
             lockManager.getLock(1L);
             lockManager.getLock(2L);
@@ -280,11 +253,9 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("lock exclusion contracts")
     class LockExclusionContracts {
 
         @Test
-        @DisplayName("write lock should exclude readers")
         void writeLockShouldExcludeReaders() throws InterruptedException {
             AtomicBoolean readerEnteredCriticalSection = new AtomicBoolean(false);
             CountDownLatch writerHoldsLock = new CountDownLatch(1);
@@ -333,7 +304,6 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("write lock should exclude other writers")
         void writeLockShouldExcludeOtherWriters() throws InterruptedException {
             AtomicBoolean secondWriterEnteredCriticalSection = new AtomicBoolean(false);
             CountDownLatch firstWriterHoldsLock = new CountDownLatch(1);

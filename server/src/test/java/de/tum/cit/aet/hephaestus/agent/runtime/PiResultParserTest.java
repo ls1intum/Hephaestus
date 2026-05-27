@@ -13,7 +13,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("PiResultParser")
 class PiResultParserTest extends BaseUnitTest {
 
     private PiResultParser parser;
@@ -35,7 +34,6 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("missing result.json returns success without rawOutput")
     void missingResultFile() {
         var result = parser.parse(new SandboxResult(0, Map.of(), "done", false, Duration.ofSeconds(10)));
         assertThat(result.success()).isTrue();
@@ -43,14 +41,12 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("non-zero exit becomes failure")
     void failureBecomesFailure() {
         var result = parser.parse(new SandboxResult(1, Map.of(), "x", false, Duration.ofSeconds(5)));
         assertThat(result.success()).isFalse();
     }
 
     @Test
-    @DisplayName("rebuilds rawOutput from review-state.json when result.json is absent")
     void rebuildsFromReviewState() {
         String reviewState = """
             {"findings":[{"practiceSlug":"x","title":"t","verdict":"NEGATIVE","severity":"MAJOR",
@@ -70,7 +66,6 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("extracts findings JSON from mixed-text output (markdown fence)")
     void extractsJsonFromMixedText() {
         String mixed =
             "Here:\n```json\n{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"a\"," +
@@ -82,7 +77,6 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("usage + runner-debug surfaced when artifacts present")
     void surfacesUsageAndRunnerDebug() {
         String findings =
             "{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"x\",\"verdict\":\"POSITIVE\"," +
@@ -116,7 +110,6 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("sanitises Swift `\\(...)` interpolation but preserves valid \\n / \\t escapes")
     void sanitizesSwiftEscapes() {
         String json =
             "{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"line1\\nline2\"," +
@@ -146,7 +139,6 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("review-state.json with empty findings array does not produce rawOutput")
     void emptyReviewStateNoOutput() {
         String empty = "{\"findings\":[]}";
         var result = parser.parse(
@@ -162,7 +154,6 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("usage with zero totalCalls is treated as no usage info")
     void zeroCallsUsageIgnored() {
         String findings = "{\"findings\":[]}";
         String usage = "{\"model\":\"m\",\"totalCalls\":0}";

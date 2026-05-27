@@ -8,10 +8,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.util.List;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("IntegrationMessageHandlerRegistry registration + lookup")
 class IntegrationMessageHandlerRegistryTest extends BaseUnitTest {
 
     @Test

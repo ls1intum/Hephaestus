@@ -54,7 +54,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>The arch-test {@code haveSecurityAnnotationIfEndpoint} already covers the
  * {@code @PreAuthorize} wiring; here we verify behaviour.
  */
-@DisplayName("ConnectionController — unit")
 class ConnectionControllerTest extends BaseUnitTest {
 
     @Mock
@@ -89,7 +88,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("list returns workspace's connections, capabilities resolved via manifest registry")
     void list_returnsRowsWithCapabilitiesFromManifests() {
         long workspaceId = 42L;
         Connection a = newConnection(11L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
@@ -122,7 +120,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("read 404s on missing id")
     void read_missingId_throwsNotFound() {
         when(admin.findInWorkspaceOrThrow(1L, 999L)).thenThrow(
             new NoSuchElementException("Connection not found: id=999")
@@ -142,7 +139,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("initiate with GITHUB returns RedirectToVendor → {type:'redirect'}")
     void initiate_github_returnsRedirect() {
         URI vendor = URI.create("https://github.com/apps/x/installations/new?state=abc");
         githubStrategy.nextInitiation = new ConnectInitiation.RedirectToVendor(vendor, "abc");
@@ -159,7 +155,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("initiate with GITLAB (AcceptInline) creates Connection + ACTIVE transition → {type:'linked'}")
     void initiate_gitlab_acceptInline_createsRow() {
         long workspaceId = 17L;
         gitlabStrategy.nextInitiation = new ConnectInitiation.AcceptInline(new BearerToken("glpat-fake", null), "200");
@@ -211,7 +206,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("suspend transitions ACTIVE → SUSPENDED and surfaces the reason")
     void suspend_active_transitionsAndPersistsReason() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
@@ -244,7 +238,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("reactivate transitions SUSPENDED → ACTIVE")
     void reactivate_suspended_transitions() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.SUSPENDED);
@@ -268,7 +261,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("disconnect calls strategy.revoke and transitions to UNINSTALLED")
     void disconnect_callsRevokeAndTransitions() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
@@ -291,7 +283,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("disconnect still transitions even if strategy.revoke throws")
     void disconnect_revokeThrows_stillTransitions() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
@@ -308,7 +299,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("audit returns entries newest-first, capped at 200")
     void audit_returnsEntriesCappedAt200() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
@@ -358,7 +348,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ExceptionHandler maps IllegalStateException (transition-guard) to 409")
     void exceptionHandler_illegalState_to409() {
         ResponseEntity<Map<String, String>> response = controller.handleIllegalTransition(
             new IllegalStateException("Illegal transition for connection 7: UNINSTALLED → ACTIVE")
@@ -370,7 +359,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ExceptionHandler maps NoSuchElementException to 404")
     void exceptionHandler_notFound_to404() {
         ResponseEntity<Map<String, String>> response = controller.handleNotFound(
             new NoSuchElementException("Connection not found: id=999")
@@ -380,7 +368,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ExceptionHandler maps DataIntegrityViolationException to 409")
     void exceptionHandler_dataIntegrity_to409() {
         org.springframework.dao.DataIntegrityViolationException e =
             new org.springframework.dao.DataIntegrityViolationException(
@@ -393,7 +380,6 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("HttpStatus alignment: handler maps map to the correct HTTP status codes")
     void exceptionHandler_statusCodesAlign() {
         assertThat(controller.handleNotFound(new NoSuchElementException("x")).getStatusCode()).isEqualTo(
             HttpStatus.NOT_FOUND
@@ -490,14 +476,6 @@ class ConnectionControllerTest extends BaseUnitTest {
                 new InstallationCredential(0L, "unused"),
                 null
             );
-        }
-
-        @Override
-        public ValidationResult validate(
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef ref,
-            de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle credentials
-        ) {
-            return new ValidationResult.Ok(null, null);
         }
 
         @Override

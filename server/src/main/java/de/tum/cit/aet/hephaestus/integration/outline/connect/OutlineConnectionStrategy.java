@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.connect;
 
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -23,7 +22,7 @@ import org.springframework.stereotype.Component;
  * pattern as Slack: stub now, real HTTP client lands with #1203.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineConnectionStrategy implements ConnectionStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(OutlineConnectionStrategy.class);
@@ -88,15 +87,9 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     }
 
     @Override
-    public ValidationResult validate(IntegrationRef ref, CredentialBundle credentials) {
-        // Honest: auth.info probe ships with the Outline OAuth client (#1203).
-        return new ValidationResult.Failed("Outline auth.info probe not wired");
-    }
-
-    @Override
     public void revoke(IntegrationRef ref) {
-        // TODO(#1203): no Outline-side revoke endpoint exists today; best-effort delete of
-        // our integration_webhook_subscription rows lives in the lifecycle path.
+        // Outline has no vendor-side revoke endpoint; the local state transition is
+        // driven by the orchestrator via ConnectionService.transition().
         log.debug("Outline revoke stub for workspace={}", ref.workspaceId());
     }
 

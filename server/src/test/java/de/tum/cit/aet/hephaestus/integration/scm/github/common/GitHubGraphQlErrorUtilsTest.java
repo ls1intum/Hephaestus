@@ -18,17 +18,14 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 class GitHubGraphQlErrorUtilsTest {
 
     @Nested
-    @DisplayName("isNotFoundError")
     class IsNotFoundError {
 
         @Test
-        @DisplayName("returns false for null response")
         void nullResponse() {
             assertThat(GitHubGraphQlErrorUtils.isNotFoundError(null, "repository.issue")).isFalse();
         }
 
         @Test
-        @DisplayName("returns false for response with no errors")
         void noErrors() {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(Collections.emptyList());
@@ -37,7 +34,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns true for NOT_FOUND error at matching path")
         void notFoundErrorAtMatchingPath() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -50,7 +46,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns false for NOT_FOUND error at different path")
         void notFoundErrorAtDifferentPath() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -63,7 +58,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns false for FORBIDDEN error at matching path")
         void forbiddenErrorAtMatchingPath() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "FORBIDDEN"));
@@ -76,7 +70,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns true when path prefix matches beginning of error path")
         void pathPrefixMatchesBeginning() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -102,7 +95,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("falls back to string path when parsed path is empty")
         void fallbackToStringPath() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -116,7 +108,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns false when pathPrefix is longer than actual error path")
         void pathPrefixLongerThanActualPath() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -130,7 +121,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns false when fallback string path is null")
         void nullStringPathInFallback() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -144,7 +134,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns false when fallback string path is empty")
         void emptyStringPathInFallback() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -158,7 +147,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns false when parsed path is null")
         void nullParsedPath() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -172,7 +160,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns true when first error matches NOT_FOUND at path")
         void multipleErrorsFirstMatches() {
             ResponseError notFoundError = mock(ResponseError.class);
             when(notFoundError.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -189,7 +176,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns true when second error matches NOT_FOUND at path")
         void multipleErrorsSecondMatches() {
             ResponseError forbiddenError = mock(ResponseError.class);
             when(forbiddenError.getExtensions()).thenReturn(Map.of("type", "FORBIDDEN"));
@@ -207,11 +193,9 @@ class GitHubGraphQlErrorUtilsTest {
     }
 
     @Nested
-    @DisplayName("hasAnyNotFoundError")
     class HasAnyNotFoundError {
 
         @Test
-        @DisplayName("returns true for any NOT_FOUND error regardless of path")
         void anyNotFoundError() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -225,17 +209,14 @@ class GitHubGraphQlErrorUtilsTest {
     }
 
     @Nested
-    @DisplayName("getNotFoundErrorMessage")
     class GetNotFoundErrorMessage {
 
         @Test
-        @DisplayName("returns null for null response")
         void nullResponse() {
             assertThat(GitHubGraphQlErrorUtils.getNotFoundErrorMessage(null)).isNull();
         }
 
         @Test
-        @DisplayName("returns message for NOT_FOUND error")
         void returnsMessage() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "NOT_FOUND"));
@@ -250,7 +231,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns null when no NOT_FOUND error")
         void noNotFoundError() {
             ResponseError error = mock(ResponseError.class);
             when(error.getExtensions()).thenReturn(Map.of("type", "FORBIDDEN"));
@@ -264,11 +244,9 @@ class GitHubGraphQlErrorUtilsTest {
     }
 
     @Nested
-    @DisplayName("detectTransientError")
     class DetectTransientError {
 
         @Test
-        @DisplayName("returns TIMEOUT for 'couldn't respond in time'")
         void timeoutCouldntRespond() {
             ClientGraphQlResponse response = responseWithError("couldn't respond in time", null);
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
@@ -277,7 +255,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns TIMEOUT for 'could not respond in time'")
         void timeoutCouldNotRespond() {
             ClientGraphQlResponse response = responseWithError("could not respond in time", null);
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
@@ -286,7 +263,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns TIMEOUT for 'something went wrong while executing'")
         void timeoutSomethingWentWrong() {
             ClientGraphQlResponse response = responseWithError("Something went wrong while executing your query", null);
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
@@ -295,7 +271,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns TIMEOUT for 'timedout'")
         void timeoutTimedout() {
             ClientGraphQlResponse response = responseWithError("Request timedout", null);
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
@@ -304,7 +279,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns TIMEOUT for 'timed out'")
         void timeoutTimedOut() {
             ClientGraphQlResponse response = responseWithError("Request timed out", null);
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
@@ -313,7 +287,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns RATE_LIMIT for 'rate limit exceeded'")
         void rateLimitExceeded() {
             ClientGraphQlResponse response = responseWithError("API rate limit exceeded", null);
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
@@ -322,7 +295,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns RATE_LIMIT for 'ratelimit'")
         void rateLimitOneWord() {
             ClientGraphQlResponse response = responseWithError("You have exceeded a ratelimit", null);
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
@@ -331,7 +303,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns RATE_LIMIT for 'abuse detection'")
         void abuseDetection() {
             ClientGraphQlResponse response = responseWithError("You have triggered an abuse detection mechanism", null);
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
@@ -340,7 +311,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns RATE_LIMIT for 'secondary rate limit'")
         void secondaryRateLimit() {
             ClientGraphQlResponse response = responseWithError("You have exceeded a secondary rate limit", null);
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
@@ -349,7 +319,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns RESOURCE_LIMIT for RESOURCE_LIMITS_EXCEEDED extension type")
         void resourceLimitsExceeded() {
             ClientGraphQlResponse response = responseWithError(
                 "Query too complex",
@@ -361,7 +330,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns RESOURCE_LIMIT for MAX_NODE_LIMIT_EXCEEDED extension type")
         void maxNodeLimitExceeded() {
             ClientGraphQlResponse response = responseWithError(
                 "Exceeded max node limit",
@@ -373,7 +341,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns SERVER_ERROR for INTERNAL_ERROR extension type")
         void internalError() {
             ClientGraphQlResponse response = responseWithError(
                 "Internal server error",
@@ -385,7 +352,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns SERVER_ERROR for SERVICE_UNAVAILABLE extension type")
         void serviceUnavailable() {
             ClientGraphQlResponse response = responseWithError(
                 "Service unavailable",
@@ -397,7 +363,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns RATE_LIMIT for FORBIDDEN extension with rate limit message")
         void forbiddenWithRateMessage() {
             ClientGraphQlResponse response = responseWithError(
                 "rate limit exceeded for this resource",
@@ -409,7 +374,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns null for non-transient error")
         void nonTransientError() {
             ClientGraphQlResponse response = responseWithError("Some other error", Map.of("type", "VALIDATION_ERROR"));
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
@@ -417,13 +381,11 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("returns null for null response")
         void nullResponse() {
             assertThat(GitHubGraphQlErrorUtils.detectTransientError(null)).isNull();
         }
 
         @Test
-        @DisplayName("returns null for response with empty errors")
         void emptyErrors() {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(Collections.emptyList());
@@ -431,7 +393,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("safely skips error with null message")
         void nullMessage() {
             ResponseError error = mock(ResponseError.class);
             when(error.getMessage()).thenReturn(null);
@@ -458,11 +419,9 @@ class GitHubGraphQlErrorUtilsTest {
     }
 
     @Nested
-    @DisplayName("TransientError properties")
     class TransientErrorProperties {
 
         @Test
-        @DisplayName("TIMEOUT recommended wait is 5 seconds")
         void timeoutWait() {
             var error = new GitHubGraphQlErrorUtils.TransientError(
                 GitHubGraphQlErrorUtils.TransientErrorType.TIMEOUT,
@@ -472,7 +431,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("RATE_LIMIT recommended wait is 60 seconds")
         void rateLimitWait() {
             var error = new GitHubGraphQlErrorUtils.TransientError(
                 GitHubGraphQlErrorUtils.TransientErrorType.RATE_LIMIT,
@@ -482,7 +440,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("SERVER_ERROR recommended wait is 10 seconds")
         void serverErrorWait() {
             var error = new GitHubGraphQlErrorUtils.TransientError(
                 GitHubGraphQlErrorUtils.TransientErrorType.SERVER_ERROR,
@@ -492,7 +449,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("RESOURCE_LIMIT recommended wait is 0 seconds")
         void resourceLimitWait() {
             var error = new GitHubGraphQlErrorUtils.TransientError(
                 GitHubGraphQlErrorUtils.TransientErrorType.RESOURCE_LIMIT,
@@ -502,7 +458,6 @@ class GitHubGraphQlErrorUtilsTest {
         }
 
         @Test
-        @DisplayName("only RESOURCE_LIMIT should reduce complexity")
         void shouldReduceComplexity() {
             assertThat(
                 new GitHubGraphQlErrorUtils.TransientError(

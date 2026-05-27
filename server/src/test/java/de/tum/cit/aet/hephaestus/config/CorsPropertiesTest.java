@@ -16,7 +16,6 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
  * @see CorsProperties
  */
 @Tag("unit")
-@DisplayName("CorsProperties Configuration Binding")
 class CorsPropertiesTest {
 
     @EnableConfigurationProperties(CorsProperties.class)
@@ -30,11 +29,9 @@ class CorsPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Valid Configuration")
     class ValidConfiguration {
 
         @Test
-        @DisplayName("should bind single origin correctly")
         void singleOrigin_boundCorrectly() {
             contextRunner()
                 .withPropertyValues("hephaestus.cors.allowed-origins[0]=https://example.com")
@@ -47,7 +44,6 @@ class CorsPropertiesTest {
         }
 
         @Test
-        @DisplayName("should bind multiple origins correctly")
         void multipleOrigins_boundCorrectly() {
             contextRunner()
                 .withPropertyValues(
@@ -83,17 +79,14 @@ class CorsPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Validation Failures")
     class ValidationFailures {
 
         @Test
-        @DisplayName("should fail when allowed-origins is empty")
         void emptyOrigins_validationFails() {
             contextRunner().run(context -> assertThat(context).hasFailed());
         }
 
         @Test
-        @DisplayName("should fail when allowed-origins list is explicitly empty")
         void explicitlyEmptyList_validationFails() {
             contextRunner()
                 .withPropertyValues("hephaestus.cors.allowed-origins=")

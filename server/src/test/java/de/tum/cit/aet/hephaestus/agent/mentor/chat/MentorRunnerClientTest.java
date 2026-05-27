@@ -33,7 +33,6 @@ import tools.jackson.databind.node.ObjectNode;
  * implementation of {@link AttachedSandbox} that buffers sent frames and pushes replies through
  * a registered listener — letting us drive the JSON-RPC protocol synchronously without Docker.
  */
-@DisplayName("MentorRunnerClient")
 class MentorRunnerClientTest extends BaseUnitTest {
 
     private FakeSandbox sandbox;
@@ -85,7 +84,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Error response surfaces as MentorRunnerException with the code")
     void errorResponseBecomesException() throws Exception {
         CompletableFuture<JsonNode> future = client.openThread(UUID.randomUUID());
         JsonNode request = sandbox.takeFrame();
@@ -105,7 +103,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PI_ERROR / INVALID_STATE codes mark the exception as sandbox-poisoning")
     void poisoningErrorCodes() {
         MentorRunnerException pi = new MentorRunnerException(
             MentorRunnerException.CODE_PI_ERROR,
@@ -125,7 +122,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Event notifications flow to the registered consumer")
     void eventFanOutToConsumer() {
         ObjectNode notification = mapper.createObjectNode();
         notification.put("jsonrpc", "2.0");
@@ -141,7 +137,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("fetch_context callback writes back a result frame on stdin")
     void fetchContextRoundTrip() {
         ObjectNode callback = mapper.createObjectNode();
         callback.put("jsonrpc", "2.0");
@@ -161,7 +156,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("fetch_context callback preserves string ids — the runner uses fc-<uuid>, not numerics")
     void fetchContextRoundTrip_preservesStringIds() {
         // Regression: an earlier impl coerced frame.get("id").asLong() → 0 for any non-numeric
         // id, then echoed back `id: 0` which the runner's pendingFetchContexts (keyed by the
@@ -185,7 +179,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("fetch_context error response preserves string id")
     void fetchContextErrorRoundTrip_preservesStringIds() {
         String callbackId = "fc-" + UUID.randomUUID();
         ObjectNode callback = mapper.createObjectNode();

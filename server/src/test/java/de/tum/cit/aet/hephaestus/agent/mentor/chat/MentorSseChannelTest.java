@@ -26,7 +26,6 @@ import tools.jackson.databind.ObjectMapper;
  * the disconnect hook fires exactly once, the {@code [DONE]} sentinel always lands, and
  * heartbeat ticks never race the terminal {@code complete()}.
  */
-@DisplayName("MentorSseChannel")
 class MentorSseChannelTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -48,7 +47,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("send serialises a chunk as data: <json>")
     void send_writesChunkAsData() {
         UUID id = UUID.randomUUID();
         channel.send(new UIMessageChunk.Start(id, null));
@@ -68,7 +66,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("send wraps an IOException as ClientDisconnectedException and flips the flag")
     void send_onIoException_throwsAndFlips() {
         emitter.failOnNextSend();
         assertThatThrownBy(() -> channel.send(new UIMessageChunk.StartStep())).isInstanceOf(
@@ -78,7 +75,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("disconnect hook fires exactly once across concurrent flips")
     void disconnectHook_firesExactlyOnce() throws Exception {
         AtomicInteger fired = new AtomicInteger();
         channel.bindLifecycle();
@@ -97,7 +93,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("onDisconnect registered AFTER the flag flipped fires immediately on the caller thread")
     void onDisconnect_afterFlagFlipped_firesImmediately() {
         channel.bindLifecycle();
         emitter.fireCompletion(); // flips first
@@ -107,7 +102,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("completeWithDone sends the [DONE] sentinel and completes")
     void completeWithDone_emitsSentinel() {
         channel.completeWithDone();
         assertThat(emitter.dataFrames()).containsExactly("[DONE]");
@@ -115,7 +109,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("completeWithError sends an Error chunk then [DONE]")
     void completeWithError_emitsErrorThenSentinel() {
         channel.completeWithError("boom");
         assertThat(emitter.dataFrames())
@@ -129,7 +122,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("completeWithConflict sends a data-mentor-status, an Error, and [DONE]")
     void completeWithConflict_emitsStatusErrorSentinel() {
         channel.completeWithConflict();
         List<String> frames = emitter.dataFrames();
@@ -141,7 +133,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("close() is idempotent + safe after completeWithDone")
     void closeAfterDone_isIdempotent() {
         channel.completeWithDone();
         channel.close();
@@ -150,7 +141,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("send AFTER completeWithDone is a silent no-op (no spurious disconnect-hook firing)")
     void sendAfterCompleteWithDone_isSilentNoOp() {
         // Setup: register a disconnect hook + bind lifecycle. A correctly-finished turn must
         // NEVER fire the hook — that hook calls session.abort() against a sandbox we just
@@ -170,7 +160,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("concurrent chunk sends do NOT byte-interleave (writeLock held)")
     void concurrentSends_areSerialised() throws Exception {
         // SseEmitter#send is not thread-safe in Spring. The channel's writeLock serialises
         // chunk-writes; this test drives 200 concurrent chunk sends from two threads and
@@ -196,7 +185,6 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("heartbeat tick + concurrent chunk sends interleave through the writeLock without corruption")
     void heartbeatTick_concurrentWithSends_writeLockSerialises() throws Exception {
         // The actual concurrency hazard: the heartbeat ScheduledExecutorService thread and
         // the runner-event-handler thread are DIFFERENT threads writing to the same emitter.

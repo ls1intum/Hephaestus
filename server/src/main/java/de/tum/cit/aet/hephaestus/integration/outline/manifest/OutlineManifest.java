@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 /** Per-kind capability declaration for Outline. */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineManifest implements IntegrationManifest {
 
     @Override

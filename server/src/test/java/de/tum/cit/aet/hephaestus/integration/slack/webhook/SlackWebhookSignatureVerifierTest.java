@@ -11,11 +11,9 @@ import java.util.HexFormat;
 import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("SlackWebhookSignatureVerifier")
 class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
 
     private static final String SECRET = "test-slack-signing-secret-32-chars";

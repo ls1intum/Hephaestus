@@ -27,7 +27,6 @@ import org.mockito.Mock;
  * enum, raw family pass-through) and that unknown strings are dropped before reaching the
  * downstream check.
  */
-@DisplayName("PracticeAvailabilityResolver")
 class PracticeAvailabilityResolverTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 11L;
@@ -61,7 +60,6 @@ class PracticeAvailabilityResolverTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("drops unknown capability strings before delegating")
     void dropsUnknownCapabilities() {
         Practice practice = practiceWith(new LinkedHashSet<>(List.of("INLINE_FINDINGS", "REMOVED_CAPABILITY")), null);
         when(
@@ -72,7 +70,6 @@ class PracticeAvailabilityResolverTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("propagates a false verdict from the underlying resolver")
     void propagatesFalseVerdict() {
         Practice practice = practiceWith(new LinkedHashSet<>(List.of("INLINE_FINDINGS")), null);
         when(capabilityResolver.isAvailable(eq(WORKSPACE_ID), any(), any())).thenReturn(false);
@@ -81,7 +78,6 @@ class PracticeAvailabilityResolverTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("universal practice still delegates (no short-circuit on this layer)")
     void universalPracticeDelegates() {
         Practice practice = practiceWith(new LinkedHashSet<>(), null);
         when(capabilityResolver.isAvailable(eq(WORKSPACE_ID), eq(Set.of()), eq(null))).thenReturn(true);

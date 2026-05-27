@@ -55,7 +55,6 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>No mocks required — this service layer does not call external APIs. It resolves practice
  * slugs against the DB and persists findings via {@code PracticeFindingRepository.insertIfAbsent()}.
  */
-@DisplayName("PracticeDetectionDeliveryService Integration")
 @RecordApplicationEvents
 class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTest {
 
@@ -204,11 +203,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("End-to-end delivery")
     class EndToEnd {
 
         @Test
-        @DisplayName("valid findings create PracticeFinding rows in DB")
         void validFindingsPersistedToDb() {
             var findings = List.of(
                 finding("pr-description-quality", Verdict.POSITIVE),
@@ -247,11 +244,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Practice resolution")
     class PracticeResolution {
 
         @Test
-        @DisplayName("unknown slugs are skipped without failing")
         void unknownSlugsSkipped() {
             var findings = List.of(
                 finding("pr-description-quality", Verdict.POSITIVE),
@@ -267,11 +262,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Negative cap enforcement")
     class NegativeCapEnforcement {
 
         @Test
-        @DisplayName("caps negatives per practice at configured limit")
         void capsNegatives() {
             // Each finding gets a unique idempotency key (includes index), so all
             // 7 findings are distinct. maxNegativeFindingsPerPractice=5 caps at 5,
@@ -302,11 +295,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Event publication")
     class EventPublication {
 
         @Test
-        @DisplayName("publishes PracticeDetectionCompletedEvent after persistence")
         void publishesEvent() {
             var findings = List.of(finding("pr-description-quality", Verdict.POSITIVE));
 
@@ -328,7 +319,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("empty findings list publishes event with zero counts")
         void emptyFindingsPublishesZeroEvent() {
             var result = deliveryService.deliver(agentJob, List.of());
 
@@ -346,11 +336,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Non-negative verdicts")
     class NonNegativeVerdicts {
 
         @Test
-        @DisplayName("POSITIVE verdicts persisted without triggering hasNegative")
         void positiveVerdictsDoNotTriggerHasNegative() {
             var findings = List.of(
                 finding("pr-description-quality", Verdict.POSITIVE),
@@ -371,11 +359,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Error cases")
     class ErrorCases {
 
         @Test
-        @DisplayName("throws when PR not found")
         void throwsWhenPrNotFound() {
             ObjectNode metadata = OBJECT_MAPPER.createObjectNode();
             metadata.put("pull_request_id", 999999L);

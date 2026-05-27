@@ -68,7 +68,6 @@ import tools.jackson.databind.node.ObjectNode;
  * synchronously and assert the full chunk sequence the webapp receives. Mocks the persistence
  * boundary to avoid pulling in JPA + the DB.
  */
-@DisplayName("MentorChatService orchestration")
 @MockitoSettings(strictness = Strictness.LENIENT)
 class MentorChatServiceTest extends BaseUnitTest {
 
@@ -201,7 +200,6 @@ class MentorChatServiceTest extends BaseUnitTest {
     // ════════════════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("happy path: emits Start → TextStart → TextDelta×3 → TextEnd → FinishStep → Finish")
     void runTurn_happyPath_emitsStartThenChunksThenFinish() throws Exception {
         // Set up the runner-side drive: respond to control calls, then push the Pi event stream.
         scheduleHappyPathResponses(sandbox).run();
@@ -241,7 +239,6 @@ class MentorChatServiceTest extends BaseUnitTest {
     // ════════════════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("client disconnect mid-stream: abort sent to runner; turn finalises normally")
     void runTurn_clientDisconnect_completesNormallyAndAbortsRunner() throws Exception {
         scheduleHappyPathResponses(sandbox).run();
         // 4 sends succeed (Start, DataMentorStatus, then translator's Start + StartStep from
@@ -271,7 +268,6 @@ class MentorChatServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("client disconnect on sync send: outcome=CLIENT_DISCONNECT (no runner activity)")
     void runTurn_clientDisconnectOnSyncSend_recordsClientDisconnect() throws Exception {
         // The orchestrator's two synchronous sends (Start, DataMentorStatus) happen BEFORE
         // sandbox.attach. If either throws ClientDisconnectedException (e.g. the client
@@ -297,7 +293,6 @@ class MentorChatServiceTest extends BaseUnitTest {
     // ════════════════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("runner poisoned: PI_ERROR causes sandbox.close + persistence.interrupt + 'error' chunk")
     void runTurn_runnerPoisoned_evictsSandbox() throws Exception {
         scheduleRunnerPoisoned(sandbox).run();
 

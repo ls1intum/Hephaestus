@@ -29,7 +29,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-@DisplayName("JobTokenAuthenticationFilter")
 class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
     @Mock
@@ -56,11 +55,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("IP validation")
     class IpValidation {
 
         @Test
-        @DisplayName("should reject non-private IP with 403")
         void shouldRejectNonPrivateIp() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("8.8.8.8");
@@ -74,13 +71,11 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept loopback IP")
         void shouldAcceptLoopbackIp() {
             assertThat(JobTokenAuthenticationFilter.isPrivateIp("127.0.0.1")).isTrue();
         }
 
         @Test
-        @DisplayName("should accept 10.x.x.x")
         void shouldAcceptClassA() {
             assertThat(JobTokenAuthenticationFilter.isPrivateIp("10.0.0.5")).isTrue();
         }
@@ -98,37 +93,31 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject public IP")
         void shouldRejectPublicIp() {
             assertThat(JobTokenAuthenticationFilter.isPrivateIp("1.2.3.4")).isFalse();
         }
 
         @Test
-        @DisplayName("should reject null IP")
         void shouldRejectNullIp() {
             assertThat(JobTokenAuthenticationFilter.isPrivateIp(null)).isFalse();
         }
 
         @Test
-        @DisplayName("should accept IPv6 loopback")
         void shouldAcceptIpv6Loopback() {
             assertThat(JobTokenAuthenticationFilter.isPrivateIp("::1")).isTrue();
         }
 
         @Test
-        @DisplayName("should accept IPv6 link-local")
         void shouldAcceptIpv6LinkLocal() {
             assertThat(JobTokenAuthenticationFilter.isPrivateIp("fe80::1")).isTrue();
         }
 
         @Test
-        @DisplayName("should reject malformed IP")
         void shouldRejectMalformedIp() {
             assertThat(JobTokenAuthenticationFilter.isPrivateIp("not-an-ip")).isFalse();
         }
 
         @Test
-        @DisplayName("should reject hostname to prevent DNS resolution")
         void shouldRejectHostname() {
             // Hostnames must be rejected before InetAddress.getByName() to prevent DNS resolution
             assertThat(JobTokenAuthenticationFilter.isPrivateIp("localhost")).isFalse();
@@ -137,11 +126,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Token extraction and validation")
     class TokenValidation {
 
         @Test
-        @DisplayName("should return 401 when no auth header present")
         void shouldReturn401WhenNoAuthHeader() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -154,7 +141,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should extract token from x-api-key header (Anthropic)")
         void shouldExtractFromXApiKey() throws Exception {
             var job = createRunningJob();
             when(
@@ -185,7 +171,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should extract token from Authorization Bearer header (OpenAI)")
         void shouldExtractFromBearerAuth() throws Exception {
             var job = createRunningJob();
             when(
@@ -215,7 +200,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should extract token from api-key header (Azure)")
         void shouldExtractFromAzureApiKey() throws Exception {
             var job = createRunningJob();
             when(
@@ -245,7 +229,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return 401 for malformed token (not Base64-URL)")
         void shouldReturn401ForMalformedToken() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -258,7 +241,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return 401 when no RUNNING job matches token hash")
         void shouldReturn401WhenNoRunningJobFound() throws Exception {
             when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING))).thenReturn(
                 Optional.empty()
@@ -275,7 +257,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return 401 for whitespace-only token")
         void shouldReturn401ForWhitespaceOnlyToken() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -289,7 +270,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return 401 for empty Bearer (Authorization: Bearer )")
         void shouldReturn401ForEmptyBearer() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -303,7 +283,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept case-insensitive Bearer prefix")
         void shouldAcceptCaseInsensitiveBearer() throws Exception {
             var job = createRunningJob();
             when(
@@ -322,7 +301,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should prefer x-api-key over Authorization header when both present")
         void shouldPreferXApiKeyOverBearer() throws Exception {
             var job = createRunningJob();
             when(
@@ -343,7 +321,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should clear SecurityContext even when filter chain throws")
         void shouldClearContextOnFilterChainException() throws Exception {
             var job = createRunningJob();
             when(
@@ -370,7 +347,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject token with Base64 padding characters")
         void shouldRejectTokenWithPadding() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -383,7 +359,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not be bypassed by X-Forwarded-For header spoofing")
         void shouldNotBeBypassedByXForwardedFor() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("8.8.8.8"); // Public IP

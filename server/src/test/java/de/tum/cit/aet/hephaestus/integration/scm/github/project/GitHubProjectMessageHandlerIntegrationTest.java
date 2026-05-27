@@ -22,7 +22,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -37,7 +36,6 @@ import tools.jackson.databind.ObjectMapper;
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  * Verifies persistence, field-level correctness, and domain event publishing.
  */
-@DisplayName("GitHub Project Message Handler")
 @Import(GitHubProjectMessageHandlerIntegrationTest.TestProjectEventListener.class)
 class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -108,18 +106,14 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should return correct event type")
     void shouldReturnCorrectEventType() {
         assertThat(handler.key().eventType()).isEqualTo("organization.projects_v2");
     }
 
     @Test
-    @DisplayName("Should handle project created event with all fields and publish ProjectCreated event")
     void shouldHandleProjectCreatedEvent() throws Exception {
-        // Given
         GitHubProjectEventDTO event = loadPayload("projects_v2.created");
 
-        // When
         handler.handleEvent(event);
 
         // Then - project should be created with correct field values
@@ -151,7 +145,6 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should handle project edited event and verify shortDescription is updated")
     void shouldHandleProjectEditedEvent() throws Exception {
         // Given - first create a project
         GitHubProjectEventDTO createEvent = loadPayload("projects_v2.created");
@@ -161,7 +154,6 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Load and process edited event
         GitHubProjectEventDTO editEvent = loadPayload("projects_v2.edited");
 
-        // When
         handler.handleEvent(editEvent);
 
         // Then - project should be updated with the edited short description
@@ -185,7 +177,6 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should handle project closed event and publish ProjectClosed event")
     void shouldHandleProjectClosedEvent() throws Exception {
         // Given - first create a project
         GitHubProjectEventDTO createEvent = loadPayload("projects_v2.created");
@@ -195,7 +186,6 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Load and process closed event
         GitHubProjectEventDTO closedEvent = loadPayload("projects_v2.closed");
 
-        // When
         handler.handleEvent(closedEvent);
 
         // Then - project should be marked as closed
@@ -216,7 +206,6 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should handle project reopened event and publish ProjectReopened event")
     void shouldHandleProjectReopenedEvent() throws Exception {
         // Given - first create and close a project
         GitHubProjectEventDTO createEvent = loadPayload("projects_v2.created");
@@ -229,7 +218,6 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Load and process reopened event
         GitHubProjectEventDTO reopenedEvent = loadPayload("projects_v2.reopened");
 
-        // When
         handler.handleEvent(reopenedEvent);
 
         // Then - project should be reopened
@@ -250,7 +238,6 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should handle project deleted event and publish ProjectDeleted event")
     void shouldHandleProjectDeletedEvent() throws Exception {
         // Given - first create a project
         GitHubProjectEventDTO createEvent = loadPayload("projects_v2.created");
@@ -263,7 +250,6 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Load and process deleted event
         GitHubProjectEventDTO deletedEvent = loadPayload("projects_v2.deleted");
 
-        // When
         handler.handleEvent(deletedEvent);
 
         // Then - project should be deleted
@@ -276,7 +262,6 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should skip event when organization is not found")
     void shouldSkipEventWhenOrganizationNotFound() throws Exception {
         // Given - clean database and don't set up test data
         databaseTestUtils.cleanDatabase();
@@ -284,7 +269,6 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         GitHubProjectEventDTO event = loadPayload("projects_v2.created");
 
-        // When
         handler.handleEvent(event);
 
         // Then - no project should be created and no events published
@@ -293,9 +277,7 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should handle duplicate created events idempotently")
     void shouldHandleDuplicateCreatedEventsIdempotently() throws Exception {
-        // Given
         GitHubProjectEventDTO event = loadPayload("projects_v2.created");
 
         // When — process the same event twice

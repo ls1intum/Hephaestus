@@ -12,7 +12,6 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.repository.Query;
@@ -35,7 +34,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *
  * @see ArchitectureTestConstants
  */
-@DisplayName("Multi-Tenancy Architecture")
 class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
     /**
@@ -104,7 +102,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Repository Workspace Filtering")
     class RepositoryWorkspaceFilteringTests {
 
         /**
@@ -121,7 +118,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * </ul>
          */
         @Test
-        @DisplayName("@Query methods include workspace filtering (audit)")
         void queryMethodsIncludeWorkspaceFiltering() {
             ArchCondition<JavaMethod> includeWorkspaceFiltering = new ArchCondition<>(
                 "include workspace filtering in @Query"
@@ -242,7 +238,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * They should have workspace-scoped alternatives.
          */
         @Test
-        @DisplayName("Repositories have workspace-scoped query alternatives")
         void repositoriesHaveWorkspaceScopedAlternatives() {
             ArchCondition<JavaClass> haveWorkspaceScopedMethods = new ArchCondition<>(
                 "have workspace-scoped query methods"
@@ -390,7 +385,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Scheduled Job Workspace Context")
     class ScheduledJobContextTests {
 
         /**
@@ -407,7 +401,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * then use SyncContextProvider to set/clear context.
          */
         @Test
-        @DisplayName("@Scheduled classes inject workspace iteration dependencies")
         void scheduledClassesHaveWorkspaceIterationDependencies() {
             ArchCondition<JavaClass> haveWorkspaceIterationCapability = new ArchCondition<>(
                 "have workspace iteration or context dependencies"
@@ -486,7 +479,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * be through a workspace-scoped method or after setting workspace context.
          */
         @Test
-        @DisplayName("@Scheduled methods don't bypass workspace context")
         void scheduledMethodsDontBypassWorkspaceContext() {
             ArchCondition<JavaMethod> notDirectlyAccessGlobalRepositoryMethods = new ArchCondition<>(
                 "not directly access repository methods without workspace context"
@@ -558,7 +550,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Event Listener Workspace Context")
     class EventListenerContextTests {
 
         /**
@@ -569,7 +560,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * tenant context.
          */
         @Test
-        @DisplayName("Event listeners receive events with workspace context")
         void eventListenersReceiveWorkspaceContext() {
             ArchCondition<JavaMethod> handleEventsWithWorkspaceContext = new ArchCondition<>(
                 "handle events that carry workspace context"
@@ -669,7 +659,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * is lost unless explicitly propagated.
          */
         @Test
-        @DisplayName("@Async event listeners propagate workspace context")
         void asyncEventListenersPropagateContext() {
             ArchCondition<JavaClass> propagateContextInAsyncListeners = new ArchCondition<>(
                 "propagate workspace context in async event listeners"
@@ -753,7 +742,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Service Layer Workspace Awareness")
     class ServiceWorkspaceAwarenessTests {
 
         /**
@@ -763,7 +751,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * to prevent accidentally returning data from all tenants.
          */
         @Test
-        @DisplayName("Service list methods are workspace-scoped")
         void serviceListMethodsAreWorkspaceScoped() {
             ArchCondition<JavaMethod> beWorkspaceScopedIfReturningList = new ArchCondition<>(
                 "be workspace-scoped if returning a list of entities"
@@ -858,7 +845,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Controller Workspace Context")
     class ControllerWorkspaceContextTests {
 
         /**
@@ -872,7 +858,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * </ul>
          */
         @Test
-        @DisplayName("Data endpoints receive WorkspaceContext")
         void dataEndpointsReceiveWorkspaceContext() {
             ArchCondition<JavaMethod> haveWorkspaceContextForDataEndpoints = new ArchCondition<>(
                 "have WorkspaceContext for data endpoints"

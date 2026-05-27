@@ -24,7 +24,6 @@ import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
@@ -38,7 +37,6 @@ import org.testcontainers.DockerClientFactory;
  * <p>Each test creates real containers that are cleaned up in {@code @AfterEach}.
  */
 @LiveDockerTest
-@DisplayName("Docker Sandbox Live")
 class DockerSandboxLiveTest {
 
     private DockerSandboxAdapter sandboxAdapter;
@@ -130,11 +128,9 @@ class DockerSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("End-to-end execution")
     class EndToEnd {
 
         @Test
-        @DisplayName("should run alpine container and collect output")
         void shouldRunAndCollectOutput() {
             UUID jobId = UUID.randomUUID();
 
@@ -165,7 +161,6 @@ class DockerSandboxLiveTest {
         }
 
         @Test
-        @DisplayName("should handle non-zero exit code")
         void shouldHandleNonZeroExit() {
             UUID jobId = UUID.randomUUID();
 
@@ -190,11 +185,9 @@ class DockerSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Timeout enforcement")
     class TimeoutEnforcement {
 
         @Test
-        @DisplayName("should kill container after timeout")
         void shouldKillAfterTimeout() {
             UUID jobId = UUID.randomUUID();
 
@@ -220,11 +213,9 @@ class DockerSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("File injection")
     class FileInjection {
 
         @Test
-        @DisplayName("should inject files and make them readable")
         void shouldInjectFiles() {
             UUID jobId = UUID.randomUUID();
 
@@ -254,11 +245,9 @@ class DockerSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Cleanup")
     class Cleanup {
 
         @Test
-        @DisplayName("should clean up all resources after execution")
         void shouldCleanupAfterExecution() {
             UUID jobId = UUID.randomUUID();
 

@@ -43,7 +43,6 @@ import tools.jackson.databind.ObjectMapper;
  * and needs to access lazy-loaded relationships. This is safe because there are no
  * parallel HTTP handler threads that would compete for database connections.
  */
-@DisplayName("GitHub Milestone Message Handler")
 @Transactional
 class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -134,7 +133,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("repository.milestone");
     }
@@ -142,7 +140,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should persist milestones on creation events")
     void shouldPersistMilestoneOnCreatedEvent() throws Exception {
-        // Given
         GitHubMilestoneEventDTO event = loadPayload("milestone.created");
 
         // Verify milestone doesn't exist initially
@@ -150,10 +147,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             milestoneRepository.findByNativeIdAndProviderId(event.milestone().id(), gitProvider.getId())
         ).isEmpty();
 
-        // When
         handler.handleEvent(event);
 
-        // Then
         assertThat(milestoneRepository.findByNativeIdAndProviderId(event.milestone().id(), gitProvider.getId()))
             .isPresent()
             .get()
@@ -167,7 +162,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should update milestone details on edit events")
     void shouldUpdateMilestoneOnEditedEvent() throws Exception {
         // Given - first create the milestone
         GitHubMilestoneEventDTO createEvent = loadPayload("milestone.created");
@@ -176,10 +170,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Load edited event
         GitHubMilestoneEventDTO editEvent = loadPayload("milestone.edited");
 
-        // When
         handler.handleEvent(editEvent);
 
-        // Then
         assertThat(milestoneRepository.findByNativeIdAndProviderId(editEvent.milestone().id(), gitProvider.getId()))
             .isPresent()
             .get()
@@ -190,7 +182,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should close milestone on closed event")
     void shouldCloseMilestoneOnClosedEvent() throws Exception {
         // Given - first create the milestone
         GitHubMilestoneEventDTO createEvent = loadPayload("milestone.created");
@@ -199,10 +190,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Load closed event
         GitHubMilestoneEventDTO closedEvent = loadPayload("milestone.closed");
 
-        // When
         handler.handleEvent(closedEvent);
 
-        // Then
         assertThat(milestoneRepository.findByNativeIdAndProviderId(closedEvent.milestone().id(), gitProvider.getId()))
             .isPresent()
             .get()
@@ -212,7 +201,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should reopen milestone on opened event")
     void shouldReopenMilestoneOnOpenedEvent() throws Exception {
         // Given - create milestone in closed state (use values from closed event fixture)
         Milestone closedMilestone = new Milestone();
@@ -228,10 +216,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Load opened event
         GitHubMilestoneEventDTO openedEvent = loadPayload("milestone.opened");
 
-        // When
         handler.handleEvent(openedEvent);
 
-        // Then
         assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, gitProvider.getId()))
             .isPresent()
             .get()
@@ -241,7 +227,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should delete milestone on deleted event")
     void shouldDeleteMilestoneOnDeletedEvent() throws Exception {
         // Given - first create the milestone
         GitHubMilestoneEventDTO createEvent = loadPayload("milestone.created");
@@ -255,10 +240,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Load deleted event
         GitHubMilestoneEventDTO deleteEvent = loadPayload("milestone.deleted");
 
-        // When
         handler.handleEvent(deleteEvent);
 
-        // Then
         assertThat(
             milestoneRepository.findByNativeIdAndProviderId(deleteEvent.milestone().id(), gitProvider.getId())
         ).isEmpty();
@@ -288,11 +271,9 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Edge Case Tests ====================
 
     @Nested
-    @DisplayName("Edge Cases")
     class EdgeCases {
 
         @Test
-        @DisplayName("Should handle null milestone in event gracefully")
         void shouldHandleNullMilestoneGracefully() {
             // Given - event with null milestone
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO("created", null, createTestRepoRef(), null);
@@ -305,7 +286,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle event with missing repository context")
         void shouldHandleMissingRepositoryContext() {
             // Given - event without repository
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
@@ -329,7 +309,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle milestone with null description")
         void shouldHandleMilestoneWithNullDescription() {
             // Given - create milestone DTO with null description
             Long milestoneId = 123456789L;
@@ -354,10 +333,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 null
             );
 
-            // When
             handler.handleEvent(event);
 
-            // Then
             assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, gitProvider.getId()))
                 .isPresent()
                 .get()
@@ -368,9 +345,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle milestone with null dueOn")
         void shouldHandleMilestoneWithNullDueOn() {
-            // Given
             Long milestoneId = 234567890L;
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
                 milestoneId,
@@ -393,10 +368,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 null
             );
 
-            // When
             handler.handleEvent(event);
 
-            // Then
             assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, gitProvider.getId()))
                 .isPresent()
                 .get()
@@ -406,7 +379,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should update description from value to null")
         void shouldUpdateDescriptionToNull() {
             // Given - existing milestone with description
             Long milestoneId = 987654321L;
@@ -453,9 +425,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle idempotent milestone creation")
         void shouldHandleIdempotentCreation() throws Exception {
-            // Given
             GitHubMilestoneEventDTO event = loadPayload("milestone.created");
 
             // When - handle same event twice
@@ -470,7 +440,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle deletion of non-existent milestone gracefully")
         void shouldHandleDeletionOfNonExistentMilestone() throws Exception {
             // Given - milestone doesn't exist
             GitHubMilestoneEventDTO event = loadPayload("milestone.deleted");
@@ -483,7 +452,6 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle unknown action gracefully")
         void shouldHandleUnknownAction() {
             // Given - event with unknown action
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
@@ -515,19 +483,14 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Repository Association Tests ====================
 
     @Nested
-    @DisplayName("Repository Association")
     class RepositoryAssociation {
 
         @Test
-        @DisplayName("Should associate created milestone with correct repository")
         void shouldAssociateMilestoneWithRepository() throws Exception {
-            // Given
             GitHubMilestoneEventDTO event = loadPayload("milestone.created");
 
-            // When
             handler.handleEvent(event);
 
-            // Then
             assertThat(milestoneRepository.findByNativeIdAndProviderId(event.milestone().id(), gitProvider.getId()))
                 .isPresent()
                 .get()
@@ -539,19 +502,15 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should find milestone by repository and number")
         void shouldFindMilestoneByRepositoryAndNumber() throws Exception {
-            // Given
             GitHubMilestoneEventDTO event = loadPayload("milestone.created");
             handler.handleEvent(event);
 
-            // When
             var foundMilestone = milestoneRepository.findByNumberAndRepositoryId(
                 event.milestone().number(),
                 testRepository.getId()
             );
 
-            // Then
             assertThat(foundMilestone)
                 .isPresent()
                 .get()
@@ -565,11 +524,9 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Milestone-Issue Relationship Tests ====================
 
     @Nested
-    @DisplayName("Milestone-Issue Relationship")
     class MilestoneIssueRelationship {
 
         @Test
-        @DisplayName("Should preserve milestone-issue relationships after milestone edit")
         void shouldPreserveMilestoneIssueRelationshipsAfterEdit() throws Exception {
             // Given - create milestone and issue with that milestone
             GitHubMilestoneEventDTO createEvent = loadPayload("milestone.created");

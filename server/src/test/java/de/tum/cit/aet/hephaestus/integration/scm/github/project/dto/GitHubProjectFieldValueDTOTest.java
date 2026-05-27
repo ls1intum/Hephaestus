@@ -30,7 +30,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUserConn
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.LocalDate;
 import java.util.List;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -42,17 +41,14 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     private static final String FIELD_ID = "PVTF_field123";
 
     @Nested
-    @DisplayName("Null and Unknown Input")
     class NullAndUnknownInput {
 
         @Test
-        @DisplayName("should return null for null field value")
         void shouldReturnNullForNullFieldValue() {
             assertThat(GitHubProjectFieldValueDTO.fromFieldValue(null)).isNull();
         }
 
         @Test
-        @DisplayName("should return null for unknown field value type")
         void shouldReturnNullForUnknownFieldValueType() {
             // Anonymous implementation of the interface
             GHProjectV2ItemFieldValue unknownType = new GHProjectV2ItemFieldValue() {};
@@ -62,11 +58,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Text Field Value")
     class TextFieldValue {
 
         @Test
-        @DisplayName("should extract text value with field ID")
         void shouldExtractTextValue() {
             GHProjectV2ItemFieldTextValue value = new GHProjectV2ItemFieldTextValue();
             value.setField(createField(FIELD_ID));
@@ -83,7 +77,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null when field is null")
         void shouldReturnNullWhenFieldIsNull() {
             GHProjectV2ItemFieldTextValue value = new GHProjectV2ItemFieldTextValue();
             value.setText("Hello");
@@ -94,11 +87,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Number Field Value")
     class NumberFieldValue {
 
         @Test
-        @DisplayName("should extract number value")
         void shouldExtractNumberValue() {
             GHProjectV2ItemFieldNumberValue value = new GHProjectV2ItemFieldNumberValue();
             value.setField(createField(FIELD_ID));
@@ -113,7 +104,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null when field is null")
         void shouldReturnNullWhenFieldIsNull() {
             GHProjectV2ItemFieldNumberValue value = new GHProjectV2ItemFieldNumberValue();
             value.setNumber(10.0);
@@ -123,11 +113,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Date Field Value")
     class DateFieldValue {
 
         @Test
-        @DisplayName("should extract date value")
         void shouldExtractDateValue() {
             GHProjectV2ItemFieldDateValue value = new GHProjectV2ItemFieldDateValue();
             value.setField(createField(FIELD_ID));
@@ -142,7 +130,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null date gracefully")
         void shouldHandleNullDate() {
             GHProjectV2ItemFieldDateValue value = new GHProjectV2ItemFieldDateValue();
             value.setField(createField(FIELD_ID));
@@ -157,11 +144,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Single Select Field Value")
     class SingleSelectFieldValue {
 
         @Test
-        @DisplayName("should extract single select option ID")
         void shouldExtractSingleSelectOptionId() {
             GHProjectV2ItemFieldSingleSelectValue value = new GHProjectV2ItemFieldSingleSelectValue();
             GHProjectV2SingleSelectField ssField = new GHProjectV2SingleSelectField();
@@ -179,11 +164,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Iteration Field Value")
     class IterationFieldValue {
 
         @Test
-        @DisplayName("should extract iteration ID")
         void shouldExtractIterationId() {
             GHProjectV2ItemFieldIterationValue value = new GHProjectV2ItemFieldIterationValue();
             GHProjectV2IterationField iterField = new GHProjectV2IterationField();
@@ -201,11 +184,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Label Field Value")
     class LabelFieldValue {
 
         @Test
-        @DisplayName("should extract labels as JSON array")
         void shouldExtractLabelsAsJsonArray() {
             GHLabel label1 = new GHLabel();
             label1.setName("bug");
@@ -227,7 +208,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle empty labels")
         void shouldHandleEmptyLabels() {
             GHLabelConnection labelConn = new GHLabelConnection();
             labelConn.setNodes(List.of());
@@ -244,7 +224,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null labels connection")
         void shouldHandleNullLabelsConnection() {
             GHProjectV2ItemFieldLabelValue value = new GHProjectV2ItemFieldLabelValue();
             value.setField(createField(FIELD_ID));
@@ -259,11 +238,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("User (Assignees) Field Value")
     class UserFieldValue {
 
         @Test
-        @DisplayName("should extract user logins as JSON array")
         void shouldExtractUserLoginsAsJsonArray() {
             GHUser user1 = new GHUser();
             user1.setLogin("alice");
@@ -285,7 +262,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null users connection")
         void shouldHandleNullUsersConnection() {
             GHProjectV2ItemFieldUserValue value = new GHProjectV2ItemFieldUserValue();
             value.setField(createField(FIELD_ID));
@@ -299,11 +275,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Reviewer Field Value")
     class ReviewerFieldValue {
 
         @Test
-        @DisplayName("should extract user reviewer logins")
         void shouldExtractUserReviewerLogins() {
             GHUser user = new GHUser();
             user.setLogin("reviewer1");
@@ -323,7 +297,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should extract team reviewer names")
         void shouldExtractTeamReviewerNames() {
             GHTeam team = new GHTeam();
             team.setName("backend-team");
@@ -343,7 +316,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle mixed user and team reviewers")
         void shouldHandleMixedUserAndTeamReviewers() {
             GHUser user = new GHUser();
             user.setLogin("alice");
@@ -365,7 +337,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null reviewers connection")
         void shouldHandleNullReviewersConnection() {
             GHProjectV2ItemFieldReviewerValue value = new GHProjectV2ItemFieldReviewerValue();
             value.setField(createField(FIELD_ID));
@@ -379,11 +350,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Milestone Field Value")
     class MilestoneFieldValue {
 
         @Test
-        @DisplayName("should extract milestone title")
         void shouldExtractMilestoneTitle() {
             GHMilestone milestone = new GHMilestone();
             milestone.setTitle("v1.0");
@@ -400,7 +369,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null milestone")
         void shouldHandleNullMilestone() {
             GHProjectV2ItemFieldMilestoneValue value = new GHProjectV2ItemFieldMilestoneValue();
             value.setField(createField(FIELD_ID));
@@ -414,11 +382,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Repository Field Value")
     class RepositoryFieldValue {
 
         @Test
-        @DisplayName("should extract repository nameWithOwner")
         void shouldExtractRepositoryNameWithOwner() {
             GHRepository repository = new GHRepository();
             repository.setNameWithOwner("org/repo");
@@ -435,7 +401,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null repository")
         void shouldHandleNullRepository() {
             GHProjectV2ItemFieldRepositoryValue value = new GHProjectV2ItemFieldRepositoryValue();
             value.setField(createField(FIELD_ID));
@@ -449,11 +414,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Field Value")
     class PullRequestFieldValue {
 
         @Test
-        @DisplayName("should extract PR numbers as JSON array")
         void shouldExtractPrNumbersAsJsonArray() {
             GHPullRequest pr1 = new GHPullRequest();
             pr1.setNumber(42);
@@ -475,7 +438,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null pull requests connection")
         void shouldHandleNullPullRequestsConnection() {
             GHProjectV2ItemFieldPullRequestValue value = new GHProjectV2ItemFieldPullRequestValue();
             value.setField(createField(FIELD_ID));
@@ -489,11 +451,9 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("extractFieldId with different field types")
     class ExtractFieldId {
 
         @Test
-        @DisplayName("should extract ID from GHProjectV2Field")
         void shouldExtractIdFromProjectV2Field() {
             GHProjectV2ItemFieldTextValue value = new GHProjectV2ItemFieldTextValue();
             GHProjectV2Field field = new GHProjectV2Field();
@@ -508,7 +468,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should extract ID from GHProjectV2SingleSelectField")
         void shouldExtractIdFromSingleSelectField() {
             GHProjectV2ItemFieldTextValue value = new GHProjectV2ItemFieldTextValue();
             GHProjectV2SingleSelectField field = new GHProjectV2SingleSelectField();
@@ -523,7 +482,6 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should extract ID from GHProjectV2IterationField")
         void shouldExtractIdFromIterationField() {
             GHProjectV2ItemFieldTextValue value = new GHProjectV2ItemFieldTextValue();
             GHProjectV2IterationField field = new GHProjectV2IterationField();

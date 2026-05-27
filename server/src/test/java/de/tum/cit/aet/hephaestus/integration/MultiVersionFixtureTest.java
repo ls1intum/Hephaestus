@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPu
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.dto.GitLabMergeRequestEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.InputStream;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -22,14 +21,12 @@ import org.junit.jupiter.api.Test;
  * top-level field and Jackson starts throwing, this test fails before the change
  * reaches a real webhook.
  */
-@DisplayName("Multi-version webhook fixture tolerance")
 class MultiVersionFixtureTest extends BaseUnitTest {
 
     // Match the production mapper: find-and-register JSR-310 + jdk8 + ignore-unknown-properties.
     private final ObjectMapper mapper = JsonMapper.builder().findAndAddModules().build();
 
     @Test
-    @DisplayName("GitHub pull_request v1 deserializes to a populated DTO")
     void githubPullRequestV1() throws Exception {
         GitHubPullRequestEventDTO dto = readFixture(
             "/integration-fixtures/github/v1/pull_request.opened.json",
@@ -43,7 +40,6 @@ class MultiVersionFixtureTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("GitHub pull_request v2 (with unknown vendor fields) still deserializes")
     void githubPullRequestV2() throws Exception {
         GitHubPullRequestEventDTO dto = readFixture(
             "/integration-fixtures/github/v2/pull_request.opened.json",
@@ -59,7 +55,6 @@ class MultiVersionFixtureTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("GitLab merge_request v1 deserializes to a populated DTO")
     void gitlabMergeRequestV1() throws Exception {
         GitLabMergeRequestEventDTO dto = readFixture(
             "/integration-fixtures/gitlab/v1/merge_request.open.json",
@@ -73,7 +68,6 @@ class MultiVersionFixtureTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("GitLab merge_request v2 (with unknown vendor fields) still deserializes")
     void gitlabMergeRequestV2() throws Exception {
         GitLabMergeRequestEventDTO dto = readFixture(
             "/integration-fixtures/gitlab/v2/merge_request.open.json",

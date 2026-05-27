@@ -17,11 +17,9 @@ import org.junit.jupiter.api.Test;
  * A regression that accidentally renames or drops a meter ID will fail this test before it
  * silently breaks Grafana dashboards.
  */
-@DisplayName("InteractiveSandboxMetrics")
 class InteractiveSandboxMetricsTest extends BaseUnitTest {
 
     @Test
-    @DisplayName("publishes the documented stable set of meter IDs")
     void publishesStableMeterIds() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         new InteractiveSandboxMetrics(reg);
@@ -52,7 +50,6 @@ class InteractiveSandboxMetricsTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("registers every attach-failure reason as a distinct tag on mentor.attach.failure")
     void attachFailureReasonsExposed() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         new InteractiveSandboxMetrics(reg);
@@ -76,7 +73,6 @@ class InteractiveSandboxMetricsTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("registers every send-rejected reason as a distinct tag on mentor.send.rejected")
     void sendRejectedReasonsExposed() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         new InteractiveSandboxMetrics(reg);
@@ -112,7 +108,6 @@ class InteractiveSandboxMetricsTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("registers mentor.send.frame.bytes with both in and out direction tags")
     void sendBytesHasBothDirections() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         new InteractiveSandboxMetrics(reg);

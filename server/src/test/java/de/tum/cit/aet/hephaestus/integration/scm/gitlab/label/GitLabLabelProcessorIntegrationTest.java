@@ -29,7 +29,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-@DisplayName("GitLabLabelProcessor Integration Test")
 class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
 
     private static final String FIXTURE_ORG_LOGIN = "hephaestustest";
@@ -71,11 +70,9 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("process()")
     class ProcessMethod {
 
         @Test
-        @DisplayName("creates a new label with all fields")
         void shouldCreateNewLabel() {
             GitLabLabelDTO dto = new GitLabLabelDTO(
                 "gid://gitlab/ProjectLabel/123",
@@ -101,7 +98,6 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("maps GitLab title to Label name")
         void shouldMapTitleToName() {
             GitLabLabelDTO dto = new GitLabLabelDTO(null, "enhancement", "#428BCA", null, null, null);
 
@@ -112,7 +108,6 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("updates existing label by name")
         void shouldUpdateExistingLabel() {
             // Create
             GitLabLabelDTO createDto = new GitLabLabelDTO(null, "bug", "#FF0000", "Old description", null, null);
@@ -143,7 +138,6 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("handles null description")
         void shouldHandleNullDescription() {
             GitLabLabelDTO dto = new GitLabLabelDTO(null, "no-desc", "#CCCCCC", null, null, null);
 
@@ -154,14 +148,12 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("returns null for null DTO")
         void shouldReturnNullForNullDto() {
             Label result = labelProcessor.process(null, testRepository, testContext());
             assertThat(result).isNull();
         }
 
         @Test
-        @DisplayName("returns null for blank title")
         void shouldReturnNullForBlankTitle() {
             GitLabLabelDTO dto = new GitLabLabelDTO(null, "  ", "#FF0000", null, null, null);
             Label result = labelProcessor.process(dto, testRepository, testContext());
@@ -169,7 +161,6 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("deduplicates group-level labels by name within a repository")
         void shouldDeduplicateGroupLabels() {
             // Same label name from different sources (project vs group)
             GitLabLabelDTO projectLabel = new GitLabLabelDTO(
@@ -197,7 +188,6 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("delete()")
     class DeleteMethod {
 
         @Test
@@ -214,14 +204,12 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("handles null labelId gracefully")
         void shouldHandleNullId() {
             labelProcessor.delete(null, testContext());
             // No exception thrown
         }
 
         @Test
-        @DisplayName("handles non-existent label gracefully")
         void shouldHandleNonExistentLabel() {
             labelProcessor.delete(-999L, testContext());
             assertThat(eventListener.getDeletedEvents()).isEmpty();

@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityManager;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +45,6 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("GitHubAppConfig round-trips through JSONB")
     void gitHubAppConfig_roundTrips() {
         ConnectionConfig.GitHubAppConfig original = new ConnectionConfig.GitHubAppConfig(
             42L,
@@ -68,7 +66,6 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("GitHubPatConfig round-trips through JSONB")
     void gitHubPatConfig_roundTrips() {
         ConnectionConfig.GitHubPatConfig original = new ConnectionConfig.GitHubPatConfig(
             "acme-org",
@@ -88,7 +85,6 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("GitLabConfig PLAINTEXT round-trips through JSONB")
     void gitLabConfig_plaintext_roundTrips() {
         ConnectionConfig.GitLabConfig original = new ConnectionConfig.GitLabConfig(
             "https://gitlab.example.com",
@@ -112,7 +108,6 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("GitLabConfig WHSEC signing mode round-trips through JSONB")
     void gitLabConfig_whsec_roundTrips() {
         ConnectionConfig.GitLabConfig original = new ConnectionConfig.GitLabConfig(
             "https://gitlab.example.com",
@@ -129,7 +124,6 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("SlackConfig round-trips through JSONB")
     void slackConfig_roundTrips() {
         ConnectionConfig.SlackConfig original = new ConnectionConfig.SlackConfig(
             "T123",
@@ -153,7 +147,6 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("OutlineConfig round-trips through JSONB")
     void outlineConfig_roundTrips() {
         ConnectionConfig.OutlineConfig original = new ConnectionConfig.OutlineConfig(
             "https://outline.example.com",
@@ -173,7 +166,6 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Connection.@PrePersist rejects kind/config subtype mismatch")
     void prePersist_rejectsKindConfigMismatch() {
         ConnectionConfig.GitHubAppConfig wrong = new ConnectionConfig.GitHubAppConfig(1L, "acme", null, Set.of());
         Connection bad = new Connection(workspace, IntegrationKind.GITLAB, "instance-x", wrong);
@@ -188,7 +180,6 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("@Version increments on update")
     void version_incrementsOnUpdate() {
         Connection conn = new Connection(
             workspace,

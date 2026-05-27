@@ -38,7 +38,6 @@ import org.springframework.stereotype.Component;
  * - Context handling and workspace association
  * - Edge cases in DTO processing
  */
-@DisplayName("GitHub Label Processor")
 class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
 
     private static final Long TEST_ORG_ID = 215361191L;
@@ -130,13 +129,10 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Process (Create/Update) Tests ====================
 
     @Nested
-    @DisplayName("Process Method")
     class ProcessMethod {
 
         @Test
-        @DisplayName("Should create new label and publish LabelCreated event")
         void shouldCreateNewLabelAndPublishEvent() {
-            // Given
             Long labelId = 111222333L;
             GitHubLabelDTO dto = new GitHubLabelDTO(
                 labelId,
@@ -148,7 +144,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 null
             );
 
-            // When
             Label result = processor.process(dto, testRepository, createContext());
 
             // Then - verify label created
@@ -175,7 +170,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should update existing label and publish LabelUpdated event")
         void shouldUpdateExistingLabelAndPublishEvent() {
             // Given - create existing label
             Long labelId = 444555666L;
@@ -200,7 +194,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 null
             );
 
-            // When
             Label result = processor.process(dto, testRepository, createContext());
 
             // Then - verify label updated
@@ -219,19 +212,15 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should return null for null DTO")
         void shouldReturnNullForNullDto() {
-            // When
             Label result = processor.process(null, testRepository, createContext());
 
-            // Then
             assertThat(result).isNull();
             assertThat(eventListener.getCreatedEvents()).isEmpty();
             assertThat(eventListener.getUpdatedEvents()).isEmpty();
         }
 
         @Test
-        @DisplayName("Should create label with generated ID when DTO has null ID (GraphQL sync scenario)")
         void shouldCreateLabelWithGeneratedIdWhenDtoHasNullId() {
             // Given - DTO without ID (like GraphQL sync)
             GitHubLabelDTO dto = new GitHubLabelDTO(
@@ -244,7 +233,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 null
             );
 
-            // When
             Label result = processor.process(dto, testRepository, createContext());
 
             // Then - label should be created with a generated negative ID
@@ -256,7 +244,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should update existing label by name when DTO has null ID")
         void shouldUpdateExistingLabelByNameWhenDtoHasNullId() {
             // Given - existing label
             Long existingId = 999888777L;
@@ -280,7 +267,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 null
             );
 
-            // When
             Label result = processor.process(dto, testRepository, createContext());
 
             // Then - should update existing label, not create new one
@@ -292,9 +278,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle label with null description")
         void shouldHandleLabelWithNullDescription() {
-            // Given
             Long labelId = 777888999L;
             GitHubLabelDTO dto = new GitHubLabelDTO(
                 labelId,
@@ -306,10 +290,8 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 null
             );
 
-            // When
             Label result = processor.process(dto, testRepository, createContext());
 
-            // Then
             assertThat(result.getDescription()).isNull();
             assertThat(
                 labelRepository.findByNativeIdAndProviderId(labelId, gitProvider.getId()).get().getDescription()
@@ -319,7 +301,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should be idempotent - processing same DTO twice")
         void shouldBeIdempotent() {
-            // Given
             Long labelId = 123123123L;
             GitHubLabelDTO dto = new GitHubLabelDTO(
                 labelId,
@@ -346,11 +327,9 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Delete Tests ====================
 
     @Nested
-    @DisplayName("Delete Method")
     class DeleteMethod {
 
         @Test
-        @DisplayName("Should delete existing label and publish LabelDeleted event")
         void shouldDeleteLabelAndPublishEvent() {
             // Given - create label
             Long labelId = 555666777L;
@@ -365,7 +344,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProvider.getId())).isPresent();
             Long savedLabelId = label.getId();
 
-            // When
             processor.delete(savedLabelId, createContext());
 
             // Then - label deleted
@@ -384,7 +362,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle deletion of non-existent label gracefully")
         void shouldHandleDeletionOfNonExistentLabel() {
             // Given - label doesn't exist
             Long nonExistentId = 999999999L;
@@ -398,7 +375,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle null label ID")
         void shouldHandleNullLabelId() {
             // When/Then - should not throw
             assertThatCode(() -> processor.delete(null, createContext())).doesNotThrowAnyException();

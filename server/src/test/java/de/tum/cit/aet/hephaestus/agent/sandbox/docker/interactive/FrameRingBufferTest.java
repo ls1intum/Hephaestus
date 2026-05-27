@@ -8,13 +8,11 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.IntNode;
 
-@DisplayName("FrameRingBuffer")
 class FrameRingBufferTest extends BaseUnitTest {
 
     private Counter dropped;
@@ -27,18 +25,15 @@ class FrameRingBufferTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Capacity & offers")
     class Capacity {
 
         @Test
-        @DisplayName("rejects non-positive capacity")
         void rejectsBadCapacity() {
             assertThatThrownBy(() -> new FrameRingBuffer(0, dropped)).isInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> new FrameRingBuffer(-3, dropped)).isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
-        @DisplayName("accepts under-capacity offers without dropping")
         void underCapacityNoDropping() {
             buffer = new FrameRingBuffer(4, dropped);
             buffer.offer(IntNode.valueOf(1));
@@ -49,7 +44,6 @@ class FrameRingBufferTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("drops oldest on overflow and increments counter")
         void dropOldestOnOverflow() {
             buffer = new FrameRingBuffer(3, dropped);
             for (int i = 1; i <= 5; i++) {
@@ -63,11 +57,9 @@ class FrameRingBufferTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Snapshot semantics")
     class Snapshot {
 
         @Test
-        @DisplayName("snapshotSince(-1) returns all retained frames in arrival order")
         void snapshotAll() {
             buffer = new FrameRingBuffer(4, dropped);
             buffer.offer(IntNode.valueOf(10));
@@ -77,7 +69,6 @@ class FrameRingBufferTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("snapshotSince(cursor) returns only frames newer than cursor")
         void snapshotSinceCursor() {
             buffer = new FrameRingBuffer(4, dropped);
             long s0 = buffer.offer(IntNode.valueOf(100));
@@ -89,7 +80,6 @@ class FrameRingBufferTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("monotonic sequence numbers — never reused after eviction")
         void sequenceMonotonic() {
             buffer = new FrameRingBuffer(2, dropped);
             long s0 = buffer.offer(IntNode.valueOf(1));

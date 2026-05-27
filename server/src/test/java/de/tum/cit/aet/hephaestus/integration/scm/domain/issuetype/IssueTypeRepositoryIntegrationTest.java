@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -26,7 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired;
  * primary keys are GitLab-global GraphQL IDs, resolving by provider-scoped name
  * yields the same row regardless of which organization owns it.
  */
-@DisplayName("IssueTypeRepository provider-scoped name fallback Integration")
 class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -85,7 +83,6 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("falls back to provider-scoped match when the subgroup has no seed rows")
     void resolvesTypeFromRootWhenSubgroupHasNoSeedRows() {
         persistIssueType("gid://gitlab/WorkItems::Type/1", "Issue", rootOrg);
 
@@ -100,7 +97,6 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("match is case-insensitive")
     void matchIsCaseInsensitive() {
         persistIssueType("gid://gitlab/WorkItems::Type/2", "Task", rootOrg);
 
@@ -116,7 +112,6 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("does not cross provider boundaries")
     void doesNotCrossProviderBoundaries() {
         Organization otherOrg = persistOrg(otherProvider, 2000L, "other-group");
         persistIssueType("gid://other/WorkItems::Type/99", "Bug", otherOrg);
@@ -130,7 +125,6 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("skips disabled types")
     void skipsDisabledTypes() {
         IssueType disabled = persistIssueType("gid://gitlab/WorkItems::Type/3", "Incident", rootOrg);
         disabled.setEnabled(false);
@@ -145,7 +139,6 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("prefers the root organization when multiple orgs share the same type name")
     void prefersRootOrganizationWhenDuplicateNames() {
         IssueType rootType = persistIssueType("gid://gitlab/WorkItems::Type/10", "Epic", rootOrg);
         persistIssueType("gid://gitlab/WorkItems::Type/11", "Epic", subgroupOrg);

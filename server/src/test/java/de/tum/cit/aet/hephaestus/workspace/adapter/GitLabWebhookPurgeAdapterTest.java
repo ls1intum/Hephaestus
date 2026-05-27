@@ -6,11 +6,9 @@ import static org.mockito.Mockito.*;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.GitLabWebhookService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-@DisplayName("GitLabWebhookPurgeAdapter")
 class GitLabWebhookPurgeAdapterTest extends BaseUnitTest {
 
     @Mock
@@ -25,19 +23,15 @@ class GitLabWebhookPurgeAdapterTest extends BaseUnitTest {
 
     @Test
     void deleteWorkspaceData_callsDeregisterWebhookByWorkspaceId() {
-        // Given
         Long workspaceId = 42L;
 
-        // When
         adapter.deleteWorkspaceData(workspaceId);
 
-        // Then
         verify(webhookService).deregisterWebhookByWorkspaceId(workspaceId);
     }
 
     @Test
     void deleteWorkspaceData_doesNotPropagateExceptions() {
-        // Given
         Long workspaceId = 99L;
         doThrow(new RuntimeException("GitLab API unreachable"))
             .when(webhookService)
@@ -46,7 +40,6 @@ class GitLabWebhookPurgeAdapterTest extends BaseUnitTest {
         // When — should not throw
         adapter.deleteWorkspaceData(workspaceId);
 
-        // Then
         verify(webhookService).deregisterWebhookByWorkspaceId(workspaceId);
     }
 

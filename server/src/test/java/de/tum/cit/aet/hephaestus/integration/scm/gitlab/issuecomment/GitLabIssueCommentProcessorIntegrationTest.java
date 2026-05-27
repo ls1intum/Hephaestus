@@ -100,7 +100,6 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("shouldPersistUpdatedAtVerbatimWhenCreatingNewComment")
     void shouldPersistUpdatedAtVerbatimWhenCreatingNewComment() {
         GitLabIssueCommentProcessor.SyncNoteData data = buildData("First comment", CREATED_AT, UPDATED_AT_LATER);
 
@@ -115,7 +114,6 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("shouldAddUpdatedAtToChangedFieldsWhenUpdatedAtDivergesOnUpsert")
     void shouldAddUpdatedAtToChangedFieldsWhenUpdatedAtDivergesOnUpsert() {
         // Insert a comment whose updatedAt initially equals createdAt.
         processor.processFromSync(
@@ -145,7 +143,6 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("shouldNotEmitUpdateEventWhenUpdatedAtUnchangedOnResync")
     void shouldNotEmitUpdateEventWhenUpdatedAtUnchangedOnResync() {
         GitLabIssueCommentProcessor.SyncNoteData first = buildData("Body", CREATED_AT, UPDATED_AT_LATER);
         processor.processFromSync(first, testIssue, gitlabProvider.getId(), testWorkspace.getId());
@@ -165,7 +162,6 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("shouldNotFallBackToCreatedAtWhenUpdatedAtIsNull")
     void shouldNotFallBackToCreatedAtWhenUpdatedAtIsNull() {
         // Seed with a real divergent updatedAt so we can prove the null branch does
         // not overwrite the stored value with createdAt.
@@ -192,7 +188,6 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("shouldEmitCommentCreatedWithDistinctUpdatedAtWhenFirstSyncSeesEditedNote")
     void shouldEmitCommentCreatedWithDistinctUpdatedAtWhenFirstSyncSeesEditedNote() {
         // Fresh scheduler run, comment already edited on GitLab. The created event must
         // not lie about updatedAt — the first insert path is responsible for the initial value.

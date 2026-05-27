@@ -30,7 +30,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +48,6 @@ import org.springframework.stereotype.Component;
  * - Label and milestone associations
  * - Edge cases in DTO processing including the critical getDatabaseId() fallback
  */
-@DisplayName("GitHub Pull Request Processor")
 class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -212,11 +210,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Critical: getDatabaseId() Fallback Tests ====================
 
     @Nested
-    @DisplayName("getDatabaseId() Fallback Logic")
     class GetDatabaseIdFallback {
 
         @Test
-        @DisplayName("Should use databaseId when present (GraphQL style)")
         void shouldUseDatabaseIdWhenPresent() {
             // Given - GraphQL style DTO with databaseId
             Long databaseId = 123456789L;
@@ -260,7 +256,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitInfo
             );
 
-            // When
             PullRequest result = processor.process(dto, createContext());
 
             // Then - should use databaseId as native_id
@@ -270,7 +265,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should fallback to id when databaseId is null (Webhook style)")
         void shouldFallbackToIdWhenDatabaseIdNull() {
             // Given - Webhook style DTO with only id
             Long webhookId = FIXTURE_PR_ID;
@@ -317,7 +311,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Verify the fallback works
             assertThat(dto.getDatabaseId()).isEqualTo(webhookId);
 
-            // When
             PullRequest result = processor.process(dto, createContext());
 
             // Then - should use id as fallback for native_id
@@ -327,7 +320,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should return null when both id and databaseId are null")
         void shouldReturnNullWhenBothIdsNull() {
             // Given - malformed DTO with no IDs
             GitHubPullRequestDTO dto = new GitHubPullRequestDTO(
@@ -373,10 +365,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Verify fallback returns null
             assertThat(dto.getDatabaseId()).isNull();
 
-            // When
             PullRequest result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result).isNull();
             assertThat(eventListener.getCreatedEvents()).isEmpty();
         }
@@ -385,11 +375,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Issue Type Promotion Tests ====================
 
     @Nested
-    @DisplayName("Issue Type Promotion (ISSUE -> PULL_REQUEST)")
     class IssueTypePromotion {
 
         @Test
-        @DisplayName("Should promote ISSUE to PULL_REQUEST when PR event arrives for existing Issue")
         void shouldPromoteIssueToPullRequestWhenPREventArrives() {
             // Arrange - insert an entity with issue_type='ISSUE' using the Issue upsert
             Long entityId = FIXTURE_PR_ID;
@@ -446,19 +434,14 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Process (Create/Update) Tests ====================
 
     @Nested
-    @DisplayName("Process Method - Create")
     class ProcessMethodCreate {
 
         @Test
-        @DisplayName("Should create new pull request and publish Created event")
         void shouldCreateNewPullRequestAndPublishCreatedEvent() {
-            // Given
             GitHubPullRequestDTO dto = createBasicPullRequestDto(FIXTURE_PR_ID, 26);
 
-            // When
             PullRequest result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result).isNotNull();
             assertThat(result.getNativeId()).isEqualTo(FIXTURE_PR_ID);
             assertThat(result.getNumber()).isEqualTo(26);
@@ -474,16 +457,12 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should create author user when processing new pull request")
         void shouldCreateAuthorWhenProcessingNewPullRequest() {
-            // Given
             assertThat(userRepository.count()).isZero();
             GitHubPullRequestDTO dto = createBasicPullRequestDto(FIXTURE_PR_ID, 26);
 
-            // When
             PullRequest result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getAuthor()).isNotNull();
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
             assertThat(
@@ -492,9 +471,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should create labels when processing new pull request with labels")
         void shouldCreateLabelsWhenProcessingNewPullRequest() {
-            // Given
             Long labelId = 9568029313L;
             String labelName = "bug";
             GitHubLabelDTO labelDto = new GitHubLabelDTO(
@@ -547,10 +524,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitInfo
             );
 
-            // When
             PullRequest result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getLabels()).hasSize(1);
             Label label = result.getLabels().iterator().next();
             assertThat(label.getName()).isEqualTo(labelName);
@@ -558,9 +533,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should create milestone when processing new pull request with milestone")
         void shouldCreateMilestoneWhenProcessingNewPullRequest() {
-            // Given
             Long milestoneId = 14028563L;
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
                 milestoneId,
@@ -617,10 +590,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitInfo
             );
 
-            // When
             PullRequest result = processor.process(dto, createContext());
 
-            // Then
             assertThat(result.getMilestone()).isNotNull();
             assertThat(result.getMilestone().getTitle()).isEqualTo("v1.0");
             assertThat(
@@ -632,11 +603,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Process Closed Tests ====================
 
     @Nested
-    @DisplayName("Process Closed")
     class ProcessClosed {
 
         @Test
-        @DisplayName("Should publish Closed event when PR is closed without merge")
         void shouldPublishClosedEventWhenPRClosedWithoutMerge() {
             // Given - create PR first
             processor.process(createBasicPullRequestDto(FIXTURE_PR_ID, 26), createContext());
@@ -682,10 +651,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitInfo
             );
 
-            // When
             PullRequest result = processor.processClosed(closedDto, createContext());
 
-            // Then
             assertThat(result.getState()).isEqualTo(PullRequest.State.CLOSED);
             assertThat(result.isMerged()).isFalse();
             assertThat(eventListener.getClosedEvents()).hasSize(1);
@@ -693,7 +660,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should publish both Closed and Merged events when PR is merged")
         void shouldPublishMergedEventWhenPRIsMerged() {
             // Given - create PR first
             processor.process(createBasicPullRequestDto(FIXTURE_PR_ID, 26), createContext());
@@ -740,10 +706,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitInfo
             );
 
-            // When
             PullRequest result = processor.processClosed(mergedDto, createContext());
 
-            // Then
             assertThat(result.getState()).isEqualTo(PullRequest.State.CLOSED);
             assertThat(result.isMerged()).isTrue();
             assertThat(eventListener.getClosedEvents()).hasSize(1);
@@ -754,11 +718,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Process Ready For Review Tests ====================
 
     @Nested
-    @DisplayName("Process Ready For Review")
     class ProcessReadyForReview {
 
         @Test
-        @DisplayName("Should publish PullRequestReady event")
         void shouldPublishPullRequestReadyEvent() {
             // Given - create draft PR first
             GitHubPullRequestDTO draftDto = new GitHubPullRequestDTO(
@@ -843,10 +805,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitInfo
             );
 
-            // When
             PullRequest result = processor.processReadyForReview(readyDto, createContext());
 
-            // Then
             assertThat(result.isDraft()).isFalse();
             assertThat(eventListener.getReadyEvents()).hasSize(1);
         }
@@ -855,11 +815,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Process Converted To Draft Tests ====================
 
     @Nested
-    @DisplayName("Process Converted To Draft")
     class ProcessConvertedToDraft {
 
         @Test
-        @DisplayName("Should publish PullRequestDrafted event")
         void shouldPublishPullRequestDraftedEvent() {
             // Given - create PR first
             processor.process(createBasicPullRequestDto(FIXTURE_PR_ID, 26), createContext());
@@ -905,10 +863,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitInfo
             );
 
-            // When
             PullRequest result = processor.processConvertedToDraft(draftDto, createContext());
 
-            // Then
             assertThat(result.isDraft()).isTrue();
             assertThat(eventListener.getDraftedEvents()).hasSize(1);
         }
@@ -917,11 +873,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Process Synchronize Tests ====================
 
     @Nested
-    @DisplayName("Process Synchronize")
     class ProcessSynchronize {
 
         @Test
-        @DisplayName("Should publish PullRequestSynchronized event")
         void shouldPublishPullRequestSynchronizedEvent() {
             // Given - create PR first
             processor.process(createBasicPullRequestDto(FIXTURE_PR_ID, 26), createContext());
@@ -967,10 +921,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitInfo
             );
 
-            // When
             PullRequest result = processor.processSynchronize(syncDto, createContext());
 
-            // Then
             assertThat(result.getCommits()).isEqualTo(3);
             assertThat(eventListener.getSynchronizedEvents()).hasSize(1);
         }
@@ -979,11 +931,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Process Labeled/Unlabeled Tests ====================
 
     @Nested
-    @DisplayName("Process Label Events")
     class ProcessLabelEvents {
 
         @Test
-        @DisplayName("Should publish Labeled event")
         void shouldPublishLabeledEvent() {
             // Given - create PR first
             processor.process(createBasicPullRequestDto(FIXTURE_PR_ID, 26), createContext());
@@ -1040,15 +990,12 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitInfo
             );
 
-            // When
             processor.processLabeled(labeledDto, labelDto, createContext());
 
-            // Then
             assertThat(eventListener.getLabeledEvents()).hasSize(1);
         }
 
         @Test
-        @DisplayName("Should publish Unlabeled event")
         void shouldPublishUnlabeledEvent() {
             // Given - create PR with label first
             Long labelId = 9568029313L;
@@ -1144,10 +1091,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitInfo
             );
 
-            // When
             processor.processUnlabeled(unlabeledDto, labelDto, createContext());
 
-            // Then
             assertThat(eventListener.getUnlabeledEvents()).hasSize(1);
         }
     }

@@ -41,7 +41,6 @@ import org.springframework.stereotype.Component;
  * - Creator user association
  * - Edge cases in DTO processing
  */
-@DisplayName("GitHub Milestone Processor")
 class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -151,13 +150,10 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Process (Create/Update) Tests ====================
 
     @Nested
-    @DisplayName("Process Method")
     class ProcessMethod {
 
         @Test
-        @DisplayName("Should create new milestone and publish MilestoneCreated event")
         void shouldCreateNewMilestoneAndPublishEvent() {
-            // Given
             Long milestoneId = 14028854L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
                 milestoneId,
@@ -174,7 +170,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null // closedAt
             );
 
-            // When
             Milestone result = processor.process(dto, testRepository, createCreatorDto(), createContext());
 
             // Then - verify milestone created
@@ -205,7 +200,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should update existing milestone and publish MilestoneProcessed event with isNew=false")
         void shouldUpdateExistingMilestoneAndPublishEvent() {
             // Given - create existing milestone
             Long milestoneId = 14028854L;
@@ -237,7 +231,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null // closedAt
             );
 
-            // When
             Milestone result = processor.process(dto, testRepository, createCreatorDto(), createContext());
 
             // Then - verify milestone updated
@@ -256,19 +249,15 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should return null for null DTO")
         void shouldReturnNullForNullDto() {
-            // When
             Milestone result = processor.process(null, testRepository, createCreatorDto(), createContext());
 
-            // Then
             assertThat(result).isNull();
             assertThat(eventListener.getCreatedEvents()).isEmpty();
             assertThat(eventListener.getUpdatedEvents()).isEmpty();
         }
 
         @Test
-        @DisplayName("Should create milestone with generated ID when DTO has null ID (GraphQL sync scenario)")
         void shouldCreateMilestoneWithGeneratedIdWhenDtoHasNullId() {
             // Given - DTO without ID (like GraphQL sync)
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
@@ -286,7 +275,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null // closedAt
             );
 
-            // When
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
             // Then - milestone should be created with a generated negative ID
@@ -299,7 +287,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should update existing milestone by number when DTO has null ID")
         void shouldUpdateExistingMilestoneByNumberWhenDtoHasNullId() {
             // Given - existing milestone
             Long existingId = 999888777L;
@@ -329,7 +316,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null // closedAt
             );
 
-            // When
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
             // Then - should update existing milestone, not create new one
@@ -341,9 +327,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle milestone with null description")
         void shouldHandleMilestoneWithNullDescription() {
-            // Given
             Long milestoneId = 777888999L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
                 milestoneId,
@@ -360,10 +344,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null // closedAt
             );
 
-            // When
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
-            // Then
             assertThat(result.getDescription()).isNull();
             assertThat(
                 milestoneRepository
@@ -374,9 +356,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle milestone with null dueOn")
         void shouldHandleMilestoneWithNullDueOn() {
-            // Given
             Long milestoneId = 888999000L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
                 milestoneId,
@@ -393,10 +373,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null // closedAt
             );
 
-            // When
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
-            // Then
             assertThat(result.getDueOn()).isNull();
             assertThat(
                 milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId()).get().getDueOn()
@@ -406,7 +384,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should be idempotent - processing same DTO twice")
         void shouldBeIdempotent() {
-            // Given
             Long milestoneId = 123123123L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
                 milestoneId,
@@ -435,9 +412,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should set creator user when provided")
         void shouldSetCreatorWhenProvided() {
-            // Given
             Long milestoneId = 444555666L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
                 milestoneId,
@@ -454,19 +429,15 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null // closedAt
             );
 
-            // When
             Milestone result = processor.process(dto, testRepository, createCreatorDto(), createContext());
 
-            // Then
             assertThat(result.getCreator()).isNotNull();
             assertThat(result.getCreator().getNativeId()).isEqualTo(FIXTURE_CREATOR_ID);
             assertThat(result.getCreator().getLogin()).isEqualTo(FIXTURE_CREATOR_LOGIN);
         }
 
         @Test
-        @DisplayName("Should create user if not exists when processing creator")
         void shouldCreateUserIfNotExists() {
-            // Given
             Long milestoneId = 555666777L;
             Long newUserId = 999888777L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
@@ -496,18 +467,14 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             // Verify user doesn't exist
             assertThat(userRepository.findByNativeIdAndProviderId(newUserId, githubProvider.getId())).isEmpty();
 
-            // When
             Milestone result = processor.process(dto, testRepository, newCreator, createContext());
 
-            // Then
             assertThat(result.getCreator()).isNotNull();
             assertThat(userRepository.findByNativeIdAndProviderId(newUserId, githubProvider.getId())).isPresent();
         }
 
         @Test
-        @DisplayName("Should handle null creator DTO gracefully")
         void shouldHandleNullCreator() {
-            // Given
             Long milestoneId = 666777888L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
                 milestoneId,
@@ -524,7 +491,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null // closedAt
             );
 
-            // When
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
             // Then - milestone saved but creator is null
@@ -533,9 +499,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should parse closed state correctly")
         void shouldParseClosedState() {
-            // Given
             Long milestoneId = 777888999L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
                 milestoneId,
@@ -552,17 +516,13 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null // closedAt
             );
 
-            // When
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
-            // Then
             assertThat(result.getState()).isEqualTo(Milestone.State.CLOSED);
         }
 
         @Test
-        @DisplayName("Should default to OPEN state for null state string")
         void shouldDefaultToOpenStateForNullState() {
-            // Given
             Long milestoneId = 888999111L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
                 milestoneId,
@@ -579,10 +539,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null // closedAt
             );
 
-            // When
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
-            // Then
             assertThat(result.getState()).isEqualTo(Milestone.State.OPEN);
         }
     }
@@ -590,11 +548,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     // ==================== Delete Tests ====================
 
     @Nested
-    @DisplayName("Delete Method")
     class DeleteMethod {
 
         @Test
-        @DisplayName("Should delete existing milestone and publish MilestoneDeleted event")
         void shouldDeleteMilestoneAndPublishEvent() {
             // Given - create milestone
             Long milestoneId = 14028854L;
@@ -612,7 +568,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
             ).isPresent();
 
-            // When
             processor.delete(milestoneId, createContext());
 
             // Then - milestone deleted
@@ -631,7 +586,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle deletion of non-existent milestone gracefully")
         void shouldHandleDeletionOfNonExistentMilestone() {
             // Given - milestone doesn't exist
             Long nonExistentId = 999999999L;
@@ -647,7 +601,6 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should handle null milestone ID")
         void shouldHandleNullMilestoneId() {
             // When/Then - should not throw
             assertThatCode(() -> processor.delete(null, createContext())).doesNotThrowAnyException();

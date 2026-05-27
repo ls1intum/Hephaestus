@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -33,7 +32,6 @@ import org.springframework.graphql.client.GraphQlClient;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-@DisplayName("CommitMetadataEnrichmentService")
 class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
 
     @Mock
@@ -65,11 +63,9 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("skip conditions")
     class SkipConditions {
 
         @Test
-        @DisplayName("should return 0 when scopeId is null")
         void shouldReturnZeroWhenScopeIdNull() {
             int result = service.enrichCommitMetadata(1L, "owner/repo", null);
 
@@ -78,7 +74,6 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return 0 when no commits need enrichment")
         void shouldReturnZeroWhenNoCommitsNeedEnrichment() {
             when(commitRepository.findShasWithoutContributorsByRepositoryId(1L)).thenReturn(List.of());
 
@@ -88,7 +83,6 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return 0 when all SHAs are invalid")
         void shouldReturnZeroWhenAllShasInvalid() {
             when(commitRepository.findShasWithoutContributorsByRepositoryId(1L)).thenReturn(
                 List.of("not-a-sha", "also-invalid", "ABC")
@@ -100,7 +94,6 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return 0 when nameWithOwner format is invalid")
         void shouldReturnZeroWhenNameWithOwnerInvalid() {
             when(commitRepository.findShasWithoutContributorsByRepositoryId(1L)).thenReturn(List.of("a".repeat(40)));
 
@@ -111,11 +104,9 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("SHA filtering")
     class ShaFiltering {
 
         @Test
-        @DisplayName("should filter out invalid SHAs and process only valid ones")
         void shouldFilterInvalidShas() {
             String validSha = "a".repeat(40);
             when(commitRepository.findShasWithoutContributorsByRepositoryId(1L)).thenReturn(
@@ -131,11 +122,9 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("rate limit handling")
     class RateLimitHandling {
 
         @Test
-        @DisplayName("should abort when rate limit is critical and wait fails")
         void shouldAbortWhenRateLimitCriticalAndWaitFails() {
             String validSha = "a".repeat(40);
             when(commitRepository.findShasWithoutContributorsByRepositoryId(1L)).thenReturn(List.of(validSha));
@@ -152,14 +141,11 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("enrichment metadata")
     class EnrichmentMetadata {
 
         @Test
-        @DisplayName("should call updateEnrichmentMetadata when processing a valid response")
         @SuppressWarnings("unchecked")
         void shouldCallUpdateEnrichmentMetadataForValidResponse() {
-            // Arrange
             String sha = "a".repeat(40);
             Long repoId = 1L;
             Long scopeId = 1L;
@@ -211,10 +197,8 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
 
             when(graphQlClientProvider.forScope(scopeId)).thenReturn(client);
 
-            // Act
             int result = service.enrichCommitMetadata(repoId, "owner/repo", scopeId);
 
-            // Assert
             assertThat(result).isEqualTo(1);
 
             // Verify enrichment metadata was updated
@@ -252,10 +236,8 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null signature gracefully")
         @SuppressWarnings("unchecked")
         void shouldHandleNullSignatureGracefully() {
-            // Arrange
             String sha = "b".repeat(40);
             Long repoId = 1L;
             Long scopeId = 1L;
@@ -306,10 +288,8 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
 
             when(graphQlClientProvider.forScope(scopeId)).thenReturn(client);
 
-            // Act
             int result = service.enrichCommitMetadata(repoId, "owner/repo", scopeId);
 
-            // Assert
             assertThat(result).isEqualTo(1);
 
             // signatureValid should be null since signature object was null

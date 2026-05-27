@@ -32,7 +32,6 @@ import reactor.core.publisher.Mono;
  * Unit tests for {@link GitLabTokenRotationClient}.
  */
 @Tag("unit")
-@DisplayName("GitLabTokenRotationClient")
 class GitLabTokenRotationClientTest extends BaseUnitTest {
 
     @Mock
@@ -61,11 +60,9 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getTokenInfo")
     class GetTokenInfo {
 
         @Test
-        @DisplayName("should return token info with expiry date")
         @SuppressWarnings("unchecked")
         void shouldReturnTokenInfoWithExpiry() {
             stubTokenService();
@@ -89,7 +86,6 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null expiry date")
         @SuppressWarnings("unchecked")
         void shouldHandleNullExpiry() {
             stubTokenService();
@@ -116,7 +112,6 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw on 401 (invalid token)")
         @SuppressWarnings("unchecked")
         void shouldThrowOn401() {
             stubTokenService();
@@ -137,11 +132,9 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("rotateToken")
     class RotateToken {
 
         @Test
-        @DisplayName("should rotate token and return new value")
         @SuppressWarnings("unchecked")
         void shouldRotateToken() {
             stubTokenService();
@@ -165,7 +158,6 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw when rotation response missing token field")
         @SuppressWarnings("unchecked")
         void shouldThrowWhenResponseMissingToken() {
             stubTokenService();
@@ -211,18 +203,15 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("record toString")
     class RecordToString {
 
         @Test
-        @DisplayName("TokenInfo toString should not expose sensitive data")
         void tokenInfoToString() {
             TokenInfo info = new TokenInfo(1L, "test", LocalDate.of(2026, 1, 1));
             assertThat(info.toString()).doesNotContain("glpat");
         }
 
         @Test
-        @DisplayName("RotatedToken toString should not expose token value")
         void rotatedTokenToString() {
             RotatedToken token = new RotatedToken("glpat-secret", LocalDate.of(2026, 1, 1));
             assertThat(token.toString()).doesNotContain("glpat-secret");

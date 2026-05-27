@@ -9,7 +9,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("unit")
-@DisplayName("GitLabTeamSyncService.mapAccessLevel")
 class GitLabTeamSyncServiceMappingTest {
 
     @ParameterizedTest
@@ -28,7 +27,6 @@ class GitLabTeamSyncServiceMappingTest {
 
     @ParameterizedTest
     @ValueSource(strings = { "NO_ACCESS", "MINIMAL_ACCESS" })
-    @DisplayName("below-guest access levels are skipped")
     void subGuestLevels_areSkipped(String level) {
         assertThat(GitLabTeamSyncService.mapAccessLevel(level)).isNull();
     }

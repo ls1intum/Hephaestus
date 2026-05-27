@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +43,6 @@ import org.springframework.transaction.annotation.Transactional;
  * - Domain event publishing (CommentCreated, CommentUpdated, CommentDeleted)
  * - Context handling and workspace association
  */
-@DisplayName("GitHub Issue Comment Processor")
 class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     private static final Long TEST_ORG_ID = 215361191L;
@@ -169,11 +167,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Process Method - Create")
     class ProcessMethodCreate {
 
         @Test
-        @DisplayName("should create comment and publish CommentCreated event")
         void shouldCreateCommentAndPublishEvent() {
             GitHubCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "This is a test comment.");
             ProcessingContext context = createContext();
@@ -197,7 +193,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("should handle null DTO gracefully")
         void shouldHandleNullDTO() {
             IssueComment result = processor.process(null, testIssue.getNumber(), createContext());
 
@@ -206,7 +201,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("should handle missing issue gracefully")
         void shouldHandleMissingIssue() {
             GitHubCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "Test");
 
@@ -218,11 +212,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Process Method - Update")
     class ProcessMethodUpdate {
 
         @Test
-        @DisplayName("should update comment and publish CommentUpdated event when body changes")
         void shouldUpdateCommentAndPublishEvent() {
             // Create initial comment
             IssueComment existing = new IssueComment();
@@ -255,7 +247,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("should not publish event when nothing changes")
         void shouldNotPublishEventWhenNothingChanges() {
             // Create initial comment with matching data
             IssueComment existing = new IssueComment();
@@ -284,7 +275,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Process With Parent Creation - Solves Message Ordering")
     class ProcessWithParentCreation {
 
         private static final Long NEW_ISSUE_ID = 555555555L;
@@ -348,7 +338,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("should create Issue stub when parent does not exist")
         void shouldCreateIssueStubWhenParentDoesNotExist() {
             GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment on new issue");
             GitHubIssueDTO issueDto = createIssueDTOForNewIssue(NEW_ISSUE_ID, false);
@@ -376,7 +365,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("should create PullRequest stub when parent is PR and does not exist")
         void shouldCreatePullRequestStubWhenParentIsPRAndDoesNotExist() {
             GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment on new PR");
             GitHubIssueDTO issueDto = createIssueDTOForNewIssue(NEW_PR_ID, true);
@@ -405,7 +393,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("should use existing parent when it already exists")
         void shouldUseExistingParentWhenItAlreadyExists() {
             GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment on existing issue");
             // Use testIssue's number (42) so that findByRepositoryIdAndNumber finds the existing issue
@@ -426,7 +413,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("should handle missing issue ID gracefully")
         void shouldHandleMissingIssueIdGracefully() {
             GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment");
             GitHubIssueDTO issueDto = new GitHubIssueDTO(
@@ -461,11 +447,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Delete Method")
     class DeleteMethod {
 
         @Test
-        @DisplayName("should delete comment and publish CommentDeleted event")
         void shouldDeleteCommentAndPublishEvent() {
             // Create comment to delete
             IssueComment existing = new IssueComment();
@@ -496,7 +480,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
         @Test
         @Transactional
-        @DisplayName("should sync bidirectional relationship with parent issue when deleting")
         void shouldSyncBidirectionalRelationshipWhenDeleting() {
             // Create comment with bidirectional relationship set up
             IssueComment existing = new IssueComment();
@@ -524,7 +507,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("should handle null commentId gracefully")
         void shouldHandleNullCommentId() {
             processor.delete(null, createContext());
 
@@ -532,7 +514,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("should handle non-existent comment gracefully")
         void shouldHandleNonExistentComment() {
             processor.delete(999999L, createContext());
 

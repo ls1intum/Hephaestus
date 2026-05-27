@@ -134,8 +134,6 @@ public class ProjectIntegrityService {
         return deleted;
     }
 
-    // TODO: Add cascadeDeleteProjectsForUser() when user-scoped project sync is implemented and the User entity deletion lifecycle exists
-
     // ==================== Validation Operations ====================
 
     /**

@@ -16,33 +16,26 @@ import org.springframework.stereotype.Component;
  * Scheduler for historical backfill operations.
  *
  * <h2>Purpose</h2>
- * Runs scheduled backfill cycles to incrementally sync historical GitHub data that
- * predates the initial sync window. Processes batches for repositories that have
- * completed their initial sync but still have historical data to fetch.
+ * Runs scheduled backfill cycles for SCM providers that need historical data
+ * predating the initial sync window. Each enabled provider's backfill service is
+ * invoked once per cycle; rate-limit and cooldown handling lives inside the
+ * per-vendor services, not here.
  *
  * <h2>Design Rationale</h2>
  * <p>Backfill is handled exclusively via scheduled batches, not event-driven triggers.
  * This is intentional:
  * <ul>
- *   <li><b>Simplicity:</b> One mechanism handles all backfill - no event/scheduler coordination</li>
- *   <li><b>API respect:</b> Doesn't hammer GitHub right after sync depletes rate limit</li>
- *   <li><b>Historical data isn't urgent:</b> Data sitting for months/years can wait 15 minutes</li>
- *   <li><b>Built-in guards:</b> The scheduler already checks rate limits, cooldowns, and
- *       {@code lastIssuesSyncedAt}/{@code lastPullRequestsSyncedAt} to skip repos that haven't synced yet</li>
+ *   <li><b>Simplicity:</b> One mechanism handles all backfill — no event/scheduler coordination</li>
+ *   <li><b>API respect:</b> Doesn't hammer the provider right after sync depletes rate limit</li>
+ *   <li><b>Historical data isn't urgent:</b> Data sitting for months/years can wait minutes</li>
+ *   <li><b>Built-in guards:</b> Each backfill service checks rate limits, cooldowns, and
+ *       last-synced timestamps to skip repos that haven't completed initial sync yet</li>
  * </ul>
  *
- * <h2>Configuration</h2>
- * <pre>{@code
- * hephaestus:
- *   sync:
- *     backfill:
- *       enabled: true              # Must be true to enable backfill
- *       batch-size: 50             # Pages per repository per cycle
- *       rate-limit-threshold: 100  # Pause when remaining points drop below this
- *       interval-seconds: 60       # Seconds between cycles (rate limit is the throttle)
- * }</pre>
+ * <p>Configuration lives on {@link SyncSchedulerProperties.BackfillProperties}.
  *
  * @see GitHubHistoricalBackfillService
+ * @see GitLabHistoricalBackfillService
  * @see SyncSchedulerProperties.BackfillProperties
  */
 @Slf4j
@@ -50,7 +43,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "hephaestus.sync.backfill.enabled", havingValue = "true")
 @WorkspaceAgnostic(
-    "Workspace iteration is owned by GitHubHistoricalBackfillService.runBackfillCycle() — the scheduler is a thin trigger."
+    "Workspace iteration is owned by the per-vendor backfill services " +
+        "(GitHubHistoricalBackfillService.runBackfillCycle and GitLabHistoricalBackfillService.runBackfillCycle); " +
+        "the scheduler is a thin trigger."
 )
 public class HistoricalBackfillScheduler {
 

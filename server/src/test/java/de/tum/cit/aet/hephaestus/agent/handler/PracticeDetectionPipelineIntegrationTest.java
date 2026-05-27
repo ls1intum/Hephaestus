@@ -60,7 +60,6 @@ import tools.jackson.databind.node.ObjectNode;
  * because they make external API calls to GitHub/GitLab. All other components (result parser,
  * delivery service, feedback service, finding repository) are real beans against PostgreSQL.
  */
-@DisplayName("Practice detection pipeline integration")
 @RecordApplicationEvents
 class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
@@ -255,11 +254,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Happy path")
     class HappyPath {
 
         @Test
-        @DisplayName("full pipeline: parse → persist findings → publish event → post feedback")
         void fullPipelineFromParseToDelivery() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-123");
@@ -296,7 +293,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("all-positive findings: approval comment posted, no diff notes")
         void allPositiveFindingsPostsApproval() {
             String output = """
                 {
@@ -331,11 +327,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Error cases")
     class ErrorCases {
 
         @Test
-        @DisplayName("invalid JSON output throws JobDeliveryException with no findings")
         void invalidJsonOutputFailsGracefully() {
             setJobOutput("this is not valid JSON at all");
 
@@ -348,7 +342,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("unknown practice slug discarded, valid findings persisted")
         void unknownSlugDiscardedOthersKept() {
             String output = """
                 {
@@ -394,7 +387,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("closed PR: findings persisted but no comment posted")
         void closedPrSkipsDelivery() {
             // Update PR state to CLOSED
             var pr = pullRequestRepository.findById(prId).orElseThrow();
@@ -452,7 +444,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Finding idempotency")
     class FindingIdempotency {
 
         @Test

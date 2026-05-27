@@ -1,11 +1,4 @@
-/**
- * Outline vendor adapter — webhook + connect + lifecycle.
- *
- * <p>CLOSED module: feature modules outside the integration namespace MUST NOT reach
- * into Outline internals. Cross-module callers go through the SPI ({@code integration::core}).
- * The {@code allowedDependencies} list below is the empirically-derived dependency
- * footprint and is checked at build time by {@code ModulithVerificationTest}.
- */
+/** Outline vendor adapter — webhook + connect + lifecycle. */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Integration · Outline",
     type = org.springframework.modulith.ApplicationModule.Type.CLOSED,

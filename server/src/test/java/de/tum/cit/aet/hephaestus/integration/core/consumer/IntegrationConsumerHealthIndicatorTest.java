@@ -20,7 +20,6 @@ import org.springframework.boot.health.contributor.Status;
  * {@code application.yml}; UP/DOWN here translates directly into k8s pulling/restoring
  * traffic to the pod.
  */
-@DisplayName("IntegrationConsumerHealthIndicator")
 class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
 
     private static IntegrationConsumerHealthIndicator indicator(IntegrationConsumerStats stats) {

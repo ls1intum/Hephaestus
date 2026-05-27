@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -32,7 +31,6 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
-@DisplayName("GitHub Membership Message Handler")
 class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -107,19 +105,15 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
     }
 
     @Test
-    @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
         assertThat(handler.key().eventType()).isEqualTo("organization.membership");
     }
 
     @Test
-    @DisplayName("Should handle member added event")
     void shouldHandleMemberAddedEvent() throws Exception {
-        // Given
         GitHubMembershipEventDTO event = loadPayload("membership.added");
         createTestTeam(event.team().id(), event.team().name());
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error
@@ -127,9 +121,7 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
     }
 
     @Test
-    @DisplayName("Should handle member removed event")
     void shouldHandleMemberRemovedEvent() throws Exception {
-        // Given
         GitHubMembershipEventDTO event = loadPayload("membership.removed");
         createTestTeam(event.team().id(), event.team().name());
 
@@ -145,7 +137,6 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
             userRepository.save(member);
         }
 
-        // When
         handler.handleEvent(event);
 
         // Then - handler processes without error

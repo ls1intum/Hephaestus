@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import com.tngtech.archunit.lang.ArchRule;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -16,7 +15,6 @@ import org.junit.jupiter.api.Test;
 class IntegrationSubjectBoundariesTest extends HephaestusArchitectureTest {
 
     @Test
-    @DisplayName("OrganizationRepository must not declare unscoped findByLogin* (provider-id required)")
     void noUnscopedFindByLogin() {
         ArchRule rule = noMethods()
             .that()

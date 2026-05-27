@@ -35,7 +35,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>Tx-template wrapping of {@code handleEvent}.</li>
  * </ul>
  */
-@DisplayName("AbstractIntegrationMessageHandler base behaviour")
 class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
 
     private NatsMessageDeserializer deserializer;
@@ -59,14 +58,12 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("key() returns the EventTypeKey assembled from constructor args")
     void key_returnsConstructorKey() {
         TestHandler handler = new TestHandler(IntegrationKind.GITHUB, "repository.issues");
         assertThat(handler.key()).isEqualTo(new EventTypeKey(IntegrationKind.GITHUB, "repository.issues"));
     }
 
     @Test
-    @DisplayName("matching subject deserializes and invokes handleEvent inside the tx template")
     void matchingSubject_deserializesAndDispatches() throws IOException {
         TestHandler handler = new TestHandler(IntegrationKind.GITHUB, "repository.issues");
         Message msg = mock(Message.class);
@@ -80,7 +77,6 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("subject with mismatched last segment is rejected without deserializing")
     void mismatchedSubject_rejected() throws IOException {
         TestHandler handler = new TestHandler(IntegrationKind.GITHUB, "repository.issues");
         Message msg = mock(Message.class);
@@ -106,7 +102,6 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("deserialization IOException is translated to PayloadParsingException")
     void deserializeIOException_translatesToPayloadParsing() throws IOException {
         TestHandler handler = new TestHandler(IntegrationKind.GITLAB, "merge_request");
         Message msg = mock(Message.class);
@@ -119,7 +114,6 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("RuntimeException from handleEvent propagates unwrapped")
     void runtimeException_propagates() throws IOException {
         TestHandler handler = new TestHandler(IntegrationKind.GITLAB, "merge_request") {
             @Override
@@ -137,7 +131,6 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("constructor rejects blank eventType")
     void blankEventType_rejected() {
         assertThatThrownBy(() -> new TestHandler(IntegrationKind.GITHUB, "  ")).isInstanceOf(
             IllegalArgumentException.class
@@ -145,13 +138,11 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("constructor rejects null kind")
     void nullKind_rejected() {
         assertThatThrownBy(() -> new TestHandler(null, "push")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    @DisplayName("eventType with trailing dot is rejected (no usable subject token)")
     void eventTypeWithTrailingDot_rejected() {
         assertThatThrownBy(() -> new TestHandler(IntegrationKind.GITHUB, "repository."))
             .isInstanceOf(IllegalArgumentException.class)

@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * {@code MissingSignature} so the pipeline fails closed.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineWebhookSecretSource implements WebhookSecretSource {
 
     private static final Logger log = LoggerFactory.getLogger(OutlineWebhookSecretSource.class);

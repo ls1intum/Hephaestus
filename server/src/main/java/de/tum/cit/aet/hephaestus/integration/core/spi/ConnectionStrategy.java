@@ -27,13 +27,6 @@ public interface ConnectionStrategy {
      */
     ConnectFinalization finalizeConnect(IntegrationRef ref, Map<String, String> callbackParams);
 
-    /**
-     * Probe credentials freshly — fail-fast on revoked tokens before going ACTIVE.
-     * Called from {@link #finalizeConnect}, periodic health checks, and the admin
-     * "Test connection" button.
-     */
-    ValidationResult validate(IntegrationRef ref, CredentialBundle credentials);
-
     /** Revoke vendor-side (best-effort) and signal local state change. */
     void revoke(IntegrationRef ref);
 
@@ -58,19 +51,5 @@ public interface ConnectionStrategy {
         ) implements ConnectFinalization {}
 
         record Failed(String reason) implements ConnectFinalization {}
-    }
-
-    sealed interface ValidationResult permits ValidationResult.Ok, ValidationResult.Failed {
-        record Ok(
-            @Nullable String observedInstanceKey,
-            @Nullable String observedDisplayName
-        ) implements ValidationResult {}
-
-        /**
-         * Probe negative. Callers MUST NOT transition the Connection to {@code ACTIVE}.
-         * A strategy without a wired vendor-side probe returns {@code Failed("probe not
-         * wired")} — never an {@code Ok} — so the absence of validation is fail-closed.
-         */
-        record Failed(String reason) implements ValidationResult {}
     }
 }

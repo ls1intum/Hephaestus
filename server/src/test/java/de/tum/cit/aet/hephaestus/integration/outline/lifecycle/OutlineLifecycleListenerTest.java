@@ -22,12 +22,10 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 
-@DisplayName("OutlineLifecycleListener — unit")
 class OutlineLifecycleListenerTest extends BaseUnitTest {
 
     private static final Instant FIXED = Instant.parse("2026-05-24T12:00:00Z");
@@ -50,7 +48,6 @@ class OutlineLifecycleListenerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("empty delta is a no-op")
     void emptyDeltaIsNoOp() {
         listener.onScopeChanged(
             new IntegrationRef(IntegrationKind.OUTLINE, 1L, "ws"),
@@ -60,7 +57,6 @@ class OutlineLifecycleListenerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("unknown connection logs + skips without exception")
     void unknownConnectionIsSilent() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, 1L, "ws-gone");
         when(
@@ -79,7 +75,6 @@ class OutlineLifecycleListenerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("collection removal soft-deletes documents first, then the collection row (workspace-pinned)")
     void removalCascadesDocumentsThenCollection() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, 1L, "ws");
         Connection conn = Mockito.mock(Connection.class);
