@@ -36,7 +36,6 @@ export default defineConfig({
 					"POST /api/v1/workspaces/{workspaceId}/connections/{id}/disconnect",
 					"POST /api/v1/workspaces/{workspaceId}/connections/{id}/reactivate",
 					"POST /api/v1/workspaces/{workspaceId}/connections/{id}/suspend",
-					"PATCH /api/v1/workspaces/{workspaceId}/connections/slack/notification-channel",
 					"POST /api/v1/workspaces/{workspaceId}/connections/slack/test-message"
 				]
 			}

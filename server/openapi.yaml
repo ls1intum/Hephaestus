@@ -26,15 +26,6 @@ tags:
   name: workspace-registry-controller
 - description: Read-only access to practice evaluation findings
   name: Practice Findings
-- description: |-
-    Slack-specific admin endpoints — channel configuration + connectivity probe.
-
-     <p>Lives next to {@link SlackConnectionStrategy SlackConnectionStrategy} (per-kind admin surface) rather than
-     inflating <code>ConnectionController</code> with a kind-specific subroute. The DTOs are
-     deliberately flat records — no sealed-type discriminators — so springdoc 3.0 emits
-     concrete schemas into <code>openapi.yaml</code> and the generated webapp client picks
-     them up cleanly.
-  name: slack-connection-admin-controller
 - description: Workspace-scoped agent configuration management
   name: Agent Config
 - description: Workspace-scoped mentor chat threads
@@ -103,6 +94,15 @@ tags:
   name: Team Settings
 - description: Team management within workspace
   name: Teams
+- description: |-
+    Slack-specific admin endpoint — connectivity probe.
+
+     <p>Channel + team configuration is owned by
+     <code>PATCH /workspaces/{slug</code>/notifications} (existing endpoint that writes
+     both <code>Workspace.leaderboardNotificationEnabled</code> and the <code>SlackConfig</code>
+     JSONB fields atomically). This controller exists only for the test-message
+     probe, which has no analogue in the workspace settings surface.
+  name: slack-connection-admin-controller
 - description: Contributor feedback on AI-generated practice findings
   name: Finding Feedback
 - description: User profile and activity data
@@ -157,37 +157,6 @@ paths:
           description: OK
       tags:
       - connection
-  /api/v1/workspaces/{workspaceId}/connections/slack/notification-channel:
-    patch:
-      description: |-
-        Set the Slack notification channel + optional team label on the workspace's
-         ACTIVE Slack Connection. Returns the updated {@link SlackNotificationConfigResponse SlackNotificationConfigResponse}.
-      operationId: updateNotificationChannel
-      parameters:
-      - in: path
-        name: workspaceId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SlackNotificationChannelRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SlackNotificationConfigResponse"
-          description: OK
-      summary: |-
-        Set the Slack notification channel + optional team label on the workspace's
-         ACTIVE Slack Connection.
-      tags:
-      - slack-connection-admin
   /api/v1/workspaces/{workspaceId}/connections/slack/test-message:
     post:
       description: |-
