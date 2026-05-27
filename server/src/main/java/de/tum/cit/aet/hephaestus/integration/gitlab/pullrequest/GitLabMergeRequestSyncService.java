@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment.Git
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.sync.backfill.BackfillBatchResult;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;

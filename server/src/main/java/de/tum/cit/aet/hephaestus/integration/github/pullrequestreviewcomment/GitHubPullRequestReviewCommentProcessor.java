@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.github.pullrequestreviewcomment;
 
-import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.integration.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequest.dto.GitHubPullRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO;
 import de.tum.cit.aet.hephaestus.integration.github.user.GitHubUserProcessor;

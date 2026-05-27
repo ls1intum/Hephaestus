@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.github.label;
 
 import static org.assertj.core.api.Assertions.*;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.github.label.dto.GitHubLabelEventDTO;

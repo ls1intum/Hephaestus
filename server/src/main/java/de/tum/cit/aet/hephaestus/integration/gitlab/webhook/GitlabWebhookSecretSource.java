@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.webhook;
 
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.WebhookSecretSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;

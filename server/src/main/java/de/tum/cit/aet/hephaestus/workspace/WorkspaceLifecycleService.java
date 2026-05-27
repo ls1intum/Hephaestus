@@ -4,8 +4,8 @@ import static de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer;
-import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamLabelFilterRepository;

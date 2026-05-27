@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.HashSet;

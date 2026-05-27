@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.refs;
 
-import de.tum.cit.aet.hephaestus.integration.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

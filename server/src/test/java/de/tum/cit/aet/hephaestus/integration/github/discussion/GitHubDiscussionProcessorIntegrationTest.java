@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.github.discussion;
 
 import static org.assertj.core.api.Assertions.*;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionCategoryDTO;
 import de.tum.cit.aet.hephaestus.integration.github.discussion.dto.GitHubDiscussionDTO;
 import de.tum.cit.aet.hephaestus.integration.github.discussioncomment.dto.GitHubDiscussionCommentDTO;

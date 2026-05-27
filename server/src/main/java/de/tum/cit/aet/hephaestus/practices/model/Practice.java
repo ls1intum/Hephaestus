@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
-import de.tum.cit.aet.hephaestus.integration.spi.Capability;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationFamily;
+import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationFamily;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

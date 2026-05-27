@@ -6,13 +6,13 @@ import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@link java.util.HexFormat#of()} is the only approved hex source inside {@code integration.webhook}.
+ * {@link java.util.HexFormat#of()} is the only approved hex source inside {@code integration.core.webhook}.
  * {@code Integer/Long.toHexString} drop leading zeros (e.g. {@code 0x0a → "a"}), silently
  * corrupting dedup IDs and HMAC signatures.
  */
 class HexEncodingArchTest extends HephaestusArchitectureTest {
 
-    private static final String WEBHOOK_PACKAGE = "..integration.webhook..";
+    private static final String WEBHOOK_PACKAGE = "..integration.core.webhook..";
 
     @Test
     void noIntegerToHexStringCall() {

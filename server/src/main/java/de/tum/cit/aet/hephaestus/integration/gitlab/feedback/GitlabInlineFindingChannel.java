@@ -6,10 +6,10 @@ import static de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrReso
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrInfo;
-import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.spi.FindingAnchor;
-import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

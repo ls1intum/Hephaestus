@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.organization;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

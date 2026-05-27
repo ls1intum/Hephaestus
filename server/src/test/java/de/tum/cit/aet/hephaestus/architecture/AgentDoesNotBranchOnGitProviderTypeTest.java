@@ -3,12 +3,12 @@ package de.tum.cit.aet.hephaestus.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.lang.ArchRule;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Agent-side code must dispatch by {@link de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind}
+ * Agent-side code must dispatch by {@link de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind}
  * only — never by the legacy {@link GitProviderType} enum.
  */
 class AgentDoesNotBranchOnGitProviderTypeTest extends HephaestusArchitectureTest {

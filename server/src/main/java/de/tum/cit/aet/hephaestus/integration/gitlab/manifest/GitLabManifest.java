@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.manifest;
 
-import de.tum.cit.aet.hephaestus.integration.spi.Capability;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationManifest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import java.util.EnumSet;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;

@@ -2,11 +2,11 @@ package de.tum.cit.aet.hephaestus.integration.github.commit;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.integration.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
-import de.tum.cit.aet.hephaestus.integration.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitAuthorResolver;
@@ -16,8 +16,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.commit.util.CommitUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.integration.spi.AuthMode;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

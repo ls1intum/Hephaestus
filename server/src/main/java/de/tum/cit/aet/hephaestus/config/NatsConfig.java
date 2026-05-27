@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.config;
 
-import de.tum.cit.aet.hephaestus.integration.consumer.NatsConnectionProperties;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import io.nats.client.Connection;
 import io.nats.client.Nats;
 import io.nats.client.Options;

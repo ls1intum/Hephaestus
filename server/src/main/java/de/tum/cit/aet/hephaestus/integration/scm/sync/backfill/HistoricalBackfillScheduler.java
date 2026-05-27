@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.sync.backfill;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.label;
 
-import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.integration.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.gitlab.label.dto.GitLabLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.common.LabelIdUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;

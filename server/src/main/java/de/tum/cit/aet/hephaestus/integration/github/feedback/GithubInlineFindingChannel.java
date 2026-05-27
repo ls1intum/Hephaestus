@@ -4,11 +4,11 @@ import static de.tum.cit.aet.hephaestus.integration.github.feedback.GithubPrNode
 
 import de.tum.cit.aet.hephaestus.integration.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.github.feedback.GithubFeedbackChannel.PrCoordinates;
-import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
-import de.tum.cit.aet.hephaestus.integration.spi.FindingAnchor;
-import de.tum.cit.aet.hephaestus.integration.spi.InlineFindingChannel;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

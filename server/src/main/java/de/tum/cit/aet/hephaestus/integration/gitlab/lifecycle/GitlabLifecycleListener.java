@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.lifecycle;
 
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import org.springframework.stereotype.Component;
 
 /**

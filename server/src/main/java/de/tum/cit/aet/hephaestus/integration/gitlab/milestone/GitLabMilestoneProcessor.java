@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.milestone;
 
-import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.integration.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.BaseGitLabProcessor;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.gitlab.milestone.dto.GitLabMilestoneDTO;
@@ -15,8 +15,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.spi.RepositoryScopeFilter;
-import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;

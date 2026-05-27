@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.WebhookSecretSource.SecretLookup;
-import de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource.SecretLookup;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;

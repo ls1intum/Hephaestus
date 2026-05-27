@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.architecture;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
-import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageHandler;
-import de.tum.cit.aet.hephaestus.integration.handler.IntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;

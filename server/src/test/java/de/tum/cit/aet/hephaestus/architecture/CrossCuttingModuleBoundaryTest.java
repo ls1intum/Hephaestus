@@ -157,9 +157,11 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         @DisplayName("Core does not depend on feature modules")
         void coreDoesNotDependOnFeatureModules() {
+            // NOTE: `..core..` would also match `integration.core.*` after the integration restructure,
+            // which is undesired — we want the framework-foundation `core` only. Anchor to the FQN root.
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..core..")
+                .resideInAPackage("de.tum.cit.aet.hephaestus.core..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage(
@@ -183,9 +185,11 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         @DisplayName("Core does not depend on integration.scm")
         void coreDoesNotDependOnGitprovider() {
+            // Anchor to the FQN root to exclude `integration.core.*` (which is the integration core
+            // and is allowed to know the scm aggregate during the migration).
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..core..")
+                .resideInAPackage("de.tum.cit.aet.hephaestus.core..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..integration.scm..")

@@ -34,4 +34,4 @@ hephaestus:
 
 logging:
     level:
-        de.tum.cit.aet.hephaestus.integration.webhook: INFO
+        de.tum.cit.aet.hephaestus.integration.core.webhook: INFO

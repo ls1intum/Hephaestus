@@ -41,15 +41,15 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     /**
      * Single property-gated config per role. Controllers inside {@code integration.webhook} are
      * implicitly gated via {@code @ConditionalOnBean(JetStreamPublisher.class)} — they auto-load
-     * iff {@link de.tum.cit.aet.hephaestus.integration.webhook.WebhookConfiguration} loads, so
+     * iff {@link de.tum.cit.aet.hephaestus.integration.core.webhook.WebhookConfiguration} loads, so
      * listing them here would just duplicate the WebhookConfiguration gate.
      */
     private static final Map<String, String> EXPECTED_GATES = Map.of(
-        "de.tum.cit.aet.hephaestus.integration.webhook.WebhookConfiguration",
+        "de.tum.cit.aet.hephaestus.integration.core.webhook.WebhookConfiguration",
         RuntimeRole.WEBHOOK_PROPERTY,
         "de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig",
         RuntimeRole.SERVER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer",
+        "de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer",
         RuntimeRole.SERVER_PROPERTY,
         "de.tum.cit.aet.hephaestus.workspace.WorkspaceStartupListener",
         RuntimeRole.SERVER_PROPERTY,
@@ -125,7 +125,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     void webhookPackageIsIsolatedFromServerWorkerConcerns() {
         noClasses()
             .that()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.webhook..")
+            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.core.webhook..")
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage(

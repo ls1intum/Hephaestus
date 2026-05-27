@@ -5,10 +5,10 @@ import static de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrReso
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.gitlab.feedback.GitlabMrResolver.MrInfo;
-import de.tum.cit.aet.hephaestus.integration.spi.ApprovalChannel;
-import de.tum.cit.aet.hephaestus.integration.spi.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.spi.FeedbackDeliveryException;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

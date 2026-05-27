@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.team;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabDescendantGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.graphql.GitLabGroupResponse;

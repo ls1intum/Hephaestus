@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.activity;
 
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointCalculator;
-import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.integration.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueCommentRepository;

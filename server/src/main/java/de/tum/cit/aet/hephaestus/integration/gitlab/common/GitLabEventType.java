@@ -9,7 +9,7 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.common;
  * <p>
  * This is an intentional subset of all GitLab webhook event types, covering only those
  * needed by current or planned handlers. Unknown event types are gracefully acknowledged
- * by {@link de.tum.cit.aet.hephaestus.integration.consumer.IntegrationNatsConsumer} without
+ * by {@link de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer} without
  * retrying. Additional types (e.g., {@code wiki_page}, {@code deployment}, {@code build},
  * {@code release}) can be added as handlers are implemented.
  *

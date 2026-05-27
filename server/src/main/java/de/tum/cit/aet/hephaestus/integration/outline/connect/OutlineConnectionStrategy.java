@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.outline.connect;
 
-import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
-import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
-import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;

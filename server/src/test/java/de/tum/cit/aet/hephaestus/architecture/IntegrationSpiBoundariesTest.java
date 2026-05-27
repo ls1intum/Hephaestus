@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * <p>Each rule encodes an invariant whose violation has bitten this repo before — or
  * would silently re-introduce the per-vendor coupling the unification fixed:
  * <ul>
- *   <li>{@link #spiHasNoVendorSdkDependencies} — {@code integration/spi} stays vendor-
+ *   <li>{@link #spiHasNoVendorSdkDependencies} — {@code integration/core/spi} stays vendor-
  *       agnostic. Today {@code RateLimitTracker} imports
  *       {@code de.tum.cit.aet.hephaestus.integration.scm.graphql.github.GHRateLimit}; that
  *       drift is acceptable while {@code integration.scm/} is still load-bearing, but new
@@ -27,11 +27,11 @@ import org.junit.jupiter.api.Test;
 class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
 
     @Test
-    @DisplayName("integration/spi does NOT depend on any vendor SDK (org.kohsuke / com.slack / org.gitlab4j)")
+    @DisplayName("integration/core/spi does NOT depend on any vendor SDK (org.kohsuke / com.slack / org.gitlab4j)")
     void spiHasNoVendorSdkDependencies() {
         ArchRule rule = noClasses()
             .that()
-            .resideInAPackage("..integration.spi..")
+            .resideInAPackage("..integration.core.spi..")
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage("org.kohsuke..", "com.slack..", "org.gitlab4j..", "com.linecorp.bot..")
@@ -121,7 +121,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                 .doNotHaveSimpleName("PullRequestReviewSubmissionRequest")
                 .should()
                 .dependOnClassesThat()
-                .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind")
+                .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind")
                 .because(
                     "The IntegrationKind enum should only be referenced by agent/ code that " +
                         "passes it through to the SPI registry. New uses indicate a switch-on-" +

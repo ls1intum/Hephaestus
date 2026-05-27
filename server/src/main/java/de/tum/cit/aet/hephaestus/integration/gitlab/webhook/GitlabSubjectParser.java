@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.webhook;
 
-import de.tum.cit.aet.hephaestus.integration.spi.EventTypeKey;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.SubjectParser;
+import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
 import org.springframework.stereotype.Component;
 
 /**

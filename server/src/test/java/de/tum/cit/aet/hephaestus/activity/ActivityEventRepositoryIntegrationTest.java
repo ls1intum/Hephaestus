@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.activity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.spi.Capability;
+import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.LinkedHashSet;
 import java.util.Set;

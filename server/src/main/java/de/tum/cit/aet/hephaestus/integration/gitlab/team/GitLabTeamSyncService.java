@@ -4,9 +4,9 @@ import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncCons
 import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.adaptPageSize;
 import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.extractNumericId;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
@@ -27,8 +27,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.team.membership.TeamMembership;
 import de.tum.cit.aet.hephaestus.integration.scm.team.membership.TeamMembershipRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.team.permission.TeamRepositoryPermission;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
-import de.tum.cit.aet.hephaestus.integration.spi.TeamMembershipListener;
-import de.tum.cit.aet.hephaestus.integration.spi.TeamMembershipListener.TeamsSyncedEvent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.TeamMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.TeamMembershipListener.TeamsSyncedEvent;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;

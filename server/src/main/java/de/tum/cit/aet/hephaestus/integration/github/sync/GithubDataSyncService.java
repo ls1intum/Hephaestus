@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.github.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.commit.CommitAuthorEnrichmentService;
 import de.tum.cit.aet.hephaestus.integration.github.commit.CommitMetadataEnrichmentService;
@@ -37,14 +37,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationReposi
 import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.spi.InstallationTokenProvider;
-import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener;
-import de.tum.cit.aet.hephaestus.integration.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncMetadata;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncMetadata;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;

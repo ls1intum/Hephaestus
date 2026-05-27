@@ -12,8 +12,8 @@ import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubReposit
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.spi.RepositoryScopeFilter;
-import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

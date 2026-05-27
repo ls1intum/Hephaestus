@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.github.connect;
 
-import de.tum.cit.aet.hephaestus.integration.oauth.state.OAuthStateService;
-import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.GithubAppCredential;
-import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.GithubAppCredential;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -93,7 +93,7 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     @Override
     public ValidationResult validate(
         IntegrationRef ref,
-        de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle credentials
+        de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle credentials
     ) {
         // Fail closed: returning Ok would silently transition the Connection to ACTIVE on
         // revoked installations. Follow-up wiring will call

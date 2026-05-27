@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.github.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.github.issuedependency.GitHubIssueDependencySyncService;
 import de.tum.cit.aet.hephaestus.integration.github.issuetype.GitHubIssueTypeSyncService;
@@ -15,12 +15,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNo
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.project.Project;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncSession;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncStatistics;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncStatistics;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.List;

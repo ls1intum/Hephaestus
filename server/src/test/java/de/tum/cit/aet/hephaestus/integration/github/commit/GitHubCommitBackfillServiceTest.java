@@ -12,15 +12,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.integration.spi.AuthMode;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
@@ -112,7 +112,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         lenient().when(repo.getId()).thenReturn(id);
         lenient().when(repo.getNameWithOwner()).thenReturn(nameWithOwner);
         lenient().when(repo.getDefaultBranch()).thenReturn(defaultBranch);
-        var provider = mock(de.tum.cit.aet.hephaestus.integration.connection.GitProvider.class);
+        var provider = mock(de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider.class);
         lenient().when(provider.getId()).thenReturn(1L);
         lenient().when(repo.getProvider()).thenReturn(provider);
         return repo;

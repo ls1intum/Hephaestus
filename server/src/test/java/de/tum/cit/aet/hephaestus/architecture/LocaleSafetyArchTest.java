@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
  */
 class LocaleSafetyArchTest extends HephaestusArchitectureTest {
 
-    private static final String WEBHOOK_PACKAGE = "..integration.webhook..";
+    private static final String WEBHOOK_PACKAGE = "..integration.core.webhook..";
 
     @Test
     void noNakedToLowerCase() {

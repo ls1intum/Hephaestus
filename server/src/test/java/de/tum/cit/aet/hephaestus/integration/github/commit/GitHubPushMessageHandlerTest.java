@@ -12,7 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.commit.CommitAuthorResolver;
@@ -21,9 +21,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -163,7 +163,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         when(repo.getDefaultBranch()).thenReturn(defaultBranch);
         when(repo.getOrganization()).thenReturn(null);
         var provider = mock(
-            de.tum.cit.aet.hephaestus.integration.connection.GitProvider.class,
+            de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider.class,
             org.mockito.Mockito.withSettings().lenient()
         );
         when(provider.getId()).thenReturn(1L);

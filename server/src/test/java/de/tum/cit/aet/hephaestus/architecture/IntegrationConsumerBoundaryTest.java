@@ -72,7 +72,7 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
             .resideInAPackage("de.tum.cit.aet.hephaestus.agent..")
             .should()
             .dependOnClassesThat()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.consumer..")
+            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.core.consumer..")
             .because(
                 "agent runtime role uses its own NATS connection (hephaestus.agent.nats.*); " +
                     "depending on integration.consumer would mix bean clusters across roles and " +

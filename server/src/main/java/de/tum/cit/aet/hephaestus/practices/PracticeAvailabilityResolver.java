@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.integration.framework.WorkspaceCapabilityResolver;
+import de.tum.cit.aet.hephaestus.integration.core.framework.WorkspaceCapabilityResolver;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import org.springframework.stereotype.Service;
 
 /**
  * Practices-module shim over
  * {@link WorkspaceCapabilityResolver#isAvailable(long,
- * java.util.Set, de.tum.cit.aet.hephaestus.integration.spi.IntegrationFamily)}.
+ * java.util.Set, de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationFamily)}.
  *
  * <p>Lives here (and not in the integration module) so the integration module never
  * imports {@link Practice} — keeping the dependency arrow one-way, {@code practices ->

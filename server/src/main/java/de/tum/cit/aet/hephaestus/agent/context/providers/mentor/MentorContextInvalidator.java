@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.integration.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -110,8 +110,8 @@ public class MentorContextInvalidator {
     }
 
     private void evictForReview(
-        de.tum.cit.aet.hephaestus.integration.events.EventContext context,
-        de.tum.cit.aet.hephaestus.integration.events.EventPayload.ReviewData review
+        de.tum.cit.aet.hephaestus.integration.core.events.EventContext context,
+        de.tum.cit.aet.hephaestus.integration.core.events.EventPayload.ReviewData review
     ) {
         Long workspaceId = resolveWorkspaceId(context);
         if (workspaceId == null || review == null) return;
@@ -129,7 +129,7 @@ public class MentorContextInvalidator {
      * Best-effort resolution of {@code workspaceId} from event context. Returns {@code null}
      * when the event lacks the necessary linkage — the caller is then a no-op.
      */
-    private Long resolveWorkspaceId(de.tum.cit.aet.hephaestus.integration.events.EventContext context) {
+    private Long resolveWorkspaceId(de.tum.cit.aet.hephaestus.integration.core.events.EventContext context) {
         if (context == null || context.repository() == null) return null;
         // The DomainEvent context carries a RepositoryRef — we resolve to workspace via the
         // RepositoryToMonitor join (same approach the aspect queries use).

@@ -781,7 +781,7 @@
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
-                                        <include>de.tum.cit.aet.hephaestus.integration.webhook</include>
+                                        <include>de.tum.cit.aet.hephaestus.integration.core.webhook</include>
                                     </includes>
                                     <limits>
                                         <limit>

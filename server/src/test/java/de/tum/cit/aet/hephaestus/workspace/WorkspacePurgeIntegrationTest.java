@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
@@ -69,7 +69,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 slug + "-group",
                 AccountType.ORG,
                 owner.getId(),
-                de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
+                de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                 "glpat-purge-test-token",
                 null
             )
@@ -147,7 +147,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "cleanup-group",
                     AccountType.ORG,
                     owner.getId(),
-                    de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
+                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                     "glpat-cleanup-token",
                     null
                 )
@@ -216,7 +216,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "idempotent-group",
                     AccountType.ORG,
                     owner.getId(),
-                    de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
+                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                     "glpat-idempotent-token",
                     null
                 )
@@ -268,7 +268,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     class SensitiveFieldClearing {
 
         @Autowired
-        private de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository connectionRepository;
+        private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository connectionRepository;
 
         /**
          * Per-workspace credentials now live on the {@code Connection} aggregate (PAT,
@@ -291,8 +291,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(connections).isNotEmpty();
             assertThat(connections).anyMatch(
                 c ->
-                    c.getKind() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB &&
-                    c.getState() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.ACTIVE &&
+                    c.getKind() == de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB &&
+                    c.getState() == de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState.ACTIVE &&
                     c.getCredentialsEncrypted() != null
             );
 
@@ -301,7 +301,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             // Post-purge: every Connection is UNINSTALLED and its credential blob is null.
             var postPurge = connectionRepository.findByWorkspaceId(workspaceId);
             assertThat(postPurge).allMatch(
-                c -> c.getState() == de.tum.cit.aet.hephaestus.integration.spi.IntegrationState.UNINSTALLED
+                c -> c.getState() == de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState.UNINSTALLED
             );
             assertThat(postPurge).allMatch(c -> c.getCredentialsEncrypted() == null);
             assertThat(postPurge).allMatch(c -> c.getCredentialsAlg() == null);
@@ -323,7 +323,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "chat-cleanup-group",
                     AccountType.ORG,
                     owner.getId(),
-                    de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
+                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                     "glpat-chat-cleanup-token",
                     null
                 )
@@ -389,7 +389,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "non-owner-group",
                     AccountType.ORG,
                     owner.getId(),
-                    de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITLAB,
+                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                     "glpat-non-owner-token",
                     null
                 )

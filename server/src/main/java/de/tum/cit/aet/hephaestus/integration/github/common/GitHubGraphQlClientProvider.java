@@ -5,8 +5,8 @@ import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService.In
 import de.tum.cit.aet.hephaestus.integration.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.common.exception.CircuitBreakerOpenException;
 import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHRateLimit;
-import de.tum.cit.aet.hephaestus.integration.spi.AuthMode;
-import de.tum.cit.aet.hephaestus.integration.spi.InstallationTokenProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.util.concurrent.TimeUnit;

@@ -6,9 +6,9 @@ import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncCons
 import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.adaptPageSize;
 import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.extractEntityId;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;

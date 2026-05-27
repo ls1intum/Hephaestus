@@ -1,15 +1,15 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig.GitLabConfig;
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig.GitLabConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenRotationClient;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookClient;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookClient.WebhookConfig;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabWebhookClient.WebhookInfo;
-import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;

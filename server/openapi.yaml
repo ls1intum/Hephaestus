@@ -58,7 +58,7 @@ tags:
   name: Account
 - description: |-
     Administrative REST surface for managing per-workspace
-     {@link de.tum.cit.aet.hephaestus.integration.connection.Connection de.tum.cit.aet.hephaestus.integration.connection.Connection} rows — list, read,
+     {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} rows — list, read,
      initiate, suspend, reactivate, disconnect, audit.
 
      <p>Thin HTTP adapter: all repository access lives in {@link ConnectionAdminService ConnectionAdminService};
@@ -80,8 +80,8 @@ tags:
      routing resolves the {@link IntegrationKindRouting kind} from the path and
      delegates to {@link WebhookIngestPipeline WebhookIngestPipeline}, which dispatches signature
      verification, subject derivation and JetStream publication through the per-kind
-     {@link de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier de.tum.cit.aet.hephaestus.integration.spi.WebhookSignatureVerifier} and
-     {@link de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver de.tum.cit.aet.hephaestus.integration.spi.SubjectKeyDeriver} beans.
+     {@link de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier} and
+     {@link de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver} beans.
      GitHub, GitLab, Slack and Outline all share this endpoint.
 
      <p>Active only on the webhook runtime role.

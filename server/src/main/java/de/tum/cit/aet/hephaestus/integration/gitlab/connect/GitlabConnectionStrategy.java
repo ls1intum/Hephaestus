@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.connect;
 
-import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.BearerToken;
-import de.tum.cit.aet.hephaestus.integration.spi.ApiCredentialProvider.CredentialBundle;
-import de.tum.cit.aet.hephaestus.integration.spi.ConnectionStrategy;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository
 import de.tum.cit.aet.hephaestus.integration.scm.repository.collaborator.RepositoryCollaborator;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.collaborator.RepositoryCollaboratorRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;

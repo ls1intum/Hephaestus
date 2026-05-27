@@ -33,7 +33,7 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
         """
         SELECT c.workspace
         FROM Connection c
-        WHERE c.kind = de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind.GITHUB
+        WHERE c.kind = de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITHUB
           AND c.instanceKey = :instanceKey
         """
     )

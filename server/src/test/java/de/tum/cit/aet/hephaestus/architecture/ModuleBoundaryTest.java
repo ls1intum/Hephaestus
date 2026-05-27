@@ -53,7 +53,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         void spiClassesAreInterfaces() {
             ArchRule rule = classes()
                 .that()
-                .resideInAPackage("..integration.spi..")
+                .resideInAPackage("..integration.core.spi..")
                 .and()
                 .areNotRecords()
                 .and()
@@ -107,7 +107,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         void spiInterfacesAreFrameworkAgnostic() {
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..integration.spi..")
+                .resideInAPackage("..integration.core.spi..")
                 .and()
                 .areInterfaces()
                 .should()
@@ -381,13 +381,13 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          *
          * <p>They SHOULD depend on:
          * <ul>
-         *   <li>integration.spi - Service Provider Interfaces</li>
-         *   <li>integration.events - Cross-vendor domain events</li>
+         *   <li>integration.core.spi - Service Provider Interfaces</li>
+         *   <li>integration.core.events - Cross-vendor domain events</li>
          *   <li>integration.scm entity packages (for reading data)</li>
          * </ul>
          */
         @Test
-        @DisplayName("Feature modules do not bypass integration.spi SPIs")
+        @DisplayName("Feature modules do not bypass integration.core.spi SPIs")
         void featureModulesDoNotBypassScmSpis() {
             // Internal packages that should NOT be accessed directly by feature modules
             String[] forbiddenInternalPackages = {

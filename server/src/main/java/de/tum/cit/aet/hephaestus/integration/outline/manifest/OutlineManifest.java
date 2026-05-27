@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.outline.manifest;
 
-import de.tum.cit.aet.hephaestus.integration.spi.Capability;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationManifest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;

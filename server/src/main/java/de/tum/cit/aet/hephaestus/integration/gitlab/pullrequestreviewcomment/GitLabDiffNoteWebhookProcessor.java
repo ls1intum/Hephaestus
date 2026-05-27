@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.gitlab.pullrequestreviewcomment;
 
-import de.tum.cit.aet.hephaestus.integration.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.BaseGitLabProcessor;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabFieldUtils;
 import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabProperties;
@@ -20,8 +20,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullReq
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.spi.RepositoryScopeFilter;
-import de.tum.cit.aet.hephaestus.integration.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import java.time.Instant;
 import java.util.Map;
 import org.slf4j.Logger;

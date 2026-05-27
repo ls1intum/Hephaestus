@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.slack.lifecycle;
 
-import de.tum.cit.aet.hephaestus.integration.connection.Connection;
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.refs.SlackChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.refs.SlackMessageRepository;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationLifecycleListener;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;

@@ -10,14 +10,14 @@
  * <ul>
  *   <li><b>Vendor coherence</b> — {@code integration/{github,gitlab,slack,outline}/...}
  *   <li><b>Family-shared abstractions</b> — {@code integration/{scm,messaging,knowledge,project-tracker}-lib/...}
- *   <li><b>Cross-cutting traits</b> — {@code integration/{webhook,realtime,consumer,identity,feedback,connection,framework}/...}
+ *   <li><b>Cross-cutting traits</b> — {@code integration/core/{webhook,consumer,events,spi,handler,connection,oauth,feedback,framework}/...}
  * </ul>
  *
  * <p>What is NOT an integration: per-user, outbound-first, ephemeral-subject endpoints
  * (IDE plugins, in-browser SSE streams). Those live elsewhere (e.g. {@code mentor/transport/}).
  *
  * <p>Cross-module access goes ONLY through {@code integration :: spi} and
- * {@code integration :: events} named interfaces.
+ * {@code integration :: events} named interfaces (now physically under {@code integration/core/}).
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Integration Framework",

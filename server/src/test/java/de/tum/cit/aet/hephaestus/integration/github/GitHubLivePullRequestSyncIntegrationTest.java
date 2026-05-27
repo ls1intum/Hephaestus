@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestReposito
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;

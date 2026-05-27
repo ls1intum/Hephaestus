@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.gitlab.common;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import de.tum.cit.aet.hephaestus.integration.spi.InstallationTokenProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import java.time.Duration;
 import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;

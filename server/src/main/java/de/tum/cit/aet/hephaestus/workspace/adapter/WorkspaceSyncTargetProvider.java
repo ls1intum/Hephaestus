@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
-import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncContextProvider;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.SyncTargetFactory;
@@ -33,8 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Implements the full sync provider interface hierarchy:
  * <ul>
  *   <li>{@link SyncTargetProvider} - Core sync target operations</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.integration.spi.SyncTimestampProvider SyncTimestampProvider} - Sync timestamp operations</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.integration.spi.BackfillStateProvider BackfillStateProvider} - Backfill state management</li>
+ *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.SyncTimestampProvider SyncTimestampProvider} - Sync timestamp operations</li>
+ *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider BackfillStateProvider} - Backfill state management</li>
  * </ul>
  */
 @Component
