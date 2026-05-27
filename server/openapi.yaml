@@ -57,6 +57,23 @@ tags:
 - description: "User account management (settings, deletion)"
   name: Account
 - description: |-
+    Administrative REST surface for managing per-workspace
+     {@link de.tum.cit.aet.hephaestus.integration.connection.Connection de.tum.cit.aet.hephaestus.integration.connection.Connection} rows — list, read,
+     initiate, suspend, reactivate, disconnect, audit.
+
+     <p>Thin HTTP adapter: all repository access lives in {@link ConnectionAdminService ConnectionAdminService};
+     the state machine + audit invariants live in {@link ConnectionService ConnectionService}; per-kind
+     vendor flows live in {@link ConnectionStrategy ConnectionStrategy} implementations. The controller's
+     only jobs are HTTP wire mapping (DTO ↔ entity), strategy resolution, and exception
+     translation.
+
+     <p>The <code>workspaceId</code> path variable + class-level
+     {@link RequireAtLeastWorkspaceAdmin RequireAtLeastWorkspaceAdmin} satisfy the
+     <code>MultiTenancyArchitectureTest.dataEndpointsReceiveWorkspaceContext</code> rule — the
+     annotation simple name contains <code>Workspace</code>, which the rule recognises as a
+     workspace-context guard.
+  name: connection-controller
+- description: |-
     Unified webhook ingest controller.
 
      <p><code>POST /webhooks/{kind</code>} is the sole webhook entry point. Per-kind
@@ -79,27 +96,6 @@ tags:
   name: Teams
 - description: Contributor feedback on AI-generated practice findings
   name: Finding Feedback
-- description: |-
-    Administrative REST surface for managing per-workspace
-     {@link de.tum.cit.aet.hephaestus.integration.connection.Connection de.tum.cit.aet.hephaestus.integration.connection.Connection} rows — list, read,
-     initiate, suspend, reactivate, disconnect, audit.
-
-     <p>Thin HTTP adapter: all repository access lives in {@link ConnectionAdminService ConnectionAdminService};
-     the state machine + audit invariants live in {@link ConnectionService ConnectionService}; per-kind
-     vendor flows live in {@link ConnectionStrategy ConnectionStrategy} implementations. The controller's
-     only jobs are HTTP wire mapping (DTO ↔ entity), strategy resolution, and exception
-     translation.
-
-     <p>The <code>workspaceId</code> path variable + class-level
-     {@link RequireAtLeastWorkspaceAdmin RequireAtLeastWorkspaceAdmin} satisfy the
-     <code>MultiTenancyArchitectureTest.dataEndpointsReceiveWorkspaceContext</code> rule — the
-     annotation simple name contains <code>Workspace</code>, which the rule recognises as a
-     workspace-context guard.
-
-     <p>TODO: credential persistence — see <code>ConnectionAdminService</code> for the AES-GCM
-     converter integration plan. TODO: an OAuth callback controller that calls
-     {@link ConnectionStrategy#finalizeConnect ConnectionStrategy#finalizeConnect} on per-kind unauthenticated endpoints.
-  name: connection-controller
 - description: User profile and activity data
   name: Profile
 - description: Contributor rankings and league statistics
