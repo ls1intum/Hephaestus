@@ -47,7 +47,9 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "hephaestus.sync.backfill.enabled", havingValue = "true")
-@WorkspaceAgnostic("Workspace iteration is owned by HistoricalBackfillService.runBackfillCycle() — the scheduler is a thin trigger.")
+@WorkspaceAgnostic(
+    "Workspace iteration is owned by HistoricalBackfillService.runBackfillCycle() — the scheduler is a thin trigger."
+)
 public class HistoricalBackfillScheduler {
 
     private final HistoricalBackfillService backfillService;
