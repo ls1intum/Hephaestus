@@ -474,7 +474,10 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                         "reside in ..integration.scm.github.. but not ..integration.scm.github.project..",
                         cls -> {
                             String pkg = cls.getPackageName();
-                            return pkg.contains(".integration.scm.github") && !pkg.contains(".integration.scm.github.project");
+                            return (
+                                pkg.contains(".integration.scm.github") &&
+                                !pkg.contains(".integration.scm.github.project")
+                            );
                         }
                     )
                 )

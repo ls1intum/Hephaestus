@@ -1,9 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.PostgresStringUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
@@ -12,6 +8,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepos
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;

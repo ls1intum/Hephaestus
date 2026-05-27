@@ -3,9 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcommen
 import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
-import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPullRequestDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -18,6 +15,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPullRequestDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.Set;
 import org.slf4j.Logger;

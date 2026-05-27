@@ -69,7 +69,11 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                 .resideInAPackage("..integration.slack..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..integration.scm.github..", "..integration.scm.gitlab..", "..integration.outline..")
+                .resideInAnyPackage(
+                    "..integration.scm.github..",
+                    "..integration.scm.gitlab..",
+                    "..integration.outline.."
+                )
                 .because("Cross-kind coupling defeats the SPI.")
         );
         check(

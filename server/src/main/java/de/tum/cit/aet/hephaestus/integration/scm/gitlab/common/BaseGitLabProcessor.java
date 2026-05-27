@@ -1,8 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.LabelIdUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.PostgresStringUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -12,8 +11,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;

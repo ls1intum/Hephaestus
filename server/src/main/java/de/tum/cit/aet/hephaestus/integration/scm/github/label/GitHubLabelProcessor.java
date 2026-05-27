@@ -4,12 +4,12 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderReposito
 import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
-import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.LabelIdUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;

@@ -4,11 +4,10 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.dto.GitLabMemberEventDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserClassifier;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.MembershipChangedEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
@@ -16,9 +15,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
-import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.MembershipChangedEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.dto.GitLabMemberEventDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserClassifier;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

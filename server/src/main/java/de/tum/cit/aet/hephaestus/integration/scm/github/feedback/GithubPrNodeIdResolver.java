@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import java.time.Duration;
 import java.util.List;
 import org.springframework.graphql.client.ClientGraphQlResponse;

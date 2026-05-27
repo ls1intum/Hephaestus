@@ -5,13 +5,13 @@ import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUt
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHActor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHBot;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHEnterpriseUserAccount;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHMannequin;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHOrganization;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
 import org.springframework.lang.Nullable;
 

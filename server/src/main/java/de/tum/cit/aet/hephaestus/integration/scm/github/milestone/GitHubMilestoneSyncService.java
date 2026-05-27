@@ -9,6 +9,12 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
@@ -19,16 +25,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubRepositoryN
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHMilestone;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHMilestoneConnection;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;

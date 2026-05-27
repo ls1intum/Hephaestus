@@ -3,6 +3,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcommen
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabFieldUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
@@ -14,13 +21,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPag
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.GitLabIssueCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLabReviewReconciler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;

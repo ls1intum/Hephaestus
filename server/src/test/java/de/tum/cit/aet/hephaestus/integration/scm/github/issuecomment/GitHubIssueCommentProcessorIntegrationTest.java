@@ -6,8 +6,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -19,6 +17,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -265,7 +265,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             existing.setHtmlUrl(
                 "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/42#issuecomment-" + TEST_COMMENT_ID
             );
-            existing.setAuthorAssociation(de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation.OWNER);
+            existing.setAuthorAssociation(
+                de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation.OWNER
+            );
             existing.setCreatedAt(Instant.now());
             existing.setIssue(testIssue);
             commentRepository.save(existing);

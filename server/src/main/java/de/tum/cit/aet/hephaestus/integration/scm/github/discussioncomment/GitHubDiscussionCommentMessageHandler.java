@@ -2,18 +2,18 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.GitHubDiscussionProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.dto.GitHubDiscussionDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.dto.GitHubDiscussionCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.dto.GitHubDiscussionCommentEventDTO;
-import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;

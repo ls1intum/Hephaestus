@@ -9,6 +9,12 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.collaborator.RepositoryCollaborator;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.collaborator.RepositoryCollaboratorRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -20,17 +26,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubRepositoryN
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRepositoryCollaboratorConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRepositoryCollaboratorEdge;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRepositoryPermission;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.collaborator.RepositoryCollaborator;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.collaborator.RepositoryCollaboratorRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;

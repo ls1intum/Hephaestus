@@ -10,6 +10,14 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncMetadata;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -21,19 +29,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubRepositoryN
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueProcessor;
-import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHSubIssuesSummary;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncMetadata;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

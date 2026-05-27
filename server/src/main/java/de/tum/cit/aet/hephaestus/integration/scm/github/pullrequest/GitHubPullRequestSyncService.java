@@ -10,6 +10,14 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.Category;
@@ -22,6 +30,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubRepositoryN
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequestConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.EmbeddedProjectItemsDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.GitHubProjectItemSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.EmbeddedReviewThreadsDTO;
@@ -31,16 +41,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.PullRequ
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview.GitHubPullRequestReviewSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview.dto.GitHubPullRequestReviewEventDTO.GitHubReviewDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment.GitHubPullRequestReviewCommentSyncService;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequestConnection;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;

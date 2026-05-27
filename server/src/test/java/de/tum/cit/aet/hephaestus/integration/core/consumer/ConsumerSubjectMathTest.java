@@ -52,10 +52,12 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
             assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.GITLAB))
                 .isInstanceOf(UnsupportedOperationException.class)
                 .hasMessageContaining("GITLAB");
-            assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.SLACK))
-                .isInstanceOf(UnsupportedOperationException.class);
-            assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.OUTLINE))
-                .isInstanceOf(UnsupportedOperationException.class);
+            assertThatThrownBy(() ->
+                ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.SLACK)
+            ).isInstanceOf(UnsupportedOperationException.class);
+            assertThatThrownBy(() ->
+                ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.OUTLINE)
+            ).isInstanceOf(UnsupportedOperationException.class);
         }
 
         @Test

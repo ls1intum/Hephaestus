@@ -9,6 +9,8 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
@@ -17,8 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGro
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabProjectResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProjectProcessor;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;

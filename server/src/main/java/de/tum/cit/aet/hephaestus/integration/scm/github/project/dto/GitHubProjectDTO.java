@@ -5,8 +5,8 @@ import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUt
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;

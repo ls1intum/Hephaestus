@@ -289,9 +289,7 @@ class IntegrationStructuralRulesTest extends HephaestusArchitectureTest {
             integrationDir = serverDir.resolve("server/src/main/java/de/tum/cit/aet/hephaestus/integration");
         }
         if (!Files.isDirectory(integrationDir)) {
-            throw new IllegalStateException(
-                "Could not locate integration/ source root from user.dir=" + serverDir
-            );
+            throw new IllegalStateException("Could not locate integration/ source root from user.dir=" + serverDir);
         }
         return integrationDir;
     }

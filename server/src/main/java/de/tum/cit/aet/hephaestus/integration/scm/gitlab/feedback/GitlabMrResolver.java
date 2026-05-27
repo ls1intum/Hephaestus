@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import java.time.Duration;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

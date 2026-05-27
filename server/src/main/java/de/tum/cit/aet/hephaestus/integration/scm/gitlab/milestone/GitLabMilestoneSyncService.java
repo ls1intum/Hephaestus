@@ -2,6 +2,11 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
@@ -9,11 +14,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstan
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

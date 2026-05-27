@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.team;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabDescendantGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

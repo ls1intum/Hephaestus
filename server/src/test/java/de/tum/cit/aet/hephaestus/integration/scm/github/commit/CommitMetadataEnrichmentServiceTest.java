@@ -10,12 +10,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributorRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;

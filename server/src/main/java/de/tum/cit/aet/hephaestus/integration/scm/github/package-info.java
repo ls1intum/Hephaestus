@@ -57,7 +57,7 @@
         "integration.scm",
         "core",
         "core::webhook",
-        "workspace"
+        "workspace",
     }
 )
 package de.tum.cit.aet.hephaestus.integration.scm.github;

@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.core.handler;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.PayloadParsingException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.PayloadParsingException;
 import io.nats.client.Message;
 import java.io.IOException;
 import org.slf4j.Logger;

@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.user;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.slf4j.Logger;

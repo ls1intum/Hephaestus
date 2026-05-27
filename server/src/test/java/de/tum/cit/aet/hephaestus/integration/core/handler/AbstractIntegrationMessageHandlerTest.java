@@ -10,10 +10,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.PayloadParsingException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.PayloadParsingException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.io.IOException;

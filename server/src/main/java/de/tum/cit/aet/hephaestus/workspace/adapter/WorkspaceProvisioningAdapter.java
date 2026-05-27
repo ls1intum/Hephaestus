@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener;
+import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;

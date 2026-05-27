@@ -410,12 +410,12 @@ public class IntegrationNatsConsumer {
     }
 
     private void setupInstallationConsumer() throws IOException {
-        String streamName = ConsumerSubjectMath
-            .streamNameFor(INSTALLATION_AWARE_KIND)
-            .orElseThrow(() ->
-                new IllegalStateException("No NATS stream resolved for installation-aware kind=" + INSTALLATION_AWARE_KIND)
-            );
-        String[] subjects = new String[] { ConsumerSubjectMath.installationAwareSubjectFilter(INSTALLATION_AWARE_KIND) };
+        String streamName = ConsumerSubjectMath.streamNameFor(INSTALLATION_AWARE_KIND).orElseThrow(() ->
+            new IllegalStateException("No NATS stream resolved for installation-aware kind=" + INSTALLATION_AWARE_KIND)
+        );
+        String[] subjects = new String[] {
+            ConsumerSubjectMath.installationAwareSubjectFilter(INSTALLATION_AWARE_KIND),
+        };
         String consumerName = ConsumerSubjectMath.installationConsumerName(durableBaseName());
 
         try {

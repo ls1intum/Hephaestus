@@ -11,6 +11,11 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -20,20 +25,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSync
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.scm.github.organization.dto.GitHubOrganizationEventDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHOrganization;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHOrganizationMemberConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHOrganizationMemberEdge;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHOrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.github.organization.dto.GitHubOrganizationEventDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;

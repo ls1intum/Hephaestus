@@ -11,6 +11,13 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -22,12 +29,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubRepositoryN
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubReviewThreadDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHCommentAuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHDiffSide;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
@@ -36,11 +37,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequ
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequestReviewThreadConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubReviewThreadDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
@@ -685,10 +685,11 @@ public class GitHubPullRequestReviewCommentSyncService {
                     // Set resolvedBy user if available (already converted to DTO)
                     GitHubUserDTO resolvedByDto = threadDto.resolvedBy();
                     if (resolvedByDto != null) {
-                        de.tum.cit.aet.hephaestus.integration.scm.domain.user.User resolvedBy = userProcessor.ensureExists(
-                            resolvedByDto,
-                            pullRequest.getRepository().getProvider().getId()
-                        );
+                        de.tum.cit.aet.hephaestus.integration.scm.domain.user.User resolvedBy =
+                            userProcessor.ensureExists(
+                                resolvedByDto,
+                                pullRequest.getRepository().getProvider().getId()
+                            );
                         thread.setResolvedBy(resolvedBy);
                     }
                 } else {
@@ -856,10 +857,11 @@ public class GitHubPullRequestReviewCommentSyncService {
                     GHUser graphQlResolvedBy = graphQlThread.getResolvedBy();
                     if (graphQlResolvedBy != null) {
                         GitHubUserDTO resolvedByDto = GitHubUserDTO.fromUser(graphQlResolvedBy);
-                        de.tum.cit.aet.hephaestus.integration.scm.domain.user.User resolvedBy = userProcessor.ensureExists(
-                            resolvedByDto,
-                            pullRequest.getRepository().getProvider().getId()
-                        );
+                        de.tum.cit.aet.hephaestus.integration.scm.domain.user.User resolvedBy =
+                            userProcessor.ensureExists(
+                                resolvedByDto,
+                                pullRequest.getRepository().getProvider().getId()
+                            );
                         thread.setResolvedBy(resolvedBy);
                     }
                 } else {

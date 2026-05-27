@@ -2,16 +2,16 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryEventDTO;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectIntegrityService;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
+import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectIntegrityService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryEventDTO;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

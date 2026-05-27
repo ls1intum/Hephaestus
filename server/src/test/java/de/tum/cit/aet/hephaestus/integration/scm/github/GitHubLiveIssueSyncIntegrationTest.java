@@ -2,15 +2,15 @@ package de.tum.cit.aet.hephaestus.integration.scm.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueSyncService;
-import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentSyncService;
-import de.tum.cit.aet.hephaestus.integration.scm.github.repository.GitHubRepositorySyncService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.repository.GitHubRepositorySyncService;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;

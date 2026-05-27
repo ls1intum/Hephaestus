@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCommentConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;

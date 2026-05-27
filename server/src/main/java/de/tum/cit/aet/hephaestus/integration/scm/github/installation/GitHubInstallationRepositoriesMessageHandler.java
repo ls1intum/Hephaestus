@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.installation;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.scm.github.installation.dto.GitHubInstallationRepositoriesEventDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener.RepositorySnapshot;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
+import de.tum.cit.aet.hephaestus.integration.scm.github.installation.dto.GitHubInstallationRepositoriesEventDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

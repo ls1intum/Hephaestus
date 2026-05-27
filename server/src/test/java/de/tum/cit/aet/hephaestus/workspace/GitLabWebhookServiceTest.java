@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Stream;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.TokenRotation;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenRotationClient;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenRotationClient.RotatedToken;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenRotationClient.TokenInfo;
@@ -24,8 +26,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClie
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClient.GroupInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClient.WebhookConfig;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClient.WebhookInfo;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.LocalDate;
 import java.util.HashMap;

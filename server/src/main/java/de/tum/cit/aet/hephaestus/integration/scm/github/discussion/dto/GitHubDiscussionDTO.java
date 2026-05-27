@@ -6,11 +6,11 @@ import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUt
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.dto.GitHubDiscussionCommentDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHDiscussion;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHDiscussionStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHLockReason;
+import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.lang.Nullable;

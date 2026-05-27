@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.discussion;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUtils.uriToString;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.DISCUSSION_SYNC_PAGE_SIZE;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.JITTER_FACTOR;
@@ -9,9 +11,17 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
-import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUtils.toInstant;
-import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUtils.uriToString;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.DiscussionRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.discussioncomment.DiscussionComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.discussioncomment.DiscussionCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.Category;
@@ -27,20 +37,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnection
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.dto.GitHubDiscussionDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.GitHubDiscussionCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.dto.GitHubDiscussionCommentDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.DiscussionRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.discussioncomment.DiscussionComment;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.discussioncomment.DiscussionCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHDiscussionCommentConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHDiscussionConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;

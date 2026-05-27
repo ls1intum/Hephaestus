@@ -16,7 +16,7 @@
         "integration.core::handler",
         "integration.core::oauth",
         "integration.core::consumer",
-        "integration.core::webhook"
+        "integration.core::webhook",
     }
 )
 package de.tum.cit.aet.hephaestus.integration.slack;

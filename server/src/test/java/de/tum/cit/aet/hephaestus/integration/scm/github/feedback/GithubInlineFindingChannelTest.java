@@ -6,7 +6,6 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
@@ -14,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Inlin
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.InlineResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

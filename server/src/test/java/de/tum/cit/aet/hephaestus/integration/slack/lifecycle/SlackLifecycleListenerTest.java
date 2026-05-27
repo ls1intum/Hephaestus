@@ -12,11 +12,11 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.refs.SlackChannelRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.refs.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener.ScopeDelta;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.slack.refs.SlackChannelRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.refs.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;

@@ -9,6 +9,13 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
@@ -18,13 +25,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGro
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupMemberResponse.GitLabMemberUser;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserClassifier;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
-import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;

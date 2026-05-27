@@ -1,14 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.BaseGitLabProcessor;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabFieldUtils;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO.NoteAttributes;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLabReviewReconciler;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -20,8 +14,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.BaseGitLabProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabFieldUtils;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO.NoteAttributes;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLabReviewReconciler;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import java.time.Instant;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -304,7 +304,9 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         return saved;
     }
 
-    private static de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State convertMrState(@Nullable String state) {
+    private static de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State convertMrState(
+        @Nullable String state
+    ) {
         if (state == null) return de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;
         return switch (state.toLowerCase()) {
             case "opened" -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;

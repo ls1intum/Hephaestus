@@ -2,12 +2,12 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 
 import static de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubFeedbackChannel.PrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubFeedbackChannel.PrCoordinates;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;

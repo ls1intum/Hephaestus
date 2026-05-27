@@ -5,11 +5,9 @@ import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUt
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.MergeStateStatus;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.ReviewDecision;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHMergeStateStatus;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHMergeableState;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequest;
@@ -19,8 +17,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHReviewRe
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHReviewRequestConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUserConnection;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.MergeStateStatus;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.ReviewDecision;
+import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Collections;

@@ -3,6 +3,12 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.label;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.LARGE_PAGE_SIZE;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
@@ -12,14 +18,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncPropert
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlPaginationHelper;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlPaginationHelper.PaginationRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlPaginationHelper.PaginationResult;
-import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHLabelConnection;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;

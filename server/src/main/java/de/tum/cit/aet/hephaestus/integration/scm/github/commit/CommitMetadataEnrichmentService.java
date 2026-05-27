@@ -5,6 +5,10 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributorRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.util.CommitUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
@@ -12,10 +16,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSync
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributor;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributorRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.util.CommitUtils;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;

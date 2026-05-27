@@ -5,10 +5,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRateLimit;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.time.Instant;

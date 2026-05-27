@@ -2,13 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuedependency;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.HashSet;

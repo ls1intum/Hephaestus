@@ -2,6 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
@@ -9,10 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstan
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.BackfillBatchResult;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;

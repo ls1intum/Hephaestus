@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

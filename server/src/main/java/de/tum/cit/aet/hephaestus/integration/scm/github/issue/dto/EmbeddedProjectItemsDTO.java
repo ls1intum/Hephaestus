@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectItemDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2Item;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectItemDTO;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;

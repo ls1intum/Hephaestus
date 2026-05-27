@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview.dto.GitHubPullRequestReviewEventDTO.GitHubReviewDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequestReviewConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview.dto.GitHubPullRequestReviewEventDTO.GitHubReviewDTO;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;

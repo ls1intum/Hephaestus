@@ -4,10 +4,10 @@ import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUt
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2StatusUpdate;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2StatusUpdateStatus;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectStatusUpdate;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.time.LocalDate;
