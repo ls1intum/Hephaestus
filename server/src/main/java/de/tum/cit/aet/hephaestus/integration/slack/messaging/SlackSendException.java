@@ -1,11 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.messaging;
 
-/**
- * Raised by {@link SlackMessageService#sendForWorkspace} when {@code chat.postMessage}
- * fails — non-2xx, transport, or {@code ok=false}. Carries the Slack error code
- * ({@code channel_not_found}, {@code not_in_channel}, {@code rate_limited}, …) so
- * controllers can map it to a meaningful HTTP response without leaking tokens.
- */
+/** Raised by {@link SlackMessageService#sendForWorkspace}; carries the Slack error code. */
 public class SlackSendException extends RuntimeException {
 
     private final long workspaceId;

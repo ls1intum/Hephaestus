@@ -39,22 +39,6 @@ tags:
 - description: Workspace-scoped agent job monitoring
   name: Agent Jobs
 - description: |-
-    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
-     the browser arrives without a Hephaestus session — so identity comes from the
-     HMAC-signed <code>state</code> param (<code>(workspaceId, kind, issuedAt, actorRef)</code>,
-     minted by {@link OAuthStateService OAuthStateService}). The path's <code>{kind</code>} MUST equal the
-     state's kind, otherwise a state issued for kind A could be replayed against kind B's
-     callback.
-
-     <p>Browser audience: success and vendor-side cancellations return 302 redirects.
-     Framework errors (bad state, unknown kind, strategy throw) return 4xx JSON so dev
-     tools surface the failure clearly.
-
-     <p>Repository access lives in {@link OAuthCallbackService OAuthCallbackService} (architecture rule). The
-     workspace-context allow-list exempts this controller — workspace identity is from
-     the verified state, never from the request.
-  name: o-auth-callback-controller
-- description: |-
     Administrative REST surface for managing per-workspace
      {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} rows — list, read,
      initiate, suspend, reactivate, disconnect, audit.
@@ -73,6 +57,14 @@ tags:
   name: connection-controller
 - description: "User account management (settings, deletion)"
   name: Account
+- description: Slack admin connectivity probe — test-message dispatch.
+  name: slack-connection-admin-controller
+- description: |-
+    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
+     identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
+     on both success and failure; only <code>Accept: application/json</code> requests get
+     4xx JSON.
+  name: o-auth-callback-controller
 - description: Authentication discovery (public)
   name: Auth
 - description: |-
@@ -94,15 +86,6 @@ tags:
   name: Team Settings
 - description: Team management within workspace
   name: Teams
-- description: |-
-    Slack-specific admin endpoint — connectivity probe.
-
-     <p>Channel + team configuration is owned by
-     <code>PATCH /workspaces/{slug</code>/notifications} (existing endpoint that writes
-     both <code>Workspace.leaderboardNotificationEnabled</code> and the <code>SlackConfig</code>
-     JSONB fields atomically). This controller exists only for the test-message
-     probe, which has no analogue in the workspace settings surface.
-  name: slack-connection-admin-controller
 - description: Contributor feedback on AI-generated practice findings
   name: Finding Feedback
 - description: User profile and activity data
@@ -159,10 +142,6 @@ paths:
       - connection
   /api/v1/workspaces/{workspaceId}/connections/slack/test-message:
     post:
-      description: |-
-        Post a quick "Hephaestus test message" to the configured channel. 404 when no
-         Slack Connection exists or the channel isn't configured. 502 on Slack-side error
-         with the Slack error code in the body.
       operationId: sendTestMessage
       parameters:
       - in: path
@@ -178,7 +157,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/SlackTestMessageResponse"
           description: OK
-      summary: Post a quick "Hephaestus test message" to the configured channel.
       tags:
       - slack-connection-admin
   /api/v1/workspaces/{workspaceId}/connections/{id}:
@@ -350,10 +328,6 @@ paths:
       - Contributors
   /oauth/callback/{kind}:
     get:
-      description: |-
-        GET callback (Slack, Outline, GitHub App install). The <code>error</code> param is
-         checked before state so vendor cancellations (<code>error=access_denied</code> with
-         no <code>code</code>) surface as 400 rather than blowing up on missing state.
       operationId: callbackGet
       parameters:
       - in: path
@@ -362,11 +336,6 @@ paths:
         schema:
           type: string
       - in: query
-        name: code
-        required: false
-        schema:
-          type: string
-      - in: query
         name: state
         required: false
         schema:
@@ -395,11 +364,9 @@ paths:
               schema:
                 type: object
           description: OK
-      summary: "GET callback (Slack, Outline, GitHub App install)."
       tags:
       - o-auth-callback
     post:
-      description: POST variant for vendors that send form-encoded callbacks.
       operationId: callbackPost
       parameters:
       - in: path
@@ -408,11 +375,6 @@ paths:
         schema:
           type: string
       - in: query
-        name: code
-        required: false
-        schema:
-          type: string
-      - in: query
         name: state
         required: false
         schema:
@@ -441,7 +403,6 @@ paths:
               schema:
                 type: object
           description: OK
-      summary: POST variant for vendors that send form-encoded callbacks.
       tags:
       - o-auth-callback
   /user:

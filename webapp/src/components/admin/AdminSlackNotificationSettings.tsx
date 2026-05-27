@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { CheckIcon, ExternalLinkIcon, LoaderIcon, SendIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { updateNotificationsMutation } from "@/api/@tanstack/react-query.gen";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,11 @@ export function AdminSlackNotificationSettings({
 	const [enabledInput, setEnabledInput] = useState(enabled);
 	const [isConnecting, setIsConnecting] = useState(false);
 
+	// Re-sync form state when props change (e.g. parent refetches after OAuth callback completes).
+	useEffect(() => setChannelInput(channelId ?? ""), [channelId]);
+	useEffect(() => setTeamInput(teamLabel ?? ""), [teamLabel]);
+	useEffect(() => setEnabledInput(enabled), [enabled]);
+
 	const channelInvalid = channelInput.length > 0 && !SLACK_CHANNEL_ID.test(channelInput);
 
 	const update = useMutation({
@@ -66,19 +71,18 @@ export function AdminSlackNotificationSettings({
 	const connect = async () => {
 		setIsConnecting(true);
 		try {
-			// Persist the originating slug so the OAuth landing route can route back.
 			window.sessionStorage.setItem("slack-connect-return-slug", workspaceSlug);
 			const initiation = await initiateSlackConnection(workspaceId);
-			if (initiation.type === "REDIRECT") {
-				window.location.assign(initiation.url);
-			} else {
-				// Already linked — refresh state.
-				toast.success("Slack workspace already linked");
-				onSaved();
-				setIsConnecting(false);
+			if (initiation.type === "redirect") {
+				window.location.assign(initiation.vendorUrl);
+				return; // page is unloading
 			}
+			// type === "linked": no OAuth needed (e.g. PAT flow). Slack never reaches here today.
+			toast.success("Slack workspace already linked");
+			onSaved();
 		} catch (e) {
 			toast.error("Could not start Slack OAuth", { description: String(e) });
+		} finally {
 			setIsConnecting(false);
 		}
 	};

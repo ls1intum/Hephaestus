@@ -36,13 +36,6 @@ export const getIdentityProviders = <ThrowOnError extends boolean = false>(optio
  */
 export const listGlobalContributors = <ThrowOnError extends boolean = false>(options?: Options<ListGlobalContributorsData, ThrowOnError>) => (options?.client ?? client).get<ListGlobalContributorsResponses, unknown, ThrowOnError>({ url: '/contributors', ...options });
 
-/**
- * GET callback (Slack, Outline, GitHub App install).
- *
- * GET callback (Slack, Outline, GitHub App install). The <code>error</code> param is
- * checked before state so vendor cancellations (<code>error=access_denied</code> with
- * no <code>code</code>) surface as 400 rather than blowing up on missing state.
- */
 export const callbackGet = <ThrowOnError extends boolean = false>(options: Options<CallbackGetData, ThrowOnError>) => (options.client ?? client).get<CallbackGetResponses, unknown, ThrowOnError>({
     querySerializer: { parameters: { allParams: { object: { style: 'form' } } } },
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -50,11 +43,6 @@ export const callbackGet = <ThrowOnError extends boolean = false>(options: Optio
     ...options
 });
 
-/**
- * POST variant for vendors that send form-encoded callbacks.
- *
- * POST variant for vendors that send form-encoded callbacks.
- */
 export const callbackPost = <ThrowOnError extends boolean = false>(options: Options<CallbackPostData, ThrowOnError>) => (options.client ?? client).post<CallbackPostResponses, unknown, ThrowOnError>({
     querySerializer: { parameters: { allParams: { object: { style: 'form' } } } },
     security: [{ scheme: 'bearer', type: 'http' }],

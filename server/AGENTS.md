@@ -38,7 +38,7 @@ Built with Paketo Cloud Native Buildpacks (Application CDS enabled); `pom.xml` `
 
 ### Optional integrations
 
-`SlackAppConfig`, `PosthogClient` are gated by `@ConditionalOnProperty`. Tolerant consumers (`AccountService`, `LeaderboardTaskScheduler`) take `ObjectProvider<T>`. `SlackMessageService` injects `App` directly on purpose: `notification.enabled=true` with `slack.token` unset must crash context refresh, not silently no-op cron ticks.
+`PosthogClient` is gated by `@ConditionalOnProperty`. Tolerant consumers (`AccountService`, `LeaderboardTaskScheduler`) take `ObjectProvider<T>`. `SlackMessageService` resolves bot tokens per-workspace at send time via `ConnectionService` — there is no global `App` bean and no `slack.token` property; admins connect each workspace via the Slack OAuth flow exposed at `/oauth/callback/slack`.
 
 ### Removing Liquibase changesets
 
@@ -104,7 +104,7 @@ src/main/java/de/tum/cit/aet/hephaestus/
 ├── activity/                     # Activity tracking (XP, leaderboard gamification)
 ├── mentor/                       # AI mentor (in-process Pi agent)
 ├── profile/                      # User profiles
-└── notification/                 # Email and Slack messaging
+└── notification/                 # Email messaging (Slack messaging lives in integration/slack/messaging/)
 ```
 
 ## Architecture Patterns

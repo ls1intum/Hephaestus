@@ -75,6 +75,24 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .hasMessageContaining("Slack channel ID");
     }
 
+    @Test
+    void updateNotificationsWithoutSlackConnectionRejectsChannelChange() {
+        User owner = persistUser("no-slack-owner");
+        Workspace workspace = createWorkspace("no-slack", "No Slack", "no-slack", AccountType.ORG, owner);
+
+        // No Slack Connection seeded — supplying channelId must 409, not silently no-op.
+        assertThatThrownBy(() ->
+            workspaceService.updateNotifications(workspace.getWorkspaceSlug(), null, null, "C12345678")
+        )
+            .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+            .hasMessageContaining("No active Slack Connection");
+
+        // But toggling enabled-only without a Slack Connection is fine — independent meaning.
+        workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, null, null);
+        Workspace updated = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        assertThat(updated.getLeaderboardNotificationEnabled()).isTrue();
+    }
+
     private void persistSlackConnection(Workspace workspace) {
         de.tum.cit.aet.hephaestus.integration.core.connection.Connection conn =
             new de.tum.cit.aet.hephaestus.integration.core.connection.Connection(

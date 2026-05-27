@@ -21,19 +21,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
- * Per-workspace Slack messaging.
- *
- * <p>Replaces the legacy global-token wrapper that lived under {@code leaderboard/}: every
- * outbound call now resolves the bot token from the workspace's ACTIVE Slack
- * {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection} via
- * {@link SlackCredentialProvider}, then builds a one-shot {@link MethodsClient}. The
- * underlying {@link Slack} singleton is thread-safe and pools its HTTP client; reusing
- * it across workspaces is the documented Slack-SDK pattern.
- *
- * <p>Errors surface as {@link SlackSendException} with the Slack error code so callers
- * can map (channel_not_found → 404, not_in_channel → 400, rate_limited → 429) without
- * peeking at tokens. {@link #listMembers} swallows pagination errors and returns what
- * it has — best-effort, used only for Slack-handle resolution in the leaderboard task.
+ * Per-workspace Slack messaging. Bot token resolved at send time via
+ * {@link SlackCredentialProvider}; failures throw {@link SlackSendException} carrying
+ * the Slack error code so callers can choose the HTTP mapping.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
@@ -44,11 +34,6 @@ public class SlackMessageService {
     private static final int USERS_LIST_PAGE_SIZE = 1000;
     private static final int USERS_LIST_MAX_PAGES = 50; // hard cap: 50_000 users is well above any realistic workspace
 
-    /**
-     * Singleton {@link Slack} instance. The Slack SDK explicitly documents this as
-     * thread-safe + connection-pooled — building a new instance per call would leak
-     * threads. Holding a single static reference matches the SDK's intended usage.
-     */
     private final Slack slack;
     private final SlackCredentialProvider credentialProvider;
 
@@ -57,11 +42,6 @@ public class SlackMessageService {
         this.credentialProvider = credentialProvider;
     }
 
-    /**
-     * Verifies that the workspace has a usable Slack bot token (active Connection,
-     * decryptable bundle, and Slack-side {@code auth.test} succeeds). Returns false
-     * — does not throw — so the caller can choose to skip the workspace silently.
-     */
     public boolean initTest(long workspaceId) {
         Optional<String> token = resolveToken(workspaceId);
         if (token.isEmpty()) {
@@ -81,10 +61,6 @@ public class SlackMessageService {
         }
     }
 
-    /**
-     * Post a {@code chat.postMessage} to {@code channelId} using the workspace's bot
-     * token. Throws if no token, or if Slack rejects the request.
-     */
     public void sendForWorkspace(long workspaceId, String channelId, List<LayoutBlock> blocks, String fallback) {
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
@@ -117,11 +93,6 @@ public class SlackMessageService {
         }
     }
 
-    /**
-     * Returns the bot token's visible users (paginated via {@code cursor}). Returns the
-     * accumulated set on transport failure rather than throwing — the leaderboard task
-     * degrades to "no Slack mention" rather than skipping the post entirely.
-     */
     public List<User> listMembers(long workspaceId) {
         Optional<String> token = resolveToken(workspaceId);
         if (token.isEmpty()) {

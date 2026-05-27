@@ -30,9 +30,14 @@ Set the following secrets before starting the stack:
 | `KC_BOOTSTRAP_ADMIN_USERNAME` | Keycloak bootstrap admin username |
 | `KC_BOOTSTRAP_ADMIN_PASSWORD` | Keycloak bootstrap admin password (`openssl rand -base64 32`) |
 | `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` | Secret used by the app server to call Keycloak |
-| `SLACK_BOT_TOKEN` | Optional: Slack bot token for notifications |
-| `SLACK_SIGNING_SECRET` | Optional: Slack signing secret for webhook verification |
+| `HEPHAESTUS_INTEGRATION_SLACK_ENABLED` | Optional: enables the Slack OAuth admin surface (per-workspace connect) |
+| `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID` | Optional: Slack app client ID used by the OAuth flow |
+| `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET` | Optional: Slack app client secret used by the OAuth flow |
+| `HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI` | Optional: Slack OAuth callback URL (typically `https://<host>/oauth/callback/slack`) |
+| `SLACK_SIGNING_SECRET` | Optional: Slack signing secret for inbound webhook verification |
 | `LEGAL_PROFILE` | Selects a bundled imprint/privacy profile. Use `tumaet` only for the canonical AET deployment; self-hosters leave empty and mount `/legal-overrides/`. See [Legal Pages](./legal-pages). |
+
+Per-workspace bot tokens are issued via OAuth and encrypted at rest in the `connection` table; there is no longer a global bot token.
 
 ### GitHub integration
 

@@ -81,13 +81,6 @@ export const listGlobalContributorsOptions = (options?: Options<ListGlobalContri
 
 export const callbackGetQueryKey = (options: Options<CallbackGetData>) => createQueryKey('callbackGet', options);
 
-/**
- * GET callback (Slack, Outline, GitHub App install).
- *
- * GET callback (Slack, Outline, GitHub App install). The <code>error</code> param is
- * checked before state so vendor cancellations (<code>error=access_denied</code> with
- * no <code>code</code>) surface as 400 rather than blowing up on missing state.
- */
 export const callbackGetOptions = (options: Options<CallbackGetData>) => queryOptions<CallbackGetResponse, DefaultError, CallbackGetResponse, ReturnType<typeof callbackGetQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await callbackGet({
@@ -101,11 +94,6 @@ export const callbackGetOptions = (options: Options<CallbackGetData>) => queryOp
     queryKey: callbackGetQueryKey(options)
 });
 
-/**
- * POST variant for vendors that send form-encoded callbacks.
- *
- * POST variant for vendors that send form-encoded callbacks.
- */
 export const callbackPostMutation = (options?: Partial<Options<CallbackPostData>>): UseMutationOptions<CallbackPostResponse, DefaultError, Options<CallbackPostData>> => {
     const mutationOptions: UseMutationOptions<CallbackPostResponse, DefaultError, Options<CallbackPostData>> = {
         mutationFn: async (fnOptions) => {

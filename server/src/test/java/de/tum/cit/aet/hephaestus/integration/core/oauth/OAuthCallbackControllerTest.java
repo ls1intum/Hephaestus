@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -49,7 +51,10 @@ import org.springframework.http.ResponseEntity;
  */
 class OAuthCallbackControllerTest extends BaseUnitTest {
 
-    private static final OAuthCallbackProperties PROPS = new OAuthCallbackProperties("/integrations?status=success");
+    private static final OAuthCallbackProperties PROPS = new OAuthCallbackProperties(
+        "/integrations?status=success",
+        null
+    );
 
     @Mock
     private OAuthStateService oauthStateService;
@@ -106,7 +111,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         allParams.put("code", "vendor-code");
         allParams.put("state", state);
 
-        ResponseEntity<?> response = controller.callbackGet("slack", "vendor-code", state, null, null, allParams);
+        ResponseEntity<?> response = controller.callbackGet("slack", state, null, null, allParams, htmlRequest());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
         assertThat(response.getHeaders().getLocation()).isNotNull();
@@ -137,7 +142,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         when(callbackService.completeConnection(any(Connection.class), any(), any())).thenReturn(pending);
         slackStrategy.nextFinalization = new ConnectFinalization.Completed("T123", new BearerToken("tok", null), null);
 
-        controller.callbackGet("slack", "c", state, null, null, Map.of("code", "c", "state", state));
+        controller.callbackGet("slack", state, null, null, Map.of("code", "c", "state", state), htmlRequest());
 
         ArgumentCaptor<String> actor = ArgumentCaptor.forClass(String.class);
         verify(callbackService).completeConnection(any(Connection.class), any(), actor.capture());
@@ -147,15 +152,15 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── Vendor-side error ───────────────────────────────────────────────────
 
     @Test
-    @DisplayName("GET /oauth/callback/slack?error=access_denied → 400 with JSON {kind, error, errorDescription}")
-    void vendorError_returns400WithStructuredJson() {
+    @DisplayName("GET /oauth/callback/slack?error=access_denied → 400 JSON when Accept: application/json")
+    void vendorError_jsonRequest_returns400WithStructuredJson() {
         ResponseEntity<?> response = controller.callbackGet(
             "slack",
-            /* code */ null,
             /* state */ null,
             "access_denied",
             "The user denied the request",
-            Map.of("error", "access_denied", "error_description", "The user denied the request")
+            Map.of("error", "access_denied", "error_description", "The user denied the request"),
+            jsonRequest()
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -172,11 +177,39 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         verify(callbackService, never()).findOrCreatePendingConnection(anyLong(), any());
     }
 
+    @Test
+    @DisplayName("GET /oauth/callback/slack?error=access_denied (browser) → 302 to failure redirect")
+    void vendorError_browserRequest_redirectsToFailure() {
+        ResponseEntity<?> response = controller.callbackGet(
+            "slack",
+            null,
+            "access_denied",
+            "The user denied the request",
+            Map.of("error", "access_denied", "error_description", "The user denied the request"),
+            htmlRequest()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+        String location = response.getHeaders().getLocation().toString();
+        assertThat(location).contains("status=error");
+        assertThat(location).contains("reason=access_denied");
+        assertThat(location).contains("kind=SLACK");
+        verify(oauthStateService, never()).consume(any());
+        assertThat(slackStrategy.finalizeCalls).isEqualTo(0);
+    }
+
     // ── State validation ────────────────────────────────────────────────────
 
     @Test
-    void missingState_returns400() {
-        ResponseEntity<?> response = controller.callbackGet("slack", "code", null, null, null, Map.of("code", "code"));
+    void missingState_jsonRequest_returns400() {
+        ResponseEntity<?> response = controller.callbackGet(
+            "slack",
+            null,
+            null,
+            null,
+            Map.of("code", "code"),
+            jsonRequest()
+        );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         @SuppressWarnings("unchecked")
         Map<String, String> body = (Map<String, String>) response.getBody();
@@ -184,18 +217,32 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     }
 
     @Test
-    void badState_returns400() {
+    void missingState_browserRequest_redirects() {
+        ResponseEntity<?> response = controller.callbackGet(
+            "slack",
+            null,
+            null,
+            null,
+            Map.of("code", "code"),
+            htmlRequest()
+        );
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+        assertThat(response.getHeaders().getLocation().toString()).contains("reason=missing_state");
+    }
+
+    @Test
+    void badState_jsonRequest_returns400() {
         when(oauthStateService.consume("tampered")).thenThrow(
             new IllegalArgumentException("OAuth state signature mismatch")
         );
 
         ResponseEntity<?> response = controller.callbackGet(
             "slack",
-            "c",
             "tampered",
             null,
             null,
-            Map.of("code", "c", "state", "tampered")
+            Map.of("code", "c", "state", "tampered"),
+            jsonRequest()
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -209,18 +256,18 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     }
 
     @Test
-    void stateKindMismatch_returns400() {
+    void stateKindMismatch_jsonRequest_returns400() {
         // State issued for SLACK; replayed against /oauth/callback/outline.
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("slack-state")).thenReturn(binding);
 
         ResponseEntity<?> response = controller.callbackGet(
             "outline",
-            "c",
             "slack-state",
             null,
             null,
-            Map.of("code", "c", "state", "slack-state")
+            Map.of("code", "c", "state", "slack-state"),
+            jsonRequest()
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -236,7 +283,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── Strategy failure ────────────────────────────────────────────────────
 
     @Test
-    void finalizeFailed_returns400() {
+    void finalizeFailed_jsonRequest_returns400() {
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("s")).thenReturn(binding);
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
@@ -246,11 +293,11 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
 
         ResponseEntity<?> response = controller.callbackGet(
             "slack",
-            "c",
             "s",
             null,
             null,
-            Map.of("code", "c", "state", "s")
+            Map.of("code", "c", "state", "s"),
+            jsonRequest()
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -263,7 +310,31 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     }
 
     @Test
-    void finalizeThrows_returns400() {
+    void finalizeFailed_browserRequest_redirects() {
+        StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
+        when(oauthStateService.consume("s")).thenReturn(binding);
+        Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
+        when(callbackService.findOrCreatePendingConnection(42L, IntegrationKind.SLACK)).thenReturn(pending);
+
+        slackStrategy.nextFinalization = new ConnectFinalization.Failed("vendor rejected the code");
+
+        ResponseEntity<?> response = controller.callbackGet(
+            "slack",
+            "s",
+            null,
+            null,
+            Map.of("code", "c", "state", "s"),
+            htmlRequest()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+        String location = response.getHeaders().getLocation().toString();
+        assertThat(location).contains("status=error").contains("reason=finalize_failed").contains("kind=SLACK");
+        verify(callbackService, never()).completeConnection(any(), any(), any());
+    }
+
+    @Test
+    void finalizeThrows_jsonRequest_returns400() {
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("s")).thenReturn(binding);
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
@@ -273,11 +344,11 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
 
         ResponseEntity<?> response = controller.callbackGet(
             "slack",
-            "c",
             "s",
             null,
             null,
-            Map.of("code", "c", "state", "s")
+            Map.of("code", "c", "state", "s"),
+            jsonRequest()
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         @SuppressWarnings("unchecked")
@@ -288,7 +359,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── Transition guard rejection ──────────────────────────────────────────
 
     @Test
-    void completeConnection_transitionGuardRejects_returns409() {
+    void completeConnection_transitionGuardRejects_jsonRequest_returns409() {
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("s")).thenReturn(binding);
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
@@ -300,11 +371,11 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
 
         ResponseEntity<?> response = controller.callbackGet(
             "slack",
-            "c",
             "s",
             null,
             null,
-            Map.of("code", "c", "state", "s")
+            Map.of("code", "c", "state", "s"),
+            jsonRequest()
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
@@ -313,23 +384,61 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(body).containsEntry("error", "transition_conflict");
     }
 
-    // ── Unknown kind ────────────────────────────────────────────────────────
-
     @Test
-    void unknownKind_returns404() {
+    void completeConnection_transitionGuardRejects_browserRequest_redirects() {
+        StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
+        when(oauthStateService.consume("s")).thenReturn(binding);
+        Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
+        when(callbackService.findOrCreatePendingConnection(42L, IntegrationKind.SLACK)).thenReturn(pending);
+        slackStrategy.nextFinalization = new ConnectFinalization.Completed("T1", new BearerToken("t", null), null);
+        when(callbackService.completeConnection(any(), any(), any())).thenThrow(
+            new IllegalStateException("Illegal transition for connection 7: UNINSTALLED → ACTIVE")
+        );
+
         ResponseEntity<?> response = controller.callbackGet(
-            "bitbucket",
-            "c",
+            "slack",
             "s",
             null,
             null,
-            Map.of("code", "c", "state", "s")
+            Map.of("code", "c", "state", "s"),
+            htmlRequest()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+        assertThat(response.getHeaders().getLocation().toString()).contains("reason=transition_conflict");
+    }
+
+    // ── Unknown kind ────────────────────────────────────────────────────────
+
+    @Test
+    void unknownKind_jsonRequest_returns404() {
+        ResponseEntity<?> response = controller.callbackGet(
+            "bitbucket",
+            "s",
+            null,
+            null,
+            Map.of("code", "c", "state", "s"),
+            jsonRequest()
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         @SuppressWarnings("unchecked")
         Map<String, String> body = (Map<String, String>) response.getBody();
         assertThat(body).containsEntry("error", "unknown_kind");
         verify(oauthStateService, never()).consume(any());
+    }
+
+    @Test
+    void unknownKind_browserRequest_redirects() {
+        ResponseEntity<?> response = controller.callbackGet(
+            "bitbucket",
+            "s",
+            null,
+            null,
+            Map.of("code", "c", "state", "s"),
+            htmlRequest()
+        );
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+        assertThat(response.getHeaders().getLocation().toString()).contains("reason=unknown_kind");
     }
 
     // ── No strategy registered ──────────────────────────────────────────────
@@ -348,7 +457,15 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("s")).thenReturn(binding);
 
-        ResponseEntity<?> response = bare.callbackGet("slack", "c", "s", null, null, Map.of("code", "c", "state", "s"));
+        ResponseEntity<?> response = bare.callbackGet(
+            "slack",
+            "s",
+            null,
+            null,
+            Map.of("code", "c", "state", "s"),
+            htmlRequest()
+        );
+        // Server-side wiring bug — always JSON 500, no point redirecting a broken flow.
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         @SuppressWarnings("unchecked")
         Map<String, String> body = (Map<String, String>) response.getBody();
@@ -368,11 +485,11 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
 
         ResponseEntity<?> response = controller.callbackPost(
             "slack",
-            "c",
             "s",
             null,
             null,
-            Map.of("code", "c", "state", "s")
+            Map.of("code", "c", "state", "s"),
+            htmlRequest()
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
@@ -395,6 +512,22 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────
+
+    /** Browser request: {@code Accept: text/html,...} (typical browser default). */
+    private static HttpServletRequest htmlRequest() {
+        HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+        Mockito.lenient()
+            .when(req.getHeader(HttpHeaders.ACCEPT))
+            .thenReturn("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        return req;
+    }
+
+    /** JSON-only request (curl / devtools / E2E suite). */
+    private static HttpServletRequest jsonRequest() {
+        HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+        Mockito.lenient().when(req.getHeader(HttpHeaders.ACCEPT)).thenReturn("application/json");
+        return req;
+    }
 
     private static Connection newConnection(
         long id,

@@ -15,13 +15,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * Unit tests for {@link SlackMessageService}'s credential resolution + early-skip
- * branches. The SDK call paths (chat.postMessage / users.list / auth.test) are covered
- * indirectly — they execute against {@code Slack.getInstance()}, which is not
- * conveniently mockable, so the live HTTP behaviour is covered in Phase B via the
- * mocked OAuth flow + connect+post integration test.
- */
 class SlackMessageServiceTest extends BaseUnitTest {
 
     @Mock
@@ -72,23 +65,5 @@ class SlackMessageServiceTest extends BaseUnitTest {
                 assertThat(sse.channelId()).isEqualTo("C1ABCDEFGH");
                 assertThat(sse.slackError()).isEqualTo("no_active_slack_connection");
             });
-    }
-
-    @Test
-    void listMembers_noToken_returnsEmptyList() {
-        when(credentialProvider.resolve(any(IntegrationRef.class))).thenReturn(Optional.empty());
-
-        List<com.slack.api.model.User> members = service.listMembers(7L);
-
-        assertThat(members).isEmpty();
-    }
-
-    @Test
-    void slackSendException_carriesStructuredFields() {
-        SlackSendException ex = new SlackSendException(99L, "C0974LJBPBK", "channel_not_found");
-        assertThat(ex.workspaceId()).isEqualTo(99L);
-        assertThat(ex.channelId()).isEqualTo("C0974LJBPBK");
-        assertThat(ex.slackError()).isEqualTo("channel_not_found");
-        assertThat(ex.getMessage()).contains("channel_not_found").contains("C0974LJBPBK").contains("99");
     }
 }

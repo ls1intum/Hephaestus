@@ -19,18 +19,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Slack OAuth connection strategy.
- *
- * <p>{@link #initiate} builds the Slack v2 OAuth authorize URL with a state token
- * minted by {@link OAuthStateService} (HMAC-signed, single-use, CSRF-safe).
- *
- * <p>{@link #finalizeConnect} POSTs the authorisation {@code code} back to Slack via
- * {@link SlackOAuthClient#exchangeCode}, then hands the resulting bot token + team
- * metadata back to {@code OAuthCallbackService} as a {@link ConnectFinalization.Completed}.
- * Token-rotation apps (Slack returns {@code expires_in} + {@code refresh_token}) are
- * rejected — rotation lands later (see #1198). The {@code SlackConfig} is initialised
- * with the {@code teamId} / {@code teamName} only; the workspace admin sets the
- * notification channel via the dedicated PATCH endpoint after install completes.
+ * Slack OAuth v2 connection strategy. Token-rotation apps are rejected at finalize
+ * (refresh path lands later in #1198).
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
@@ -40,11 +30,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     private static final String AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize";
 
-    /**
-     * Locked scope set for Slack installs. Drops {@code app_mentions:read} and
-     * {@code channels:history} (the leaderboard task only posts; it does not read history)
-     * and adds {@code users:read.email} so reviewer Slack handles can be resolved by email.
-     */
+    // Locked OAuth scope set; rotating apps rejected at finalize until token-rotation refresher ships.
     static final Set<String> DEFAULT_SCOPES = Set.of(
         "chat:write",
         "chat:write.public",
@@ -108,8 +94,6 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
             return new ConnectFinalization.Failed("slack oauth failed: " + e.getMessage());
         }
         if (r.expiresIn() != null || r.refreshToken() != null) {
-            // Token rotation requires a separate refresh path. Reject loudly rather than
-            // dropping the rotation fields on the floor and letting the bot token expire silently.
             return new ConnectFinalization.Failed("Token rotation not yet supported");
         }
         if (r.team() == null || r.team().id() == null) {

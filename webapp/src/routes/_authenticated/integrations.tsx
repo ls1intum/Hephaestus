@@ -10,13 +10,7 @@ type Search = {
 	reason?: string;
 };
 
-/**
- * Landing route hit by the server-side OAuth callback after a vendor finalizes
- * a Connection. The callback controller redirects here with
- * {@code ?status=success} (or {@code ?status=error&reason=...}); we surface a toast
- * and bounce back to the originating workspace's admin settings, which we stashed
- * in {@code sessionStorage} before initiating OAuth.
- */
+// OAuth callback landing route: toasts status, then redirects to the originating workspace.
 export const Route = createFileRoute("/_authenticated/integrations")({
 	component: IntegrationsCallback,
 	validateSearch: (search): Search => ({

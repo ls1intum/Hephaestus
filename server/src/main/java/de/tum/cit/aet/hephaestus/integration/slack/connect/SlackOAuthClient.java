@@ -15,17 +15,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 /**
- * Slack {@code oauth.v2.access} client.
- *
- * <p>POSTs the authorisation {@code code} back to Slack with the app's
- * {@code client_id} / {@code client_secret} (form-encoded) and parses the bot-install
- * payload into {@link OAuthV2Access}. The endpoint base URL is configurable via
- * {@code hephaestus.integration.slack.api-base} so tests can point at a local
- * mock-web-server; production defaults to {@code https://slack.com}.
- *
- * <p>Secrets are never logged. On any error (transport failure, non-2xx, malformed
- * body, or Slack-reported {@code ok=false}) we throw {@link SlackOAuthException}
- * carrying the Slack error code (or a short transport hint), never the request body.
+ * Slack {@code oauth.v2.access} client — exchanges an auth code for a bot token.
+ * Throws {@link SlackOAuthException} on transport, non-2xx, or {@code ok=false};
+ * secrets are never logged.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
@@ -76,8 +68,6 @@ public class SlackOAuthClient {
                 .retrieve()
                 .body(OAuthV2Access.class);
         } catch (RestClientException e) {
-            // Transport, non-2xx, or deserialisation failure. Don't surface the exception
-            // message verbatim — it can carry the request body or response excerpt.
             log.warn("Slack oauth.v2.access transport failure: {}", e.getClass().getSimpleName());
             throw new SlackOAuthException("transport_failure", e);
         }
@@ -97,14 +87,6 @@ public class SlackOAuthClient {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
-    /**
-     * Slack {@code oauth.v2.access} response. Only the fields we read are bound;
-     * unknown fields (enterprise install metadata, incoming_webhook, etc.) are ignored.
-     *
-     * <p>{@code expiresIn} + {@code refreshToken} are populated only for token-rotation
-     * apps. We don't yet support rotation, so the strategy rejects responses that
-     * carry these fields rather than silently dropping them.
-     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record OAuthV2Access(
         @JsonProperty("ok") boolean ok,

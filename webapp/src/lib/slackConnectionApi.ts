@@ -1,19 +1,8 @@
 import environment from "@/environment";
 import { keycloakService } from "@/integrations/auth";
 
-/**
- * Thin wrappers around the Slack-related Connection endpoints that are
- * excluded from openapi-ts codegen.
- *
- *  - {@code POST /api/v1/workspaces/{workspaceId}/connections} — initiate OAuth.
- *    Excluded from codegen because its response body is a sealed type
- *    (Redirect / Linked) that springdoc-3 doesn't emit as a named schema.
- *  - {@code POST /api/v1/workspaces/{workspaceId}/connections/slack/test-message}
- *    — connectivity probe. Excluded for the same nested-record reason.
- *
- * Channel + team + enabled config still flows through the existing
- * generated {@code updateNotifications} mutation.
- */
+// Slack-specific Connection endpoints excluded from openapi-ts codegen
+// (springdoc-3 sealed-type bug). See webapp/openapi-ts.config.ts for the exclusion list.
 
 async function authFetch(path: string, init?: RequestInit): Promise<Response> {
 	await keycloakService.updateToken(60).catch(() => undefined);
@@ -28,16 +17,20 @@ async function authFetch(path: string, init?: RequestInit): Promise<Response> {
 	});
 }
 
-export type InitiateConnectionRedirect = { type: "REDIRECT"; url: string };
-export type InitiateConnectionLinked = { type: "LINKED"; connectionId: number };
+// Mirrors server-side InitiateConnectionResponse sealed type. The @JsonTypeInfo
+// discriminator emits lowercase names ("redirect" / "linked") and the Redirect
+// variant carries `vendorUrl` (not `url`). Match exactly.
+export type InitiateConnectionRedirect = { type: "redirect"; vendorUrl: string; state: string };
+export type InitiateConnectionLinked = { type: "linked"; connectionId: number };
 export type InitiateConnectionResponse = InitiateConnectionRedirect | InitiateConnectionLinked;
 
 export async function initiateSlackConnection(
 	workspaceId: number,
 ): Promise<InitiateConnectionResponse> {
+	// userInput is empty for Slack — the strategy needs no extra inputs at initiate time.
 	const response = await authFetch(`/api/v1/workspaces/${workspaceId}/connections`, {
 		method: "POST",
-		body: JSON.stringify({ kind: "SLACK" }),
+		body: JSON.stringify({ kind: "SLACK", userInput: {} }),
 	});
 	if (!response.ok) {
 		throw new Error(`Slack OAuth initiate failed (HTTP ${response.status})`);
@@ -56,8 +49,8 @@ export async function sendSlackTestMessage(workspaceId: number): Promise<SlackTe
 		`/api/v1/workspaces/${workspaceId}/connections/slack/test-message`,
 		{ method: "POST" },
 	);
-	// 200 → success; 502 carries structured failure with slackError; everything else is a real fault.
-	if (response.status === 200 || response.status === 502) {
+	// 200 → success; 4xx Slack user-error → structured failure body with slackError.
+	if (response.ok || (response.status >= 400 && response.status < 500)) {
 		return (await response.json()) as SlackTestMessageResponse;
 	}
 	throw new Error(`Slack test-message failed (HTTP ${response.status})`);

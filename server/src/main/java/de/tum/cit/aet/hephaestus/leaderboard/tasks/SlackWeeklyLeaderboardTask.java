@@ -44,14 +44,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Task to send a weekly leaderboard message to each workspace's configured Slack channel.
- *
- * <p>Fan-out is driven by the Connection table — every ACTIVE Slack
- * {@link Connection} with a configured {@code notificationChannelId} and the workspace's
- * {@code leaderboardNotificationEnabled=true} gets a post. One workspace's failure does
- * NOT block the next.
- *
- * @see SlackMessageService
+ * Weekly Slack digest fan-out. Posts to every ACTIVE Slack {@link Connection} whose
+ * workspace has notifications enabled and a configured channel; one workspace's failure
+ * does NOT block the next.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
@@ -79,17 +74,6 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         this.connectionRepository = connectionRepository;
     }
 
-    /**
-     * Probe that the Slack family is enabled (notifications toggle on). Per-workspace
-     * connectivity is verified at send time by {@link SlackMessageService#initTest(long)}.
-     */
-    public boolean testSlackConnection() {
-        return leaderboardProperties.notification().enabled();
-    }
-
-    /**
-     * Gets the Slack handles of the top 3 reviewers in the given time frame for one workspace.
-     */
     private List<User> getTop3SlackReviewers(
         Workspace workspace,
         Instant after,
@@ -216,14 +200,10 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             log.debug("Skipped Slack notification: reason=disabled, workspaceId={}", workspace.getId());
             return;
         }
-        if (!(connection.getConfig() instanceof ConnectionConfig.SlackConfig slackConfig)) {
-            log.warn(
-                "Slack Connection {} has unexpected config variant {} — skipping",
-                connection.getId(),
-                connection.getConfig() == null ? null : connection.getConfig().getClass().getSimpleName()
-            );
-            return;
-        }
+        // Cast is safe: the repo query filters by IntegrationKind.SLACK, so the config
+        // variant is always SlackConfig. (Cross-variant returns are guarded by
+        // ConnectionService.updateConfig.)
+        ConnectionConfig.SlackConfig slackConfig = (ConnectionConfig.SlackConfig) connection.getConfig();
         String channelId = slackConfig.notificationChannelId();
         if (channelId == null || channelId.isBlank()) {
             log.info("Skipped Slack notification: reason=noChannelConfigured, workspaceId={}", workspace.getId());

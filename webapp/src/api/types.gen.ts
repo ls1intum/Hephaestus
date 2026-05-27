@@ -1981,7 +1981,6 @@ export type CallbackGetData = {
         kind: string;
     };
     query: {
-        code?: string;
         state?: string;
         error?: string;
         error_description?: string;
@@ -2009,7 +2008,6 @@ export type CallbackPostData = {
         kind: string;
     };
     query: {
-        code?: string;
         state?: string;
         error?: string;
         error_description?: string;

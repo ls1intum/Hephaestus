@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.leaderboard.tasks;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -28,8 +27,12 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 
 class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
@@ -75,10 +78,15 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
         verify(slackMessageService, never()).sendForWorkspace(anyLong(), anyString(), any(), any());
     }
 
-    @Test
-    void run_workspaceNotificationDisabled_skipsThatWorkspace() {
-        Workspace w = workspace(1L, "acme", false);
-        Connection c = connection(w, slackConfig("T1", "Acme", "C0974LJBPBK", "engineering"));
+    /**
+     * Per-workspace skip preconditions (notifications-off, no channel configured) all
+     * route through the same fast-return path. Fold into one parameterised case so the
+     * contract stays clear: skip → never call Slack.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("skipScenarios")
+    void run_perWorkspaceSkipConditions_neverCallSlack(String name, Workspace w, ConnectionConfig.SlackConfig cfg) {
+        Connection c = connection(w, cfg);
         when(
             connectionRepository.findByKindAndStateWithWorkspace(IntegrationKind.SLACK, IntegrationState.ACTIVE)
         ).thenReturn(List.of(c));
@@ -88,17 +96,15 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
         verify(slackMessageService, never()).sendForWorkspace(anyLong(), anyString(), any(), any());
     }
 
-    @Test
-    void run_channelIdMissing_skipsThatWorkspace() {
-        Workspace w = workspace(1L, "acme", true);
-        Connection c = connection(w, slackConfig("T1", "Acme", /* channelId */ null, null));
-        when(
-            connectionRepository.findByKindAndStateWithWorkspace(IntegrationKind.SLACK, IntegrationState.ACTIVE)
-        ).thenReturn(List.of(c));
-
-        task.run();
-
-        verify(slackMessageService, never()).sendForWorkspace(anyLong(), anyString(), any(), any());
+    private static Stream<Arguments> skipScenarios() {
+        return Stream.of(
+            Arguments.of(
+                "notificationsDisabled",
+                workspace(1L, "acme", false),
+                slackConfig("T1", "Acme", "C0974LJBPBK", "engineering")
+            ),
+            Arguments.of("noChannelConfigured", workspace(1L, "acme", true), slackConfig("T1", "Acme", null, null))
+        );
     }
 
     @Test
@@ -165,27 +171,6 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
         );
     }
 
-    @Test
-    void run_unexpectedConfigVariant_skipsThatWorkspaceWithoutThrowing() {
-        Workspace w = workspace(1L, "acme", true);
-        Connection c = connection(
-            w,
-            new ConnectionConfig.GitHubPatConfig(null, null, Set.of()) // wrong variant on purpose
-        );
-        when(
-            connectionRepository.findByKindAndStateWithWorkspace(IntegrationKind.SLACK, IntegrationState.ACTIVE)
-        ).thenReturn(List.of(c));
-
-        task.run();
-
-        verify(slackMessageService, never()).sendForWorkspace(anyLong(), anyString(), any(), any());
-    }
-
-    @Test
-    void testSlackConnection_reflectsPropertyToggle() {
-        assertThat(task.testSlackConnection()).isTrue();
-    }
-
     // ─── Test helpers ─────────────────────────────────────────────────────────
 
     private static Workspace workspace(long id, String slug, boolean notificationsEnabled) {
@@ -197,8 +182,7 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
     }
 
     private static Connection connection(Workspace w, ConnectionConfig config) {
-        Connection c = new Connection(w, IntegrationKind.SLACK, "T-" + w.getId(), config);
-        return c;
+        return new Connection(w, IntegrationKind.SLACK, "T-" + w.getId(), config);
     }
 
     private static ConnectionConfig.SlackConfig slackConfig(

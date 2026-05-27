@@ -46,15 +46,9 @@ public interface ConnectionStrategy {
 
     sealed interface ConnectFinalization permits ConnectFinalization.Completed, ConnectFinalization.Failed {
         /**
-         * Successful finalization payload.
-         *
-         * <p>{@code config} (nullable) lets strategies hand back vendor-side metadata that
-         * needs to land on the Connection row alongside credentials — Slack uses this to
-         * stamp {@code teamId} / {@code teamName} on the {@link ConnectionConfig.SlackConfig}.
-         * Null means "leave the existing config alone" (the OAuth-finalize service keeps
-         * the placeholder set in {@code findOrCreatePendingConnection}). Strategies that
-         * have no vendor-side config (GitHub App installation events, GitLab PAT paste)
-         * pass null and rely on the placeholder.
+         * Successful finalization. Nullable {@code config} lets strategies stamp vendor
+         * metadata onto the Connection row; null keeps the placeholder set by
+         * {@code findOrCreatePendingConnection}.
          */
         record Completed(
             String instanceKey,

@@ -16,15 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Slack-specific admin endpoint — connectivity probe.
- *
- * <p>Channel + team configuration is owned by
- * {@code PATCH /workspaces/{slug}/notifications} (existing endpoint that writes
- * both {@code Workspace.leaderboardNotificationEnabled} and the {@code SlackConfig}
- * JSONB fields atomically). This controller exists only for the test-message
- * probe, which has no analogue in the workspace settings surface.
- */
+/** Slack admin connectivity probe — test-message dispatch. */
 @RestController
 @RequestMapping("/api/v1/workspaces/{workspaceId}/connections/slack")
 @RequireAtLeastWorkspaceAdmin
@@ -44,11 +36,6 @@ public class SlackConnectionAdminController {
         this.slackMessageService = slackMessageService;
     }
 
-    /**
-     * Post a quick "Hephaestus test message" to the configured channel. 404 when no
-     * Slack Connection exists or the channel isn't configured. 502 on Slack-side error
-     * with the Slack error code in the body.
-     */
     @PostMapping("/test-message")
     public ResponseEntity<SlackTestMessageResponse> sendTestMessage(@PathVariable Long workspaceId) {
         var config = connectionService
@@ -81,9 +68,25 @@ public class SlackConnectionAdminController {
                 channelId,
                 e.slackError()
             );
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(
+            return ResponseEntity.status(statusForSlackError(e.slackError())).body(
                 new SlackTestMessageResponse(false, channelId, e.slackError())
             );
         }
+    }
+
+    private static HttpStatus statusForSlackError(String slackError) {
+        if (slackError == null) {
+            return HttpStatus.BAD_GATEWAY;
+        }
+        return switch (slackError) {
+            case
+                "channel_not_found",
+                "is_archived",
+                "invalid_blocks",
+                "invalid_arguments",
+                "msg_too_long" -> (HttpStatus.BAD_REQUEST);
+            case "not_in_channel", "missing_scope", "cannot_dm_bot" -> HttpStatus.FORBIDDEN;
+            default -> HttpStatus.BAD_GATEWAY;
+        };
     }
 }

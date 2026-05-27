@@ -9,12 +9,15 @@ import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Service for workspace configuration and settings management.
@@ -95,15 +98,8 @@ public class WorkspaceSettingsService {
         }
 
         if (team != null || channelId != null) {
-            connectionService.updateConfig(workspaceId, IntegrationKind.SLACK, cfg -> {
-                if (!(cfg instanceof ConnectionConfig.SlackConfig slack)) {
-                    throw new IllegalStateException(
-                        "Expected SlackConfig on workspace=" +
-                            workspaceId +
-                            " but got " +
-                            cfg.getClass().getSimpleName()
-                    );
-                }
+            Optional<?> updated = connectionService.updateConfig(workspaceId, IntegrationKind.SLACK, cfg -> {
+                ConnectionConfig.SlackConfig slack = (ConnectionConfig.SlackConfig) cfg;
                 return new ConnectionConfig.SlackConfig(
                     slack.teamId(),
                     slack.teamName(),
@@ -112,6 +108,12 @@ public class WorkspaceSettingsService {
                     slack.enabledStreams()
                 );
             });
+            if (updated.isEmpty()) {
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "No active Slack Connection — reconnect via the admin panel before changing channel/team."
+                );
+            }
         }
 
         log.info("Updated workspace notifications: workspaceId={}, enabled={}", workspaceId, enabled);

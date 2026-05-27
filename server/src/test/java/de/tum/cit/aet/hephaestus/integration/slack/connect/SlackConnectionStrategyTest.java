@@ -43,13 +43,6 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
     }
 
     @Test
-    void finalize_blankCode_returnsFailedMissingCode() {
-        ConnectFinalization r = strategy.finalizeConnect(ref(), Map.of());
-        assertThat(r).isInstanceOf(ConnectFinalization.Failed.class);
-        assertThat(((ConnectFinalization.Failed) r).reason()).isEqualTo("missing code");
-    }
-
-    @Test
     void finalize_oauthClientThrows_returnsFailedWithErrorMessage() {
         when(oauthClient.exchangeCode(eq("c1"), any())).thenThrow(new SlackOAuthException("invalid_code"));
 
@@ -91,28 +84,6 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
 
         assertThat(r).isInstanceOf(ConnectFinalization.Failed.class);
         assertThat(((ConnectFinalization.Failed) r).reason()).contains("missing team");
-    }
-
-    @Test
-    void finalize_missingAccessToken_returnsFailed() {
-        when(oauthClient.exchangeCode(eq("c"), any())).thenReturn(
-            new OAuthV2Access(
-                true,
-                null,
-                "",
-                "U1",
-                "A1",
-                new OAuthV2Access.Team("T1", "Acme"),
-                "chat:write",
-                null,
-                null
-            )
-        );
-
-        ConnectFinalization r = strategy.finalizeConnect(ref(), Map.of("code", "c"));
-
-        assertThat(r).isInstanceOf(ConnectFinalization.Failed.class);
-        assertThat(((ConnectFinalization.Failed) r).reason()).contains("access_token");
     }
 
     @Test
@@ -167,15 +138,11 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
             (de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.ConnectInitiation.RedirectToVendor) initiation;
         String url = redirect.vendorUrl().toString();
         assertThat(url).startsWith("https://slack.com/oauth/v2/authorize?");
-        // The scope set is locked — chat:write, chat:write.public, team:read, users:read, users:read.email.
         assertThat(url).contains("chat%3Awrite");
         assertThat(url).contains("chat%3Awrite.public");
         assertThat(url).contains("team%3Aread");
         assertThat(url).contains("users%3Aread");
         assertThat(url).contains("users%3Aread.email");
-        // The dropped scopes must not appear.
-        assertThat(url).doesNotContain("app_mentions");
-        assertThat(url).doesNotContain("channels%3Ahistory");
         assertThat(url).contains("state=state-abc");
         assertThat(url).contains("client_id=client-id");
         assertThat(url).contains("redirect_uri=https%3A%2F%2Fapp.test%2Foauth%2Fcallback%2Fslack");

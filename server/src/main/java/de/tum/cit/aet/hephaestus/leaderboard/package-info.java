@@ -1,15 +1,27 @@
 /**
- * Read model for developer activity rankings. Reads from
- * {@code activity_event} (written by {@link de.tum.cit.aet.hephaestus.activity}); never
- * writes. XP aggregation uses SUM/GROUP BY in SQL, not in-memory iteration.
- *
- * <p>Also owns {@code workspace_membership.league_points} via {@link LeaguePointsService}
- * and the Elo-style rating constants in {@link LeaguePointsConstants}.
- *
- * <p>The weekly Slack notification task in {@code leaderboard/tasks/} depends on the
- * {@code integration.slack::messaging} named interface (the per-workspace
- * {@code SlackMessageService}). It deliberately does NOT depend on the rest of the
- * slack/* internals.
+ * Read model for developer activity rankings. Reads from {@code activity_event}; never
+ * writes. Owns {@code workspace_membership.league_points} via {@link LeaguePointsService}
+ * and the weekly Slack digest task in {@code leaderboard/tasks/}. The {@code
+ * allowedDependencies} list pins the OUTBOUND boundary so this read model cannot
+ * silently grow new cross-module imports.
  */
-@org.springframework.modulith.ApplicationModule(displayName = "Leaderboard")
+@org.springframework.modulith.ApplicationModule(
+    displayName = "Leaderboard",
+    allowedDependencies = {
+        "activity",
+        "activity::scoring",
+        "config",
+        "core",
+        "core::exception",
+        "core::runtime",
+        "integration.core",
+        "integration.core::spi",
+        "integration.scm",
+        "integration.slack::messaging",
+        "profile",
+        "workspace",
+        "workspace::context",
+        "workspace::settings",
+    }
+)
 package de.tum.cit.aet.hephaestus.leaderboard;

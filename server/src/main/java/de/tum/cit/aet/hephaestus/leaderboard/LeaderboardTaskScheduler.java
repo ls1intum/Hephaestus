@@ -76,11 +76,6 @@ public class LeaderboardTaskScheduler {
             return;
         }
 
-        if (!task.testSlackConnection()) {
-            log.error("Failed to schedule Slack message: reason=connectionTestFailed");
-            return;
-        }
-
         log.info("Scheduled Slack message: cronExpression={}", cron);
         scheduleSafely(task, new CronTrigger(cron), "Slack weekly leaderboard message");
     }
