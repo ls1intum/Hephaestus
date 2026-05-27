@@ -5,6 +5,7 @@ import {
 } from "./AdminFeaturesSettings";
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
+import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
 // Use the RepositoryItem type from the AdminRepositoriesSettings component
 type RepositoryItem = {
@@ -27,6 +28,14 @@ export interface AdminSettingsPageProps {
 	features: FeatureValues;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
+	// Slack notification card props (only rendered when leaderboard is enabled)
+	workspaceId?: number;
+	workspaceSlug?: string;
+	hasSlackConnection: boolean;
+	slackChannelId?: string;
+	slackTeamLabel?: string;
+	slackNotificationsEnabled: boolean;
+	onSlackSaved: () => void;
 }
 
 export function AdminSettingsPage({
@@ -44,6 +53,13 @@ export function AdminSettingsPage({
 	features,
 	isSavingFeatures,
 	onToggleFeature,
+	workspaceId,
+	workspaceSlug,
+	hasSlackConnection,
+	slackChannelId,
+	slackTeamLabel,
+	slackNotificationsEnabled,
+	onSlackSaved,
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
@@ -70,6 +86,18 @@ export function AdminSettingsPage({
 
 				{features.leaguesEnabled && (
 					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
+				)}
+
+				{features.leaderboardEnabled && workspaceId != null && workspaceSlug != null && (
+					<AdminSlackNotificationSettings
+						workspaceId={workspaceId}
+						workspaceSlug={workspaceSlug}
+						hasSlackConnection={hasSlackConnection}
+						channelId={slackChannelId}
+						teamLabel={slackTeamLabel}
+						enabled={slackNotificationsEnabled}
+						onSaved={onSlackSaved}
+					/>
 				)}
 			</div>
 		</div>

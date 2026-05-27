@@ -37,6 +37,11 @@ const meta = {
 		features: allOff,
 		isSavingFeatures: false,
 		onToggleFeature: fn(),
+		workspaceId: 1,
+		workspaceSlug: "demo",
+		hasSlackConnection: false,
+		slackNotificationsEnabled: false,
+		onSlackSaved: fn(),
 	},
 } satisfies Meta<typeof AdminSettingsPage>;
 
