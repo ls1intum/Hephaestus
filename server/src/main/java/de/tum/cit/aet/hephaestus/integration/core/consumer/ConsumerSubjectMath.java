@@ -147,15 +147,31 @@ public final class ConsumerSubjectMath {
     }
 
     /**
-     * Wildcard subject filter that matches every installation-level event.
+     * Wildcard subject filter that matches every installation-level event for the given
+     * {@link IntegrationKind}. Today only GitHub publishes installation events (GitLab
+     * uses PAT-based auth and has no installation concept); the kind is taken as a
+     * parameter so the SPI signature stays vendor-neutral and new installation-capable
+     * vendors can plug in without renaming the call site.
      *
-     * <p>GitHub-only: GitLab uses PAT-based auth and has no installation concept. The
-     * caller is responsible for not subscribing this filter against a GitLab stream.
-     *
-     * @return the subject {@code github.?.?.>}
+     * @param kind installation-aware kind. Must be {@link IntegrationKind#GITHUB} today;
+     *             any other kind throws {@link UnsupportedOperationException} with a
+     *             clear message rather than silently producing a bogus filter.
+     * @return the subject e.g. {@code github.?.?.>}
+     * @throws UnsupportedOperationException if {@code kind} does not yet have installation
+     *             semantics (anything other than GITHUB today).
      */
-    public static String installationFilterGithub() {
-        return buildSubjectPrefix("github", "?/?") + ".>";
+    public static String installationAwareSubjectFilter(IntegrationKind kind) {
+        if (kind == null) {
+            throw new IllegalArgumentException("kind must not be null");
+        }
+        return switch (kind) {
+            case GITHUB -> buildSubjectPrefix("github", "?/?") + ".>";
+            case GITLAB, SLACK, OUTLINE -> throw new UnsupportedOperationException(
+                "Installation-aware subject filter not yet supported for kind=" +
+                    kind +
+                    " (only GITHUB publishes installation events today)"
+            );
+        };
     }
 
     /**

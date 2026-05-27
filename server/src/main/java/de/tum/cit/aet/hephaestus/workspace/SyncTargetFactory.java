@@ -40,7 +40,7 @@ public final class SyncTargetFactory {
         String personalAccessToken = null;
 
         if (gitHubApp.isPresent()) {
-            authMode = AuthMode.GITHUB_APP;
+            authMode = AuthMode.INSTALLATION_APP;
             installationId = gitHubApp.get().installationId();
         } else if (gitHubPat.isPresent()) {
             authMode = AuthMode.PERSONAL_ACCESS_TOKEN;
@@ -50,8 +50,8 @@ public final class SyncTargetFactory {
             personalAccessToken = resolveBearerToken(connectionService, workspaceId, IntegrationKind.GITLAB);
         } else {
             // No SCM connection bound — caller is responsible for filtering these out
-            // before scheduling work; default to GITHUB_APP for backward-compat shape.
-            authMode = AuthMode.GITHUB_APP;
+            // before scheduling work; default to INSTALLATION_APP for backward-compat shape.
+            authMode = AuthMode.INSTALLATION_APP;
         }
 
         return new SyncTarget(

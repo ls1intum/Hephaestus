@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class ConsumerSubjectMathTest extends BaseUnitTest {
 
     @Nested
-    @DisplayName("repositoryFilter / organizationFilter / installationFilterGithub")
+    @DisplayName("repositoryFilter / organizationFilter / installationAwareSubjectFilter")
     class FilterShapes {
 
         @Test
@@ -41,8 +41,28 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
         }
 
         @Test
-        void installationFilterGithubMatchesAllInstallationEvents() {
-            assertThat(ConsumerSubjectMath.installationFilterGithub()).isEqualTo("github.?.?.>");
+        void installationAwareSubjectFilterForGithubMatchesAllInstallationEvents() {
+            assertThat(ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.GITHUB)).isEqualTo(
+                "github.?.?.>"
+            );
+        }
+
+        @Test
+        void installationAwareSubjectFilterRejectsNonInstallationKinds() {
+            assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.GITLAB))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("GITLAB");
+            assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.SLACK))
+                .isInstanceOf(UnsupportedOperationException.class);
+            assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.OUTLINE))
+                .isInstanceOf(UnsupportedOperationException.class);
+        }
+
+        @Test
+        void installationAwareSubjectFilterRejectsNullKind() {
+            assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(null)).isInstanceOf(
+                IllegalArgumentException.class
+            );
         }
     }
 

@@ -56,17 +56,17 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
     public AuthMode getAuthMode(Long scopeId) {
         var kind = connectionService.findActiveProviderKind(scopeId);
         if (kind.isEmpty()) {
-            log.warn("Defaulted to GITHUB_APP auth mode: reason=noActiveSCMConnection, scopeId={}", scopeId);
-            return AuthMode.GITHUB_APP;
+            log.warn("Defaulted to INSTALLATION_APP auth mode: reason=noActiveSCMConnection, scopeId={}", scopeId);
+            return AuthMode.INSTALLATION_APP;
         }
         return switch (kind.get()) {
             case GITHUB -> connectionService.findActiveGitHubAppConfig(scopeId).isPresent()
-                ? AuthMode.GITHUB_APP
+                ? AuthMode.INSTALLATION_APP
                 : AuthMode.PERSONAL_ACCESS_TOKEN;
             case GITLAB -> AuthMode.PERSONAL_ACCESS_TOKEN;
             case SLACK, OUTLINE -> {
-                log.warn("Non-SCM provider for scope {}: kind={}; defaulting to GITHUB_APP", scopeId, kind.get());
-                yield AuthMode.GITHUB_APP;
+                log.warn("Non-SCM provider for scope {}: kind={}; defaulting to INSTALLATION_APP", scopeId, kind.get());
+                yield AuthMode.INSTALLATION_APP;
             }
         };
     }

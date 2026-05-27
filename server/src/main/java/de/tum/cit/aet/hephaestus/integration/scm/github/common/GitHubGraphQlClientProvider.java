@@ -256,7 +256,7 @@ public class GitHubGraphQlClientProvider {
 
         AuthMode authMode = tokenProvider.getAuthMode(scopeId);
 
-        if (authMode == AuthMode.GITHUB_APP) {
+        if (authMode == AuthMode.INSTALLATION_APP) {
             Long installationId = tokenProvider
                 .getInstallationId(scopeId)
                 .orElseThrow(() -> new IllegalStateException("Scope " + scopeId + " has no installation id."));

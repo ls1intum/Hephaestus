@@ -85,7 +85,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         return new SyncTarget(
             1L,
             100L,
-            authMode == AuthMode.GITHUB_APP ? 42L : null,
+            authMode == AuthMode.INSTALLATION_APP ? 42L : null,
             authMode == AuthMode.PERSONAL_ACCESS_TOKEN ? "ghp_test_token" : null,
             authMode,
             "owner/repo",
@@ -174,7 +174,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         void shouldReturnNegativeOneWhenDisabled() {
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -187,7 +187,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         void shouldReturnNegativeOneWhenDefaultBranchNull() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             Repository repo = createMockRepository(1L, "owner/repo", null);
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -200,7 +200,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         void shouldReturnNegativeOneWhenDefaultBranchBlank() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             Repository repo = createMockRepository(1L, "owner/repo", "  ");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -213,7 +213,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn(null);
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -230,7 +230,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(commitRepository.findLatestByRepositoryId(1L)).thenReturn(Optional.of(latestCommit));
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -261,7 +261,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -302,7 +302,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             service.backfillCommits(target, repo, 100L);
 
@@ -337,7 +337,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(commitRepository.findByShaAndRepositoryId("head456", 1L)).thenReturn(Optional.of(mockCommit));
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -370,7 +370,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(commitRepository.findByShaAndRepositoryId("newone", 1L)).thenReturn(Optional.of(mockCommit));
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -404,7 +404,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of());
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -444,7 +444,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of());
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             service.backfillCommits(target, repo, 100L);
 
@@ -481,7 +481,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             );
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -497,7 +497,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             );
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -516,7 +516,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of());
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
@@ -548,7 +548,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             service.backfillCommits(target, repo, 100L);
 
@@ -589,7 +589,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             service.backfillCommits(target, repo, 100L);
 
@@ -635,7 +635,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             lenient().when(mockCommit.getRepository()).thenReturn(repo);
             // findByShaAndRepositoryId called twice: once for file changes, once for event
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
-            SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
+            SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             service.backfillCommits(target, repo, 100L);
 

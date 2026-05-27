@@ -297,7 +297,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * Sets the Keycloak {@code sub} claim on a user row, only when it is currently NULL
      * or differs from the supplied value.
      *
-     * <p>Called from {@link AuthenticatedGitProviderUserService} after an authenticated
+     * <p>Called from {@link de.tum.cit.aet.hephaestus.integration.core.connection.identity.AuthenticatedGitProviderUserService} after an authenticated
      * upsert so the SCM {@code User} row gains the stable IdP-side identifier. Sync
      * paths (which observe vendor users we have not yet authenticated) must NOT call
      * this — they would clobber a real subject with NULL.

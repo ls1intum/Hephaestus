@@ -8,14 +8,20 @@
  * feedback-post tracking aggregate ({@code feedback/}), and the framework bootstrap
  * ({@code framework/}).
  *
- * <p>Deliberately not annotated with {@link org.springframework.modulith.ApplicationModule}:
- * core/ is part of the {@code integration} application module (declared one level up), not a
- * sub-module. The {@code @NamedInterface} annotations on individual {@code core/<x>/}
- * packages (spi, events, oauth, handler, consumer, webhook, …) still register those packages
- * as named interfaces of the parent {@code integration} module — Modulith resolves
- * named-interface ownership by walking up to the nearest {@code @ApplicationModule}.
+ * <p>Promoted in Phase 4 to an explicit OPEN {@link org.springframework.modulith.ApplicationModule}
+ * sibling of {@code scm/}, {@code slack/}, {@code outline/}. This is what makes
+ * {@code allowedDependencies = "integration::core"} a legal grant on the CLOSED vendor
+ * modules — Modulith only resolves named-interface ownership across formally-declared
+ * application modules. OPEN means existing {@code @NamedInterface} annotations on sub-
+ * packages (spi, events, oauth, handler, consumer, webhook) keep working and the vendor
+ * adapters can also reach into a few non-interfaced internals (the connection aggregate,
+ * the framework bootstrap) without a wholesale interface inventory we don't need yet.
  *
- * <p>Nothing under {@code core/} may know about a specific {@code IntegrationKind}.
- * Vendor-specific implementations live under {@code integration/<kind>/...}.
+ * <p>Nothing under {@code core/} may know about a specific {@code IntegrationKind} by
+ * name. Vendor-specific implementations live under {@code integration/<kind>/...}.
  */
+@org.springframework.modulith.ApplicationModule(
+    displayName = "Integration · Core",
+    type = org.springframework.modulith.ApplicationModule.Type.OPEN
+)
 package de.tum.cit.aet.hephaestus.integration.core;

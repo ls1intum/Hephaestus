@@ -171,7 +171,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SCOPE_ID,
             INSTALLATION_ID,
             null,
-            AuthMode.GITHUB_APP,
+            AuthMode.INSTALLATION_APP,
             repoName,
             Instant.now(), // lastLabelsSyncedAt
             Instant.now(), // lastMilestonesSyncedAt
@@ -200,7 +200,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SCOPE_ID,
             INSTALLATION_ID,
             null,
-            AuthMode.GITHUB_APP,
+            AuthMode.INSTALLATION_APP,
             repoName,
             null, // lastLabelsSyncedAt
             null, // lastMilestonesSyncedAt
@@ -229,7 +229,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SCOPE_ID,
             INSTALLATION_ID,
             null,
-            AuthMode.GITHUB_APP,
+            AuthMode.INSTALLATION_APP,
             repoName,
             Instant.now(), // lastLabelsSyncedAt
             Instant.now(), // lastMilestonesSyncedAt
@@ -258,7 +258,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SCOPE_ID,
             INSTALLATION_ID,
             null,
-            AuthMode.GITHUB_APP,
+            AuthMode.INSTALLATION_APP,
             repoName,
             Instant.now(), // lastLabelsSyncedAt
             Instant.now(), // lastMilestonesSyncedAt
@@ -504,7 +504,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 SCOPE_ID,
                 INSTALLATION_ID,
                 null,
-                AuthMode.GITHUB_APP,
+                AuthMode.INSTALLATION_APP,
                 "invalid-repo-name", // no owner/name separator
                 null,
                 null,
@@ -739,7 +739,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 SCOPE_ID,
                 INSTALLATION_ID,
                 null,
-                AuthMode.GITHUB_APP,
+                AuthMode.INSTALLATION_APP,
                 "org/empty-repo",
                 null, // lastLabelsSyncedAt
                 null, // lastMilestonesSyncedAt
@@ -774,7 +774,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 SCOPE_ID,
                 INSTALLATION_ID,
                 null,
-                AuthMode.GITHUB_APP,
+                AuthMode.INSTALLATION_APP,
                 "org/repo-a",
                 null, // lastLabelsSyncedAt
                 null, // lastMilestonesSyncedAt
@@ -861,7 +861,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 scopeId2,
                 installationId2,
                 null,
-                AuthMode.GITHUB_APP,
+                AuthMode.INSTALLATION_APP,
                 "org2/repo-b",
                 null,
                 null,

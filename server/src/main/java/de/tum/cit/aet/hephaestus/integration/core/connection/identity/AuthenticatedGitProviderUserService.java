@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.integration.scm.user;
+package de.tum.cit.aet.hephaestus.integration.core.connection.identity;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;

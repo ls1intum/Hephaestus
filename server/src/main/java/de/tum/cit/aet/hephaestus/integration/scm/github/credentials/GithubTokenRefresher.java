@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenServic
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService.InstallationToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.GithubAppCredential;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.InstallationCredential;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TokenRefresher;
@@ -48,9 +48,9 @@ public class GithubTokenRefresher implements TokenRefresher {
 
     @Override
     public BearerToken refresh(IntegrationRef ref, CredentialBundle source) {
-        if (!(source instanceof GithubAppCredential app)) {
+        if (!(source instanceof InstallationCredential app)) {
             throw new UnsupportedOperationException(
-                "GitHub TokenRefresher only supports GithubAppCredential, got " +
+                "GitHub TokenRefresher only supports InstallationCredential, got " +
                     (source == null ? "null" : source.getClass().getSimpleName())
             );
         }

@@ -11,7 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleCon
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.GithubAppCredential;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.InstallationCredential;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
@@ -76,7 +76,7 @@ class GithubCredentialProviderTest extends BaseUnitTest {
 
     @Test
     @DisplayName("ACTIVE GitHubAppConfig Connection still surfaces installation identity (regression guard)")
-    void appConnection_surfacesGithubAppCredential() {
+    void appConnection_surfacesInstallationCredentialBundle() {
         long workspaceId = 17L;
         Workspace ws = Mockito.mock(Workspace.class);
         Connection connection = new Connection(
@@ -93,8 +93,8 @@ class GithubCredentialProviderTest extends BaseUnitTest {
         );
 
         assertThat(resolved).hasValueSatisfying(bundle -> {
-            assertThat(bundle).isInstanceOf(GithubAppCredential.class);
-            GithubAppCredential gh = (GithubAppCredential) bundle;
+            assertThat(bundle).isInstanceOf(InstallationCredential.class);
+            InstallationCredential gh = (InstallationCredential) bundle;
             assertThat(gh.installationId()).isEqualTo(100L);
         });
     }

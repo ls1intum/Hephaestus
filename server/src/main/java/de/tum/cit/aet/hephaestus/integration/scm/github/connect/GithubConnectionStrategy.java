@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.connect;
 
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.GithubAppCredential;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.InstallationCredential;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * GitHub adapter for {@link ConnectionStrategy}: GitHub App install flow.
  * {@link #initiate} bounces to the configured install URL with a signed {@code state};
  * {@link #finalizeConnect} reads {@code installation_id} from the callback and emits a
- * {@link GithubAppCredential} for orchestrator persistence.
+ * {@link InstallationCredential} for orchestrator persistence.
  *
  * <p>{@link #validate} fails closed ("probe not wired") until the GitHub installation
  * health probe lands. {@link #revoke} is a local no-op log: GitHub App uninstall happens
@@ -86,7 +86,7 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
         // wired hephaestus.github.app.id yet. The credential record carries it so
         // downstream callers (token refresh) can reconstruct the JWT without hitting
         // the DB for an unrelated property.
-        GithubAppCredential credentials = new GithubAppCredential(installationId, appId);
+        InstallationCredential credentials = new InstallationCredential(installationId, appId);
         return new ConnectFinalization.Completed(Long.toString(installationId), credentials, null);
     }
 

@@ -1,23 +1,27 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 /**
- * Authentication mode for GitHub API access.
+ * Authentication mode for SCM API access.
  * <p>
- * This enum represents the two supported authentication mechanisms:
+ * This enum represents the two supported authentication mechanisms across SCM
+ * vendors (GitHub today; GitLab / Bitbucket follow the same shape):
  * <ul>
- *   <li>{@link #GITHUB_APP} - Uses GitHub App installation tokens (recommended)</li>
+ *   <li>{@link #INSTALLATION_APP} - Uses installation-based App authentication
+ *       (GitHub App installation tokens; analogous flow on other vendors)</li>
  *   <li>{@link #PERSONAL_ACCESS_TOKEN} - Uses a Personal Access Token (PAT)</li>
  * </ul>
  * <p>
  * This is a shared enum used across the SPI layer to ensure consistent authentication
- * mode representation throughout the codebase.
+ * mode representation throughout the codebase. The name {@code INSTALLATION_APP} is
+ * deliberately vendor-neutral — see {@link ApiCredentialProvider.InstallationCredential}
+ * for the matching credential bundle.
  */
 public enum AuthMode {
     /**
-     * GitHub App installation authentication.
+     * Installation-based App authentication (e.g. GitHub App installation tokens).
      * <p>
-     * Uses short-lived installation tokens minted from the GitHub App.
-     * This is the recommended authentication mode as it provides:
+     * Uses short-lived tokens minted from an App installation. This is the recommended
+     * authentication mode as it provides:
      * <ul>
      *   <li>Fine-grained permissions</li>
      *   <li>Automatic token rotation</li>
@@ -25,14 +29,14 @@ public enum AuthMode {
      *   <li>Organization-level access</li>
      * </ul>
      */
-    GITHUB_APP,
+    INSTALLATION_APP,
 
     /**
      * Personal Access Token authentication for local development.
      * <p>
      * Uses a user-provided PAT stored in the workspace configuration.
      * This mode is intended for <b>local development</b> where setting up
-     * a full GitHub App with webhooks is impractical.
+     * a full App with webhooks is impractical.
      * <p>
      * Configure via:
      * <ul>
@@ -40,7 +44,7 @@ public enum AuthMode {
      *   <li>{@code hephaestus.workspace.default.token: <your-PAT>}</li>
      * </ul>
      * <p>
-     * <b>Not recommended for production.</b> Use {@link #GITHUB_APP} instead.
+     * <b>Not recommended for production.</b> Use {@link #INSTALLATION_APP} instead.
      *
      * @see de.tum.cit.aet.hephaestus.workspace.WorkspaceProperties
      */

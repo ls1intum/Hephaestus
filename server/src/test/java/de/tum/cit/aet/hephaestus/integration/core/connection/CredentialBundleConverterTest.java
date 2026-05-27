@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.core.security.EncryptionException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.GithubAppCredential;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.InstallationCredential;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.OAuthSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -61,9 +61,9 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         }
 
         @Test
-        void githubAppCredential_roundTrips() {
+        void installationCredential_roundTrips() {
             CredentialBundleConverter c = enabled();
-            GithubAppCredential bundle = new GithubAppCredential(987654L, "12345");
+            InstallationCredential bundle = new InstallationCredential(987654L, "12345");
             assertThat(c.decrypt(c.encrypt(bundle, CTX_A), CTX_A)).isEqualTo(bundle);
         }
 
@@ -84,10 +84,10 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         @Test
         void polymorphism_preservesVariant() {
             CredentialBundleConverter c = enabled();
-            CredentialBundle asInterface = new GithubAppCredential(42L, "appid");
+            CredentialBundle asInterface = new InstallationCredential(42L, "appid");
 
             CredentialBundle decoded = c.decrypt(c.encrypt(asInterface, CTX_A), CTX_A);
-            assertThat(decoded).isInstanceOf(GithubAppCredential.class).isEqualTo(asInterface);
+            assertThat(decoded).isInstanceOf(InstallationCredential.class).isEqualTo(asInterface);
         }
 
         @Test

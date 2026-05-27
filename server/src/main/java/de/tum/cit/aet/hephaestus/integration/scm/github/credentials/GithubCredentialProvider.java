@@ -18,10 +18,11 @@ import org.springframework.stereotype.Component;
  * GitHub adapter for {@link ApiCredentialProvider}. Looks up the workspace's ACTIVE
  * {@code Connection} row via {@link ConnectionService#findActive} and maps the persisted
  * {@link ConnectionConfig} sub-type to a {@link ApiCredentialProvider.CredentialBundle}:
- * {@code GitHubAppConfig} → {@link GithubAppCredential} (installation identity only;
- * actual installation token is minted by {@link GithubTokenRefresher}),
- * {@code GitHubPatConfig} → {@link BearerToken} (decrypted from the per-row credential
- * blob via {@link CredentialBundleConverter}).
+ * {@code GitHubAppConfig} → {@link ApiCredentialProvider.InstallationCredential}
+ * (installation identity only; actual installation token is minted by
+ * {@link GithubTokenRefresher}),
+ * {@code GitHubPatConfig} → {@link ApiCredentialProvider.BearerToken} (decrypted from
+ * the per-row credential blob via {@link CredentialBundleConverter}).
  *
  * <p>Returns {@link Optional#empty()} when no Connection exists, the Connection is not
  * ACTIVE, the persisted config is not a GitHub variant, or the PAT row has no credential
@@ -76,7 +77,7 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
                     yield Optional.empty();
                 }
                 yield Optional.of(
-                    new GithubAppCredential(installationId, String.valueOf(appTokenService.getConfiguredAppId()))
+                    new InstallationCredential(installationId, String.valueOf(appTokenService.getConfiguredAppId()))
                 );
             }
             case ConnectionConfig.GitHubPatConfig ignored -> {

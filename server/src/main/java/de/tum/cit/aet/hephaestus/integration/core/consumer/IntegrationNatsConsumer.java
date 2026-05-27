@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionException;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import io.nats.client.Connection;
@@ -103,8 +104,14 @@ public class IntegrationNatsConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(IntegrationNatsConsumer.class);
 
-    /** Stream name used by the GitHub installation-wide consumer. */
-    private static final String GITHUB_STREAM = "github";
+    /**
+     * Kind whose stream backs the installation-wide consumer. Today only GitHub
+     * publishes installation events; we go through {@link ConsumerSubjectMath#streamNameFor}
+     * so the field name and consumer wiring stay vendor-neutral while the singular
+     * supported value remains explicit. New installation-capable vendors will need a
+     * sibling consumer (and likely a different field), not an in-place rename.
+     */
+    private static final IntegrationKind INSTALLATION_AWARE_KIND = IntegrationKind.GITHUB;
 
     /** NATS client connection timeout — keep short; reconnect handles long outages. */
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(10);
@@ -403,20 +410,25 @@ public class IntegrationNatsConsumer {
     }
 
     private void setupInstallationConsumer() throws IOException {
-        String[] subjects = new String[] { ConsumerSubjectMath.installationFilterGithub() };
+        String streamName = ConsumerSubjectMath
+            .streamNameFor(INSTALLATION_AWARE_KIND)
+            .orElseThrow(() ->
+                new IllegalStateException("No NATS stream resolved for installation-aware kind=" + INSTALLATION_AWARE_KIND)
+            );
+        String[] subjects = new String[] { ConsumerSubjectMath.installationAwareSubjectFilter(INSTALLATION_AWARE_KIND) };
         String consumerName = ConsumerSubjectMath.installationConsumerName(durableBaseName());
 
         try {
             JetStreamOptions jsOptions = JetStreamOptions.builder()
                 .requestTimeout(connectionProperties.consumer().requestTimeout())
                 .build();
-            StreamContext streamContext = natsConnection.getStreamContext(GITHUB_STREAM, jsOptions);
+            StreamContext streamContext = natsConnection.getStreamContext(streamName, jsOptions);
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
 
             ScopeConsumer installation = new ScopeConsumer(
                 null,
                 consumerName,
-                GITHUB_STREAM,
+                streamName,
                 consumerContext,
                 streamContext,
                 subjects,

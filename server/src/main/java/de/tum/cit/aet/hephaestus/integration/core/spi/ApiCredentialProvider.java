@@ -36,11 +36,11 @@ public interface ApiCredentialProvider {
     @JsonSubTypes(
         {
             @JsonSubTypes.Type(value = BearerToken.class, name = "BEARER"),
-            @JsonSubTypes.Type(value = GithubAppCredential.class, name = "GITHUB_APP"),
+            @JsonSubTypes.Type(value = InstallationCredential.class, name = "INSTALLATION_APP"),
             @JsonSubTypes.Type(value = OAuthSession.class, name = "OAUTH_SESSION"),
         }
     )
-    sealed interface CredentialBundle permits BearerToken, GithubAppCredential, OAuthSession {}
+    sealed interface CredentialBundle permits BearerToken, InstallationCredential, OAuthSession {}
 
     /**
      * Long-lived or short-lived bearer (PAT, Slack xoxb, Outline OAuth access token).
@@ -54,8 +54,14 @@ public interface ApiCredentialProvider {
         }
     }
 
-    /** GitHub App: installation identity. Actual token minted by {@link TokenRefresher}. */
-    record GithubAppCredential(long installationId, String appId) implements CredentialBundle {}
+    /**
+     * Installation-based app credential identity (e.g. GitHub App, future GitLab/Bitbucket
+     * App). Carries the installation identifier and the issuer (the JWT-spec term for the
+     * entity issuing tokens; for GitHub this is the App ID). Actual access tokens are
+     * minted lazily by {@link TokenRefresher} using these two fields plus the platform's
+     * private signing key. Kept vendor-neutral so the SPI does not pin to "GitHub" by name.
+     */
+    record InstallationCredential(long installationId, String issuer) implements CredentialBundle {}
 
     /** OAuth session with refresh capability. {@code accessToken} + {@code refreshToken} redacted. */
     record OAuthSession(
