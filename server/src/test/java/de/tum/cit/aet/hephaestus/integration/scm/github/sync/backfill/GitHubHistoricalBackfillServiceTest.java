@@ -302,7 +302,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         void shouldReturnTrueWhenBackfillEnabled() {
             service = createService(enabledSchedulerProperties);
 
-            // Act & Assert
             assertThat(service.isEnabled()).isTrue();
         }
 
@@ -310,7 +309,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         void shouldReturnFalseWhenBackfillDisabled() {
             service = createService(disabledSchedulerProperties);
 
-            // Act & Assert
             assertThat(service.isEnabled()).isFalse();
         }
     }

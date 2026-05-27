@@ -86,7 +86,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
   `RuntimeRole.WEBHOOK_PROPERTY`. Production runs them in the dedicated `webhook-server`
   container (`SPRING_PROFILES_ACTIVE=prod,webhook`) for restart independence — see ADR 0008.
 - Configuration is shared with auto-registration: `core.webhook.WebhookProperties` bound to
-  `hephaestus.webhook.*`. JaCoCo package coverage gate ≥ 0.95 branch on `integration.webhook`.
+  `hephaestus.webhook.*`. JaCoCo package coverage gate ≥ 0.95 branch on `integration.core.webhook`.
 
 ## Docs site (`/docs`)
 

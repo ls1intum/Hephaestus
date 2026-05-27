@@ -255,7 +255,7 @@ This deletes the Keycloak H2 database and forces a fresh realm import with your 
 
 ### Webhook receiver
 
-The webhook receiver lives in the Java server (`integration.webhook` package). In local
+The webhook receiver lives in the Java server (`integration.core.webhook` package). In local
 development the monolith default boots all three runtime roles (`server`, `worker`, `webhook`),
 so `pnpm run dev:server` exposes the unified `/webhooks/{kind}` endpoint (kinds: `github`,
 `gitlab`, `slack`, `outline`) alongside the rest of the API.

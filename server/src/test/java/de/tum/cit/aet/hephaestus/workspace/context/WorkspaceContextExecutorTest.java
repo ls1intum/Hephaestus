@@ -177,7 +177,6 @@ class WorkspaceContextExecutorTest {
 
     @Test
     void shouldThrowExceptionForNullRunnable() {
-        // Act & Assert
         assertThrows(IllegalArgumentException.class, () -> {
             WorkspaceContextExecutor.wrap((Runnable) null);
         });
@@ -185,7 +184,6 @@ class WorkspaceContextExecutorTest {
 
     @Test
     void shouldThrowExceptionForNullCallable() {
-        // Act & Assert
         assertThrows(IllegalArgumentException.class, () -> {
             WorkspaceContextExecutor.wrap((Callable<?>) null);
         });

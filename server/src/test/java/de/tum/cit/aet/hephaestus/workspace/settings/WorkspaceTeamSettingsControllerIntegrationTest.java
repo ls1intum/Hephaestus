@@ -107,7 +107,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         void getTeamSettings_asAdmin_shouldReturnSettings() {
             ensureAdminMembership(workspace);
 
-            // Act & Assert
             WorkspaceTeamSettingsDTO result = webTestClient
                 .get()
                 .uri("/workspaces/{slug}/teams/{teamId}/settings", workspace.getWorkspaceSlug(), team.getId())
@@ -127,7 +126,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
 
         @Test
         void getTeamSettings_asNonMember_shouldReturn403() {
-            // Act & Assert
             webTestClient
                 .get()
                 .uri("/workspaces/{slug}/teams/{teamId}/settings", workspace.getWorkspaceSlug(), team.getId())
@@ -178,7 +176,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
             );
             var request = new UpdateTeamSettingsRequestDTO(true);
 
-            // Act & Assert
             webTestClient
                 .patch()
                 .uri("/workspaces/{slug}/teams/{teamId}/settings", workspace.getWorkspaceSlug(), team.getId())
@@ -198,7 +195,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
             var request = new UpdateTeamSettingsRequestDTO(true);
             Long nonExistentTeamId = 999999L;
 
-            // Act & Assert
             webTestClient
                 .patch()
                 .uri("/workspaces/{slug}/teams/{teamId}/settings", workspace.getWorkspaceSlug(), nonExistentTeamId)
@@ -223,7 +219,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         void getRepositorySettings_asAdmin_shouldReturnSettings() {
             ensureAdminMembership(workspace);
 
-            // Act & Assert
             WorkspaceTeamRepositorySettingsDTO result = webTestClient
                 .get()
                 .uri(
@@ -249,7 +244,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
 
         @Test
         void getRepositorySettings_asNonMember_shouldReturn403() {
-            // Act & Assert
             webTestClient
                 .get()
                 .uri(
@@ -314,7 +308,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
             );
             var request = new UpdateRepositorySettingsRequestDTO(true);
 
-            // Act & Assert
             webTestClient
                 .patch()
                 .uri(
@@ -339,7 +332,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
             var request = new UpdateRepositorySettingsRequestDTO(true);
             Long nonExistentRepoId = 999999L;
 
-            // Act & Assert
             webTestClient
                 .patch()
                 .uri(
@@ -369,7 +361,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         void getLabelFilters_asAdmin_shouldReturnFilters() {
             ensureAdminMembership(workspace);
 
-            // Act & Assert
             List<LabelInfoDTO> result = webTestClient
                 .get()
                 .uri(
@@ -426,7 +417,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
                 de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole.MEMBER
             );
 
-            // Act & Assert
             webTestClient
                 .post()
                 .uri(
@@ -527,7 +517,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
             ensureAdminMembership(workspace);
             Long nonExistentLabelId = 999999L;
 
-            // Act & Assert
             webTestClient
                 .delete()
                 .uri(

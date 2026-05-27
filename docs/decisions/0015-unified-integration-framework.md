@@ -1,8 +1,39 @@
 # ADR 0015: Unified integration framework — package layout and SPI surface
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-05-27 for Phase 1-4 restructure)
 **Date:** 2026-05-26
 **Authors:** Felix T.J. Dietrich
+
+## 2026-05-27 Update — Phase 1-4 Restructure
+
+The original Decision shipped vendor adapters and cross-cutting substrate as
+siblings under `integration/`. A four-phase restructure (commits `121b32472`,
+`8066bdba1`, `461c914cd`, `6d8a2d564`) re-shaped the tree:
+
+```
+integration/
+├── core/        cross-cutting substrate (Phase 1: spi, events, framework,
+│                connection, consumer, handler, oauth, webhook, feedback;
+│                Phase 4: connection/identity for multi-vendor JWT→User)
+├── scm/         SCM family root (Phase 2/3)
+│   ├── domain/  shared kernel — 18 leaf packages (Phase 3)
+│   ├── github/  vendor adapter (Phase 2: moved from integration/github/)
+│   ├── gitlab/  vendor adapter (Phase 2)
+│   └── sync/    family-shared orchestrator
+├── slack/       Modulith CLOSED — single vendor, opt-in (matchIfMissing=false)
+└── outline/     Modulith CLOSED — single vendor, opt-in
+```
+
+Key non-layout changes from Phase 4:
+- SPI vendor-name purge: `GithubAppCredential` → `InstallationCredential`,
+  `AuthMode.GITHUB_APP` → `INSTALLATION_APP`.
+- Modulith `allowedDependencies` declared explicitly on every vendor leaf.
+- `IntegrationStructuralRulesTest` pins post-restructure invariants in ArchUnit.
+- Identity persistence: see [ADR 0016](0016-unified-identity-keycloak-as-truth.md)
+  for the Keycloak-subject migration (Stage A) that runs alongside this layout.
+
+The original Decision text below is preserved as the canonical SPI surface;
+the Phase 1-4 deltas are renames and module re-rooting, not contract changes.
 
 ## Context
 

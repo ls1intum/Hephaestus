@@ -16,5 +16,13 @@ New ADRs use the next available number and link from this index.
 | [0006](0006-llm-proxy-on-coordinator-trust-model.md) | LLM proxy stays on the coordinator (BYO trust model) | Accepted |
 | [0007](0007-sandbox-spi-shape.md) | Sandbox SPI shape — sealed VolumeMount + typed NetworkPolicy | Accepted |
 | [0008](0008-webhook-runtime-role.md) | Webhook as a third runtime role (`webhook-server` container) | Accepted |
+| [0009](0009-worker-runtime-substrate-wss-control-channel.md) | Worker runtime substrate over WSS control channel | Accepted |
+| [0010](0010-outbound-oauth-state-handrolled.md) | Outbound OAuth state hand-rolled (HMAC-signed, no library) | Accepted |
+| [0011](0011-integration-identity-not-wired-from-sync.md) | `integration_identity` is OAuth-fed, not sync-fed | Superseded by [0016](0016-unified-identity-keycloak-as-truth.md) |
+| [0012](0012-cross-instance-identity-safety-on-sync-paths.md) | Cross-instance identity safety on sync paths | Accepted |
+| [0013](0013-no-jetstream-dlq-stream.md) | No JetStream DLQ stream (in-place NAK with backoff) | Accepted |
+| [0014](0014-per-row-aes-gcm-aad-binding.md) | Per-row AES-GCM AAD binding for credential storage | Accepted |
+| [0015](0015-unified-integration-framework.md) | Unified integration framework — single SPI for SCM/messaging/knowledge vendors | Accepted (amended 2026-05-27 for Phase 1-4 restructure) |
+| [0016](0016-unified-identity-keycloak-as-truth.md) | Unified identity — Keycloak `sub` as the authoritative join key | Accepted |
 
 Template: [0000-template.md](0000-template.md).

@@ -427,7 +427,6 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             when(requestSpec.execute()).thenReturn(Mono.error(new InstallationNotFoundException(SCOPE_ID)));
 
-            // Act & Assert
             assertThatThrownBy(() -> service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN)).isInstanceOf(
                 InstallationNotFoundException.class
             );
@@ -577,7 +576,6 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 ClassificationResult.of(Category.AUTH_ERROR, "Auth failed")
             );
 
-            // Act & Assert
             assertThatThrownBy(() -> service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN)).isSameAs(authEx);
         }
 

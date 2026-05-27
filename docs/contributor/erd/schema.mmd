@@ -282,18 +282,6 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
-    IntegrationWebhookSubscription {
-        BIGINT id PK
-        BIGINT connection_id FK,UK "NOT NULL"
-        VARCHAR(128) subscription_id UK "NOT NULL"
-        BYTEA signing_secret_encrypted "NOT NULL"
-        VARCHAR(64) credentials_alg "NOT NULL"
-        JSONB events_subscribed "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at "NOT NULL"
-        TIMESTAMPTZ last_delivery_at
-    }
-
     Issue {
         VARCHAR(31) issue_type UK "NOT NULL"
         BIGINT id PK
@@ -888,7 +876,6 @@ erDiagram
     GitProvider ||--|| DiscussionComment : commented_on
     Connection ||--|| FeedbackPost : has
     Repository ||--|| GitCommit : has
-    Connection ||--|| IntegrationWebhookSubscription : has
     GitProvider ||--|| Issue : references
     Repository ||--|| Issue : has
     GitProvider ||--|| IssueComment : commented_on

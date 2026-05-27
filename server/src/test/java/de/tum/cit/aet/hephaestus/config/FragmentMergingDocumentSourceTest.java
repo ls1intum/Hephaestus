@@ -288,7 +288,6 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
         void shouldThrowWhenFragmentResourceMissing() {
             Resource missingResource = new ClassPathResource("nonexistent/fragment.graphql");
 
-            // Act & Assert
             assertThatThrownBy(() ->
                 new FragmentMergingDocumentSource(
                     List.of(new ClassPathResource("graphql/github/operations/")),
