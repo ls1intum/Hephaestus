@@ -359,19 +359,6 @@ public class WorkspaceService {
         return updateToken(requireSlug(workspaceContext), personalAccessToken);
     }
 
-    public Workspace updateSlackCredentials(String slug, String slackToken, String slackSigningSecret) {
-        Workspace workspace = requireWorkspace(slug);
-        return workspaceSettingsService.updateSlackCredentials(workspace.getId(), slackToken, slackSigningSecret);
-    }
-
-    public Workspace updateSlackCredentials(
-        WorkspaceContext workspaceContext,
-        String slackToken,
-        String slackSigningSecret
-    ) {
-        return updateSlackCredentials(requireSlug(workspaceContext), slackToken, slackSigningSecret);
-    }
-
     public Workspace updatePublicVisibility(String slug, Boolean isPubliclyViewable) {
         Workspace workspace = requireWorkspace(slug);
         return workspaceSettingsService.updatePublicVisibility(workspace.getId(), isPubliclyViewable);

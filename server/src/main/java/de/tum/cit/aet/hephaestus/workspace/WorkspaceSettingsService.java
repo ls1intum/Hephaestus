@@ -143,41 +143,6 @@ public class WorkspaceSettingsService {
     }
 
     /**
-     * Update Slack credentials for a workspace.
-     *
-     * <p>{@code slackToken} rotates the Slack Connection's bearer credential. {@code
-     * slackSigningSecret} is dead at runtime — the Slack manifest's app-global signing
-     * secret in {@code hephaestus.slack.signing-secret} is what verifies incoming webhook
-     * signatures — so this parameter is accepted for API back-compat but ignored.
-     *
-     * <p>Requires a pre-existing Slack Connection (typically created by the Slack OAuth
-     * install flow). Returns the workspace; throws if no active Slack Connection exists.
-     */
-    @Transactional
-    public Workspace updateSlackCredentials(Long workspaceId, String slackToken, String slackSigningSecret) {
-        Workspace workspace = requireWorkspace(workspaceId);
-        if (slackToken != null) {
-            connectionService
-                .rotateBearerToken(workspaceId, IntegrationKind.SLACK, new BearerToken(slackToken, null))
-                .orElseThrow(() ->
-                    new IllegalStateException(
-                        "Cannot rotate Slack credentials for workspace " +
-                            workspaceId +
-                            ": no active Slack Connection. Complete the Slack OAuth install first."
-                    )
-                );
-        }
-        if (slackSigningSecret != null) {
-            log.debug(
-                "Ignored per-workspace Slack signing secret update: workspaceId={} (runtime uses app-global hephaestus.slack.signing-secret)",
-                workspaceId
-            );
-        }
-        log.info("Updated workspace Slack credentials: workspaceId={}", workspaceId);
-        return workspace;
-    }
-
-    /**
      * Update public visibility for a workspace.
      *
      * @param workspaceId the workspace ID

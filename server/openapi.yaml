@@ -26,6 +26,15 @@ tags:
   name: workspace-registry-controller
 - description: Read-only access to practice evaluation findings
   name: Practice Findings
+- description: |-
+    Slack-specific admin endpoints — channel configuration + connectivity probe.
+
+     <p>Lives next to {@link SlackConnectionStrategy SlackConnectionStrategy} (per-kind admin surface) rather than
+     inflating <code>ConnectionController</code> with a kind-specific subroute. The DTOs are
+     deliberately flat records — no sealed-type discriminators — so springdoc 3.0 emits
+     concrete schemas into <code>openapi.yaml</code> and the generated webapp client picks
+     them up cleanly.
+  name: slack-connection-admin-controller
 - description: Workspace-scoped agent configuration management
   name: Agent Config
 - description: Workspace-scoped mentor chat threads
@@ -148,6 +157,61 @@ paths:
           description: OK
       tags:
       - connection
+  /api/v1/workspaces/{workspaceId}/connections/slack/notification-channel:
+    patch:
+      description: |-
+        Set the Slack notification channel + optional team label on the workspace's
+         ACTIVE Slack Connection. Returns the updated {@link SlackNotificationConfigResponse SlackNotificationConfigResponse}.
+      operationId: updateNotificationChannel
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlackNotificationChannelRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackNotificationConfigResponse"
+          description: OK
+      summary: |-
+        Set the Slack notification channel + optional team label on the workspace's
+         ACTIVE Slack Connection.
+      tags:
+      - slack-connection-admin
+  /api/v1/workspaces/{workspaceId}/connections/slack/test-message:
+    post:
+      description: |-
+        Post a quick "Hephaestus test message" to the configured channel. 404 when no
+         Slack Connection exists or the channel isn't configured. 502 on Slack-side error
+         with the Slack error code in the body.
+      operationId: sendTestMessage
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackTestMessageResponse"
+          description: OK
+      summary: Post a quick "Hephaestus test message" to the configured channel.
+      tags:
+      - slack-connection-admin
   /api/v1/workspaces/{workspaceId}/connections/{id}:
     get:
       operationId: read
@@ -2066,33 +2130,6 @@ paths:
                 $ref: "#/components/schemas/Workspace"
           description: Workspace updated
       summary: Update leaderboard schedule configuration
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}/slack-credentials:
-    patch:
-      operationId: updateSlackCredentials
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkspaceSlackCredentialsRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace updated
-      summary: Update Slack credentials for a workspace
       tags:
       - workspace
   /workspaces/{workspaceSlug}/slug:
@@ -4718,21 +4755,6 @@ components:
       required:
       - day
       - time
-    UpdateWorkspaceSlackCredentialsRequest:
-      type: object
-      description: Request to update Slack integration credentials
-      properties:
-        slackSigningSecret:
-          type: string
-          description: Slack Signing Secret for webhook verification
-          minLength: 1
-        slackToken:
-          type: string
-          description: Slack Bot User OAuth Token for API access
-          minLength: 1
-      required:
-      - slackSigningSecret
-      - slackToken
     UpdateWorkspaceStatusRequest:
       type: object
       description: Request to update the workspace lifecycle status

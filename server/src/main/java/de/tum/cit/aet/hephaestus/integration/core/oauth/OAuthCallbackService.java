@@ -162,5 +162,11 @@ public class OAuthCallbackService {
         if (completed.displayName() != null) {
             connection.setDisplayName(completed.displayName());
         }
+        // Strategies that resolve vendor metadata during finalize (Slack team id/name)
+        // hand back a config blob; null leaves the placeholder seeded by
+        // findOrCreatePendingConnection in place.
+        if (completed.config() != null) {
+            connection.setConfig(completed.config());
+        }
     }
 }

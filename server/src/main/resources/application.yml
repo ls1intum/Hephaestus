@@ -318,13 +318,9 @@ hephaestus:
             day: 2
             time: "9:00"
         notification:
+            # Global on/off for the weekly Slack post; per-workspace channel + team filter
+            # live on the Slack Connection's SlackConfig (set via the connection admin API).
             enabled: false
-            team: "all"
-            channel-id: ""
-            # Workspace slugs opted in to Slack notifications. Temporary allowlist while the
-            # global Slack channel/token is shared across tenants — remove once per-workspace
-            # Slack routing lands.
-            workspace-slugs: []
         # PR authors whose assignee-reviewers don't earn points (e.g., AI bots)
         self-review-author-logins:
             - Copilot
@@ -575,23 +571,29 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # SLACK INTEGRATION
     # ═══════════════════════════════════════════════════════════════════════════
+    # Slack app credentials. The `signing-secret` is app-global and verifies inbound
+    # webhook signatures. The OAuth client-id/client-secret drive the per-workspace
+    # install flow (Slack does NOT support refresh-token rotation for legacy bot tokens,
+    # so we don't ship a refresher for them — see SlackConnectionStrategy).
     slack:
-        token: ${SLACK_BOT_TOKEN:${SLACK_TOKEN:}}
         signing-secret: ${SLACK_SIGNING_SECRET:}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # INTEGRATION FEATURE FLAGS
+    # INTEGRATION FEATURE FLAGS + SLACK OAUTH CLIENT
     # ═══════════════════════════════════════════════════════════════════════════
     # Slack and Outline integrations are opt-in. Every bean under
     # integration/slack/** and integration/outline/** carries
     # @ConditionalOnProperty(...enabled, matchIfMissing=false), so leaving these
     # unset keeps the OAuth flows, webhook verifiers, and lifecycle listeners
-    # inert. Flip to `true` once the follow-up wires the actual OAuth code
-    # exchange + signature verification.
-    #
-    # integration:
-    #     slack:
-    #         enabled: false
+    # inert. Flip `enabled` to `true` once client-id + client-secret + redirect-uri
+    # are configured.
+    integration:
+        slack:
+            enabled: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:false}
+            client-id: ${HEPHAESTUS_SLACK_CLIENT_ID:}
+            client-secret: ${HEPHAESTUS_SLACK_CLIENT_SECRET:}
+            redirect-uri: ${HEPHAESTUS_SLACK_REDIRECT_URI:}
+            api-base: ${HEPHAESTUS_SLACK_API_BASE:https://slack.com}
     #     outline:
     #         enabled: false
 

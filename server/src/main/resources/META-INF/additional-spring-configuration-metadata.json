@@ -30,7 +30,11 @@
     },
     {
       "name": "hephaestus.slack",
-      "description": "Slack workspace integration for notifications"
+      "description": "App-global Slack secrets (signing secret); per-workspace tokens live on Connection rows"
+    },
+    {
+      "name": "hephaestus.integration.slack",
+      "description": "Slack integration toggle + OAuth client credentials"
     },
     {
       "name": "hephaestus.sentry",
@@ -158,14 +162,34 @@
       "description": "JWK Set URI for token verification; defaults to standard Keycloak endpoint"
     },
     {
-      "name": "hephaestus.slack.token",
-      "type": "java.lang.String",
-      "description": "Slack bot token for workspace notifications (starts with xoxb-)"
-    },
-    {
       "name": "hephaestus.slack.signing-secret",
       "type": "java.lang.String",
-      "description": "Slack signing secret for webhook verification"
+      "description": "Slack signing secret for webhook verification (app-global)"
+    },
+    {
+      "name": "hephaestus.integration.slack.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Master toggle for the Slack integration (OAuth, webhook verifier, lifecycle listeners, messaging)"
+    },
+    {
+      "name": "hephaestus.integration.slack.client-id",
+      "type": "java.lang.String",
+      "description": "Slack OAuth client id used by SlackOAuthClient during oauth.v2.access"
+    },
+    {
+      "name": "hephaestus.integration.slack.client-secret",
+      "type": "java.lang.String",
+      "description": "Slack OAuth client secret used by SlackOAuthClient during oauth.v2.access"
+    },
+    {
+      "name": "hephaestus.integration.slack.redirect-uri",
+      "type": "java.lang.String",
+      "description": "Redirect URI registered on the Slack app; must match the SlackConnectionStrategy authorize URL"
+    },
+    {
+      "name": "hephaestus.integration.slack.api-base",
+      "type": "java.lang.String",
+      "description": "Base URL of the Slack API. Defaults to https://slack.com; override in tests to point at a mock server."
     },
     {
       "name": "hephaestus.sentry.dsn",

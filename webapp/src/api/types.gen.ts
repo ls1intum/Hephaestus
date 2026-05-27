@@ -413,20 +413,6 @@ export type UpdateWorkspaceStatusRequest = {
 };
 
 /**
- * Request to update Slack integration credentials
- */
-export type UpdateWorkspaceSlackCredentialsRequest = {
-    /**
-     * Slack Signing Secret for webhook verification
-     */
-    slackSigningSecret: string;
-    /**
-     * Slack Bot User OAuth Token for API access
-     */
-    slackToken: string;
-};
-
-/**
  * Request to update the leaderboard notification schedule
  */
 export type UpdateWorkspaceScheduleRequest = {
@@ -3494,27 +3480,6 @@ export type UpdateScheduleResponses = {
 };
 
 export type UpdateScheduleResponse = UpdateScheduleResponses[keyof UpdateScheduleResponses];
-
-export type UpdateSlackCredentialsData = {
-    body: UpdateWorkspaceSlackCredentialsRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/slack-credentials';
-};
-
-export type UpdateSlackCredentialsResponses = {
-    /**
-     * Workspace updated
-     */
-    200: Workspace;
-};
-
-export type UpdateSlackCredentialsResponse = UpdateSlackCredentialsResponses[keyof UpdateSlackCredentialsResponses];
 
 export type RenameSlugData = {
     body: RenameWorkspaceSlugRequest;

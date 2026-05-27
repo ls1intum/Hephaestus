@@ -49,10 +49,9 @@ hephaestus:
             day: ${LEADERBOARD_SCHEDULE_DAY:2}
             time: ${LEADERBOARD_SCHEDULE_TIME:9}
         notification:
+            # Per-workspace channel + team filter live on the Slack Connection's SlackConfig
+            # (set via the connection admin API); this flag is the global kill-switch.
             enabled: ${LEADERBOARD_NOTIFICATION_ENABLED:true}
-            team: ${LEADERBOARD_NOTIFICATION_TEAM:all}
-            channel-id: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
-            workspace-slugs: ${LEADERBOARD_NOTIFICATION_WORKSPACE_SLUGS:}
 
     workspace:
         init-default: false

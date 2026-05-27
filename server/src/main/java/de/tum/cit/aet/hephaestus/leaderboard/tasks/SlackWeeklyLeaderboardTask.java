@@ -8,15 +8,23 @@ import static com.slack.api.model.block.Blocks.section;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 
-import com.slack.api.methods.SlackApiException;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
-import de.tum.cit.aet.hephaestus.leaderboard.*;
+import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
+import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
+import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardEntryDTO;
+import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardMode;
+import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardProperties;
+import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardService;
+import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardSortType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
@@ -32,17 +40,21 @@ import java.util.stream.IntStream;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Task to send a weekly leaderboard message to the Slack channel.
+ * Task to send a weekly leaderboard message to each workspace's configured Slack channel.
+ *
+ * <p>Fan-out is driven by the Connection table — every ACTIVE Slack
+ * {@link Connection} with a configured {@code notificationChannelId} and the workspace's
+ * {@code leaderboardNotificationEnabled=true} gets a post. One workspace's failure does
+ * NOT block the next.
  *
  * @see SlackMessageService
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.leaderboard.notification", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackWeeklyLeaderboardTask implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(SlackWeeklyLeaderboardTask.class);
@@ -51,39 +63,32 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
     private final ApplicationProperties applicationProperties;
     private final SlackMessageService slackMessageService;
     private final LeaderboardService leaderboardService;
-    private final WorkspaceRepository workspaceRepository;
+    private final ConnectionRepository connectionRepository;
 
     public SlackWeeklyLeaderboardTask(
         LeaderboardProperties leaderboardProperties,
         ApplicationProperties applicationProperties,
-        @Autowired(required = false) SlackMessageService slackMessageService,
+        SlackMessageService slackMessageService,
         LeaderboardService leaderboardService,
-        WorkspaceRepository workspaceRepository
+        ConnectionRepository connectionRepository
     ) {
         this.leaderboardProperties = leaderboardProperties;
         this.applicationProperties = applicationProperties;
         this.slackMessageService = slackMessageService;
         this.leaderboardService = leaderboardService;
-        this.workspaceRepository = workspaceRepository;
+        this.connectionRepository = connectionRepository;
     }
 
     /**
-     * Test the Slack connection.
-     *
-     * @return {@code true} if the connection is valid, {@code false} otherwise.
+     * Probe that the Slack family is enabled (notifications toggle on). Per-workspace
+     * connectivity is verified at send time by {@link SlackMessageService#initTest(long)}.
      */
     public boolean testSlackConnection() {
-        return (
-            leaderboardProperties.notification().enabled() &&
-            slackMessageService != null &&
-            slackMessageService.initTest()
-        );
+        return leaderboardProperties.notification().enabled();
     }
 
     /**
-     * Gets the Slack handles of the top 3 reviewers in the given time frame.
-     *
-     * @return
+     * Gets the Slack handles of the top 3 reviewers in the given time frame for one workspace.
      */
     private List<User> getTop3SlackReviewers(
         Workspace workspace,
@@ -114,7 +119,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 .toList()
         );
 
-        List<User> allSlackUsers = slackMessageService != null ? slackMessageService.getAllMembers() : List.of();
+        List<User> allSlackUsers = slackMessageService.listMembers(workspace.getId());
         return top3
             .stream()
             .map(mapToSlackUser(allSlackUsers))
@@ -134,7 +139,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 .filter(
                     user ->
                         user.getName().equalsIgnoreCase(leaderboardUser.name()) ||
-                        (user.getProfile().getEmail() != null &&
+                        (user.getProfile() != null &&
+                            user.getProfile().getEmail() != null &&
                             user.getProfile().getEmail().equalsIgnoreCase(leaderboardUser.email()))
                 )
                 .findFirst();
@@ -165,19 +171,12 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
 
     @Override
     public void run() {
-        if (slackMessageService == null) {
-            log.warn("Skipped Slack notification: reason=serviceUnavailable");
-            return;
-        }
-
-        List<String> allowedSlugs = leaderboardProperties.notification().workspaceSlugs();
-        List<Workspace> workspaces = workspaceRepository
-            .findAll()
-            .stream()
-            .filter(w -> allowedSlugs.contains(w.getWorkspaceSlug()))
-            .toList();
-        if (workspaces.isEmpty()) {
-            log.info("Skipped Slack notification: reason=noWorkspacesConfigured, allowedSlugs={}", allowedSlugs);
+        List<Connection> connections = connectionRepository.findByKindAndStateWithWorkspace(
+            IntegrationKind.SLACK,
+            IntegrationState.ACTIVE
+        );
+        if (connections.isEmpty()) {
+            log.info("Skipped Slack notification: reason=noActiveSlackConnections");
             return;
         }
 
@@ -193,22 +192,61 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         Instant before = zonedBefore.toInstant();
         Instant after = zonedBefore.minusWeeks(1).toInstant();
 
-        String team = leaderboardProperties.notification().team();
-        String channelId = leaderboardProperties.notification().channelId();
-
-        for (Workspace workspace : workspaces) {
-            var topReviewers = getTop3SlackReviewers(workspace, after, before, Optional.ofNullable(team));
-            if (topReviewers.isEmpty()) {
-                log.info("Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}", workspace.getId());
-                continue;
-            }
-
-            List<LayoutBlock> blocks = buildBlocks(workspace, topReviewers, currentDate, after, before, team);
+        for (Connection connection : connections) {
+            // Skip-then-iterate; one workspace's failure must NOT block the next.
             try {
-                slackMessageService.sendMessage(channelId, blocks, "Weekly review highlights");
-            } catch (IOException | SlackApiException e) {
-                log.error("Failed to send scheduled Slack message: workspaceId={}", workspace.getId(), e);
+                postForConnection(connection, currentDate, after, before);
+            } catch (RuntimeException e) {
+                log.warn(
+                    "Slack notification failed for workspace={}: {}",
+                    connection.getWorkspace() == null ? null : connection.getWorkspace().getId(),
+                    e.getMessage()
+                );
             }
+        }
+    }
+
+    private void postForConnection(Connection connection, long currentDate, Instant after, Instant before) {
+        Workspace workspace = connection.getWorkspace();
+        if (workspace == null) {
+            log.warn("Slack Connection {} has no workspace — skipping", connection.getId());
+            return;
+        }
+        if (!Boolean.TRUE.equals(workspace.getLeaderboardNotificationEnabled())) {
+            log.debug("Skipped Slack notification: reason=disabled, workspaceId={}", workspace.getId());
+            return;
+        }
+        if (!(connection.getConfig() instanceof ConnectionConfig.SlackConfig slackConfig)) {
+            log.warn(
+                "Slack Connection {} has unexpected config variant {} — skipping",
+                connection.getId(),
+                connection.getConfig() == null ? null : connection.getConfig().getClass().getSimpleName()
+            );
+            return;
+        }
+        String channelId = slackConfig.notificationChannelId();
+        if (channelId == null || channelId.isBlank()) {
+            log.info("Skipped Slack notification: reason=noChannelConfigured, workspaceId={}", workspace.getId());
+            return;
+        }
+
+        Optional<String> team = Optional.ofNullable(slackConfig.teamLabel()).filter(t -> !t.isBlank());
+        var topReviewers = getTop3SlackReviewers(workspace, after, before, team);
+        if (topReviewers.isEmpty()) {
+            log.info("Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}", workspace.getId());
+            return;
+        }
+
+        List<LayoutBlock> blocks = buildBlocks(workspace, topReviewers, currentDate, after, before, team.orElse(null));
+        try {
+            slackMessageService.sendForWorkspace(workspace.getId(), channelId, blocks, "Weekly review highlights");
+        } catch (SlackSendException e) {
+            log.warn(
+                "Failed to send scheduled Slack message: workspaceId={}, channelId={}, slackError={}",
+                workspace.getId(),
+                e.channelId(),
+                e.slackError()
+            );
         }
     }
 

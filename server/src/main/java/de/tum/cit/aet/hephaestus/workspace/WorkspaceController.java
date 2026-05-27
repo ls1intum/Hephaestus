@@ -134,26 +134,6 @@ public class WorkspaceController {
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
-    @PatchMapping("/slack-credentials")
-    @Operation(summary = "Update Slack credentials for a workspace")
-    @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
-    @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<WorkspaceDTO> updateSlackCredentials(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateWorkspaceSlackCredentialsRequestDTO request
-    ) {
-        Workspace workspace = workspaceService.updateSlackCredentials(
-            workspaceContext,
-            request.slackToken(),
-            request.slackSigningSecret()
-        );
-        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
-    }
-
     @PatchMapping("/public-visibility")
     @Operation(summary = "Toggle public visibility for a workspace")
     @ApiResponse(

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import java.net.URI;
 import java.util.Map;
@@ -44,11 +45,28 @@ public interface ConnectionStrategy {
     }
 
     sealed interface ConnectFinalization permits ConnectFinalization.Completed, ConnectFinalization.Failed {
+        /**
+         * Successful finalization payload.
+         *
+         * <p>{@code config} (nullable) lets strategies hand back vendor-side metadata that
+         * needs to land on the Connection row alongside credentials — Slack uses this to
+         * stamp {@code teamId} / {@code teamName} on the {@link ConnectionConfig.SlackConfig}.
+         * Null means "leave the existing config alone" (the OAuth-finalize service keeps
+         * the placeholder set in {@code findOrCreatePendingConnection}). Strategies that
+         * have no vendor-side config (GitHub App installation events, GitLab PAT paste)
+         * pass null and rely on the placeholder.
+         */
         record Completed(
             String instanceKey,
             CredentialBundle credentials,
-            @Nullable String displayName
-        ) implements ConnectFinalization {}
+            @Nullable String displayName,
+            @Nullable ConnectionConfig config
+        ) implements ConnectFinalization {
+            /** 3-arg overload for strategies that don't need to upgrade the config blob. */
+            public Completed(String instanceKey, CredentialBundle credentials, @Nullable String displayName) {
+                this(instanceKey, credentials, displayName, null);
+            }
+        }
 
         record Failed(String reason) implements ConnectFinalization {}
     }

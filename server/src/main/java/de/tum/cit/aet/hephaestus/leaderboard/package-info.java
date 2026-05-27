@@ -5,6 +5,11 @@
  *
  * <p>Also owns {@code workspace_membership.league_points} via {@link LeaguePointsService}
  * and the Elo-style rating constants in {@link LeaguePointsConstants}.
+ *
+ * <p>The weekly Slack notification task in {@code leaderboard/tasks/} depends on the
+ * {@code integration.slack::messaging} named interface (the per-workspace
+ * {@code SlackMessageService}). It deliberately does NOT depend on the rest of the
+ * slack/* internals.
  */
 @org.springframework.modulith.ApplicationModule(displayName = "Leaderboard")
 package de.tum.cit.aet.hephaestus.leaderboard;
