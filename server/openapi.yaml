@@ -54,8 +54,6 @@ tags:
      workspace-context allow-list exempts this controller — workspace identity is from
      the verified state, never from the request.
   name: o-auth-callback-controller
-- description: "User account management (settings, deletion)"
-  name: Account
 - description: |-
     Administrative REST surface for managing per-workspace
      {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} rows — list, read,
@@ -73,6 +71,10 @@ tags:
      annotation simple name contains <code>Workspace</code>, which the rule recognises as a
      workspace-context guard.
   name: connection-controller
+- description: "User account management (settings, deletion)"
+  name: Account
+- description: Authentication discovery (public)
+  name: Auth
 - description: |-
     Unified webhook ingest controller.
 
@@ -86,8 +88,6 @@ tags:
 
      <p>Active only on the webhook runtime role.
   name: webhook-controller
-- description: Authentication discovery (public)
-  name: Auth
 - description: Manage practice definitions
   name: Practice Catalog
 - description: Workspace-scoped team settings management
