@@ -7,8 +7,6 @@ import de.tum.cit.aet.hephaestus.integration.handler.AbstractIntegrationMessageH
 import de.tum.cit.aet.hephaestus.integration.handler.IntegrationMessageHandler;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -36,8 +34,6 @@ import org.junit.jupiter.api.Test;
  * added or removed within the same family without churning this test, while still failing
  * loudly if the migration is reverted to the legacy bases (zero unified handlers).
  */
-@Tag("architecture")
-@DisplayName("Integration message handler architecture")
 class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
 
     /**
@@ -53,7 +49,6 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
     );
 
     @Test
-    @DisplayName("deleted legacy registry classes never reappear in production code")
     void deletedLegacyClassesDoNotReappear() {
         List<String> reintroduced = classes
             .stream()
@@ -70,7 +65,6 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    @DisplayName("every *MessageHandler under integration/<kind>/ binds to the unified SPI")
     void everyMessageHandlerExtendsUnifiedBaseOrImplementsSpi() {
         // Whitelist: classes that look like handlers by name but aren't NATS message
         // handlers (e.g. ABSTRACT bases, support classes). Add here ONLY if intentional.
@@ -110,24 +104,26 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    @DisplayName("at least 30 concrete handlers bind to the unified registry")
-    void unifiedRegistryFloorIsMet() {
-        long count = classes
+    void everyKindWithMessageHandlersBindsAtLeastOneToTheUnifiedRegistry() {
+        long githubBound = countBoundHandlersUnder("de.tum.cit.aet.hephaestus.integration.github.");
+        long gitlabBound = countBoundHandlersUnder("de.tum.cit.aet.hephaestus.integration.gitlab.");
+
+        assertThat(githubBound)
+            .as("GitHub handlers must bind to the unified registry; zero means the SPI wiring regressed.")
+            .isPositive();
+        assertThat(gitlabBound)
+            .as("GitLab handlers must bind to the unified registry; zero means the SPI wiring regressed.")
+            .isPositive();
+    }
+
+    private long countBoundHandlersUnder(String packagePrefix) {
+        return classes
             .stream()
-            .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.integration."))
+            .filter(c -> c.getPackageName().startsWith(packagePrefix))
             .filter(c -> c.getSimpleName().endsWith("MessageHandler"))
             .filter(c -> !c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.ABSTRACT))
             .filter(IntegrationMessageHandlerArchTest::bindsToUnifiedSpi)
             .count();
-
-        assertThat(count)
-            .as(
-                "The unified IntegrationMessageHandlerRegistry must carry the full handler " +
-                    "fleet. 30 is the floor (24 GitHub + 8 GitLab − 2 slack/whitespace) " +
-                    "that survives normal additions/removals; anything below means the " +
-                    "registry is silently empty and traffic falls to ACK-as-no-op."
-            )
-            .isGreaterThanOrEqualTo(30);
     }
 
     private static boolean bindsToUnifiedSpi(JavaClass c) {

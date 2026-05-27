@@ -75,21 +75,7 @@ public class User extends BaseGitServiceEntity {
 
     private String email;
 
-    /**
-     * Keycloak {@code sub} claim — the stable IdP-side identifier for the real person.
-     *
-     * <p>Populated on first authenticated upsert (see
-     * {@link AuthenticatedGitProviderUserService}); nullable for synced rows that
-     * never authenticate (bots, organizations, and contributors observed only via
-     * webhooks). The unique constraint is a partial index defined in Liquibase —
-     * it covers only non-null rows so the many never-authenticated users keep
-     * coexisting with no collision.
-     *
-     * <p>Lookup of the authenticated user today still goes via {@code login}
-     * (see {@code WorkspaceContextFilter} / {@code SecurityUtils}); this field
-     * exists so a follow-up PR can flip the lookup to {@code keycloak_subject}
-     * without a backfill window. ADR 0016 captures the rationale.
-     */
+    /** Keycloak {@code sub} claim — populated on first authenticated upsert. See ADR 0016. */
     @Nullable
     @Column(name = "keycloak_subject", length = 128)
     private String keycloakSubject;
@@ -137,13 +123,6 @@ public class User extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
 
-    // Note: Membership is accessed via the consuming module's repository, not via User entity.
-    // The relationship is unidirectional to maintain module separation.
-
-    // Note: User preferences (participateInResearch, aiReviewEnabled) are stored in
-    // UserPreferences entity in the account module to maintain domain isolation.
-    // The integration.scm module should only contain data from the Git provider.
-
     @JsonFormat(with = JsonFormat.Feature.ACCEPT_CASE_INSENSITIVE_VALUES)
     public enum Type {
         USER,
@@ -171,20 +150,4 @@ public class User extends BaseGitServiceEntity {
     public void removeTeam(Team team) {
         teamMemberships.removeIf(m -> m.getTeam() != null && m.getTeam().equals(team));
     }
-    // ========== INTENTIONALLY OMITTED GITHUB PROPERTIES ==========
-    // These fields are available from GitHub API but deliberately not persisted:
-    //
-    // Privacy/Compliance:
-    // - twitter_username: Social media handles not needed for core functionality
-    // - publicRepos: Count can be derived, not needed for user profiles
-    //
-    // Private/Org-specific (not accessible with standard tokens):
-    // - totalPrivateRepos, ownedPrivateRepos, privateGists
-    // - collaborators, disk_usage
-    // - is_verified, billing_email (org-specific)
-    // - has_organization_projects, has_repository_projects (org-specific)
-    // - suspended_at
-    //
-    // Derived/Unused:
-    // - publicGists: Not relevant to PR/code review workflows
 }

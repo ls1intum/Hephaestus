@@ -101,6 +101,22 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
         assertThat(newVerifier(SECRET).kind()).isEqualTo(IntegrationKind.GITHUB);
     }
 
+    @Test
+    void pingEventShortCircuitsBeforeSignatureCheck() {
+        // GitHub posts a setup-time ping with no signature; the verifier must respond
+        // 200 OK before the HMAC step (so the App installation registration succeeds).
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("X-GitHub-Event", "ping");
+        headers.put("X-GitHub-Delivery", "delivery-id");
+
+        VerificationResult result = newVerifier(SECRET).verify(new WebhookRequest(body("{}"), headers));
+
+        assertThat(result).isInstanceOf(VerificationResult.RespondImmediately.class);
+        VerificationResult.RespondImmediately respond = (VerificationResult.RespondImmediately) result;
+        assertThat(respond.statusCode()).isEqualTo(200);
+        assertThat(new String(respond.body(), StandardCharsets.UTF_8)).contains("pong");
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private static GithubWebhookSignatureVerifier newVerifier(String secret) {

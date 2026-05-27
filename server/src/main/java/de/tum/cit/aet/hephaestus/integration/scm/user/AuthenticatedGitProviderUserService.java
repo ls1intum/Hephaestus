@@ -230,10 +230,6 @@ public class AuthenticatedGitProviderUserService {
             .map(User::getId)
             .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
 
-        // Seed the stable Keycloak subject claim on the SCM User row so a follow-up
-        // PR can flip WorkspaceContextFilter / SecurityUtils to look up by subject
-        // instead of login. Sync paths must NOT call this (they have no JWT) — only
-        // authenticated upserts pass a subject through. See ADR 0016.
         if (keycloakSubject != null && !keycloakSubject.isBlank()) {
             int updated = userRepository.setKeycloakSubjectIfChanged(userId, keycloakSubject);
             if (updated > 0) {

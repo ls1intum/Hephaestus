@@ -87,10 +87,6 @@ public class Connection {
     @Nullable
     private String credentialsAlg;
 
-    @Column(name = "replaces_connection_id")
-    @Nullable
-    private Long replacesConnectionId;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -193,11 +189,6 @@ public class Connection {
         return credentialsAlg;
     }
 
-    @Nullable
-    public Long getReplacesConnectionId() {
-        return replacesConnectionId;
-    }
-
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -239,24 +230,17 @@ public class Connection {
         this.credentialsAlg = credentialsAlg;
     }
 
-    public void setReplacesConnectionId(@Nullable Long replacesConnectionId) {
-        this.replacesConnectionId = replacesConnectionId;
-    }
-
     public void setLastActivityAt(@Nullable Instant lastActivityAt) {
         this.lastActivityAt = lastActivityAt;
     }
 
-    //
-    // The entity owns the encryption context — `(workspaceId, kind, instanceKey)` is
-    // bound into the AES-GCM AAD so a ciphertext written here cannot be substituted
-    // into a different row. Callers never pass context: it's derivable from `this`
-    // and any flexibility there would re-open the cross-row attack.
-
     /**
-     * Encrypt {@code bundle} (v2 — per-row AAD) and stamp the algorithm tag. Passing
-     * {@code null} clears both columns; the surrounding transition's {@code stateReason}
-     * records WHY.
+     * Encrypt {@code bundle} and stamp the algorithm tag. Passing {@code null} clears
+     * both columns; the surrounding transition's {@code stateReason} records why.
+     *
+     * <p>The encryption context — {@code (workspaceId, kind, instanceKey)} — is derived
+     * from {@code this} and bound into the AES-GCM AAD; a ciphertext written for one row
+     * cannot be substituted into another.
      */
     public void setCredentials(@Nullable CredentialBundle bundle, CredentialBundleConverter converter) {
         if (bundle == null) {

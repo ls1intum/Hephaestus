@@ -6,9 +6,12 @@ import java.util.Set;
 /**
  * Per-Connection lifecycle state.
  *
- * <p>{@code PENDING} models the OAuth round-trip (renamed from plan v3's
- * {@code INSTALLING} per agent A2 — we model OUR wait, not vendor's setup work).
- * Reconnect after {@code UNINSTALLED} revives the row via {@code replaces_connection_id}.
+ * <p>{@code PENDING} models the OAuth round-trip — we model OUR wait, not vendor's
+ * setup work. {@code UNINSTALLED} is terminal: the row stays for audit, no further
+ * transitions are legal, and reconnect requires a vendor-issued fresh
+ * {@code instance_key} (the same tuple would collide with the {@code uq_connection}
+ * unique constraint). Reconnect-with-same-installation-id is a known product gap
+ * tracked separately.
  *
  * <p>Idempotent transitions: hitting {@code SUSPENDED} on an already-{@code SUSPENDED}
  * Connection returns the current state with no audit row — protects against webhook
@@ -24,7 +27,7 @@ public enum IntegrationState {
     /** Vendor revoked / Hephaestus admin paused; credentials retained but unused. */
     SUSPENDED,
 
-    /** Hard disconnected; credentials cleared. Reconnect spawns a new row. */
+    /** Hard disconnected; credentials cleared. Terminal — no legal transition out. */
     UNINSTALLED;
 
     private static final Map<IntegrationState, Set<IntegrationState>> LEGAL = Map.of(

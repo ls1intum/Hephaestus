@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.sync.backfill;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.framework.SyncSchedulerProperties;
-import de.tum.cit.aet.hephaestus.integration.spi.SyncTargetProvider;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,15 +47,12 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "hephaestus.sync.backfill.enabled", havingValue = "true")
+@WorkspaceAgnostic("Workspace iteration is owned by HistoricalBackfillService.runBackfillCycle() — the scheduler is a thin trigger.")
 public class HistoricalBackfillScheduler {
 
     private final HistoricalBackfillService backfillService;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final ObjectProvider<GitLabHistoricalBackfillService> gitLabBackfillServiceProvider;
-
-    // Injected to satisfy architecture test: signals this scheduler iterates workspaces via the service
-    @SuppressWarnings("unused")
-    private final SyncTargetProvider syncTargetProvider;
 
     @jakarta.annotation.PostConstruct
     void logInitialization() {

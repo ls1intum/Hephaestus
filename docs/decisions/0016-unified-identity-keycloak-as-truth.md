@@ -41,11 +41,15 @@ Shipping infrastructure that does not run is a tax on every future reader. The a
   - Add `User.keycloakSubject` (column + partial unique index `uq_user_keycloak_subject WHERE keycloak_subject IS NOT NULL`).
   - Wire `AuthenticatedGitProviderUserService.upsertUser` to seed `keycloak_subject` from the JWT `sub` claim on every authenticated upsert. Sync paths (`GitLabIssueProcessor.findOrCreateUser` etc.) explicitly do NOT populate this column — they upsert vendor users we have never authenticated.
   - This ADR replaces ADR 0011 in the live decision set. ADR 0011 stays in the tree as a historical record of "we tried, we deferred, then we deleted."
-- **Stage B (follow-up PR):**
-  - Flip `WorkspaceContextFilter` + `SecurityUtils.getCurrentUserLogin` to look up by `keycloak_subject` first, fall back to `login` while the partial unique index is still filling.
+- **Stage B (follow-up PR — bigger than originally framed):**
+  - Replace the auth-time identity resolver. Concretely, `getCurrentUser()` on `UserRepository` (and the underlying lookups in `SecurityUtils.getCurrentUserLogin` + `WorkspaceContextFilter`) become a `findByKeycloakSubject(sub)` call with a transitional `findByLogin(preferred_username)` fallback for users whose row has not yet been touched by an authenticated request after Stage A shipped.
+  - Twelve+ call sites of `getCurrentUser()` / `getCurrentUserLogin()` automatically flip through the resolver change — they don't need per-site edits, but each is in the auth path and needs its own behavioural test (e.g. `WorkspaceMembershipController` self-vs-other, `PracticeFindingService` ownership, `MentorChatService` thread auth).
+  - Critically: keep **vendor-login lookups** (`UserRepository.findByLogin` from sync paths like `CommitAuthorResolver`, `GitHubLifecycleListener`, `GitLabCommitMergeRequestLinker`, `WorkspaceProvisioningService.findByLogin("admin")`) on login — they are *not* auth-path; they match vendor records that have never had a JWT.
+  - Frontend: `isCurrentUser(login)` (`webapp/src/integrations/auth/keycloak.ts`) compares against `preferred_username`. Stage B should flip it to compare against the server's authenticated-user response identity, or delete the helper entirely.
+  - Race + double-provider: the partial unique index `uq_user_keycloak_subject` will reject two concurrent first-time authenticated upserts that resolve to the same Keycloak subject across two providers (the deleted three-layer model handled this implicitly). Stage A's `setKeycloakSubjectIfChanged` catches the unique-violation only via Spring's generic `DataIntegrityViolationException`; Stage B must either (a) translate the violation into a successful no-op, or (b) introduce a per-Keycloak-account row that the per-provider `User` rows reference.
   - Once every active user has a populated `keycloak_subject`, drop the `login`-fallback branch.
 
-The partial unique index is the correct uniqueness contract for this column: only authenticated upserts ever set `keycloak_subject`, while the many synced-only rows (bots, organizations, contributors observed only via webhooks) stay NULL and stay outside the constraint.
+The partial unique index is the correct uniqueness contract for the seeded column: only authenticated upserts ever set `keycloak_subject`, while the many synced-only rows (bots, organizations, contributors observed only via webhooks) stay NULL and stay outside the constraint.
 
 ## Consequences
 
@@ -55,7 +59,8 @@ The partial unique index is the correct uniqueness contract for this column: onl
 - The Liquibase delta for #1198 is smaller and more honest.
 
 **Negative:**
-- Stage A only seeds the column. Authorization still goes through `login` until Stage B lands; the stable-id property is dormant. The mitigation is that Stage B is now a small, independently revertible PR — much easier to land than the original three-layer wiring.
+- Stage A only seeds the column. Authorization still goes through `login` until Stage B lands; the stable-id property is dormant. Honest scoping of Stage B: a single resolver flip transitively re-routes ~12 services (workspace, mentor, practices, findings) and needs a behavioural test per auth-path service — call that a medium PR, not a small one.
+- The webapp still surfaces `UserProfile.githubId` / `UserProfile.gitlabId` and resolves the avatar via raw provider ID; ADR-driven "sub is the stable join key" only becomes a frontend reality after the avatar + linked-accounts code routes through the server's authenticated-user response. Stage B should close that loop too.
 - Anyone holding a branch off #1198 with a dependency on `IntegrationIdentity` will need to rebase. There are zero such branches today.
 - If we later add genuine multi-workspace identity-aggregation, we will need a new design pass. That is the right time to do it — against a concrete surface, not as speculative scaffolding.
 

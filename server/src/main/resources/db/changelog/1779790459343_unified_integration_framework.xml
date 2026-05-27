@@ -106,7 +106,6 @@
             </column>
             <column name="credentials_encrypted" type="bytea"/>
             <column name="credentials_alg" type="varchar(64)"/>
-            <column name="replaces_connection_id" type="bigint"/>
             <column name="created_at" type="timestamp with time zone" defaultValueComputed="NOW()">
                 <constraints nullable="false"/>
             </column>

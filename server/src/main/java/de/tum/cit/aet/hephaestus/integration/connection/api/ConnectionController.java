@@ -48,10 +48,6 @@ import tools.jackson.databind.ObjectMapper;
  * {@code MultiTenancyArchitectureTest.dataEndpointsReceiveWorkspaceContext} rule — the
  * annotation simple name contains {@code Workspace}, which the rule recognises as a
  * workspace-context guard.
- *
- * <p>TODO: credential persistence — see {@code ConnectionAdminService} for the AES-GCM
- * converter integration plan. TODO: an OAuth callback controller that calls
- * {@link ConnectionStrategy#finalizeConnect} on per-kind unauthenticated endpoints.
  */
 @RestController
 @RequestMapping("/api/v1/workspaces/{workspaceId}/connections")

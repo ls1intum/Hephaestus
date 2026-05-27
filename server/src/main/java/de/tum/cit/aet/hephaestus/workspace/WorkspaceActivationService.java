@@ -235,7 +235,7 @@ public class WorkspaceActivationService {
             try {
                 GitProviderType providerType = connectionService
                     .findActiveProviderKind(workspace.getId())
-                    .map(IntegrationKind::toGitProviderType)
+                    .map(GitProviderType::from)
                     .orElse(GitProviderType.GITHUB);
                 if (providerType == GitProviderType.GITLAB) {
                     // Core initialization: webhook, project discovery, org linking, monitors

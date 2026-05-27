@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -33,7 +32,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * <p>See ADR 0005 (baseline) and ADR 0008 (webhook role + SERVER_PROPERTY wiring).
  */
-@Tag("architecture")
 class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
 
     /** Container annotation Spring Boot 4 uses for repeated {@code @ConditionalOnProperty}. */

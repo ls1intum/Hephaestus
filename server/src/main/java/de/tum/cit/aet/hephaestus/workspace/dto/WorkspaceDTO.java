@@ -112,7 +112,7 @@ public record WorkspaceDTO(
             workspace.getAccountLogin(),
             installationId,
             providerKind.map(Enum::name).orElse(null),
-            providerKind.map(IntegrationKind::toGitProviderType).orElse(null),
+            providerKind.map(GitProviderType::from).orElse(null),
             serverUrl,
             workspace.getCreatedAt(),
             workspace.getUpdatedAt(),

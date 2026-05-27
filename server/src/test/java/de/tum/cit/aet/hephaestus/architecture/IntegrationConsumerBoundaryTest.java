@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClass;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -27,7 +26,6 @@ import org.junit.jupiter.api.Test;
  * accidental drift from a refactor surfaces as a precise failure, not a vague "package
  * boundary breached".
  */
-@Tag("architecture")
 class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
 
     /** Packages allowed to remain under {@code integration/scm/sync/}. */

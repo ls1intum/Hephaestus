@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.connection;
 
+import de.tum.cit.aet.hephaestus.integration.spi.IntegrationKind;
+
 /**
  * High-level git provider identity.
  *
@@ -8,5 +10,22 @@ package de.tum.cit.aet.hephaestus.integration.connection;
  */
 public enum GitProviderType {
     GITHUB,
-    GITLAB,
+    GITLAB;
+
+    /**
+     * Narrow an {@link IntegrationKind} to the SCM-only subset. The dependency direction
+     * is connection → spi, never the reverse; this method lives here so the SPI stays
+     * vendor-agnostic.
+     *
+     * @throws IllegalArgumentException if {@code kind} is not an SCM kind
+     */
+    public static GitProviderType from(IntegrationKind kind) {
+        return switch (kind) {
+            case GITHUB -> GITHUB;
+            case GITLAB -> GITLAB;
+            case SLACK, OUTLINE -> throw new IllegalArgumentException(
+                "IntegrationKind " + kind + " is not an SCM kind and has no GitProviderType"
+            );
+        };
+    }
 }
