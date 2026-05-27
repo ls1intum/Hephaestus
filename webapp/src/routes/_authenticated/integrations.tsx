@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { CheckCircleIcon, XCircleIcon } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,31 +10,42 @@ type Search = {
 	reason?: string;
 };
 
-// OAuth callback landing route: toasts status, then redirects to the originating workspace.
+// OAuth callback landing route. When sessionStorage has a return-slug from the
+// initiating workspace, we redirect back BEFORE rendering (no Card flash) and
+// surface the toast on the destination. When there's no slug (different tab,
+// browser restart), we render the terminal Card with a return-to-dashboard button.
 export const Route = createFileRoute("/_authenticated/integrations")({
 	component: IntegrationsCallback,
 	validateSearch: (search): Search => ({
 		status: search.status === "success" || search.status === "error" ? search.status : undefined,
 		reason: typeof search.reason === "string" ? search.reason : undefined,
 	}),
+	beforeLoad: ({ search }) => {
+		if (typeof window === "undefined") return; // SSR no-op
+		const slug = window.sessionStorage.getItem("slack-connect-return-slug");
+		if (!slug) return; // fall through to terminal render
+		window.sessionStorage.removeItem("slack-connect-return-slug");
+		// Stash the status so the destination route can toast it after navigation.
+		if (search.status) {
+			window.sessionStorage.setItem("slack-connect-result", search.status);
+			if (search.reason) window.sessionStorage.setItem("slack-connect-reason", search.reason);
+		}
+		throw redirect({ to: "/w/$workspaceSlug/admin/settings", params: { workspaceSlug: slug } });
+	},
 });
 
 function IntegrationsCallback() {
 	const { status, reason } = Route.useSearch();
 	const navigate = useNavigate();
+	const toasted = useRef(false);
 
 	useEffect(() => {
-		const slug = window.sessionStorage.getItem("slack-connect-return-slug");
-		if (status === "success") {
-			toast.success("Integration connected");
-		} else if (status === "error") {
+		if (toasted.current) return;
+		toasted.current = true;
+		if (status === "success") toast.success("Integration connected");
+		else if (status === "error")
 			toast.error("Integration connection failed", { description: reason });
-		}
-		window.sessionStorage.removeItem("slack-connect-return-slug");
-		if (slug) {
-			navigate({ to: "/w/$workspaceSlug/admin/settings", params: { workspaceSlug: slug } });
-		}
-	}, [status, reason, navigate]);
+	}, [status, reason]);
 
 	const ok = status === "success";
 	const Icon = ok ? CheckCircleIcon : XCircleIcon;

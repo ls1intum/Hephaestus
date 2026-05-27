@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.Connect
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.slack.connect.SlackOAuthClient.OAuthV2Access;
+import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +27,9 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
     @Mock
     private SlackOAuthClient oauthClient;
 
+    @Mock
+    private SlackCredentialProvider credentialProvider;
+
     private SlackConnectionStrategy strategy;
 
     @BeforeEach
@@ -33,6 +37,7 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
         strategy = new SlackConnectionStrategy(
             oauthStateService,
             oauthClient,
+            credentialProvider,
             "client-id",
             "https://app.test/oauth/callback/slack"
         );

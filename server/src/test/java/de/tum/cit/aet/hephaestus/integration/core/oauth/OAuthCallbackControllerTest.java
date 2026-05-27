@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -87,7 +86,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── Happy path ──────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("GET /oauth/callback/slack: state consumed → finalize Completed → upsert + ACTIVE transition → 302")
     void happyPath_slackCompleted_transitionsAndRedirects() {
         String state = "signed-state-token";
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice@example.com");
@@ -152,7 +150,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── Vendor-side error ───────────────────────────────────────────────────
 
     @Test
-    @DisplayName("GET /oauth/callback/slack?error=access_denied → 400 JSON when Accept: application/json")
     void vendorError_jsonRequest_returns400WithStructuredJson() {
         ResponseEntity<?> response = controller.callbackGet(
             "slack",
@@ -178,7 +175,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("GET /oauth/callback/slack?error=access_denied (browser) → 302 to failure redirect")
     void vendorError_browserRequest_redirectsToFailure() {
         ResponseEntity<?> response = controller.callbackGet(
             "slack",
@@ -444,7 +440,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── No strategy registered ──────────────────────────────────────────────
 
     @Test
-    @DisplayName("Kind allow-listed but no strategy bean → 500 (configuration bug)")
     void noStrategy_returns500() {
         // Build a controller with NO strategies registered.
         OAuthCallbackController bare = new OAuthCallbackController(
@@ -500,7 +495,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     // ── Duplicate strategy guard ────────────────────────────────────────────
 
     @Test
-    @DisplayName("Constructor rejects duplicate ConnectionStrategy beans for the same kind")
     void duplicateStrategy_throwsAtWiringTime() {
         FakeStrategy a = new FakeStrategy(IntegrationKind.SLACK);
         FakeStrategy b = new FakeStrategy(IntegrationKind.SLACK);

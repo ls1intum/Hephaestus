@@ -49,8 +49,10 @@ export async function sendSlackTestMessage(workspaceId: number): Promise<SlackTe
 		`/api/v1/workspaces/${workspaceId}/connections/slack/test-message`,
 		{ method: "POST" },
 	);
-	// 200 → success; 4xx Slack user-error → structured failure body with slackError.
-	if (response.ok || (response.status >= 400 && response.status < 500)) {
+	// 200 → success; 4xx Slack user-error / 502 transport → structured failure body with slackError.
+	// Only treat genuine failures (no JSON body) as an exception.
+	const contentType = response.headers.get("Content-Type") ?? "";
+	if (contentType.includes("application/json")) {
 		return (await response.json()) as SlackTestMessageResponse;
 	}
 	throw new Error(`Slack test-message failed (HTTP ${response.status})`);

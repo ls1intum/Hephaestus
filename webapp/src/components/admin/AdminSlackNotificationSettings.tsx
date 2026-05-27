@@ -36,10 +36,28 @@ export function AdminSlackNotificationSettings({
 	const [enabledInput, setEnabledInput] = useState(enabled);
 	const [isConnecting, setIsConnecting] = useState(false);
 
-	// Re-sync form state when props change (e.g. parent refetches after OAuth callback completes).
-	useEffect(() => setChannelInput(channelId ?? ""), [channelId]);
-	useEffect(() => setTeamInput(teamLabel ?? ""), [teamLabel]);
-	useEffect(() => setEnabledInput(enabled), [enabled]);
+	// Pop any OAuth-callback result the /integrations route stashed and surface it.
+	useEffect(() => {
+		const result = window.sessionStorage.getItem("slack-connect-result");
+		if (!result) return;
+		const reason = window.sessionStorage.getItem("slack-connect-reason") ?? undefined;
+		window.sessionStorage.removeItem("slack-connect-result");
+		window.sessionStorage.removeItem("slack-connect-reason");
+		if (result === "success") toast.success("Slack workspace connected");
+		else toast.error("Slack connection failed", { description: reason });
+	}, []);
+	// Re-sync form state when props change (e.g. parent refetches after OAuth completion)
+	// — but ONLY when the user hasn't typed anything yet, so we don't clobber in-flight edits.
+	const [dirty, setDirty] = useState(false);
+	useEffect(() => {
+		if (!dirty) setChannelInput(channelId ?? "");
+	}, [channelId, dirty]);
+	useEffect(() => {
+		if (!dirty) setTeamInput(teamLabel ?? "");
+	}, [teamLabel, dirty]);
+	useEffect(() => {
+		if (!dirty) setEnabledInput(enabled);
+	}, [enabled, dirty]);
 
 	const channelInvalid = channelInput.length > 0 && !SLACK_CHANNEL_ID.test(channelInput);
 
@@ -47,6 +65,7 @@ export function AdminSlackNotificationSettings({
 		...updateNotificationsMutation(),
 		onSuccess: () => {
 			toast.success("Slack notification settings saved");
+			setDirty(false);
 			onSaved();
 		},
 		onError: (e) => {
@@ -131,7 +150,10 @@ export function AdminSlackNotificationSettings({
 									<Switch
 										id="slack-enabled"
 										checked={enabledInput}
-										onCheckedChange={setEnabledInput}
+										onCheckedChange={(value) => {
+											setEnabledInput(value);
+											setDirty(true);
+										}}
 									/>
 								</div>
 
@@ -140,7 +162,10 @@ export function AdminSlackNotificationSettings({
 									<Input
 										id="slack-channel"
 										value={channelInput}
-										onChange={(e) => setChannelInput(e.target.value.trim())}
+										onChange={(e) => {
+											setChannelInput(e.target.value.trim());
+											setDirty(true);
+										}}
 										placeholder="C0974LJBPBK"
 										autoComplete="off"
 										aria-invalid={channelInvalid}
@@ -162,7 +187,10 @@ export function AdminSlackNotificationSettings({
 									<Input
 										id="slack-team"
 										value={teamInput}
-										onChange={(e) => setTeamInput(e.target.value)}
+										onChange={(e) => {
+											setTeamInput(e.target.value);
+											setDirty(true);
+										}}
 										placeholder="e.g. engineering"
 										autoComplete="off"
 									/>

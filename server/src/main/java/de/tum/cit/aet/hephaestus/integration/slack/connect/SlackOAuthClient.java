@@ -82,10 +82,43 @@ public class SlackOAuthClient {
         return response;
     }
 
+    /**
+     * Best-effort {@code auth.revoke} — invalidates the bot token on Slack's side so a
+     * disconnect on our side doesn't leave a dangling credential. Returns true when Slack
+     * confirms the revocation; false on transport/HTTP failure or {@code ok=false}.
+     * Never throws — disconnect-from-vendor is fire-and-forget by design.
+     */
+    public boolean revoke(String botToken) {
+        if (botToken == null || botToken.isBlank()) return false;
+        try {
+            AuthRevoke response = restClient
+                .post()
+                .uri("/api/auth.revoke")
+                .header("Authorization", "Bearer " + botToken)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .retrieve()
+                .body(AuthRevoke.class);
+            if (response == null || !response.ok()) {
+                log.warn(
+                    "Slack auth.revoke returned ok=false: error={}",
+                    response == null ? "null_body" : response.error()
+                );
+                return false;
+            }
+            return true;
+        } catch (RestClientException e) {
+            log.warn("Slack auth.revoke transport failure: {}", e.getClass().getSimpleName());
+            return false;
+        }
+    }
+
     private static String stripTrailingSlash(String url) {
         if (url == null || url.isEmpty()) return "";
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record AuthRevoke(@JsonProperty("ok") boolean ok, @JsonProperty("error") @Nullable String error) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record OAuthV2Access(

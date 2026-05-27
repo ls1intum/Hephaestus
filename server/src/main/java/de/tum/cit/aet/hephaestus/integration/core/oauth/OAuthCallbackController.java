@@ -289,7 +289,7 @@ public class OAuthCallbackController {
         if (request == null) return false;
         String accept = request.getHeader(HttpHeaders.ACCEPT);
         if (accept == null) return false;
-        String lower = accept.toLowerCase();
+        String lower = accept.toLowerCase(java.util.Locale.ROOT);
         return lower.contains("application/json") && !lower.contains("text/html");
     }
 

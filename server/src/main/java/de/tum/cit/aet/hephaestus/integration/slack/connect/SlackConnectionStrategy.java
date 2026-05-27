@@ -2,11 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.slack.connect;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.slack.connect.SlackOAuthClient.OAuthV2Access;
+import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +43,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     private final OAuthStateService oauthStateService;
     private final SlackOAuthClient oauthClient;
+    private final SlackCredentialProvider credentialProvider;
     private final String clientId;
     private final String scopes;
     private final String redirectUri;
@@ -48,11 +51,13 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     public SlackConnectionStrategy(
         OAuthStateService oauthStateService,
         SlackOAuthClient oauthClient,
+        SlackCredentialProvider credentialProvider,
         @Value("${hephaestus.integration.slack.client-id:}") String clientId,
         @Value("${hephaestus.integration.slack.redirect-uri:}") String redirectUri
     ) {
         this.oauthStateService = oauthStateService;
         this.oauthClient = oauthClient;
+        this.credentialProvider = credentialProvider;
         this.clientId = clientId;
         this.scopes = String.join(",", DEFAULT_SCOPES);
         this.redirectUri = redirectUri;
@@ -119,8 +124,16 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public void revoke(IntegrationRef ref) {
-        // Slack auth.revoke is best-effort and ships with token-rotation support (#1198).
-        log.debug("Slack revoke stub for workspace={}", ref.workspaceId());
+        // Best-effort: invalidate the bot token on Slack's side so a disconnect doesn't
+        // leave a dangling credential. Failure here doesn't block the local UNINSTALLED
+        // transition — the caller has already cleared credentials_encrypted.
+        var bundle = credentialProvider.resolve(ref);
+        if (bundle.isEmpty() || !(bundle.get() instanceof BearerToken bt)) {
+            log.debug("Slack revoke skipped: no bearer token for workspace={}", ref.workspaceId());
+            return;
+        }
+        boolean revoked = oauthClient.revoke(bt.token());
+        log.info("Slack revoke for workspace={}: success={}", ref.workspaceId(), revoked);
     }
 
     private String redirectUri() {
