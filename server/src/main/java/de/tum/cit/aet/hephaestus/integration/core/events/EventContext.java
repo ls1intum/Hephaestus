@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.core.events;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.common.DataSource;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.LazyInitializationException;

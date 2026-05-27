@@ -8,10 +8,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResp
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncException;
-import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueType;
-import de.tum.cit.aet.hephaestus.integration.scm.issuetype.IssueTypeRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueTypeRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;

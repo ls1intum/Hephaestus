@@ -11,9 +11,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.organization.GitHubOrgan
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.GitHubProjectSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.subissue.GitHubSubIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.team.GitHubTeamSyncService;
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;

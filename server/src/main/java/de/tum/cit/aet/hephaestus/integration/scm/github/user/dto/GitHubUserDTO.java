@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.user.dto;
 
-import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
-import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.uriToString;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUtils.uriToString;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -11,7 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHEnterpri
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHMannequin;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHOrganization;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
-import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
 import org.springframework.lang.Nullable;
 

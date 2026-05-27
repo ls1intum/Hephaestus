@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.leaderboard.tasks;
 
-import de.tum.cit.aet.hephaestus.integration.scm.user.UserInfoDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.leaderboard.*;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;

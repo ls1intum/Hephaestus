@@ -9,17 +9,17 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabN
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLabReviewReconciler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewcomment.PullRequestReviewCommentRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThread;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import java.time.Instant;
@@ -268,10 +268,10 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         GitLabNoteEventDTO.EmbeddedMergeRequest dto,
         ProcessingContext context
     ) {
-        de.tum.cit.aet.hephaestus.integration.scm.repository.Repository repository = context.repository();
+        de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository repository = context.repository();
         if (repository == null || dto.id() == null) return null;
 
-        de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State mappedState = convertMrState(dto.state());
+        de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State mappedState = convertMrState(dto.state());
 
         PullRequest pr = new PullRequest();
         pr.setNativeId(dto.id());
@@ -282,7 +282,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         pr.setState(mappedState);
         pr.setHtmlUrl(dto.url());
         pr.setDraft(dto.draft());
-        pr.setMerged(mappedState == de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.MERGED);
+        pr.setMerged(mappedState == de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.MERGED);
         pr.setAdditions(0);
         pr.setDeletions(0);
         pr.setChangedFiles(0);
@@ -304,13 +304,13 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         return saved;
     }
 
-    private static de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State convertMrState(@Nullable String state) {
-        if (state == null) return de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN;
+    private static de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State convertMrState(@Nullable String state) {
+        if (state == null) return de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;
         return switch (state.toLowerCase()) {
-            case "opened" -> de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN;
-            case "closed" -> de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.CLOSED;
-            case "merged" -> de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.MERGED;
-            default -> de.tum.cit.aet.hephaestus.integration.scm.issue.Issue.State.OPEN;
+            case "opened" -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;
+            case "closed" -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.CLOSED;
+            case "merged" -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.MERGED;
+            default -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;
         };
     }
 }

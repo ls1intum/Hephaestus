@@ -1,0 +1,56 @@
+package de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryInfoDTO;
+import io.swagger.v3.oas.annotations.media.Schema;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
+
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
+@Schema(description = "Basic information about a pull request")
+public record PullRequestBaseInfoDTO(
+    @NonNull @Schema(description = "Unique identifier of the pull request") Long id,
+    @NonNull @Schema(description = "Pull request number within the repository", example = "42") Integer number,
+    @NonNull @Schema(description = "Title of the pull request") String title,
+    @NonNull @Schema(description = "Current state of the pull request (OPEN, CLOSED, MERGED)") State state,
+    @NonNull @Schema(description = "Whether the pull request is in draft mode") Boolean isDraft,
+    @NonNull @Schema(description = "Whether the pull request has been merged") Boolean isMerged,
+    @Schema(description = "Repository the pull request belongs to") RepositoryInfoDTO repository,
+    @NonNull @Schema(description = "URL to the pull request on the git provider") String htmlUrl
+) {
+    @Nullable
+    public static PullRequestBaseInfoDTO fromPullRequest(@Nullable PullRequest pullRequest) {
+        if (pullRequest == null) {
+            return null;
+        }
+        return new PullRequestBaseInfoDTO(
+            pullRequest.getId(),
+            pullRequest.getNumber(),
+            pullRequest.getTitle(),
+            pullRequest.getState(),
+            pullRequest.isDraft(),
+            pullRequest.isMerged(),
+            RepositoryInfoDTO.fromRepository(pullRequest.getRepository()),
+            pullRequest.getHtmlUrl()
+        );
+    }
+
+    @Nullable
+    public static PullRequestBaseInfoDTO fromIssue(@Nullable Issue issue) {
+        if (issue == null) {
+            return null;
+        }
+        return new PullRequestBaseInfoDTO(
+            issue.getId(),
+            issue.getNumber(),
+            issue.getTitle(),
+            issue.getState(),
+            false,
+            false,
+            RepositoryInfoDTO.fromRepository(issue.getRepository()),
+            issue.getHtmlUrl()
+        );
+    }
+}

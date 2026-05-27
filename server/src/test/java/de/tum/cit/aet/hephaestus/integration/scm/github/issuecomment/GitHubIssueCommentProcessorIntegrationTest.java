@@ -8,17 +8,17 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
-import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueComment;
-import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueCommentRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.Organization;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -265,7 +265,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             existing.setHtmlUrl(
                 "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/42#issuecomment-" + TEST_COMMENT_ID
             );
-            existing.setAuthorAssociation(de.tum.cit.aet.hephaestus.integration.scm.common.AuthorAssociation.OWNER);
+            existing.setAuthorAssociation(de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation.OWNER);
             existing.setCreatedAt(Instant.now());
             existing.setIssue(testIssue);
             commentRepository.save(existing);

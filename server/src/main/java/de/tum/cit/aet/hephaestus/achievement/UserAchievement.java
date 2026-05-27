@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.achievement;
 
 import de.tum.cit.aet.hephaestus.achievement.progress.AchievementProgress;
-import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

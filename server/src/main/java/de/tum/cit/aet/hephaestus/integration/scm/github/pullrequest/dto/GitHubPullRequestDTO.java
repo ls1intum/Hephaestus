@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto;
 
-import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.toInstant;
-import static de.tum.cit.aet.hephaestus.integration.scm.common.DateTimeUtils.uriToString;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUtils.uriToString;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -19,8 +19,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHReviewRe
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHReviewRequestConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUserConnection;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.MergeStateStatus;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.ReviewDecision;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.MergeStateStatus;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.ReviewDecision;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Collections;

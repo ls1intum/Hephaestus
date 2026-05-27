@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.profile.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestBaseInfoDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.integration.scm.user.UserInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestBaseInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.springframework.lang.NonNull;

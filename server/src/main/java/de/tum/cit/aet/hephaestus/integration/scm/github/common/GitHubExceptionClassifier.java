@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
-import de.tum.cit.aet.hephaestus.integration.scm.common.exception.InstallationSuspendedException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationSuspendedException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;

@@ -2,12 +2,12 @@ package de.tum.cit.aet.hephaestus.workspace.settings;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
-import de.tum.cit.aet.hephaestus.integration.scm.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.team.Team;
-import de.tum.cit.aet.hephaestus.integration.scm.team.TeamRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.HashMap;
@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>This service replaces direct modifications to the deprecated fields on
  * {@link Team#isHidden()}, {@link Team#getLabels()}, and
- * {@link de.tum.cit.aet.hephaestus.integration.scm.team.permission.TeamRepositoryPermission#isHiddenFromContributions()}.
+ * {@link de.tum.cit.aet.hephaestus.integration.scm.domain.team.permission.TeamRepositoryPermission#isHiddenFromContributions()}.
  *
  * @see WorkspaceTeamSettings
  * @see WorkspaceTeamRepositorySettings

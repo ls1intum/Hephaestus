@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.team;
 
-import de.tum.cit.aet.hephaestus.integration.scm.team.TeamInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamInfoDTO;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;

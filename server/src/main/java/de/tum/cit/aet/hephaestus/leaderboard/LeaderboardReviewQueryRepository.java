@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -46,7 +46,7 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
         WHERE prr.submittedAt >= :since
             AND prr.submittedAt < :until
             AND prr.author.id IN :actorIds
-            AND prr.author.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
+            AND prr.author.type = de.tum.cit.aet.hephaestus.integration.scm.domain.user.User$Type.USER
             AND rtm.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
@@ -89,7 +89,7 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
         WHERE prr.submittedAt >= :since
             AND prr.submittedAt < :until
             AND prr.author.id IN :actorIds
-            AND prr.author.type = de.tum.cit.aet.hephaestus.integration.scm.user.User$Type.USER
+            AND prr.author.type = de.tum.cit.aet.hephaestus.integration.scm.domain.user.User$Type.USER
             AND rtm.workspace.id = :workspaceId
             AND EXISTS (
                 SELECT 1 FROM TeamRepositoryPermission trp

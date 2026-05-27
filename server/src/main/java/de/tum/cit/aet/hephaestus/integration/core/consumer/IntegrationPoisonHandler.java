@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Counters tag {@code kind=<integration-kind>} derived from
  * {@link ConsumerSubjectMath#kindFromSubjectPrefix}; cache is per-kind. Backoff math is
- * inlined (rather than imported from {@code integration.scm.common.github.ExponentialBackoff})
+ * inlined (rather than imported from {@code integration.scm.github.common.ExponentialBackoff})
  * to keep this package free of a {@code integration.scm} import.
  */
 @Component

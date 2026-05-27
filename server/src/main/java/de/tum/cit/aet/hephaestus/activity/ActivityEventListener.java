@@ -3,20 +3,20 @@ package de.tum.cit.aet.hephaestus.activity;
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
-import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueComment;
-import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReviewRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThread;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewthread.PullRequestReviewThreadRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -1586,7 +1586,7 @@ public class ActivityEventListener {
      * @return Repository reference if repository-scoped, null otherwise
      */
     @Nullable
-    private de.tum.cit.aet.hephaestus.integration.scm.repository.Repository getRepositoryForProject(
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository getRepositoryForProject(
         EventPayload.ProjectData projectData
     ) {
         if (projectData.ownerType() == Project.OwnerType.REPOSITORY) {
@@ -1597,7 +1597,7 @@ public class ActivityEventListener {
     }
 
     @Nullable
-    private de.tum.cit.aet.hephaestus.integration.scm.repository.Repository resolveRepositoryForProjectId(
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository resolveRepositoryForProjectId(
         @Nullable Long projectId
     ) {
         if (projectId == null) {
@@ -1614,7 +1614,7 @@ public class ActivityEventListener {
     }
 
     @Nullable
-    private de.tum.cit.aet.hephaestus.integration.scm.repository.Repository resolveRepositoryForProjectItem(
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository resolveRepositoryForProjectItem(
         EventPayload.ProjectItemData itemData,
         @Nullable Long projectId
     ) {

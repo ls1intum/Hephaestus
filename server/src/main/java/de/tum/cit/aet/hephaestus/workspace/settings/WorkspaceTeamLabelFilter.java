@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.settings;
 
-import de.tum.cit.aet.hephaestus.integration.scm.label.Label;
-import de.tum.cit.aet.hephaestus.integration.scm.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;

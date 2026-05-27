@@ -18,11 +18,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabN
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO.EmbeddedMergeRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO.NoteAttributes;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiffNoteWebhookProcessor;
-import de.tum.cit.aet.hephaestus.integration.scm.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.io.IOException;
@@ -58,10 +58,10 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     private GitLabWebhookContextResolver contextResolver;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository pullRequestRepository;
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository pullRequestRepository;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.scm.user.UserRepository userRepository;
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository userRepository;
 
     @Mock
     private NatsMessageDeserializer deserializer;

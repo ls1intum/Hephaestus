@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMemberRole;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMembership;
-import de.tum.cit.aet.hephaestus.integration.scm.organization.OrganizationMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembership;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;

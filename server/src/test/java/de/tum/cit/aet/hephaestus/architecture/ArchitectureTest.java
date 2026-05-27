@@ -124,13 +124,13 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * within their respective feature modules.
          */
         @Test
-        @DisplayName("SPI interfaces are not added under integration.scm.common")
+        @DisplayName("SPI interfaces are not added under integration.scm.domain.common")
         void spiInterfacesAreInSpiPackage() {
             // Prevent Provider/Resolver/Listener SPI interfaces from creeping back
             // into integration.scm — they belong in integration.spi.
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..integration.scm.common..")
+                .resideInAPackage("..integration.scm.domain.common..")
                 .and()
                 .areInterfaces()
                 .should()

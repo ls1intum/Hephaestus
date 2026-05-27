@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import de.tum.cit.aet.hephaestus.integration.scm.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;

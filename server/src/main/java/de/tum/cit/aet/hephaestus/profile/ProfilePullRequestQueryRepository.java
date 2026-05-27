@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.profile;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -45,7 +45,7 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
         WHERE p.author.id IN :authorIds
-            AND p.state = de.tum.cit.aet.hephaestus.integration.scm.issue.Issue$State.OPEN
+            AND p.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue$State.OPEN
             AND p.createdAt >= :since
             AND p.createdAt < :until
             AND rtm.workspace.id = :workspaceId
@@ -70,7 +70,7 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
                 WHERE tm.user = p.author
                 AND tm.team.id IN :teamIds
             )
-            AND p.state = de.tum.cit.aet.hephaestus.integration.scm.issue.Issue$State.OPEN
+            AND p.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue$State.OPEN
             AND p.createdAt >= :since
             AND p.createdAt < :until
             AND rtm.workspace.id = :workspaceId

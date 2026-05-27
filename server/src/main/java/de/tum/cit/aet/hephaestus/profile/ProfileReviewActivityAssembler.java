@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.profile;
 
-import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueComment;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestBaseInfoDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.integration.scm.user.UserInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestBaseInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileReviewActivityDTO;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
