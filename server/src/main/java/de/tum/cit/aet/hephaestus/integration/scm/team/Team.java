@@ -74,7 +74,7 @@ public class Team extends BaseGitServiceEntity {
      * was last synchronized via GraphQL. Used to implement sync cooldown logic
      * and detect stale data.
      *
-     * @see de.tum.cit.aet.hephaestus.integration.github.team.GitHubTeamSyncService
+     * @see de.tum.cit.aet.hephaestus.integration.scm.github.team.GitHubTeamSyncService
      */
     private Instant lastSyncAt;
 

@@ -58,7 +58,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             // Orchestrator services that coordinate many sub-services are allowed more dependencies
             Set<String> orchestratorExceptions = Set.of(
                 "GithubDataSyncService", // Coordinates 15 entity-specific sync services
-                "HistoricalBackfillService", // Coordinates multiple sync services for historical data backfill
+                "GitHubHistoricalBackfillService", // Coordinates multiple sync services for historical data backfill
                 "GitHubPullRequestSyncService", // Coordinates review, review comment, and project item sub-sync services
                 "WorkspaceProvisioningService", // Orchestrates provisioning across GitHub and GitLab providers
                 "MentorChatService", // Coordinates persistence, SSE, runner, lock, metrics, executor, llm config, context build

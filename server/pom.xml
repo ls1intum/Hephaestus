@@ -517,9 +517,9 @@
 
                             <!-- Output configuration -->
                             <outputDir>${project.build.directory}/generated-sources/graphql-github</outputDir>
-                            <packageName>de.tum.cit.aet.hephaestus.integration.scm.graphql.github</packageName>
-                            <apiPackageName>de.tum.cit.aet.hephaestus.integration.scm.graphql.github.api</apiPackageName>
-                            <modelPackageName>de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model
+                            <packageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql</packageName>
+                            <apiPackageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql.api</apiPackageName>
+                            <modelPackageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model
                             </modelPackageName>
                             <modelNamePrefix>GH</modelNamePrefix>
 
@@ -602,9 +602,9 @@
 
                             <!-- Output configuration (separate dir to avoid codegen cleanup conflicts) -->
                             <outputDir>${project.build.directory}/generated-sources/graphql-gitlab</outputDir>
-                            <packageName>de.tum.cit.aet.hephaestus.integration.scm.graphql.gitlab</packageName>
-                            <apiPackageName>de.tum.cit.aet.hephaestus.integration.scm.graphql.gitlab.api</apiPackageName>
-                            <modelPackageName>de.tum.cit.aet.hephaestus.integration.scm.graphql.gitlab.model
+                            <packageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql</packageName>
+                            <apiPackageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql.api</apiPackageName>
+                            <modelPackageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql.model
                             </modelPackageName>
                             <modelNamePrefix>GL</modelNamePrefix>
 
@@ -703,7 +703,7 @@
                                 <!-- Delete Relay files that depend on missing Query root type -->
                                 <delete failonerror="false">
                                     <fileset
-                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/graphql/github/model">
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
                                         <include name="RelayQueryRequest.java"/>
                                         <include name="RelayQueryResponse.java"/>
                                     </fileset>
@@ -715,7 +715,7 @@
                                     <substitution
                                             expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1"/>
                                     <fileset
-                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/graphql/github/model">
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
                                         <include name="ProjectPendingCardsParametrizedInput.java"/>
                                         <include name="IssueProjectCardsParametrizedInput.java"/>
                                         <include name="PullRequestProjectCardsParametrizedInput.java"/>
@@ -1120,7 +1120,7 @@
                      compile failures because the model classes don't exist. The
                      `model` subdirectory is only present when codegen actually ran. -->
                 <file>
-                    <exists>${basedir}/target/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/graphql/github/model</exists>
+                    <exists>${basedir}/target/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model</exists>
                 </file>
             </activation>
             <properties>

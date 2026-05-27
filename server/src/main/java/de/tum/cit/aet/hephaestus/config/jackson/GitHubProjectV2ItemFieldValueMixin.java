@@ -2,17 +2,17 @@ package de.tum.cit.aet.hephaestus.config.jackson;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldDateValue;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldIterationValue;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldLabelValue;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldMilestoneValue;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldNumberValue;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldPullRequestValue;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldRepositoryValue;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldReviewerValue;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldSingleSelectValue;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldTextValue;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHProjectV2ItemFieldUserValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldDateValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldIterationValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldLabelValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldMilestoneValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldNumberValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldPullRequestValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldRepositoryValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldReviewerValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldSingleSelectValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldTextValue;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldUserValue;
 
 /**
  * Jackson mixin for GitHub GraphQL ProjectV2ItemFieldValue union type.

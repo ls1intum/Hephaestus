@@ -521,7 +521,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             // Recognized base classes that integration tests should extend
             java.util.Set<String> validBaseClasses = java.util.Set.of(
                 "de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest",
-                "de.tum.cit.aet.hephaestus.integration.github.AbstractGitHubLiveSyncIntegrationTest",
+                "de.tum.cit.aet.hephaestus.integration.scm.github.AbstractGitHubLiveSyncIntegrationTest",
                 "de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest"
             );
 

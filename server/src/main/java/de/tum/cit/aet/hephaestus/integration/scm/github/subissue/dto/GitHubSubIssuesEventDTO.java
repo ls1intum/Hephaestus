@@ -1,0 +1,31 @@
+package de.tum.cit.aet.hephaestus.integration.scm.github.subissue.dto;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
+
+/**
+ * DTO for GitHub sub_issues webhook events.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record GitHubSubIssuesEventDTO(
+    @JsonProperty("action") String action,
+    @JsonProperty("sub_issue") GitHubIssueDTO subIssue,
+    @JsonProperty("parent_issue") GitHubIssueDTO parentIssue,
+    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+    @JsonProperty("sender") GitHubUserDTO sender
+) implements GitHubWebhookEvent {
+    @Override
+    public GitHubEventAction.SubIssue actionType() {
+        return GitHubEventAction.SubIssue.fromString(action);
+    }
+
+    @Override
+    public GitHubRepositoryRefDTO repository() {
+        return repository;
+    }
+}

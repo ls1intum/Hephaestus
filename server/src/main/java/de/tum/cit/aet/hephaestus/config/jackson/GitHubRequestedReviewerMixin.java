@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.config.jackson;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHMannequin;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHTeam;
-import de.tum.cit.aet.hephaestus.integration.scm.graphql.github.model.GHUser;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHMannequin;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHTeam;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
 
 /**
  * Jackson mixin for GitHub GraphQL RequestedReviewer interface.

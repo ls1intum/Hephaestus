@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.contributors;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.github.GitHubProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.github.GitHubProperties;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;

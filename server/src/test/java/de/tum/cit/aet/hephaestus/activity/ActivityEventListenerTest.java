@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.discussioncomment.DiscussionCom
 import de.tum.cit.aet.hephaestus.integration.scm.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.issuecomment.IssueCommentRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.pullrequestreview.PullRequestReview;

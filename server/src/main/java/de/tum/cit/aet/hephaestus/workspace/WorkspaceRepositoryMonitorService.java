@@ -9,10 +9,10 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderReposito
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
-import de.tum.cit.aet.hephaestus.integration.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.integration.github.installation.GitHubInstallationRepositoryEnumerationService;
-import de.tum.cit.aet.hephaestus.integration.github.sync.GithubDataSyncService;
-import de.tum.cit.aet.hephaestus.integration.scm.project.ProjectIntegrityService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationRepositoryEnumerationService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectIntegrityService;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.workdir.GitRepositoryManager;

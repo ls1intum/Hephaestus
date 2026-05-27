@@ -51,8 +51,8 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
      */
     static final String SCM_PACKAGE = BASE_PACKAGE + ".integration.scm";
 
-    static final String INTEGRATION_GITHUB_PACKAGE = BASE_PACKAGE + ".integration.github";
-    static final String INTEGRATION_GITLAB_PACKAGE = BASE_PACKAGE + ".integration.gitlab";
+    static final String INTEGRATION_GITHUB_PACKAGE = BASE_PACKAGE + ".integration.scm.github";
+    static final String INTEGRATION_GITLAB_PACKAGE = BASE_PACKAGE + ".integration.scm.gitlab";
 
     /**
      * Checks if a class belongs to a workspace-agnostic package (integration.scm kernel

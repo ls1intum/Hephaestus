@@ -42,10 +42,10 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
      * (extends / implements / type usage).
      */
     private static final List<String> DELETED_LEGACY_NAMES = List.of(
-        "de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandler",
-        "de.tum.cit.aet.hephaestus.integration.github.common.GitHubMessageHandlerRegistry",
-        "de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandler",
-        "de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabMessageHandlerRegistry"
+        "de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubMessageHandler",
+        "de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubMessageHandlerRegistry",
+        "de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabMessageHandler",
+        "de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabMessageHandlerRegistry"
     );
 
     @Test
@@ -72,7 +72,7 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
 
         List<String> violations = classes
             .stream()
-            .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.integration.github."))
+            .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.integration.scm.github."))
             .filter(c -> c.getSimpleName().endsWith("MessageHandler"))
             .filter(c -> !c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.ABSTRACT))
             .filter(c -> !whitelist.contains(c.getFullName()))
@@ -84,7 +84,7 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
         violations.addAll(
             classes
                 .stream()
-                .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.integration.gitlab."))
+                .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.integration.scm.gitlab."))
                 .filter(c -> c.getSimpleName().endsWith("MessageHandler"))
                 .filter(c -> !c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.ABSTRACT))
                 .filter(c -> !whitelist.contains(c.getFullName()))
@@ -105,8 +105,8 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
 
     @Test
     void everyKindWithMessageHandlersBindsAtLeastOneToTheUnifiedRegistry() {
-        long githubBound = countBoundHandlersUnder("de.tum.cit.aet.hephaestus.integration.github.");
-        long gitlabBound = countBoundHandlersUnder("de.tum.cit.aet.hephaestus.integration.gitlab.");
+        long githubBound = countBoundHandlersUnder("de.tum.cit.aet.hephaestus.integration.scm.github.");
+        long gitlabBound = countBoundHandlersUnder("de.tum.cit.aet.hephaestus.integration.scm.gitlab.");
 
         assertThat(githubBound)
             .as("GitHub handlers must bind to the unified registry; zero means the SPI wiring regressed.")

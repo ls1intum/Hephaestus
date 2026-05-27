@@ -11,7 +11,7 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
  * concepts. By using this SPI, the filtering decision is delegated to the host application
  * which knows its own configuration (e.g., {@code hephaestus.sync.filters.allowed-repositories}).
  *
- * @see de.tum.cit.aet.hephaestus.integration.scm.common.ProcessingContextFactory
+ * @see de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory
  */
 public interface RepositoryScopeFilter {
     /**

@@ -8,7 +8,7 @@
  *
  * <p>Three coexisting structural axes:
  * <ul>
- *   <li><b>Vendor coherence</b> — {@code integration/{github,gitlab,slack,outline}/...}
+ *   <li><b>Vendor coherence</b> — {@code integration/scm/{github,gitlab}/...}, {@code integration/{slack,outline}/...}
  *   <li><b>Family-shared abstractions</b> — {@code integration/{scm,messaging,knowledge,project-tracker}-lib/...}
  *   <li><b>Cross-cutting traits</b> — {@code integration/core/{webhook,consumer,events,spi,handler,connection,oauth,feedback,framework}/...}
  * </ul>

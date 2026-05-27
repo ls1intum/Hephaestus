@@ -1,6 +1,6 @@
 /**
  * Vendor-neutral SCM domain — entities for commits, PRs, reviews, issues, etc.
- * Vendor adapters under {@code integration/github}, {@code integration/gitlab} write
+ * Vendor adapters under {@code integration/scm/github}, {@code integration/scm/gitlab} write
  * here via processors; cross-module coupling goes through
  * {@code integration.spi} (interfaces) and {@code integration.events} (domain events).
  */

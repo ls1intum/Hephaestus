@@ -1,16 +1,16 @@
 package de.tum.cit.aet.hephaestus.config;
 
-import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.HEADER_RATE_LIMIT_LIMIT;
-import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.HEADER_RATE_LIMIT_REMAINING;
-import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.HEADER_RATE_LIMIT_RESET;
-import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.JITTER_FACTOR;
-import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.TRANSPORT_INITIAL_BACKOFF;
-import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.TRANSPORT_MAX_BACKOFF;
-import static de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.HEADER_RATE_LIMIT_LIMIT;
+import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.HEADER_RATE_LIMIT_REMAINING;
+import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.HEADER_RATE_LIMIT_RESET;
+import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.JITTER_FACTOR;
+import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import de.tum.cit.aet.hephaestus.integration.github.common.GitHubTransportErrors;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.integration.gitlab.common.GitLabRateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
 import java.time.Duration;
 import java.util.List;
 import org.slf4j.Logger;

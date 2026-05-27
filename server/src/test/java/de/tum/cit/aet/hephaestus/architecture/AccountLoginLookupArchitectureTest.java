@@ -20,7 +20,7 @@ class AccountLoginLookupArchitectureTest extends HephaestusArchitectureTest {
         "de.tum.cit.aet.hephaestus.workspace.WorkspaceProvisioningService",
         "de.tum.cit.aet.hephaestus.workspace.adapter.WorkspaceContextResolverAdapter",
         "de.tum.cit.aet.hephaestus.workspace.adapter.WorkspaceOrganizationMembershipAdapter",
-        "de.tum.cit.aet.hephaestus.integration.github.lifecycle.GithubLifecycleListener"
+        "de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener"
     );
 
     @Test

@@ -14,11 +14,11 @@ import org.junit.jupiter.api.Test;
  * <ul>
  *   <li>{@link #spiHasNoVendorSdkDependencies} — {@code integration/core/spi} stays vendor-
  *       agnostic. Today {@code RateLimitTracker} imports
- *       {@code de.tum.cit.aet.hephaestus.integration.scm.graphql.github.GHRateLimit}; that
+ *       {@code de.tum.cit.aet.hephaestus.integration.scm.github.graphql.GHRateLimit}; that
  *       drift is acceptable while {@code integration.scm/} is still load-bearing, but new
  *       SPI surfaces must NOT add vendor-SDK imports.
- *   <li>{@link #kindModulesDoNotImportEachOther} — {@code integration/github} cannot
- *       import {@code integration/gitlab}, etc. Cross-kind coupling defeats the point
+ *   <li>{@link #kindModulesDoNotImportEachOther} — {@code integration/scm/github} cannot
+ *       import {@code integration/scm/gitlab}, etc. Cross-kind coupling defeats the point
  *       of the SPI.
  *   <li>{@link #agentDoesNotBranchOnIntegrationKind} — agent/** must dispatch via SPI
  *       rather than switching on {@code IntegrationKind}.
@@ -48,19 +48,19 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
         check(
             noClasses()
                 .that()
-                .resideInAPackage("..integration.github..")
+                .resideInAPackage("..integration.scm.github..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..integration.gitlab..", "..integration.slack..", "..integration.outline..")
+                .resideInAnyPackage("..integration.scm.gitlab..", "..integration.slack..", "..integration.outline..")
                 .because("Cross-kind coupling defeats the SPI. Use the shared integration/spi surface.")
         );
         check(
             noClasses()
                 .that()
-                .resideInAPackage("..integration.gitlab..")
+                .resideInAPackage("..integration.scm.gitlab..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..integration.github..", "..integration.slack..", "..integration.outline..")
+                .resideInAnyPackage("..integration.scm.github..", "..integration.slack..", "..integration.outline..")
                 .because("Cross-kind coupling defeats the SPI.")
         );
         check(
@@ -69,7 +69,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                 .resideInAPackage("..integration.slack..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..integration.github..", "..integration.gitlab..", "..integration.outline..")
+                .resideInAnyPackage("..integration.scm.github..", "..integration.scm.gitlab..", "..integration.outline..")
                 .because("Cross-kind coupling defeats the SPI.")
         );
         check(
@@ -78,7 +78,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                 .resideInAPackage("..integration.outline..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..integration.github..", "..integration.gitlab..", "..integration.slack..")
+                .resideInAnyPackage("..integration.scm.github..", "..integration.scm.gitlab..", "..integration.slack..")
                 .because("Cross-kind coupling defeats the SPI.")
         );
     }

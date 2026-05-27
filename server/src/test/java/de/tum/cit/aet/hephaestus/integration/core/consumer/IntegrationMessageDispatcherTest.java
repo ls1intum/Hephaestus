@@ -6,8 +6,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import de.tum.cit.aet.hephaestus.integration.github.webhook.GithubSubjectParser;
-import de.tum.cit.aet.hephaestus.integration.gitlab.webhook.GitlabSubjectParser;
+import de.tum.cit.aet.hephaestus.integration.scm.github.webhook.GithubSubjectParser;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitlabSubjectParser;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandlerRegistry;
 import de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineSubjectParser;

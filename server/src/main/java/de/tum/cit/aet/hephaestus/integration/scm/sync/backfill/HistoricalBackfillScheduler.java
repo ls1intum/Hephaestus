@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.sync.backfill;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.GitLabHistoricalBackfillService;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +42,7 @@ import org.springframework.stereotype.Component;
  *       interval-seconds: 60       # Seconds between cycles (rate limit is the throttle)
  * }</pre>
  *
- * @see HistoricalBackfillService
+ * @see GitHubHistoricalBackfillService
  * @see SyncSchedulerProperties.BackfillProperties
  */
 @Slf4j
@@ -48,11 +50,11 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "hephaestus.sync.backfill.enabled", havingValue = "true")
 @WorkspaceAgnostic(
-    "Workspace iteration is owned by HistoricalBackfillService.runBackfillCycle() — the scheduler is a thin trigger."
+    "Workspace iteration is owned by GitHubHistoricalBackfillService.runBackfillCycle() — the scheduler is a thin trigger."
 )
 public class HistoricalBackfillScheduler {
 
-    private final HistoricalBackfillService backfillService;
+    private final GitHubHistoricalBackfillService backfillService;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final ObjectProvider<GitLabHistoricalBackfillService> gitLabBackfillServiceProvider;
 
@@ -80,7 +82,7 @@ public class HistoricalBackfillScheduler {
     public void runBackfillCycle() {
         log.trace("Starting backfill cycle");
         try {
-            HistoricalBackfillService.BackfillCycleResult result = backfillService.runBackfillCycle();
+            GitHubHistoricalBackfillService.BackfillCycleResult result = backfillService.runBackfillCycle();
             if (result.repositoriesProcessed() > 0) {
                 log.info("Backfill cycle complete: repositoriesProcessed={}", result.repositoriesProcessed());
             } else if (result.pendingRepositories() > 0) {

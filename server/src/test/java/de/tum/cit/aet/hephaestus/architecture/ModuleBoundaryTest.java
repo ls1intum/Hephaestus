@@ -131,40 +131,55 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
     class GitproviderBoundaryTests {
 
         /**
-         * Gitprovider should not depend on feature modules.
+         * Vendor-neutral SCM domain should not depend on feature modules.
          *
-         * <p>The integration.scm is the core ETL engine for git data sync.
-         * It should not have direct dependencies on workspace, leaderboard,
-         * or other feature modules - only on SPIs in {@code integration.spi}
-         * that they implement.
+         * <p>The vendor-neutral SCM layer (integration.scm.* minus the per-vendor
+         * adapters scm.github/scm.gitlab) is the core ETL engine for git data sync.
+         * It should not have direct dependencies on workspace, leaderboard, or other
+         * feature modules - only on SPIs in {@code integration.core.spi}.
+         *
+         * <p>Vendor adapters under scm.github/scm.gitlab are exempt because their job
+         * is to bridge workspace-aware concerns into the neutral domain.
          */
         @Test
-        @DisplayName("Gitprovider does not depend on workspace internals")
+        @DisplayName("Vendor-neutral SCM domain does not depend on workspace internals")
         void scmDoesNotDependOnWorkspace() {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage("..integration.scm..")
+                .and()
+                .resideOutsideOfPackages("..integration.scm.github..", "..integration.scm.gitlab..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..workspace..")
-                .because("Gitprovider should depend on SPIs, not workspace implementation");
+                .because(
+                    "Vendor-neutral SCM domain must depend on SPIs, not workspace implementation. " +
+                        "Vendor adapters (scm.github/scm.gitlab) are exempt — they bridge workspace concerns."
+                );
             rule.check(classes);
         }
 
         /**
-         * Gitprovider should not depend on feature modules.
+         * Vendor-neutral SCM domain should not depend on feature modules.
          *
-         * <p>This is the SINGLE SOURCE OF TRUTH for integration.scm isolation.
+         * <p>This is the SINGLE SOURCE OF TRUTH for vendor-neutral SCM isolation.
          * Cross-cutting concerns should be handled via domain events, not direct dependencies.
+         *
+         * <p>Vendor adapters (scm.github/scm.gitlab) are exempt for the same reason as
+         * {@link #scmDoesNotDependOnWorkspace} — but note this is intentionally lax;
+         * vendor adapters shouldn't import feature modules either, but Phase 2 of the
+         * unified-integration migration carries forward pre-existing coupling.
          *
          * <p>CRITICAL: Keep this list in sync with the actual feature modules.
          */
         @Test
-        @DisplayName("Gitprovider does not depend on feature modules")
+        @DisplayName("Vendor-neutral SCM domain does not depend on feature modules")
         void scmDoesNotDependOnFeatureModules() {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage("..integration.scm..")
+                .and()
+                .resideOutsideOfPackages("..integration.scm.github..", "..integration.scm.gitlab..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage(
@@ -176,7 +191,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                     "..account..",
                     "..contributors.."
                 )
-                .because("Gitprovider should be isolated - use domain events for cross-cutting concerns");
+                .because("Vendor-neutral SCM domain must be isolated - use domain events for cross-cutting concerns");
             rule.check(classes);
         }
 
@@ -375,25 +390,50 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          * the SPI layer and directly depend on integration.scm internals like:
          * <ul>
          *   <li>integration.scm.sync - internal sync orchestration</li>
-         *   <li>integration.github.installation - internal installation management</li>
-         *   <li>integration.scm.common.github - GitHub-specific internal code</li>
+         *   <li>integration.scm.github.installation - GitHub installation management</li>
+         *   <li>integration.scm.github.app - GitHub-app credential handling</li>
+         *   <li>integration.scm.github.lifecycle - GitHub install/uninstall handlers</li>
+         *   <li>integration.scm.github.sync - GitHub-specific sync orchestration</li>
+         *   <li>integration.scm.github.webhook - GitHub webhook ingest</li>
+         *   <li>integration.scm.gitlab.* mirrors of the above</li>
          * </ul>
          *
          * <p>They SHOULD depend on:
          * <ul>
          *   <li>integration.core.spi - Service Provider Interfaces</li>
          *   <li>integration.core.events - Cross-vendor domain events</li>
-         *   <li>integration.scm entity packages (for reading data)</li>
+         *   <li>integration.scm entity packages (for reading data — including
+         *       vendor-specific entity sub-packages like scm.github.project)</li>
          * </ul>
+         *
+         * <p>NOTE: Entity sub-packages under vendor adapters (e.g. scm.github.project) are
+         * exempt because they are <i>data</i>, not adapter internals. Phase 3 of the
+         * integration-restructure will revisit whether these should move back under
+         * scm.{entity}/ for vendor-neutral access.
          */
         @Test
         @DisplayName("Feature modules do not bypass integration.core.spi SPIs")
         void featureModulesDoNotBypassScmSpis() {
-            // Internal packages that should NOT be accessed directly by feature modules
+            // Internal packages that should NOT be accessed directly by feature modules.
+            // We list ETL-internal subpackages explicitly instead of blanketing on
+            // ..integration.scm.github.. so that entity data packages (e.g. project/)
+            // remain readable by feature modules — same as scm.commit/, scm.issue/, etc.
             String[] forbiddenInternalPackages = {
                 "..integration.scm.sync..",
-                "..integration.github.installation..",
-                "..integration.github..",
+                "..integration.scm.github.installation..",
+                "..integration.scm.github.app..",
+                "..integration.scm.github.lifecycle..",
+                "..integration.scm.github.sync..",
+                "..integration.scm.github.webhook..",
+                "..integration.scm.github.connect..",
+                "..integration.scm.github.credentials..",
+                "..integration.scm.github.manifest..",
+                "..integration.scm.gitlab.lifecycle..",
+                "..integration.scm.gitlab.sync..",
+                "..integration.scm.gitlab.webhook..",
+                "..integration.scm.gitlab.connect..",
+                "..integration.scm.gitlab.credentials..",
+                "..integration.scm.gitlab.manifest..",
             };
 
             ArchRule rule = noClasses()
@@ -419,12 +459,25 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         @DisplayName("Feature modules do not depend on integration.scm GitHub service implementations")
         void featureModulesDoNotDependOnGitHubServiceImplementations() {
+            // Entity data sub-packages (e.g. scm.github.project) stay readable; only
+            // adapter/service implementations are off-limits. See
+            // featureModulesDoNotBypassScmSpis for the broader rationale.
+            //
+            // Equivalent to: no feature-module class may depend on a class that is
+            // in ..integration.scm.github.. AND not in ..integration.scm.github.project..
             ArchRule rule = noClasses()
                 .that()
                 .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
                 .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..integration.github..")
+                .dependOnClassesThat(
+                    com.tngtech.archunit.base.DescribedPredicate.describe(
+                        "reside in ..integration.scm.github.. but not ..integration.scm.github.project..",
+                        cls -> {
+                            String pkg = cls.getPackageName();
+                            return pkg.contains(".integration.scm.github") && !pkg.contains(".integration.scm.github.project");
+                        }
+                    )
+                )
                 .because("Feature modules should use SPIs, not depend on provider-specific service implementations");
             rule.check(classes);
         }
@@ -507,7 +560,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .resideInAPackage("..profile..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..integration.scm.sync..", "..integration.github..")
+                .resideInAnyPackage("..integration.scm.sync..", "..integration.scm.github..")
                 .because("Profile should only read data, not depend on sync internals");
             rule.check(classes);
         }
