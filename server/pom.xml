@@ -81,7 +81,6 @@
         <slack-bolt.version>1.48.1</slack-bolt.version>
         <jnats.version>2.25.2</jnats.version>
         <jgit.version>7.6.0.202603022253-r</jgit.version>
-        <keycloak-admin.version>26.0.9</keycloak-admin.version>
         <java-jwt.version>4.5.2</java-jwt.version>
         <graphql-codegen.version>5.10.0</graphql-codegen.version>
         <postgresql.version>42.7.11</postgresql.version>
@@ -351,11 +350,6 @@
         <dependency>
             <groupId>org.hibernate.validator</groupId>
             <artifactId>hibernate-validator</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.keycloak</groupId>
-            <artifactId>keycloak-admin-client</artifactId>
-            <version>${keycloak-admin.version}</version>
         </dependency>
         <dependency>
             <groupId>io.sentry</groupId>

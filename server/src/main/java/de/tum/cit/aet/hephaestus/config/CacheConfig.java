@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.cit.aet.hephaestus.achievement.AchievementService;
-import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
 import java.time.Duration;
@@ -71,7 +70,9 @@ public class CacheConfig {
      */
     static final List<CacheSpec> SPECS = List.of(
         new CacheSpec(AchievementService.ACHIEVEMENT_PROGRESS_CACHE, LONG_TTL, LONG_MAX),
-        new CacheSpec(RevocationAwareJwtDecoder.CACHE_NAME, AUTH_JWT_REVOKED_TTL, AUTH_JWT_REVOKED_MAX),
+        // Name mirrors core.auth.jwt.RevocationAwareJwtDecoder.CACHE_NAME (kept as a literal to
+        // avoid a config→core.auth internal-type dependency; the decoder owns the canonical const).
+        new CacheSpec("auth_jwt_revoked", AUTH_JWT_REVOKED_TTL, AUTH_JWT_REVOKED_MAX),
         new CacheSpec("contributors", LONG_TTL, LONG_MAX),
         new CacheSpec("mentor_findings_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
         new CacheSpec("mentor_practice_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),

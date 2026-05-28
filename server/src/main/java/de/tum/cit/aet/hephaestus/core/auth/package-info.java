@@ -50,6 +50,9 @@
  * </ul>
  *
  * <p>See ADR 0017 for the full rationale.
+ *
+ * <p><b>Modulith:</b> {@code core.auth} is part of the {@code core} application module (like
+ * {@code core.security}, {@code core.tenancy}); it is not a nested module. Cross-module
+ * consumers reach it only through the {@code core.auth.spi} named interface ({@code auth-spi}).
  */
-@org.springframework.modulith.ApplicationModule(displayName = "Auth")
 package de.tum.cit.aet.hephaestus.core.auth;

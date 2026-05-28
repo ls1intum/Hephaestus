@@ -14,12 +14,10 @@ spring:
     liquibase:
         contexts: prod
 
-    security:
-        oauth2:
-            resourceserver:
-                jwt:
-                    # Public URL for issuer validation (must match token's iss claim)
-                    issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
+    # No resourceserver.jwt.issuer-uri in prod: tokens are issued + verified by Hephaestus
+    # itself (core.auth). Required prod env: HEPHAESTUS_AUTH_ISSUER,
+    # HEPHAESTUS_AUTH_STATE_COOKIE_KEY, GITHUB_OAUTH_CLIENT_ID/SECRET,
+    # GITLAB_LRZ_OAUTH_CLIENT_ID/SECRET. See ADR 0017 + docs/runbooks/auth-cutover.md.
 
 server:
     forward-headers-strategy: native
@@ -87,17 +85,11 @@ hephaestus:
             durable-consumer-name: ${NATS_DURABLE_CONSUMER_NAME:}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # KEYCLOAK IDENTITY PROVIDER (Production)
+    # AUTH (Production) — Hephaestus-native, see ADR 0017
     # ═══════════════════════════════════════════════════════════════════════════
-    keycloak:
-        url: ${KEYCLOAK_URL}
-        realm: ${KEYCLOAK_REALM}
-        client-id: ${KEYCLOAK_CLIENT_ID}
-        client-secret: ${KEYCLOAK_CLIENT_SECRET}
-        # Internal base URL for container-to-container access (defaults to public URL)
-        internal-url: "${KEYCLOAK_INTERNAL_URL:${KEYCLOAK_URL}}"
-        # Internal JWKS endpoint for containerized deployments (optional)
-        jwk-set-uri: "${KEYCLOAK_JWK_SET_URI:${hephaestus.keycloak.internal-url}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs}"
+    auth:
+        issuer: ${HEPHAESTUS_AUTH_ISSUER}
+        state-cookie-key: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # GITLAB INTEGRATION (Production)

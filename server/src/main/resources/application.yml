@@ -60,9 +60,8 @@ spring:
 
     security:
         oauth2:
-            resourceserver:
-                jwt:
-                    issuer-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus
+            # No resourceserver.jwt.issuer-uri: tokens are issued + verified by Hephaestus
+            # itself (core.auth RevocationAwareJwtDecoder is the sole JwtDecoder bean). See ADR 0017.
             client:
                 # Default IdPs visible to every workspace. Workspace-scoped self-hosted
                 # GitLab / GHE registrations layer on top via a composite
@@ -608,17 +607,6 @@ hephaestus:
     contributors:
         github:
             auth-token: ${GH_AUTH_TOKEN:}
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # KEYCLOAK IDENTITY PROVIDER
-    # ═══════════════════════════════════════════════════════════════════════════
-    keycloak:
-        url: http://localhost:${KEYCLOAK_PORT:8081}
-        realm: hephaestus
-        client-id: hephaestus-confidential
-        # SECURITY: Never commit secrets. Use environment variables in production.
-        # For local development, the default 'hephaestus-dev-secret' matches the realm import.
-        client-secret: ${KEYCLOAK_CLIENT_SECRET:hephaestus-dev-secret}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # SLACK INTEGRATION
