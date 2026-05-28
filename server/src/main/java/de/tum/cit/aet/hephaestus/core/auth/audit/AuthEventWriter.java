@@ -35,25 +35,9 @@ public class AuthEventWriter {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void write(AuthEventLogger.AuthEventData data) {
+    public void write(AuthEventData data) {
         try {
-            AuthEvent event = AuthEvent.create(
-                sequence.next(),
-                clock.instant(),
-                data.type(),
-                data.result(),
-                data.accountId(),
-                data.actingAccountId(),
-                data.failureReason(),
-                data.gitProviderId(),
-                data.workspaceId(),
-                data.identityLinkId(),
-                captureIp(),
-                captureUserAgent(),
-                /* requestId */ null,
-                /* sessionHash */ null,
-                data.details()
-            );
+            AuthEvent event = AuthEvent.create(data, sequence.next(), clock.instant(), captureIp(), captureUserAgent());
             repository.save(event);
         } catch (RuntimeException e) {
             log.error("auth.audit: failed to persist {} event", data.type(), e);

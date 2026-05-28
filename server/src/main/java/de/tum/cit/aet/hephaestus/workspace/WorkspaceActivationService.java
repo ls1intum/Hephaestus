@@ -195,7 +195,7 @@ public class WorkspaceActivationService {
                 }
                 yield false;
             }
-            case SLACK, OUTLINE -> false;
+            case SLACK, OUTLINE, OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> false;
         };
     }
 

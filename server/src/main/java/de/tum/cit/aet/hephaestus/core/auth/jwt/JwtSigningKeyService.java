@@ -9,6 +9,7 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
 import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.security.KeyFactory;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
@@ -48,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
  * invalidated on rotation and (defensively) refreshed on TTL expiry.
  */
 @Service
+@WorkspaceAgnostic("JWT signing keys are system-wide; get() returns the global JWK set, not tenant data")
 public class JwtSigningKeyService implements JWKSource<SecurityContext> {
 
     private static final Logger log = LoggerFactory.getLogger(JwtSigningKeyService.class);

@@ -26,19 +26,6 @@ public class AuthEventLogger {
         return new Draft(type, result);
     }
 
-    /** Immutable carrier handed to {@link AuthEventWriter#write}. */
-    public record AuthEventData(
-        AuthEvent.EventType type,
-        AuthEvent.Result result,
-        @Nullable Long accountId,
-        @Nullable Long actingAccountId,
-        @Nullable String failureReason,
-        @Nullable Long gitProviderId,
-        @Nullable Long workspaceId,
-        @Nullable Long identityLinkId,
-        @Nullable String details
-    ) {}
-
     /** Fluent, null-tolerant builder. Terminal {@link #record()} persists via the writer. */
     public final class Draft {
 

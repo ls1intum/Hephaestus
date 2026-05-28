@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.domain;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Repository;
  * ArchUnit suite enforces that constraint once it lands.
  */
 @Repository
+@WorkspaceAgnostic("Federated-login associations are user-scoped, resolved by (provider, subject) at login")
 public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long> {
     /**
      * Resolve an IdentityLink by the immutable {@code (provider, subject, team_id)} triple.

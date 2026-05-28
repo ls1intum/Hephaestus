@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.jwt;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Optional;
@@ -12,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
+@WorkspaceAgnostic("JWT revocation list is account-scoped, not workspace-scoped")
 public interface IssuedJwtRepository extends JpaRepository<IssuedJwt, UUID> {
     /**
      * Used by {@code RevocationAwareJwtDecoder} on every authenticated request via a Caffeine cache.

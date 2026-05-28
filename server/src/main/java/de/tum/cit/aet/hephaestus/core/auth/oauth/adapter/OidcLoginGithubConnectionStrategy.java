@@ -1,5 +1,6 @@
-package de.tum.cit.aet.hephaestus.core.auth.oauth;
+package de.tum.cit.aet.hephaestus.core.auth.oauth.adapter;
 
+import de.tum.cit.aet.hephaestus.core.auth.oauth.IssuerDiscoveryProbe;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import org.springframework.stereotype.Component;
 

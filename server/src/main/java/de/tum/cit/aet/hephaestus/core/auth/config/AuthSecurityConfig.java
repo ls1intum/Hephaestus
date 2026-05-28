@@ -1,14 +1,12 @@
 package de.tum.cit.aet.hephaestus.core.auth.config;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.LoginClientRegistrationRepository;
-import de.tum.cit.aet.hephaestus.core.auth.oauth.RegistrationToGitProviderResolver;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.oauth.AccountProvisioningService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import java.time.Clock;
@@ -91,18 +89,14 @@ public class AuthSecurityConfig {
 
     @Bean
     public HephaestusAuthSuccessHandler hephaestusAuthSuccessHandler(
-        AccountRepository accountRepository,
-        IdentityLinkRepository identityLinkRepository,
-        RegistrationToGitProviderResolver providerResolver,
+        AccountProvisioningService provisioningService,
         HephaestusJwtIssuer jwtIssuer,
         AuthIntentCookie authIntentCookie,
         AuthProperties properties,
         Clock authClock
     ) {
         return new HephaestusAuthSuccessHandler(
-            accountRepository,
-            identityLinkRepository,
-            providerResolver,
+            provisioningService,
             jwtIssuer,
             authIntentCookie,
             properties,

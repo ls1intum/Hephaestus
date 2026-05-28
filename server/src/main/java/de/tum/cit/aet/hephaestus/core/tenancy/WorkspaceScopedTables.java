@@ -54,6 +54,14 @@ public class WorkspaceScopedTables {
         "model_pricing",
         // Fleet-wide worker JWT revocation; worker JWTs are not workspace-scoped
         "worker_token_denylist",
+        // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
+        // Account ↔ Workspace association lives on workspace_membership, not these tables.
+        "account",
+        "identity_link",
+        "account_feature",
+        "auth_event",
+        "issued_jwt",
+        "jwt_signing_key",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"

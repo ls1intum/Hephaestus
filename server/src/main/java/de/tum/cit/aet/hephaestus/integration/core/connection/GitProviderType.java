@@ -23,7 +23,9 @@ public enum GitProviderType {
         return switch (kind) {
             case GITHUB -> GITHUB;
             case GITLAB -> GITLAB;
-            case SLACK, OUTLINE -> throw new IllegalArgumentException(
+            // OIDC_LOGIN_* are identity providers, not SCM sync sources. The git-provider row
+            // for a federated login is resolved by the auth module's success handler, not here.
+            case SLACK, OUTLINE, OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> throw new IllegalArgumentException(
                 "IntegrationKind " + kind + " is not an SCM kind and has no GitProviderType"
             );
         };

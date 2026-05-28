@@ -904,6 +904,16 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
+                    // Skip the core.auth module (ADR 0017): authentication / session / OIDC
+                    // discovery endpoints are USER- or SYSTEM-scoped by definition, never
+                    // workspace-scoped. Login (AuthBegin), session lifecycle (AuthLifecycle),
+                    // session inventory (SessionWeb), and OIDC discovery (WellKnown) all
+                    // operate outside any single workspace. The module is annotated
+                    // @WorkspaceAgnostic at the package level.
+                    if (method.getOwner().getPackageName().startsWith("de.tum.cit.aet.hephaestus.core.auth")) {
+                        return;
+                    }
+
                     // Skip workspace registry operations - these are ADMIN operations that happen
                     // BEFORE a workspace context exists (creating/listing workspaces).
                     if (controllerName.contains("WorkspaceRegistry")) {

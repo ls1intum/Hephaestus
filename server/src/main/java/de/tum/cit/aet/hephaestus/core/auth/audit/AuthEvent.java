@@ -122,42 +122,33 @@ public class AuthEvent {
     }
 
     /**
-     * Factory used by {@link AuthEventLogger} — the only sanctioned construction path.
-     * Keeps the entity {@code @Getter}-only (append-only invariant) while allowing the
-     * logger to populate every field in one call.
+     * Factory used by {@link AuthEventWriter} — the only sanctioned construction path.
+     * Keeps the entity {@code @Getter}-only (append-only invariant). Business fields come
+     * via the {@link AuthEventData} parameter object; request-derived metadata is supplied
+     * directly. {@code requestId} / {@code sessionHash} are reserved columns, currently null.
      */
     public static AuthEvent create(
+        AuthEventData data,
         Long id,
         Instant occurredAt,
-        EventType eventType,
-        Result result,
-        @Nullable Long accountId,
-        @Nullable Long actingAccountId,
-        @Nullable String failureReason,
-        @Nullable Long gitProviderId,
-        @Nullable Long workspaceId,
-        @Nullable Long identityLinkId,
         String ipInet,
-        @Nullable String userAgent,
-        @Nullable UUID requestId,
-        @Nullable byte[] sessionHash,
-        @Nullable String details
+        @Nullable String userAgent
     ) {
         AuthEvent e = new AuthEvent();
         e.id = new Id(id, occurredAt);
-        e.eventType = eventType;
-        e.result = result;
-        e.accountId = accountId;
-        e.actingAccountId = actingAccountId;
-        e.failureReason = failureReason;
-        e.gitProviderId = gitProviderId;
-        e.workspaceId = workspaceId;
-        e.identityLinkId = identityLinkId;
+        e.eventType = data.type();
+        e.result = data.result();
+        e.accountId = data.accountId();
+        e.actingAccountId = data.actingAccountId();
+        e.failureReason = data.failureReason();
+        e.gitProviderId = data.gitProviderId();
+        e.workspaceId = data.workspaceId();
+        e.identityLinkId = data.identityLinkId();
         e.ipInet = ipInet;
         e.userAgent = userAgent;
-        e.requestId = requestId;
-        e.sessionHash = sessionHash;
-        e.details = details;
+        e.requestId = null;
+        e.sessionHash = null;
+        e.details = data.details();
         return e;
     }
 
