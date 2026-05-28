@@ -206,7 +206,29 @@ public class ConnectionAdminService {
                 instanceKey,
                 enabledStreams
             );
+            case OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> {
+                String issuerUrl = userInput.get("issuer_url");
+                if (issuerUrl == null || issuerUrl.isBlank()) {
+                    throw new IllegalArgumentException("OIDC login requires 'issuer_url'");
+                }
+                Set<String> scopes = parseScopes(userInput.get("scopes"));
+                String displayName = userInput.getOrDefault("display_name", instanceKey);
+                yield new ConnectionConfig.OidcLoginConfig(issuerUrl, scopes, displayName);
+            }
         };
+    }
+
+    private static Set<String> parseScopes(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Set.of("openid", "profile", "email");
+        }
+        Set<String> scopes = new HashSet<>();
+        for (String s : raw.split("[,\\s]+")) {
+            if (!s.isBlank()) {
+                scopes.add(s.trim());
+            }
+        }
+        return scopes;
     }
 
     private static @Nullable Long parseGroupId(@Nullable String instanceKey) {
