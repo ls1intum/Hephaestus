@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.config.jackson;
+package de.tum.cit.aet.hephaestus.integration.scm.github.jackson;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;

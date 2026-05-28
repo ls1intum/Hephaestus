@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.config.jackson;
+package de.tum.cit.aet.hephaestus.integration.scm.github.jackson;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
