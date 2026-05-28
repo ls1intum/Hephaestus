@@ -36,7 +36,6 @@ public final class ScmEventPayload {
 
     private ScmEventPayload() {}
 
-
     public record IssueData(
         @NonNull Long id,
         int number,
@@ -70,7 +69,6 @@ public final class ScmEventPayload {
             );
         }
     }
-
 
     public record PullRequestData(
         @NonNull Long id,
@@ -116,7 +114,6 @@ public final class ScmEventPayload {
         }
     }
 
-
     public record LabelData(
         @NonNull Long id,
         @NonNull String name,
@@ -127,7 +124,6 @@ public final class ScmEventPayload {
             return new LabelData(label.getId(), label.getName(), label.getColor(), label.getDescription());
         }
     }
-
 
     public record MilestoneData(
         @NonNull Long id,
@@ -147,13 +143,11 @@ public final class ScmEventPayload {
         }
     }
 
-
     public record IssueTypeData(@NonNull String id, @NonNull String name, @Nullable String description) {
         public static IssueTypeData from(IssueType issueType) {
             return new IssueTypeData(issueType.getId(), issueType.getName(), issueType.getDescription());
         }
     }
-
 
     public record CommentData(
         @NonNull Long id,
@@ -178,7 +172,6 @@ public final class ScmEventPayload {
             );
         }
     }
-
 
     public record ReviewData(
         @NonNull Long id,
@@ -213,7 +206,6 @@ public final class ScmEventPayload {
         }
     }
 
-
     public record ReviewCommentData(
         @NonNull Long id,
         @NonNull String body,
@@ -244,7 +236,6 @@ public final class ScmEventPayload {
         }
     }
 
-
     public record ReviewThreadData(
         @NonNull Long id,
         @NonNull PullRequestReviewThread.State state,
@@ -264,7 +255,6 @@ public final class ScmEventPayload {
         }
     }
 
-
     public record TeamData(
         @NonNull Long id,
         @NonNull String name,
@@ -283,14 +273,11 @@ public final class ScmEventPayload {
         }
     }
 
-
     public record UserData(@NonNull Long id, @NonNull String login, @Nullable String name, @Nullable String avatarUrl) {
         public static UserData from(User user) {
             return new UserData(user.getId(), user.getLogin(), user.getName(), user.getAvatarUrl());
         }
     }
-
-
 
     public record CommitData(
         @NonNull Long id,
@@ -321,7 +308,6 @@ public final class ScmEventPayload {
             );
         }
     }
-
 
     public record DiscussionData(
         @NonNull Long id,
@@ -362,7 +348,6 @@ public final class ScmEventPayload {
             );
         }
     }
-
 
     public record DiscussionCommentData(
         @NonNull Long id,

@@ -110,7 +110,6 @@ public final class ScmDomainEvent {
         EventContext context
     ) implements IssueEvent {}
 
-
     public sealed interface PullRequestEvent
         extends Event, ContextualEvent
         permits
@@ -182,7 +181,6 @@ public final class ScmDomainEvent {
         EventContext context
     ) implements PullRequestEvent {}
 
-
     public sealed interface LabelEvent
         extends Event, ContextualEvent
         permits LabelCreated, LabelUpdated, LabelDeleted {}
@@ -192,7 +190,6 @@ public final class ScmDomainEvent {
     public record LabelUpdated(ScmEventPayload.LabelData label, EventContext context) implements LabelEvent {}
 
     public record LabelDeleted(Long labelId, String labelName, EventContext context) implements LabelEvent {}
-
 
     public sealed interface MilestoneEvent
         extends Event, ContextualEvent
@@ -209,7 +206,6 @@ public final class ScmDomainEvent {
     ) implements MilestoneEvent {}
 
     public record MilestoneDeleted(Long milestoneId, String title, EventContext context) implements MilestoneEvent {}
-
 
     public sealed interface CommentEvent
         extends Event, ContextualEvent
@@ -233,7 +229,6 @@ public final class ScmDomainEvent {
 
     public record CommentDeleted(Long commentId, Long issueId, EventContext context) implements CommentEvent {}
 
-
     public sealed interface ReviewEvent
         extends Event, ContextualEvent
         permits ReviewSubmitted, ReviewEdited, ReviewDismissed
@@ -250,7 +245,6 @@ public final class ScmDomainEvent {
     ) implements ReviewEvent {}
 
     public record ReviewDismissed(ScmEventPayload.ReviewData review, EventContext context) implements ReviewEvent {}
-
 
     public sealed interface ReviewCommentEvent
         extends Event, ContextualEvent
@@ -278,7 +272,6 @@ public final class ScmDomainEvent {
         EventContext context
     ) implements ReviewCommentEvent {}
 
-
     public sealed interface ReviewThreadEvent
         extends Event, ContextualEvent
         permits ReviewThreadResolved, ReviewThreadUnresolved
@@ -295,7 +288,6 @@ public final class ScmDomainEvent {
         ScmEventPayload.ReviewThreadData thread,
         EventContext context
     ) implements ReviewThreadEvent {}
-
 
     public sealed interface TeamEvent extends Event, ContextualEvent permits TeamCreated, TeamUpdated, TeamDeleted {
         Long teamId();
@@ -347,7 +339,6 @@ public final class ScmDomainEvent {
         }
     }
 
-
     public sealed interface DiscussionEvent
         extends Event, ContextualEvent
         permits
@@ -396,7 +387,6 @@ public final class ScmDomainEvent {
             return null;
         }
     }
-
 
     public sealed interface DiscussionCommentEvent
         extends Event, ContextualEvent
