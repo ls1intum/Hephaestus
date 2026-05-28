@@ -101,6 +101,10 @@ services:
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
+      # Webhook reception runs in a dedicated `webhook-server` container (see ADR 0008
+      # + docker/compose.core.yaml). Disable it here so the receiver beans don't load
+      # in application-server (saves RAM; prevents accidental localhost traffic).
+      HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "false"
       DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
@@ -174,6 +178,10 @@ services:
       LLM_PROXY_AZURE_OPENAI_URL: ${LLM_PROXY_AZURE_OPENAI_URL:-}
       LLM_PROXY_AZURE_OPENAI_AUTH_HEADER: ${LLM_PROXY_AZURE_OPENAI_AUTH_HEADER:-api-key}
       LLM_PROXY_AZURE_OPENAI_USE_BEARER: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:-false}
+      # Worker control channel: same env var feeds the worker pod's registration-token claim.
+      HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
+      # PEM PKCS#8 RSA private key. Unset = ephemeral keypair regenerated on restart (dev only).
+      HEPHAESTUS_WORKER_HUB_TOKEN_SIGNING_KEY: ${HEPHAESTUS_WORKER_HUB_SIGNING_KEY:-}
     depends_on:
       postgres:
         condition: service_started
@@ -230,6 +238,56 @@ services:
     # Matches application.yml's SHUTDOWN_TIMEOUT default (20s) plus headroom so SIGTERM has time
     # to drain in-flight requests before Docker SIGKILLs the launcher.
     stop_grace_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # Worker runtime — same image, worker profile, no HTTP server, dials the hub over WSS.
+  application-worker:
+    image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    environment:
+      APP_VERSION: ${IMAGE_TAG}
+      SPRING_PROFILES_ACTIVE: prod,worker
+      HEPHAESTUS_HUB_URL: ws://application-server:8080/api/workers/connect
+      HEPHAESTUS_WORKER_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
+      NATS_SERVER: nats://nats-server:4222
+      AGENT_NATS_ENABLED: ${AGENT_NATS_ENABLED:-false}
+      SANDBOX_ENABLED: ${SANDBOX_ENABLED:-false}
+      SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
+      SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
+      SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
+      SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
+      SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
+      # BYO LLM credentials: when both set, agent-pi reaches the operator's LLM directly
+      # instead of the app-pod's bundled proxy (not reachable from a separate host).
+      HEPHAESTUS_LLM_BASE_URL: ${HEPHAESTUS_WORKER_LLM_BASE_URL:-}
+      HEPHAESTUS_LLM_API_KEY: ${HEPHAESTUS_WORKER_LLM_API_KEY:-}
+      HEPHAESTUS_WORKER_CAPACITY_REVIEW_MAX: ${HEPHAESTUS_WORKER_REVIEW_MAX:-auto}
+      HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX: ${HEPHAESTUS_WORKER_MENTOR_MAX:-auto}
+      HEPHAESTUS_WORKER_DRAIN_TIMEOUT: ${HEPHAESTUS_WORKER_DRAIN_TIMEOUT:-5m}
+      SENTRY_DSN: ${SENTRY_DSN}
+    depends_on:
+      application-server:
+        condition: service_started
+      release-pin-fetcher:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - git-repos:/data/git-repos
+      - release-pin:/pin:ro
+    networks:
+      - shared-network
+    # 5m drain budget + 1m headroom; matches spring.lifecycle.timeout-per-shutdown-phase.
+    stop_grace_period: 6m
+    healthcheck:
+      test: "wget -qO- http://localhost:8080/actuator/health/liveness || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     logging:
       driver: "json-file"
       options:

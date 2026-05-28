@@ -21,17 +21,13 @@ public record UpdatePracticeRequestDTO(
     @Schema(description = "Practice category", example = "code-quality")
     String category,
 
-    @Size(max = 10000, message = "Description must be at most 10000 characters")
-    @Pattern(regexp = ".*\\S.*", message = "Description must not be blank")
-    @Schema(description = "Practice description")
-    String description,
-
     @Size(min = 1, max = 10, message = "Trigger events must contain between 1 and 10 entries")
     @ValidTriggerEvents
     @Schema(description = "Domain events that trigger detection")
     List<String> triggerEvents,
 
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
+    @Pattern(regexp = ".*\\S.*", message = "Criteria must not be blank")
     @Schema(description = "Practice evaluation criteria")
     String criteria,
 

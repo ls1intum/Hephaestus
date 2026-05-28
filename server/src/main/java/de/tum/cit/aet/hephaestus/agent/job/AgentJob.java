@@ -131,6 +131,15 @@ public class AgentJob {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    /**
+     * When {@link #status} is {@link AgentJobStatus#CANCELLED}, distinguishes drain-initiated
+     * cancellation (with operator intent) from user/timeout cancellation. Null for non-cancelled
+     * terminal states.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancellation_reason", length = 32)
+    private AgentJobCancellationReason cancellationReason;
+
     @Column(name = "container_logs", columnDefinition = "TEXT")
     @ToString.Exclude
     private String containerLogs;

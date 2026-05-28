@@ -17,7 +17,7 @@ package de.tum.cit.aet.hephaestus.gitprovider.common.gitlab;
  *      GitLab Webhook Events Reference</a>
  */
 public enum GitLabEventType {
-    // Core resource events (work_item events are normalized to "issue" in webhook-ingest)
+    // Core resource events (work_item events are normalized to "issue" by the webhook receiver)
     MERGE_REQUEST("merge_request"),
     ISSUE("issue"),
     NOTE("note"),
@@ -27,7 +27,7 @@ public enum GitLabEventType {
     PUSH("push"),
     TAG_PUSH("tag_push"),
 
-    // Group events (normalized from granular event_name values in webhook-ingest)
+    // Group events (normalized from granular event_name values by the webhook receiver)
     MEMBER("member"),
     SUBGROUP("subgroup"),
     PROJECT("project"),

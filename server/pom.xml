@@ -121,6 +121,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- Worker control channel (WSS over TLS-443). Server-side @WebSocketHandler + client-side
+             JDK java.net.http.WebSocket. ADR 0009. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-restclient</artifactId>
@@ -754,6 +760,21 @@
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
                                             <minimum>${jacoco.branch.coverage.minimum}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- Webhook receiver pure-class layer (subject grammar, dedup ID,
+                                     HMAC, hex): ≥95% branch coverage so refactors fail loudly. -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>de.tum.cit.aet.hephaestus.gitprovider.webhook</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.95</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

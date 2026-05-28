@@ -40,9 +40,8 @@ import tools.jackson.databind.node.ObjectNode;
  * Live end-to-end test for the practice-review {@code pi-runner.mjs} against a real LLM.
  *
  * <p>Layer A coverage (per Audit 3): exercises Pi SDK ↔ LLM, the runner's two-attempt loop,
- * watchdog, custom {@code report_finding}/{@code set_review_summary} tools, and the result schema
- * the runner emits — all without Docker. The {@code DockerSandboxLiveTest} covers the sandbox SPI
- * separately.
+ * watchdog, custom {@code report_finding} tool, and the result schema the runner emits — all
+ * without Docker. The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
  *
  * <p>Mirrors {@code MentorLiveLlmTest} for the Pi SDK install and the {@code tum-openai}
  * extension that bends Pi's built-in {@code openai} provider toward the TUM gateway (Pi does not
@@ -194,7 +193,7 @@ class PracticeRunnerLiveLlmTest {
 
         // Strict assertion 1: the parser must classify the run as successful when exit code is 0.
         // If exit code is 1 (retry-exhausted) we don't enforce success() — but we still demand
-        // findings + delivery below, which is the real product invariant.
+        // findings below, which is the real product invariant.
         if (exitCode == 0) {
             assertThat(result.success()).as("PiResultParser.success() reflects exit code 0").isTrue();
         }
@@ -225,13 +224,6 @@ class PracticeRunnerLiveLlmTest {
                 .as(tag + ".evidence.locations is an array")
                 .isTrue();
         }
-
-        // Delivery is mandatory — DeliveryComposer rejects empty mrNotes and downstream MR comment
-        // posting silently no-ops without one.
-        JsonNode delivery = parsed.path("delivery");
-        assertThat(delivery.isObject()).as("delivery is an object").isTrue();
-        String mrNote = delivery.path("mrNote").asText("");
-        assertThat(mrNote.trim()).as("delivery.mrNote is non-blank").isNotEmpty();
 
         // Planted-violation detection. gpt-oss-120b has 100% hit rate for this practice in audits;
         // if it misses, the prompt or fixture is broken — not the LLM.
@@ -266,12 +258,7 @@ class PracticeRunnerLiveLlmTest {
                 usage.costUsd()
             );
         }
-        System.out.printf(
-            "[practice-live] %d finding(s); negative=%s; mrNote=%d chars%n",
-            findings.size(),
-            foundNegative,
-            mrNote.length()
-        );
+        System.out.printf("[practice-live] %d finding(s); negative=%s%n", findings.size(), foundNegative);
     }
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -346,8 +333,7 @@ class PracticeRunnerLiveLlmTest {
                 "Review merge request #1 in test/fixture. Read context/target/diff_summary.md, " +
                     ".practices/all-criteria.md, .practices/index.json, and context/target/metadata.json. " +
                     "Apply the hardcoded-secrets practice to context/target/diff.patch. Persist each " +
-                    "justified finding via report_finding (one tool call per finding) and the final MR " +
-                    "comment via set_review_summary. Follow " +
+                    "justified finding via report_finding (one tool call per finding). Follow " +
                     WorkspaceAbi.ORCHESTRATOR_PATH +
                     " for the schema and review rules.",
                 1,

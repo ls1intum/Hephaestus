@@ -75,8 +75,8 @@ public class GitLabWorkspaceInitializationService {
     private final NatsProperties natsProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
 
-    // Services
-    private final NatsConsumerService natsConsumerService;
+    // Services — natsConsumerService absent under webhook profile.
+    private final ObjectProvider<NatsConsumerService> natsConsumerService;
     private final SyncTargetProvider syncTargetProvider;
 
     // Lazy-loaded: optional GitLab beans gated by @ConditionalOnProperty
@@ -94,7 +94,7 @@ public class GitLabWorkspaceInitializationService {
         RepositoryRepository repositoryRepository,
         NatsProperties natsProperties,
         SyncSchedulerProperties syncSchedulerProperties,
-        NatsConsumerService natsConsumerService,
+        ObjectProvider<NatsConsumerService> natsConsumerService,
         SyncTargetProvider syncTargetProvider,
         ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
         ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider,
@@ -210,7 +210,7 @@ public class GitLabWorkspaceInitializationService {
                 int created = ensureRepositoryMonitors(workspace, syncedRepos);
                 // Update NATS consumer subscriptions to include newly discovered repos
                 if (created > 0 && natsProperties.enabled()) {
-                    natsConsumerService.updateScopeConsumer(workspace.getId());
+                    natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspace.getId()));
                 }
             }
 
@@ -796,7 +796,7 @@ public class GitLabWorkspaceInitializationService {
      */
     private void startNatsConsumer(Workspace workspace) {
         if (natsProperties.enabled()) {
-            natsConsumerService.startConsumingScope(workspace.getId());
+            natsConsumerService.ifAvailable(svc -> svc.startConsumingScope(workspace.getId()));
         }
     }
 

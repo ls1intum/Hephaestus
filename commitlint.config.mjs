@@ -27,8 +27,7 @@ const TYPES = [
 const SCOPES = [
   // === SERVICE SCOPES (where the code lives) - WILL trigger release ===
   "webapp", // React frontend, webapp Dockerfile
-  "server", // Java backend (includes in-process Pi mentor agent), server Dockerfile
-  "webhooks", // Webhook ingestion, webhooks Dockerfile
+  "server", // Java backend (includes in-process Pi mentor agent + webhook receiver), server Dockerfile
   "docs", // Documentation site
 
   // === INFRASTRUCTURE SCOPES that WILL trigger release (affect runtime) ===
@@ -83,7 +82,7 @@ const helpfulErrorsPlugin = {
           ? ""
           : `scope "${scope}" is not allowed.\n\n` +
             `Allowed scopes:\n` +
-            `  Services (release):    webapp, server, ai, webhooks, docs\n` +
+            `  Services (release):    webapp, server, docs\n` +
             `  Infra (release):       deps, security, db, docker\n` +
             `  Infra (NO release):    ci, config, deps-dev, scripts, no-release\n` +
             `  Features (release):    gitprovider, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +

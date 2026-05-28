@@ -140,12 +140,11 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         return job;
     }
 
-    private Practice createPractice(String slug, String name, String description, String criteria) {
+    private Practice createPractice(String slug, String name, String criteria) {
         Practice p = new Practice();
         p.setId((long) slug.hashCode());
         p.setSlug(slug);
         p.setName(name);
-        p.setDescription(description);
         p.setCriteria(criteria);
         p.setActive(true);
         return p;
@@ -153,8 +152,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
     private List<Practice> samplePractices() {
         return List.of(
-            createPractice("pr-description-quality", "PR Description Quality", "desc", "criteria"),
-            createPractice("error-handling", "Error Handling", "desc", null)
+            createPractice("pr-description-quality", "PR Description Quality", "criteria"),
+            createPractice("error-handling", "Error Handling", "fallback criteria")
         );
     }
 
@@ -281,7 +280,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void rejectsMalformedSlug() {
             when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(
-                List.of(createPractice("../etc/passwd", "bad", "d", "c"))
+                List.of(createPractice("../etc/passwd", "bad", "c"))
             );
 
             assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
@@ -380,7 +379,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                         objectMapper.createArrayNode().add(objectMapper.createObjectNode().put("path", path))
                     ),
                 null,
-                null
+                null,
+                List.of()
             );
         }
     }

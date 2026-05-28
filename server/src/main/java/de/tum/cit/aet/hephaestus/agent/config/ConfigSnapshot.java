@@ -31,10 +31,16 @@ public record ConfigSnapshot(
     CredentialMode credentialMode,
     @Nullable String modelName,
     @Nullable String modelVersion,
+    @Nullable String llmBaseUrl,
     int timeoutSeconds,
     boolean allowInternet
 ) {
-    /** Current schema version. Bump when adding/removing fields. */
+    /**
+     * Current schema version. Bump only for breaking changes (field removal, type change,
+     * semantic reinterpretation). Additive nullable fields are forward- AND backward-compatible
+     * thanks to {@code @JsonIgnoreProperties(ignoreUnknown = true)} on read and Jackson's
+     * default null-fill on missing fields — those do NOT need a bump.
+     */
     public static final int SCHEMA_VERSION = 3;
 
     public ConfigSnapshot {
@@ -58,6 +64,7 @@ public record ConfigSnapshot(
             config.getCredentialMode(),
             config.getModelName(),
             config.getModelVersion(),
+            config.getLlmBaseUrl(),
             config.getTimeoutSeconds(),
             config.isAllowInternet()
         );

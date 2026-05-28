@@ -1,9 +1,7 @@
 package de.tum.cit.aet.hephaestus.config;
 
-import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.lang.Nullable;
-import org.springframework.validation.annotation.Validated;
 
 /**
  * Configuration properties for Keycloak identity provider integration.
@@ -36,14 +34,19 @@ import org.springframework.validation.annotation.Validated;
  * @param validateOnStartup whether to validate Keycloak connectivity at startup (default: false)
  * @see <a href="https://www.keycloak.org/docs/latest/securing_apps/">Keycloak Securing Apps</a>
  */
-@Validated
+/**
+ * Constraints intentionally accept {@code null}: non-server roles (worker, webhook) boot
+ * without Keycloak. {@link #isConfigured()} reports completeness; {@link KeycloakConfig}
+ * builds a non-functional admin client when unset — first-use throws, so any accidental
+ * server-role traffic against Keycloak surfaces loudly rather than silently 404-ing.
+ */
 @ConfigurationProperties(prefix = "hephaestus.keycloak")
 public record KeycloakProperties(
-    @NotBlank(message = "Keycloak URL must not be blank") String url,
+    @Nullable String url,
 
-    @NotBlank(message = "Keycloak realm must not be blank") String realm,
+    @Nullable String realm,
 
-    @NotBlank(message = "Keycloak client ID must not be blank") String clientId,
+    @Nullable String clientId,
 
     @Nullable String clientSecret,
 
@@ -53,6 +56,18 @@ public record KeycloakProperties(
 
     @Nullable Boolean validateOnStartup
 ) {
+    /** @return {@code true} when {@link #url}, {@link #realm}, and {@link #clientId} are all set. */
+    public boolean isConfigured() {
+        return (
+            url != null &&
+            !url.isBlank() &&
+            realm != null &&
+            !realm.isBlank() &&
+            clientId != null &&
+            !clientId.isBlank()
+        );
+    }
+
     /**
      * Returns whether Keycloak connectivity should be validated at startup.
      *

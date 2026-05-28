@@ -13,12 +13,13 @@ deploy-config change only.
 
 Two boundaries matter operationally:
 
-1. **server ↔ worker** — Docker sandbox runtime resource isolation
-2. **server ↔ webhook-ingest** — restart independence (webhook-ingest already separate)
+1. **server ↔ worker** — Docker sandbox runtime resource isolation.
+2. **server ↔ webhook receiver** — restart independence; push events are not redeliverable.
 
 A draft considered five runtime roles (`api`/`ingest`/`worker`/`mentor`/`scheduler`); the
-pressure-test concluded mentor + ingest live in the same JVM as today, and the
-scheduler can stay single-replica. Two roles match the actual operational pressure.
+pressure-test concluded mentor and the webhook receiver live in the same JVM as today, and the
+scheduler can stay single-replica. Two roles match the actual operational pressure for this
+epic; a third role is anticipated but deferred.
 
 ## Decision drivers
 
@@ -49,7 +50,8 @@ Option 1. `core.runtime.RuntimeRole` defines the property keys:
 - `hephaestus.sandbox.llm-proxy.enabled` — capability flag (not a role), see ADR 0006
 
 Every `hephaestus.runtime.*` gate uses `matchIfMissing=true`, enforced by
-`RuntimeRoleBoundaryTest`. `webhook-ingest` stays TypeScript for this epic.
+`RuntimeRoleBoundaryTest`. The webhook receiver remains in-process under the default profile for
+this epic; the third role lands when restart independence becomes a hard requirement.
 
 ## Consequences
 
@@ -69,5 +71,13 @@ Every `hephaestus.runtime.*` gate uses `matchIfMissing=true`, enforced by
 
 ## Revisit trigger
 
-A real operational need to scale `ingest`/`mentor` independently of `server`; or a third
-runtime role becomes load-bearing (likely Java `webhook-ingest`).
+A real operational need to scale `mentor` independently of `server`; or a third runtime role
+becomes load-bearing (e.g., a dedicated webhook receiver pod for restart independence).
+
+## Update — 2026-05-20 (issue #1110)
+
+The revisit trigger has fired. `RuntimeRole.WEBHOOK_PROPERTY` is now wired (third runtime role:
+`webhook`), and `RuntimeRole.SERVER_PROPERTY` — reserved by this ADR — is wired for the first
+time. `ServerSchedulingConfig`, `NatsConsumerService`, and `WorkspaceStartupListener` are gated
+by `SERVER_PROPERTY` so they do not duplicate-run on the dedicated `webhook-server` pod. See
+**ADR 0008**.

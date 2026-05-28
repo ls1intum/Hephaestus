@@ -7,14 +7,7 @@ import org.springframework.lang.Nullable;
 
 /**
  * Slim projection of the LLM fields that {@link MentorPiAdapter} needs to build a sandbox spec.
- *
- * <p>Populated from instance-level {@link MentorAgentProperties} (primary path, works without a
- * workspace DB row) or from a workspace-scoped {@link AgentConfig} (fallback for multi-tenant
- * deployments that need per-workspace key routing).
- *
- * <p>{@link AgentConfig} is the practice-review agent's concept; mentor treats it only as a
- * fallback. The canonical local-dev configuration lives in {@code application-local.yml} under
- * {@code hephaestus.mentor.agent.*}.
+ * Decouples the mentor module from the JPA {@link AgentConfig} entity.
  */
 public record MentorLlmConfig(
     LlmProvider llmProvider,
@@ -23,16 +16,6 @@ public record MentorLlmConfig(
     @Nullable String modelName,
     int timeoutSeconds
 ) {
-    public static MentorLlmConfig fromProperties(MentorAgentProperties props) {
-        return new MentorLlmConfig(
-            props.llmProvider(),
-            props.credentialMode(),
-            props.llmApiKey(),
-            props.modelName(),
-            props.timeoutSeconds()
-        );
-    }
-
     public static MentorLlmConfig fromAgentConfig(AgentConfig config) {
         return new MentorLlmConfig(
             config.getLlmProvider(),

@@ -56,14 +56,11 @@ public class PiRuntimeFactory {
             env
         );
 
-        boolean useCustomProvider = shouldRegisterHephaestusProvider(spec);
-        if (useCustomProvider) {
-            inputFiles.put(
-                WorkspaceAbi.PI_AGENT_PREFIX + "extensions/hephaestus-provider.ts",
-                buildExtensionFile(spec)
-            );
-        }
-
+        // Provider config is owned by the runner script: it constructs the ModelRegistry and
+        // calls registerProvider("hephaestus", {...}) BEFORE createAgentSession, sidestepping
+        // the Pi 0.74.x race where findInitialModel runs ahead of extension loading. Settings.json
+        // pins defaultProvider/defaultModel so the runner's registration is what Pi resolves to.
+        boolean useCustomProvider = useHephaestusProvider(spec);
         inputFiles.put(
             WorkspaceAbi.PI_AGENT_PREFIX + "settings.json",
             buildPiSettingsJson(spec.provider(), spec.modelName(), useCustomProvider)
@@ -99,8 +96,11 @@ public class PiRuntimeFactory {
             "mkdir -p " +
             WorkspaceAbi.OUTPUT_PATH +
             " /home/agent/.config /home/agent/.local/tmp && " +
-            // Pi SDK ESM imports require a workspace-local node_modules.
-            "ln -sf /usr/local/lib/node_modules " +
+            // Pi SDK ESM imports resolve from /<workspace>/node_modules. The agent-pi Dockerfile
+            // exposes the SDK at /opt/pi-sdk/node_modules (a stable symlink to pnpm's
+            // content-addressed global install). NODE_PATH would NOT work here — Node's ESM
+            // resolver ignores NODE_PATH, only the CommonJS require() honors it.
+            "ln -sf /opt/pi-sdk/node_modules " +
             workspaceRoot +
             "/node_modules && " +
             spec.precomputeStep() +
@@ -163,8 +163,13 @@ public class PiRuntimeFactory {
 
     /**
      * Build the settings JSON Pi loads at session start. When {@code useCustomProvider} is true,
-     * {@code defaultProvider} routes through the {@code hephaestus} extension (see
-     * {@link #buildExtensionFile}).
+     * {@code defaultProvider} resolves to the {@code hephaestus} provider that the runner script
+     * (pi-runner.mjs / pi-mentor-runner.mjs) registers directly on the ModelRegistry before
+     * {@code createAgentSession}. {@code defaultModel} is the verbatim model id — gateway-routed
+     * deployments (e.g. TUM GPU expects {@code openai/gpt-oss-120b} as the wire id) and Pi's
+     * exact-match lookup against {@code modelRegistry.find} see the same string. With
+     * {@code defaultProvider="hephaestus"} pinned explicitly, Pi does not reinterpret slashes
+     * as a provider prefix.
      */
     public byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName, boolean useCustomProvider) {
         Map<String, Object> settings = new LinkedHashMap<>();
@@ -189,29 +194,15 @@ public class PiRuntimeFactory {
     }
 
     /**
-     * True when the spec needs a custom Pi provider extension: only for non-Azure providers in
+     * True when the spec routes the LLM through the {@code hephaestus} custom provider that the
+     * runner script registers directly on the ModelRegistry: non-Azure providers in
      * API_KEY/OAUTH mode with a non-blank {@code baseUrl}. PROXY mode and Azure both have their
      * own routing primitives (proxy URL injected at runtime; Azure deployment-name map).
      */
-    static boolean shouldRegisterHephaestusProvider(PiPlanSpec spec) {
+    static boolean useHephaestusProvider(PiPlanSpec spec) {
         if (spec.credentialMode() == CredentialMode.PROXY) return false;
         if (spec.provider() == LlmProvider.AZURE_OPENAI) return false;
         return spec.baseUrl() != null && !spec.baseUrl().isBlank();
-    }
-
-    /**
-     * Emit the Pi extension that registers the {@code hephaestus} custom provider. The provider
-     * reads its base URL, API key, and model id from env vars set by {@link LlmProxyAuthShell};
-     * Pi auto-discovers extensions in the agent dir via jiti at session start.
-     */
-    public byte[] buildExtensionFile(PiPlanSpec spec) {
-        // TS source typechecked at CI time via the agent-extensions npm workspace; bump in
-        // lockstep with MentorLiveLlmTest.PI_SDK_VERSION.
-        String resource =
-            spec.provider() == LlmProvider.ANTHROPIC
-                ? "extensions/provider-anthropic.ts"
-                : "extensions/provider-openai.ts";
-        return loadClasspathResource(resource);
     }
 
     /** Sandbox-layer fills in {@code llmProxyUrl} during PREPARE; this only emits the policy shape. */

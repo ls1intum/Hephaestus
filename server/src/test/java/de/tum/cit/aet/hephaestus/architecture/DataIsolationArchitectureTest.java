@@ -92,7 +92,8 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "WorkspaceSlugHistory", // Tracks workspace slug changes
         "IssueType", // GitHub issue types are workspace-scoped through issue
         "GitProvider", // Global provider instances (e.g., github.com, gitlab.com)
-        "ModelPricing" // Vendor list prices per LLM model — not tenant-scoped (#1071)
+        "ModelPricing", // Vendor list prices per LLM model — not tenant-scoped
+        "WorkerTokenDenylist" // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
     );
 
     // ========================================================================

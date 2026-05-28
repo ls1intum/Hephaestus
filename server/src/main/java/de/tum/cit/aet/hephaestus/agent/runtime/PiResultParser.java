@@ -138,14 +138,6 @@ public class PiResultParser {
             }
             Map<String, Object> assembled = new LinkedHashMap<>();
             assembled.put("findings", objectMapper.treeToValue(findings, Object.class));
-
-            JsonNode delivery = root.get("delivery");
-            if (delivery != null && delivery.isObject()) {
-                JsonNode mrNote = delivery.get("mrNote");
-                if (mrNote != null && mrNote.isTextual() && !mrNote.asText().isBlank()) {
-                    assembled.put("delivery", Map.of("mrNote", mrNote.asText()));
-                }
-            }
             return objectMapper.writeValueAsBytes(assembled);
         } catch (JacksonException e) {
             recordFailure("review_state", e);

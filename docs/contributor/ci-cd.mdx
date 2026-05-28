@@ -161,8 +161,7 @@ CI only runs jobs for components that actually changed:
 | Component            | Triggers On                                                   |
 | -------------------- | ------------------------------------------------------------- |
 | Webapp               | `webapp/**`, `package.json`, `package-lock.json`              |
-| Application Server   | `server/**`, `scripts/db-utils.sh`         |
-| Webhook Ingest       | `webhook-ingest/**`, root package files                |
+| Application Server   | `server/**`, `scripts/db-utils.sh` (includes webhook receiver — ADR 0008) |
 | CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
 
 **Benefits:**
@@ -179,7 +178,6 @@ Docker builds use **registry-based caching** to store intermediate layers in `gh
 | -------------------- | ----------- | ------------ | ---------- |
 | Application Server   | ~7 min      | ~30 sec      | ~500 MB    |
 | Webapp               | ~5 min      | ~30 sec      | ~200 MB    |
-| Webhook Ingest       | ~3 min      | ~30 sec      | ~100 MB    |
 
 **How it works:**
 
@@ -209,7 +207,7 @@ The Docker build workflow will automatically use these credentials if present, f
 
 ### Parallel Execution
 
-- 7 test types run in parallel (3 app-server, 3 webapp, 1 webhook-ingest)
+- 6 test types run in parallel (3 app-server, 3 webapp). Webhook reception is part of the app-server test surface since ADR 0008.
 - 8 quality gate checks run in parallel
 - 4 Docker builds × 2 architectures (amd64 + arm64)
 - `fail-fast: false` ensures all jobs complete for full feedback
@@ -237,13 +235,9 @@ pnpm run format && pnpm run check
 pnpm run check:webapp          # Full check (format + lint + typecheck)
 pnpm run test:webapp           # Unit tests
 
-# Application Server (Java)
+# Application Server (Java) — includes the gitprovider.webhook receiver
 pnpm run format:java:check     # Check formatting
 cd server && ./mvnw test -Dgroups="unit"  # Unit tests
-
-# Webhook Ingest
-pnpm run check:webhook-ingest
-cd webhook-ingest && pnpm run test
 ```
 
 ### Common Issues
@@ -262,9 +256,8 @@ cd webhook-ingest && pnpm run test
 
 All test suites generate JUnit XML reports that are displayed in the **Test Results** tab of each workflow run:
 
-- **Application Server**: Unit, integration, and architecture tests (incl. the in-process Pi mentor agent)
+- **Application Server**: Unit, integration, and architecture tests (incl. the in-process Pi mentor agent and the webhook receiver per ADR 0008)
 - **Webapp**: Unit tests and Storybook interaction tests
-- **Webhook Ingest**: Unit tests
 
 ### Job Summary
 

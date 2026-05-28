@@ -30,15 +30,7 @@ import tools.jackson.databind.node.ObjectNode;
 class MentorChatControllerTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final MentorAgentProperties TEST_PROPERTIES = new MentorAgentProperties(
-        100_000,
-        "",
-        null,
-        null,
-        null,
-        null,
-        600
-    );
+    private static final MentorAgentProperties TEST_PROPERTIES = new MentorAgentProperties(100_000, "");
 
     @Mock
     MentorChatService mentorChatService;

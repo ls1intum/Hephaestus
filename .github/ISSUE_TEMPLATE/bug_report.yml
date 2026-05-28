@@ -48,7 +48,7 @@ body:
       options:
         - Webapp (React UI)
         - Application Server (Java/Spring, includes Pi mentor agent)
-        - Webhook Ingest
+        - Webhook Server (inbound webhook receiver)
         - Don't know
     validations:
       required: true

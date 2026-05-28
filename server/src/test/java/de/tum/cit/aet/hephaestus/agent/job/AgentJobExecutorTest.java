@@ -17,9 +17,11 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
@@ -29,6 +31,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.nats.client.Connection;
 import io.nats.client.Message;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -40,6 +43,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -114,7 +118,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
             sandboxExecutor,
             transactionTemplate,
             objectMapper,
-            meterRegistry
+            meterRegistry,
+            java.util.Optional.empty(),
+            java.util.Optional.empty()
         );
 
         jobId = UUID.randomUUID();
@@ -131,15 +137,13 @@ class AgentJobExecutorTest extends BaseUnitTest {
             CredentialMode.PROXY,
             null,
             null,
+            null,
             600,
             false
         );
 
-        // Build a real AgentJob instead of a mock
         job = new AgentJob();
-        job.prePersist(); // generate ID + token
-        // Override the random ID with our test ID via reflection-free approach:
-        // We use the mock for findByIdQueuedForUpdateSkipLocked which returns our job
+        job.prePersist();
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setConfig(config);
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
@@ -165,9 +169,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             .when(transactionTemplate)
             .executeWithoutResult(any());
 
-        // The production code creates a read-only TransactionTemplate from
-        // transactionTemplate.getTransactionManager() — stub it so the real
-        // TransactionTemplate.execute() works on the readOnlyTx.
+        // readOnlyTx in prepareAndExecute is built from getTransactionManager(); stub the bridge.
         lenient().when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
     }
@@ -222,7 +224,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.executeJob(msg);
 
-            // The real job object should have RUNNING status set during claim
             verify(jobRepository).save(any(AgentJob.class));
         }
     }
@@ -242,7 +243,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             setupFullExecution();
 
-            // For the complete phase
             AgentJob freshJob = new AgentJob();
             freshJob.prePersist();
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
@@ -401,7 +401,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.executeJob(msg);
 
-            // Bug fix: only transition from RUNNING, not QUEUED
             verify(jobRepository).transitionStatus(
                 any(),
                 eq(AgentJobStatus.FAILED),
@@ -427,6 +426,103 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             verify(msg).ack();
             verify(sandboxManager, never()).execute(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Worker LLM override")
+    class WorkerLlmOverride {
+
+        @Test
+        @DisplayName("overrides credentialMode/credential/baseUrl when WorkerProperties.llm is configured")
+        void overridesPracticeRequestWhenWorkerLlmConfigured() {
+            // Configured worker LLM: PROXY snapshot must be overridden to API_KEY with the
+            // worker's apiKey and baseUrl so agent-pi reaches the operator's gateway directly.
+            executor = new AgentJobExecutor(
+                natsConnection,
+                NATS_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                Optional.empty(),
+                Optional.of(workerPropsWithLlm("https://gpu.ase.cit.tum.de/v1", "operator-key"))
+            );
+
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            setupFullExecution();
+
+            AgentJob freshJob = new AgentJob();
+            freshJob.prePersist();
+            when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
+            when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
+
+            executor.executeJob(msg);
+
+            ArgumentCaptor<PracticeAgentRequest> captor = ArgumentCaptor.forClass(PracticeAgentRequest.class);
+            verify(practiceAgent).buildSandboxSpec(captor.capture());
+            PracticeAgentRequest request = captor.getValue();
+
+            assertThat(request.credentialMode()).isEqualTo(CredentialMode.API_KEY);
+            assertThat(request.credential()).isEqualTo("operator-key");
+            assertThat(request.baseUrl()).isEqualTo("https://gpu.ase.cit.tum.de/v1");
+            // Snapshot's LLM provider + model still flow through unchanged.
+            assertThat(request.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
+        }
+
+        @Test
+        @DisplayName("leaves snapshot credentialMode untouched when WorkerProperties.llm is unset")
+        void leavesSnapshotCredentialModeWhenWorkerLlmUnset() {
+            executor = new AgentJobExecutor(
+                natsConnection,
+                NATS_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                Optional.empty(),
+                Optional.of(workerPropsWithLlm(null, null))
+            );
+
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            // Snapshot is PROXY mode — jobToken is required, the existing AgentJob fixture has one.
+
+            setupFullExecution();
+
+            AgentJob freshJob = new AgentJob();
+            freshJob.prePersist();
+            when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
+            when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
+
+            executor.executeJob(msg);
+
+            ArgumentCaptor<PracticeAgentRequest> captor = ArgumentCaptor.forClass(PracticeAgentRequest.class);
+            verify(practiceAgent).buildSandboxSpec(captor.capture());
+            PracticeAgentRequest request = captor.getValue();
+
+            assertThat(request.credentialMode()).isEqualTo(CredentialMode.PROXY);
+            assertThat(request.baseUrl()).isNull();
         }
     }
 
@@ -456,6 +552,17 @@ class AgentJobExecutorTest extends BaseUnitTest {
         when(practiceAgent.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
 
         when(sandboxManager.execute(any())).thenReturn(sandboxResult);
+    }
+
+    private static WorkerProperties workerPropsWithLlm(String baseUrl, String apiKey) {
+        return new WorkerProperties(
+            "test-worker",
+            new WorkerProperties.Capacity("2", "1"),
+            new WorkerProperties.Drain(Duration.ofMinutes(5)),
+            new WorkerProperties.Heartbeat(Duration.ofSeconds(20)),
+            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10)),
+            new WorkerProperties.Llm(baseUrl, apiKey)
+        );
     }
 
     private void setupFullExecutionWithException(Exception exception) {

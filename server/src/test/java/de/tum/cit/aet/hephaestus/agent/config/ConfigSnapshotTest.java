@@ -238,7 +238,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @DisplayName("should reject null llmProvider")
         void shouldRejectNullLlmProvider() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(1, 1L, "name", null, CredentialMode.PROXY, null, null, 600, false)
+                new ConfigSnapshot(1, 1L, "name", null, CredentialMode.PROXY, null, null, null, 600, false)
             ).isInstanceOf(NullPointerException.class);
         }
 
@@ -246,7 +246,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @DisplayName("should reject null credentialMode")
         void shouldRejectNullCredentialMode() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(1, 1L, "name", LlmProvider.ANTHROPIC, null, null, null, 600, false)
+                new ConfigSnapshot(1, 1L, "name", LlmProvider.ANTHROPIC, null, null, null, null, 600, false)
             ).isInstanceOf(NullPointerException.class);
         }
 
@@ -254,7 +254,18 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @DisplayName("should reject zero timeout")
         void shouldRejectZeroTimeout() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(1, 1L, "name", LlmProvider.ANTHROPIC, CredentialMode.PROXY, null, null, 0, false)
+                new ConfigSnapshot(
+                    1,
+                    1L,
+                    "name",
+                    LlmProvider.ANTHROPIC,
+                    CredentialMode.PROXY,
+                    null,
+                    null,
+                    null,
+                    0,
+                    false
+                )
             ).isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -262,7 +273,18 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @DisplayName("should reject negative timeout")
         void shouldRejectNegativeTimeout() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(1, 1L, "name", LlmProvider.ANTHROPIC, CredentialMode.PROXY, null, null, -1, false)
+                new ConfigSnapshot(
+                    1,
+                    1L,
+                    "name",
+                    LlmProvider.ANTHROPIC,
+                    CredentialMode.PROXY,
+                    null,
+                    null,
+                    null,
+                    -1,
+                    false
+                )
             ).isInstanceOf(IllegalArgumentException.class);
         }
     }

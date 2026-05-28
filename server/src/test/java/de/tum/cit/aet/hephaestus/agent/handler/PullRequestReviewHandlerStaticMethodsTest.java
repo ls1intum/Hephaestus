@@ -121,7 +121,8 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
                 0.9f,
                 evidence,
                 "reasoning",
-                "guidance"
+                "guidance",
+                List.of()
             );
         }
 
@@ -134,7 +135,8 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
                 0.9f,
                 null,
                 "reasoning",
-                "guidance"
+                "guidance",
+                List.of()
             );
         }
 

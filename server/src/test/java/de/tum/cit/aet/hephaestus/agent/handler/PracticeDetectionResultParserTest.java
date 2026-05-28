@@ -450,139 +450,19 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Delivery content extraction")
-    class DeliveryContentExtraction {
+    @DisplayName("Per-finding suggestedDiffNotes parsing")
+    class PerFindingSuggestedDiffNotes {
 
-        private String wrapWithDelivery(String deliveryJson) {
-            return """
-            {"findings": [%s], "delivery": %s}
-            """.formatted(validFindingNode().toString(), deliveryJson);
-        }
-
-        @Test
-        @DisplayName("delivery with mrNote and diffNotes parsed correctly")
-        void deliveryPresentParsedCorrectly() {
-            String raw = """
-                {
-                  "findings": [%s],
-                  "delivery": {
-                    "mrNote": "Please fix the tests.",
-                    "diffNotes": [
-                      {"filePath": "src/Foo.java", "startLine": 10, "endLine": 20, "body": "Add null check here."}
-                    ]
-                  }
-                }
-                """.formatted(validFindingNode().toString());
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().mrNote()).isEqualTo("Please fix the tests.");
-            assertThat(result.delivery().diffNotes()).hasSize(1);
-            DiffNote note = result.delivery().diffNotes().get(0);
-            assertThat(note.filePath()).isEqualTo("src/Foo.java");
-            assertThat(note.startLine()).isEqualTo(10);
-            assertThat(note.endLine()).isEqualTo(20);
-            assertThat(note.body()).isEqualTo("Add null check here.");
-        }
-
-        @Test
-        @DisplayName("missing delivery does not affect findings")
-        void deliveryMissingFindingsStillValid() {
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(validFindingNode())));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.delivery()).isNull();
-        }
-
-        @Test
-        @DisplayName("malformed delivery does not affect findings")
-        void deliveryMalformedFindingsStillValid() {
-            String raw = """
-                {"findings": [%s], "delivery": "not an object"}
-                """.formatted(validFindingNode().toString());
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.delivery()).isNull();
-        }
-
-        @Test
-        @DisplayName("mrNote null but diffNotes still parsed")
-        void mrNoteNullDiffNotesStillParsed() {
-            String raw = wrapWithDelivery(
-                """
-                {"diffNotes": [{"filePath": "a.txt", "startLine": 1, "body": "Fix"}]}
-                """
-            );
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().mrNote()).isNull();
-            assertThat(result.delivery().diffNotes()).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("mrNote truncated at max length")
-        void mrNoteTruncatedAtMaxLength() {
-            String longNote = "x".repeat(PracticeDetectionResultParser.MAX_MR_NOTE_LENGTH + 1000);
-            String raw = wrapWithDelivery("{\"mrNote\": \"%s\"}".formatted(longNote));
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().mrNote()).hasSize(PracticeDetectionResultParser.MAX_MR_NOTE_LENGTH);
-        }
-
-        @Test
-        @DisplayName("diffNotes with missing fields are skipped")
-        void diffNotesMissingFieldsSkipped() {
-            String raw = wrapWithDelivery(
-                """
-                {
-                  "diffNotes": [
-                    {"startLine": 1, "body": "Missing filePath"},
-                    {"filePath": "a.txt", "body": "Missing startLine"},
-                    {"filePath": "b.txt", "startLine": 5, "body": "Valid note"}
-                  ]
-                }
-                """
-            );
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().diffNotes()).hasSize(1);
-            assertThat(result.delivery().diffNotes().get(0).filePath()).isEqualTo("b.txt");
-        }
-
-        @Test
-        @DisplayName("delivery diffNotes exceeding max are capped")
-        void diffNotesExceedMaxCapped() {
-            var sb = new StringBuilder("{\"diffNotes\": [");
-            for (int i = 0; i < PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES + 5; i++) {
-                if (i > 0) sb.append(',');
-                sb.append(
-                    "{\"filePath\": \"f%d.txt\", \"startLine\": %d, \"body\": \"Note %d\"}".formatted(i, i + 1, i)
-                );
-            }
-            sb.append("]}");
-            String raw = wrapWithDelivery(sb.toString());
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().diffNotes()).hasSize(PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES);
-        }
-    }
-
-    @Nested
-    @DisplayName("SuggestedDiffNotes fallback")
-    class SuggestedDiffNotesFallback {
-
-        /** Creates a NEGATIVE finding with suggestedDiffNotes. */
-        private ObjectNode negativeFindingWithSuggestedNotes(String slug, String severity, ObjectNode... notes) {
+        private ObjectNode findingWithSuggestedNotes(
+            String slug,
+            String verdict,
+            String severity,
+            ObjectNode... notes
+        ) {
             ObjectNode finding = objectMapper.createObjectNode();
             finding.put("practiceSlug", slug);
             finding.put("title", "Issue found");
-            finding.put("verdict", "NEGATIVE");
+            finding.put("verdict", verdict);
             finding.put("severity", severity);
             finding.put("confidence", 0.90);
             ArrayNode arr = finding.putArray("suggestedDiffNotes");
@@ -592,7 +472,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             return finding;
         }
 
-        /** Creates a valid suggestedDiffNote JSON object. */
         private ObjectNode suggestedNote(String filePath, int startLine, String body) {
             ObjectNode note = objectMapper.createObjectNode();
             note.put("filePath", filePath);
@@ -602,160 +481,33 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("collects suggestedDiffNotes from NEGATIVE findings when delivery.diffNotes is empty")
-        void collectsFromNegativeFindingsWhenDeliveryEmpty() {
-            ObjectNode finding = negativeFindingWithSuggestedNotes(
+        @DisplayName("attaches suggestedDiffNotes to the validated finding")
+        void attachesNotesToFinding() {
+            ObjectNode finding = findingWithSuggestedNotes(
                 "error-handling",
+                "NEGATIVE",
                 "MAJOR",
                 suggestedNote("src/Main.java", 42, "Add error handling here.")
             );
-            // Delivery present but with empty diffNotes
-            String raw = """
-                {
-                  "findings": [%s],
-                  "delivery": {"mrNote": "Summary note", "diffNotes": []}
-                }
-                """.formatted(finding.toString());
+            String raw = "{\"findings\": [%s]}".formatted(finding.toString());
 
             ParseResult result = parser.parse(wrapRawOutput(raw));
 
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().mrNote()).isEqualTo("Summary note");
-            assertThat(result.delivery().diffNotes()).hasSize(1);
-            DiffNote note = result.delivery().diffNotes().get(0);
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validFindings().get(0).suggestedDiffNotes()).hasSize(1);
+            DiffNote note = result.validFindings().get(0).suggestedDiffNotes().get(0);
             assertThat(note.filePath()).isEqualTo("src/Main.java");
             assertThat(note.startLine()).isEqualTo(42);
             assertThat(note.body()).isEqualTo("Add error handling here.");
         }
 
         @Test
-        @DisplayName("collects suggestedDiffNotes when delivery is absent")
-        void collectsWhenDeliveryAbsent() {
-            ObjectNode finding = negativeFindingWithSuggestedNotes(
-                "error-handling",
-                "MAJOR",
-                suggestedNote("src/Foo.java", 10, "Fix this.")
-            );
-            String raw = """
-                {"findings": [%s]}
-                """.formatted(finding.toString());
+        @DisplayName("absent suggestedDiffNotes yields an empty list")
+        void absentNotesYieldsEmptyList() {
+            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(validFindingNode())));
 
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().mrNote()).isNull();
-            assertThat(result.delivery().diffNotes()).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("does not collect suggestedDiffNotes from POSITIVE findings")
-        void ignoresPositiveFindings() {
-            ObjectNode positive = validFindingNode(); // POSITIVE verdict
-            ArrayNode arr = positive.putArray("suggestedDiffNotes");
-            ObjectNode note = objectMapper.createObjectNode();
-            note.put("filePath", "src/Good.java");
-            note.put("startLine", 1);
-            note.put("body", "This should not appear");
-            arr.add(note);
-
-            String raw = """
-                {"findings": [%s]}
-                """.formatted(positive.toString());
-
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            // No delivery since POSITIVE findings are excluded from fallback
-            assertThat(result.delivery()).isNull();
-        }
-
-        @Test
-        @DisplayName("does not use fallback when delivery.diffNotes already has entries")
-        void noFallbackWhenDeliveryHasDiffNotes() {
-            ObjectNode finding = negativeFindingWithSuggestedNotes(
-                "error-handling",
-                "MAJOR",
-                suggestedNote("src/Fallback.java", 5, "Fallback note")
-            );
-            String raw = """
-                {
-                  "findings": [%s],
-                  "delivery": {
-                    "diffNotes": [
-                      {"filePath": "src/Original.java", "startLine": 1, "body": "Original note"}
-                    ]
-                  }
-                }
-                """.formatted(finding.toString());
-
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().diffNotes()).hasSize(1);
-            assertThat(result.delivery().diffNotes().get(0).filePath()).isEqualTo("src/Original.java");
-        }
-
-        @Test
-        @DisplayName("prioritizes higher severity findings (CRITICAL before MINOR)")
-        void prioritizesBySeverity() {
-            // Create 12 notes total across MINOR and CRITICAL findings to test cap + priority
-            ObjectNode minorFinding = negativeFindingWithSuggestedNotes(
-                "code-style",
-                "MINOR",
-                suggestedNote("src/Minor1.java", 1, "minor-1"),
-                suggestedNote("src/Minor2.java", 2, "minor-2"),
-                suggestedNote("src/Minor3.java", 3, "minor-3"),
-                suggestedNote("src/Minor4.java", 4, "minor-4"),
-                suggestedNote("src/Minor5.java", 5, "minor-5"),
-                suggestedNote("src/Minor6.java", 6, "minor-6")
-            );
-            ObjectNode criticalFinding = negativeFindingWithSuggestedNotes(
-                "hardcoded-secrets",
-                "CRITICAL",
-                suggestedNote("src/Critical1.java", 10, "critical-1"),
-                suggestedNote("src/Critical2.java", 20, "critical-2"),
-                suggestedNote("src/Critical3.java", 30, "critical-3"),
-                suggestedNote("src/Critical4.java", 40, "critical-4"),
-                suggestedNote("src/Critical5.java", 50, "critical-5"),
-                suggestedNote("src/Critical6.java", 60, "critical-6")
-            );
-
-            // MINOR finding listed first in array, but CRITICAL should take priority
-            String raw = """
-                {"findings": [%s, %s]}
-                """.formatted(minorFinding.toString(), criticalFinding.toString());
-
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().diffNotes()).hasSize(12); // 6 critical + 6 minor, all under cap
-
-            // First 6 should be CRITICAL (sorted by severity), remaining 6 should be MINOR
-            for (int i = 0; i < 6; i++) {
-                assertThat(result.delivery().diffNotes().get(i).body()).startsWith("critical-");
-            }
-            for (int i = 6; i < 12; i++) {
-                assertThat(result.delivery().diffNotes().get(i).body()).startsWith("minor-");
-            }
-        }
-
-        @Test
-        @DisplayName("caps inline delivery notes at MAX_DELIVERY_DIFF_NOTES total")
-        void capsAtMaxDiffNotes() {
-            int count = PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES + 5;
-            ObjectNode[] notes = new ObjectNode[count];
-            for (int i = 0; i < count; i++) {
-                notes[i] = suggestedNote("src/File" + i + ".java", i + 1, "Note " + i);
-            }
-            ObjectNode finding = negativeFindingWithSuggestedNotes("error-handling", "MAJOR", notes);
-
-            String raw = """
-                {"findings": [%s]}
-                """.formatted(finding.toString());
-
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().diffNotes()).hasSize(PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES);
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validFindings().get(0).suggestedDiffNotes()).isEmpty();
         }
 
         @Test
@@ -768,68 +520,56 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             finding.put("severity", "MAJOR");
             finding.put("confidence", 0.90);
             ArrayNode arr = finding.putArray("suggestedDiffNotes");
-            // Invalid: missing filePath
             ObjectNode bad1 = objectMapper.createObjectNode();
             bad1.put("startLine", 1);
             bad1.put("body", "missing file path");
             arr.add(bad1);
-            // Invalid: missing body
             ObjectNode bad2 = objectMapper.createObjectNode();
             bad2.put("filePath", "src/A.java");
             bad2.put("startLine", 1);
             arr.add(bad2);
-            // Valid
             arr.add(suggestedNote("src/Valid.java", 5, "Valid note"));
 
-            String raw = """
-                {"findings": [%s]}
-                """.formatted(finding.toString());
-
+            String raw = "{\"findings\": [%s]}".formatted(finding.toString());
             ParseResult result = parser.parse(wrapRawOutput(raw));
 
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().diffNotes()).hasSize(1);
-            assertThat(result.delivery().diffNotes().get(0).filePath()).isEqualTo("src/Valid.java");
-        }
-
-        @Test
-        @DisplayName("preserves mrNote from delivery when fallback fills diffNotes")
-        void preservesMrNoteFromDelivery() {
-            ObjectNode finding = negativeFindingWithSuggestedNotes(
-                "error-handling",
-                "MAJOR",
-                suggestedNote("src/Fix.java", 1, "Fix this")
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validFindings().get(0).suggestedDiffNotes()).hasSize(1);
+            assertThat(result.validFindings().get(0).suggestedDiffNotes().get(0).filePath()).isEqualTo(
+                "src/Valid.java"
             );
-            String raw = """
-                {
-                  "findings": [%s],
-                  "delivery": {"mrNote": "Important summary"}
-                }
-                """.formatted(finding.toString());
-
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().mrNote()).isEqualTo("Important summary");
-            assertThat(result.delivery().diffNotes()).hasSize(1);
         }
 
         @Test
-        @DisplayName("handles endLine in suggestedDiffNotes")
-        void handlesEndLine() {
+        @DisplayName("rejects suggestedDiffNotes pointing at internal workspace paths")
+        void rejectsInternalPaths() {
+            ObjectNode finding = findingWithSuggestedNotes(
+                "error-handling",
+                "NEGATIVE",
+                "MAJOR",
+                suggestedNote("context/target/foo.json", 1, "should be rejected"),
+                suggestedNote("src/Real.java", 5, "should be kept")
+            );
+            String raw = "{\"findings\": [%s]}".formatted(finding.toString());
+
+            ParseResult result = parser.parse(wrapRawOutput(raw));
+
+            assertThat(result.validFindings().get(0).suggestedDiffNotes()).hasSize(1);
+            assertThat(result.validFindings().get(0).suggestedDiffNotes().get(0).filePath()).isEqualTo("src/Real.java");
+        }
+
+        @Test
+        @DisplayName("preserves endLine when supplied")
+        void preservesEndLine() {
             ObjectNode note = suggestedNote("src/Range.java", 10, "Multi-line issue");
             note.put("endLine", 20);
-            ObjectNode finding = negativeFindingWithSuggestedNotes("error-handling", "MAJOR", note);
-
-            String raw = """
-                {"findings": [%s]}
-                """.formatted(finding.toString());
+            ObjectNode finding = findingWithSuggestedNotes("error-handling", "NEGATIVE", "MAJOR", note);
+            String raw = "{\"findings\": [%s]}".formatted(finding.toString());
 
             ParseResult result = parser.parse(wrapRawOutput(raw));
 
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().diffNotes()).hasSize(1);
-            DiffNote diffNote = result.delivery().diffNotes().get(0);
+            assertThat(result.validFindings().get(0).suggestedDiffNotes()).hasSize(1);
+            DiffNote diffNote = result.validFindings().get(0).suggestedDiffNotes().get(0);
             assertThat(diffNote.startLine()).isEqualTo(10);
             assertThat(diffNote.endLine()).isEqualTo(20);
         }
@@ -874,19 +614,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                     .anyMatch(f -> f.practiceSlug().equals("code-hygiene"))
             ).isTrue();
         }
-
-        @Test
-        @DisplayName("no dedup needed when all slugs are unique")
-        void noDedupWhenAllUnique() {
-            ObjectNode f1 = validFindingNode();
-            f1.put("practiceSlug", "slug-a");
-            ObjectNode f2 = validFindingNode();
-            f2.put("practiceSlug", "slug-b");
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(f1, f2)));
-
-            assertThat(result.validFindings()).hasSize(2);
-        }
     }
 
     @Nested
@@ -900,14 +627,12 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 [PHASE0] Context loaded: 1 files changed
                 [PHASE1] RELEVANT: hardcoded-secrets
                 [PHASE4] Output ready
-                {"findings": [%s], "delivery": {"mrNote": "Review", "diffNotes": []}}
+                {"findings": [%s]}
                 """.formatted(validFindingNode().toString());
 
             ParseResult result = parser.parse(wrapRawOutput(mixed));
 
             assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.delivery()).isNotNull();
-            assertThat(result.delivery().mrNote()).isEqualTo("Review");
         }
 
         @Test
@@ -942,14 +667,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("sanitizeJsonEscapes preserves valid escapes")
-        void preservesValidEscapes() {
-            String input = "hello\\nworld\\t\\\"quoted\\\"\\\\backslash";
-            String result = PracticeDetectionResultParser.sanitizeJsonEscapes(input);
-            assertThat(result).isEqualTo(input);
-        }
-
-        @Test
         @DisplayName("sanitizeJsonEscapes fixes invalid \\( escape")
         void fixesInvalidParenEscape() {
             String input = "print(\\\"\\(error)\\\")";
@@ -964,14 +681,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             String input = "print(\\\\(error))";
             String result = PracticeDetectionResultParser.sanitizeJsonEscapes(input);
             assertThat(result).isEqualTo(input);
-        }
-
-        @Test
-        @DisplayName("sanitizeJsonEscapes is no-op for text without backslashes")
-        void noOpWithoutBackslashes() {
-            String input = "just plain text with no escapes";
-            String result = PracticeDetectionResultParser.sanitizeJsonEscapes(input);
-            assertThat(result).isSameAs(input);
         }
     }
 
@@ -999,7 +708,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ValidatedFinding first = result.validFindings().get(0);
             assertThat(first.practiceSlug()).isEqualTo("pr-description-quality");
             assertThat(first.verdict()).isEqualTo(Verdict.POSITIVE);
-            // guidanceMethod removed — no assertion needed
 
             // Verify negative finding
             ValidatedFinding negative = result.validFindings().get(1);

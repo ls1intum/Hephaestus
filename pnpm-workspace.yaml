@@ -1,7 +1,5 @@
 packages:
   - webapp
-  - webhook-ingest
-  - server/agent-extensions
   - docs
 
 # Hoist patterns target packages found via Node module resolution from
@@ -12,18 +10,14 @@ publicHoistPattern:
   - '*react*'
   # @types/* searched by TypeScript from source files in any subtree
   - '@types/*'
-  # @earendil-works pi-coding-agent imported from
-  # server/src/main/resources/agent/extensions/*.ts
-  # (sits under Maven classpath resources, outside agent-extensions/).
-  - '@earendil-works/*'
 
 autoInstallPeers: true
 strictPeerDependencies: false
 
 # pnpm 11 reads overrides from pnpm-workspace.yaml (was package.json#pnpm.overrides
 # in pnpm <= 10; both still work but workspace yaml is the documented home).
-# vitest/hono: force a single instance across the workspace so addon-vitest +
-#   coverage-v8 + hono/node-server share the version we directly depend on.
+# vitest: force a single instance across the workspace so addon-vitest +
+#   coverage-v8 share the version we directly depend on.
 # Security pins (override transitives that ship known-vulnerable versions):
 #   dompurify  – monaco-editor pins 3.2.7 / mermaid ^3.3.1 → XSS bypasses
 #                (GHSA-crv5-9vww-q3g8 etc.); 3.4.4 is the patched line.
@@ -36,7 +30,6 @@ overrides:
   vitest: 4.1.6
   '@vitest/browser': 4.1.6
   '@vitest/runner': 4.1.6
-  hono: 4.12.19
   dompurify: 3.4.4
   lodash: 4.18.1
   lodash-es: 4.18.1

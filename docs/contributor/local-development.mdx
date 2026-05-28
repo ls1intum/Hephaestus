@@ -13,7 +13,7 @@ Install and configure the following tools before you attempt a local build:
 
 1. **Java JDK 21** – Required for the Spring Boot application server.
 2. **Docker Desktop** – Used for PostgreSQL, Keycloak, and NATS containers.
-3. **Node.js LTS (>= 22.10)** and **npm (>= 10.8)** – For the React client and TypeScript services.
+3. **Node.js LTS (>= 24)** and **pnpm (>= 11)** (enable via `corepack enable`) – For the React client and root scripts.
 4. **NATS CLI (optional)** – Helpful when debugging webhook messages.
 
 ## Recommended IDE setup
@@ -253,9 +253,20 @@ docker compose up       # Re-import realm with fresh settings
 
 This deletes the Keycloak H2 database and forces a fresh realm import with your current `.env` values.
 
-### Webhook ingest service
+### Webhook receiver
 
-When you run `docker/compose.core.yaml` or start the webhook ingest service locally, set the webhook secrets up front so signature checks succeed:
+The webhook receiver lives in the Java server (`gitprovider.webhook` package). In local
+development the monolith default boots all three runtime roles (`server`, `worker`, `webhook`),
+so `pnpm run dev:server` exposes the `/gitlab` and `/github` endpoints alongside the rest of the
+API.
+
+In production the receiver is deployed as a separate `webhook-server` container from the same
+image, activated with `SPRING_PROFILES_ACTIVE=prod,webhook`. The app-server's deploy cycle does
+NOT interrupt webhook reception — push events on GitHub/GitLab are not manually redeliverable,
+so restart independence is operationally required. See ADR 0008.
+
+When you run `docker/compose.core.yaml` set the webhook secret up front so signature checks
+succeed (the same secret is used by both auto-registration and the receiver):
 
 ```bash
 cp docker/.env.example docker/.env
@@ -263,16 +274,8 @@ export WEBHOOK_SECRET=$(openssl rand -hex 32)
 echo "WEBHOOK_SECRET=$WEBHOOK_SECRET" >> docker/.env
 ```
 
-The value must match the secret configured on your GitHub and GitLab webhooks (validated via `X-Hub-Signature-256` when available).
-
-To run the webhook ingest service locally:
-
-```bash
-cd webhook-ingest
-cp .env.example .env
-pnpm install
-pnpm run dev
-```
+The value must match the secret configured on your GitHub and GitLab webhooks (validated via
+`X-Hub-Signature-256` for GitHub, `X-Gitlab-Token` for GitLab).
 
 ## Web client (`webapp`)
 

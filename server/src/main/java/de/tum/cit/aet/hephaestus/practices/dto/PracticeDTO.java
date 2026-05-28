@@ -16,9 +16,8 @@ public record PracticeDTO(
     @NonNull @Schema(description = "URL-safe identifier unique within workspace") String slug,
     @NonNull @Schema(description = "Human-readable name") String name,
     @Nullable @Schema(description = "Practice category") String category,
-    @NonNull @Schema(description = "Practice description") String description,
     @NonNull @Schema(description = "Domain events that trigger detection") List<String> triggerEvents,
-    @Nullable @Schema(description = "Practice evaluation criteria") String criteria,
+    @NonNull @Schema(description = "Practice evaluation criteria") String criteria,
     @Nullable
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     String precomputeScript,
@@ -32,7 +31,6 @@ public record PracticeDTO(
             practice.getSlug(),
             practice.getName(),
             practice.getCategory(),
-            practice.getDescription(),
             TriggerEventsConverter.toList(practice.getTriggerEvents()),
             practice.getCriteria(),
             practice.getPrecomputeScript(),

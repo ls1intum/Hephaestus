@@ -38,6 +38,7 @@ erDiagram
         TIMESTAMPTZ updated_at
         VARCHAR(16) credential_mode "NOT NULL"
         VARCHAR(50) model_version
+        VARCHAR(2048) llm_base_url
     }
 
     AgentJob {
@@ -73,6 +74,7 @@ erDiagram
         INTEGER llm_cache_write_tokens
         DOUBLE llm_cost_usd
         VARCHAR(50) llm_model_version
+        VARCHAR(32) cancellation_reason
     }
 
     ChatMessage {
@@ -386,9 +388,8 @@ erDiagram
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name "NOT NULL"
         VARCHAR(64) category
-        TEXT description "NOT NULL"
         JSONB trigger_events "NOT NULL"
-        TEXT criteria
+        TEXT criteria "NOT NULL"
         BOOLEAN is_active "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
@@ -671,6 +672,12 @@ erDiagram
         BIGINT user_id FK,UK "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
         BOOLEAN ai_review_enabled "NOT NULL"
+    }
+
+    WorkerTokenDenylist {
+        VARCHAR(64) jti PK
+        TIMESTAMPTZ revoked_at "NOT NULL"
+        TIMESTAMPTZ expires_at "NOT NULL"
     }
 
     Workspace {

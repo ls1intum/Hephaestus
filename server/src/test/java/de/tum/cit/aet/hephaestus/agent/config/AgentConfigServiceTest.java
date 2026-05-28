@@ -77,6 +77,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 true,
                 null,
                 "sk-key",
+                null,
                 LlmProvider.ANTHROPIC,
                 null,
                 null,
@@ -101,6 +102,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 true,
                 null,
                 "oauth-token",
+                null,
                 LlmProvider.ANTHROPIC,
                 null,
                 null,
@@ -126,6 +128,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 true,
                 null,
                 "sk-key",
+                null,
                 LlmProvider.ANTHROPIC,
                 null,
                 null,
@@ -150,6 +153,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 true,
                 null,
                 null,
+                null,
                 LlmProvider.ANTHROPIC,
                 null,
                 null,
@@ -172,6 +176,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             var request = new CreateAgentConfigRequestDTO(
                 "test",
                 true,
+                null,
                 null,
                 null,
                 LlmProvider.ANTHROPIC,
@@ -205,6 +210,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
                 CredentialMode.API_KEY
             );
 
@@ -225,7 +231,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
             when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
 
-            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, false, null);
+            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, false, null);
 
             assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
                 AgentConfigCredentialModeException.class
@@ -288,6 +294,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 true,
                 "claude-sonnet-4-20250514",
                 "sk-abc",
+                null,
                 LlmProvider.ANTHROPIC,
                 300,
                 2,
@@ -315,6 +322,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             var request = new CreateAgentConfigRequestDTO(
                 "my-agent",
                 true,
+                null,
                 null,
                 null,
                 LlmProvider.ANTHROPIC,
@@ -350,6 +358,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 null,
                 "gpt-4o",
                 null,
+                null,
                 LlmProvider.OPENAI,
                 120,
                 null,
@@ -369,7 +378,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
         void shouldThrowNotFoundWhenUpdatingNonExistentConfig() {
             when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
 
-            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, null);
+            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, null, null);
 
             assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 999L, request)).isInstanceOf(
                 EntityNotFoundException.class

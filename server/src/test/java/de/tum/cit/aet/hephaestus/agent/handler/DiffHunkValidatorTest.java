@@ -354,10 +354,23 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("snaps note far beyond all valid lines to last valid line")
-        void snapsBeyondAllLines() {
+        @DisplayName("drops note when nearest valid line is beyond MAX_SNAP_DELTA")
+        void dropsNoteBeyondSnapDelta() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
             DiffNote note = new DiffNote("File.swift", 1000, null, "way beyond");
+            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
+                List.of(note),
+                Map.of("File.swift", lines),
+                "job-1"
+            );
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("snaps note within MAX_SNAP_DELTA to nearest valid line")
+        void snapsWithinSnapDelta() {
+            TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
+            DiffNote note = new DiffNote("File.swift", 5, null, "close enough"); // delta=2 (to 3)
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
                 List.of(note),
                 Map.of("File.swift", lines),

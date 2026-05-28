@@ -5,11 +5,8 @@ import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -19,7 +16,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Parses structured agent output into validated practice findings and optional delivery content.
+ * Parses structured agent output into validated practice findings. The MR summary is composed
+ * server-side by {@link DeliveryComposer}; the agent only supplies findings and per-finding
+ * inline diff suggestions.
  *
  * <p>This is a pure function with no Spring dependencies. It never throws — all
  * parse failures are captured in {@link ParseResult#discarded()}.
@@ -83,8 +82,6 @@ public class PracticeDetectionResultParser {
         if (jobOutput == null || jobOutput.isNull() || jobOutput.isMissingNode()) {
             return ParseResult.empty("jobOutput is null or missing");
         }
-
-        // Step 1: Extract rawOutput string
         JsonNode rawOutputNode = jobOutput.get("rawOutput");
         if (rawOutputNode == null || rawOutputNode.isNull() || rawOutputNode.isMissingNode()) {
             return ParseResult.empty("missing rawOutput field in job output");
@@ -94,15 +91,13 @@ public class PracticeDetectionResultParser {
             return ParseResult.empty("rawOutput is blank");
         }
 
-        // Step 2: Sanitize invalid JSON escapes (e.g., Swift's \(variable) interpolation)
-        // then parse. The rawOutput may be pure JSON (from --json-schema) or may contain
-        // phase markers followed by JSON (from orchestrator protocol).
+        // rawOutput is JSON but LLMs sometimes emit Swift-style \(var) interpolation that strict
+        // JSON rejects; sanitize then fall back to extracting JSON from mixed-text output.
         String sanitizedText = sanitizeJsonEscapes(rawOutputText);
         JsonNode root;
         try {
             root = lenientMapper.readTree(sanitizedText);
         } catch (JacksonException e) {
-            // Fallback: try to extract JSON from mixed text (e.g., "[PHASE0]...\n{...}")
             root = extractJsonFromText(sanitizedText);
             if (root == null) {
                 return ParseResult.empty("invalid JSON in rawOutput: " + e.getMessage());
@@ -111,8 +106,6 @@ public class PracticeDetectionResultParser {
         if (root == null || root.isNull()) {
             return ParseResult.empty("rawOutput parsed to null");
         }
-
-        // Step 3: Extract findings array using the canonical top-level contract.
         JsonNode findingsNode = extractFindingsNode(root);
         if (findingsNode == null || !findingsNode.isArray()) {
             return ParseResult.empty("missing or non-array 'findings' field");
@@ -121,10 +114,8 @@ public class PracticeDetectionResultParser {
             return ParseResult.empty("findings array is empty");
         }
 
-        // Step 4: Validate each entry. Do not silently truncate findings.
         List<ValidatedFinding> valid = new ArrayList<>();
         List<DiscardedEntry> discarded = new ArrayList<>();
-
         for (int i = 0; i < findingsNode.size(); i++) {
             JsonNode entry = findingsNode.get(i);
             if (!entry.isObject()) {
@@ -138,165 +129,31 @@ public class PracticeDetectionResultParser {
             }
         }
 
-        // Step 5: Extract optional delivery content (never affects findings)
-        DeliveryContent delivery = parseDeliveryContent(root);
-
-        // Step 6: Fallback — if delivery has no diffNotes, collect suggestedDiffNotes from
-        // NEGATIVE findings' raw JSON. The Pi runner persists per-finding suggestedDiffNotes
-        // that the agent does not always aggregate into a top-level delivery.diffNotes block.
-        if (delivery == null || delivery.diffNotes().isEmpty()) {
-            List<DiffNote> fallbackNotes = collectSuggestedDiffNotes(findingsNode, valid);
-            if (!fallbackNotes.isEmpty()) {
-                String mrNote = delivery != null ? delivery.mrNote() : null;
-                delivery = new DeliveryContent(mrNote, fallbackNotes);
-                log.info(
-                    "Collected {} diff notes from per-finding suggestedDiffNotes (fallback)",
-                    fallbackNotes.size()
-                );
-            }
-        }
-
-        return new ParseResult(Collections.unmodifiableList(valid), Collections.unmodifiableList(discarded), delivery);
+        return new ParseResult(Collections.unmodifiableList(valid), Collections.unmodifiableList(discarded));
     }
 
     private JsonNode extractFindingsNode(JsonNode root) {
         return root.get("findings");
     }
 
-    // =========================================================================
-    // Delivery content parsing
-    // =========================================================================
-
-    @Nullable
-    private DeliveryContent parseDeliveryContent(JsonNode root) {
-        JsonNode deliveryNode = root.get("delivery");
-        if (deliveryNode == null || deliveryNode.isNull() || deliveryNode.isMissingNode()) {
-            return null;
-        }
-        if (!deliveryNode.isObject()) {
-            log.debug("delivery field is not an object, ignoring");
-            return null;
-        }
-
-        // mrNote — optional text
-        String mrNote = null;
-        JsonNode mrNoteNode = deliveryNode.get("mrNote");
-        if (mrNoteNode != null && !mrNoteNode.isNull() && mrNoteNode.isTextual()) {
-            mrNote = mrNoteNode.asText();
-            if (mrNote.isBlank()) {
-                mrNote = null;
-            } else if (mrNote.length() > MAX_MR_NOTE_LENGTH) {
-                log.debug("Truncating mrNote from {} to {} chars", mrNote.length(), MAX_MR_NOTE_LENGTH);
-                mrNote = mrNote.substring(0, MAX_MR_NOTE_LENGTH);
-            }
-        }
-
-        // diffNotes — optional array
-        List<DiffNote> diffNotes = parseDiffNotes(deliveryNode);
-
-        if (mrNote == null && diffNotes.isEmpty()) {
-            return null;
-        }
-
-        return new DeliveryContent(mrNote, diffNotes);
-    }
-
-    private List<DiffNote> parseDiffNotes(JsonNode deliveryNode) {
-        JsonNode diffNotesNode = deliveryNode.get("diffNotes");
-        if (diffNotesNode == null || diffNotesNode.isNull() || !diffNotesNode.isArray()) {
+    /** Parse the {@code suggestedDiffNotes} array on a single finding (may be absent). */
+    private List<DiffNote> parseSuggestedDiffNotes(JsonNode entry, int findingIndex) {
+        JsonNode suggestedNode = entry.get("suggestedDiffNotes");
+        if (suggestedNode == null || suggestedNode.isNull() || !suggestedNode.isArray()) {
             return List.of();
         }
-
         List<DiffNote> notes = new ArrayList<>();
-        int limit = Math.min(diffNotesNode.size(), MAX_DELIVERY_DIFF_NOTES);
-
-        if (diffNotesNode.size() > MAX_DELIVERY_DIFF_NOTES) {
-            log.debug(
-                "Limiting delivery.diffNotes from {} to {} to bound inline comment fan-out",
-                diffNotesNode.size(),
-                MAX_DELIVERY_DIFF_NOTES
-            );
-        }
-
-        for (int i = 0; i < limit; i++) {
-            DiffNote note = parseSingleDiffNote(diffNotesNode.get(i), -1, i);
+        for (int j = 0; j < suggestedNode.size(); j++) {
+            DiffNote note = parseSingleDiffNote(suggestedNode.get(j), findingIndex, j);
             if (note != null) {
                 notes.add(note);
             }
         }
-
         return Collections.unmodifiableList(notes);
     }
 
     /**
-     * Fallback: collect suggestedDiffNotes from individual NEGATIVE findings when delivery.diffNotes is empty.
-     *
-     * <p>The Pi runner persists per-finding {@code suggestedDiffNotes} arrays, but the agent does not
-     * always aggregate them into a top-level {@code delivery.diffNotes} block. This method scans raw
-     * finding JSON nodes, matches them against validated NEGATIVE findings (by practiceSlug), and
-     * collects their suggested diff notes — prioritizing higher severity findings, capped at
-     * {@link #MAX_DELIVERY_DIFF_NOTES}.
-     */
-    private List<DiffNote> collectSuggestedDiffNotes(JsonNode findingsNode, List<ValidatedFinding> validatedFindings) {
-        // Build lookup of NEGATIVE validated findings by slug → severity for filtering and sorting
-        Map<String, Severity> negativeSlugs = new LinkedHashMap<>();
-        for (ValidatedFinding vf : validatedFindings) {
-            if (vf.verdict() == Verdict.NEGATIVE) {
-                negativeSlugs.put(vf.practiceSlug(), vf.severity());
-            }
-        }
-        if (negativeSlugs.isEmpty()) {
-            return List.of();
-        }
-
-        // Collect (severity, diffNote) pairs from raw findings that match NEGATIVE validated slugs
-        record ScoredNote(Severity severity, DiffNote note) {}
-        List<ScoredNote> scored = new ArrayList<>();
-
-        for (int i = 0; i < findingsNode.size(); i++) {
-            JsonNode entry = findingsNode.get(i);
-            if (!entry.isObject()) continue;
-
-            // Match by practiceSlug — normalize the same way validateEntry does
-            JsonNode slugNode = entry.get("practiceSlug");
-            if (slugNode == null || slugNode.isNull() || !slugNode.isTextual()) continue;
-            String slug = slugNode.asText().toLowerCase(Locale.ROOT).replace('_', '-');
-
-            Severity severity = negativeSlugs.get(slug);
-            if (severity == null) continue; // not a validated NEGATIVE finding
-
-            // Parse suggestedDiffNotes array
-            JsonNode suggestedNode = entry.get("suggestedDiffNotes");
-            if (suggestedNode == null || suggestedNode.isNull() || !suggestedNode.isArray()) continue;
-
-            for (int j = 0; j < suggestedNode.size(); j++) {
-                JsonNode noteEntry = suggestedNode.get(j);
-                DiffNote note = parseSingleDiffNote(noteEntry, i, j);
-                if (note != null) {
-                    scored.add(new ScoredNote(severity, note));
-                }
-            }
-        }
-
-        if (scored.isEmpty()) {
-            return List.of();
-        }
-
-        // Sort by severity: CRITICAL (ordinal 0) first, INFO (ordinal 3) last
-        scored.sort(Comparator.comparingInt(s -> s.severity().ordinal()));
-
-        // Limit inline delivery fan-out without dropping the underlying findings.
-        int limit = Math.min(scored.size(), MAX_DELIVERY_DIFF_NOTES);
-        List<DiffNote> result = new ArrayList<>(limit);
-        for (int i = 0; i < limit; i++) {
-            result.add(scored.get(i).note());
-        }
-        return Collections.unmodifiableList(result);
-    }
-
-    /**
      * Parse a single diff note JSON object. Returns null if the entry is invalid.
-     * Shared validation logic used by both delivery.diffNotes and suggestedDiffNotes parsing.
      */
     @Nullable
     private DiffNote parseSingleDiffNote(JsonNode entry, int findingIndex, int noteIndex) {
@@ -458,7 +315,20 @@ public class PracticeDetectionResultParser {
             guidance = guidance.substring(0, MAX_GUIDANCE_LENGTH);
         }
 
-        return new ValidatedFinding(practiceSlug, title, verdict, severity, confidence, evidence, reasoning, guidance);
+        // Optional: per-finding suggested diff notes — the agent's inline-comment suggestions.
+        List<DiffNote> suggestedDiffNotes = parseSuggestedDiffNotes(entry, index);
+
+        return new ValidatedFinding(
+            practiceSlug,
+            title,
+            verdict,
+            severity,
+            confidence,
+            evidence,
+            reasoning,
+            guidance,
+            suggestedDiffNotes
+        );
     }
 
     private static String textField(JsonNode entry, String field) {
@@ -599,15 +469,10 @@ public class PracticeDetectionResultParser {
     /**
      * @param validFindings validated findings from the agent output
      * @param discarded entries that failed validation with reasons
-     * @param delivery optional pre-rendered delivery content (null if absent or malformed)
      */
-    public record ParseResult(
-        List<ValidatedFinding> validFindings,
-        List<DiscardedEntry> discarded,
-        @Nullable DeliveryContent delivery
-    ) {
+    public record ParseResult(List<ValidatedFinding> validFindings, List<DiscardedEntry> discarded) {
         static ParseResult empty(String reason) {
-            return new ParseResult(List.of(), List.of(new DiscardedEntry(-1, reason)), null);
+            return new ParseResult(List.of(), List.of(new DiscardedEntry(-1, reason)));
         }
     }
 
@@ -619,7 +484,8 @@ public class PracticeDetectionResultParser {
         float confidence,
         JsonNode evidence,
         String reasoning,
-        String guidance
+        String guidance,
+        List<DiffNote> suggestedDiffNotes
     ) {}
 
     public record DiscardedEntry(int index, String reason) {}

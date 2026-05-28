@@ -70,7 +70,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
         practice.setCategory("test");
-        practice.setDescription("Test description");
+        practice.setCriteria("Test description");
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         practice = practiceRepository.save(practice);
 
@@ -254,7 +254,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             practiceB.setSlug("practice-b");
             practiceB.setName("Practice B");
             practiceB.setCategory("test");
-            practiceB.setDescription("Workspace B practice");
+            practiceB.setCriteria("Workspace B practice");
             practiceB.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             practiceB = practiceRepository.save(practiceB);
 
@@ -325,7 +325,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
             otherPractice.setCategory("test");
-            otherPractice.setDescription("Other description");
+            otherPractice.setCriteria("Other description");
             otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             otherPractice = practiceRepository.save(otherPractice);
 
@@ -433,7 +433,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             secondPractice.setSlug("error-handling");
             secondPractice.setName("Error Handling");
             secondPractice.setCategory("test");
-            secondPractice.setDescription("Handle errors");
+            secondPractice.setCriteria("Handle errors");
             secondPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             secondPractice = practiceRepository.save(secondPractice);
 
@@ -460,7 +460,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             otherPractice.setSlug("test-practice"); // Same slug, different workspace
             otherPractice.setName("Test Practice");
             otherPractice.setCategory("test");
-            otherPractice.setDescription("Other workspace practice");
+            otherPractice.setCriteria("Other workspace practice");
             otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             otherPractice = practiceRepository.save(otherPractice);
 

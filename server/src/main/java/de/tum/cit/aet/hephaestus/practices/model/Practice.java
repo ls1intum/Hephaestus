@@ -72,14 +72,11 @@ public class Practice {
     @Column(name = "category", length = 64)
     private String category;
 
-    @Column(name = "description", columnDefinition = "TEXT", nullable = false)
-    private String description;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "trigger_events", columnDefinition = "jsonb", nullable = false)
     private JsonNode triggerEvents;
 
-    @Column(name = "criteria", columnDefinition = "TEXT")
+    @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
     private String criteria;
 
     /**

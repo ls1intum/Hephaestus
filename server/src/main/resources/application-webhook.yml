@@ -1,0 +1,37 @@
+# Activated by SPRING_PROFILES_ACTIVE=prod,webhook on the webhook-server container.
+# Keeps the gitprovider.webhook beans + the NATS Connection bean; disables every
+# server-only and worker-only cluster so an application-server restart cannot
+# interrupt webhook reception (push events are not manually redeliverable).
+# See ADR 0008 for the gated bean inventory.
+spring:
+    config:
+        activate:
+            on-profile: webhook
+
+    # Only application-server owns DDL; disable here to avoid a boot-time race.
+    liquibase:
+        enabled: false
+
+    jpa:
+        hibernate:
+            ddl-auto: none
+
+
+hephaestus:
+    runtime:
+        server:
+            enabled: false
+        worker:
+            enabled: false
+        webhook:
+            enabled: true
+
+    # Must stay true so config.NatsConfig contributes the @Bean Connection that
+    # the webhook publisher reuses (no second NATS connection per pod).
+    sync:
+        nats:
+            enabled: true
+
+logging:
+    level:
+        de.tum.cit.aet.hephaestus.gitprovider.webhook: INFO

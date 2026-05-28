@@ -13,10 +13,6 @@ application-server:
   - changed-files:
     - any-glob-to-any-file: server/**
 
-webhook-ingest:
-  - changed-files:
-    - any-glob-to-any-file: "webhook-ingest/**"
-
 ci:
   - changed-files:
     - any-glob-to-any-file:

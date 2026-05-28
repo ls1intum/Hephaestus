@@ -26,7 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -43,8 +43,7 @@ import tools.jackson.databind.ObjectMapper;
  * component scanning surprises.
  */
 @Configuration
-@ConditionalOnProperty(prefix = "hephaestus.sandbox", name = "enabled", havingValue = "true", matchIfMissing = false)
-@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
+@ConditionalOnExpression("${hephaestus.sandbox.enabled:false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}")
 @ConditionalOnClass(DockerClient.class)
 @EnableConfigurationProperties({ SandboxProperties.class, InteractiveSandboxProperties.class })
 public class DockerSandboxConfiguration {

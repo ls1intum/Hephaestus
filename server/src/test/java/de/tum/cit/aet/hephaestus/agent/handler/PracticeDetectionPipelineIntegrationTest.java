@@ -214,7 +214,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         p.setSlug(slug);
         p.setName(name);
         p.setCategory("test");
-        p.setDescription("Test " + slug);
+        p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         return practiceRepository.save(p);
     }
@@ -226,7 +226,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         agentJob = agentJobRepository.save(agentJob);
     }
 
-    private String validAgentOutput(boolean includeDelivery) {
+    private String validAgentOutput() {
         String findings = """
             {
               "findings": [
@@ -244,27 +244,13 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                   "severity": "MAJOR",
                   "confidence": 0.85,
                   "reasoning": "The method does not check for null input.",
-                  "guidance": "Add a null check at the top of the method."
+                  "guidance": "Add a null check at the top of the method.",
+                  "suggestedDiffNotes": [
+                    { "filePath": "src/Main.java", "startLine": 10, "endLine": 15,
+                      "body": "Consider adding a null check here." }
+                  ]
                 }
               ]""";
-
-        if (includeDelivery) {
-            return (
-                findings +
-                """
-                  ,
-                  "delivery": {
-                    "mrNote": "## Practice Review\\nPlease add null checks for safety.",
-                    "diffNotes": [{
-                      "filePath": "src/Main.java",
-                      "startLine": 10,
-                      "endLine": 15,
-                      "body": "Consider adding a null check here."
-                    }]
-                  }
-                }"""
-            );
-        }
         return findings + "\n}";
     }
 
@@ -275,7 +261,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("full pipeline: parse → persist findings → publish event → post feedback")
         void fullPipelineFromParseToDelivery() {
-            setJobOutput(validAgentOutput(true));
+            setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-123");
             when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
 
@@ -388,8 +374,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                       "severity": "MINOR",
                       "confidence": 0.8
                     }
-                  ],
-                  "delivery": { "mrNote": "Fix error handling." }
+                  ]
                 }""";
             setJobOutput(output);
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-456");
@@ -449,7 +434,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 null // mergeCommitSha
             );
 
-            setJobOutput(validAgentOutput(true));
+            setJobOutput(validAgentOutput());
 
             handler.deliver(agentJob);
 
@@ -473,7 +458,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("re-delivering same job creates no duplicate findings")
         void redeliveryNoDuplicates() {
-            setJobOutput(validAgentOutput(true));
+            setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-789");
             when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
 

@@ -521,24 +521,10 @@ public class MentorChatService {
     }
 
     /**
-     * Resolve the LLM config mentor should use for this turn.
-     *
-     * <p>Primary path: all three required fields on {@code MentorAgentProperties} are set
-     * ({@code llmProvider}, {@code credentialMode}, {@code modelName}) — the instance config
-     * applies to every workspace without a DB row. Set these in {@code application-local.yml}
-     * or via env vars for local dev and single-model deployments.
-     *
-     * <p>Fallback: first enabled {@code AgentConfig} for the workspace — the original
-     * multi-tenant path for per-workspace key routing.
+     * Resolve the LLM config mentor should use: first enabled workspace-scoped
+     * {@link AgentConfig}. A single source of truth — no instance-level override path.
      */
     private MentorLlmConfig resolveLlmConfig(long workspaceId) {
-        if (
-            mentorAgentProperties.llmProvider() != null &&
-            mentorAgentProperties.credentialMode() != null &&
-            mentorAgentProperties.modelName() != null
-        ) {
-            return MentorLlmConfig.fromProperties(mentorAgentProperties);
-        }
         return agentConfigRepository
             .findByWorkspaceId(workspaceId)
             .stream()
@@ -547,10 +533,7 @@ public class MentorChatService {
             .map(MentorLlmConfig::fromAgentConfig)
             .orElseThrow(() ->
                 new IllegalStateException(
-                    "No LLM config for mentor in workspace " +
-                        workspaceId +
-                        " — set hephaestus.mentor.agent.llm-provider / credential-mode / model-name" +
-                        " or create an enabled AgentConfig for this workspace"
+                    "No enabled AgentConfig for workspace " + workspaceId + " — mentor cannot run a turn"
                 )
             );
     }
@@ -589,9 +572,5 @@ public class MentorChatService {
         UUID threadId,
         String userMessage,
         @Nullable UUID clientUserMessageId
-    ) {
-        public MentorTurnRequest(long workspaceId, UUID threadId, String userMessage) {
-            this(workspaceId, threadId, userMessage, null);
-        }
-    }
+    ) {}
 }

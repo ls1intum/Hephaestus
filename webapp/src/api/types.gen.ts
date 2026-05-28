@@ -539,10 +539,6 @@ export type UpdatePracticeRequest = {
      */
     criteria?: string;
     /**
-     * Practice description
-     */
-    description?: string;
-    /**
      * Human-readable name
      */
     name?: string;
@@ -586,6 +582,10 @@ export type UpdateAgentConfigRequest = {
      * LLM API key (omit or null to keep existing key)
      */
     llmApiKey?: string;
+    /**
+     * Optional LLM base URL override (omit or null to keep existing value; empty string clears it)
+     */
+    llmBaseUrl?: string;
     /**
      * LLM provider
      */
@@ -1173,11 +1173,7 @@ export type Practice = {
     /**
      * Practice evaluation criteria
      */
-    criteria?: string;
-    /**
-     * Practice description
-     */
-    description: string;
+    criteria: string;
     /**
      * Practice ID
      */
@@ -1673,11 +1669,7 @@ export type CreatePracticeRequest = {
     /**
      * Practice evaluation criteria
      */
-    criteria?: string;
-    /**
-     * Practice description
-     */
-    description: string;
+    criteria: string;
     /**
      * Human-readable name
      */
@@ -1730,6 +1722,10 @@ export type CreateAgentConfigRequest = {
      * LLM API key
      */
     llmApiKey?: string;
+    /**
+     * Optional LLM base URL — set for OpenAI/Anthropic-compatible endpoints that need routing through the hephaestus chat/completions provider extension (e.g. TUM GPU, on-prem gateways)
+     */
+    llmBaseUrl?: string;
     /**
      * LLM provider
      */
@@ -1921,6 +1917,10 @@ export type AgentConfig = {
      * Configuration ID
      */
     id: number;
+    /**
+     * Optional LLM base URL override
+     */
+    llmBaseUrl?: string;
     /**
      * LLM provider
      */

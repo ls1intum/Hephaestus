@@ -32,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>
  * Processes {@code user_add_to_group}, {@code user_remove_from_group}, and
  * {@code user_update_for_group} events that are normalized to the "member"
- * event key by the webhook-ingest layer.
+ * event key by the webhook receiver.
  * <p>
  * This closes the gap where membership changes between scheduled syncs were
  * invisible, allowing removed users to retain access until the next restart.

@@ -18,6 +18,7 @@ import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,7 +42,12 @@ public class WorkspaceInstallationService {
 
     private final WorkspaceSlugService workspaceSlugService;
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final NatsConsumerService natsConsumerService;
+    /**
+     * Absent when {@code hephaestus.runtime.server.enabled=false} (e.g., the webhook-server pod)
+     * because {@link NatsConsumerService} is gated by {@code SERVER_PROPERTY}. The webhook
+     * profile never invokes the methods that consume this; it boots dead-code but doesn't crash.
+     */
+    private final ObjectProvider<NatsConsumerService> natsConsumerService;
     private final GitHubAppTokenService gitHubAppTokenService;
     private final OrganizationService organizationService;
 
@@ -54,7 +60,7 @@ public class WorkspaceInstallationService {
         GitProviderRepository gitProviderRepository,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceMembershipService workspaceMembershipService,
-        NatsConsumerService natsConsumerService,
+        ObjectProvider<NatsConsumerService> natsConsumerService,
         GitHubAppTokenService gitHubAppTokenService,
         OrganizationService organizationService
     ) {
@@ -293,7 +299,7 @@ public class WorkspaceInstallationService {
             .findByInstallationId(installationId)
             .ifPresent(workspace -> {
                 if (shouldUseNats(workspace)) {
-                    natsConsumerService.stopConsumingScope(workspace.getId());
+                    natsConsumerService.ifAvailable(svc -> svc.stopConsumingScope(workspace.getId()));
                 }
             });
     }
@@ -309,7 +315,7 @@ public class WorkspaceInstallationService {
             .findByInstallationId(installationId)
             .ifPresent(workspace -> {
                 if (shouldUseNats(workspace)) {
-                    natsConsumerService.startConsumingScope(workspace.getId());
+                    natsConsumerService.ifAvailable(svc -> svc.startConsumingScope(workspace.getId()));
                 }
             });
     }
@@ -429,7 +435,7 @@ public class WorkspaceInstallationService {
 
         // Update the workspace consumer with new subjects after all renames
         if (shouldUseNats(workspace)) {
-            natsConsumerService.updateScopeConsumer(workspace.getId());
+            natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspace.getId()));
         }
     }
 
@@ -479,7 +485,7 @@ public class WorkspaceInstallationService {
 
         // Update the workspace consumer - it will pick up the new org login from
         // workspace
-        natsConsumerService.updateScopeConsumer(workspace.getId());
+        natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspace.getId()));
     }
 
     /**
