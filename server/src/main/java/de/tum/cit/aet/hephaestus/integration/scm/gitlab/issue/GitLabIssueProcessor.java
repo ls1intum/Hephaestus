@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
@@ -311,7 +311,11 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Issue issue = process(event, context);
         if (issue != null) {
             eventPublisher.publishEvent(
-                new ScmDomainEvent.IssueClosed(ScmEventPayload.IssueData.from(issue), "completed", EventContext.from(context))
+                new ScmDomainEvent.IssueClosed(
+                    ScmEventPayload.IssueData.from(issue),
+                    "completed",
+                    EventContext.from(context)
+                )
             );
             log.debug("Closed issue: issueId={}", issue.getId());
         }

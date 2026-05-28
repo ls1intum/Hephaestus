@@ -1,8 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -20,6 +17,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItem;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItemRepository;
@@ -1048,7 +1047,9 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertThat(events.get(0)).isInstanceOf(GitHubProjectEvent.ProjectItemUpdated.class);
             assertThat(events.get(1)).isInstanceOf(GitHubProjectEvent.ProjectItemArchived.class);
 
-            GitHubProjectEvent.ProjectItemArchived archivedEvent = (GitHubProjectEvent.ProjectItemArchived) events.get(1);
+            GitHubProjectEvent.ProjectItemArchived archivedEvent = (GitHubProjectEvent.ProjectItemArchived) events.get(
+                1
+            );
             assertThat(archivedEvent.projectId()).isEqualTo(PROJECT_ID);
             assertThat(archivedEvent.item().id()).isEqualTo(ITEM_DB_ID);
         }
@@ -1146,7 +1147,9 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertThat(events.get(0)).isInstanceOf(GitHubProjectEvent.ProjectItemUpdated.class);
             assertThat(events.get(1)).isInstanceOf(GitHubProjectEvent.ProjectItemRestored.class);
 
-            GitHubProjectEvent.ProjectItemRestored restoredEvent = (GitHubProjectEvent.ProjectItemRestored) events.get(1);
+            GitHubProjectEvent.ProjectItemRestored restoredEvent = (GitHubProjectEvent.ProjectItemRestored) events.get(
+                1
+            );
             assertThat(restoredEvent.projectId()).isEqualTo(PROJECT_ID);
             assertThat(restoredEvent.item().id()).isEqualTo(ITEM_DB_ID);
         }

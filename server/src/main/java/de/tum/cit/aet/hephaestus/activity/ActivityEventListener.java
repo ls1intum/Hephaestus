@@ -1171,7 +1171,6 @@ public class ActivityEventListener {
         );
     }
 
-
     private ActivityEventType mapReviewState(PullRequestReview.State state) {
         if (state == PullRequestReview.State.APPROVED) {
             return ActivityEventType.REVIEW_APPROVED;

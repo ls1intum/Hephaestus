@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
@@ -301,7 +301,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         PullRequest pr = process(event, context);
         if (pr != null && before != Issue.State.OPEN) {
             eventPublisher.publishEvent(
-                new ScmDomainEvent.PullRequestReopened(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
+                new ScmDomainEvent.PullRequestReopened(
+                    ScmEventPayload.PullRequestData.from(pr),
+                    EventContext.from(context)
+                )
             );
             log.debug("Reopened merge request: prId={}", pr.getId());
         }
@@ -357,7 +360,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 reviewRepository.save(review);
 
                 ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
+                    eventPublisher.publishEvent(
+                        new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context))
+                    )
                 );
                 log.debug("Updated review to APPROVED: prId={}, reviewerId={}", pr.getId(), approver.getLogin());
             }
@@ -417,7 +422,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 reviewRepository.save(review);
 
                 ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(context)))
+                    eventPublisher.publishEvent(
+                        new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(context))
+                    )
                 );
                 log.debug("Dismissed review (unapproval): prId={}, reviewerId={}", pr.getId(), approver.getLogin());
             });
@@ -816,7 +823,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         if (isNew) {
             eventPublisher.publishEvent(
-                new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
+                new ScmDomainEvent.PullRequestCreated(
+                    ScmEventPayload.PullRequestData.from(pr),
+                    EventContext.from(context)
+                )
             );
             log.debug("Created merge request: nativeId={}, iid={}", nativeId, mrNumber);
         } else {
@@ -1029,7 +1039,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
                 if (ctx != null) {
                     ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                        eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
+                        eventPublisher.publishEvent(
+                            new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx))
+                        )
                     );
                 }
             }

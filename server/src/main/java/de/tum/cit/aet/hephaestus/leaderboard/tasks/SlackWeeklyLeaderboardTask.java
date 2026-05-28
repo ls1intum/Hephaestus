@@ -182,7 +182,10 @@ public class SlackWeeklyLeaderboardTask implements LeaderboardNotificationTask {
             "Fetched top reviewers: workspaceId={}, userCount={}, users={}",
             workspace.getId(),
             top3.size(),
-            top3.stream().map(entry -> entry.user() != null ? entry.user().name() : "<team>").toList()
+            top3
+                .stream()
+                .map(entry -> entry.user() != null ? entry.user().name() : "<team>")
+                .toList()
         );
         return top3;
     }

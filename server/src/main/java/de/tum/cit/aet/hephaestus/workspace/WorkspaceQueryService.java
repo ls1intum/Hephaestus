@@ -104,21 +104,23 @@ public class WorkspaceQueryService {
      * between SPI and DTO is the {@code installationUrl} / {@code defaultServerUrl} string.
      */
     public WorkspaceProvidersDTO getAvailableProviders() {
-        var github = providerAvailability
-            .getOrDefault(IntegrationKind.GITHUB, null) instanceof WorkspaceProviderAvailability ghAvail
-            ? ghAvail
-                .connectionHint()
-                .map(h -> new WorkspaceProvidersDTO.GitHubProviderDTO(h.hintUrl()))
-                .orElse(null)
-            : null;
+        var github =
+            providerAvailability.getOrDefault(IntegrationKind.GITHUB, null) instanceof
+                WorkspaceProviderAvailability ghAvail
+                ? ghAvail
+                      .connectionHint()
+                      .map(h -> new WorkspaceProvidersDTO.GitHubProviderDTO(h.hintUrl()))
+                      .orElse(null)
+                : null;
 
-        var gitlab = providerAvailability
-            .getOrDefault(IntegrationKind.GITLAB, null) instanceof WorkspaceProviderAvailability glAvail
-            ? glAvail
-                .connectionHint()
-                .map(h -> new WorkspaceProvidersDTO.GitLabProviderDTO(h.hintUrl()))
-                .orElse(null)
-            : null;
+        var gitlab =
+            providerAvailability.getOrDefault(IntegrationKind.GITLAB, null) instanceof
+                WorkspaceProviderAvailability glAvail
+                ? glAvail
+                      .connectionHint()
+                      .map(h -> new WorkspaceProvidersDTO.GitLabProviderDTO(h.hintUrl()))
+                      .orElse(null)
+                : null;
 
         return new WorkspaceProvidersDTO(github, gitlab);
     }

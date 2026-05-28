@@ -44,9 +44,9 @@ class IntegrationCoreVendorNeutralityTest extends HephaestusArchitectureTest {
             )
             .because(
                 "integration.core.** is the shared event/registry/SPI substrate. " +
-                "Vendor types must live in integration.<kind>.** and reach core via SPI ports. " +
-                "A vendor import in core silently transitively couples every consumer of the " +
-                "core surface to that vendor."
+                    "Vendor types must live in integration.<kind>.** and reach core via SPI ports. " +
+                    "A vendor import in core silently transitively couples every consumer of the " +
+                    "core surface to that vendor."
             );
         rule.check(classes);
     }

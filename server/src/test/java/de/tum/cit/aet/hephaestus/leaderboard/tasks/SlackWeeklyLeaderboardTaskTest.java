@@ -94,11 +94,7 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("skipScenarios")
-    void run_perWorkspaceSkipConditions_neverPublishEvent(
-        String name,
-        Workspace w,
-        ConnectionConfig.SlackConfig cfg
-    ) {
+    void run_perWorkspaceSkipConditions_neverPublishEvent(String name, Workspace w, ConnectionConfig.SlackConfig cfg) {
         Connection c = connection(w, cfg);
         when(
             connectionRepository.findByKindAndStateWithWorkspace(IntegrationKind.SLACK, IntegrationState.ACTIVE)
@@ -194,9 +190,7 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
 
         task.run();
 
-        ArgumentCaptor<LeaderboardDigestReadyEvent> captor = ArgumentCaptor.forClass(
-            LeaderboardDigestReadyEvent.class
-        );
+        ArgumentCaptor<LeaderboardDigestReadyEvent> captor = ArgumentCaptor.forClass(LeaderboardDigestReadyEvent.class);
         verify(eventPublisher, times(1)).publishEvent(captor.capture());
         LeaderboardDigestReadyEvent event = captor.getValue();
         assertThat(event.workspaceId()).isEqualTo(99L);

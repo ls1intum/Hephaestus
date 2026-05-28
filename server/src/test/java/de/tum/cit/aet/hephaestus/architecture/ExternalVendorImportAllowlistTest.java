@@ -55,16 +55,18 @@ class ExternalVendorImportAllowlistTest extends HephaestusArchitectureTest {
     @DisplayName("no new class outside integration/ imports a vendor adapter package")
     void noNewExternalVendorImporter() {
         ArchRule rule = noClasses()
-            .that(new DescribedPredicate<>("are not in integration/ and are not in the allowlist") {
-                @Override
-                public boolean test(JavaClass input) {
-                    String pkg = input.getPackageName();
-                    if (pkg.startsWith("de.tum.cit.aet.hephaestus.integration")) {
-                        return false; // intra-integration imports are governed by other rules
+            .that(
+                new DescribedPredicate<>("are not in integration/ and are not in the allowlist") {
+                    @Override
+                    public boolean test(JavaClass input) {
+                        String pkg = input.getPackageName();
+                        if (pkg.startsWith("de.tum.cit.aet.hephaestus.integration")) {
+                            return false; // intra-integration imports are governed by other rules
+                        }
+                        return !ALLOWED_CALLERS.contains(input.getFullName());
                     }
-                    return !ALLOWED_CALLERS.contains(input.getFullName());
                 }
-            })
+            )
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage(
@@ -75,12 +77,12 @@ class ExternalVendorImportAllowlistTest extends HephaestusArchitectureTest {
             )
             .because(
                 "external modules (workspace, agent, activity, leaderboard, contributors, ...) must " +
-                "reach vendor adapters through the SPI ports in integration.core.spi (ScmTokenSource, " +
-                "WorkspaceDataSyncTrigger, ScmCommentReactionSink, WorkspaceProviderAvailability, " +
-                "WorkspaceProvisioningHook, WorkspaceInitializationHook, ActivityRecorder, etc.) or " +
-                "via Spring ApplicationEvents (LeaderboardDigestReadyEvent). The current allowlist " +
-                "covers only Jackson polymorphic-deserialization mixins; adding a new entry without " +
-                "removing one fails the build."
+                    "reach vendor adapters through the SPI ports in integration.core.spi (ScmTokenSource, " +
+                    "WorkspaceDataSyncTrigger, ScmCommentReactionSink, WorkspaceProviderAvailability, " +
+                    "WorkspaceProvisioningHook, WorkspaceInitializationHook, ActivityRecorder, etc.) or " +
+                    "via Spring ApplicationEvents (LeaderboardDigestReadyEvent). The current allowlist " +
+                    "covers only Jackson polymorphic-deserialization mixins; adding a new entry without " +
+                    "removing one fails the build."
             );
         rule.check(classes);
     }

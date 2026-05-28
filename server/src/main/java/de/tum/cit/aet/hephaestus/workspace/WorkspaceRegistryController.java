@@ -99,5 +99,4 @@ public class WorkspaceRegistryController {
     public ResponseEntity<List<WorkspaceListItemDTO>> listWorkspaces() {
         return ResponseEntity.ok(workspaceQueryService.findAccessibleWorkspaceListItems());
     }
-
 }

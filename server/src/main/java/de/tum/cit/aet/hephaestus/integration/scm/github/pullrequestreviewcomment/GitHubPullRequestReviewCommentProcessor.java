@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -251,7 +251,9 @@ public class GitHubPullRequestReviewCommentProcessor {
                 );
             });
 
-        eventPublisher.publishEvent(new ScmDomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context)));
+        eventPublisher.publishEvent(
+            new ScmDomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context))
+        );
     }
 
     private PullRequestReviewComment createComment(

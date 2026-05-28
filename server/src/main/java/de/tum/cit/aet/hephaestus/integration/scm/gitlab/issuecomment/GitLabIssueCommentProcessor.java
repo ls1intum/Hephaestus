@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
@@ -243,7 +243,12 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
                 GitProviderType.GITLAB
             );
             eventPublisher.publishEvent(
-                new ScmDomainEvent.CommentUpdated(ScmEventPayload.CommentData.from(saved), issueId, changedFields, eventCtx)
+                new ScmDomainEvent.CommentUpdated(
+                    ScmEventPayload.CommentData.from(saved),
+                    issueId,
+                    changedFields,
+                    eventCtx
+                )
             );
             log.debug("Updated comment from sync: commentId={}, changed={}", saved.getId(), changedFields);
         }

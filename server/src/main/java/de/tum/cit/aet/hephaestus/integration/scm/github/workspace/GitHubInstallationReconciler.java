@@ -48,7 +48,6 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
         ensureGitHubAppInstallations();
     }
 
-
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationReconciler.class);
 
     private final GitHubAppTokenService gitHubAppTokenService;

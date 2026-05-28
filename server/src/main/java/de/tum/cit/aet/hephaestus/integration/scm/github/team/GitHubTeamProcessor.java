@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.team;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
@@ -165,7 +165,9 @@ public class GitHubTeamProcessor {
                 team.getRepoPermissions().clear();
 
                 teamRepository.delete(team);
-                eventPublisher.publishEvent(new ScmDomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context)));
+                eventPublisher.publishEvent(
+                    new ScmDomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context))
+                );
                 log.info("Deleted team: teamId={}, teamSlug={}", teamId, teamName);
             });
     }

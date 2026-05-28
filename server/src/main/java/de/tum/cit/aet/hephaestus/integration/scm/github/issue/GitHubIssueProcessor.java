@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -370,7 +370,11 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         Issue issue = processInternal(issueDto, context, true, false);
         String stateReason = issueDto.stateReason() != null ? issueDto.stateReason() : "completed";
         eventPublisher.publishEvent(
-            new ScmDomainEvent.IssueClosed(ScmEventPayload.IssueData.from(issue), stateReason, EventContext.from(context))
+            new ScmDomainEvent.IssueClosed(
+                ScmEventPayload.IssueData.from(issue),
+                stateReason,
+                EventContext.from(context)
+            )
         );
         log.debug("Closed issue: issueId={}, stateReason={}", issue.getId(), stateReason);
         return issue;

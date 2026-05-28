@@ -4,10 +4,10 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointCalculator;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
@@ -197,7 +197,11 @@ class ActivityEventListenerTest extends BaseUnitTest {
             PullRequest pullRequest = createPullRequest(3L);
             pullRequest.setClosedAt(Instant.now());
 
-            var event = new ScmDomainEvent.PullRequestClosed(createPullRequestData(pullRequest), false, createContext());
+            var event = new ScmDomainEvent.PullRequestClosed(
+                createPullRequestData(pullRequest),
+                false,
+                createContext()
+            );
 
             listener.onPullRequestClosed(event);
 
@@ -406,7 +410,11 @@ class ActivityEventListenerTest extends BaseUnitTest {
         void skipsPullRequests() {
             PullRequest pullRequest = createPullRequest(13L);
 
-            var event = new ScmDomainEvent.IssueClosed(ScmEventPayload.IssueData.from(pullRequest), null, createContext());
+            var event = new ScmDomainEvent.IssueClosed(
+                ScmEventPayload.IssueData.from(pullRequest),
+                null,
+                createContext()
+            );
 
             listener.onIssueClosed(event);
 
@@ -559,7 +567,11 @@ class ActivityEventListenerTest extends BaseUnitTest {
             Discussion discussion = createDiscussion(32L);
             discussion.setClosedAt(Instant.now());
 
-            var event = new ScmDomainEvent.DiscussionClosed(createDiscussionData(discussion), "resolved", createContext());
+            var event = new ScmDomainEvent.DiscussionClosed(
+                createDiscussionData(discussion),
+                "resolved",
+                createContext()
+            );
 
             listener.onDiscussionClosed(event);
 

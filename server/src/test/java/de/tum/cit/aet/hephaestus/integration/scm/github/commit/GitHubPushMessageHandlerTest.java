@@ -968,7 +968,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             invokeHandleEvent(event);
 
             // Verify event was published
-            ArgumentCaptor<ScmDomainEvent.CommitCreated> captor = ArgumentCaptor.forClass(ScmDomainEvent.CommitCreated.class);
+            ArgumentCaptor<ScmDomainEvent.CommitCreated> captor = ArgumentCaptor.forClass(
+                ScmDomainEvent.CommitCreated.class
+            );
             verify(eventPublisher).publishEvent(captor.capture());
 
             ScmDomainEvent.CommitCreated published = captor.getValue();

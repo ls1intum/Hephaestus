@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -181,7 +181,9 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
                 review.setDismissed(true);
                 review = reviewRepository.save(review);
                 ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(context)))
+                    eventPublisher.publishEvent(
+                        new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(context))
+                    )
                 );
                 log.debug("Dismissed review: nativeId={}", reviewNativeId);
             });

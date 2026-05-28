@@ -1,10 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
-
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -12,6 +9,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.BaseGitHubProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItem;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItemRepository;
@@ -151,11 +150,16 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
             );
 
         // Publish domain events with actor information
-        GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
+        GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
+            item,
+            actorId
+        );
         EventContext eventContext = EventContext.from(context);
 
         if (isNew) {
-            eventPublisher.publishEvent(new GitHubProjectEvent.ProjectItemCreated(itemData, project.getId(), eventContext));
+            eventPublisher.publishEvent(
+                new GitHubProjectEvent.ProjectItemCreated(itemData, project.getId(), eventContext)
+            );
             log.debug("Created project item: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         } else {
             eventPublisher.publishEvent(
@@ -203,7 +207,10 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         // so the primitive defaults to false during deserialization. Force it to true.
         ProjectItem item = process(dto.withArchived(true), project, context, actorId);
         if (item != null) {
-            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
+            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
+                item,
+                actorId
+            );
             eventPublisher.publishEvent(
                 new GitHubProjectEvent.ProjectItemArchived(itemData, project.getId(), EventContext.from(context))
             );
@@ -248,7 +255,10 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         // defaults to false. This makes the intent unambiguous.
         ProjectItem item = process(dto.withArchived(false), project, context, actorId);
         if (item != null) {
-            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
+            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
+                item,
+                actorId
+            );
             eventPublisher.publishEvent(
                 new GitHubProjectEvent.ProjectItemRestored(itemData, project.getId(), EventContext.from(context))
             );
@@ -288,7 +298,10 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
     ) {
         ProjectItem item = process(dto, project, context, actorId);
         if (item != null) {
-            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
+            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
+                item,
+                actorId
+            );
             eventPublisher.publishEvent(
                 new GitHubProjectEvent.ProjectItemConverted(itemData, project.getId(), EventContext.from(context))
             );
@@ -328,7 +341,10 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
     ) {
         ProjectItem item = process(dto, project, context, actorId);
         if (item != null) {
-            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
+            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
+                item,
+                actorId
+            );
             eventPublisher.publishEvent(
                 new GitHubProjectEvent.ProjectItemReordered(itemData, project.getId(), EventContext.from(context))
             );

@@ -19,28 +19,34 @@ public final class GitHubProjectEvent {
     private GitHubProjectEvent() {}
 
     public sealed interface ProjectEvent
-        permits ProjectCreated, ProjectUpdated, ProjectClosed, ProjectReopened, ProjectDeleted {
+        permits ProjectCreated, ProjectUpdated, ProjectClosed, ProjectReopened, ProjectDeleted
+    {
         @Nullable
         GitHubProjectEventPayload.ProjectData project();
 
         EventContext context();
     }
 
-    public record ProjectCreated(GitHubProjectEventPayload.ProjectData project, EventContext context)
-        implements ProjectEvent {}
+    public record ProjectCreated(
+        GitHubProjectEventPayload.ProjectData project,
+        EventContext context
+    ) implements ProjectEvent {}
 
     public record ProjectUpdated(
         GitHubProjectEventPayload.ProjectData project,
         Set<String> changedFields,
         EventContext context
-    )
-        implements ProjectEvent {}
+    ) implements ProjectEvent {}
 
-    public record ProjectClosed(GitHubProjectEventPayload.ProjectData project, EventContext context)
-        implements ProjectEvent {}
+    public record ProjectClosed(
+        GitHubProjectEventPayload.ProjectData project,
+        EventContext context
+    ) implements ProjectEvent {}
 
-    public record ProjectReopened(GitHubProjectEventPayload.ProjectData project, EventContext context)
-        implements ProjectEvent {}
+    public record ProjectReopened(
+        GitHubProjectEventPayload.ProjectData project,
+        EventContext context
+    ) implements ProjectEvent {}
 
     /** Deleted event - entity no longer exists, only ID and title available. */
     public record ProjectDeleted(Long projectId, String projectTitle, EventContext context) implements ProjectEvent {
@@ -58,7 +64,8 @@ public final class GitHubProjectEvent {
             ProjectItemRestored,
             ProjectItemDeleted,
             ProjectItemConverted,
-            ProjectItemReordered {
+            ProjectItemReordered
+    {
         @Nullable
         GitHubProjectEventPayload.ProjectItemData item();
 
@@ -71,30 +78,26 @@ public final class GitHubProjectEvent {
         GitHubProjectEventPayload.ProjectItemData item,
         Long projectId,
         EventContext context
-    )
-        implements ProjectItemEvent {}
+    ) implements ProjectItemEvent {}
 
     public record ProjectItemUpdated(
         GitHubProjectEventPayload.ProjectItemData item,
         Long projectId,
         Set<String> changedFields,
         EventContext context
-    )
-        implements ProjectItemEvent {}
+    ) implements ProjectItemEvent {}
 
     public record ProjectItemArchived(
         GitHubProjectEventPayload.ProjectItemData item,
         Long projectId,
         EventContext context
-    )
-        implements ProjectItemEvent {}
+    ) implements ProjectItemEvent {}
 
     public record ProjectItemRestored(
         GitHubProjectEventPayload.ProjectItemData item,
         Long projectId,
         EventContext context
-    )
-        implements ProjectItemEvent {}
+    ) implements ProjectItemEvent {}
 
     /** Deleted event - entity no longer exists, only ID available. */
     public record ProjectItemDeleted(Long itemId, Long projectId, EventContext context) implements ProjectItemEvent {
@@ -109,19 +112,18 @@ public final class GitHubProjectEvent {
         GitHubProjectEventPayload.ProjectItemData item,
         Long projectId,
         EventContext context
-    )
-        implements ProjectItemEvent {}
+    ) implements ProjectItemEvent {}
 
     /** Reordered event - item position changed in project view. */
     public record ProjectItemReordered(
         GitHubProjectEventPayload.ProjectItemData item,
         Long projectId,
         EventContext context
-    )
-        implements ProjectItemEvent {}
+    ) implements ProjectItemEvent {}
 
     public sealed interface ProjectStatusUpdateEvent
-        permits ProjectStatusUpdateCreated, ProjectStatusUpdateUpdated, ProjectStatusUpdateDeleted {
+        permits ProjectStatusUpdateCreated, ProjectStatusUpdateUpdated, ProjectStatusUpdateDeleted
+    {
         @Nullable
         GitHubProjectEventPayload.ProjectStatusUpdateData statusUpdate();
 
@@ -134,18 +136,19 @@ public final class GitHubProjectEvent {
         GitHubProjectEventPayload.ProjectStatusUpdateData statusUpdate,
         Long projectId,
         EventContext context
-    )
-        implements ProjectStatusUpdateEvent {}
+    ) implements ProjectStatusUpdateEvent {}
 
     public record ProjectStatusUpdateUpdated(
         GitHubProjectEventPayload.ProjectStatusUpdateData statusUpdate,
         Long projectId,
         EventContext context
-    )
-        implements ProjectStatusUpdateEvent {}
+    ) implements ProjectStatusUpdateEvent {}
 
-    public record ProjectStatusUpdateDeleted(Long statusUpdateId, Long projectId, EventContext context)
-        implements ProjectStatusUpdateEvent {
+    public record ProjectStatusUpdateDeleted(
+        Long statusUpdateId,
+        Long projectId,
+        EventContext context
+    ) implements ProjectStatusUpdateEvent {
         @Override
         public GitHubProjectEventPayload.ProjectStatusUpdateData statusUpdate() {
             return null;

@@ -71,7 +71,9 @@ public class GitLabPreflightController {
     @PreAuthorize(
         "@featureFlagService.isEnabled(T(de.tum.cit.aet.hephaestus.feature.FeatureFlag).GITLAB_WORKSPACE_CREATION)"
     )
-    public ResponseEntity<List<GitLabGroupDTO>> listGitLabGroups(@Valid @RequestBody GitLabPreflightRequestDTO request) {
+    public ResponseEntity<List<GitLabGroupDTO>> listGitLabGroups(
+        @Valid @RequestBody GitLabPreflightRequestDTO request
+    ) {
         List<GitLabGroupDTO> groups = gitLabPreflightService.listAccessibleGroups(
             request.personalAccessToken(),
             request.serverUrl()

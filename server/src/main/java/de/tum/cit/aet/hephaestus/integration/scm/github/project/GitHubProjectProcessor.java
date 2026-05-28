@@ -1,10 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
-
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
@@ -12,6 +9,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepos
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.BaseGitHubProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectDTO;
@@ -87,7 +86,10 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         }
 
         // Publish domain events with actor information
-        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(result.project(), actorId);
+        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(
+            result.project(),
+            actorId
+        );
         EventContext eventContext = EventContext.from(context);
 
         if (result.isNew()) {
@@ -229,7 +231,10 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         }
 
         Project project = result.project();
-        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(project, actorId);
+        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(
+            project,
+            actorId
+        );
         eventPublisher.publishEvent(new GitHubProjectEvent.ProjectClosed(projectData, EventContext.from(context)));
         log.info("Project closed: projectId={}, projectNumber={}", project.getId(), project.getNumber());
         return project;
@@ -278,7 +283,10 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         }
 
         Project project = result.project();
-        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(project, actorId);
+        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(
+            project,
+            actorId
+        );
         eventPublisher.publishEvent(new GitHubProjectEvent.ProjectReopened(projectData, EventContext.from(context)));
         log.info("Project reopened: projectId={}, projectNumber={}", project.getId(), project.getNumber());
         return project;

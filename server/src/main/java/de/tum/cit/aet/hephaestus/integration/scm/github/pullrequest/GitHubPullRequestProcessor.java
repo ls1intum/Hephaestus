@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
@@ -251,7 +251,10 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         // because the entity was an Issue, not a PullRequest, so computeChangedFields would crash.
         if (isNew || promotedFromIssue) {
             eventPublisher.publishEvent(
-                new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
+                new ScmDomainEvent.PullRequestCreated(
+                    ScmEventPayload.PullRequestData.from(pr),
+                    EventContext.from(context)
+                )
             );
             log.debug("Created pull request: prId={}, prNumber={}", pr.getId(), dto.number());
 
@@ -420,7 +423,10 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     public PullRequest processSynchronize(GitHubPullRequestDTO dto, ProcessingContext context) {
         PullRequest pr = process(dto, context);
         eventPublisher.publishEvent(
-            new ScmDomainEvent.PullRequestSynchronized(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
+            new ScmDomainEvent.PullRequestSynchronized(
+                ScmEventPayload.PullRequestData.from(pr),
+                EventContext.from(context)
+            )
         );
         log.debug("Synchronized pull request: prId={}", pr.getId());
         return pr;
@@ -540,7 +546,10 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         // Publish CommitCreated event for newly created merge commits
         if (isNew && commitOpt.isPresent()) {
             eventPublisher.publishEvent(
-                new ScmDomainEvent.CommitCreated(ScmEventPayload.CommitData.from(commitOpt.get()), EventContext.from(context))
+                new ScmDomainEvent.CommitCreated(
+                    ScmEventPayload.CommitData.from(commitOpt.get()),
+                    EventContext.from(context)
+                )
             );
         }
 

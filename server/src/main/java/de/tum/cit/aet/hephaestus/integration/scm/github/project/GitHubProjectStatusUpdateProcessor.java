@@ -1,13 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
-
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectStatusUpdate;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectStatusUpdateRepository;
@@ -93,7 +92,9 @@ public class GitHubProjectStatusUpdateProcessor {
 
         // Publish events
         EventContext eventContext = EventContext.from(context);
-        GitHubProjectEventPayload.ProjectStatusUpdateData data = GitHubProjectEventPayload.ProjectStatusUpdateData.from(statusUpdate);
+        GitHubProjectEventPayload.ProjectStatusUpdateData data = GitHubProjectEventPayload.ProjectStatusUpdateData.from(
+            statusUpdate
+        );
 
         if (isNew) {
             eventPublisher.publishEvent(
