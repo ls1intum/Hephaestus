@@ -32,6 +32,11 @@
           9.  Unconditional drop of the eleven legacy Workspace columns superseded
               by the Connection registry. account_login is intentionally KEPT —
               40+ join sites depend on it as a denormalised org/group lookup column.
+         10.  user.keycloak_subject column + partial-unique index — Stage A of the
+              identity refactor (ADR 0016). Seeds the column so a follow-up PR can
+              flip WorkspaceContextFilter from preferred_username → sub lookups
+              without a backfill window. Partial index covers only non-null rows
+              so synced bots/orgs keep coexisting with NULL subjects.
 
          Note: the hephaestus_user + integration_identity tables that appeared in
          earlier revisions of this changelog were removed before merge — the
@@ -804,6 +809,47 @@
             <addColumn tableName="workspace">
                 <column name="installation_linked_at" type="timestamp with time zone"/>
             </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         10. user.keycloak_subject column + partial-unique index (ADR 0016
+             Stage A). Only authenticated upserts populate the column; synced
+             rows stay NULL. The "user" table name stays double-quoted because
+             USER is a SQL reserved word in PostgreSQL.
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-33">
+        <preConditions onFail="MARK_RAN" onFailMessage="user.keycloak_subject already present">
+            <not><columnExists tableName="user" columnName="keycloak_subject"/></not>
+        </preConditions>
+        <comment>Stable Keycloak subject claim — nullable until the first authenticated upsert populates it.</comment>
+        <sql>
+            ALTER TABLE "user" ADD COLUMN keycloak_subject VARCHAR(128);
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE "user" DROP COLUMN IF EXISTS keycloak_subject;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1198" id="1779790459343-34">
+        <preConditions onFail="MARK_RAN" onFailMessage="uq_user_keycloak_subject already present">
+            <not><indexExists indexName="uq_user_keycloak_subject"/></not>
+        </preConditions>
+        <comment>
+            Partial unique index over (keycloak_subject) WHERE keycloak_subject IS NOT NULL.
+            Synced rows without a Keycloak login (bots, organizations, observed-only
+            contributors) carry NULL — the partial predicate keeps them outside the
+            uniqueness contract while still guaranteeing one row per real authenticated
+            person.
+        </comment>
+        <sql>
+            CREATE UNIQUE INDEX uq_user_keycloak_subject
+                ON "user" (keycloak_subject)
+                WHERE keycloak_subject IS NOT NULL;
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS uq_user_keycloak_subject;</sql>
         </rollback>
     </changeSet>
 
