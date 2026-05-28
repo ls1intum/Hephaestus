@@ -48,6 +48,20 @@ public final class CurrentAccount {
         }
     }
 
+    /** Realm roles from the JWT ({@code realm_access.roles}); empty if absent. */
+    @SuppressWarnings("unchecked")
+    public static java.util.List<String> roles() {
+        Jwt jwt = jwtOrNull();
+        if (jwt == null) {
+            return java.util.List.of();
+        }
+        Object realmAccess = jwt.getClaims().get("realm_access");
+        if (realmAccess instanceof java.util.Map<?, ?> map && map.get("roles") instanceof java.util.List<?> roles) {
+            return roles.stream().filter(String.class::isInstance).map(String.class::cast).toList();
+        }
+        return java.util.List.of();
+    }
+
     /** Impersonator account id if this is an impersonation session, else null. */
     @Nullable
     public static Long impersonatorId() {

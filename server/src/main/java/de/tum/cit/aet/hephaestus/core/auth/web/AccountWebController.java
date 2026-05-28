@@ -41,7 +41,15 @@ public class AccountWebController {
         String appRole,
         String status,
         boolean impersonating,
-        @Nullable Long impersonatorId
+        @Nullable Long impersonatorId,
+        // Identity fields the SPA's useAuth() surface needs (sourced from the primary IdentityLink).
+        @Nullable String username,
+        @Nullable String avatarUrl,
+        @Nullable String profileUrl,
+        @Nullable String identityProvider,
+        @Nullable String gitProviderId,
+        boolean hasGitLabIdentity,
+        java.util.List<String> roles
     ) {}
 
     public record IdentityView(
@@ -59,6 +67,12 @@ public class AccountWebController {
     public ResponseEntity<CurrentUserView> currentUser() {
         Account account = accountService.requireById(CurrentAccount.requireId());
         Long impersonatorId = CurrentAccount.impersonatorId();
+        var identities = accountService.activeIdentities(account.getId());
+        // Primary identity = most recently used active link (login source for the SPA).
+        IdentityLink primary = identities.stream().findFirst().orElse(null);
+        boolean hasGitLab = identities
+            .stream()
+            .anyMatch(il -> il.getGitProvider() != null && "GITLAB".equals(il.getGitProvider().getType().name()));
         return ResponseEntity.ok(
             new CurrentUserView(
                 account.getId(),
@@ -67,7 +81,16 @@ public class AccountWebController {
                 account.getAppRole().name(),
                 account.getStatus().name(),
                 impersonatorId != null,
-                impersonatorId
+                impersonatorId,
+                primary != null ? primary.getUsernameAtSignup() : account.getDisplayName(),
+                primary != null ? primary.getAvatarUrl() : null,
+                primary != null ? primary.getProfileUrl() : null,
+                primary != null && primary.getGitProvider() != null
+                    ? primary.getGitProvider().getType().name()
+                    : null,
+                primary != null ? primary.getSubject() : null,
+                hasGitLab,
+                CurrentAccount.roles()
             )
         );
     }
