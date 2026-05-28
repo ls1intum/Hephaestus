@@ -1,9 +1,14 @@
 package de.tum.cit.aet.hephaestus.core.auth.config;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository;
-import de.tum.cit.aet.hephaestus.core.auth.oauth.StubAuthSuccessHandler;
+import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
+import de.tum.cit.aet.hephaestus.core.auth.oauth.RegistrationToGitProviderResolver;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
+import java.time.Clock;
 import java.security.SecureRandom;
 import java.util.Base64;
 import org.slf4j.Logger;
@@ -58,8 +63,24 @@ public class AuthSecurityConfig {
     }
 
     @Bean
-    public StubAuthSuccessHandler stubAuthSuccessHandler(AuthIntentCookie cookie) {
-        return new StubAuthSuccessHandler(cookie);
+    public HephaestusAuthSuccessHandler hephaestusAuthSuccessHandler(
+        AccountRepository accountRepository,
+        IdentityLinkRepository identityLinkRepository,
+        RegistrationToGitProviderResolver providerResolver,
+        HephaestusJwtIssuer jwtIssuer,
+        AuthIntentCookie authIntentCookie,
+        AuthProperties properties,
+        Clock authClock
+    ) {
+        return new HephaestusAuthSuccessHandler(
+            accountRepository,
+            identityLinkRepository,
+            providerResolver,
+            jwtIssuer,
+            authIntentCookie,
+            properties,
+            authClock
+        );
     }
 
     @Bean
@@ -67,7 +88,7 @@ public class AuthSecurityConfig {
     public SecurityFilterChain oauthLoginSecurityFilterChain(
         HttpSecurity http,
         CookieOAuth2AuthorizationRequestRepository cookieRepo,
-        StubAuthSuccessHandler successHandler
+        HephaestusAuthSuccessHandler successHandler
     ) throws Exception {
         http
             .securityMatcher(
