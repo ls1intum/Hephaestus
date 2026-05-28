@@ -34,7 +34,6 @@ export function AdminSlackNotificationSettings({
 	const [channelInput, setChannelInput] = useState(channelId ?? "");
 	const [teamInput, setTeamInput] = useState(teamLabel ?? "");
 	const [enabledInput, setEnabledInput] = useState(enabled);
-	const [isConnecting, setIsConnecting] = useState(false);
 
 	// Pop any OAuth-callback result the /integrations route stashed and surface it.
 	useEffect(() => {
@@ -87,24 +86,25 @@ export function AdminSlackNotificationSettings({
 		},
 	});
 
-	const connect = async () => {
-		setIsConnecting(true);
-		try {
+	const connect = useMutation({
+		mutationFn: () => {
+			// Persist the originating slug so the OAuth landing route can route back.
 			window.sessionStorage.setItem("slack-connect-return-slug", workspaceSlug);
-			const initiation = await initiateSlackConnection(workspaceId);
+			return initiateSlackConnection(workspaceId);
+		},
+		onSuccess: (initiation) => {
 			if (initiation.type === "redirect") {
 				window.location.assign(initiation.vendorUrl);
 				return; // page is unloading
 			}
-			// type === "linked": no OAuth needed (e.g. PAT flow). Slack never reaches here today.
+			// type === "linked" — no OAuth needed (e.g. PAT flow). Slack never reaches here today.
 			toast.success("Slack workspace already linked");
 			onSaved();
-		} catch (e) {
+		},
+		onError: (e) => {
 			toast.error("Could not start Slack OAuth", { description: String(e) });
-		} finally {
-			setIsConnecting(false);
-		}
-	};
+		},
+	});
 
 	return (
 		<div className="space-y-6">
@@ -118,8 +118,12 @@ export function AdminSlackNotificationSettings({
 						</p>
 
 						{!hasSlackConnection ? (
-							<Button onClick={connect} disabled={isConnecting} className="w-full">
-								{isConnecting ? (
+							<Button
+								onClick={() => connect.mutate()}
+								disabled={connect.isPending}
+								className="w-full"
+							>
+								{connect.isPending ? (
 									<>
 										<LoaderIcon className="mr-2 size-4 animate-spin" />
 										Redirecting to Slack…
