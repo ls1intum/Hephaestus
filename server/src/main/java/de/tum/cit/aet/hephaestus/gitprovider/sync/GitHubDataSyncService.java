@@ -362,9 +362,12 @@ public class GitHubDataSyncService {
             int commitsMetadataEnriched = enrichCommitMetadata(syncTarget, repository);
 
             // Sync discussions and comments (with cursor persistence for resumability)
-            // Skip discussion sync for repos without discussions enabled
+            // Skip when globally disabled, or for repos without discussions enabled
             SyncResult discussionResult;
-            if (!repository.isHasDiscussionsEnabled()) {
+            if (!syncSchedulerProperties.discussions().enabled()) {
+                log.debug("Skipped discussion sync: reason=discussionsSyncDisabled, repoId={}", repositoryId);
+                discussionResult = SyncResult.completed(0);
+            } else if (!repository.isHasDiscussionsEnabled()) {
                 log.debug("Skipped discussion sync: reason=discussionsNotEnabled, repoId={}", repositoryId);
                 discussionResult = SyncResult.completed(0);
             } else {
@@ -775,6 +778,11 @@ public class GitHubDataSyncService {
      * @param scopeId the scope ID
      */
     private void syncProjects(Long scopeId) {
+        if (!syncSchedulerProperties.projects().enabled()) {
+            log.debug("Skipped project sync: reason=projectsSyncDisabled, scopeId={}", scopeId);
+            return;
+        }
+
         Optional<SyncMetadata> metadataOpt = syncTargetProvider.getSyncMetadata(scopeId);
         if (metadataOpt.isEmpty()) {
             log.debug("Skipped project sync: reason=noMetadata, scopeId={}", scopeId);

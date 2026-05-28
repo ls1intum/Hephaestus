@@ -68,7 +68,11 @@ public record SyncSchedulerProperties(
     /** Configuration for historical data backfill operations. */
     @Valid BackfillProperties backfill,
     /** Configuration for filtering which organizations and repositories to sync. */
-    @Valid FilterProperties filters
+    @Valid FilterProperties filters,
+    /** Configuration for GitHub Discussions sync (disabled by default). */
+    @Valid DiscussionsProperties discussions,
+    /** Configuration for GitHub Projects V2 sync (disabled by default). */
+    @Valid ProjectsProperties projects
 ) {
     /**
      * Configuration for the backfill subsystem that handles historical data synchronization.
@@ -143,6 +147,28 @@ public record SyncSchedulerProperties(
         }
     }
 
+    /**
+     * Toggle for GitHub Discussions sync.
+     *
+     * <p>Discussions sync paginates discussions, their comments, and replies (three nested
+     * levels of GraphQL pagination), which is slow and currently unused. Disabled by default;
+     * enable per-environment when discussion data is actually needed.
+     *
+     * @param enabled whether discussion sync runs (default {@code false})
+     */
+    public record DiscussionsProperties(@DefaultValue("false") boolean enabled) {}
+
+    /**
+     * Toggle for GitHub Projects V2 sync.
+     *
+     * <p>Project sync walks projects → fields → status updates → items → item field values,
+     * which is the slowest part of a sync and currently unused. Disabled by default; enable
+     * per-environment when project data is actually needed.
+     *
+     * @param enabled whether project sync runs (default {@code false})
+     */
+    public record ProjectsProperties(@DefaultValue("false") boolean enabled) {}
+
     /** Compact constructor ensuring nested records are never null. */
     public SyncSchedulerProperties {
         if (backfill == null) {
@@ -150,6 +176,12 @@ public record SyncSchedulerProperties(
         }
         if (filters == null) {
             filters = new FilterProperties(Set.of(), Set.of(), Set.of());
+        }
+        if (discussions == null) {
+            discussions = new DiscussionsProperties(false);
+        }
+        if (projects == null) {
+            projects = new ProjectsProperties(false);
         }
     }
 }

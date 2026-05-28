@@ -205,6 +205,18 @@ hephaestus:
         # Cooldown in minutes before running the monitoring again
         cooldown-minutes: 15
         # ═══════════════════════════════════════════════════════════════════════════
+        # FEATURE TOGGLES (disabled by default — currently unused and slow)
+        # ═══════════════════════════════════════════════════════════════════════════
+        # GitHub Discussions sync paginates discussions → comments → replies (three
+        # nested GraphQL levels). GitHub Projects V2 sync walks projects → fields →
+        # status updates → items → item field values. Both are the slowest parts of a
+        # sync and aren't consumed yet, so they're off by default. Flip to true per
+        # environment when the data is actually needed.
+        discussions:
+            enabled: ${HEPHAESTUS_SYNC_DISCUSSIONS_ENABLED:false}
+        projects:
+            enabled: ${HEPHAESTUS_SYNC_PROJECTS_ENABLED:false}
+        # ═══════════════════════════════════════════════════════════════════════════
         # BACKFILL CONFIGURATION
         # ═══════════════════════════════════════════════════════════════════════════
         # Historical data synchronization settings for ISSUES and PULL REQUESTS only.

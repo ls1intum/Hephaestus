@@ -118,7 +118,9 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             "0 0 3 * * *",
             15,
             new BackfillProperties(true, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of())
+            new FilterProperties(Set.of(), Set.of(), Set.of()),
+            null,
+            null
         );
 
         disabledSchedulerProperties = new SyncSchedulerProperties(
@@ -127,7 +129,9 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             "0 0 3 * * *",
             15,
             new BackfillProperties(false, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of())
+            new FilterProperties(Set.of(), Set.of(), Set.of()),
+            null,
+            null
         );
 
         // TransactionTemplate: execute callbacks immediately

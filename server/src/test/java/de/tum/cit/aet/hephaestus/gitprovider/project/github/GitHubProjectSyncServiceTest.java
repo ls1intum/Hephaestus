@@ -141,7 +141,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             "0 0 3 * * *", // cron
             15, // cooldownMinutes
             new BackfillProperties(false, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of()) // empty = all allowed
+            new FilterProperties(Set.of(), Set.of(), Set.of()), // empty = all allowed
+            null,
+            new SyncSchedulerProperties.ProjectsProperties(true) // projects enabled for these tests
         );
 
         // TransactionTemplate mocking: execute callbacks immediately
@@ -545,7 +547,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 "0 0 3 * * *",
                 15,
                 new BackfillProperties(false, 50, 100, 60),
-                new FilterProperties(Set.of(), Set.of(), Set.of("test-org/1")) // Only project #1
+                new FilterProperties(Set.of(), Set.of(), Set.of("test-org/1")), // Only project #1
+                null,
+                new SyncSchedulerProperties.ProjectsProperties(true)
             );
             service = new GitHubProjectSyncService(
                 projectRepository,
