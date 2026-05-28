@@ -1,21 +1,10 @@
-import environment from "@/environment";
-import { keycloakService } from "@/integrations/auth";
+import { client } from "@/api/client.gen";
 
 // Slack-specific Connection endpoints excluded from openapi-ts codegen
-// (springdoc-3 sealed-type bug). See webapp/openapi-ts.config.ts for the exclusion list.
-
-async function authFetch(path: string, init?: RequestInit): Promise<Response> {
-	await keycloakService.updateToken(60).catch(() => undefined);
-	const token = keycloakService.getToken();
-	return fetch(`${environment.serverUrl}${path}`, {
-		...init,
-		headers: {
-			...(init?.body ? { "Content-Type": "application/json" } : {}),
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
-			...init?.headers,
-		},
-	});
-}
+// (springdoc-3 sealed-type bug — see webapp/openapi-ts.config.ts).
+// Going through the shared `client` reuses main.tsx's Bearer-token + refresh
+// interceptor and the configured baseUrl. The `unknown` generic dodges hey-api's
+// grouped-response type indirection; we cast the body shape at the boundary.
 
 // Mirrors server-side InitiateConnectionResponse sealed type. The @JsonTypeInfo
 // discriminator emits lowercase names ("redirect" / "linked") and the Redirect
@@ -28,14 +17,12 @@ export async function initiateSlackConnection(
 	workspaceId: number,
 ): Promise<InitiateConnectionResponse> {
 	// userInput is empty for Slack — the strategy needs no extra inputs at initiate time.
-	const response = await authFetch(`/api/v1/workspaces/${workspaceId}/connections`, {
-		method: "POST",
-		body: JSON.stringify({ kind: "SLACK", userInput: {} }),
+	const result = await client.post({
+		url: `/api/v1/workspaces/${workspaceId}/connections`,
+		body: { kind: "SLACK", userInput: {} },
+		throwOnError: true,
 	});
-	if (!response.ok) {
-		throw new Error(`Slack OAuth initiate failed (HTTP ${response.status})`);
-	}
-	return (await response.json()) as InitiateConnectionResponse;
+	return result.data as InitiateConnectionResponse;
 }
 
 export type SlackTestMessageResponse = {
@@ -45,15 +32,16 @@ export type SlackTestMessageResponse = {
 };
 
 export async function sendSlackTestMessage(workspaceId: number): Promise<SlackTestMessageResponse> {
-	const response = await authFetch(
-		`/api/v1/workspaces/${workspaceId}/connections/slack/test-message`,
-		{ method: "POST" },
-	);
-	// 200 → success; 4xx Slack user-error / 502 transport → structured failure body with slackError.
-	// Only treat genuine failures (no JSON body) as an exception.
-	const contentType = response.headers.get("Content-Type") ?? "";
-	if (contentType.includes("application/json")) {
-		return (await response.json()) as SlackTestMessageResponse;
+	// 200 → success, 4xx Slack user-error, 502 transport — all return a structured
+	// SlackTestMessageResponse JSON body. Only network/parse failures throw.
+	const result = await client.post({
+		url: `/api/v1/workspaces/${workspaceId}/connections/slack/test-message`,
+	});
+	if (result.data !== undefined) {
+		return result.data as SlackTestMessageResponse;
 	}
-	throw new Error(`Slack test-message failed (HTTP ${response.status})`);
+	if (result.error !== undefined) {
+		return result.error as SlackTestMessageResponse;
+	}
+	throw new Error(`Slack test-message failed (HTTP ${result.response?.status ?? "unknown"})`);
 }
